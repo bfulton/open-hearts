@@ -29,6 +29,30 @@ Pages deployment.
 - [03 — A deal nobody can rig](docs/03-fair-deal.md): mental poker — a
   shuffle no player controls and hands nobody else can read, with no
   dealer to trust
+- [04 — Live play](docs/04-live-play.md): tap Play, be in a game in
+  seconds; bots fill the empty seats and say so; who is allowed to know
+  what
+- [05 — Screens](docs/05-form-factors.md): phone, tablet, foldable,
+  desktop — one product, sized from the space it is given
+
+## Where this is going
+
+The finished game is four people playing Hearts with no game server
+between them, matched in seconds, on a deal none of them could have
+rigged. Roughly in order:
+
+1. **Solo play** against bots — done, and free on every platform forever.
+2. **Two devices, one table** over WebRTC — the spike that proves the
+   transport and the shared-referee model.
+3. **The verifiable deal** ([doc 03](docs/03-fair-deal.md)), starting
+   with a wasm benchmark on a real phone before anything is built on it.
+4. **Matchmaking** ([doc 04](docs/04-live-play.md)) — tap Play, be in a
+   game, bots holding the seats nobody has taken yet.
+5. **Tablet layout** ([doc 05](docs/05-form-factors.md)) — the first
+   composition that is genuinely different rather than derived.
+6. **iPhone Duo**, which mostly falls out of the tablet work: both its
+   displays share an aspect ratio, so unfolding is a change of scale.
+7. **The stores.**
 
 ## Developing
 

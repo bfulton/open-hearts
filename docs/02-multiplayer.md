@@ -1,5 +1,13 @@
 # 02 — Multiplayer without a server
 
+> **Revised by [doc 04](04-live-play.md).** This document was written
+> assuming players arrive at a table by invitation. They don't — they are
+> matched with whoever wants a game right now, and matchmaking needs
+> presence in a way that signalling does not. There is a small rendezvous
+> service; doc 04 says what it does and what it is not allowed to know.
+> Everything below about the transport still holds, because gameplay is
+> still peer to peer and the service is still not a trust anchor.
+
 **Question.** Can four people play a real-time game of Hearts with no
 game server, no hosting bill, and sub-second latency?
 
@@ -101,12 +109,14 @@ the lowest peer id. Deterministic, unanimous, and no votes.
 
 ## Sequencing
 
-1. Local play against bots — **done**, this is what ships today.
-2. Two devices, one table, direct WebRTC, no fairness guarantees beyond
-   the shared rules engine. This is the interesting spike: it proves the
-   transport and the shared-referee model.
+1. Local play against bots — **done**.
+2. Two devices, one table, direct WebRTC, with the shared rules engine as
+   the only referee. The spike that proves the transport and the
+   shared-referee model.
 3. The verifiable deal from [doc 03](03-fair-deal.md).
-4. The relay-lane fallback.
+4. Matchmaking and the rendezvous service ([doc 04](04-live-play.md)).
+5. The relay-lane fallback.
 
-Step 2 is worth doing before step 3. A table that works among friends is
-useful immediately, and friends are not the threat model.
+Steps 2 and 3 are independent of 4: a hand-wired table between two
+devices proves everything about the transport without anyone needing to
+be matched.

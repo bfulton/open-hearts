@@ -1,0 +1,125 @@
+# 05 — Screens
+
+The web build and the app builds are the same product. Where they differ,
+the difference comes from the screen in front of the player and nothing
+else — not the platform, not the store it came from.
+
+That is a design constraint with teeth: no feature exists on one and not
+the other, and no layout is written for a device. The table is laid out
+from the size and shape of the space it is given.
+
+## What has to work
+
+| | Roughly | Notes |
+|---|---|---|
+| Phone, portrait | 390 × 844 | Where the game is settled first |
+| Phone, landscape | 844 × 390 | Equally first-class, and a different composition — see below |
+| Tablet | iPad, Android tablets | Not a stretched phone. See below |
+| iPhone Duo, closed | 5.4″ | A phone |
+| iPhone Duo, open | 7.6″ | A small tablet |
+| Desktop web | anything | Windowed, resized mid-game, very wide |
+
+## Portrait and landscape are both the game
+
+Not "portrait, and landscape works too." A phone on its side is how a lot
+of people hold a card game, and the game has to be as good there.
+
+They cannot be the same composition, though, because **their scarcities
+are opposite.** In portrait, width is what runs out: thirteen cards have
+to fan across 390 points, which is what forces the overlap down to a
+~24-point sliver per card. In landscape there is 844 points of width and
+the fan is comfortable — but only 390 points of height, and the current
+chrome (score strip, action line, hand) eats 236 of it before the table
+gets any.
+
+So landscape is not portrait squeezed. **The score strip becomes a side
+rail.** Moving it off the top buys back the height the trick needs, and
+it has somewhere to go, because width is the thing landscape has spare.
+The hand keeps the bottom edge, near the thumbs, with wider and shorter
+cards — more of each card visible, less of it tall.
+
+That is two compositions, chosen on aspect ratio, sharing every widget
+below them. It is not two layouts to maintain so much as one layout with
+the score rail on a different edge.
+
+Rotation mid-hand must keep the game, exactly as unfolding must.
+
+## The foldable is easier than it looks
+
+Apple's [iPhone Duo](https://www.apple.com/iphone-duo/) has a 5.4″ Super
+Retina XDR outer display and a 7.6″ folding inner one, and — the fact
+that matters — **both share the same aspect ratio.** So unfolding is a
+change of scale, not of shape. The layout does not have to reflow into a
+different composition the way it must on foldables whose cover screen is
+a different rectangle.
+
+Two smaller gifts: the FaceTime camera is under the display, so the inner
+screen is a clean rectangle with no cutout to lay out around; and the
+inner display carries a nano-texture finish, which means the table's dark
+felt will hold up under a lamp rather than turning into a mirror. The
+felt was chosen for looks — it turns out to suit the panel too.
+
+Two things still have to hold:
+
+- **Unfolding mid-hand keeps the game.** The fold is a resize, and a
+  resize must never cost state. Worth an explicit test, because the
+  usual way this breaks is a widget rebuilding a controller on a
+  constraints change.
+- **Split View gives the app half a screen.** iOS 27 puts two apps side
+  by side on the Duo. Half of 7.6″ in portrait is narrower than any
+  phone, so whatever the layout does at its narrowest has to be the
+  thing it does there — which is the argument for sizing from
+  constraints rather than from a device list, again.
+
+## A note on the chip
+
+The Duo runs an A20 Pro with a 7-core GPU and Neural Accelerators. That
+does not change a card game's rendering budget by any amount worth
+discussing — but it is a useful upper anchor for
+[doc 03](03-fair-deal.md)'s open question, which is whether a verifiable
+52-card shuffle is fast enough in wasm on a phone. When that gets
+measured, it should be measured on something mid-range and old, not on
+this.
+
+## Tablets are not big phones
+
+The phone layout scaled up is the classic tablet failure: enormous cards,
+acres of felt, and a hand fan you have to reach across the device to
+touch. A tablet has enough room to show more of the game rather than more
+of the same game — the trick tidily in the middle at a sane size, and the
+space around it earning its keep with what a phone has to hide, like the
+running trick history or what each player has taken.
+
+The hand should stay near the bottom edge and near the thumbs, which on a
+tablet in landscape means it does not want to be one wide fan across the
+full width.
+
+None of that is designed yet. What matters now is not baking in the
+assumption that it is a scaled phone.
+
+## How the layout decides
+
+One rule, applied everywhere: **size from the constraints you are given,
+never from the device you think you are on.** No platform checks, no
+device lists, no user-agent sniffing. The table already asks how much
+room it has and picks a card size from it; everything else works the same
+way.
+
+Breakpoints, when they are needed, key on the shortest side and the
+aspect ratio, because those are what actually change the composition. A
+foldable opening, a desktop window being dragged narrower, and a phone
+turning sideways are then all the same event, handled once.
+
+## Order
+
+1. **Phone, both orientations.** Portrait settles the game; landscape
+   settles the second composition. Neither ships without the other.
+2. **Desktop web** — the landscape composition with more room, plus
+   surviving a window dragged to any size mid-game.
+3. **Tablet** — the first layout worth designing rather than deriving.
+4. **iPhone Duo** — mostly falls out of the tablet work plus the resize
+   test, given the shared aspect ratio.
+
+The through-line is that steps 2 to 4 keep being cheap only if the layout
+never asks what device it is on. A window being dragged narrower, a phone
+turning sideways, and a foldable opening are the same event.
