@@ -110,6 +110,62 @@ What it does stop is the entire class of cheating that a serverless game
 would otherwise be wide open to: a stacked deck, a peeked hand, a card
 claimed but never held.
 
+## Has anyone actually built this?
+
+Yes — and notably, **including a trick-taking game**, which is the part
+that was not obvious.
+
+**SecureSkat** is a peer-to-peer implementation of Skat, the German
+three-handed trick-taking game, built on **LibTMCG** (Heiko Stamer's C++
+library implementing Schindelhauer's toolbox). Wikipedia's article on
+mental poker calls LibTMCG the first practical implementation of these
+protocols, and describes SecureSkat as achieving "modest real-world
+performance." That matters more than any poker implementation does,
+because Skat and Hearts are the same shape of problem: a full deal to
+every player, hidden hands, tricks. LibTMCG's own description lists
+hearts among the games its protocols suit — nobody has built it.
+
+Everything modern is poker. The most relevant:
+
+| | |
+|---|---|
+| [geometryxyz/mental-poker](https://github.com/geometryxyz/mental-poker) | Rust, Barnett–Smart with the Bayer–Groth shuffle argument. Needs only an elliptic curve — no pairing-friendliness, no high 2-adicity. Research-origin, unaudited. The closest thing to a reference implementation of the protocol above |
+| [predatorray/mental-texas-holdem](https://github.com/predatorray/mental-texas-holdem) | Browser P2P over WebRTC, no server. Architecturally the closest to what we would ship, even though the game is wrong |
+| [vladris/mental-poker-toolkit](https://github.com/vladris/mental-poker-toolkit), [monicanagent/cypherpoker](https://github.com/monicanagent/cypherpoker), [kripod/mental-poker](https://github.com/kripod/mental-poker) | Other toolkits, various protocols and maturity |
+| [dpinones/mental-poker](https://github.com/dpinones/mental-poker) | ZK proofs in the browser (Noir), verified on-chain |
+
+So the position is: the protocol is settled, a trick-taking game has been
+done before, a Rust implementation of the exact construction exists, and
+browser P2P poker without a server ships today. **No part of this is
+unproven.** What is missing is that nobody has put them together for
+Hearts.
+
+## References
+
+- Shamir, Rivest and Adleman, *Mental Poker*, MIT Technical Memo
+  LCS/TM-125, 1979 — where the problem starts.
+- Goldwasser and Micali, [*Probabilistic encryption & how to play mental
+  poker keeping secret all partial
+  information*](https://dl.acm.org/doi/10.1145/800070.802212), STOC 1982
+  — the original leaked partial information; this closed it.
+- Schindelhauer, *A Toolbox for Mental Card Games*, University of
+  Lübeck, 1998 — general card operations rather than poker-specific
+  ones. What LibTMCG implements.
+- **Barnett and Smart, [*Mental Poker
+  Revisited*](https://doi.org/10.1007/978-3-540-40974-8_29),
+  Cryptography and Coding 2003, LNCS 2898, pp. 370–383 — the protocol
+  this document describes.** Its contribution is that the bits per card
+  no longer grow with the number of players.
+- Bayer and Groth, [*Efficient Zero-Knowledge Argument for Correctness
+  of a Shuffle*](https://doi.org/10.1007/978-3-642-29011-4_17),
+  EUROCRYPT 2012 — the shuffle proof, with sub-linear communication.
+- Neff, *A Verifiable Secret Shuffle and its Application to E-Voting*,
+  CCS 2001 — the earlier shuffle argument; simpler, linear.
+
+The shuffle proof arrives here from electronic voting, which wanted the
+same guarantee for the same reason: prove a list was permuted without
+revealing the permutation.
+
 ## The plan
 
 1. Ship local play. **Done.**
