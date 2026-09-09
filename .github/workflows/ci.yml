@@ -1,0 +1,36 @@
+# Analyze, test, and prove the web build still builds.
+#
+# Pull requests and main only: the agent commits many times an hour on a
+# working branch, and a build on each one would be noise that costs
+# minutes.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.2
+          cache: true
+      - name: Analyze
+        run: cd app && flutter pub get && flutter analyze
+      - name: Test (rules engine + widgets)
+        run: cd app && flutter test
+      # --no-web-resources-cdn keeps CanvasKit local: the app must render
+      # on a filtered network, and the suit pips are drawn paths rather
+      # than glyphs for the same reason.
+      - name: Build web
+        run: |
+          cd app
+          flutter build web --release --no-web-resources-cdn \
+            --base-href /play/ \
+            --dart-define=BUILD=${GITHUB_SHA::7}

@@ -1,0 +1,14 @@
+# Flutter / Dart
+app/build/
+app/.dart_tool/
+app/.flutter-plugins-dependencies
+build/
+.dart_tool/
+*.iml
+
+# Tooling
+node_modules/
+.wrangler/
+
+# OS
+.DS_Store
