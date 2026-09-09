@@ -64,8 +64,9 @@ The proof of correct shuffle is the only exotic part, and it is well
 covered: **Neff** (2001) is `O(n)` and simple; **Bayer–Groth** (2012) has
 smaller proofs and matters at deck sizes far beyond 52. There are Rust
 implementations of Barnett–Smart built on `arkworks`, which matters here
-because `countmein` already ships a Rust crate compiled to `wasm32` and
-called from Flutter web — the same road, already paved.
+because a Rust crate compiled to `wasm32` and called from Flutter web is
+a well-worn path — the shuffle would not be the thing breaking new
+ground.
 
 ## Will it run on a phone?
 

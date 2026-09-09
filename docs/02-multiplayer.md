@@ -17,9 +17,9 @@ needs a third party is the introduction, and public relays do that for
 free. The hard half is fairness, which gets its own document
 ([03 — A deal nobody can rig](03-fair-deal.md)).
 
-This is not speculation about a technique: `countmein` runs this exact
-stack in production — Trystero over public Nostr relays for signalling,
-WebRTC for the interior, no servers, no bill.
+The stack is off-the-shelf: [Trystero](https://github.com/dmotz/trystero)
+over public Nostr relays for signalling, WebRTC data channels for the
+interior. It is a well-trodden path, not a technique to invent.
 
 ## The shape
 
@@ -67,8 +67,9 @@ Three ways out, in the order they should be tried:
 2. **Fall back to a relay lane.** When ICE fails, keep playing over the
    signalling relays: encrypt each game event to the table and publish it
    as a relay message. Adds a couple of hundred milliseconds, costs
-   nothing, and Hearts is turn-based enough not to care. `countmein`
-   already carries a lane like this.
+   nothing, and Hearts is turn-based enough not to care. The same relays
+   are already open for signalling, so the lane is a use of the transport
+   rather than a new one.
 3. **Only then, paid TURN.** Cloudflare Realtime sells TURN with a free
    monthly allowance. Worth keeping as an option; not worth building on.
 
