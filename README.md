@@ -70,6 +70,29 @@ a bot whose mistakes are legible is one you can fix. The interface is two
 methods over a `BotView` of public information, so a search player can
 replace it without touching anything else.
 
+The suite proves it never breaks a rule; it cannot prove it plays well.
+That is what the benchmark is for:
+
+```bash
+cd app && dart run --define=GAMES=2000 tool/bot_stats.dart
+```
+
+```
+wins by seat        : [503, 537, 500, 502]   (fair share 500)
+mean final score    : [74.7, 75.2, 75.9, 75.4]
+moons shot          : 373  (1.7% of hands)
+```
+
+All four seats run the same bot, so **wins by seat should be flat** — a
+persistent skew is a positional bug rather than strategy. And **moons
+shot** gauges defence: nothing here tries to shoot, so every moon is one
+the other three failed to break up. Adding moon defence took that number
+from 3.2% to 1.7%. Run it before and after touching `bot.dart`.
+
+Known gaps, in the order they are worth closing: the bot never tries to
+shoot the moon itself, does not count the cards that have gone, and does
+not read what an opponent's discards say about their hand.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).

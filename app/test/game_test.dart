@@ -67,6 +67,7 @@ int playOut(HeartsGame game, Bot bot, {int handLimit = 200}) {
           played: played,
           heartsBroken: game.heartsBroken,
           isFirstTrick: game.isFirstTrick,
+          taken: game.taken,
         );
         final choice = bot.chooseCard(view, legal);
         expect(legal, contains(choice), reason: 'the bot plays legally');
@@ -315,6 +316,7 @@ BotView _view(HeartsGame game, int seat) => BotView(
       played: const {},
       heartsBroken: game.heartsBroken,
       isFirstTrick: game.isFirstTrick,
+      taken: game.taken,
     );
 
 /// One engine step: settle the pass, sweep a finished trick, or play the

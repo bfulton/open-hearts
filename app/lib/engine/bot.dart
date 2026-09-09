@@ -26,6 +26,7 @@ class BotView {
     required this.played,
     required this.heartsBroken,
     required this.isFirstTrick,
+    this.taken = const [0, 0, 0, 0],
   });
 
   final int seat;
@@ -41,8 +42,27 @@ class BotView {
   final bool heartsBroken;
   final bool isFirstTrick;
 
+  /// Points each seat has taken so far this hand. Public at a real
+  /// table — the tricks are face up in front of people.
+  final List<int> taken;
+
   /// True once the queen has been seen, so spades are no longer scary.
   bool get queenGone => played.contains(queenOfSpades);
+
+  /// An opponent who holds every point played so far, far enough along
+  /// that letting the rest through would hand them the moon.
+  ///
+  /// The moon is the one situation where the whole game inverts: taking
+  /// points becomes the cheap move and ducking becomes the ruinous one.
+  /// Four points is the trigger — early enough to break a run before it
+  /// is out of reach, late enough not to fire on a single stray heart.
+  int? get moonThreat {
+    final total = taken.fold(0, (a, b) => a + b);
+    if (total < 4) return null;
+    final holder = taken.indexOf(total);
+    if (holder < 0 || holder == seat) return null;
+    return holder;
+  }
 
   List<Card> suit(Suit s) => hand.where((c) => c.suit == s).toList();
 
@@ -179,6 +199,14 @@ class Bot {
         .map((p) => p.card.rank.value)
         .reduce(max);
 
+    // With the moon live, ducking is the losing move: one point taken
+    // here costs one, and letting the run finish costs twenty-six. Win
+    // as cheaply as the suit allows.
+    if (view.moonThreat != null) {
+      final over = legal.where((c) => c.rank.value > high).toList();
+      if (over.isNotEmpty) return _lowest(over);
+    }
+
     final under = legal.where((c) => c.rank.value < high).toList();
     if (under.isNotEmpty) {
       // The queen is the exception to "duck high": sliding her under a
@@ -207,6 +235,14 @@ class Bot {
   /// hearts from the top, then the highest card of the suit worth
   /// shortening.
   Card _discard(BotView view, List<Card> legal) {
+    // Void in the led suit and the moon is live: this trick is going to
+    // the shooter, so feeding it points is feeding the shot. Throw the
+    // most harmless card in hand instead of the most dangerous one.
+    if (view.moonThreat != null) {
+      final safe = legal.where((c) => cardPoints(c) == 0).toList();
+      if (safe.isNotEmpty) return _highest(safe);
+    }
+
     if (legal.contains(queenOfSpades)) return queenOfSpades;
 
     final highSpades =

@@ -204,6 +204,7 @@ class GameController extends ChangeNotifier {
         played: _played,
         heartsBroken: _game.heartsBroken,
         isFirstTrick: _game.isFirstTrick,
+        taken: _game.taken,
       );
 
   @override
