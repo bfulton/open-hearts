@@ -11,6 +11,7 @@ import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
+import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
 
 /// A phone-shaped surface: the fan layout is the part most likely to
@@ -106,7 +107,8 @@ void main() {
     expect(find.text('Pass'), findsNothing);
     // Hand 1 passes left, so seat 0 receives from seat 3 — East, drawn
     // on the right, so the arrow points right.
-    expect(find.text('East passed you'), findsOneWidget);
+    final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
+    expect(find.text('${names[3]} passed you'), findsOneWidget);
     expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
     // Thirteen again: three left, three arrived.
     expect(fanCards(tester).length, 13);
@@ -156,10 +158,10 @@ void main() {
     }
 
     expect(find.text('Next hand'), findsOneWidget);
-    // Every seat is on the sheet, and the totals still add to 26.
-    for (final name in ['You', 'West', 'North', 'East']) {
-      expect(find.text(name), findsWidgets, reason: '$name is scored');
-    }
+    // Every seat is on the sheet: the player, and three named bots.
+    expect(find.text('You'), findsWidgets);
+    final seated = engine.Persona.roster.where((p) => find.text(p.name).evaluate().isNotEmpty);
+    expect(seated.length, 3, reason: 'three of the roster are at the table');
 
     await tester.tap(find.text('Next hand'));
     await tester.pumpAndSettle();

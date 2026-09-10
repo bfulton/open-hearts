@@ -38,6 +38,22 @@ so a table that starts at one human and three bots may be three and one
 by the fourth hand. The state is always on screen — how many seats are
 bots, and a note when somebody sits down.
 
+**The bots have names, and the names are famous lovers.** Romeo and
+Juliet, Cyrano and Roxane, Westley and Buttercup, Casanova — open hearts.
+Each is a temperament: the one policy with a few of its thresholds
+moved, so Romeo cannot hold a queen and Juliet waits for the moment and
+Cyrano leads from his long suit. Every setting is a choice a strong
+player might make, and that is measured, not assumed: a tool plays each
+setting alone against the baseline, and a tournament test seats random
+fours from the roster and fails if any persona falls behind — a
+character may be rash or patient, never bad. (The measuring already
+earned its keep: emptying a short suit in the pass turned out to be
+worth a third of tables instead of a quarter, so it stopped being a
+style and became the rule for everyone.) The roster is data in
+`packages/engine/lib/src/persona.dart`; the oblivious circuit takes the
+same settings as constants, so a named bot holding a departed seat is
+the same computable consequence as any other.
+
 ## Filling and emptying seats
 
 **A human joining takes a bot's seat at the next hand boundary, never
@@ -182,8 +198,8 @@ Counted, in AND gates — what a garbled circuit costs; XOR is free:
 |---|---|
 | one play, legality included | 1,234 |
 | the same, hand in as thirteen dealt positions and position out | 2,313 |
-| one pass | 8,796 |
-| a bot seat for a whole hand: one pass and thirteen plays | 38,865 |
+| one pass | 9,831 |
+| a bot seat for a whole hand: one pass and thirteen plays | 39,900 |
 
 At two ciphertexts per gate a play is about 75 KB and a whole hand about
 1.2 MB; malicious security multiplies that by a small constant. Small

@@ -7,19 +7,17 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
 import 'package:engine/engine.dart';
 
-/// The names around the table, seat order (0 is the player).
-const seatNames = ['You', 'West', 'North', 'East'];
-
 class GameController extends ChangeNotifier {
   GameController({int? seed, this.paced = true})
       : _seed = seed,
         _game = HeartsGame(seed: seed),
-        _bot = Bot() {
+        _bots = _seatBots(seed) {
     _pump();
   }
 
@@ -32,9 +30,30 @@ class GameController extends ChangeNotifier {
   final bool paced;
 
   HeartsGame _game;
-  final Bot _bot;
+
+  /// Who holds each seat; null at the player's. Three from the roster,
+  /// drawn by the game's seed so a seeded table is the same table.
+  List<Bot?> _bots;
+
+  final Random _rhythm = Random();
 
   HeartsGame get game => _game;
+
+  /// The names around the table, seat order (0 is the player).
+  List<String> get names =>
+      [for (var s = 0; s < seatCount; s++) s == humanSeat ? 'You' : _bots[s]!.persona.name];
+
+  /// The persona at [seat], or null at the player's.
+  Persona? personaAt(int seat) => _bots[seat]?.persona;
+
+  static List<Bot?> _seatBots(int? seed) {
+    final rng = seed == null ? Random() : Random(seed);
+    final draw = List.of(Persona.roster)..shuffle(rng);
+    return [
+      for (var s = 0; s < seatCount; s++)
+        s == humanSeat ? null : Bot(persona: draw[s], random: Random(rng.nextInt(1 << 30))),
+    ];
+  }
 
   /// Every card played this hand, which is what a seated player would
   /// have seen. Feeds [BotView.played] — the bots read the table, not
@@ -49,7 +68,12 @@ class GameController extends ChangeNotifier {
   bool _disposed = false;
   bool _pumping = false;
 
-  Duration get _botThink => paced ? const Duration(milliseconds: 600) : Duration.zero;
+  /// How long [seat]'s bot appears to think: its persona's rhythm.
+  Duration _botThink(int seat) {
+    if (!paced) return Duration.zero;
+    final pace = _bots[seat]!.persona.pace;
+    return Duration(milliseconds: pace.minMs + _rhythm.nextInt(pace.maxMs - pace.minMs + 1));
+  }
   Duration get _trickHold => paced ? const Duration(milliseconds: 950) : Duration.zero;
   Duration get _passBeat => paced ? const Duration(milliseconds: 350) : Duration.zero;
 
@@ -135,6 +159,7 @@ class GameController extends ChangeNotifier {
 
   void newGame() {
     _game = HeartsGame(seed: _seed);
+    _bots = _seatBots(_seed);
     _played.clear();
     _selected.clear();
     notifyListeners();
@@ -155,7 +180,7 @@ class GameController extends ChangeNotifier {
           if (_game.passOf(humanSeat) == null) break; // the player owes cards
           for (var s = 0; s < seatCount; s++) {
             if (s != humanSeat && _game.passOf(s) == null) {
-              _game.setPass(s, _bot.choosePass(_game.handOf(s)));
+              _game.setPass(s, _bots[s]!.choosePass(_game.handOf(s)));
             }
           }
           if (!await _wait(_passBeat)) return;
@@ -175,9 +200,9 @@ class GameController extends ChangeNotifier {
         final seat = _game.currentSeat!;
         if (seat == humanSeat) break; // the player's turn
 
-        if (!await _wait(_botThink)) return;
+        if (!await _wait(_botThink(seat))) return;
         final legal = _game.legalPlaysFor(seat);
-        final card = _bot.chooseCard(_viewFor(seat), legal);
+        final card = _bots[seat]!.chooseCard(_viewFor(seat), legal);
         _game.play(seat, card);
         _played.add(card);
         notifyListeners();

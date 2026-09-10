@@ -5,13 +5,13 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart';
-import '../game_controller.dart';
 import '../theme.dart';
 
 class HandOverSheet extends StatelessWidget {
-  const HandOverSheet({super.key, required this.game, required this.onNext});
+  const HandOverSheet({super.key, required this.game, required this.names, required this.onNext});
 
   final HeartsGame game;
+  final List<String> names;
   final VoidCallback onNext;
 
   @override
@@ -22,7 +22,7 @@ class HandOverSheet extends StatelessWidget {
           ? 'Hand ${game.handNumber + 1}'
           : shooter == humanSeat
               ? 'You shot the moon'
-              : '${seatNames[shooter]} shot the moon',
+              : '${names[shooter]} shot the moon',
       accent: shooter == null
           ? Palette.gold
           : shooter == humanSeat
@@ -36,7 +36,7 @@ class HandOverSheet extends StatelessWidget {
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
-            name: seatNames[seat],
+            name: names[seat],
             delta: game.handScores[seat],
             total: game.totals[seat],
             you: seat == humanSeat,
@@ -49,9 +49,10 @@ class HandOverSheet extends StatelessWidget {
 }
 
 class GameOverSheet extends StatelessWidget {
-  const GameOverSheet({super.key, required this.game, required this.onNewGame});
+  const GameOverSheet({super.key, required this.game, required this.names, required this.onNewGame});
 
   final HeartsGame game;
+  final List<String> names;
   final VoidCallback onNewGame;
 
   @override
@@ -61,8 +62,8 @@ class GameOverSheet extends StatelessWidget {
     final title = youWon
         ? (won.length > 1 ? 'A share of it' : 'You win')
         : won.length > 1
-            ? '${won.map((s) => seatNames[s]).join(' and ')} tie'
-            : '${seatNames[won.first]} wins';
+            ? '${won.map((s) => names[s]).join(' and ')} tie'
+            : '${names[won.first]} wins';
 
     return _Sheet(
       title: title,
@@ -71,7 +72,7 @@ class GameOverSheet extends StatelessWidget {
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
-            name: seatNames[seat],
+            name: names[seat],
             delta: game.handScores[seat],
             total: game.totals[seat],
             you: seat == humanSeat,

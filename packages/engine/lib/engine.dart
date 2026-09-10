@@ -5,8 +5,10 @@
 /// here knows which of those it is being used by.
 library;
 
+export 'src/arena.dart';
 export 'src/bot.dart';
 export 'src/card.dart';
 export 'src/game.dart';
 export 'src/oblivious.dart';
+export 'src/persona.dart';
 export 'src/rules.dart';

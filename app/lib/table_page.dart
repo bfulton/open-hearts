@@ -112,7 +112,7 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
             children: [
               Column(
                 children: [
-                  Scoreboard(game: game),
+                  Scoreboard(game: game, names: _controller.names),
                   Expanded(
                     child: Stack(
                       children: [
@@ -153,9 +153,9 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
               ),
 
               if (game.phase == Phase.handOver)
-                HandOverSheet(game: game, onNext: _controller.nextHand),
+                HandOverSheet(game: game, names: _controller.names, onNext: _controller.nextHand),
               if (game.phase == Phase.gameOver)
-                GameOverSheet(game: game, onNewGame: _controller.newGame),
+                GameOverSheet(game: game, names: _controller.names, onNewGame: _controller.newGame),
 
             ],
           ),
@@ -236,7 +236,7 @@ class _ActionBar extends StatelessWidget {
             // is read off the table rather than out of the sentence.
             Icon(_towards(from), size: 14, color: Palette.chromeDim),
             const SizedBox(width: 3),
-            Text('${seatNames[from]} passed you',
+            Text('${controller.names[from]} passed you',
                 style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
             for (final card in received)
               Padding(

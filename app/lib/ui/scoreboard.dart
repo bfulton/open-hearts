@@ -5,13 +5,15 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart';
-import '../game_controller.dart';
 import '../theme.dart';
 
 class Scoreboard extends StatelessWidget {
-  const Scoreboard({super.key, required this.game});
+  const Scoreboard({super.key, required this.game, required this.names});
 
   final HeartsGame game;
+
+  /// Seat names, seat order.
+  final List<String> names;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,7 @@ class Scoreboard extends StatelessWidget {
           Row(
             children: [
               for (var seat = 0; seat < seatCount; seat++)
-                Expanded(child: _SeatScore(game: game, seat: seat)),
+                Expanded(child: _SeatScore(game: game, seat: seat, name: names[seat])),
             ],
           ),
           const SizedBox(height: 5),
@@ -44,10 +46,11 @@ class Scoreboard extends StatelessWidget {
 }
 
 class _SeatScore extends StatelessWidget {
-  const _SeatScore({required this.game, required this.seat});
+  const _SeatScore({required this.game, required this.seat, required this.name});
 
   final HeartsGame game;
   final int seat;
+  final String name;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +59,7 @@ class _SeatScore extends StatelessWidget {
     return Column(
       children: [
         Text(
-          seatNames[seat],
+          name,
           style: TextStyle(
             fontSize: 11,
             fontWeight: isYou ? FontWeight.w700 : FontWeight.w500,

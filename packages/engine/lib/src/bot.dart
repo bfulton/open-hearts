@@ -10,11 +10,15 @@
 /// What it knows is exactly what a seated human knows: its own hand, the
 /// cards on the table, and which cards have already been played. It does
 /// not read other hands.
+///
+/// A [Persona] sets its temperament: the same rules, with a few of the
+/// thresholds and preferences moved. persona.dart has the roster.
 library;
 
 import 'dart:math';
 
 import 'card.dart';
+import 'persona.dart';
 import 'rules.dart';
 
 /// The public information a bot decides from.
@@ -54,11 +58,14 @@ class BotView {
   ///
   /// The moon is the one situation where the whole game inverts: taking
   /// points becomes the cheap move and ducking becomes the ruinous one.
-  /// Four points is the trigger — early enough to break a run before it
-  /// is out of reach, late enough not to fire on a single stray heart.
-  int? get moonThreat {
+  /// Four points is the usual trigger — early enough to break a run
+  /// before it is out of reach, late enough not to fire on a single
+  /// stray heart. [Persona.moonDefenseTrigger] moves it.
+  int? get moonThreat => moonThreatAt(4);
+
+  int? moonThreatAt(int trigger) {
     final total = taken.fold(0, (a, b) => a + b);
-    if (total < 4) return null;
+    if (total < trigger) return null;
     final holder = taken.indexOf(total);
     if (holder < 0 || holder == seat) return null;
     return holder;
@@ -70,11 +77,16 @@ class BotView {
 }
 
 /// A heuristic Hearts player. Stateless apart from its tie-breaking
-/// [Random], so one instance can serve every bot seat.
+/// [Random], so one instance can serve every seat that shares a persona.
 class Bot {
-  Bot({Random? random}) : _random = random ?? Random();
+  Bot({this.persona = Persona.westley, Random? random})
+      : _random = random ?? Random();
 
+  final Persona persona;
   final Random _random;
+
+  int? _moonThreat(BotView view) =>
+      view.moonThreatAt(persona.moonDefenseTrigger);
 
   // ---- passing --------------------------------------------------------
 
@@ -104,36 +116,41 @@ class Bot {
   }
 
   /// How much a card wants to leave the hand. Higher is more urgent.
-  double _passDanger(Card card, List<Card> hand) {
+  /// Whole numbers throughout, so the circuit can carry them.
+  int _passDanger(Card card, List<Card> hand) {
     final spades = hand.where((c) => c.suit == Suit.spades).length;
-    // Below the queen, spades are the protection; at four or more you
-    // hold enough of them to duck the queen out of someone else's hand.
-    final spadesProtected = spades >= 5;
+    // Below the queen, spades are the protection; with enough of them
+    // you can duck the queen out of someone else's hand. How many is
+    // enough, and how much she is then worth keeping, is temperament.
+    final spadesProtected = spades >= persona.queenProtectedAt;
     final belowQueen =
         hand.where((c) => c.suit == Suit.spades && c.rank.value < 12).length;
+    final highSpadesCovered = belowQueen >= persona.highSpadesCoveredAt;
 
     switch (card.suit) {
       case Suit.spades:
         if (card == queenOfSpades) {
-          return spadesProtected ? 60 : 100;
+          return spadesProtected ? persona.queenKeptDanger : 100;
         }
         if (card.rank.value > 12) {
           // A♠/K♠ take the queen when she is led at them. Enough small
           // spades to get under her first makes them survivable.
-          return belowQueen >= 3 ? 45 : 90;
+          return highSpadesCovered ? 45 : 90;
         }
         // Small spades are the protection; passing them is actively bad.
-        return -10.0 + card.rank.value;
+        return -10 + card.rank.value;
       case Suit.hearts:
         // Hearts cost a point every time one lands, and high ones land.
-        return card.rank.value * 2.0 + (card.rank.value >= 12 ? 12 : 0);
+        return card.rank.value * 2 + (card.rank.value >= 12 ? 12 : 0);
       case Suit.clubs:
       case Suit.diamonds:
         final length = hand.where((c) => c.suit == card.suit).length;
         // A high card in a short suit is doubly awkward: it takes tricks
         // AND there is nothing to hide behind. Shedding it also moves the
-        // suit toward a void worth having.
-        return card.rank.value + (length <= 3 ? (4 - length) * 3.0 : 0);
+        // suit toward a void worth having — which a void-maker weights
+        // enough that the whole short suit goes.
+        return card.rank.value +
+            (length <= 3 ? (4 - length) * persona.shortSuitWeight : 0);
     }
   }
 
@@ -153,34 +170,45 @@ class Bot {
   ///
   /// The first job is to make someone else take the queen. Holding no
   /// spade above her, leading small spades drags her out of whoever does
-  /// hold her — the standard "flush the queen" line. Otherwise lead the
-  /// lowest card of the shortest suit, which both keeps the trick cheap
-  /// and works toward the void that makes discarding possible.
+  /// hold her — the standard "flush the queen" line; how many small
+  /// spades it takes to try is [Persona.flushMinSmallSpades]. Otherwise
+  /// lead the lowest card of the shortest suit, which both keeps the
+  /// trick cheap and works toward the void that makes discarding
+  /// possible — or of the longest, whose low cards are the safest leads
+  /// in the hand ([Persona.leadFrom]).
   Card _lead(BotView view, List<Card> legal) {
     if (!view.queenGone) {
       final spades = legal.where((c) => c.suit == Suit.spades).toList();
       final holdsHighSpade =
           view.hand.any((c) => c.suit == Suit.spades && c.rank.value >= 12);
-      if (spades.isNotEmpty && !holdsHighSpade) {
+      if (spades.length >= persona.flushMinSmallSpades && !holdsHighSpade) {
         return _lowest(spades);
       }
     }
-    // Shortest suit first; hearts last, since leading them hands out
-    // points on purpose.
+    // Hearts last, since leading them hands out points on purpose.
     final bySuit = <Suit, List<Card>>{};
     for (final c in legal) {
       bySuit.putIfAbsent(c.suit, () => []).add(c);
     }
-    final suits = bySuit.keys.toList()
+    List<Suit> ordered({required bool longest}) => bySuit.keys.toList()
       ..sort((a, b) {
         if ((a == Suit.hearts) != (b == Suit.hearts)) {
           return a == Suit.hearts ? 1 : -1;
         }
         final d = bySuit[a]!.length.compareTo(bySuit[b]!.length);
-        return d != 0 ? d : a.index.compareTo(b.index);
+        if (d != 0) return longest ? -d : d;
+        return a.index.compareTo(b.index);
       });
-    return _lowest(bySuit[suits.first]!);
+    if (persona.leadFrom == LeadFrom.longestWhileLow) {
+      final long = ordered(longest: true).first;
+      final low = _lowest(bySuit[long]!);
+      if (long != Suit.hearts && low.rank.value <= lowLeadRank) return low;
+    }
+    return _lowest(bySuit[ordered(longest: false).first]!);
   }
+
+  /// A lead this low from a long suit is not going to win the trick.
+  static const lowLeadRank = 6;
 
   /// Following suit.
   ///
@@ -202,7 +230,7 @@ class Bot {
     // With the moon live, ducking is the losing move: one point taken
     // here costs one, and letting the run finish costs twenty-six. Win
     // as cheaply as the suit allows.
-    if (view.moonThreat != null) {
+    if (_moonThreat(view) != null) {
       final over = legal.where((c) => c.rank.value > high).toList();
       if (over.isNotEmpty) return _lowest(over);
     }
@@ -238,7 +266,7 @@ class Bot {
     // Void in the led suit and the moon is live: this trick is going to
     // the shooter, so feeding it points is feeding the shot. Throw the
     // most harmless card in hand instead of the most dangerous one.
-    if (view.moonThreat != null) {
+    if (_moonThreat(view) != null) {
       final safe = legal.where((c) => cardPoints(c) == 0).toList();
       if (safe.isNotEmpty) return _highest(safe);
     }
@@ -253,8 +281,9 @@ class Bot {
     if (hearts.isNotEmpty) {
       final top = _highest(hearts);
       // A low heart is a worse throw than a high side-suit card: it gives
-      // away a point and keeps the dangerous card.
-      if (top.rank.value >= 10) return top;
+      // away a point and keeps the dangerous card. Where "low" ends is
+      // temperament.
+      if (top.rank.value >= persona.heartDumpRank) return top;
     }
 
     final side = legal

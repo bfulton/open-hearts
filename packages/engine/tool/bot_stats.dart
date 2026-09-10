@@ -11,6 +11,9 @@
 /// Run it before and after touching bot.dart:
 ///
 ///     cd packages/engine && dart run --define=GAMES=2000 tool/bot_stats.dart
+///
+/// `PERSONA=<name>` seats four of one persona instead of four Westleys; the
+/// tournament in test/persona_test.dart is where they meet each other.
 library;
 
 // A benchmark's entire output is its printing.
@@ -22,13 +25,15 @@ import 'package:engine/engine.dart';
 
 void main() {
   final games = int.parse(const String.fromEnvironment('GAMES', defaultValue: '500'));
+  const personaName = String.fromEnvironment('PERSONA', defaultValue: 'Westley');
+  final persona = Persona.named(personaName);
   final wins = List.filled(4, 0);
   final totalPts = List.filled(4, 0);
   var hands = 0, moons = 0, queenTaken = List.filled(4, 0);
 
   for (var seed = 0; seed < games; seed++) {
     final game = HeartsGame(seed: seed);
-    final bot = Bot(random: Random(seed));
+    final bot = Bot(persona: persona, random: Random(seed));
     final played = <Card>{};
     while (game.phase != Phase.gameOver) {
       switch (game.phase) {
@@ -73,7 +78,7 @@ void main() {
     }
   }
 
-  print('$games games, $hands hands');
+  print('$games games, $hands hands, four seats of ${persona.name}');
   print('wins by seat        : $wins   (fair share ${games ~/ 4})');
   print('mean final score    : ${totalPts.map((t) => (t / games).toStringAsFixed(1)).toList()}');
   print('queen taken by seat : $queenTaken');

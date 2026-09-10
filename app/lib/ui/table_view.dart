@@ -64,6 +64,7 @@ class TableView extends StatelessWidget {
                       alignment: _badgeAt[seat]!,
                       child: _SeatBadge(
                         seat: seat,
+                        name: controller.names[seat],
                         game: game,
                         onTurn: game.currentSeat == seat,
                         won: pending?.winner == seat,
@@ -107,6 +108,7 @@ class TableView extends StatelessWidget {
               child: pending != null
                   ? _TrickResult(
                       winner: pending.winner,
+                      name: controller.names[pending.winner],
                       points: pointsIn(pending.plays.map((p) => p.card)),
                     )
                   : game.phase == Phase.playing
@@ -160,12 +162,14 @@ class _TrickSlot extends StatelessWidget {
 class _SeatBadge extends StatelessWidget {
   const _SeatBadge({
     required this.seat,
+    required this.name,
     required this.game,
     required this.onTurn,
     required this.won,
   });
 
   final int seat;
+  final String name;
   final HeartsGame game;
   final bool onTurn;
   final bool won;
@@ -190,7 +194,7 @@ class _SeatBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            seatNames[seat],
+            name,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -226,14 +230,15 @@ class _SeatBadge extends StatelessWidget {
 }
 
 class _TrickResult extends StatelessWidget {
-  const _TrickResult({required this.winner, required this.points});
+  const _TrickResult({required this.winner, required this.name, required this.points});
 
   final int winner;
+  final String name;
   final int points;
 
   @override
   Widget build(BuildContext context) {
-    final who = winner == humanSeat ? 'You take it' : '${seatNames[winner]} takes it';
+    final who = winner == humanSeat ? 'You take it' : '$name takes it';
     return _Pill(
       text: points == 0 ? who : '$who  ·  $points',
       tone: points == 0 ? Palette.gold : Palette.danger,
