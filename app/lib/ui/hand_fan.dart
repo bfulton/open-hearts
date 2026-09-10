@@ -102,16 +102,30 @@ class HandFan extends StatelessWidget {
               duration: const Duration(milliseconds: 140),
               curve: Curves.easeOut,
               transform: Matrix4.translationValues(0, raised ? -_lift : 0, 0),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onTap(card),
-                child: CardView(
-                  card: card,
-                  width: width,
-                  dimmed: dimUnplayable && !isPlayable,
+              // One semantics node per card — its name, and the tap —
+              // so a screen reader, and the end-to-end suite, can play
+              // it by name.
+              child: MergeSemantics(
+                child: Semantics(
+                  button: true,
+                  label: card.spoken,
                   selected: isSelected,
-                  highlighted: card == forced,
-                  marked: justReceived.contains(card),
+                  enabled: !dimUnplayable || isPlayable,
+                  onTap: () => onTap(card),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onTap(card),
+                    child: ExcludeSemantics(
+                      child: CardView(
+                        card: card,
+                        width: width,
+                        dimmed: dimUnplayable && !isPlayable,
+                        selected: isSelected,
+                        highlighted: card == forced,
+                        marked: justReceived.contains(card),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

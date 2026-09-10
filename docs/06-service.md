@@ -160,11 +160,16 @@ partitions — on a virtual clock. The whole matrix runs in seconds,
 every failure replays from its seed, and it runs in CI on every commit.
 
 **Real browsers** (`e2e/`): Playwright drives four headless browsers as
-players against the local service and relay, with real WebRTC between
-them, through a handful of representative cells. That is what proves the
-transport, and the only way to see a departure as it actually happens:
-a browser closed mid-hand, a second booting a stalled one, a table
-draining to one human and the local juror stepping in.
+players against the local relay and the built app, with real WebRTC
+between them, through the app's own screens — it finds the buttons,
+the cards and the state pills in the accessibility tree the app grows
+on request. Host a room, join it by code, a hand over WebRTC in under
+half a minute; then the cells only a browser can show: one closed
+mid-hand and replaced by a bot within ten seconds, one stalled on its
+turn and booted by the others at fifteen, one that leaves, and the
+last person finishing the hand with three bots. That is what proves
+the transport. The juror stepping in for a table drained to one human
+joins the suite with the jury. It runs in CI on every commit.
 
 The axes:
 

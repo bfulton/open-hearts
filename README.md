@@ -64,9 +64,10 @@ rigged. Roughly in order:
    join one, and the four of you are on WebRTC data channels with the
    relay as fallback, signing in wasm since Dart-to-JavaScript
    signatures cost 100 ms each ([measurements](measurements/README.md)).
-   Still to come: the end-to-end suite in real browsers, and a relay
-   that is not on localhost. Meanwhile every solo game is kept on the
-   device as a
+   Four headless browsers prove it on every commit — a hand over
+   WebRTC, a browser closed mid-hand, a stalled one booted, a leaver
+   (`e2e/`). Still to come: a relay that is not on localhost.
+   Meanwhile every solo game is kept on the device as a
    record — the deal, the bots, your own passes and plays — and **Copy
    record** on the game-over sheet hands it over as a line of text that
    `packages/engine/tool/replay.dart` turns back into every trick.

@@ -57,10 +57,14 @@ class RelayTransport implements Transport {
   /// Offers, answers and candidates addressed to this peer.
   Stream<Signal> get signals => _signals.stream;
 
-  /// Lobby events for this table id — hosting, joining, starting — the
-  /// relay's stored history first, then live. Anyone's, this peer's
-  /// own included.
+  /// Lobby events for this table id — hosting, joining, starting — as
+  /// they arrive. Anyone's, this peer's own included. The relay's
+  /// stored history comes before [ready] resolves, so a listener that
+  /// starts after that reads [lobbySoFar] first.
   Stream<NostrEvent> get lobby => _lobby.stream;
+
+  /// Every lobby event received so far, in order.
+  final List<NostrEvent> lobbySoFar = [];
 
   /// Publishes a lobby event, tagged with the table id.
   void announce(Map<String, Object?> content) {
@@ -143,6 +147,7 @@ class RelayTransport implements Transport {
         if (!_seen.add(e.id)) return;
         if (_seen.length > 50000) _seen.clear();
         if (e.kind == TableKinds.lobby) {
+          lobbySoFar.add(e);
           _lobby.add(e);
           return;
         }

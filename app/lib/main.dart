@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
+import 'crypto/schnorr.dart';
 import 'table_page.dart';
 import 'theme.dart';
 
-void main() => runApp(const OpenHeartsApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // The end-to-end suite drives the app through its accessibility
+  // tree, which the web build only grows on request.
+  if (Uri.base.queryParameters.containsKey('e2e')) {
+    SemanticsBinding.instance.ensureSemantics();
+  }
+  await installFastSchnorr();
+  runApp(const OpenHeartsApp());
+}
 
 class OpenHeartsApp extends StatelessWidget {
   const OpenHeartsApp({super.key});

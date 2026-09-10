@@ -87,6 +87,10 @@ class Room extends ChangeNotifier {
   }
 
   void _listen() {
+    // What the relay replayed on connection, then what comes live.
+    for (final e in List.of(relay.lobbySoFar)) {
+      _onLobby(e);
+    }
     _sub = relay.lobby.listen(_onLobby);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (isHost && spec == null && secondsToStart == 0) start();
