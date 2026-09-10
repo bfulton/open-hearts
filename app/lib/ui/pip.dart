@@ -9,7 +9,7 @@ library;
 
 import 'package:flutter/widgets.dart';
 
-import '../engine/card.dart' as engine;
+import 'package:engine/engine.dart' as engine;
 import '../theme.dart';
 
 /// Colour a suit is drawn in on a card face: the usual red pair, the

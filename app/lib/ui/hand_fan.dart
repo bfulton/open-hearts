@@ -8,7 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../engine/card.dart' as engine;
+import 'package:engine/engine.dart' as engine;
 import 'card_view.dart';
 
 /// Extra space between two suits in the fan. Grouping is most of what

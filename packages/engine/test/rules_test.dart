@@ -1,6 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:open_hearts/engine/card.dart';
-import 'package:open_hearts/engine/rules.dart';
+import 'package:engine/engine.dart';
+import 'package:test/test.dart';
 
 List<Card> cards(String codes) =>
     codes.split(' ').where((s) => s.isNotEmpty).map(Card.parse).toList();

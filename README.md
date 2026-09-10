@@ -11,8 +11,8 @@ not attached yet — see [docs/01](docs/01-dev-loop.md#domains))*
 
 | | |
 |---|---|
+| [`packages/engine/`](packages/engine/) | The rules of Hearts and the bots, as pure Dart. No Flutter, no I/O, no clock. Shared by the app and the service |
 | [`app/`](app/) | The Flutter app — one codebase, six platforms; web is what ships today |
-| [`app/lib/engine/`](app/lib/engine/) | The rules of Hearts as pure Dart. No Flutter, no I/O, no clock |
 | [`site/`](site/) | The marketing site, hand-written static HTML |
 | [`deploy.sh`](deploy.sh) | Build both, publish to Cloudflare Pages |
 | [`docs/`](docs/) | Decisions, and the reasoning behind them |
@@ -63,10 +63,9 @@ rigged. Roughly in order:
 ## Developing
 
 ```bash
-cd app
-flutter test        # rules engine + widget tests
-flutter analyze
-flutter run -d chrome
+cd packages/engine && dart test     # the rules, the bots, 200 seeded games
+cd app && flutter test              # the widgets
+cd app && flutter run -d chrome
 ```
 
 Publish the current commit to the dev branch page:
@@ -77,7 +76,7 @@ Publish the current commit to the dev branch page:
 
 ### The engine is the point
 
-`app/lib/engine/` has no Flutter imports and no notion of time. That is
+`packages/engine/` has no Flutter imports and no notion of time. That is
 deliberate, and it buys three things:
 
 - the rules are testable without a screen — a full game runs in
@@ -94,7 +93,7 @@ clock.
 
 ### The bot
 
-`app/lib/engine/bot.dart` is heuristics, not search: named rules you can
+`packages/engine/lib/src/bot.dart` is heuristics, not search: named rules you can
 read and argue with. That is worth more than strength right now, because
 a bot whose mistakes are legible is one you can fix. The interface is two
 methods over a `BotView` of public information, so a search player can
@@ -104,7 +103,7 @@ The suite proves it never breaks a rule; it cannot prove it plays well.
 That is what the benchmark is for:
 
 ```bash
-cd app && dart run --define=GAMES=2000 tool/bot_stats.dart
+cd packages/engine && dart run --define=GAMES=2000 tool/bot_stats.dart
 ```
 
 ```

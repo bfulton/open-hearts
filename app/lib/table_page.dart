@@ -9,9 +9,8 @@ library;
 import 'package:flutter/material.dart';
 
 import 'build_info.dart';
-import 'engine/card.dart' as engine;
-import 'engine/game.dart';
-import 'engine/rules.dart';
+import 'package:engine/engine.dart';
+import 'package:engine/engine.dart' as engine;
 import 'game_controller.dart';
 import 'theme.dart';
 import 'ui/hand_fan.dart';

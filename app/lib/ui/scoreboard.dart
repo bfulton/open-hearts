@@ -4,8 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../engine/game.dart';
-import '../engine/rules.dart';
+import 'package:engine/engine.dart';
 import '../game_controller.dart';
 import '../theme.dart';
 

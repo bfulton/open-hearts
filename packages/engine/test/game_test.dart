@@ -1,10 +1,7 @@
 import 'dart:math';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:open_hearts/engine/bot.dart';
-import 'package:open_hearts/engine/card.dart';
-import 'package:open_hearts/engine/game.dart';
-import 'package:open_hearts/engine/rules.dart';
+import 'package:engine/engine.dart';
+import 'package:test/test.dart';
 
 /// Plays [game] to its end with [bot] in every seat, asserting the
 /// invariants that must hold at every step. Returns the number of hands.

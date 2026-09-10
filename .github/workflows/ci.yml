@@ -21,9 +21,11 @@ jobs:
           channel: stable
           flutter-version: 3.47.2
           cache: true
+      - name: Engine (pure Dart — rules, bots, 200 seeded games)
+        run: cd packages/engine && dart pub get && dart analyze && dart test
       - name: Analyze
         run: cd app && flutter pub get && flutter analyze
-      - name: Test (rules engine + widgets)
+      - name: Test (widgets)
         run: cd app && flutter test
       # --no-web-resources-cdn keeps CanvasKit local: the app must render
       # on a filtered network, and the suit pips are drawn paths rather

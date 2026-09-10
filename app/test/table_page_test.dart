@@ -7,7 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:open_hearts/engine/card.dart' as engine;
+import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';

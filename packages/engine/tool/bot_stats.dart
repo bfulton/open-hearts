@@ -10,16 +10,15 @@
 ///
 /// Run it before and after touching bot.dart:
 ///
-///     dart run --define=GAMES=2000 tool/bot_stats.dart
+///     cd packages/engine && dart run --define=GAMES=2000 tool/bot_stats.dart
 library;
 
 // A benchmark's entire output is its printing.
 // ignore_for_file: avoid_print
 
 import 'dart:math';
-import 'package:open_hearts/engine/bot.dart';
-import 'package:open_hearts/engine/game.dart';
-import 'package:open_hearts/engine/card.dart';
+
+import 'package:engine/engine.dart';
 
 void main() {
   final games = int.parse(const String.fromEnvironment('GAMES', defaultValue: '500'));

@@ -7,7 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../engine/card.dart' as engine;
+import 'package:engine/engine.dart' as engine;
 import '../theme.dart';
 import 'pip.dart';
 

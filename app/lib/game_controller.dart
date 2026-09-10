@@ -10,10 +10,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'engine/bot.dart';
-import 'engine/card.dart';
-import 'engine/game.dart';
-import 'engine/rules.dart';
+import 'package:engine/engine.dart';
 
 /// The names around the table, seat order (0 is the player).
 const seatNames = ['You', 'West', 'North', 'East'];
