@@ -1,0 +1,17 @@
+name: table
+description: The table protocol — signed events, membership, departures, the play chain — over an abstract transport and clock.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  bip340: ^0.3.1
+  crypto: ^3.0.6
+  engine:
+    path: ../engine
+
+dev_dependencies:
+  lints: ^5.1.1
+  test: ^1.25.0

@@ -1,0 +1,41 @@
+import 'package:table/table.dart';
+import 'package:test/test.dart';
+
+import 'sim_support.dart';
+
+void main() {
+  test('events round-trip and refuse a bad signature', () {
+    final me = FakeSigner('me');
+    final e = TableEvent.sign(me, table: 't', kind: EventKind.play, body: {'hand': 0, 'turn': 4, 'seat': 0, 'card': '2C'});
+    final back = TableEvent.parse(e.toJson());
+    expect(back, isNotNull);
+    expect(back!.id, e.id);
+    final forged = Map<String, Object?>.from(e.toJson())..['body'] = {'hand': 0, 'turn': 4, 'seat': 0, 'card': 'QS'};
+    expect(TableEvent.parse(forged), isNull);
+    final real = SchnorrSigner.generate();
+    final r = TableEvent.sign(real, table: 't', kind: EventKind.heartbeat, body: {'hand': 0, 'step': 0});
+    expect(TableEvent.parse(r.toJson()), isNotNull);
+  });
+
+  for (final humans in [1, 2, 3, 4]) {
+    test('$humans human(s) and ${4 - humans} bot(s) play a whole game and agree on it', () {
+      final t = SimTable(humans: humans, seed: 7);
+      t.start();
+      expect(t.run(), isTrue, reason: 'every client reaches the end of the game');
+      final records = [for (final c in t.clients) c.record.map((d) => d.event.id).toList()];
+      for (final r in records) {
+        expect(r, records.first, reason: 'every client holds the same record');
+      }
+      final totals = [for (final c in t.clients) c.game.totals];
+      for (final s in totals) {
+        expect(s, totals.first);
+      }
+      final v = verifyRecord(t.spec, t.clients.first.record);
+      expect(v.ok, isTrue, reason: v.reason);
+      expect(v.winners, t.clients.first.game.winners);
+      expect(v.ratings.length, humans);
+      expect(t.clients.first.pause, isNull);
+      t.stop();
+    });
+  }
+}
