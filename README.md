@@ -48,17 +48,24 @@ rigged. Roughly in order:
 2. **The engine as a package**, shared by the app and the service.
 3. **Two measurements before anything is built on them** — taken
    ([measurements](measurements/README.md)). The bot policy as a boolean
-   circuit: 3,558 AND gates a play, proven equal to the bot
+   circuit: 3,676 AND gates a play, proven equal to the bot
    ([doc 04](docs/04-live-play.md)). A verifiable 52-card deal in wasm:
    2.1 s critical path on a desktop core with the reference crate, so
    four to six on a phone — implement, then optimise
    ([doc 03](docs/03-fair-deal.md)). The phone's own number is a tap
    away on the dev site.
-4. **Four clients, one table.** The protocol is written and its
-   departure matrix passes on a simulated network
-   ([doc 06](docs/06-service.md), `packages/table`). Still to come:
-   the same clients over WebRTC with the local relay behind them, the
-   app's live table, and the end-to-end suite in real browsers.
+4. **Four clients, one table.** The protocol is written, its
+   departure matrix passes on a simulated network, and a thousand
+   seeds of random faults walk its explicit state model without a
+   fork or a deadlock ([doc 06](docs/06-service.md), `packages/table`).
+   Still to come: the same clients over WebRTC with the local relay
+   behind them, the app's live table, and the end-to-end suite in real
+   browsers. Meanwhile every solo game is kept on the device as a
+   record — the deal, the bots, your own passes and plays — and **Copy
+   record** on the game-over sheet hands it over as a line of text that
+   `packages/engine/tool/replay.dart` turns back into every trick.
+   Bot moves are recomputed from it, which is why the bots are
+   deterministic.
 5. **The verifiable deal.**
 6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
    matchmaking, seat handover, the jury.
@@ -113,20 +120,25 @@ cd packages/engine && dart run --define=GAMES=2000 tool/bot_stats.dart
 ```
 
 ```
-wins by seat        : [503, 537, 500, 502]   (fair share 500)
-mean final score    : [74.7, 75.2, 75.9, 75.4]
-moons shot          : 373  (1.7% of hands)
+wins by seat        : [503, 510, 498, 533]   (fair share 500)
+mean final score    : [76.5, 76.2, 76.5, 75.7]
+queen taken by seat : [5146, 5078, 5035, 4926]
+moons shot          : 1633  (8.1% of hands)
 ```
 
 All four seats run the same bot, so **wins by seat should be flat** — a
 persistent skew is a positional bug rather than strategy. And **moons
-shot** gauges defence: nothing here tries to shoot, so every moon is one
-the other three failed to break up. Adding moon defence took that number
-from 3.2% to 1.7%. Run it before and after touching `bot.dart`.
+shot** gauges attack against defence: every bot runs at the moon on a
+hand that is plainly a shot, and with four of them one lands in about
+one hand in twelve; before any bot shot, defence alone had it at 1.7%.
+Run it before and after touching `bot.dart`.
 
-Known gaps, in the order they are worth closing: the bot never tries to
-shoot the moon itself, does not count the cards that have gone, and does
-not read what an opponent's discards say about their hand.
+Known gaps, in the order they are worth closing: the bot does not read
+what an opponent's discards say about their hand, and counts the cards
+that have gone only to know which of its own are sure winners.
+`tool/blunders.dart` lists the plays that took points they did not have
+to, with hindsight, by persona and kind — the place to look for the
+next rule.
 
 ## Licence
 

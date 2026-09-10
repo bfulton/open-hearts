@@ -19,7 +19,6 @@ library;
 // A benchmark's entire output is its printing.
 // ignore_for_file: avoid_print
 
-import 'dart:math';
 
 import 'package:engine/engine.dart';
 
@@ -33,7 +32,7 @@ void main() {
 
   for (var seed = 0; seed < games; seed++) {
     final game = HeartsGame(seed: seed);
-    final bot = Bot(persona: persona, random: Random(seed));
+    final bot = Bot(persona: persona);
     final played = <Card>{};
     while (game.phase != Phase.gameOver) {
       switch (game.phase) {

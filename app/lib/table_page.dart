@@ -7,6 +7,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'build_info.dart';
 import 'package:engine/engine.dart';
@@ -87,6 +88,11 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
     if (refusal != null) _say(refusal);
   }
 
+  Future<void> _copyRecord() async {
+    await Clipboard.setData(ClipboardData(text: _controller.recordText));
+    if (mounted) _say('Record copied');
+  }
+
   void _say(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -155,7 +161,12 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
               if (game.phase == Phase.handOver)
                 HandOverSheet(game: game, names: _controller.names, onNext: _controller.nextHand),
               if (game.phase == Phase.gameOver)
-                GameOverSheet(game: game, names: _controller.names, onNewGame: _controller.newGame),
+                GameOverSheet(
+                  game: game,
+                  names: _controller.names,
+                  onNewGame: _controller.newGame,
+                  onCopyRecord: _copyRecord,
+                ),
 
             ],
           ),

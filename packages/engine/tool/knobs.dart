@@ -28,14 +28,15 @@ void main() {
     const Persona(name: 'no stopper', epithet: '', keepsStopper: false),
     const Persona(name: 'flush 2', epithet: '', flushMinSmallSpades: 2),
     const Persona(name: 'flush 3', epithet: '', flushMinSmallSpades: 3),
-    const Persona(name: 'dump 8', epithet: '', heartDumpRank: 8),
-    const Persona(name: 'dump 12', epithet: '', heartDumpRank: 12),
     const Persona(name: 'defend 3', epithet: '', moonDefenseTrigger: 3),
     const Persona(name: 'defend 6', epithet: '', moonDefenseTrigger: 6),
     const Persona(name: 'defend 8', epithet: '', moonDefenseTrigger: 8),
     const Persona(name: 'pass keepQ', epithet: '', passStyle: PassStyle.keepQueen),
     const Persona(name: 'pass dumpQ', epithet: '', passStyle: PassStyle.dumpQueen),
     const Persona(name: 'lead long/low', epithet: '', leadFrom: LeadFrom.longestWhileLow),
+    const Persona(name: 'long/low ≤5', epithet: '', leadFrom: LeadFrom.longestWhileLow, longLeadMaxRank: 5),
+    const Persona(name: 'long/low ≤4', epithet: '', leadFrom: LeadFrom.longestWhileLow, longLeadMaxRank: 4),
+    const Persona(name: 'long/low ≤3', epithet: '', leadFrom: LeadFrom.longestWhileLow, longLeadMaxRank: 3),
   ];
   print('$games games each, one variant against three Westleys\n');
   print('${'variant'.padRight(14)} ${'wins'.padLeft(7)} ${'mean score'.padLeft(11)}');

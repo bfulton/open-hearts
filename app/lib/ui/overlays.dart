@@ -49,11 +49,21 @@ class HandOverSheet extends StatelessWidget {
 }
 
 class GameOverSheet extends StatelessWidget {
-  const GameOverSheet({super.key, required this.game, required this.names, required this.onNewGame});
+  const GameOverSheet({
+    super.key,
+    required this.game,
+    required this.names,
+    required this.onNewGame,
+    this.onCopyRecord,
+  });
 
   final HeartsGame game;
   final List<String> names;
   final VoidCallback onNewGame;
+
+  /// Puts the game's record on the clipboard: a line that replays the
+  /// whole game, for looking at a hand afterwards.
+  final VoidCallback? onCopyRecord;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +90,8 @@ class GameOverSheet extends StatelessWidget {
       ],
       action: 'New game',
       onAction: onNewGame,
+      secondary: onCopyRecord == null ? null : 'Copy record',
+      onSecondary: onCopyRecord,
     );
   }
 }
@@ -94,6 +106,8 @@ class _Sheet extends StatelessWidget {
     required this.action,
     required this.onAction,
     this.subtitle,
+    this.secondary,
+    this.onSecondary,
   });
 
   final String title;
@@ -102,6 +116,10 @@ class _Sheet extends StatelessWidget {
   final List<_Row> rows;
   final String action;
   final VoidCallback onAction;
+
+  /// A quieter second action under the first, when there is one.
+  final String? secondary;
+  final VoidCallback? onSecondary;
 
   @override
   Widget build(BuildContext context) {
@@ -160,6 +178,14 @@ class _Sheet extends StatelessWidget {
                             fontSize: 15, fontWeight: FontWeight.w700)),
                   ),
                 ),
+                if (secondary != null) ...[
+                  const SizedBox(height: 4),
+                  TextButton(
+                    onPressed: onSecondary,
+                    style: TextButton.styleFrom(foregroundColor: Palette.chromeDim),
+                    child: Text(secondary!, style: const TextStyle(fontSize: 13)),
+                  ),
+                ],
               ],
             ),
           ),

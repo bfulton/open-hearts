@@ -13,7 +13,7 @@ void eachDecision(
 ) {
   for (var seed = 0; seed < games; seed++) {
     final game = HeartsGame(seed: seed);
-    final bot = Bot(persona: persona, random: Random(seed));
+    final bot = Bot(persona: persona);
     final played = <Card>{};
     while (game.phase != Phase.gameOver) {
       switch (game.phase) {

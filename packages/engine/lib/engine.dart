@@ -12,3 +12,4 @@ export 'src/game.dart';
 export 'src/oblivious.dart';
 export 'src/persona.dart';
 export 'src/rules.dart';
+export 'src/solo_record.dart';

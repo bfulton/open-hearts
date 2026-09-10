@@ -58,7 +58,7 @@ class Arena {
   /// One seeded game with [table] in the seats. `wins` is 1 for the
   /// winner, a share for tied seats, 0 otherwise.
   static ({List<double> wins, List<int> totals}) playTable(int seed, List<Persona> table) {
-    final bots = [for (final p in table) Bot(persona: p, random: Random(seed))];
+    final bots = [for (final p in table) Bot(persona: p)];
     final game = HeartsGame(seed: seed);
     _playOut(game, bots);
     final won = game.winners;

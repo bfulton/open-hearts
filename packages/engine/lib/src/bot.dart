@@ -68,6 +68,12 @@ class BotView {
     if (total < trigger) return null;
     final holder = taken.indexOf(total);
     if (holder < 0 || holder == seat) return null;
+    // Exactly thirteen with the queen out is the queen and nothing
+    // else: somebody was caught with her, not somebody collecting. (Ten
+    // random tables in ten, taking points to break "that" run cost the
+    // defender two points a game — tool/knobs.dart.) Thirteen with the
+    // queen still to come is every heart, and very much a run.
+    if (total == 13 && queenGone) return null;
     return holder;
   }
 
@@ -76,14 +82,15 @@ class BotView {
   int count(Suit s) => hand.where((c) => c.suit == s).length;
 }
 
-/// A heuristic Hearts player. Stateless apart from its tie-breaking
-/// [Random], so one instance can serve every seat that shares a persona.
+/// A heuristic Hearts player. Stateless, and deterministic: the same
+/// cards and the same table always get the same play, which is what
+/// lets a game be replayed from a record of the deal and the human's
+/// choices alone (solo_record.dart), and what lets the oblivious
+/// circuit in oblivious.dart compute the same policy blind.
 class Bot {
-  Bot({this.persona = Persona.westley, Random? random})
-      : _random = random ?? Random();
+  Bot({this.persona = Persona.westley});
 
   final Persona persona;
-  final Random _random;
 
   int? _moonThreat(BotView view) =>
       view.moonThreatAt(persona.moonDefenseTrigger);
@@ -304,6 +311,11 @@ class Bot {
       if (spades.length >= persona.flushMinSmallSpades && !holdsHighSpade) {
         return _lowest(spades);
       }
+      // Never the queen herself, nor the ace or king above her, while
+      // she is out: whoever holds her drops her on it. Given any other
+      // card. Worth three points of tables (tool/knobs.dart).
+      final safe = legal.where((c) => c.suit != Suit.spades || c.rank.value < 12).toList();
+      if (safe.isNotEmpty) legal = safe;
     }
     // Hearts last, since leading them hands out points on purpose.
     final bySuit = <Suit, List<Card>>{};
@@ -322,13 +334,10 @@ class Bot {
     if (persona.leadFrom == LeadFrom.longestWhileLow) {
       final long = ordered(longest: true).first;
       final low = _lowest(bySuit[long]!);
-      if (long != Suit.hearts && low.rank.value <= lowLeadRank) return low;
+      if (long != Suit.hearts && low.rank.value <= persona.longLeadMaxRank) return low;
     }
     return _lowest(bySuit[ordered(longest: false).first]!);
   }
-
-  /// A lead this low from a long suit is not going to win the trick.
-  static const lowLeadRank = 6;
 
   /// Following suit.
   ///
@@ -346,6 +355,15 @@ class Bot {
         .where((p) => p.card.suit == led)
         .map((p) => p.card.rank.value)
         .reduce(max);
+
+    // The first trick cannot carry a point, so the highest club goes:
+    // a duck here keeps a liability for a trick that can. Worth three
+    // points of tables (tool/knobs.dart). (Taking a pointless trick
+    // later with the top card, a "free" trick, measured neutral: the
+    // lead it costs is worth about what the card shed is.)
+    if (view.isFirstTrick) return _highest(legal);
+
+    final isLastSeat = view.trick.length == seatCountInTrick - 1;
 
     // With the moon live, ducking is the losing move: one point taken
     // here costs one, and letting the run finish costs twenty-six. Win
@@ -365,7 +383,6 @@ class Bot {
     }
 
     // Taking the trick is now certain (last seat) or likely.
-    final isLastSeat = view.trick.length == seatCountInTrick - 1;
     if (isLastSeat) {
       // Except when winning it cheap is what avoids the queen: with the
       // queen still out and spades led, the smallest winner risks least
@@ -407,13 +424,12 @@ class Bot {
       final stopper = _highest(hearts);
       hearts = hearts.where((c) => c != stopper).toList();
     }
-    if (hearts.isNotEmpty) {
-      final top = _highest(hearts);
-      // A low heart is a worse throw than a high side-suit card: it gives
-      // away a point and keeps the dangerous card. Where "low" ends is
-      // temperament.
-      if (top.rank.value >= persona.heartDumpRank) return top;
-    }
+    // Any heart, from the top: a point handed to whoever takes the trick
+    // is worth more than a high side-suit card kept. This used to be a
+    // threshold a persona could set — throw only a heart this high —
+    // and every setting of it measured worse than none, by three points
+    // of tables at the old default of ten (tool/knobs.dart).
+    if (hearts.isNotEmpty) return _highest(hearts);
 
     final side = legal
         .where((c) => c.suit != Suit.hearts && c.suit != Suit.spades)
@@ -438,11 +454,6 @@ class Bot {
 
   Card _highest(List<Card> cards) =>
       cards.reduce((a, b) => a.rank.value >= b.rank.value ? a : b);
-
-  /// Unused today, kept so the tie-break has somewhere to go when the
-  /// heuristics are extended.
-  // ignore: unused_element
-  T _anyOf<T>(List<T> options) => options[_random.nextInt(options.length)];
 }
 
 /// A trick is four cards. Named here so [Bot] does not import the game

@@ -563,6 +563,17 @@ class ObliviousBot {
     final flush = c.all([c.not(p.queenGone), enoughSpades, c.not(holdsHighSpade)]);
     final flushCard = c.firstSet(spades);
 
+    // While the queen is out, no spade at or above her is a lead, given
+    // any other card: the rest of the choice is made among the safe
+    // ones.
+    final unsafe = [
+      for (var i = 0; i < 52; i++)
+        _suitOf(i) == Suit.spades.index && _rankOf(i) >= _queen ? c.and(legal[i], c.not(p.queenGone)) : Circuit.zero,
+    ];
+    final safe = [for (var i = 0; i < 52; i++) c.and(legal[i], c.not(unsafe[i]))];
+    final anySafe = c.any(safe);
+    legal = c.muxEach(anySafe, safe, legal);
+
     // Otherwise the lowest card of the shortest suit, hearts last, ties
     // to the lower suit index; empty suits count as 15 so they lose.
     final counts = [for (final s in Suit.values) c.popcount(_laneOf(legal, s), width: 4)];
@@ -595,7 +606,7 @@ class ObliviousBot {
       final longSel = pickSuit(counts.sublist(0, 3), (a, b) => c.not(c.lt(a, b)));
       final lowEnough = c.any([
         for (var s = 0; s < 3; s++)
-          c.and(longSel[s], c.any(_laneOf(legal, Suit.values[s]).sublist(0, Bot.lowLeadRank - 1))),
+          c.and(longSel[s], c.any(_laneOf(legal, Suit.values[s]).sublist(0, persona.longLeadMaxRank - 1))),
       ]);
       sel = c.muxEach(lowEnough, longSel, shortSel);
     }
@@ -627,6 +638,8 @@ class ObliviousBot {
     final hasOver = c.any(over);
     final moonWin = c.and(p.moonThreat, hasOver);
     final lowestOver = c.firstSet(over);
+    // The first trick cannot carry a point: the highest club.
+    final firstHigh = p.isFirstTrick;
 
     // Duck as high as possible; the queen ahead of any other duck.
     final hasUnder = c.any(under);
@@ -645,7 +658,7 @@ class ObliviousBot {
     final highestLane = c.lastSet(lane);
     final take = c.muxEach(takeLow, lowestLane, highestLane);
 
-    final pick = c.muxEach(moonWin, lowestOver, c.muxEach(hasUnder, duck, take));
+    final pick = c.muxEach(firstHigh, highestLane, c.muxEach(moonWin, lowestOver, c.muxEach(hasUnder, duck, take)));
     return (
       play: [for (var i = 0; i < 52; i++) c.and(pick[_rankOf(i)], p.ledSuit[_suitOf(i)])],
       hasOver: hasOver,
@@ -692,7 +705,6 @@ class ObliviousBot {
     }
     final hasHearts = c.any(hearts);
     final topHeart = c.lastSet(hearts);
-    final heartHigh = c.any(hearts.sublist(persona.heartDumpRank - 2));
 
     // 5. The highest card of the shorter side suit; equal lengths
     //    compare across both suits, ties to clubs.
@@ -738,7 +750,7 @@ class ObliviousBot {
     final p1 = moonSafe;
     final p2 = next(hasQueen);
     final p3 = next(dumpHigh);
-    final p4 = next(heartHigh);
+    final p4 = next(hasHearts);
     final p5 = next(hasSide);
     final p6 = next(hasHearts);
     final p7 = c.not(taken);

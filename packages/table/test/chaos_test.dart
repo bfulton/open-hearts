@@ -11,6 +11,8 @@
 /// in this version.
 library;
 
+import 'dart:io';
+
 import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
@@ -39,8 +41,10 @@ final seatClosure = closure(seatTransitions);
 final tableClosure = closure(tableTransitions);
 
 /// Two records conflict when they settle the same turn differently: two
-/// different actions, or an action by a seat one record says was
-/// removed at that very turn.
+/// different actions, or an action by a seat that the other record
+/// removed at that very turn instead. (A seat that passed and was then
+/// claimed gone at its pass position holds both, in that order, and
+/// that is one story, not two.)
 String? conflict(List<Decision> a, List<Decision> b) {
   final actionsA = {for (final d in a) if (!d.removal) d.turn: d};
   final actionsB = {for (final d in b) if (!d.removal) d.turn: d};
@@ -49,15 +53,21 @@ String? conflict(List<Decision> a, List<Decision> b) {
     final y = actionsB[t];
     if (y != null && x.key != y.key) return 'two actions at $t: ${x.event} vs ${y.event}';
   }
-  bool removedAt(List<Decision> r, TurnId t, int seat) =>
-      r.any((d) => d.removal && d.turn == t && d.event.seat == seat);
+  String? instead(List<Decision> r, Map<TurnId, Decision> actions, Decision d) {
+    final removed = r.any((x) => x.removal && x.turn == d.turn && x.event.seat == d.event.seat);
+    final held = actions[d.turn]?.key == d.key;
+    if (removed && !held) return 'action by seat ${d.event.seat} at ${d.turn} vs its removal there';
+    return null;
+  }
   for (final d in a) {
     if (d.removal) continue;
-    if (removedAt(b, d.turn, d.event.seat)) return 'action by seat ${d.event.seat} at ${d.turn} vs its removal there';
+    final why = instead(b, actionsB, d);
+    if (why != null) return why;
   }
   for (final d in b) {
     if (d.removal) continue;
-    if (removedAt(a, d.turn, d.event.seat)) return 'action by seat ${d.event.seat} at ${d.turn} vs its removal there';
+    final why = instead(a, actionsA, d);
+    if (why != null) return why;
   }
   return null;
 }
@@ -69,7 +79,8 @@ class Observed {
 }
 
 void main() {
-  final seeds = int.parse(const String.fromEnvironment('CHAOS_SEEDS', defaultValue: '40'));
+  // CHAOS_SEEDS=250 dart test test/chaos_test.dart — for a longer walk.
+  final seeds = int.parse(Platform.environment['CHAOS_SEEDS'] ?? '40');
 
   for (var seed = 0; seed < seeds; seed++) {
     test('chaos $seed', () {
@@ -129,9 +140,17 @@ void main() {
       check('at the end after [${sc.faults.join('; ')}]');
 
       final survivors = t.survivors.toList();
-      expect(survivors, isNotEmpty);
       final finished = survivors.every((c) => c.done);
-      if (finished) {
+      if (survivors.isEmpty) {
+        // The last player still running was replaced while cut off, and
+        // then everyone else went: a dead table. Every client still
+        // running has to know it has no seat, and hold a sound record.
+        for (final p in t.people.where((p) => !p.gone)) {
+          expect(p.client.amSeated, isFalse, reason: 'faults were [${sc.faults.join('; ')}]\n${p.client.describe()}');
+          final v = verifyRecord(t.spec, p.client.record, allowPartial: true);
+          expect(v.ok, isTrue, reason: v.reason);
+        }
+      } else if (finished) {
         final keysOf = [for (final c in survivors) c.record.map((d) => d.key).toList()];
         for (final r in keysOf) {
           expect(r, keysOf.first, reason: 'every survivor holds the same record');

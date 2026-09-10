@@ -47,15 +47,25 @@ moon on a hand the others would not. Every setting is a choice a strong
 player might make, and that is measured, not assumed: a tool plays each
 setting alone against the baseline, and a tournament test seats random
 fours from the roster and fails if any persona falls behind — a
-character may be rash or patient, never bad. The measuring has already
-moved two things from style to rule: emptying a short suit in the pass
-is worth a third of tables instead of a quarter, and never shooting the
-moon costs six points of tables, so every bot voids and every bot
-shoots when the hand is plainly a shot, and every bot keeps a top heart
-back while no points are out, because that is what stops a shot. The
-roster is data in `packages/engine/lib/src/persona.dart`; the oblivious
-circuit takes the same settings as constants, so a named bot holding a
-departed seat is the same computable consequence as any other.
+character may be rash or patient, never bad. The measuring keeps moving
+things from style to rule: emptying a short suit in the pass is worth a
+third of tables instead of a quarter, and never shooting the moon costs
+six points of tables, so every bot voids and every bot shoots when the
+hand is plainly a shot, and every bot keeps a top heart back while no
+points are out, because that is what stops a shot. A tool that looks
+for self-destructive plays in bot-versus-bot games
+(`packages/engine/tool/blunders.dart`) then found four more, each
+worth two or three points of tables, and every bot now plays them:
+never lead the queen of spades, or a spade above her, while she is out;
+throw the highest club on the first trick, where no point can fall; do
+not take points to break up a "run" that is exactly thirteen —
+somebody caught with the queen, not somebody collecting; and void in
+the led suit, throw a heart, any heart, before a side-suit card. The
+last had been a threshold each persona set, and every setting of it
+measured worse than none. The roster is
+data in `packages/engine/lib/src/persona.dart`; the oblivious circuit
+takes the same settings as constants, so a named bot holding a departed
+seat is the same computable consequence as any other.
 
 ## Filling and emptying seats
 
@@ -108,8 +118,9 @@ few seconds) plus an application heartbeat for the connected-but-wedged
 case, which is usually a backgrounded tab.
 
 This one matters more than it looks. A silent player who has not yet been
-evicted **blocks the table even when it is not their turn**, because they
-are a required party to the computation that plays the bot seats. Someone
+evicted **still counts toward every majority**: two silent seats out of
+four leave the other two unable to decide anything, and once the bots'
+moves are computed jointly a silent seat blocks those too. Someone
 pocketing their phone during another player's turn is enough to wedge
 things. The timeout is what prevents that, so it is load-bearing rather
 than hygiene.
@@ -141,40 +152,30 @@ in `packages/table` treats every turn as exactly that question.
 
 **A turn is a race with two sides.** On one side the seat's own action —
 its pass or play, signed by the seat — and on the other its removal: a
-boot pressed by someone after fifteen seconds, or an absence claimed
-after thirty of silence. Every other participant backs one side or the
-other with a signature, never both, and a side wins with a **strict
-majority of the participants at that turn**. Only then does the next
-turn open, so nothing is ever rolled back. A signed Leave is evidence
-and needs no majority.
+boot, pressed by someone after fifteen seconds on turn, or made at once
+by a peer that has not heard from the seat for thirty. Every other
+participant backs one side or the other with a signature, never both,
+and a side wins with a **strict majority of the participants at that
+turn**. Only then does the next turn open, so nothing is ever rolled
+back. A signed Leave is evidence and needs no majority.
 
-**Who a majority is of** cannot depend on when each peer heard the news,
-so it is a function of the record: the participants at a turn are the
-humans who sat down, less anyone removed at that turn or earlier. The
-four pass turns of a hand are concurrent, so they count as one position.
-A peer that has not yet heard of a removal measures against a larger
-set, which can only make it wait, never settle something the others
-would not; and because the two sides of a race are disjoint within any
-one set, both cannot win.
-
-**Nobody claims a departure from inside a hole in the network.** A peer
-presses or countersigns a boot, or claims or backs an absence, only
-while it has heard from a majority of the participants within the last
-couple of heartbeats. A peer that has not is the one that is cut off,
-and its table says so — "waiting for the others" — instead of judging
-anyone. Nor does anyone boot a player whose heartbeats show them still
-receiving the game: behind is not gone.
-
-**An even split waits for the jury.** When every participant has voted
-on a turn and neither side has a majority, the turn is stuck and the
-table pauses for the jury. Letting the play win the tie, which is what
-this document once said, was tried and found unsafe: a peer that knew of
-a removal made at the same turn could call the vote complete while a
-peer that did not still counted the removed player, and the two
-settled the turn differently. Only a party outside the table can break
-a tie without that risk. A peer holding the play rebroadcasts it
-instead of countersigning the boot, so the split is rare; the jury is
-what makes it harmless.
+**Silence is answered at the seat's own turn, and nowhere else.** A
+peer that has heard nothing from a seat for thirty seconds boots it the
+moment its turn is open, without the fifteen-second wait; the removal is
+the race's own decision, and a seat removed that way has no later votes
+for anyone to disagree about. What it cannot do is remove a silent seat
+*before* its turn — and a silent seat still counts toward every majority
+meanwhile, so someone else's contested turn can be stuck for want of its
+vote. That turn goes to the jury, as a deadlock. The alternative was
+tried: a claim that the seat was gone as of whatever position the
+claimant stood on, backed by others, shrinking the majority for the turn
+in progress. A thousand random walks showed why not. Peers apply such a
+claim to an open turn at different moments, and two claims in flight at
+once — each about a seat that had voted at that turn — let two peers
+settle the turn opposite ways, each with a majority of the set it
+believed in. No local rule closes that; agreement on who is present is
+the jury's job, and the protocol only ever removes a seat where its own
+race decides it or its own signature says so.
 
 **The majority rule is what stops a partition becoming a fork.** Split a
 four-human table 2–2 and each half sees the other as silent — but each
@@ -185,6 +186,17 @@ unsettled evidence repeats it and whoever is ahead hands the others the
 whole decision they missed. Split it 2–1 and the two proceed correctly;
 the one learns it is out when the network heals, and goes back to
 matchmaking.
+
+**Hearing is direct, and a peer behind is carried forward.** Peers relay
+each other's signed events when catching someone up, so a relayed play
+says nothing about whether its author is still there: a peer counts as
+heard from only when it sent something itself. (Before that rule, three
+live peers re-sent a crashed seat's old witness to each other every two
+seconds and each took it for a sign of life, forever.) A heartbeat says
+where its sender stands, and a peer that is behind hears back the turns
+it is missing, a few at a time, without having to ask — which is also
+how a peer learns of a leave it never received, since every departure in
+the record travels with every answer.
 
 **The record is the belt and braces.** Every settled turn and every
 departure goes into it with the signatures that carried it, in an
@@ -242,10 +254,10 @@ Counted, in AND gates — what a garbled circuit costs; XOR is free:
 
 | | AND gates |
 |---|---|
-| one play, legality included | 2,479 |
-| the same, hand in as thirteen dealt positions and position out | 3,558 |
+| one play, legality included | 2,597 |
+| the same, hand in as thirteen dealt positions and position out | 3,676 |
 | one pass | 10,933 |
-| a bot seat for a whole hand: one pass and thirteen plays | 57,187 |
+| a bot seat for a whole hand: one pass and thirteen plays | 58,721 |
 
 About half of a play is the run at the moon — knowing which cards are
 sure winners takes the whole played set as public input. At two

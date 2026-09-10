@@ -151,8 +151,16 @@ survivors hold conflicting decisions, that every record verifies as far
 as it goes, and that every state change is one the protocol's explicit
 model (`packages/table/lib/src/model.dart`: a turn is open, acting,
 contested, split or settled; a seat is human, left, booted, absent or
-bot; the table is playing, paused, or finished) allows. It found four
-things the matrix had not, in its first hour.
+bot; the table is playing, paused, or finished) allows. Its first hour
+found four things the matrix had not; its first 250 seeds found six
+more, among them a relayed event mistaken for a sign of life, a leave
+that was never re-sent, and a pass lost between a hand opening and its
+bots passing; and its first thousand settled a design question — where
+a silent seat may be removed — by finding a fork in the answer that
+looked more helpful (doc 04, "Silence is answered at the seat's own
+turn"). A thousand seeds now finish or pause for the jury with every
+survivor holding the same record. CI walks forty seeds on every commit;
+`CHAOS_SEEDS=1000 dart test test/chaos_test.dart` walks a thousand.
 
 What every cell asserts:
 

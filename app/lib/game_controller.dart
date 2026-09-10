@@ -13,27 +13,57 @@ import 'package:flutter/foundation.dart';
 
 import 'package:engine/engine.dart';
 
+import 'record_store.dart';
+
 class GameController extends ChangeNotifier {
-  GameController({int? seed, this.paced = true})
-      : _seed = seed,
-        _game = HeartsGame(seed: seed),
-        _bots = _seatBots(seed) {
-    _pump();
+  GameController({this.seed, this.paced = true, RecordStore? store})
+      : _store = store ?? PrefsRecordStore() {
+    _start();
   }
 
-  /// Kept so [newGame] reshuffles the same way a test expects. Null in
-  /// the app, where every game should be a fresh shuffle.
-  final int? _seed;
+  /// Fixes the shuffle, so [newGame] reshuffles the same way a test
+  /// expects. Null in the app, where every game is a fresh draw.
+  final int? seed;
+
+  final RecordStore _store;
+
+  /// The seed this game was actually dealt from — drawn once when the
+  /// game starts, so every game has one and the record can name it.
+  late int _dealSeed;
+
+  /// This game as a line of text: the deal, the bots, and the player's
+  /// own passes and plays. Everything the bots did follows from those.
+  late SoloRecord _record;
+  bool _saved = false;
+
+  String get recordText => _record.encode();
+
+  /// Every finished game kept on the device, newest first.
+  Future<List<String>> pastRecords() => _store.load();
+
+  void _start() {
+    _dealSeed = seed ?? Random().nextInt(1 << 31);
+    _game = HeartsGame(seed: _dealSeed);
+    _bots = _seatBots(_dealSeed);
+    _record = SoloRecord(
+      seed: _dealSeed,
+      personas: [for (var s = 0; s < seatCount; s++) s == humanSeat ? '' : _bots[s]!.persona.name],
+    );
+    _saved = false;
+    _played.clear();
+    _selected.clear();
+    _pump();
+  }
 
   /// False in tests: every wait collapses to zero so a game runs at
   /// engine speed.
   final bool paced;
 
-  HeartsGame _game;
+  late HeartsGame _game;
 
   /// Who holds each seat; null at the player's. Three from the roster,
   /// drawn by the game's seed so a seeded table is the same table.
-  List<Bot?> _bots;
+  late List<Bot?> _bots;
 
   final Random _rhythm = Random();
 
@@ -46,12 +76,11 @@ class GameController extends ChangeNotifier {
   /// The persona at [seat], or null at the player's.
   Persona? personaAt(int seat) => _bots[seat]?.persona;
 
-  static List<Bot?> _seatBots(int? seed) {
-    final rng = seed == null ? Random() : Random(seed);
-    final draw = List.of(Persona.roster)..shuffle(rng);
+  static List<Bot?> _seatBots(int seed) {
+    final draw = List.of(Persona.roster)..shuffle(Random(seed));
     return [
       for (var s = 0; s < seatCount; s++)
-        s == humanSeat ? null : Bot(persona: draw[s], random: Random(rng.nextInt(1 << 30))),
+        s == humanSeat ? null : Bot(persona: draw[s]),
     ];
   }
 
@@ -106,6 +135,7 @@ class GameController extends ChangeNotifier {
 
   void confirmPass() {
     if (!canConfirmPass) return;
+    _record.passes.add(_selected.toList());
     _game.setPass(humanSeat, _selected.toList());
     _selected.clear();
     notifyListeners();
@@ -119,6 +149,7 @@ class GameController extends ChangeNotifier {
     if (!awaitingPlay) return null;
     final legal = _game.legalPlaysFor(humanSeat);
     if (!legal.contains(card)) return _refusal(card);
+    _record.plays.add(card);
     _game.play(humanSeat, card);
     _played.add(card);
     notifyListeners();
@@ -151,6 +182,7 @@ class GameController extends ChangeNotifier {
   void nextHand() {
     if (_game.phase != Phase.handOver) return;
     _game.nextHand();
+    if (_game.passDirection == PassDirection.hold) _record.passes.add(null);
     _played.clear();
     _selected.clear();
     notifyListeners();
@@ -158,12 +190,8 @@ class GameController extends ChangeNotifier {
   }
 
   void newGame() {
-    _game = HeartsGame(seed: _seed);
-    _bots = _seatBots(_seed);
-    _played.clear();
-    _selected.clear();
+    _start();
     notifyListeners();
-    _pump();
   }
 
   // ---- the pump --------------------------------------------------------
@@ -188,7 +216,14 @@ class GameController extends ChangeNotifier {
           continue;
         }
 
-        if (_game.phase != Phase.playing) break; // handOver / gameOver
+        if (_game.phase == Phase.gameOver) {
+          if (!_saved) {
+            _saved = true;
+            unawaited(_store.save(_record.encode()));
+          }
+          break;
+        }
+        if (_game.phase != Phase.playing) break; // handOver
 
         if (_game.pendingTrick != null) {
           if (!await _wait(_trickHold)) return;

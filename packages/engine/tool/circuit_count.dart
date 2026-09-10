@@ -12,7 +12,6 @@ library;
 // A measurement's entire output is its printing.
 // ignore_for_file: avoid_print
 
-import 'dart:math';
 
 import 'package:engine/engine.dart';
 
@@ -24,7 +23,7 @@ void main() {
 
   for (var seed = 0; seed < 20; seed++) {
     final game = HeartsGame(seed: seed);
-    final bot = Bot(random: Random(seed));
+    final bot = Bot();
     final played = <Card>{};
     while (game.phase != Phase.gameOver) {
       switch (game.phase) {

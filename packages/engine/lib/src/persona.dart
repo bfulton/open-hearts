@@ -19,9 +19,12 @@ enum LeadFrom {
   shortest,
 
   /// The longest suit, while it still has a genuinely low card to lead
-  /// (a six or under). Those are the safest leads in the hand, and the
-  /// short suits stay short for discarding into. Once the long suit has
-  /// nothing low left, the shortest suit as usual.
+  /// (a three or under — [Persona.longLeadMaxRank]; a six measured a
+  /// point and a half of tables worse than the shortest suit once the
+  /// first trick went to the highest club). Those are the safest leads
+  /// in the hand, and the short suits stay short for discarding into.
+  /// Once the long suit has nothing low left, the shortest suit as
+  /// usual.
   longestWhileLow,
 }
 
@@ -64,10 +67,10 @@ class Persona {
     required this.name,
     required this.epithet,
     this.flushMinSmallSpades = 1,
-    this.heartDumpRank = 10,
     this.moonDefenseTrigger = 4,
     this.passStyle = PassStyle.shedHeight,
     this.leadFrom = LeadFrom.shortest,
+    this.longLeadMaxRank = 3,
     this.pace = Pace.measured,
     this.shortSuitWeight = 20,
     this.shootLoserShare = 4,
@@ -84,16 +87,17 @@ class Persona {
   /// flush her out. A value above 13 means never.
   final int flushMinSmallSpades;
 
-  /// Void in the led suit, a heart at least this high is thrown before
-  /// any side-suit card.
-  final int heartDumpRank;
-
   /// Points one opponent has to hold — all of them so far — before the
   /// bot starts taking tricks to break up the moon.
   final int moonDefenseTrigger;
 
   final PassStyle passStyle;
   final LeadFrom leadFrom;
+
+  /// For [LeadFrom.longestWhileLow]: how high a card the long suit's
+  /// lowest may be and still count as a safe lead.
+  final int longLeadMaxRank;
+
   final Pace pace;
 
   /// Runs at the moon when at most one card in this many is a loser
@@ -163,7 +167,6 @@ class Persona {
     name: 'Buttercup',
     epithet: 'Ducks everything, and wins anyway.',
     flushMinSmallSpades: 2,
-    heartDumpRank: 12,
     moonDefenseTrigger: 3,
     leadFrom: LeadFrom.longestWhileLow,
     pace: Pace.slow,
@@ -172,7 +175,6 @@ class Persona {
   static const romeo = Persona(
     name: 'Romeo',
     epithet: "Can't hold a queen, or a heart, or his breath.",
-    heartDumpRank: 8,
     passStyle: PassStyle.dumpQueen,
     pace: Pace.quick,
   );
@@ -181,7 +183,6 @@ class Persona {
     name: 'Juliet',
     epithet: 'Waits for the moment. Then it is yours.',
     flushMinSmallSpades: 2,
-    heartDumpRank: 12,
     passStyle: PassStyle.keepQueen,
     pace: Pace.slow,
   );
@@ -205,7 +206,7 @@ class Persona {
   static const casanova = Persona(
     name: 'Casanova',
     epithet: 'Keeps the queen close and the spades closer.',
-    flushMinSmallSpades: 3,
+    flushMinSmallSpades: 2,
     moonDefenseTrigger: 6,
     passStyle: PassStyle.keepQueen,
   );

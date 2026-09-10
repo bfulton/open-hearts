@@ -159,7 +159,7 @@ void main() {
 
     test('the fourth hand holds and goes straight to play', () {
       var game = HeartsGame(seed: 5);
-      final bot = Bot(random: Random(5));
+      final bot = Bot();
       for (var h = 0; h < 3; h++) {
         expect(game.phase, Phase.passing, reason: 'hand $h passes');
         for (var s = 0; s < seatCount; s++) {
@@ -211,7 +211,7 @@ void main() {
 
     test('a finished trick waits to be collected', () {
       final game = _dealt(seed: 21);
-      final bot = Bot(random: Random(1));
+      final bot = Bot();
       for (var i = 0; i < seatCount; i++) {
         final seat = game.currentSeat!;
         game.play(seat, bot.chooseCard(_view(game, seat), game.legalPlaysFor(seat)));
@@ -226,7 +226,7 @@ void main() {
 
     test('the trick winner takes its points and leads the next', () {
       final game = _dealt(seed: 33);
-      final bot = Bot(random: Random(2));
+      final bot = Bot();
       for (var i = 0; i < seatCount; i++) {
         final seat = game.currentSeat!;
         game.play(seat, bot.chooseCard(_view(game, seat), game.legalPlaysFor(seat)));
@@ -243,7 +243,7 @@ void main() {
     test('200 seeded games finish, obeying every rule along the way', () {
       for (var seed = 0; seed < 200; seed++) {
         final game = HeartsGame(seed: seed);
-        final bot = Bot(random: Random(seed));
+        final bot = Bot();
         final hands = playOut(game, bot);
         expect(hands, greaterThanOrEqualTo(4),
             reason: 'reaching $gameOverScore takes several hands');
@@ -258,7 +258,7 @@ void main() {
 
     test('every hand puts exactly 26 points on the board', () {
       final game = HeartsGame(seed: 1234);
-      final bot = Bot(random: Random(1234));
+      final bot = Bot();
       var checked = 0;
       while (game.phase != Phase.gameOver) {
         if (game.phase == Phase.handOver) {
@@ -275,7 +275,7 @@ void main() {
 
     test('totals only ever move by a legal hand score', () {
       final game = HeartsGame(seed: 99);
-      final bot = Bot(random: Random(99));
+      final bot = Bot();
       var previous = List.of(game.totals);
       while (game.phase != Phase.gameOver) {
         if (game.phase == Phase.handOver) {
@@ -297,7 +297,7 @@ void main() {
 /// Deals and gets past passing, so a test can start on trick one.
 HeartsGame _dealt({required int seed}) {
   final game = HeartsGame(seed: seed);
-  final bot = Bot(random: Random(seed));
+  final bot = Bot();
   if (game.phase == Phase.passing) {
     for (var s = 0; s < seatCount; s++) {
       game.setPass(s, bot.choosePass(game.handOf(s)));

@@ -9,20 +9,25 @@
 /// ```
 /// open ──action arrives──▶ acting ──majority──▶ settledByAction
 ///   │                        │
-///   │ boot/absence claimed   │ boot/absence claimed
+///   │ boot claimed           │ boot claimed
 ///   ▼                        ▼
 /// contested ──majority for the action──▶ settledByAction
 ///   │  │
 ///   │  └──majority for the removal──▶ settledByRemoval
-///   └──everyone voted, no majority──▶ split  (waits for the jury)
+///   └──neither side can reach a majority──▶ split  (waits for the jury)
 /// ```
 ///
-/// A bot's turn goes straight from open to settledByAction. A settled
-/// turn never reopens; a split one settles only when the jury decides.
+/// A boot is claimed by the clock, fifteen seconds on turn, or for
+/// silence, thirty seconds unheard; both are votes in the same race,
+/// and a seat is only ever removed at its own turn or by its own signed
+/// leave (client.dart, "silence", says why). A turn stuck for want of a
+/// silent seat's vote is split. A bot's turn goes straight from open to
+/// settledByAction. A settled turn never reopens; a split one settles
+/// only when the jury decides.
 ///
 /// **A seat**: human, until one of three doors — left (signed), booted
-/// (a boot carried), absent (an absence carried) — after which it is a
-/// bot for good. A seat never comes back.
+/// (a boot carried at its turn), absent (a silence claim carried) —
+/// after which it is a bot for good. A seat never comes back.
 ///
 /// **The table**: playing, or paused waiting for the jury (a removal the
 /// players cannot decide among themselves) or for peers (not enough
@@ -41,7 +46,7 @@ enum TurnState {
   /// A removal is claimed; the action may or may not be in.
   contested,
 
-  /// Everyone has voted and nobody has a majority. Only the jury can
+  /// Neither side can reach a majority any more. Only the jury can
   /// settle it.
   split,
 
