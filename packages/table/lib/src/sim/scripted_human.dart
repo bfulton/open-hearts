@@ -99,10 +99,22 @@ class ScriptedHuman {
     for (var seat = 0; seat < seatCount; seat++) {
       if (client.canBoot(seat) && _pressed.add(seat * 1000 + client.step)) {
         clock.schedule(pressBootMs, () {
-          if (!gone && client.canBoot(seat)) client.boot(seat);
+          if (gone) return;
+          if (client.canBoot(seat)) {
+            client.boot(seat);
+          } else {
+            _pressed.remove(seat * 1000 + client.step); // not now; maybe later
+          }
         });
       }
     }
+  }
+
+  /// Leaves now, by [how], whatever the scenario said.
+  void depart(Exit how) {
+    if (gone) return;
+    exit = how;
+    _go();
   }
 
   void _go() {

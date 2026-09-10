@@ -16,10 +16,21 @@ import 'signing.dart';
 import 'spec.dart';
 
 class Verification {
-  const Verification({required this.ok, required this.reason, required this.winners, required this.ratings, required this.finalHolders});
+  const Verification({
+    required this.ok,
+    required this.reason,
+    required this.winners,
+    required this.ratings,
+    required this.finalHolders,
+    this.complete = true,
+  });
 
   final bool ok;
   final String reason;
+
+  /// Whether the record ran to the end of the game. A partial record can
+  /// still be [ok]: everything in it checked.
+  final bool complete;
 
   /// Winning seats, when the replay reached the end of the game.
   final List<int> winners;
@@ -39,7 +50,7 @@ class Verification {
 /// reached it yet, so a removed member who witnessed still counts, in
 /// the denominator as well as the count. Nobody gains by that: it can
 /// only raise the bar.
-Verification verifyRecord(TableSpec spec, List<Decision> record) {
+Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPartial = false}) {
   final game = HeartsGame(seed: spec.seed);
   final holders = List.of(spec.seats);
   final humans = {for (final h in spec.seats) if (h is HumanSeat) h.key};
@@ -50,6 +61,9 @@ Verification verifyRecord(TableSpec spec, List<Decision> record) {
   Verification fail(String why) =>
       Verification(ok: false, reason: why, winners: const [], ratings: const {}, finalHolders: holders);
 
+  Verification partial() => Verification(
+      ok: true, reason: 'verified so far', winners: const [], ratings: const {}, finalHolders: holders, complete: false);
+
   bool atOrBefore(TurnId a, TurnId b) {
     if (a.hand != b.hand) return a.hand < b.hand;
     final ai = a.isPass ? -1 : a.index;
@@ -57,20 +71,27 @@ Verification verifyRecord(TableSpec spec, List<Decision> record) {
     return ai <= bi;
   }
 
-  Set<PublicKey> participantsAt(TurnId turn) =>
-      {for (final k in humans) if (!removedAt.containsKey(k) || !atOrBefore(removedAt[k]!, turn)) k};
+  // Every removal in the record, wherever it sits: the smallest set a
+  // peer could legitimately have measured against at a turn is everyone
+  // less all of these made by then — including ones recorded at the
+  // same position but later in the record's order.
+  final allRemovals = <PublicKey, TurnId>{};
+  for (final d in record) {
+    if (!d.removal) continue;
+    final h = spec.seats[d.event.seat];
+    if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
+  }
+  Set<PublicKey> floorAt(TurnId turn) =>
+      {for (final k in humans) if (!allRemovals.containsKey(k) || !atOrBefore(allRemovals[k]!, turn)) k};
 
-  /// Whether [witnesses] carry a decision at [turn]. Removed members who
-  /// witnessed count on both sides of the fraction. An action also
-  /// carries when the whole table voted and split evenly ([opposed] is
-  /// the other half).
-  bool carried(Set<PublicKey> witnesses, TurnId turn, {Set<PublicKey> opposed = const {}}) {
-    final of = participantsAt(turn).union(witnesses.intersection(removedAt.keys.toSet()));
-    final needed = of.length ~/ 2 + 1;
-    final backing = witnesses.intersection(of).length;
-    if (backing >= needed) return true;
-    final against = opposed.intersection(of).length;
-    return against < needed && backing + against == of.length && witnesses.intersection(opposed).isEmpty;
+  /// Whether a decision carries: a strict majority of [among], the set
+  /// the peer measured against — which must be a legitimate one, every
+  /// human who sat down less some of the removals made by [turn], never
+  /// fewer than that.
+  bool carried(Set<PublicKey> witnesses, TurnId turn, Set<PublicKey> among) {
+    if (among.isEmpty || !humans.containsAll(among)) return false;
+    if (!among.containsAll(floorAt(turn))) return false;
+    return witnesses.intersection(among).length >= among.length ~/ 2 + 1;
   }
 
   int playIndex() => game.tricksPlayed * seatCount + game.trick.length;
@@ -116,7 +137,10 @@ Verification verifyRecord(TableSpec spec, List<Decision> record) {
         if (e.author != holder.key) return 'a leave signed by someone else';
       } else {
         final backers = Set.of(d.witnesses)..remove(holder.key);
-        if (!carried(backers, d.turn)) return 'a ${e.kind.name} without a majority behind it';
+        if (!carried(backers, d.turn, d.among)) {
+          return 'a ${e.kind.name} of seat $seat at ${d.turn} without a majority behind it '
+              '(${backers.length} of ${d.among.length})';
+        }
       }
       removedAt[holder.key] = d.turn;
       holders[seat] = BotSeat(spec.replacementFor(seat));
@@ -132,15 +156,15 @@ Verification verifyRecord(TableSpec spec, List<Decision> record) {
         if (holders[s] is BotSeat && game.passOf(s) == null) botActs(s, passing: true);
       }
       if (game.phase != Phase.passing) continue;
-      if (index >= record.length) return fail('the record ends mid-pass');
+      if (index >= record.length) return allowPartial ? partial() : fail('the record ends mid-pass');
       final d = record[index++];
       final e = d.event;
       if (e.kind != EventKind.pass) return fail('expected a pass, saw ${e.kind.name}');
       final holder = holders[e.seat];
       if (holder is! HumanSeat || holder.key != e.author) return fail('a pass by a key that did not hold seat ${e.seat}');
-      if (!carried(d.witnesses, d.turn, opposed: d.opposed)) {
+      if (!carried(d.witnesses, d.turn, d.among)) {
         return fail('a pass at ${d.turn} by seat ${e.seat} without a majority behind it '
-            '(${d.witnesses.length} of ${participantsAt(d.turn).length} seated)');
+            '(${d.witnesses.length} of ${d.among.length})');
       }
       try {
         game.setPass(e.seat, [for (final c in e.body['cards'] as List) Card.parse(c as String)]);
@@ -155,7 +179,7 @@ Verification verifyRecord(TableSpec spec, List<Decision> record) {
       sweep();
       continue;
     }
-    if (index >= record.length) return fail('the record ends with seat $seat to play');
+    if (index >= record.length) return allowPartial ? partial() : fail('the record ends with seat $seat to play');
     final d = record[index++];
     final e = d.event;
     if (e.kind != EventKind.play) return fail('expected a play, saw ${e.kind.name}');
@@ -165,9 +189,9 @@ Verification verifyRecord(TableSpec spec, List<Decision> record) {
     }
     final turn = TurnId.play(game.handNumber, playIndex());
     if (d.turn != turn) return fail('a play recorded at $turn as ${d.turn}');
-    if (!carried(d.witnesses, turn, opposed: d.opposed)) {
+    if (!carried(d.witnesses, turn, d.among)) {
       return fail('a play at $turn by seat $seat without a majority behind it '
-          '(${d.witnesses.length} of ${participantsAt(turn).length} seated)');
+          '(${d.witnesses.length} of ${d.among.length})');
     }
     final card = Card.parse(e.body['card'] as String);
     if (!game.legalPlaysFor(seat).contains(card)) return fail('an illegal play by seat $seat: $card');

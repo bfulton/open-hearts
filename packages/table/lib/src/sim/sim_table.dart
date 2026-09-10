@@ -40,8 +40,11 @@ class SimTable {
 
   Iterable<TableClient> get clients => people.map((p) => p.client);
 
-  /// Clients of people who have not left, crashed or gone quiet.
-  Iterable<TableClient> get survivors => people.where((p) => !p.gone).map((p) => p.client);
+  /// Clients of people who have not left, crashed or gone quiet, and
+  /// have not been removed by the others — a removed client is out of
+  /// the table whatever it thinks.
+  Iterable<TableClient> get survivors =>
+      people.where((p) => !p.gone && p.client.amSeated).map((p) => p.client);
 
   void start() {
     for (final p in people) {

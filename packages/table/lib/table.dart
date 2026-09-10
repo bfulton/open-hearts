@@ -10,6 +10,7 @@ library;
 export 'src/client.dart';
 export 'src/clock.dart';
 export 'src/events.dart';
+export 'src/model.dart';
 export 'src/record.dart';
 export 'src/signing.dart';
 export 'src/spec.dart';

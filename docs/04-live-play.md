@@ -157,29 +157,45 @@ set, which can only make it wait, never settle something the others
 would not; and because the two sides of a race are disjoint within any
 one set, both cannot win.
 
-**A play that exists beats a boot that could not win.** When every
-participant has voted and the table has split evenly — which a
-partition can do — the action carries. That is what "a valid signed
-play for turn T voids any boot for turn T" comes to in practice, and a
-peer holding the play rebroadcasts it instead of countersigning the
-boot, so the split rarely happens at all.
+**Nobody claims a departure from inside a hole in the network.** A peer
+presses or countersigns a boot, or claims or backs an absence, only
+while it has heard from a majority of the participants within the last
+couple of heartbeats. A peer that has not is the one that is cut off,
+and its table says so — "waiting for the others" — instead of judging
+anyone. Nor does anyone boot a player whose heartbeats show them still
+receiving the game: behind is not gone.
+
+**An even split waits for the jury.** When every participant has voted
+on a turn and neither side has a majority, the turn is stuck and the
+table pauses for the jury. Letting the play win the tie, which is what
+this document once said, was tried and found unsafe: a peer that knew of
+a removal made at the same turn could call the vote complete while a
+peer that did not still counted the removed player, and the two
+settled the turn differently. Only a party outside the table can break
+a tie without that risk. A peer holding the play rebroadcasts it
+instead of countersigning the boot, so the split is rare; the jury is
+what makes it harmless.
 
 **The majority rule is what stops a partition becoming a fork.** Split a
 four-human table 2–2 and each half sees the other as silent — but each
-half holds two of four, neither has a majority, neither evicts anyone.
+half holds two of four, neither has a majority, neither evicts anyone,
+and neither is connected to a majority, so neither so much as claims.
 Both halves wait, and when the network heals, whoever still holds
-unsettled evidence repeats it and whoever is ahead catches the others
-up. Split it 2–1 and the two proceed correctly; the one learns it is
-out when the network heals, and goes back to matchmaking.
+unsettled evidence repeats it and whoever is ahead hands the others the
+whole decision they missed. Split it 2–1 and the two proceed correctly;
+the one learns it is out when the network heals, and goes back to
+matchmaking.
 
 **The record is the belt and braces.** Every settled turn and every
 departure goes into it with the signatures that carried it, in an
 order every peer arrives at independently, and anyone can replay it
 against the deal with the same rules: every human action signed by the
 seat's key and legal, every removal carried by the participants of its
-moment, every bot move recomputed. The departure matrix in
+moment, every bot move recomputed, every majority checked against a set the
+peer could legitimately have measured against. The departure matrix in
 [doc 06](06-service.md) runs all of this on a simulated network on
-every commit.
+every commit, and a chaos test walks the same simulator through random
+faults checking that no two survivors ever disagree.
 
 ## Playing a seat nobody holds
 

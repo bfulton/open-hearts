@@ -15,8 +15,11 @@ class SimNetwork {
       : _random = Random(seed);
 
   final VirtualClock clock;
-  final int minLatencyMs;
-  final int maxLatencyMs;
+  int minLatencyMs;
+  int maxLatencyMs;
+
+  /// Fraction of messages lost on a healthy link, 0 to 1.
+  double lossRate = 0;
 
   /// How long the transport takes to notice a peer is gone.
   final int detectDisconnectMs;
@@ -69,6 +72,10 @@ class SimNetwork {
     for (final to in _peers.keys) {
       if (to == from) continue;
       if (!_reachable(from, to)) {
+        dropped++;
+        continue;
+      }
+      if (lossRate > 0 && _random.nextDouble() < lossRate) {
         dropped++;
         continue;
       }

@@ -144,6 +144,16 @@ The axes:
 The juror rows arrive with the jury ([doc 04](04-live-play.md)); they
 are in the matrix from the start and skipped until then.
 
+**The chaos test** is the matrix's complement: random walks through
+the same simulator — departures, partitions, blips, loss and latency at
+random times — checking every few seconds of virtual time that no two
+survivors hold conflicting decisions, that every record verifies as far
+as it goes, and that every state change is one the protocol's explicit
+model (`packages/table/lib/src/model.dart`: a turn is open, acting,
+contested, split or settled; a seat is human, left, booted, absent or
+bot; the table is playing, paused, or finished) allows. It found four
+things the matrix had not, in its first hour.
+
 What every cell asserts:
 
 - **The game reaches its end** with a bot in every departed seat — or,
