@@ -153,11 +153,17 @@ would mean elliptic-curve arithmetic gate by gate — hundreds of millions
 of gates per card — and the count below is what rules that out. Instead,
 at the deal, once a player has opened their thirteen cards, they
 secret-share the *plaintext* — which card sits at each of their thirteen
-positions — among the other three, alongside a share of their decryption
-key. The hand shares feed the policy. The key shares let the survivors
-open a position in public, each contributing its part of the decryption
-without anyone reassembling the key. The policy answers with a position,
-the survivors open it, and the card that appears is the play.
+positions — among the other three players and a juror, alongside a
+share of their decryption key. Each fragment on its own is random noise;
+only all of them together are the hand, and they are never put together
+in the open. The three other players, colluding, still hold noise
+without the juror's piece, and the juror releases it only when the jury
+has agreed the player is gone. Then the fragments feed the policy, and
+the key shares let the survivors open a position in public, each
+contributing its part of the decryption without anyone reassembling the
+key. The policy answers with a position, the survivors open it, and the
+card that appears is the play. Nobody sees a hand: not one player, not
+all of them.
 
 A leaver who shared a false hand is caught, not accommodated. The bot
 plays from what it was given, the opened card is what was really there,
@@ -211,12 +217,13 @@ Departures require re-sharing among the survivors, and the material for
 the next configuration is precomputed one hop ahead so a departure does
 not stall the table. Preprocessing is input-independent — it reveals
 nothing and cannot be opened — so it is safe to distribute in advance,
-which a hand would not be. The hand shares themselves are re-shared one
-hop ahead too, and the extra share goes to the jury, never to a
-survivor: two survivors holding enough between them to carry on without
-a third could open the hand without them as well. If two people go
-inside the same window the table pauses for a beat while it catches up;
-that is a moment to design, not an error.
+which a hand would not be. Hand fragments are re-shared one hop ahead
+too, and the piece that lets the survivors carry on without a departed
+holder goes to the jury, never to a survivor: survivors holding enough
+between them to continue without someone could open the hand without
+them as well. If two people go inside the same window the table pauses
+for a beat while it catches up; that is a moment to design, not an
+error.
 
 ## Why there is no service in any of this
 
