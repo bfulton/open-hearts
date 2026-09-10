@@ -54,10 +54,11 @@ rigged. Roughly in order:
    four to six on a phone — implement, then optimise
    ([doc 03](docs/03-fair-deal.md)). The phone's own number is a tap
    away on the dev site.
-4. **Two devices, one table** over WebRTC, with the local service and
-   relay behind it ([doc 06](docs/06-service.md)) — the spike that
-   proves the transport and the shared-referee model, and the start of
-   the end-to-end suite.
+4. **Four clients, one table.** The protocol is written and its
+   departure matrix passes on a simulated network
+   ([doc 06](docs/06-service.md), `packages/table`). Still to come:
+   the same clients over WebRTC with the local relay behind them, the
+   app's live table, and the end-to-end suite in real browsers.
 5. **The verifiable deal.**
 6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
    matchmaking, seat handover, the jury.

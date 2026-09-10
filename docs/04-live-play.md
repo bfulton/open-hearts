@@ -135,24 +135,51 @@ rejoin as, so a removed player goes back to matchmaking.
 
 Hearts is turn-based, and that dissolves most of what would otherwise be
 a hard problem. Exactly one seat may act at a time and the order comes
-from the rules, not from who spoke first — so there is no ordering
-ambiguity to resolve and no race to arbitrate.
+from the rules, not from who spoke first. The one genuinely concurrent
+question is whether the seat on turn is still there, and the protocol
+in `packages/table` treats every turn as exactly that question.
 
-The only genuinely concurrent question is whether someone has gone, which
-is why it gets the machinery above and nothing else does.
+**A turn is a race with two sides.** On one side the seat's own action —
+its pass or play, signed by the seat — and on the other its removal: a
+boot pressed by someone after fifteen seconds, or an absence claimed
+after thirty of silence. Every other participant backs one side or the
+other with a signature, never both, and a side wins with a **strict
+majority of the participants at that turn**. Only then does the next
+turn open, so nothing is ever rolled back. A signed Leave is evidence
+and needs no majority.
 
-The majority rule is what stops a partition becoming a fork. Split a
+**Who a majority is of** cannot depend on when each peer heard the news,
+so it is a function of the record: the participants at a turn are the
+humans who sat down, less anyone removed at that turn or earlier. The
+four pass turns of a hand are concurrent, so they count as one position.
+A peer that has not yet heard of a removal measures against a larger
+set, which can only make it wait, never settle something the others
+would not; and because the two sides of a race are disjoint within any
+one set, both cannot win.
+
+**A play that exists beats a boot that could not win.** When every
+participant has voted and the table has split evenly — which a
+partition can do — the action carries. That is what "a valid signed
+play for turn T voids any boot for turn T" comes to in practice, and a
+peer holding the play rebroadcasts it instead of countersigning the
+boot, so the split rarely happens at all.
+
+**The majority rule is what stops a partition becoming a fork.** Split a
 four-human table 2–2 and each half sees the other as silent — but each
-half holds two of four, neither has a majority, neither evicts anyone,
-and neither reconstructs anything. Both halves wait. That is the right
-outcome for a genuinely symmetric event: nobody left, so nobody is
-replaced. Split it 3–1 and the three proceed correctly.
+half holds two of four, neither has a majority, neither evicts anyone.
+Both halves wait, and when the network heals, whoever still holds
+unsettled evidence repeats it and whoever is ahead catches the others
+up. Split it 2–1 and the two proceed correctly; the one learns it is
+out when the network heals, and goes back to matchmaking.
 
-Belt and braces: the game state is hash-chained. Every play appends to a
-log and each player signs the resulting hash, so a peer whose hash
-diverges knows immediately and halts rather than playing on into a fork.
-Since turn order is fixed by the rules, a mismatch means a genuine fault
-and is worth stopping for.
+**The record is the belt and braces.** Every settled turn and every
+departure goes into it with the signatures that carried it, in an
+order every peer arrives at independently, and anyone can replay it
+against the deal with the same rules: every human action signed by the
+seat's key and legal, every removal carried by the participants of its
+moment, every bot move recomputed. The departure matrix in
+[doc 06](06-service.md) runs all of this on a simulated network on
+every commit.
 
 ## Playing a seat nobody holds
 
