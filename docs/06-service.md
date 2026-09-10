@@ -96,8 +96,11 @@ lines of handlers, the whole service is Dart. Locally that is one
 runtime — a packaging decision, deferred.
 
 ```
-packages/engine/     the rules and the bot — shared by app and service
-app/                 Flutter
+packages/engine/     the rules and the bot — shared by app, table and service
+packages/table/      the table protocol — signed events, membership,
+                     departures, the play chain — pure Dart over an
+                     abstract transport and clock, with its simulator
+app/                 Flutter: the table package over WebRTC, and the UI
 service/             handlers, juror, storage adapters, local relay
 e2e/                 Playwright, driving real browsers against the local service
 site/
@@ -105,13 +108,57 @@ docs/
 ```
 
 Extracting the engine into its own package comes before the service
-exists, so nothing is ever imported across the app/service line.
+exists, so nothing is ever imported across the app/service line. The
+table protocol is a package for the same reason, and one more: the same
+code has to run under a simulated network and a real one.
 
-## End-to-end tests
+## The departure matrix
 
-Playwright drives several headless browsers as players against the local
-service and relay, with real WebRTC between them. That is what makes the
-departure cases testable as they will actually happen: a browser closed
-mid-hand, a second booting a stalled one, a table draining to one human
-and the local juror stepping into the computation. It is also the only
-way to catch partition and split-brain bugs, which do not unit-test.
+The protocol's whole job is to keep four seats playing while people
+come and go, and the cases multiply: how many humans, who goes, how,
+and when. Written out it is thousands of cells, so the tests are in
+two layers that drive the same client code with the network and the
+clock swapped.
+
+**The simulator** (`packages/table`) runs every client as an in-process
+object over a simulated network — controllable latency, drops, and
+partitions — on a virtual clock. The whole matrix runs in seconds,
+every failure replays from its seed, and it runs in CI on every commit.
+
+**Real browsers** (`e2e/`): Playwright drives four headless browsers as
+players against the local service and relay, with real WebRTC between
+them, through a handful of representative cells. That is what proves the
+transport, and the only way to see a departure as it actually happens:
+a browser closed mid-hand, a second booting a stalled one, a table
+draining to one human and the local juror stepping in.
+
+The axes:
+
+| | |
+|---|---|
+| **Live humans at the start** | 1, 2, 3, 4 — bots in the rest. A table reaches 1 by departures too, so this axis is not independent of the others. |
+| **Who goes** | one player; two players in the same window; two in sequence; a juror; the foreman; two jurors; the whole jury |
+| **How** | a signed Leave; a silent drop, found by timeout; a boot at fifteen seconds on turn; a two-and-two partition, which is not a departure but looks like one from inside |
+| **When** | on the departed seat's own turn; off it; mid-trick; the last trick of a hand; during the pass; during the deal; at a hand boundary |
+
+The juror rows arrive with the jury ([doc 04](04-live-play.md)); they
+are in the matrix from the start and skipped until then.
+
+What every cell asserts:
+
+- **The game reaches its end** with a bot in every departed seat — or,
+  at two humans with an inferred departure and no jury seated yet, the
+  table **pauses and says so**, and stays consistent while paused.
+- **Every surviving client holds the same record**, event for event,
+  once the network settles.
+- **The record verifies**: every human play signed by its seat's key and
+  legal under the engine, every bot play recomputable from the deal.
+- **Ratings follow doc 04's two rules**: a bot in the winning seat moves
+  nobody; a live winner moves everyone, leavers included.
+- **A play at 14.9 seconds beats a boot at 15.0**, and a peer holding
+  the play rebroadcasts it instead of countersigning the boot.
+- **Nobody is removed without a strict majority** of the last agreed
+  participant set, so a partition never forks: neither side can act,
+  and when it heals there is one record.
+- **Nothing hangs**: the virtual clock advances until the game is over
+  or the pause is explained on screen.
