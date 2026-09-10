@@ -142,14 +142,47 @@ them or the bot cannot play — and nobody may learn them.
 
 Both are satisfied by **secure multi-party computation**, and the
 distinction that makes it work is that computing on a secret is not the
-same as reconstructing one. At the deal, each player secret-shares their
-own decryption key among the others. The fragments are never reassembled;
-they go in as inputs, and the computation internally reconstructs the
-key, decrypts the hand, runs the bot policy and outputs one card. Only
-that card leaves, and it was going face up anyway.
-
-So the survivors collectively hold a departed hand and individually know
+same as reconstructing one. The hand goes in as fragments that are never
+reassembled; the computation runs the bot policy over them and outputs
+one card. Only that card leaves, and it was going face up anyway. So the
+survivors collectively hold a departed hand and individually know
 nothing about it.
+
+**What goes in.** Not the ciphertexts. Decrypting inside the computation
+would mean elliptic-curve arithmetic gate by gate — hundreds of millions
+of gates per card — and the count below is what rules that out. Instead,
+at the deal, once a player has opened their thirteen cards, they
+secret-share the *plaintext* — which card sits at each of their thirteen
+positions — among the other three, alongside a share of their decryption
+key. The hand shares feed the policy. The key shares let the survivors
+open a position in public, each contributing its part of the decryption
+without anyone reassembling the key. The policy answers with a position,
+the survivors open it, and the card that appears is the play.
+
+A leaver who shared a false hand is caught, not accommodated. The bot
+plays from what it was given, the opened card is what was really there,
+and at the end of the hand — when every hand is revealed for the audit
+[doc 03](03-fair-deal.md) describes — the two disagree, provably,
+against a player who already took the rating loss for leaving. Until
+then the worst case is one bot playing the cheater's own seat a little
+wrong.
+
+**The policy as a circuit.** `packages/engine/lib/src/oblivious.dart` is
+the bot rewritten without a branch on secret data, and its test proves
+it picks the same card as the bot on every decision of forty games.
+Counted, in AND gates — what a garbled circuit costs; XOR is free:
+
+| | AND gates |
+|---|---|
+| one play, legality included | 1,234 |
+| the same, hand in as thirteen dealt positions and position out | 2,313 |
+| one pass | 8,796 |
+| a bot seat for a whole hand: one pass and thirteen plays | 38,865 |
+
+At two ciphertexts per gate a play is about 75 KB and a whole hand about
+1.2 MB; malicious security multiplies that by a small constant. Small
+enough that the material for a hand travels while the previous one is
+played, and that the precomputation below is seconds of background work.
 
 **The parties are the humans at the table, and only them.** Adding the
 service as a third party would buy a cheaper protocol — honest-majority
@@ -178,9 +211,12 @@ Departures require re-sharing among the survivors, and the material for
 the next configuration is precomputed one hop ahead so a departure does
 not stall the table. Preprocessing is input-independent — it reveals
 nothing and cannot be opened — so it is safe to distribute in advance,
-which a hand would not be. If two people go inside the same window the
-table pauses for a beat while it catches up; that is a moment to design,
-not an error.
+which a hand would not be. The hand shares themselves are re-shared one
+hop ahead too, and the extra share goes to the jury, never to a
+survivor: two survivors holding enough between them to carry on without
+a third could open the hand without them as well. If two people go
+inside the same window the table pauses for a beat while it catches up;
+that is a moment to design, not an error.
 
 ## Why there is no service in any of this
 

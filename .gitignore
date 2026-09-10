@@ -6,6 +6,9 @@ build/
 .dart_tool/
 *.iml
 
+# Rust (measurements/shuffle)
+measurements/shuffle/target/
+
 # Tooling
 node_modules/
 .wrangler/

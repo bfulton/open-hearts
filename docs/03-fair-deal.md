@@ -80,22 +80,42 @@ the right way: **the crypto is per-hand, not per-play.**
 | Play one card | one share + one small proof | per play |
 | Verify one play | a handful of multiplications | per play |
 
-On a mid-range phone in WASM a scalar multiplication on a modern curve
-(ristretto255 or similar) is tens of microseconds. That puts a full
-verifiable deal in the neighbourhood of a few hundred milliseconds of
-compute, spread over about eight messages between players — call it one
-to two seconds of "dealing…" at the start of a hand, which is roughly how
-long dealing takes at a real table anyway.
+**Measured, not estimated.** [`measurements/shuffle/`](../measurements/README.md)
+times the reference implementation of exactly this protocol —
+Barnett–Smart with a Bayer–Groth shuffle argument, from
+geometryxyz/mental-poker, on the Starknet curve — through one deal: four
+shuffle-and-remask proofs, their verification, and one seat opening its
+thirteen cards.
 
-Playing a card stays in the noise. **Sub-second play and a provably fair
-deal are not in tension**, because they are not the same cost.
+| Step | native, x86-64 | wasm, Chromium 141, same core |
+|---|---|---|
+| shuffle + prove, one player | 80 ms | 370 ms |
+| verify one shuffle proof | 36 ms | 163 ms |
+| one reveal token with its proof | 0.4 ms | 1.6 ms |
+| unmask one card, four tokens' proofs checked | 2.2 ms | 8.8 ms |
+| **critical path, sit to cards in hand** | **0.47 s** | **2.1 s** |
 
-These are estimates from published complexities, not measurements. The
-first task in this line of work is a benchmark, not an implementation:
-build the shuffle-and-prove step for n=52, run it in wasm on an actual
-phone, and put the real number here. If it comes back at ten seconds
-instead of one, the design changes and it is much cheaper to learn that
-before anything is built on top of it.
+The critical path is the four shuffles one after another, each verified
+before the next begins, then the tokens and the opening; network time is
+not in it. Any one player's own compute is about half of it.
+
+Two things about those numbers. They are for the reference crate as
+found — generic field arithmetic, no wasm SIMD, a curve picked for a
+different purpose — and a tuned implementation on ristretto255 is
+usually several times faster. And they come from a desktop-class core;
+a phone is two to three times slower. So **expect four to six seconds of
+"dealing…" on a phone with this crate as it stands**: more than the one
+to two seconds this section once estimated, well short of the ten that
+would send the design back. The conclusion is implement the deal, then
+optimise it — not redesign it.
+
+The phone's own number is one tap away: `deploy.sh` publishes the same
+benchmark at `/measure/shuffle/` on the dev site whenever the wasm has
+been built, and that number belongs in the table above.
+
+Playing a card stays in the noise — a token and a proof, two
+milliseconds. **Sub-second play and a provably fair deal are not in
+tension**, because they are not the same cost.
 
 ## What it still does not stop
 
@@ -195,8 +215,8 @@ revealing the permutation.
 2. Real players over WebRTC with the shared rules engine as referee
    ([doc 02](02-multiplayer.md)). Good enough for friends, and friends
    are not the threat model.
-3. Benchmark a 52-card verifiable shuffle in wasm on a real phone.
-   Publish the number.
+3. Benchmark a 52-card verifiable shuffle in wasm. **Done on a desktop
+   core** (above); the phone's number is a tap away on the dev site.
 4. If the number holds, implement Barnett–Smart and make the fair deal
    the default for tables with strangers.
 

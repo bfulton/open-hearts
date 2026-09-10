@@ -15,7 +15,10 @@ anything whose feedback arrives in a terminal.
    `build/publish/play/`.
 3. Writes `build/publish/play/build-info.json` stamped with the short
    commit sha.
-4. Uploads the lot to Cloudflare Pages as a **branch deployment**.
+4. Copies the deal benchmark to `build/publish/measure/shuffle/` when
+   its wasm has been built ([measurements](../measurements/README.md)),
+   so the number that matters comes from a phone.
+5. Uploads the lot to Cloudflare Pages as a **branch deployment**.
 
 Cloudflare gives every branch a stable alias host, so the URL does not
 change between commits:

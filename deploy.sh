@@ -5,6 +5,8 @@
 #
 #   /            the marketing site (site/, copied verbatim)
 #   /play/       the Flutter web build, base-href /play/
+#   /measure/    benchmarks meant to be run on a phone (only the ones
+#                that have been built; see measurements/README.md)
 #
 # Every commit publishes, which is the whole point: the phone reading
 # https://dev.open-hearts.pages.dev/play is looking at the last push.
@@ -65,6 +67,16 @@ cp -r app/build/web/. "$STAGE/play"/
 printf '{"build": "%s", "date": "%s"}\n' "$BUILD_TAG" "$BUILD_DATE" \
   > "$STAGE/play/build-info.json"
 
+# The deal benchmark rides along when its wasm has been built here; the
+# phone is the device the number is wanted from.
+SHUFFLE_WASM=measurements/shuffle/target/wasm32-unknown-unknown/release/shuffle_bench.wasm
+if [ -f "$SHUFFLE_WASM" ]; then
+  mkdir -p "$STAGE/measure/shuffle"
+  cp "$SHUFFLE_WASM" "$STAGE/measure/shuffle/"
+  cp measurements/shuffle/bench.html "$STAGE/measure/shuffle/index.html"
+  echo "==> including /measure/shuffle/"
+fi
+
 echo "==> publishing to $PROJECT ($LABEL)"
 CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-$CLOUDFLARE_TOKEN}" \
 CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
@@ -77,3 +89,6 @@ CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
 echo
 echo "site  https://$LABEL.$PROJECT.pages.dev/"
 echo "app   https://$LABEL.$PROJECT.pages.dev/play"
+if [ -f "$SHUFFLE_WASM" ]; then
+  echo "bench https://$LABEL.$PROJECT.pages.dev/measure/shuffle/"
+fi

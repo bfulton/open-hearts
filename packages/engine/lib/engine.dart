@@ -8,4 +8,5 @@ library;
 export 'src/bot.dart';
 export 'src/card.dart';
 export 'src/game.dart';
+export 'src/oblivious.dart';
 export 'src/rules.dart';

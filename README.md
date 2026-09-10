@@ -46,9 +46,14 @@ rigged. Roughly in order:
 
 1. **Solo play** against bots — done, and free on every platform forever.
 2. **The engine as a package**, shared by the app and the service.
-3. **Two measurements before anything is built on them:** the bot policy
-   as a boolean circuit, counted; and a verifiable 52-card shuffle timed
-   in wasm on a real phone ([doc 03](docs/03-fair-deal.md)).
+3. **Two measurements before anything is built on them** — taken
+   ([measurements](measurements/README.md)). The bot policy as a boolean
+   circuit: 2,313 AND gates a play, proven equal to the bot
+   ([doc 04](docs/04-live-play.md)). A verifiable 52-card deal in wasm:
+   2.1 s critical path on a desktop core with the reference crate, so
+   four to six on a phone — implement, then optimise
+   ([doc 03](docs/03-fair-deal.md)). The phone's own number is a tap
+   away on the dev site.
 4. **Two devices, one table** over WebRTC, with the local service and
    relay behind it ([doc 06](docs/06-service.md)) — the spike that
    proves the transport and the shared-referee model, and the start of
