@@ -167,6 +167,10 @@ class TableClient {
   /// Turns settled in the current hand.
   int step = 0;
 
+  /// The last hand's score sheet, kept because the game moves straight
+  /// on to the next deal.
+  ({int hand, List<int> scores, List<int> totals, int? moonShooter})? lastHand;
+
   /// Cards played this hand, what a seated player has seen.
   final Set<Card> played = {};
 
@@ -511,6 +515,14 @@ class TableClient {
     }
     if (game.pendingTrick != null) game.collectTrick();
     if (game.phase == Phase.handOver) {
+      // The table does not wait on anyone to look at the score sheet;
+      // a view that wants to show it takes it from here.
+      lastHand = (
+        hand: game.handNumber,
+        scores: game.handScores,
+        totals: game.totals,
+        moonShooter: game.moonShooter,
+      );
       game.nextHand();
       _openHand();
     } else if (game.phase == Phase.playing) {

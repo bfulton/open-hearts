@@ -9,12 +9,15 @@ import 'package:engine/engine.dart';
 import '../theme.dart';
 
 class Scoreboard extends StatelessWidget {
-  const Scoreboard({super.key, required this.game, required this.names});
+  const Scoreboard({super.key, required this.game, required this.names, this.mySeat = humanSeat});
 
   final HeartsGame game;
 
   /// Seat names, seat order.
   final List<String> names;
+
+  /// The player's seat, shown first.
+  final int mySeat;
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +33,14 @@ class Scoreboard extends StatelessWidget {
         children: [
           Row(
             children: [
-              for (var seat = 0; seat < seatCount; seat++)
+              for (var p = 0; p < seatCount; p++)
                 Expanded(
-                  child: _SeatScore(game: game, seat: seat, name: names[seat]),
+                  child: _SeatScore(
+                    game: game,
+                    seat: (p + mySeat) % seatCount,
+                    name: names[(p + mySeat) % seatCount],
+                    isYou: p == 0,
+                  ),
                 ),
             ],
           ),
@@ -57,15 +65,16 @@ class _SeatScore extends StatelessWidget {
     required this.game,
     required this.seat,
     required this.name,
+    required this.isYou,
   });
 
   final HeartsGame game;
   final int seat;
   final String name;
+  final bool isYou;
 
   @override
   Widget build(BuildContext context) {
-    final isYou = seat == humanSeat;
     final taken = game.taken[seat];
     return Column(
       children: [

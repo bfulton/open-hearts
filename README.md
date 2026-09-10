@@ -60,11 +60,13 @@ rigged. Roughly in order:
    fork or a deadlock ([doc 06](docs/06-service.md), `packages/table`).
    The local relay exists (`service/`, a NIP-01 subset), the same
    clients play a hand over it with real keys and real sockets, and
-   WebRTC signalling has its wire. Still to come: WebRTC itself in the
-   app, with signing in wasm since Dart-to-JavaScript signatures cost
-   100 ms each ([measurements](measurements/README.md)); the app's
-   live table; and the end-to-end suite in real browsers. Meanwhile
-   every solo game is kept on the device as a
+   the app has a live table: **Play live**, host a four-letter code or
+   join one, and the four of you are on WebRTC data channels with the
+   relay as fallback, signing in wasm since Dart-to-JavaScript
+   signatures cost 100 ms each ([measurements](measurements/README.md)).
+   Still to come: the end-to-end suite in real browsers, and a relay
+   that is not on localhost. Meanwhile every solo game is kept on the
+   device as a
    record — the deal, the bots, your own passes and plays — and **Copy
    record** on the game-over sheet hands it over as a line of text that
    `packages/engine/tool/replay.dart` turns back into every trick.

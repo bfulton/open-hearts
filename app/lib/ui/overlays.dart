@@ -8,41 +8,67 @@ import 'package:engine/engine.dart';
 import '../theme.dart';
 
 class HandOverSheet extends StatelessWidget {
-  const HandOverSheet({super.key, required this.game, required this.names, required this.onNext});
+  const HandOverSheet({
+    super.key,
+    required this.handNumber,
+    required this.scores,
+    required this.totals,
+    required this.moonShooter,
+    required this.names,
+    required this.onNext,
+    this.mySeat = humanSeat,
+    this.action = 'Next hand',
+  });
 
-  final HeartsGame game;
+  /// Takes the numbers rather than the game: at a live table the game
+  /// has already moved on to the next deal by the time this shows.
+  factory HandOverSheet.of(HeartsGame game, {required List<String> names, required VoidCallback onNext}) =>
+      HandOverSheet(
+        handNumber: game.handNumber,
+        scores: game.handScores,
+        totals: game.totals,
+        moonShooter: game.moonShooter,
+        names: names,
+        onNext: onNext,
+      );
+
+  final int handNumber;
+  final List<int> scores;
+  final List<int> totals;
+  final int? moonShooter;
   final List<String> names;
   final VoidCallback onNext;
+  final int mySeat;
+
+  /// The button's label: at a live table the next hand is already
+  /// under way, so it only dismisses.
+  final String action;
 
   @override
   Widget build(BuildContext context) {
-    final shooter = game.moonShooter;
+    final shooter = moonShooter;
     return _Sheet(
       title: shooter == null
-          ? 'Hand ${game.handNumber + 1}'
-          : shooter == humanSeat
+          ? 'Hand ${handNumber + 1}'
+          : shooter == mySeat
               ? 'You shot the moon'
               : '${names[shooter]} shot the moon',
       accent: shooter == null
           ? Palette.gold
-          : shooter == humanSeat
+          : shooter == mySeat
               ? Palette.gold
               : Palette.danger,
-      subtitle: shooter == null
-          ? null
-          : shooter == humanSeat
-              ? 'All 26 — everyone else takes them'
-              : 'All 26 — everyone else takes them',
+      subtitle: shooter == null ? null : 'All 26 — everyone else takes them',
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
             name: names[seat],
-            delta: game.handScores[seat],
-            total: game.totals[seat],
-            you: seat == humanSeat,
+            delta: scores[seat],
+            total: totals[seat],
+            you: seat == mySeat,
           ),
       ],
-      action: 'Next hand',
+      action: action,
       onAction: onNext,
     );
   }
@@ -55,11 +81,15 @@ class GameOverSheet extends StatelessWidget {
     required this.names,
     required this.onNewGame,
     this.onCopyRecord,
+    this.mySeat = humanSeat,
+    this.action = 'New game',
   });
 
   final HeartsGame game;
   final List<String> names;
   final VoidCallback onNewGame;
+  final int mySeat;
+  final String action;
 
   /// Puts the game's record on the clipboard: a line that replays the
   /// whole game, for looking at a hand afterwards.
@@ -68,7 +98,7 @@ class GameOverSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final won = game.winners;
-    final youWon = won.contains(humanSeat);
+    final youWon = won.contains(mySeat);
     final title = youWon
         ? (won.length > 1 ? 'A share of it' : 'You win')
         : won.length > 1
@@ -85,10 +115,10 @@ class GameOverSheet extends StatelessWidget {
             name: names[seat],
             delta: game.handScores[seat],
             total: game.totals[seat],
-            you: seat == humanSeat,
+            you: seat == mySeat,
           ),
       ],
-      action: 'New game',
+      action: action,
       onAction: onNewGame,
       secondary: onCopyRecord == null ? null : 'Copy record',
       onSecondary: onCopyRecord,

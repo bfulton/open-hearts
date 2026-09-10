@@ -41,11 +41,18 @@ bool verify(PublicKey key, String digestHex, String signatureHex) {
     return FakeSigner.check(key, digestHex, signatureHex);
   }
   try {
-    return bip340.verify(key, digestHex, signatureHex);
+    return schnorrVerifier(key, digestHex, signatureHex);
   } catch (_) {
     return false;
   }
 }
+
+/// How a real signature is checked. The pure-Dart `bip340` package by
+/// default — 11 ms in the VM, fine for the service and the tests — and
+/// on the web the app swaps in its wasm, which is two hundred times
+/// faster there (measurements/sign). Set once, at startup, before any
+/// event is parsed.
+bool Function(PublicKey key, String digestHex, String signatureHex) schnorrVerifier = bip340.verify;
 
 /// A real key. Generated fresh, or loaded from the 32-byte secret.
 class SchnorrSigner implements Signer {

@@ -184,4 +184,9 @@ abstract final class TableKinds {
   /// WebRTC signalling — an offer, answer or ICE candidate — tagged `p`
   /// with the recipient and `t` with the table id.
   static const signal = 24243;
+
+  /// The lobby: hosting a table, joining it, starting it, tagged `t`
+  /// with the room code. Stored, not ephemeral, so a relay hands a
+  /// joiner the room that was announced before it arrived.
+  static const lobby = 4244;
 }

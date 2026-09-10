@@ -13,6 +13,8 @@ import 'build_info.dart';
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
 import 'game_controller.dart';
+import 'live/lobby_page.dart';
+import 'table_model.dart';
 import 'theme.dart';
 import 'ui/hand_fan.dart';
 import 'ui/overlays.dart';
@@ -106,7 +108,7 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final game = _controller.game;
-    final hand = game.handOf(humanSeat);
+    final hand = game.handOf(_controller.mySeat);
     final legal = _controller.legalNow;
     final passing = _controller.awaitingPass;
 
@@ -129,10 +131,19 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
                           child: _BuildStamp(
                               newBuild: _newBuild, onReload: _reload),
                         ),
+                        Positioned(
+                          left: 6,
+                          bottom: 2,
+                          child: _LivePill(onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(builder: (_) => const LobbyPage()),
+                            );
+                          }),
+                        ),
                       ],
                     ),
                   ),
-                  _ActionBar(
+                  ActionBar(
                     controller: _controller,
                     onPass: _controller.confirmPass,
                   ),
@@ -150,7 +161,7 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
                         dimUnplayable: _controller.awaitingPlay,
                         forced: legal.length == 1 ? legal.first : null,
                         justReceived: game.tricksPlayed == 0
-                            ? game.receivedBy(humanSeat).toSet()
+                            ? game.receivedBy(_controller.mySeat).toSet()
                             : const {},
                       ),
                     ),
@@ -159,7 +170,7 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
               ),
 
               if (game.phase == Phase.handOver)
-                HandOverSheet(game: game, names: _controller.names, onNext: _controller.nextHand),
+                HandOverSheet.of(game, names: _controller.names, onNext: _controller.nextHand),
               if (game.phase == Phase.gameOver)
                 GameOverSheet(
                   game: game,
@@ -180,11 +191,16 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
 
 /// The line between the felt and your hand: what the game wants from you,
 /// and the Pass button when it wants three cards.
-class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.controller, required this.onPass});
+class ActionBar extends StatelessWidget {
+  const ActionBar({super.key, required this.controller, required this.onPass, this.note});
 
-  final GameController controller;
+  final TableModel controller;
   final VoidCallback onPass;
+
+  /// A line that takes the place of the default note when there is
+  /// something more pressing to say — a live table's pause, or a boot
+  /// clock.
+  final Widget? note;
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +244,9 @@ class _ActionBar extends StatelessWidget {
       );
     }
 
-    final received = game.receivedBy(humanSeat);
+    if (this.note != null) return SizedBox(height: 30, child: Center(child: this.note));
+
+    final received = game.receivedBy(controller.mySeat);
 
     // Through the whole first trick, not just the lead: the bots play
     // into the trick before your turn comes round, and what you were
@@ -237,7 +255,7 @@ class _ActionBar extends StatelessWidget {
     if (game.phase == Phase.playing &&
         game.tricksPlayed == 0 &&
         received.isNotEmpty) {
-      final from = game.passerTo(humanSeat);
+      final from = game.passerTo(controller.mySeat);
       return SizedBox(
         height: 30,
         child: Row(
@@ -245,7 +263,7 @@ class _ActionBar extends StatelessWidget {
           children: [
             // Points at the seat the cards came from, so the direction
             // is read off the table rather than out of the sentence.
-            Icon(_towards(from), size: 14, color: Palette.chromeDim),
+            Icon(_towards(controller.positionOf(from)), size: 14, color: Palette.chromeDim),
             const SizedBox(width: 3),
             Text('${controller.names[from]} passed you',
                 style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
@@ -279,9 +297,9 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
-/// Which way a seat lies from the player, as an arrow. Seats are drawn
-/// west-left, north-top, east-right, so the mapping is literal.
-IconData _towards(int seat) => switch (seat) {
+/// Which way a seat lies from the player, as an arrow, by its position
+/// on screen: left, across, right.
+IconData _towards(int position) => switch (position) {
       1 => Icons.arrow_back,
       2 => Icons.arrow_upward,
       _ => Icons.arrow_forward,
@@ -332,6 +350,37 @@ class _BuildStamp extends StatelessWidget {
         fontSize: 9.5,
         color: Palette.chrome.withValues(alpha: 0.22),
         fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+  }
+}
+
+/// The way to a live table: small, and out of the felt's way.
+class _LivePill extends StatelessWidget {
+  const _LivePill({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Palette.gold.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.people_outline, size: 13, color: Palette.gold),
+            const SizedBox(width: 5),
+            Text('Play live',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Palette.gold.withValues(alpha: 0.9))),
+          ],
+        ),
       ),
     );
   }

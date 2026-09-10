@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
-import '../game_controller.dart';
+import '../table_model.dart';
 import '../theme.dart';
 import 'card_view.dart';
 import 'pip.dart';
@@ -32,7 +32,7 @@ const _trickOffset = <int, Offset>{
 class TableView extends StatelessWidget {
   const TableView({super.key, required this.controller});
 
-  final GameController controller;
+  final TableModel controller;
 
   @override
   Widget build(BuildContext context) {
@@ -59,15 +59,15 @@ class TableView extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Stack(
                 children: [
-                  for (var seat = 1; seat < seatCount; seat++)
+                  for (var position = 1; position < seatCount; position++)
                     Align(
-                      alignment: _badgeAt[seat]!,
+                      alignment: _badgeAt[position]!,
                       child: _SeatBadge(
-                        seat: seat,
-                        name: controller.names[seat],
+                        seat: controller.seatAt(position),
+                        name: controller.names[controller.seatAt(position)],
                         game: game,
-                        onTurn: game.currentSeat == seat,
-                        won: pending?.winner == seat,
+                        onTurn: game.currentSeat == controller.seatAt(position),
+                        won: pending?.winner == controller.seatAt(position),
                       ),
                     ),
                 ],
@@ -84,16 +84,16 @@ class TableView extends StatelessWidget {
                   alignment: Alignment.center,
                   clipBehavior: Clip.none,
                   children: [
-                    for (var seat = 0; seat < seatCount; seat++)
+                    for (var position = 0; position < seatCount; position++)
                       Transform.translate(
                         offset: Offset(
-                          _trickOffset[seat]!.dx * cardWidth * 1.15,
-                          _trickOffset[seat]!.dy * cardHeight * 1.02,
+                          _trickOffset[position]!.dx * cardWidth * 1.15,
+                          _trickOffset[position]!.dy * cardHeight * 1.02,
                         ),
                         child: _TrickSlot(
-                          card: _cardFrom(game, seat),
+                          card: _cardFrom(game, controller.seatAt(position)),
                           width: cardWidth,
-                          winning: pending != null && pending.winner == seat,
+                          winning: pending != null && pending.winner == controller.seatAt(position),
                         ),
                       ),
                   ],
@@ -107,12 +107,12 @@ class TableView extends StatelessWidget {
               alignment: const Alignment(0, 0.88),
               child: pending != null
                   ? _TrickResult(
-                      winner: pending.winner,
+                      you: pending.winner == controller.mySeat,
                       name: controller.names[pending.winner],
                       points: pointsIn(pending.plays.map((p) => p.card)),
                     )
                   : game.phase == Phase.playing
-                      ? _TurnHint(game: game)
+                      ? _TurnHint(game: game, mySeat: controller.mySeat)
                       : const SizedBox.shrink(),
             ),
           ],
@@ -230,15 +230,15 @@ class _SeatBadge extends StatelessWidget {
 }
 
 class _TrickResult extends StatelessWidget {
-  const _TrickResult({required this.winner, required this.name, required this.points});
+  const _TrickResult({required this.you, required this.name, required this.points});
 
-  final int winner;
+  final bool you;
   final String name;
   final int points;
 
   @override
   Widget build(BuildContext context) {
-    final who = winner == humanSeat ? 'You take it' : '$name takes it';
+    final who = you ? 'You take it' : '$name takes it';
     return _Pill(
       text: points == 0 ? who : '$who  ·  $points',
       tone: points == 0 ? Palette.gold : Palette.danger,
@@ -247,15 +247,16 @@ class _TrickResult extends StatelessWidget {
 }
 
 class _TurnHint extends StatelessWidget {
-  const _TurnHint({required this.game});
+  const _TurnHint({required this.game, required this.mySeat});
 
   final HeartsGame game;
+  final int mySeat;
 
   @override
   Widget build(BuildContext context) {
     final seat = game.currentSeat;
     if (seat == null) return const SizedBox.shrink();
-    if (seat == humanSeat) {
+    if (seat == mySeat) {
       return _Pill(
         text: game.trick.isEmpty ? 'Your lead' : 'Your turn',
         tone: Palette.gold,

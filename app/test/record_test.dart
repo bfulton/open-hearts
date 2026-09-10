@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:engine/engine.dart' as engine;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:open_hearts/record_store.dart';
+import 'package:open_hearts/game_controller.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
@@ -53,7 +54,7 @@ void main() {
     }
     expect(find.text('New game'), findsOneWidget, reason: 'the game ran to its end');
 
-    final controller = tester.widget<TableView>(find.byType(TableView)).controller;
+    final controller = tester.widget<TableView>(find.byType(TableView)).controller as GameController;
     final game = controller.game;
     expect(game.phase, engine.Phase.gameOver);
 

@@ -67,6 +67,30 @@ data in `packages/engine/lib/src/persona.dart`; the oblivious circuit
 takes the same settings as constants, so a named bot holding a departed
 seat is the same computable consequence as any other.
 
+## The live table, as it stands
+
+What the app does today, ahead of matchmaking and the jury. **Play
+live** on the solo table opens a lobby: a name, and either *Host a
+table* — a four-letter code to read out — or *Join* with one. The lobby
+is the relay's business (`Room` in `app/lib/net/room.dart`): the host
+announces the room, joiners announce themselves, and ten seconds after
+the last person arrives, or when four are in, or when the host presses
+*Start now*, the host publishes one signed start event naming the seats
+— people in the order they came, bots in the rest — and everyone builds
+the same table from it. The transport is a WebRTC data channel to every
+other person, set up over the relay's signalling and carrying the
+table's events directly, with the relay as the path of last resort
+while a channel is not open (`MeshTransport`). The table is drawn from
+whichever chair you hold. On its rail: who is still here; the boot
+clock on a seat that is holding everyone up, and the *Boot* button
+when it runs out; *Leave*; and, when the table is stuck, why — waiting
+for the others, or for the jury. A seat that is booted or falls silent
+sees *A bot took your seat*. The device's key is minted the first time
+it is needed and kept; on the web every signature goes through the wasm
+([measurements/sign](../measurements/README.md)). A widget test seats
+the player at seat 2 with three simulated people and plays a hand,
+watches one leave and boots one for silence.
+
 ## Filling and emptying seats
 
 **A human joining takes a bot's seat at the next hand boundary, never

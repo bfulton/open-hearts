@@ -37,6 +37,7 @@ class RelayTransport implements Transport {
   final _incoming = StreamController<({PublicKey from, Map<String, Object?> message})>.broadcast();
   final _disconnected = StreamController<PublicKey>.broadcast();
   final _signals = StreamController<Signal>.broadcast();
+  final _lobby = StreamController<NostrEvent>.broadcast();
 
   WebSocketChannel? _channel;
   bool _closed = false;
@@ -55,6 +56,18 @@ class RelayTransport implements Transport {
 
   /// Offers, answers and candidates addressed to this peer.
   Stream<Signal> get signals => _signals.stream;
+
+  /// Lobby events for this table id — hosting, joining, starting — the
+  /// relay's stored history first, then live. Anyone's, this peer's
+  /// own included.
+  Stream<NostrEvent> get lobby => _lobby.stream;
+
+  /// Publishes a lobby event, tagged with the table id.
+  void announce(Map<String, Object?> content) {
+    _publish(NostrEvent.sign(signer, kind: TableKinds.lobby, content: jsonEncode(content), tags: [
+      ['t', table],
+    ]));
+  }
 
   @override
   void broadcast(Map<String, Object?> message) {
@@ -91,6 +104,7 @@ class RelayTransport implements Transport {
         'table',
         const Filter(kinds: [TableKinds.table]).toJson()..['#t'] = [table],
         Filter(kinds: const [TableKinds.signal], tags: {'p': [signer.publicKey]}).toJson()..['#t'] = [table],
+        const Filter(kinds: [TableKinds.lobby]).toJson()..['#t'] = [table],
       ]));
       log?.call('connected to $url');
     }).catchError((Object e) {
@@ -125,9 +139,14 @@ class RelayTransport implements Transport {
       case 'EVENT':
         if (m.length != 3) return;
         final e = NostrEvent.parse(m[2]);
-        if (e == null || e.tag('t') != table || e.pubkey == signer.publicKey) return;
+        if (e == null || e.tag('t') != table) return;
         if (!_seen.add(e.id)) return;
         if (_seen.length > 50000) _seen.clear();
+        if (e.kind == TableKinds.lobby) {
+          _lobby.add(e);
+          return;
+        }
+        if (e.pubkey == signer.publicKey) return;
         if (e.kind == TableKinds.table) {
           try {
             final message = Map<String, Object?>.from(jsonDecode(e.content) as Map);
@@ -152,6 +171,7 @@ class RelayTransport implements Transport {
     _incoming.close();
     _disconnected.close();
     _signals.close();
+    _lobby.close();
   }
 }
 

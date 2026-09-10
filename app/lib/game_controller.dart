@@ -14,8 +14,9 @@ import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 
 import 'record_store.dart';
+import 'table_model.dart';
 
-class GameController extends ChangeNotifier {
+class GameController extends ChangeNotifier implements TableModel {
   GameController({this.seed, this.paced = true, RecordStore? store})
       : _store = store ?? PrefsRecordStore() {
     _start();
@@ -67,13 +68,25 @@ class GameController extends ChangeNotifier {
 
   final Random _rhythm = Random();
 
+  @override
   HeartsGame get game => _game;
 
+  @override
+  int get mySeat => humanSeat;
+
+  @override
+  int positionOf(int seat) => (seat - mySeat + seatCount) % seatCount;
+
+  @override
+  int seatAt(int position) => (position + mySeat) % seatCount;
+
   /// The names around the table, seat order (0 is the player).
+  @override
   List<String> get names =>
       [for (var s = 0; s < seatCount; s++) s == humanSeat ? 'You' : _bots[s]!.persona.name];
 
   /// The persona at [seat], or null at the player's.
+  @override
   Persona? personaAt(int seat) => _bots[seat]?.persona;
 
   static List<Bot?> _seatBots(int seed) {
@@ -88,10 +101,12 @@ class GameController extends ChangeNotifier {
   /// have seen. Feeds [BotView.played] — the bots read the table, not
   /// each other's hands.
   final Set<Card> _played = {};
+  @override
   Set<Card> get playedThisHand => Set.unmodifiable(_played);
 
   /// The player's in-progress pass selection.
   final Set<Card> _selected = {};
+  @override
   Set<Card> get selected => Set.unmodifiable(_selected);
 
   bool _disposed = false;
@@ -108,20 +123,25 @@ class GameController extends ChangeNotifier {
 
   // ---- what the view asks ---------------------------------------------
 
+  @override
   bool get awaitingPass =>
       _game.phase == Phase.passing && _game.passOf(humanSeat) == null;
 
+  @override
   bool get canConfirmPass => awaitingPass && _selected.length == passSize;
 
+  @override
   bool get awaitingPlay =>
       _game.phase == Phase.playing && _game.currentSeat == humanSeat;
 
   /// The player's legal cards, or empty when it is not their turn.
+  @override
   Set<Card> get legalNow =>
       awaitingPlay ? _game.legalPlaysFor(humanSeat).toSet() : const {};
 
   // ---- what the player does -------------------------------------------
 
+  @override
   void toggleSelected(Card card) {
     if (!awaitingPass) return;
     if (_selected.contains(card)) {
@@ -133,6 +153,7 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  @override
   void confirmPass() {
     if (!canConfirmPass) return;
     _record.passes.add(_selected.toList());
@@ -145,38 +166,17 @@ class GameController extends ChangeNotifier {
   /// Plays [card] for the player. Returns null on success, or a short
   /// reason the card is not playable — the message the table shows when
   /// a dimmed card is tapped.
+  @override
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
     final legal = _game.legalPlaysFor(humanSeat);
-    if (!legal.contains(card)) return _refusal(card);
+    if (!legal.contains(card)) return refusalFor(_game, humanSeat, card);
     _record.plays.add(card);
     _game.play(humanSeat, card);
     _played.add(card);
     notifyListeners();
     _pump();
     return null;
-  }
-
-  /// Why [card] cannot be played right now. Phrased as the rule, not as
-  /// an error: a Hearts player learns these four sentences and then never
-  /// needs them again.
-  String _refusal(Card card) {
-    final trick = _game.trick;
-    if (_game.isFirstTrick && trick.isEmpty) {
-      return 'The ${twoOfClubs.spoken} leads the first trick';
-    }
-    if (trick.isNotEmpty) {
-      final led = trick.first.card.suit;
-      if (card.suit != led && _game.handOf(humanSeat).any((c) => c.suit == led)) {
-        return 'You have to follow ${led.name}';
-      }
-      if (_game.isFirstTrick && cardPoints(card) > 0) {
-        return 'No points on the first trick';
-      }
-    } else if (card.suit == Suit.hearts && !_game.heartsBroken) {
-      return "Hearts aren't broken yet";
-    }
-    return 'You cannot play that card';
   }
 
   void nextHand() {
