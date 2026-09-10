@@ -264,6 +264,10 @@ scales inversely with the player base: it runs when the room is empty
 and never otherwise. This is the only place a gameplay event reaches
 anything of ours, and what it carries is "a table needs a juror."
 
+**The draw is verifiable.** The four at the table agree a snapshot of
+who is online, and apply the deal's own randomness to it. Nobody at the
+table can steer the draw, and nobody outside it can either.
+
 ## What the jury does not change
 
 Everything a juror holds is a share. A juror alone can open nothing.
@@ -298,26 +302,74 @@ the signed play chain, so there is no end-of-game ceremony for a leaver
 to withhold — which would have handed a veto to exactly the player most
 motivated to use it.
 
+## Presence and matchmaking
+
+There is no presence server. Every online client publishes a signed,
+short-lived event to a well-known relay topic every few seconds —
+*identity, status, region* — and everyone subscribes. At hundreds online
+that is a few dozen tiny events per second per client.
+
+**Forming a table** is the one place eventual consistency bites: seekers
+see each other through relays that deliver in different orders, so two
+seekers can compute different groupings. The rule is time-windowed
+batching. Everyone who announced in the same short window groups
+deterministically by sorted identity. No rounds, no votes. If your
+group-mates saw a different set, the connection fails and you fall
+through to bots — a split brain degrades to "you got bots" rather than
+to a hang. Costs a second or two inside the ten-second window.
+
+**One device at a time** is cooperative here: a newer attestation
+appears on the topic and the older device signs itself out. An honest
+client does; a modified one could ignore it and be at two tables at
+once, which random matchmaking makes hard to turn into anything.
+
+What decentralising presence buys is that the game keeps working if we
+vanish. What it costs is the second or two above and the honour-system
+device rule. Fairness was never at stake either way — a presence server
+could refuse to match you, but never see a card.
+
+## Identity
+
+An identity is a keypair generated on the device, in Nostr's format. The
+public key is what appears in every public record — plays, ratings, jury
+draws. It is opaque, and nothing links it to who you are.
+
+**Sign-in attests it.** Live play needs Sign in with Apple or Google.
+The service verifies the token, checks that this provider account is not
+already bound to a different key, and issues a signed attestation:
+*"this key is backed by a provider account."* Not which one. The
+provider's identifier never leaves the service, and no email is stored
+at all — neither of our uses needs one.
+
+**Losing a device is a supersession.** Sign in on the new one, generate
+a fresh key, and the service — seeing the same provider account — signs
+*"new key supersedes old."* Ratings and entitlement attach to the chain,
+so everything follows you. Within a platform the key syncs through the
+keychain and nothing is needed; a cross-platform move is a supersession.
+
+The player sees none of this. Sign in, and you have an identity. There
+is no key to look at and no export — the word Nostr appears nowhere in
+the app.
+
 ## What the service does
 
-Matchmaking, recording who has bought live play on the web, and
-bringing a juror of last resort online when a table cannot draw one.
+Five stateless handlers and a small key-value store:
+
+| | |
+|---|---|
+| attest | verify a sign-in token, enforce one provider account per key, sign the attestation |
+| supersede | same sign-in, sign the supersession link |
+| entitle | receive the purchase webhook, mark the key entitled, issue a signed licence |
+| turn-creds | mint short-lived TURN credentials |
+| last-resort | bring a juror online when a table reports it could not draw one |
 
 It never holds a card, never signs a play, never adjudicates anything,
-and is not required by a table already in progress. The juror it brings
-online is a client like any other and is the only one of these that
-touches a game — for one hand, holding a share, knowing nothing else.
-
-The jury draw needs to know who is online, which is the same question
-matchmaking asks. The two should share one presence mechanism rather
-than each inventing one; neither is designed here.
+never sees who is at which table, and is not required by a table already
+in progress. Every handler is a point lookup and a signature.
+[Doc 06](06-service.md) has the storage, the local mode, and the layout.
 
 ## Still open
 
-- **Identity.** Matchmaking among strangers wants some persistence, and
-  ratings need it. A device keypair is the shape; keys are cheap, which
-  makes ratings work (you keep a good one) and bans useless (you discard
-  a bad one). What the smallest useful thing is has not been settled.
 - **Chat.** None. Text between strangers is a moderation surface and
   Hearts does not need one. Whether a fixed set of table gestures earns
   its place is worth revisiting.

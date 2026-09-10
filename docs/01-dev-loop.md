@@ -58,24 +58,3 @@ work newer than the commit it names.
 `deploy.sh` needs `CLOUDFLARE_TOKEN` (Pages: Edit) and
 `CLOUDFLARE_ACCOUNT_ID`. Nothing else, and no `wrangler.toml` — the
 project name is in the script.
-
-## Domains
-
-`openhearts.game` and `openhearts.lol` are not attached yet; the API
-token used by `deploy.sh` is scoped to Pages and cannot touch DNS. Both
-steps are one-time, in the Cloudflare dashboard:
-
-**`openhearts.game` → the site.** Add the zone, then Workers & Pages →
-`open-hearts` → Custom domains → add `openhearts.game` and
-`www.openhearts.game`. Production (the `main` branch) serves it, so
-`/play` comes along for free.
-
-**`openhearts.lol` → redirect.** Add the zone. Add a proxied DNS record
-so requests reach the edge at all (an `AAAA` for `@` to `100::` with the
-orange cloud on is the conventional placeholder). Then Rules → Redirect
-Rules: match hostname `openhearts.lol`, redirect to
-`concat("https://openhearts.game", http.request.uri.path)`, 301,
-preserve query string. Free, no Worker, no origin.
-
-Keep `*.pages.dev` working after that: the branch aliases are the dev
-loop, and production keeping its `pages.dev` host costs nothing.

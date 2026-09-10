@@ -2,15 +2,12 @@
 
 > **Revised by [doc 04](04-live-play.md).** This document assumed players
 > arrive at a table by invitation. They don't — they are matched with
-> whoever wants a game right now, and matchmaking needs live presence in
-> a way that a one-shot signalling handshake does not. So there is a
-> matchmaking service, and it also records who has bought live play on
-> the web.
->
-> It does nothing else. It holds no cards, signs no plays, adjudicates
-> nothing, and a table already in progress does not need it — so the
-> conclusion below survives intact, including the part about a game
-> under way not caring whether we are having a good day.
+> whoever wants a game right now. Presence and matchmaking ride the same
+> relays as signalling, so the conclusion below survives whole: there is
+> no game server, and a table under way needs nothing from us. What does
+> exist is a handful of stateless handlers for sign-in, entitlement and
+> TURN credentials, described in [doc 06](06-service.md). TURN itself is
+> Cloudflare's; signalling is public Nostr relays, unchanged.
 
 **Question.** Can four people play a real-time game of Hearts with no
 game server, no hosting bill, and sub-second latency?

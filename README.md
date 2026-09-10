@@ -1,7 +1,7 @@
 # Open Hearts
 
 The best Hearts app we can make, for phones and the web. Free, open
-source, no accounts, no ads.
+source, no ads.
 
 **Play:** [openhearts.game/play](https://openhearts.game/play) *(domain
 not attached yet — see [docs/01](docs/01-dev-loop.md#domains))*
@@ -34,6 +34,9 @@ Pages deployment.
   what
 - [05 — Screens](docs/05-form-factors.md): phone, tablet, foldable,
   desktop — one product, sized from the space it is given
+- [06 — The service](docs/06-service.md): the little that runs on our
+  side — identity, entitlement, a juror for an empty room — and how it
+  runs locally for end-to-end tests
 
 ## Where this is going
 
@@ -42,18 +45,20 @@ between them, matched in seconds, on a deal none of them could have
 rigged. Roughly in order:
 
 1. **Solo play** against bots — done, and free on every platform forever.
-2. **Two devices, one table** over WebRTC — the spike that proves the
-   transport and the shared-referee model.
-3. **The verifiable deal** ([doc 03](docs/03-fair-deal.md)), starting
-   with a wasm benchmark on a real phone before anything is built on it.
-4. **Matchmaking and seat handover** ([doc 04](docs/04-live-play.md)) —
-   tap Play, be in a game; bots hold the seats nobody has taken, and the
-   seats people walk away from.
-5. **Tablet layout** ([doc 05](docs/05-form-factors.md)) — the first
-   composition that is genuinely different rather than derived.
-6. **iPhone Duo**, which mostly falls out of the tablet work: both its
-   displays share an aspect ratio, so unfolding is a change of scale.
-7. **The stores.**
+2. **The engine as a package**, shared by the app and the service.
+3. **Two measurements before anything is built on them:** the bot policy
+   as a boolean circuit, counted; and a verifiable 52-card shuffle timed
+   in wasm on a real phone ([doc 03](docs/03-fair-deal.md)).
+4. **Two devices, one table** over WebRTC, with the local service and
+   relay behind it ([doc 06](docs/06-service.md)) — the spike that
+   proves the transport and the shared-referee model, and the start of
+   the end-to-end suite.
+5. **The verifiable deal.**
+6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
+   matchmaking, seat handover, the jury.
+7. **Landscape**, then **tablet**, then **iPhone Duo**
+   ([doc 05](docs/05-form-factors.md)).
+8. **The stores.**
 
 ## Developing
 
