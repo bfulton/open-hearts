@@ -10,8 +10,24 @@
 /// after fifteen seconds, or an absence claimed after thirty of silence,
 /// pressed or countersigned by others). Each participant signs one side
 /// or the other, never both, and a side wins with a strict majority of
-/// the participants at the time the turn opened. Then, and only then,
-/// the next turn opens. A signed Leave needs no majority: it is evidence.
+/// the participants. When everyone has signed and neither side has one
+/// — an even table split down the middle, which a partition can do —
+/// the action carries: a play that exists beats a boot that could not
+/// win. Then, and only then, the next turn opens, so there is never
+/// anything to roll back. A signed Leave needs no majority: it is
+/// evidence.
+///
+/// **Who the majority is of** has to be the same at every peer, however
+/// late each one hears the news, so it is a function of the record and
+/// not of the clock: the participants at turn T are the humans who sat
+/// down, less anyone whose removal was made at T or earlier. Every
+/// removal — boot, absence, leave — names the turn it is made at, and is
+/// only backed by peers standing at that same turn; in the record it
+/// sits ahead of the action at that turn. A peer that has yet to hear
+/// of a removal measures against a larger set, which can only make it
+/// wait, never settle something the others would not; the two sides of
+/// one race are disjoint within any one set, so the sides cannot both
+/// win.
 ///
 /// Bot seats need no events at all. A bot's move is a function of the
 /// deal and the record, so every peer computes it the moment the bot's
@@ -49,27 +65,47 @@ enum Pause {
 
 /// A settled turn or a departure, as it goes in the record.
 class Decision {
-  const Decision({required this.turn, required this.event, required this.witnesses, this.removal = false});
+  const Decision({
+    required this.turn,
+    required this.event,
+    required this.witnesses,
+    this.removal = false,
+    this.opposed = const {},
+  });
 
-  /// The turn settled, or the turn open when a leave or absence landed.
+  /// The turn settled, or the turn at which a departure was made.
   final TurnId turn;
 
-  /// The action (pass or play), the boot or absence, or the leave.
+  /// The action (pass or play), or one of the claims that carried the
+  /// removal (a boot, an absence, or the leave itself).
   final TableEvent event;
 
   /// Who backed it, the author included.
   final Set<PublicKey> witnesses;
 
-  /// True when the seat left this turn rather than acting in it.
+  /// True when this is a departure rather than an action.
   final bool removal;
+
+  /// For an action that carried on a split table: who had backed the
+  /// removal instead, which is what shows the split was complete.
+  final Set<PublicKey> opposed;
+
+  /// What this decision is, independent of which of several equivalent
+  /// claims a peer happened to record: two peers' records match when
+  /// their keys match.
+  String get key => removal ? '${event.kind.name}@$turn#${event.seat}' : event.id;
 
   /// Canonical position in a record. Pass turns are concurrent and
   /// settle in a different order at every peer; ordering by turn, with
-  /// departures ahead of the action they landed beside, makes every
+  /// departures ahead of the action at the same turn, makes every
   /// peer's record the same list.
   int compareTo(Decision other) {
     if (turn.hand != other.turn.hand) return turn.hand.compareTo(other.turn.hand);
-    if (turn.index != other.turn.index) return turn.index.compareTo(other.turn.index);
+    // The pass turns are one position: departures during the pass come
+    // before every pass of the hand, then the passes by seat.
+    final a = turn.isPass ? -1 : turn.index;
+    final b = other.turn.isPass ? -1 : other.turn.index;
+    if (a != b) return a.compareTo(b);
     if (removal != other.removal) return removal ? -1 : 1;
     return event.seat.compareTo(other.event.seat);
   }
@@ -89,7 +125,7 @@ class TableClient {
     this.heartbeatMs = 5000,
   })  : game = HeartsGame(seed: spec.seed),
         holders = List.of(spec.seats),
-        participants = {for (final h in spec.seats) if (h is HumanSeat) h.key};
+        _humans = {for (final h in spec.seats) if (h is HumanSeat) h.key};
 
   final TableSpec spec;
   final Signer signer;
@@ -104,22 +140,14 @@ class TableClient {
   /// Who holds each seat now; humans become bots as they go.
   final List<SeatHolder> holders;
 
-  /// The humans at the table: the set removals are decided against.
-  final Set<PublicKey> participants;
+  /// Every human who sat down.
+  final Set<PublicKey> _humans;
 
-  /// Everyone who ever held a seat, for the ratings at the end.
-  late final List<SeatHolder> originalHolders = List.unmodifiable(spec.seats);
+  /// The humans still at the table.
+  Set<PublicKey> get participants => _humans.difference(_removedAt.keys.toSet());
 
   /// Every settled turn and departure, in canonical order.
   final List<Decision> record = [];
-
-  void _log(Decision d) {
-    var i = record.length;
-    while (i > 0 && record[i - 1].compareTo(d) > 0) {
-      i--;
-    }
-    record.insert(i, d);
-  }
 
   /// Turns settled in the current hand.
   int step = 0;
@@ -130,6 +158,14 @@ class TableClient {
   Pause? get pause => _pause;
   Pause? _pause;
 
+  /// Receives a line for every transition, for traces. Off by default.
+  void Function(String line)? log;
+
+  void _trace(String what) {
+    final l = log;
+    if (l != null) l('${clock.nowMs.toString().padLeft(7)} ${signer.publicKey.substring(0, 4)}/$mySeat $what');
+  }
+
   bool get done => game.phase == Phase.gameOver;
 
   /// Fires after any change of state a view might show. Synchronous, so
@@ -139,12 +175,18 @@ class TableClient {
   final _changes = StreamController<void>.broadcast(sync: true);
 
   int? get mySeat => spec.seatOf(signer.publicKey);
-  bool get amSeated => mySeat != null && participants.contains(signer.publicKey);
+  bool get amSeated => mySeat != null && !_removedAt.containsKey(signer.publicKey);
 
+  /// The player owes a pass, and has not yet made one that is waiting
+  /// on the table.
   bool get awaitingMyPass =>
-      amSeated && game.phase == Phase.passing && game.passOf(mySeat!) == null && !_left;
+      amSeated && game.phase == Phase.passing && game.passOf(mySeat!) == null && !_left && !_acted(TurnId.pass(game.handNumber, mySeat!));
+
+  /// It is the player's turn and they have not yet played into it.
   bool get awaitingMyPlay =>
-      amSeated && game.phase == Phase.playing && game.currentSeat == mySeat && !_left;
+      amSeated && game.phase == Phase.playing && game.currentSeat == mySeat && !_left && !_acted(TurnId.play(game.handNumber, _playIndex));
+
+  bool _acted(TurnId turn) => _races[turn]?.action != null;
 
   /// Whether the Boot button shows for [seat]: a human's turn, open for
   /// fifteen seconds by this peer's clock.
@@ -163,6 +205,27 @@ class TableClient {
     return left < 0 ? 0 : left;
   }
 
+  /// The open races and pending claims, for traces and tests.
+  String describe() {
+    final b = StringBuffer();
+    b.writeln('${signer.publicKey.substring(0, 6)} seat $mySeat: hand ${game.handNumber} ${game.phase.name} '
+        'step $step current ${game.currentSeat} pause $_pause participants ${participants.length} '
+        'holders $holders');
+    for (final e in _races.entries) {
+      if (e.value.settled) continue;
+      final r = e.value;
+      b.writeln('  open ${e.key} seat ${_turnSeat[e.key]}: action ${r.action?.kind.name} by '
+          '${r.forAction.map((k) => k.substring(0, 4))} boots ${r.boots.length} by ${r.forRemoval.map((k) => k.substring(0, 4))} '
+          'needed ${_majority(_participantsAt(e.key))} of ${_participantsAt(e.key).length}');
+    }
+    for (final e in _absences.entries) {
+      if (e.value.settled) continue;
+      b.writeln('  absent ${e.key.$1} seat ${e.key.$2}: backers ${e.value.backers.map((k) => k.substring(0, 4))}');
+    }
+    if (_future.isNotEmpty) b.writeln('  deferred ${_future.length}: ${_future.take(4).map((e) => '${e.kind.name}@${e.turn}')}');
+    return b.toString();
+  }
+
   // ---- internals ------------------------------------------------------
 
   final Map<TurnId, _Race> _races = {};
@@ -170,9 +233,10 @@ class TableClient {
   final Map<TurnId, int> _turnSeat = {};
   final Map<String, Set<PublicKey>> _earlyWitnesses = {};
   final Map<TurnId, String> _myWitness = {};
-  final Map<int, _Absence> _absences = {};
+  final Map<(TurnId, int), _Absence> _absences = {};
+  final Map<PublicKey, TurnId> _removedAt = {};
   final Map<PublicKey, int> _lastHeard = {};
-  final Map<PublicKey, int> _mySilenceClaims = {};
+  final Set<(TurnId, PublicKey)> _mySilenceClaims = {};
   final List<TableEvent> _future = [];
   final Set<String> _seen = {};
   final List<Cancel> _timers = [];
@@ -180,9 +244,11 @@ class TableClient {
   StreamSubscription<void>? _drops;
   bool _left = false;
   bool _closed = false;
+  bool _notifying = false;
+  bool _notifyAgain = false;
 
   void start() {
-    for (final k in participants) {
+    for (final k in _humans) {
       _lastHeard[k] = clock.nowMs;
     }
     _incoming = transport.incoming.listen((m) => _onMessage(m.message));
@@ -230,11 +296,13 @@ class TableClient {
     });
   }
 
-  /// The polite exit: signed, so nobody needs to agree.
+  /// The polite exit: signed, so nobody needs to agree. Made at this
+  /// peer's current position, which is where it takes effect.
   void leave() {
     if (!amSeated || _left) return;
     _left = true;
-    _emit(EventKind.leave, {'hand': game.handNumber, 'step': step, 'seat': mySeat});
+    final at = _positionOf(mySeat!);
+    _emit(EventKind.leave, {'hand': at.hand, 'turn': at.index, 'seat': mySeat});
   }
 
   /// Presses Boot on [seat]. A no-op unless [canBoot].
@@ -247,13 +315,50 @@ class TableClient {
 
   void _emit(EventKind kind, Map<String, Object?> body) {
     final event = TableEvent.sign(signer, table: spec.id, kind: kind, body: body);
+    if (kind != EventKind.heartbeat) _trace('emit ${kind.name} $body');
     transport.broadcast(event.toJson());
     _accept(event);
   }
 
-  // ---- the hand ---------------------------------------------------------
+  // ---- positions ---------------------------------------------------------
 
   int get _playIndex => game.tricksPlayed * seatCount + game.trick.length;
+
+  /// Where a claim about [seat] is made: the seat's own pass turn during
+  /// the pass, otherwise the play turn that is open.
+  TurnId _positionOf(int seat) => game.phase == Phase.passing
+      ? TurnId.pass(game.handNumber, seat)
+      : TurnId.play(game.handNumber, _playIndex);
+
+  /// Negative when [t] is behind this peer, zero when it is current
+  /// here, positive when it is still to come. During the pass every pass
+  /// turn of the hand is current, settled or not: a removal made at a
+  /// seat's pass turn has to be placeable by peers whose other pass
+  /// turns have already settled.
+  int _compare(TurnId t) {
+    if (t.hand != game.handNumber) return t.hand.compareTo(game.handNumber);
+    if (game.phase == Phase.passing) return t.isPass ? 0 : 1;
+    if (t.isPass) return -1;
+    return t.playIndex.compareTo(_playIndex);
+  }
+
+  /// Whether a removal at [a] counts for a race at [b]. The pass turns
+  /// of a hand are concurrent, so a removal made during the pass counts
+  /// for every pass of that hand, whichever seat's turn it names.
+  static bool _atOrBefore(TurnId a, TurnId b) {
+    if (a.hand != b.hand) return a.hand < b.hand;
+    final ai = a.isPass ? -1 : a.index;
+    final bi = b.isPass ? -1 : b.index;
+    return ai <= bi;
+  }
+
+  /// The set a majority at [turn] is of: everyone not removed by then.
+  Set<PublicKey> _participantsAt(TurnId turn) =>
+      {for (final k in _humans) if (!_removedAt.containsKey(k) || !_atOrBefore(_removedAt[k]!, turn)) k};
+
+  static int _majority(Set<PublicKey> of) => of.length ~/ 2 + 1;
+
+  // ---- the hand ---------------------------------------------------------
 
   void _openHand() {
     played.clear();
@@ -275,21 +380,17 @@ class TableClient {
 
   void _openTurn(TurnId turn, int seat) {
     if (_races.containsKey(turn)) return;
-    _races[turn] = _Race(snapshot: Set.of(participants));
+    _races[turn] = _Race();
     _openedAt[turn] = clock.nowMs;
     _turnSeat[turn] = seat;
-    final holder = holders[seat];
-    if (holder is BotSeat) {
-      _botActs(turn, seat, holder.persona);
-    } else if (holder is HumanSeat && !participants.contains(holder.key)) {
-      // Left already; its seat is a bot from here.
-      _seatBot(seat);
-      _botActs(turn, seat, (holders[seat] as BotSeat).persona);
+    _trace('open $turn for seat $seat (${holders[seat]})');
+    if (holders[seat] is BotSeat) {
+      _botActs(turn, seat);
     }
   }
 
-  void _botActs(TurnId turn, int seat, Persona persona) {
-    final bot = Bot(persona: persona);
+  void _botActs(TurnId turn, int seat) {
+    final bot = Bot(persona: (holders[seat] as BotSeat).persona);
     if (turn.isPass) {
       game.setPass(seat, bot.choosePass(game.handOf(seat)));
     } else {
@@ -316,19 +417,17 @@ class TableClient {
     _myWitness.remove(turn);
     if (game.phase == Phase.passing) {
       // Waits for every seat's pass; the next turns open with play.
+      _drainFuture();
       return;
     }
     if (game.pendingTrick != null) game.collectTrick();
     if (game.phase == Phase.handOver) {
       game.nextHand();
       _openHand();
-      _drainFuture();
-      return;
-    }
-    if (game.phase == Phase.playing) {
+    } else if (game.phase == Phase.playing) {
       _openPlayTurn();
-      _drainFuture();
     }
+    _drainFuture();
     _notify();
   }
 
@@ -351,9 +450,9 @@ class TableClient {
   }
 
   void _onDisconnected(PublicKey key) {
-    // Treat a closed connection as silence that began now, minus most of
-    // the allowance: the transport is sure, so the timeout is short.
-    if (participants.contains(key)) {
+    // A closed connection is silence the transport is sure of, so most
+    // of the allowance is already spent.
+    if (_humans.contains(key)) {
       _lastHeard[key] = clock.nowMs - silenceAfterMs + 3000;
     }
   }
@@ -377,20 +476,14 @@ class TableClient {
     }
   }
 
-  bool _isAhead(int hand, int index) {
-    if (hand > game.handNumber) return true;
-    if (hand < game.handNumber) return false;
-    return !_races.containsKey(TurnId(hand, index)) && index >= TurnId.passTurns
-        ? _playIndex < index - TurnId.passTurns
-        : false;
-  }
-
   void _defer(TableEvent event) {
     _seen.remove(event.id);
     _future.add(event);
+    if (event.kind != EventKind.witness) _trace('defer ${event.kind.name}@${event.turn} from ${event.author.substring(0, 4)}');
   }
 
   void _drainFuture() {
+    if (_future.isEmpty) return;
     final again = List.of(_future);
     _future.clear();
     for (final e in again) {
@@ -398,22 +491,37 @@ class TableClient {
     }
   }
 
+  bool _isParticipant(PublicKey key) => _humans.contains(key) && !_removedAt.containsKey(key);
+
+  /// A peer sending evidence for a turn settled here is behind — it
+  /// missed what settled it. Send the decision and this peer's witness.
+  void _catchUp(TurnId turn) {
+    final race = _races[turn];
+    if (race == null || !race.settled) return;
+    if (race.action != null) transport.broadcast(race.action!.toJson());
+    for (final b in race.boots) {
+      transport.broadcast(b.toJson());
+    }
+    final w = _myWitnessEvents[turn];
+    if (w != null) transport.broadcast(w.toJson());
+  }
+
   void _onAction(TableEvent event) {
     final turn = event.turn;
-    if (_isAhead(turn.hand, turn.index)) return _defer(event);
+    final where = _compare(turn);
+    if (where > 0) return _defer(event);
+    if (where < 0) return _catchUp(turn);
     final race = _races[turn];
-    if (race == null || race.settled) return;
+    if (race == null) return;
+    if (race.settled) return _catchUp(turn);
     final seat = _turnSeat[turn]!;
     final holder = holders[seat];
     if (holder is! HumanSeat || holder.key != event.author) return;
-    if (!participants.contains(event.author)) return;
     if (!_valid(event, seat)) return;
-    if (race.action != null && race.action!.id != event.id) return; // equivocation: first stands
+    if (race.action != null && race.action!.id != event.id) return; // equivocation: the first stands
     race.action = event;
     race.forAction.add(event.author);
-    if (_earlyWitnesses.containsKey(event.id)) {
-      race.forAction.addAll(_earlyWitnesses.remove(event.id)!);
-    }
+    race.forAction.addAll(_earlyWitnesses.remove(event.id) ?? const {});
     // Witness the action unless this peer already backed the boot.
     if (amSeated && event.author != signer.publicKey && !_myWitness.containsKey(turn)) {
       _witness(turn, event);
@@ -438,19 +546,20 @@ class TableClient {
 
   void _onBoot(TableEvent event) {
     final turn = event.turn;
-    if (_isAhead(turn.hand, turn.index)) return _defer(event);
+    final where = _compare(turn);
+    if (where > 0) return _defer(event);
+    if (where < 0) return _catchUp(turn);
     final race = _races[turn];
-    if (race == null || race.settled) return;
+    if (race == null) return;
+    if (race.settled) return _catchUp(turn);
     final seat = _turnSeat[turn]!;
     if (event.seat != seat) return;
-    if (!participants.contains(event.author)) return;
+    if (!_isParticipant(event.author)) return;
     final holder = holders[seat];
     if (holder is! HumanSeat || holder.key == event.author) return;
     race.boots.add(event);
     race.forRemoval.add(event.author);
-    if (_earlyWitnesses.containsKey(event.id)) {
-      race.forRemoval.addAll(_earlyWitnesses.remove(event.id)!);
-    }
+    race.forRemoval.addAll(_earlyWitnesses.remove(event.id) ?? const {});
     _considerCountersigning(turn, event);
     _settle(turn);
   }
@@ -476,43 +585,51 @@ class TableClient {
       'event': of.id,
       'hand': turn.hand,
       'turn': turn.index,
-      'seat': _turnSeat[turn],
+      'seat': of.seat,
     });
     transport.broadcast(w.toJson());
+    _myWitnessEvents[turn] = w;
     _accept(w);
   }
 
   void _onWitness(TableEvent event) {
-    if (!participants.contains(event.author)) return;
+    if (!_humans.contains(event.author)) return;
+    final id = event.witnessed;
     final turn = event.turn;
     final race = _races[turn];
-    if (race == null) {
-      if (_isAhead(turn.hand, turn.index)) return _defer(event);
-      return;
+    if (race != null) {
+      if (race.settled) return _catchUp(turn);
+      if (race.action?.id == id) {
+        race.forAction.add(event.author);
+        return _settle(turn);
+      }
+      if (race.boots.any((b) => b.id == id)) {
+        race.forRemoval.add(event.author);
+        return _settle(turn);
+      }
     }
-    final id = event.witnessed;
-    if (race.action?.id == id) {
-      race.forAction.add(event.author);
-    } else if (race.boots.any((b) => b.id == id)) {
-      race.forRemoval.add(event.author);
-    } else if (_absences.values.any((a) => a.claims.any((c) => c.id == id))) {
-      final a = _absences.values.firstWhere((a) => a.claims.any((c) => c.id == id));
+    final a = _absences[(turn, event.seat)];
+    if (a != null && a.claims.any((c) => c.id == id)) {
       a.backers.add(event.author);
-      _settleAbsence(a);
-      return;
-    } else {
-      _earlyWitnesses.putIfAbsent(id, () => {}).add(event.author);
-      return;
+      return _settleAbsence((turn, event.seat));
     }
-    _settle(turn);
+    if (_compare(turn) > 0) return _defer(event);
+    _earlyWitnesses.putIfAbsent(id, () => {}).add(event.author);
   }
 
   void _settle(TurnId turn) {
     final race = _races[turn]!;
     if (race.settled) return;
-    final needed = race.snapshot.length ~/ 2 + 1;
+    final of = _participantsAt(turn);
+    final needed = _majority(of);
     final seat = _turnSeat[turn]!;
-    if (race.forAction.intersection(race.snapshot).length >= needed) {
+    final forAction = race.forAction.intersection(of);
+    final forRemoval = race.forRemoval.intersection(of);
+    final split = race.action != null &&
+        forAction.length < needed &&
+        forRemoval.length < needed &&
+        forAction.union(forRemoval).length == of.length;
+    if (forAction.length >= needed || split) {
       race.settled = true;
       final e = race.action!;
       if (e.kind == EventKind.pass) {
@@ -522,32 +639,31 @@ class TableClient {
         game.play(seat, card);
         played.add(card);
       }
-      _log(Decision(turn: turn, event: e, witnesses: Set.of(race.forAction)));
+      _log(Decision(turn: turn, event: e, witnesses: Set.of(race.forAction), opposed: Set.of(race.forRemoval)));
+      _trace('settled $turn ${e.kind.name} by ${forAction.length}${split ? ' on a split' : ''}');
       _pause = null;
       _closeTurn(turn);
-    } else if (race.forRemoval.intersection(race.snapshot).length >= needed) {
+    } else if (forRemoval.length >= needed) {
       race.settled = true;
       _log(Decision(turn: turn, event: race.boots.first, witnesses: Set.of(race.forRemoval), removal: true));
-      _remove(seat);
+      _trace('booted seat $seat at $turn by ${forRemoval.length}');
+      _remove(seat, at: turn);
       _pause = null;
-      _botActs(turn, seat, (holders[seat] as BotSeat).persona);
+      _botActs(turn, seat);
+      _reconsider();
     } else if (race.forRemoval.isNotEmpty) {
       // Proposed, and not carried: is it ever going to be?
-      final reachable = race.snapshot.difference({(holders[seat] as HumanSeat).key});
+      final reachable = of.difference({(holders[seat] as HumanSeat).key});
       if (reachable.length < needed) _pause = Pause.waitingForJury;
     }
   }
 
-  void _remove(int seat) {
+  void _remove(int seat, {required TurnId at}) {
     final holder = holders[seat];
     if (holder is HumanSeat) {
-      participants.remove(holder.key);
-      _seatBot(seat);
+      _removedAt[holder.key] = at;
+      holders[seat] = BotSeat(spec.replacementFor(seat));
     }
-  }
-
-  void _seatBot(int seat) {
-    holders[seat] = BotSeat(spec.replacementFor(seat));
   }
 
   void _onLeave(TableEvent event) {
@@ -555,17 +671,18 @@ class TableClient {
     if (seat < 0 || seat >= seatCount) return;
     final holder = holders[seat];
     if (holder is! HumanSeat || holder.key != event.author) return;
-    if (event.hand > game.handNumber || (event.hand == game.handNumber && event.step > step)) {
-      return _defer(event);
-    }
+    final turn = event.turn;
+    final where = _compare(turn);
+    if (where > 0) return _defer(event);
+    _log(Decision(turn: turn, event: event, witnesses: {event.author}, removal: true));
+    _trace('left seat $seat at $turn');
+    _remove(seat, at: turn);
     final open = _openTurnOf(seat);
-    _log(Decision(turn: open ?? TurnId(game.handNumber, step), event: event, witnesses: {event.author}, removal: true));
-    _remove(seat);
     if (open != null) {
       _races[open]!.settled = true;
-      _botActs(open, seat, (holders[seat] as BotSeat).persona);
+      _botActs(open, seat);
     }
-    _repauseOrResume();
+    _reconsider();
   }
 
   // ---- absence ------------------------------------------------------------
@@ -573,70 +690,74 @@ class TableClient {
   void _onAbsent(TableEvent event) {
     final seat = event.seat;
     if (seat < 0 || seat >= seatCount) return;
-    if (event.hand != game.handNumber) return;
-    if (!participants.contains(event.author)) return;
+    final turn = event.turn;
+    final where = _compare(turn);
+    if (where > 0) return _defer(event);
+    if (where < 0) return;
+    if (!_isParticipant(event.author)) return;
     final holder = holders[seat];
     if (holder is! HumanSeat || holder.key == event.author) return;
-    final a = _absences.putIfAbsent(seat, () => _Absence(snapshot: Set.of(participants)));
+    final key = (turn, seat);
+    final a = _absences.putIfAbsent(key, () => _Absence());
     a.claims.add(event);
     a.backers.add(event.author);
-    if (_earlyWitnesses.containsKey(event.id)) {
-      a.backers.addAll(_earlyWitnesses.remove(event.id)!);
-    }
+    a.backers.addAll(_earlyWitnesses.remove(event.id) ?? const {});
     // Countersign only when this peer has heard nothing from the seat
     // for as long itself.
     if (amSeated && !a.backers.contains(signer.publicKey) && _silent(holder.key)) {
       a.backers.add(signer.publicKey);
       final w = TableEvent.sign(signer, table: spec.id, kind: EventKind.witness, body: {
         'event': event.id,
-        'hand': event.hand,
-        'turn': -1,
+        'hand': turn.hand,
+        'turn': turn.index,
         'seat': seat,
       });
       transport.broadcast(w.toJson());
       _seen.add(w.id);
+      a.myWitness = w;
     }
-    _settleAbsence(a);
+    _settleAbsence(key);
   }
 
   bool _silent(PublicKey key) => clock.nowMs - (_lastHeard[key] ?? clock.nowMs) >= silenceAfterMs;
 
-  void _settleAbsence(_Absence a) {
+  void _settleAbsence((TurnId, int) key) {
+    final a = _absences[key]!;
     if (a.settled) return;
-    final seat = a.claims.first.seat;
+    final (turn, seat) = key;
     final holder = holders[seat];
     if (holder is! HumanSeat) {
       a.settled = true;
       return;
     }
-    final needed = a.snapshot.length ~/ 2 + 1;
-    if (a.backers.intersection(a.snapshot).length >= needed) {
+    if (_compare(turn) != 0) return;
+    final of = _participantsAt(turn);
+    final needed = _majority(of);
+    if (a.backers.intersection(of).length >= needed) {
       a.settled = true;
+      _log(Decision(turn: turn, event: a.claims.first, witnesses: Set.of(a.backers), removal: true));
+      _trace('absent seat $seat at $turn by ${a.backers.length}');
+      _remove(seat, at: turn);
       final open = _openTurnOf(seat);
-      _log(Decision(
-        turn: open ?? TurnId(game.handNumber, step),
-        event: a.claims.first,
-        witnesses: Set.of(a.backers),
-        removal: true,
-      ));
-      _remove(seat);
       if (open != null) {
         _races[open]!.settled = true;
-        _botActs(open, seat, (holders[seat] as BotSeat).persona);
+        _botActs(open, seat);
       }
-      _repauseOrResume();
+      _reconsider();
     } else {
-      final reachable = a.snapshot.difference({holder.key});
+      final reachable = of.difference({holder.key});
       _pause = reachable.length < needed ? Pause.waitingForJury : Pause.waitingForPeers;
     }
   }
 
-  void _repauseOrResume() {
+  /// After a departure: a proposal that could not carry may carry now.
+  void _reconsider() {
     _pause = null;
-    for (final r in _races.values) {
-      if (!r.settled && r.forRemoval.isNotEmpty) {
-        _settle(_races.entries.firstWhere((e) => e.value == r).key);
-      }
+    for (final turn in List.of(_races.keys)) {
+      if (!_races[turn]!.settled) _settle(turn);
+    }
+    for (final key in List.of(_absences.keys)) {
+      _settleAbsence(key);
     }
     _notify();
   }
@@ -651,42 +772,84 @@ class TableClient {
     _timers.add(clock.schedule(heartbeatMs, _heartbeat));
   }
 
-  /// Once a second: propose the removal of anyone silent too long, and
-  /// re-check boots this peer held back on until its clock agreed.
+  /// Once a second: propose the removal of anyone silent too long,
+  /// re-check boots this peer held back on until its clock agreed, and
+  /// repeat what is still unsettled — a message lost to a partition or
+  /// a reconnect is recovered by whoever still holds it.
   void _tick() {
     if (_closed) return;
     if (amSeated && !_left && !done) {
+      _repeat();
       for (var seat = 0; seat < seatCount; seat++) {
         final h = holders[seat];
-        if (h is! HumanSeat || h.key == signer.publicKey || !participants.contains(h.key)) continue;
-        if (_silent(h.key) && !_absences.containsKey(seat) && !_mySilenceClaims.containsKey(h.key)) {
-          _mySilenceClaims[h.key] = clock.nowMs;
-          _emit(EventKind.absent, {'hand': game.handNumber, 'step': step, 'seat': seat});
-        }
+        if (h is! HumanSeat || h.key == signer.publicKey || !_isParticipant(h.key)) continue;
+        if (!_silent(h.key)) continue;
+        final at = _positionOf(seat);
+        if (_absences.containsKey((at, seat)) || !_mySilenceClaims.add((at, h.key))) continue;
+        _emit(EventKind.absent, {'hand': at.hand, 'turn': at.index, 'seat': seat});
       }
-      for (final e in _races.entries) {
+      for (final e in List.of(_races.entries)) {
         final race = e.value;
         if (race.settled || race.boots.isEmpty || _myWitness.containsKey(e.key)) continue;
         _considerCountersigning(e.key, race.boots.first);
         _settle(e.key);
       }
-      _absences.removeWhere((seat, a) => a.settled);
     }
     _notify();
     _timers.add(clock.schedule(1000, _tick));
   }
 
+  int _repeatTick = 0;
+
+  void _repeat() {
+    if (++_repeatTick % 2 != 0) return;
+    for (final e in List.of(_races.entries)) {
+      final race = e.value;
+      if (race.settled) continue;
+      if (race.action != null) transport.broadcast(race.action!.toJson());
+      for (final b in race.boots) {
+        transport.broadcast(b.toJson());
+      }
+    }
+    for (final a in _absences.values) {
+      if (a.settled) continue;
+      for (final c in a.claims) {
+        transport.broadcast(c.toJson());
+      }
+      if (a.myWitness != null) transport.broadcast(a.myWitness!.toJson());
+    }
+    for (final e in _myWitnessEvents.entries) {
+      if (_races[e.key]?.settled == false) transport.broadcast(e.value.toJson());
+    }
+  }
+
+  /// This peer's own unsettled witnesses, kept to repeat.
+  final Map<TurnId, TableEvent> _myWitnessEvents = {};
+
+  void _log(Decision d) {
+    var i = record.length;
+    while (i > 0 && record[i - 1].compareTo(d) > 0) {
+      i--;
+    }
+    record.insert(i, d);
+  }
+
   void _notify() {
-    if (!_closed) _changes.add(null);
+    if (_closed) return;
+    if (_notifying) {
+      _notifyAgain = true;
+      return;
+    }
+    _notifying = true;
+    do {
+      _notifyAgain = false;
+      _changes.add(null);
+    } while (_notifyAgain && !_closed);
+    _notifying = false;
   }
 }
 
 class _Race {
-  _Race({required this.snapshot});
-
-  /// The participants when the turn opened: who a majority is of.
-  final Set<PublicKey> snapshot;
-
   TableEvent? action;
   final List<TableEvent> boots = [];
   final Set<PublicKey> forAction = {};
@@ -695,10 +858,8 @@ class _Race {
 }
 
 class _Absence {
-  _Absence({required this.snapshot});
-
-  final Set<PublicKey> snapshot;
   final List<TableEvent> claims = [];
   final Set<PublicKey> backers = {};
+  TableEvent? myWitness;
   bool settled = false;
 }

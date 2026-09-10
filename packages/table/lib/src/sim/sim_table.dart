@@ -1,6 +1,14 @@
+/// A whole simulated table, ready to run: the harness the matrix and
+/// the trace tool share.
+library;
+
 import 'package:engine/engine.dart';
-import 'package:table/src/sim/sim.dart';
-import 'package:table/table.dart';
+import '../client.dart';
+import '../signing.dart';
+import '../spec.dart';
+import 'scripted_human.dart';
+import 'sim_network.dart';
+import 'virtual_clock.dart';
 
 /// A simulated table: [humans] scripted people in the first seats,
 /// bots in the rest.

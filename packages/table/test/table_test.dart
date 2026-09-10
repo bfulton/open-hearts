@@ -1,7 +1,7 @@
+import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
 
-import 'sim_support.dart';
 
 void main() {
   test('events round-trip and refuse a bad signature', () {
@@ -22,7 +22,7 @@ void main() {
       final t = SimTable(humans: humans, seed: 7);
       t.start();
       expect(t.run(), isTrue, reason: 'every client reaches the end of the game');
-      final records = [for (final c in t.clients) c.record.map((d) => d.event.id).toList()];
+      final records = [for (final c in t.clients) c.record.map((d) => d.key).toList()];
       for (final r in records) {
         expect(r, records.first, reason: 'every client holds the same record');
       }

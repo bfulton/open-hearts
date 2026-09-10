@@ -26,7 +26,9 @@ class Moment {
   static final midTrick = Moment('mid-trick', (c) => c.awaitingMyPlay && c.game.trick.isNotEmpty);
   static final lastTrick = Moment('last trick', (c) => c.awaitingMyPlay && c.game.tricksPlayed == 12);
   static final duringPass = Moment('during the pass', (c) => c.awaitingMyPass);
-  static final handBoundary = Moment('at a hand boundary', (c) => c.step == 0 && c.game.handNumber > 0 && c.game.phase == Phase.playing && !c.awaitingMyPlay);
+  /// The first trick of a hand about to be led: after the deal and the
+  /// pass, before a card is played.
+  static final handBoundary = Moment('at a hand boundary', (c) => c.game.phase == Phase.playing && c.game.tricksPlayed == 0 && c.game.trick.isEmpty);
   static final atOnce = Moment('at once', (c) => true, fromHand: 0);
 
   static final all = [onOwnTurn, offTurn, midTrick, lastTrick, duringPass, handBoundary];

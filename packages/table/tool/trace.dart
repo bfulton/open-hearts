@@ -1,36 +1,40 @@
 // Runs one simulated table and prints where every client stands.
-//   dart run --define=HUMANS=2 tool/trace.dart
+//   dart run --define=HUMANS=3 --define=SEED=52 --define=SPLIT=2 tool/trace.dart
+// SPLIT=n partitions the first n humans from the rest for a minute once
+// the first hand is over, then heals.
 // ignore_for_file: avoid_print
-import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
-import 'package:table/table.dart';
 
 void main() {
   final humans = int.parse(const String.fromEnvironment('HUMANS', defaultValue: '2'));
   final limit = int.parse(const String.fromEnvironment('LIMIT_MS', defaultValue: '600000'));
-  final clock = VirtualClock();
-  final net = SimNetwork(clock, seed: 1);
-  final signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i')];
-  final spec = TableSpec(id: 't', seed: 7, seats: [
-    for (var s = 0; s < seatCount; s++)
-      s < humans ? HumanSeat(signers[s].publicKey) : BotSeat(Persona.roster[s]),
-  ]);
-  final people = [
-    for (var i = 0; i < humans; i++)
-      ScriptedHuman(
-        TableClient(spec: spec, signer: signers[i], transport: net.attach(signers[i].publicKey), clock: clock),
-        net, clock, persona: Persona.roster[i]),
-  ];
-  for (final p in people) {
-    p.start();
+  final seed = int.parse(const String.fromEnvironment('SEED', defaultValue: '7'));
+  final split = int.parse(const String.fromEnvironment('SPLIT', defaultValue: '0'));
+  final t = SimTable(humans: humans, seed: seed);
+  final from = int.parse(const String.fromEnvironment('LOG_FROM_MS', defaultValue: '-1'));
+  if (from >= 0) {
+    for (final c in t.clients) {
+      c.log = (line) {
+        if (t.clock.nowMs >= from) print(line);
+      };
+    }
   }
-  final done = clock.runUntil(() => people.every((p) => p.client.done), limitMs: limit);
-  print('done=$done at ${clock.nowMs} ms; delivered ${net.delivered}, dropped ${net.dropped}');
-  for (final p in people) {
-    final c = p.client;
-    final g = c.game;
-    print('--- ${c.signer.publicKey.substring(0, 6)} seat ${c.mySeat}: hand ${g.handNumber} ${g.phase.name} step ${c.step} '
-        'current ${g.currentSeat} trick ${g.trick} pass ${c.awaitingMyPass} play ${c.awaitingMyPlay} pause ${c.pause} '
-        'record ${c.record.length} passes ${[for (var s = 0; s < 4; s++) g.passOf(s) != null]}');
+  t.start();
+  if (split > 0) {
+    t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: limit);
+    final keys = t.signers.map((s) => s.publicKey).toList();
+    t.net.partition([keys.sublist(0, split).toSet(), keys.sublist(split).toSet()]);
+    t.clock.advance(60000);
+    print('split for 60 s at ${t.clock.nowMs}; healing');
+    for (final c in t.clients) {
+      print(c.describe());
+    }
+    t.net.heal();
+  }
+  final done = t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: limit);
+  print('done=$done at ${t.clock.nowMs} ms; delivered ${t.net.delivered}, dropped ${t.net.dropped}');
+  for (final c in t.clients) {
+    print(c.describe().trimRight());
+    print('    trick ${c.game.trick} record ${c.record.length}');
   }
 }
