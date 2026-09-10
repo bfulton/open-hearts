@@ -1,12 +1,16 @@
 # 02 — Multiplayer without a server
 
-> **Revised by [doc 04](04-live-play.md).** This document was written
-> assuming players arrive at a table by invitation. They don't — they are
-> matched with whoever wants a game right now, and matchmaking needs
-> presence in a way that signalling does not. There is a small rendezvous
-> service; doc 04 says what it does and what it is not allowed to know.
-> Everything below about the transport still holds, because gameplay is
-> still peer to peer and the service is still not a trust anchor.
+> **Revised by [doc 04](04-live-play.md).** This document assumed players
+> arrive at a table by invitation. They don't — they are matched with
+> whoever wants a game right now, and matchmaking needs live presence in
+> a way that a one-shot signalling handshake does not. So there is a
+> matchmaking service, and it also records who has bought live play on
+> the web.
+>
+> It does nothing else. It holds no cards, signs no plays, adjudicates
+> nothing, and a table already in progress does not need it — so the
+> conclusion below survives intact, including the part about a game
+> under way not caring whether we are having a good day.
 
 **Question.** Can four people play a real-time game of Hearts with no
 game server, no hosting bill, and sub-second latency?

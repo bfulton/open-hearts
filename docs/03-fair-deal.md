@@ -111,6 +111,36 @@ What it does stop is the entire class of cheating that a serverless game
 would otherwise be wide open to: a stacked deck, a peeked hand, a card
 claimed but never held.
 
+## Exactly what is guaranteed
+
+Worth stating precisely, because this is the claim the whole product
+rests on and an overstatement would be found and quoted.
+
+- **The deal cannot be rigged.** All four players shuffle in sequence
+  with proofs, and one honest shuffler is enough — so this holds even at
+  a table of one human and three bots, which is exactly when a player
+  would most suspect otherwise.
+- **No player ever sees another player's cards.** Any coalition able to
+  open a hand contains every human at the table, and then there is
+  nobody left to defraud.
+- **Nobody can misrepresent a card**, because the ciphertext binds it.
+- **Every game verifies end to end** against the committed deal, by
+  anyone, after the fact.
+
+One exception, disclosed rather than buried. A player left alone with
+three bots holds every remaining hand, because no second party is left to
+hold anything with. Those hands were dealt to people, so the honest
+statement is not "only bot cards are exposed" — it is this:
+
+> **While you are in the game, nobody can see your cards. If you leave,
+> the cards you leave behind may become visible to the last player still
+> at the table.**
+
+Which is narrow, but real. It applies only after you have gone, only to
+the hand you walked out of, and only once every other player has gone
+too. [Doc 04](04-live-play.md) sets out why no fix for it survives
+contact, and what bounds it in practice.
+
 ## Has anyone actually built this?
 
 Yes — and notably, **including a trick-taking game**, which is the part

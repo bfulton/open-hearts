@@ -46,8 +46,9 @@ rigged. Roughly in order:
    transport and the shared-referee model.
 3. **The verifiable deal** ([doc 03](docs/03-fair-deal.md)), starting
    with a wasm benchmark on a real phone before anything is built on it.
-4. **Matchmaking** ([doc 04](docs/04-live-play.md)) — tap Play, be in a
-   game, bots holding the seats nobody has taken yet.
+4. **Matchmaking and seat handover** ([doc 04](docs/04-live-play.md)) —
+   tap Play, be in a game; bots hold the seats nobody has taken, and the
+   seats people walk away from.
 5. **Tablet layout** ([doc 05](docs/05-form-factors.md)) — the first
    composition that is genuinely different rather than derived.
 6. **iPhone Duo**, which mostly falls out of the tablet work: both its
