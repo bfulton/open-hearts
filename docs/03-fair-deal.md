@@ -120,26 +120,18 @@ rests on and an overstatement would be found and quoted.
   with proofs, and one honest shuffler is enough — so this holds even at
   a table of one human and three bots, which is exactly when a player
   would most suspect otherwise.
-- **No player ever sees another player's cards.** Any coalition able to
-  open a hand contains every human at the table, and then there is
-  nobody left to defraud.
+- **Nobody can see your cards.** Not another player, not us, and not
+  whoever is left at the table after you go. Any coalition able to open
+  a hand contains every human at the table plus a randomly drawn
+  stranger who has no stake in it — [doc 04](04-live-play.md) has the
+  construction.
 - **Nobody can misrepresent a card**, because the ciphertext binds it.
 - **Every game verifies end to end** against the committed deal, by
   anyone, after the fact.
 
-One exception, disclosed rather than buried. A player left alone with
-three bots holds every remaining hand, because no second party is left to
-hold anything with. Those hands were dealt to people, so the honest
-statement is not "only bot cards are exposed" — it is this:
-
-> **While you are in the game, nobody can see your cards. If you leave,
-> the cards you leave behind may become visible to the last player still
-> at the table.**
-
-Which is narrow, but real. It applies only after you have gone, only to
-the hand you walked out of, and only once every other player has gone
-too. [Doc 04](04-live-play.md) sets out why no fix for it survives
-contact, and what bounds it in practice.
+No exceptions. Earlier drafts of this document carried one — a player
+left alone with three bots could see them — and the jury in doc 04 is
+what removed it.
 
 ## Has anyone actually built this?
 

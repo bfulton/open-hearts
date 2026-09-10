@@ -100,8 +100,14 @@ fifteen on-turn — so an active table always resolves through the visible,
 explicable path and the timeout only catches what boot cannot see.
 
 All three doors produce the same event: **"seat N is out as of game state
-S,"** signed by the surviving set. One code path for the consequences,
-three ways in.
+S."** One code path for the consequences, three ways in.
+
+They differ in what backs the event. A signed Leave is evidence and
+needs nobody's agreement. Boot and timeout are *inferences* about
+someone's absence, and an inference needs **a strict majority of the
+last agreed participant set** behind it — three of four, two of three.
+At two humans no majority exists among the players, and that case goes
+to the jury, below.
 
 There is no rejoining. Without persistent identity there is nothing to
 rejoin as, so a removed player goes back to matchmaking.
@@ -115,6 +121,13 @@ ambiguity to resolve and no race to arbitrate.
 
 The only genuinely concurrent question is whether someone has gone, which
 is why it gets the machinery above and nothing else does.
+
+The majority rule is what stops a partition becoming a fork. Split a
+four-human table 2–2 and each half sees the other as silent — but each
+half holds two of four, neither has a majority, neither evicts anyone,
+and neither reconstructs anything. Both halves wait. That is the right
+outcome for a genuinely symmetric event: nobody left, so nobody is
+replaced. Split it 3–1 and the three proceed correctly.
 
 Belt and braces: the game state is hash-chained. Every play appends to a
 log and each player signs the resulting hash, so a peer whose hash
@@ -146,19 +159,20 @@ who gets hurt. Keeping the parties to the humans means any coalition able
 to open a hand contains every human at the table, and then there is
 nobody left to defraud. That is the same guarantee the deal itself makes.
 
-The requirement falls away as the table empties:
+The parties shrink with the table, down to a floor of two:
 
-| Table | Who must not see bot hands | What runs |
+| Table | Who must not see bot hands | Parties |
 |---|---|---|
-| 4 humans | no bots exist | nothing |
-| 3 humans + 1 bot | each human, individually | 3-party MPC |
-| 2 humans + 2 bots | each human, individually | 2-party MPC |
-| 1 human + 3 bots | nobody — see below | plain local computation |
+| 4 humans | no bots exist | — |
+| 3 humans + 1 bot | each human | the three humans |
+| 2 humans + 2 bots | each human | the two humans |
+| 1 human + 3 bots | the human | the human **and the foreman** |
 
-The floor needs no protection because there is no second human to
-disadvantage. Which also means a cascade of departures lands in the
-configuration that needs no cryptography at all — fast, multiple
-departures make this easier rather than harder.
+A lone human is never a lone party. The foreman — a stranger drawn at
+random from elsewhere, with no stake in the table — takes the departed
+player's place as a computing party, so the survivor never holds a bot
+hand and cannot see one, however their client has been modified. That
+is what makes [doc 03](03-fair-deal.md)'s guarantee unconditional.
 
 Departures require re-sharing among the survivors, and the material for
 the next configuration is precomputed one hop ahead so a departure does
@@ -188,29 +202,77 @@ Which is why there is no witness, no arbiter and no server in the game.
 Not as a principle we are defending, but because the determinism of the
 bot and the commitment of the deal make one unnecessary.
 
-## The one thing that cannot be prevented
+## The jury
 
-A player left alone with three bots holds every hand, because there is no
-second party to hold anything with. They can see the bot cards.
+Two of the cases above cannot be settled by the players alone. At **two
+humans**, a silent player leaves the other with one vote of two — no
+majority, and from the inside a rage quit and a partition look the same.
+At **one human**, there is nobody to be the second MPC party. Both need
+one thing: a party with no stake in the table.
 
-No human's cards are ever visible to another human — the three seats they
-can see are bots — so the privacy guarantee between players is intact.
-But that player can play the rest of the game with information a real
-opponent would not have, and under the scoring rules below, a win moves
-other people's ratings.
+So every hand seats a **jury**: a small number of players drawn at random
+from whoever is online at other tables. Each juror holds a share of the
+hand's key material — useless alone — and connects to all four seats at
+the start of the hand. One is **foreman**, chosen by the deal's own
+randomness (which every party has already verified), with the others in
+a deterministic order behind them.
 
-There is no fix for this that survives contact. Computational cost does
-not work, because the advantage is informational and free. Proving plays
-happened in real time does not work, because the advantage is used at
-normal speed. Denying the information needs a second party we removed on
-purpose. And every scheme that scores the game early to avoid the state
-lets a *winning* player leave and bank it.
+**Random, not ranked.** Any selection criterion an attacker can optimise
+becomes a lever, and uptime or latency are trivially optimised by running
+a node. Random draw from purchase-backed identities offers no lever; a
+juror with a bad connection is simply disqualified and redrawn. Random
+selection across unrelated networks also keeps juror failures
+independent, which the sizing below depends on.
 
-So it stands, disclosed: **if you would rather the last player standing
-did not have that, do not leave.** What bounds it in practice is that
-exploiting it means writing a modified client, and it only pays in games
-that drained to one human before ending — which should be instrumented
-rather than assumed.
+**Per hand, not per game.** The deck is resealed every hand, so shares
+are per-hand and a juror's whole obligation is one hand — p50 a minute,
+p90 two. Short enough to ask of a stranger, and short enough that an
+attacker who does get selected has a couple of minutes of relevance.
+
+**The tiebreak.** At two humans, A reports that B has gone silent. The
+foreman checks for itself: it connected to B at the start of the hand and
+knows whether that route still works. If B is reachable, A is told to
+wait — it is a partition, not a departure. If not, B is gone. A rage quit
+is offline from every juror's perspective, so every juror agrees and the
+survivor continues. Only a partition that also splits the jury can
+produce two answers, and that degrades to a detectable fork rather than a
+silent one.
+
+**The second party.** At one human, the foreman steps into the MPC in
+the departed player's place. Survivor and foreman compute each bot move
+together, for the rest of the hand, and neither sees a card. If the
+foreman drops, the next juror in order already holds the share and takes
+over at the next move.
+
+**Size.** The jury fails only if every juror leaves inside one
+replacement window — the ten seconds or so it takes to notice a drop,
+redraw, and distribute a share. With sessions of one game and a p90
+two-minute hand, four jurors put that around 10⁻⁵ per hand; with
+players staying for two or three games it is nearer 10⁻⁶. **k = 4**,
+and the number to make small is the replacement window, which enters
+as (λT)ᵏ. Halving it is worth more than a fifth juror.
+
+**If the jury is lost anyway**, the table pauses, says so, and resumes
+when one is rebuilt. Nobody at the table controls whether strangers
+elsewhere go offline, so the pause is not a lever.
+
+**Juror of last resort.** When a table cannot draw a jury — because too
+few people are online — it says so, and a client we manage comes online
+to serve. It is the same code every other juror runs, holds the same
+kind of share, does the same one hand, and knows nothing else. Its cost
+scales inversely with the player base: it runs when the room is empty
+and never otherwise. This is the only place a gameplay event reaches
+anything of ours, and what it carries is "a table needs a juror."
+
+## What the jury does not change
+
+Everything a juror holds is a share. A juror alone can open nothing.
+Together with a player at the table, a juror can help play a seat that
+seat's owner abandoned — and that is the whole of it. To break a hand
+you need a juror colluding with a player at that specific table, which
+means being drawn at random for it, for the one hand it matters, and
+having arranged the collusion in advance. Bounded, and expensive to
+target.
 
 ## Scoring
 
@@ -238,10 +300,17 @@ motivated to use it.
 
 ## What the service does
 
-Matchmaking, and recording who has bought live play on the web.
+Matchmaking, recording who has bought live play on the web, and
+bringing a juror of last resort online when a table cannot draw one.
 
 It never holds a card, never signs a play, never adjudicates anything,
-and is not required by a table already in progress.
+and is not required by a table already in progress. The juror it brings
+online is a client like any other and is the only one of these that
+touches a game — for one hand, holding a share, knowing nothing else.
+
+The jury draw needs to know who is online, which is the same question
+matchmaking asks. The two should share one presence mechanism rather
+than each inventing one; neither is designed here.
 
 ## Still open
 
