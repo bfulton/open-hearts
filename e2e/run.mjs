@@ -2,6 +2,7 @@
 //
 //   cd app && flutter build web -o build/e2e --base-href / --no-web-resources-cdn
 //   node e2e/run.mjs            # from the repo root; needs the global Playwright
+//   RELAY_URL=wss://relay.damus.io node e2e/run.mjs   # against a public relay
 //
 // Starts the local relay and a static server for the built app, opens
 // four headless Chromium contexts — four devices, four keys — and
@@ -180,7 +181,9 @@ const names = ['Ada', 'Bao', 'Cara', 'Dee'];
 const roster = /^(Westley|Buttercup|Romeo|Juliet|Cyrano|Roxane|Casanova|Don Juan)$/;
 
 async function main() {
-  const relay = await startRelay();
+  // RELAY_URL=wss://… runs the suite against a relay that already
+  // exists — a public one, say — instead of starting the local one.
+  const relay = process.env.RELAY_URL ? { url: process.env.RELAY_URL, stop() {} } : await startRelay();
   const app = await serveApp();
   log(`relay ${relay.url}, app ${app.url}`);
   const browser = await chromium.launch();
