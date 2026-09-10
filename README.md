@@ -58,9 +58,13 @@ rigged. Roughly in order:
    departure matrix passes on a simulated network, and a thousand
    seeds of random faults walk its explicit state model without a
    fork or a deadlock ([doc 06](docs/06-service.md), `packages/table`).
-   Still to come: the same clients over WebRTC with the local relay
-   behind them, the app's live table, and the end-to-end suite in real
-   browsers. Meanwhile every solo game is kept on the device as a
+   The local relay exists (`service/`, a NIP-01 subset), the same
+   clients play a hand over it with real keys and real sockets, and
+   WebRTC signalling has its wire. Still to come: WebRTC itself in the
+   app, with signing in wasm since Dart-to-JavaScript signatures cost
+   100 ms each ([measurements](measurements/README.md)); the app's
+   live table; and the end-to-end suite in real browsers. Meanwhile
+   every solo game is kept on the device as a
    record — the deal, the bots, your own passes and plays — and **Copy
    record** on the game-over sheet hands it over as a line of text that
    `packages/engine/tool/replay.dart` turns back into every trick.

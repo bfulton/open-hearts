@@ -7,8 +7,9 @@ build/
 pubspec.lock
 *.iml
 
-# Rust (measurements/shuffle)
-measurements/shuffle/target/
+# Rust (measurements)
+measurements/*/target/
+measurements/*/wasm/target/
 
 # Tooling
 node_modules/

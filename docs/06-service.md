@@ -87,6 +87,40 @@ code and different adapters:
 
 One process, one flag.
 
+## The relay, and the table over it
+
+`service/` is, so far, the local relay: a NIP-01 subset in a few
+hundred lines of Dart — `EVENT`, `REQ` with filters on ids, authors,
+kinds, `since`, `until`, `limit` and single-letter tags, `CLOSE`, and
+`OK`, `EOSE` and `NOTICE` back. Every event's id and BIP-340 signature
+are checked before anything else sees it. Stored kinds live in memory
+up to a cap; the kinds the table uses are ephemeral (20000–29999),
+forwarded and forgotten, because the protocol's own repeat-and-catch-up
+already recovers a dropped message and nobody needs a relay to remember
+a game.
+
+`packages/table` has the other side: `RelayTransport`, a [Transport]
+that wraps each table message in an ephemeral event of kind 24242,
+tagged with the table id and signed by the sender, and subscribes to
+the same. What arrives is stamped *from* the envelope's signer — the
+peer that sent it, which for a relayed message is not the author — and
+that is the distinction "heard from" rests on. The relay says nothing
+when a peer goes, so the transport never reports a disconnect; the
+heartbeats carry that. Kind 24243 on the same wire is WebRTC
+signalling — an offer, an answer, an ICE candidate — addressed with a
+`p` tag to one recipient, who is the only one subscribed to it. Plain
+text on a local relay; encrypted to the recipient's key (NIP-44) is
+the step before a public relay carries it.
+
+`service/test/table_over_relay_test.dart` seats two people and two bots
+on the local relay with real keys, real sockets and the wall clock, and
+they play a hand: 28 decisions, every one signed twice and verified by
+the other side, in about four seconds. That is the cost the app pays,
+measured — and it is why the web app will not sign in Dart: the same
+signature that takes 11 ms in the VM takes 100 ms compiled to
+JavaScript, and 0.6 ms as wasm
+([measurements/sign](../measurements/README.md)).
+
 ## Language and layout
 
 The juror runs the bot policy under MPC, and the bot is Dart. So the

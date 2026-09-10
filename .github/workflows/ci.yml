@@ -25,6 +25,8 @@ jobs:
         run: cd packages/engine && dart pub get && dart analyze && dart test
       - name: Table (the protocol over a simulated network — the departure matrix)
         run: cd packages/table && dart pub get && dart analyze && dart test
+      - name: Service (the local relay, and a hand played over it with real signatures)
+        run: cd service && dart pub get && dart analyze && dart test
       - name: Analyze
         run: cd app && flutter pub get && flutter analyze
       - name: Test (widgets)
