@@ -106,6 +106,16 @@ class Bot {
   /// three slots, so it is taken only when it falls out of the ranking
   /// for free.
   List<Card> choosePass(List<Card> hand) {
+    if (persona.shoots && strength(hand, const {}).losers <= persona.shootPassMaxLosers) {
+      // A shot in the making: the three lowest go, ties to the lower
+      // suit, and the hand keeps its height.
+      final byRank = List.of(hand)
+        ..sort((a, b) {
+          final d = a.rank.value.compareTo(b.rank.value);
+          return d != 0 ? d : a.compareTo(b);
+        });
+      return byRank.take(passSize).toList();
+    }
     final scored = [
       for (final c in hand) (card: c, danger: _passDanger(c, hand)),
     ]..sort((a, b) {
@@ -141,7 +151,12 @@ class Bot {
         return -10 + card.rank.value;
       case Suit.hearts:
         // Hearts cost a point every time one lands, and high ones land.
-        return card.rank.value * 2 + (card.rank.value >= 12 ? 12 : 0);
+        // A stopper-keeper discounts the top heart, queen or better: the
+        // one card that can break up a moon later.
+        final stopper = persona.keepsStopper &&
+            card.rank.value >= 12 &&
+            !hand.any((c) => c.suit == Suit.hearts && c.rank.value > card.rank.value);
+        return card.rank.value * 2 + (card.rank.value >= 12 ? 12 : 0) - (stopper ? 20 : 0);
       case Suit.clubs:
       case Suit.diamonds:
         final length = hand.where((c) => c.suit == card.suit).length;
@@ -161,9 +176,114 @@ class Bot {
   Card chooseCard(BotView view, List<Card> legal) {
     assert(legal.isNotEmpty);
     if (legal.length == 1) return legal.first;
+    final following =
+        view.trick.isNotEmpty && legal.first.suit == view.trick.first.card.suit;
+    if (persona.shoots && shooting(view, legal, following: following)) {
+      return _shoot(view, legal, following: following);
+    }
     if (view.trick.isEmpty) return _lead(view, legal);
-    final following = legal.first.suit == view.trick.first.card.suit;
     return following ? _follow(view, legal) : _discard(view, legal);
+  }
+
+  // ---- the moon ---------------------------------------------------------
+
+  /// Whether this play is part of a run at the moon.
+  ///
+  /// Decided fresh at every play from what is on the table, so it needs
+  /// no memory: the run is on while nobody else holds a point, the hand
+  /// is strong enough ([strength]: at most a quarter of it losers), and
+  /// this trick is not already lost with points in it. The moment any of
+  /// those fails the bot is an ordinary player again, which is also what
+  /// happens to a person whose shot goes wrong.
+  bool shooting(BotView view, List<Card> legal, {required bool following}) {
+    final total = view.taken.fold(0, (a, b) => a + b);
+    if (total - view.taken[view.seat] > 0) return false;
+    final s = strength(view.hand, view.played);
+    if (s.losers * persona.shootLoserShare > view.hand.length) return false;
+    if (view.trick.isEmpty) return true;
+    final trickPoints = pointsIn(view.trick.map((p) => p.card));
+    if (trickPoints == 0) return true;
+    if (!following) return false;
+    final high = _topOfLed(view);
+    return legal.any((c) => c.rank.value > high);
+  }
+
+  /// How many of [hand]'s cards will take a trick if led: the top run
+  /// of each suit among the cards still unplayed, plus the cards that
+  /// will be top once those have drawn out what is outside the hand.
+  /// Everything else is a loser.
+  static ({int winners, int losers}) strength(List<Card> hand, Set<Card> played) {
+    var winners = 0;
+    for (final suit in Suit.values) {
+      final mine = hand.where((c) => c.suit == suit).length;
+      var outside = 0;
+      var top = 0;
+      var run = true;
+      for (var r = Rank.values.length - 1; r >= 0; r--) {
+        final card = Card.of(suit, Rank.values[r]);
+        if (played.contains(card)) continue;
+        if (hand.contains(card)) {
+          if (run) top++;
+        } else {
+          run = false;
+          outside++;
+        }
+      }
+      // Each top card led takes up to three outside cards with it.
+      final left = outside - 3 * top;
+      final late = mine - top - (left > 0 ? left : 0);
+      winners += top + (late > 0 ? late : 0);
+    }
+    return (winners: winners, losers: hand.length - winners);
+  }
+
+  /// The cards in [hand] nothing outside it can beat right now.
+  static List<Card> _tops(List<Card> hand, Set<Card> played) {
+    final tops = <Card>[];
+    for (final suit in Suit.values) {
+      for (var r = Rank.values.length - 1; r >= 0; r--) {
+        final card = Card.of(suit, Rank.values[r]);
+        if (played.contains(card)) continue;
+        if (!hand.contains(card)) break;
+        tops.add(card);
+      }
+    }
+    return tops;
+  }
+
+  int _topOfLed(BotView view) {
+    final led = view.trick.first.card.suit;
+    return view.trick
+        .where((p) => p.card.suit == led)
+        .map((p) => p.card.rank.value)
+        .reduce(max);
+  }
+
+  /// A play in a run at the moon.
+  ///
+  /// Leading, the highest card that is sure to win, hearts last so the
+  /// hearts stay in hand as winners for the end. Following, a card that
+  /// beats the table: the cheapest one from the last seat, otherwise the
+  /// highest held, since a later player might beat a cheap one. When
+  /// the trick cannot be won it has no points in it (or [shooting]
+  /// would have said no), so throw the lowest card and keep the winners.
+  Card _shoot(BotView view, List<Card> legal, {required bool following}) {
+    if (view.trick.isEmpty) {
+      final tops = _tops(view.hand, view.played).where(legal.contains).toList();
+      final sideTops = tops.where((c) => c.suit != Suit.hearts).toList();
+      if (sideTops.isNotEmpty) return _highest(sideTops);
+      if (tops.isNotEmpty) return _highest(tops);
+      return _highest(legal);
+    }
+    if (following) {
+      final high = _topOfLed(view);
+      final over = legal.where((c) => c.rank.value > high).toList();
+      if (over.isEmpty) return _lowest(legal);
+      final isLastSeat = view.trick.length == seatCountInTrick - 1;
+      return isLastSeat ? _lowest(over) : _highest(legal);
+    }
+    final harmless = legal.where((c) => cardPoints(c) == 0).toList();
+    return _lowest(harmless.isNotEmpty ? harmless : legal);
   }
 
   /// On lead.
@@ -277,7 +397,16 @@ class Bot {
         legal.where((c) => c.suit == Suit.spades && c.rank.value > 12).toList();
     if (highSpades.isNotEmpty && !view.queenGone) return _highest(highSpades);
 
-    final hearts = legal.where((c) => c.suit == Suit.hearts).toList();
+    var hearts = legal.where((c) => c.suit == Suit.hearts).toList();
+    // A stopper-keeper holds the top heart, queen or better, while no
+    // points are out at all: it is what breaks up a moon later.
+    if (persona.keepsStopper &&
+        view.taken.every((t) => t == 0) &&
+        hearts.isNotEmpty &&
+        _highest(hearts).rank.value >= 12) {
+      final stopper = _highest(hearts);
+      hearts = hearts.where((c) => c != stopper).toList();
+    }
     if (hearts.isNotEmpty) {
       final top = _highest(hearts);
       // A low heart is a worse throw than a high side-suit card: it gives

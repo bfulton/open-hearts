@@ -1,6 +1,7 @@
 /// Prints the roster's standings against each other.
 ///
 ///     cd packages/engine && dart run --define=GAMES=3000 tool/arena.dart
+///     dart run --define=ROSTER="Westley,Romeo,Don Juan,Roxane" tool/arena.dart
 ///
 /// Fair share of wins is 25%. The test holds every persona to at least
 /// 20% and within ten points of the best mean score; this is for seeing
@@ -14,7 +15,13 @@ import 'package:engine/engine.dart';
 
 void main() {
   final games = int.parse(const String.fromEnvironment('GAMES', defaultValue: '1200'));
-  final standings = Arena.play(games)..sort((a, b) => a.meanScore.compareTo(b.meanScore));
+  // ROSTER=Westley,Don Juan,... seats a chosen field; default is the roster.
+  const names = String.fromEnvironment('ROSTER');
+  final roster = names.isEmpty
+      ? Persona.roster
+      : [for (final n in names.split(',')) Persona.named(n.trim())];
+  final standings = Arena.play(games, roster: roster)
+    ..sort((a, b) => a.meanScore.compareTo(b.meanScore));
   print('$games tables, four from the roster at each\n');
   print('${'persona'.padRight(10)} ${'seats'.padLeft(6)} ${'wins'.padLeft(7)} ${'mean score'.padLeft(11)}');
   for (final s in standings) {

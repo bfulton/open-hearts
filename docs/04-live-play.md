@@ -39,20 +39,23 @@ by the fourth hand. The state is always on screen — how many seats are
 bots, and a note when somebody sits down.
 
 **The bots have names, and the names are famous lovers.** Romeo and
-Juliet, Cyrano and Roxane, Westley and Buttercup, Casanova — open hearts.
-Each is a temperament: the one policy with a few of its thresholds
-moved, so Romeo cannot hold a queen and Juliet waits for the moment and
-Cyrano leads from his long suit. Every setting is a choice a strong
+Juliet, Cyrano and Roxane, Westley and Buttercup, Casanova, Don Juan —
+open hearts. Each is a temperament: the one policy with a few of its
+thresholds moved, so Romeo cannot hold a queen and Juliet waits for the
+moment and Cyrano leads from his long suit and Don Juan runs at the
+moon on a hand the others would not. Every setting is a choice a strong
 player might make, and that is measured, not assumed: a tool plays each
 setting alone against the baseline, and a tournament test seats random
 fours from the roster and fails if any persona falls behind — a
-character may be rash or patient, never bad. (The measuring already
-earned its keep: emptying a short suit in the pass turned out to be
-worth a third of tables instead of a quarter, so it stopped being a
-style and became the rule for everyone.) The roster is data in
-`packages/engine/lib/src/persona.dart`; the oblivious circuit takes the
-same settings as constants, so a named bot holding a departed seat is
-the same computable consequence as any other.
+character may be rash or patient, never bad. The measuring has already
+moved two things from style to rule: emptying a short suit in the pass
+is worth a third of tables instead of a quarter, and never shooting the
+moon costs six points of tables, so every bot voids and every bot
+shoots when the hand is plainly a shot, and every bot keeps a top heart
+back while no points are out, because that is what stops a shot. The
+roster is data in `packages/engine/lib/src/persona.dart`; the oblivious
+circuit takes the same settings as constants, so a named bot holding a
+departed seat is the same computable consequence as any other.
 
 ## Filling and emptying seats
 
@@ -196,15 +199,17 @@ Counted, in AND gates — what a garbled circuit costs; XOR is free:
 
 | | AND gates |
 |---|---|
-| one play, legality included | 1,234 |
-| the same, hand in as thirteen dealt positions and position out | 2,313 |
-| one pass | 9,831 |
-| a bot seat for a whole hand: one pass and thirteen plays | 39,900 |
+| one play, legality included | 2,479 |
+| the same, hand in as thirteen dealt positions and position out | 3,558 |
+| one pass | 10,933 |
+| a bot seat for a whole hand: one pass and thirteen plays | 57,187 |
 
-At two ciphertexts per gate a play is about 75 KB and a whole hand about
-1.2 MB; malicious security multiplies that by a small constant. Small
-enough that the material for a hand travels while the previous one is
-played, and that the precomputation below is seconds of background work.
+About half of a play is the run at the moon — knowing which cards are
+sure winners takes the whole played set as public input. At two
+ciphertexts per gate a play is about 110 KB and a whole hand under 2 MB;
+malicious security multiplies that by a small constant. Small enough
+that the material for a hand travels while the previous one is played,
+and that the precomputation below is seconds of background work.
 
 **The parties are the humans at the table, and only them.** Adding the
 service as a third party would buy a cheaper protocol — honest-majority

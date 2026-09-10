@@ -111,7 +111,7 @@ void main() {
   });
 
   group('the oblivious bot', () {
-    for (final persona in Persona.roster) {
+    for (final persona in Persona.candidates) {
       test('agrees with ${persona.name} on every decision of 8 games', () {
         var plays = 0, passes = 0;
         int? playGates, passGates, legalGates, positionGates;

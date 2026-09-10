@@ -207,6 +207,44 @@ class Circuit {
   Bit eq(List<Bit> a, List<Bit> b) => not(any(xorEach(a, b)));
 
   Bit isZero(List<Bit> a) => not(any(a));
+
+  /// a + b, little-endian, [width] bits: one AND per bit.
+  List<Bit> add(List<Bit> a, List<Bit> b, {required int width}) {
+    var carry = zero;
+    final out = <Bit>[];
+    for (var k = 0; k < width; k++) {
+      final ak = k < a.length ? a[k] : zero;
+      final bk = k < b.length ? b[k] : zero;
+      final ab = xor(ak, bk);
+      out.add(xor(ab, carry));
+      carry = xor(and(ab, xor(ak, carry)), ak); // majority
+    }
+    return out;
+  }
+
+  /// a − b, little-endian, [width] bits, and whether it went below zero.
+  ({List<Bit> diff, Bit borrow}) sub(List<Bit> a, List<Bit> b, {required int width}) {
+    var borrow = zero;
+    final out = <Bit>[];
+    for (var k = 0; k < width; k++) {
+      final ak = k < a.length ? a[k] : zero;
+      final bk = k < b.length ? b[k] : zero;
+      final ab = xor(ak, bk);
+      out.add(xor(ab, borrow));
+      borrow = mux(ab, bk, borrow);
+    }
+    return (diff: out, borrow: borrow);
+  }
+
+  /// max(0, a − b).
+  List<Bit> subClamped(List<Bit> a, List<Bit> b, {required int width}) {
+    final r = sub(a, b, width: width);
+    return andEach(r.diff, not(r.borrow));
+  }
+
+  /// a × 2ⁿ: free.
+  List<Bit> shl(List<Bit> a, int n, {required int width}) =>
+      [for (var k = 0; k < width; k++) k - n >= 0 && k - n < a.length ? a[k - n] : zero];
 }
 
 /// The bot's inputs that everyone at the table can see, as wires.
@@ -223,6 +261,19 @@ class PublicPlay {
         isLastSeat = c.public(view.trick.length == seatCountInTrick - 1),
         queenGone = c.public(view.queenGone),
         moonThreat = c.public(view.moonThreatAt(persona.moonDefenseTrigger) != null),
+        othersHavePoints = c.public(
+            view.taken.fold(0, (a, b) => a + b) - view.taken[view.seat] > 0),
+        nobodyHasPoints = c.public(view.taken.every((t) => t == 0)),
+        trickHasPoints = c.public(pointsIn(view.trick.map((p) => p.card)) > 0),
+        handSize = [for (var k = 0; k < 4; k++) c.public((view.hand.length >> k) & 1 == 1)],
+        played = [for (final card in Card.deck) c.public(view.played.contains(card))],
+        unplayed = [
+          for (final s in Suit.values)
+            [
+              for (var k = 0; k < 4; k++)
+                c.public(((13 - view.played.where((x) => x.suit == s).length) >> k) & 1 == 1),
+            ],
+        ],
         ledSuit = [
           for (final s in Suit.values)
             c.public(view.trick.isNotEmpty && view.trick.first.card.suit == s),
@@ -237,6 +288,25 @@ class PublicPlay {
   final Bit isLastSeat;
   final Bit queenGone;
   final Bit moonThreat;
+
+  /// Somebody other than this seat holds points this hand: no run at
+  /// the moon is possible.
+  final Bit othersHavePoints;
+
+  /// No points have been taken by anyone yet.
+  final Bit nobodyHasPoints;
+
+  final Bit trickHasPoints;
+
+  /// Cards still in this seat's hand, 4 bits: public, since every play
+  /// is seen.
+  final List<Bit> handSize;
+
+  /// Every card played this hand, by [Card.index].
+  final List<Bit> played;
+
+  /// Per suit, 4 bits: how many of its cards are not yet played.
+  final List<List<Bit>> unplayed;
 
   /// One-hot by [Suit.index]; all clear on lead.
   final List<Bit> ledSuit;
@@ -356,9 +426,126 @@ class ObliviousBot {
   List<Bit> chooseCard(List<Bit> hand, PublicPlay p) {
     final r = legal(hand, p);
     final lead = _lead(hand, r.legal, p);
-    final follow = _follow(r.legal, p);
+    final f = _follow(r.legal, p);
     final discard = _discard(r.legal, p);
-    return c.muxEach(p.isLead, lead, c.muxEach(r.hasFollowing, follow, discard));
+    final ordinary = c.muxEach(p.isLead, lead, c.muxEach(r.hasFollowing, f.play, discard));
+    if (!persona.shoots) return ordinary;
+
+    // A run at the moon: nobody else holds a point, the hand is strong,
+    // and this trick is not already lost with points in it.
+    final st = _strength(hand, p.played, p.unplayed);
+    final losers = c.sub(p.handSize, st.winners, width: 6).diff;
+    final strong = c.not(c.lt(p.handSize, _times(losers, persona.shootLoserShare)));
+    final canTake = c.or(p.isLead, c.or(c.not(p.trickHasPoints), c.and(r.hasFollowing, f.hasOver)));
+    final shooting = c.all([c.not(p.othersHavePoints), strong, canTake]);
+
+    // Leading: the highest sure winner, hearts last; else the highest
+    // card. Ties to the lower suit, as the bot's list order has it.
+    final topsLegal = [for (var i = 0; i < 52; i++) c.and(st.tops[i], r.legal[i])];
+    final sideOrder = _byRankThenSuitDesc([for (var i = 0; i < 52; i++) if (!_isHeart(i)) i]);
+    final sideTop = _lastIn(topsLegal, sideOrder);
+    final hasSideTop = c.any([for (final i in sideOrder) topsLegal[i]]);
+    final heartTops = _laneOf(topsLegal, Suit.hearts);
+    final heartTop = c.lastSet(heartTops);
+    final hasHeartTop = c.any(heartTops);
+    final anyTop = _lastIn(r.legal, _byRankThenSuitDesc([for (var i = 0; i < 52; i++) i]));
+    final useHeart = c.and(hasHeartTop, c.not(hasSideTop));
+    final useAny = c.not(c.or(hasSideTop, hasHeartTop));
+    final shootLead = [
+      for (var i = 0; i < 52; i++)
+        c.parity([
+          if (!_isHeart(i)) c.and(hasSideTop, sideTop[i]),
+          if (_isHeart(i)) c.and(useHeart, heartTop[_rankOf(i)]),
+          c.and(useAny, anyTop[i]),
+        ]),
+    ];
+
+    // Following: beat the table, cheaply from the last seat, else with
+    // the highest held; when it cannot be beaten, the lowest.
+    final take = c.muxEach(p.isLastSeat, f.lowestOver, f.highestLane);
+    final shootLane = c.muxEach(f.hasOver, take, f.lowestLane);
+    final shootFollow = [for (var i = 0; i < 52; i++) c.and(shootLane[_rankOf(i)], p.ledSuit[_suitOf(i)])];
+
+    // Void: the lowest harmless card, or the lowest of all.
+    final harmlessOrder = _byRankThenSuit([for (var i = 0; i < 52; i++) if (!_isPoint(i)) i]);
+    final hasHarmless = c.any([for (final i in harmlessOrder) r.legal[i]]);
+    final dumpable = [
+      for (var i = 0; i < 52; i++) _isPoint(i) ? c.and(r.legal[i], c.not(hasHarmless)) : r.legal[i],
+    ];
+    final shootDiscard = _firstIn(dumpable, _byRankThenSuit([for (var i = 0; i < 52; i++) i]));
+
+    final shot = c.muxEach(p.isLead, shootLead, c.muxEach(r.hasFollowing, shootFollow, shootDiscard));
+    return c.muxEach(shooting, shot, ordinary);
+  }
+
+  /// n × [a] for the small constants the moon logic uses.
+  List<Bit> _times(List<Bit> a, int n) => switch (n) {
+        0 => List.filled(6, Circuit.zero),
+        1 => a,
+        2 => c.shl(a, 1, width: 6),
+        3 => c.add(a, c.shl(a, 1, width: 6), width: 6),
+        4 => c.shl(a, 2, width: 6),
+        _ => throw ArgumentError('unsupported multiplier $n'),
+      };
+
+  static List<int> _byRankThenSuitDesc(List<int> indexes) => List.of(indexes)
+    ..sort((a, b) {
+      final d = _rankOf(a).compareTo(_rankOf(b));
+      return d != 0 ? d : _suitOf(b).compareTo(_suitOf(a));
+    });
+
+  static List<int> _byRankThenSuit(List<int> indexes) => List.of(indexes)
+    ..sort((a, b) {
+      final d = _rankOf(a).compareTo(_rankOf(b));
+      return d != 0 ? d : _suitOf(a).compareTo(_suitOf(b));
+    });
+
+  /// One-hot of the last set bit of [v] in [order], back in index order.
+  List<Bit> _lastIn(List<Bit> v, List<int> order) {
+    final picked = c.lastSet([for (final i in order) v[i]]);
+    final out = List<Bit>.filled(52, Circuit.zero);
+    for (var k = 0; k < order.length; k++) {
+      out[order[k]] = picked[k];
+    }
+    return out;
+  }
+
+  List<Bit> _firstIn(List<Bit> v, List<int> order) {
+    final picked = c.firstSet([for (final i in order) v[i]]);
+    final out = List<Bit>.filled(52, Circuit.zero);
+    for (var k = 0; k < order.length; k++) {
+      out[order[k]] = picked[k];
+    }
+    return out;
+  }
+
+  /// `Bot.strength`: the cards nothing outside the hand can beat
+  /// ([tops], one-hot per card) and the count of winners, tops plus the
+  /// cards that will be tops once those have drawn out what is outside.
+  ({List<Bit> tops, List<Bit> winners}) _strength(
+    List<Bit> hand,
+    List<Bit> played,
+    List<List<Bit>> unplayed,
+  ) {
+    const w = 6;
+    final tops = List<Bit>.filled(52, Circuit.zero);
+    var winners = List<Bit>.filled(w, Circuit.zero);
+    for (final s in Suit.values) {
+      final lane = _laneOf(hand, s);
+      final gone = _laneOf(played, s);
+      var runAbove = Circuit.one;
+      for (var r = _lane - 1; r >= 0; r--) {
+        tops[s.index * _lane + r] = c.and(lane[r], runAbove);
+        runAbove = c.and(runAbove, c.or(gone[r], lane[r]));
+      }
+      final top = c.popcount(_laneOf(tops, s), width: w);
+      final mine = c.popcount(lane, width: w);
+      final outside = c.subClamped(unplayed[s.index], mine, width: w);
+      final left = c.subClamped(outside, _times(top, 3), width: w);
+      final late = c.subClamped(c.subClamped(mine, top, width: w), left, width: w);
+      winners = c.add(winners, c.add(top, late, width: w), width: w);
+    }
+    return (tops: tops, winners: winners);
   }
 
   List<Bit> _lead(List<Bit> hand, List<Bit> legal, PublicPlay p) {
@@ -424,7 +611,10 @@ class ObliviousBot {
     ];
   }
 
-  List<Bit> _follow(List<Bit> legal, PublicPlay p) {
+  ({List<Bit> play, Bit hasOver, List<Bit> lowestOver, List<Bit> highestLane, List<Bit> lowestLane}) _follow(
+    List<Bit> legal,
+    PublicPlay p,
+  ) {
     // Following, legal lies in one suit, so folding the four lanes with
     // XOR is the same as OR and costs nothing.
     final lane = [
@@ -434,7 +624,8 @@ class ObliviousBot {
     final over = [for (var r = 0; r < _lane; r++) c.and(lane[r], c.not(p.highGeq[r]))];
 
     // Moon live: win as cheaply as the suit allows.
-    final moonWin = c.and(p.moonThreat, c.any(over));
+    final hasOver = c.any(over);
+    final moonWin = c.and(p.moonThreat, hasOver);
     final lowestOver = c.firstSet(over);
 
     // Duck as high as possible; the queen ahead of any other duck.
@@ -450,10 +641,18 @@ class ObliviousBot {
     // queen still out; anyone else wins as cheaply as possible.
     final cheapWin = c.all([p.isLastSeat, p.ledSuit[Suit.spades.index], c.not(p.queenGone)]);
     final takeLow = c.or(c.not(p.isLastSeat), cheapWin);
-    final take = c.muxEach(takeLow, c.firstSet(lane), c.lastSet(lane));
+    final lowestLane = c.firstSet(lane);
+    final highestLane = c.lastSet(lane);
+    final take = c.muxEach(takeLow, lowestLane, highestLane);
 
     final pick = c.muxEach(moonWin, lowestOver, c.muxEach(hasUnder, duck, take));
-    return [for (var i = 0; i < 52; i++) c.and(pick[_rankOf(i)], p.ledSuit[_suitOf(i)])];
+    return (
+      play: [for (var i = 0; i < 52; i++) c.and(pick[_rankOf(i)], p.ledSuit[_suitOf(i)])],
+      hasOver: hasOver,
+      lowestOver: lowestOver,
+      highestLane: highestLane,
+      lowestLane: lowestLane,
+    );
   }
 
   List<Bit> _discard(List<Bit> legal, PublicPlay p) {
@@ -483,8 +682,14 @@ class ObliviousBot {
     final kingNotAce = c.and(kingS, c.not(aceS));
 
     // 4. The top heart if it is high enough to be worth throwing; 6. any
-    //    top heart.
-    final hearts = _laneOf(legal, Suit.hearts);
+    //    top heart. A stopper-keeper first sets aside the top heart, queen
+    //    or better, while no points are out.
+    var hearts = _laneOf(legal, Suit.hearts);
+    if (persona.keepsStopper) {
+      final top = c.lastSet(hearts);
+      final keep = c.and(p.nobodyHasPoints, c.any(hearts.sublist(_queen)));
+      hearts = [for (var r = 0; r < _lane; r++) c.and(hearts[r], c.not(c.and(keep, top[r])))];
+    }
     final hasHearts = c.any(hearts);
     final topHeart = c.lastSet(hearts);
     final heartHigh = c.any(hearts.sublist(persona.heartDumpRank - 2));
@@ -513,9 +718,13 @@ class ObliviousBot {
     }
     final hasSide = c.or(hasC, hasD);
 
-    // 7. Whatever is left is spades below the queen (or above her once
-    //    she is gone): the highest.
-    final spadesTop = c.lastSet(_laneOf(legal, Suit.spades));
+    // 7. Whatever is left: the highest of it, ties to the lower suit.
+    //    Without a stopper that is spades below the queen (or above her
+    //    once she is gone); with one it may be the stopper itself.
+    final anyOrder = _byRankThenSuitDesc([for (var i = 0; i < 52; i++) i]);
+    final leftover = persona.keepsStopper
+        ? _lastIn(legal, anyOrder)
+        : _lastIn([for (var i = 0; i < 52; i++) _suitOf(i) == Suit.spades.index ? legal[i] : Circuit.zero], anyOrder);
 
     // First rule that applies wins. `taken` is the OR of the rules so
     // far, kept as XOR because each new rule fires only when it is clear.
@@ -545,9 +754,21 @@ class ObliviousBot {
           if (i == spadeLane + _king) c.and(p3, kingNotAce),
           if (_isHeart(i)) c.and(anyHeart, topHeart[_rankOf(i)]),
           if (i < 2 * _lane) c.and(p5, sideTop[i]),
-          if (_suitOf(i) == Suit.spades.index) c.and(p7, spadesTop[_rankOf(i)]),
+          c.and(p7, leftover[i]),
         ]),
     ];
+  }
+
+  /// A heart's pass danger; for a stopper-keeper the top heart, queen or
+  /// better, is discounted, which turns on whether any higher heart is
+  /// held.
+  List<Bit> _heartDanger(List<Bit> hand, int r, int offset, int width) {
+    final v = r + 2;
+    final base = v * 2 + (v >= 12 ? 12 : 0) + offset;
+    if (!persona.keepsStopper || v < 12) return c.number(base, width);
+    final lane = _laneOf(hand, Suit.hearts);
+    final isTop = c.not(c.any(lane.sublist(r + 1)));
+    return c.muxEach(isTop, c.number(base - 20, width), c.number(base, width));
   }
 
   // ---- the seat's cards, as dealt ------------------------------------
@@ -627,6 +848,25 @@ class ObliviousBot {
   /// the lower index, so one bit settles both directions. A card is
   /// passed when fewer than three held cards rank ahead of it.
   List<Bit> choosePass(List<Bit> hand) {
+    final ordinary = _passByDanger(hand);
+    if (!persona.shoots) return ordinary;
+    // A shot in the making passes its three lowest cards, ties to the
+    // lower suit. Nothing is played yet, so every suit has thirteen out.
+    final st = _strength(hand, List.filled(52, Circuit.zero), [for (var s = 0; s < 4; s++) c.number(13, 4)]);
+    final losers = c.sub(c.number(13, 6), st.winners, width: 6).diff;
+    final shot = c.not(c.lt(c.number(persona.shootPassMaxLosers, 6), losers));
+    final order = _byRankThenSuit([for (var i = 0; i < 52; i++) i]);
+    var rest = hand;
+    var lowest = List<Bit>.filled(52, Circuit.zero);
+    for (var n = 0; n < passSize; n++) {
+      final pick = _firstIn(rest, order);
+      lowest = c.xorEach(lowest, pick); // disjoint picks, so XOR is OR
+      rest = [for (var i = 0; i < 52; i++) c.and(rest[i], c.not(pick[i]))];
+    }
+    return c.muxEach(shot, lowest, ordinary);
+  }
+
+  List<Bit> _passByDanger(List<Bit> hand) {
     final danger = _dangers(hand);
     final ahead = List.generate(52, (_) => List<Bit>.filled(52, Circuit.zero));
     for (var i = 0; i < 52; i++) {
@@ -699,8 +939,7 @@ class ObliviousBot {
               : _rankOf(i) > _queen
                   ? pick(highSpadesCovered, 45, 90)
                   : c.number(-10 + _rankOf(i) + 2 + offset, width),
-          Suit.hearts => c.number(
-              (_rankOf(i) + 2) * 2 + (_rankOf(i) + 2 >= 12 ? 12 : 0) + offset, width),
+          Suit.hearts => _heartDanger(hand, _rankOf(i), offset, width),
         },
     ];
   }

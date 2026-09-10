@@ -70,6 +70,9 @@ class Persona {
     this.leadFrom = LeadFrom.shortest,
     this.pace = Pace.measured,
     this.shortSuitWeight = 20,
+    this.shootLoserShare = 4,
+    this.shootPassMaxLosers = 5,
+    this.keepsStopper = true,
   });
 
   final String name;
@@ -92,6 +95,22 @@ class Persona {
   final PassStyle passStyle;
   final LeadFrom leadFrom;
   final Pace pace;
+
+  /// Runs at the moon when at most one card in this many is a loser
+  /// (`Bot.strength`); zero never runs. Four is a shot most strong
+  /// players would take; three is a gambler's. Never running costs six
+  /// points of tables, so everyone runs.
+  final int shootLoserShare;
+
+  /// Passes for a shot — the three lowest cards — when thirteen hold at
+  /// most this many losers.
+  final int shootPassMaxLosers;
+
+  /// Holds on to the top heart, in the pass and when void, while no
+  /// points are out: the one card that can stop a moon later.
+  final bool keepsStopper;
+
+  bool get shoots => shootLoserShare > 0;
 
   bool get flushesQueen => flushMinSmallSpades <= 13;
 
@@ -191,6 +210,14 @@ class Persona {
     passStyle: PassStyle.keepQueen,
   );
 
+  static const donJuan = Persona(
+    name: 'Don Juan',
+    epithet: 'Wants all of them, or none.',
+    shootLoserShare: 3,
+    shootPassMaxLosers: 7,
+    pace: Pace.quick,
+  );
+
   /// Everyone who might sit down. Order is not rank.
   static const roster = [
     westley,
@@ -200,8 +227,13 @@ class Persona {
     cyrano,
     roxane,
     casanova,
+    donJuan,
   ];
 
+  /// The roster plus any character still being measured before it is
+  /// let in.
+  static const candidates = roster;
+
   static Persona named(String name) =>
-      roster.firstWhere((p) => p.name == name);
+      candidates.firstWhere((p) => p.name == name);
 }

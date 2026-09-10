@@ -48,7 +48,7 @@ rigged. Roughly in order:
 2. **The engine as a package**, shared by the app and the service.
 3. **Two measurements before anything is built on them** — taken
    ([measurements](measurements/README.md)). The bot policy as a boolean
-   circuit: 2,313 AND gates a play, proven equal to the bot
+   circuit: 3,558 AND gates a play, proven equal to the bot
    ([doc 04](docs/04-live-play.md)). A verifiable 52-card deal in wasm:
    2.1 s critical path on a desktop core with the reference crate, so
    four to six on a phone — implement, then optimise
