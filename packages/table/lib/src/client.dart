@@ -561,8 +561,21 @@ class TableClient {
     }
     if (event.kind == EventKind.heartbeat) {
       if (event.author != from) return;
+      if (!_isParticipant(from)) {
+        // A seat removed from the table, still sending: it is behind
+        // for good, and what it needs is the turns up to the one that
+        // removed it, so that it learns so in order — and no more, and
+        // not often. Carrying it forward like anyone else used to have
+        // every peer at the table answering its every heartbeat with
+        // the whole record, forever.
+        final last = _lastTold[from];
+        if (last != null && clock.nowMs - last < 10000) return;
+        _lastTold[from] = clock.nowMs;
+        _carryForward(from, event.hand, event.step, upTo: _removedAt[from]);
+        return;
+      }
       _lastPosition[from] = (event.hand, event.step);
-      _carryForward(event.hand, event.step);
+      _carryForward(from, event.hand, event.step);
       return;
     }
     if (_seen.contains(event.id)) {
@@ -636,13 +649,27 @@ class TableClient {
   /// A heartbeat that puts its sender behind this peer: send it what it
   /// is missing, a window at a time, so a peer back from a blip is
   /// carried forward without having to say anything first.
-  void _carryForward(int hand, int step) {
+  void _carryForward(PublicKey asker, int hand, int step, {TurnId? upTo}) {
+    if (hand > game.handNumber || (hand == game.handNumber && step >= this.step)) {
+      _behindSince.remove(asker);
+      return;
+    }
+    if (upTo != null && (hand > upTo.hand || (hand == upTo.hand && step > _stepOf(upTo)))) return;
+    // One answer is enough: the lowest key among the live participants
+    // answers a heartbeat at once, the others only once the asker has
+    // stayed behind through a couple more — three peers answering the
+    // same heartbeat with the same turns is three times the traffic.
+    _behindSince.putIfAbsent(asker, () => clock.nowMs);
+    final live = participants.where((k) => k == signer.publicKey || _recent(k)).toList()..sort();
+    if (live.first != signer.publicKey && clock.nowMs - _behindSince[asker]! < heartbeatMs * 2 + 1000) return;
     var h = hand;
     var st = step;
     for (var n = 0; n < carryWindow; n++) {
       if (h > game.handNumber || (h == game.handNumber && st >= this.step)) return;
       final passes = PassDirection.forHand(h) == PassDirection.hold ? 0 : TurnId.passTurns;
-      _catchUp(st < passes ? TurnId.pass(h, 0) : TurnId.play(h, st - passes));
+      final turn = st < passes ? TurnId.pass(h, 0) : TurnId.play(h, st - passes);
+      if (upTo != null && (h > upTo.hand || (h == upTo.hand && turn.index > upTo.index))) return;
+      _catchUp(turn);
       st++;
       if (st >= passes + playsPerHand) {
         h++;
@@ -653,6 +680,18 @@ class TableClient {
 
   /// Turns handed over per heartbeat to a peer behind.
   static const carryWindow = 8;
+
+  /// When each peer was first seen behind, for the turn-taking above.
+  final Map<PublicKey, int> _behindSince = {};
+
+  /// When each removed seat was last carried forward.
+  final Map<PublicKey, int> _lastTold = {};
+
+  /// A turn's position in the hand's step count.
+  int _stepOf(TurnId t) {
+    final passes = PassDirection.forHand(t.hand) == PassDirection.hold ? 0 : TurnId.passTurns;
+    return t.isPass ? 0 : passes + t.playIndex;
+  }
 
   /// Steps in a hand after the pass: every card.
   static const playsPerHand = seatCount * 13;
@@ -669,23 +708,22 @@ class TableClient {
     final key = turns.first;
     final last = _lastCatchUp[key];
     if (last != null && clock.nowMs - last < 2000) return;
-    // And a budget over all turns: a peer far behind asks about a
-    // window of them per heartbeat, and each answer is several events.
-    // Unbudgeted, two peers carrying two others forward sent a public
-    // relay forty events a second between them, which is how relays
-    // come to ban you. Refilled at a few a second; a turn skipped now
-    // is asked for again on the next heartbeat.
+    // And a budget over all turns, in events: a peer far behind asks
+    // about a window of them per heartbeat, and each answer is several
+    // events. Unbudgeted, two peers carrying two others forward sent a
+    // public relay forty events a second between them, which is how
+    // relays come to ban you. Refilled at a few a second; what is not
+    // sent now is asked for again on the next heartbeat.
     _refillCatchUp();
     if (_catchUpTokens < 1) return;
     _lastCatchUp[key] = clock.nowMs;
-    _catchUpTokens -= 1;
     // Everything that decided these positions, and every departure in
     // the record wherever it sits: a removal the asker missed is the
     // commonest reason to be stuck, and it may have been made at a turn
     // the asker has long settled — a leave is placed where the leaver
     // stood, not where the table noticed.
     for (final d in record) {
-      if (d.removal || settled.contains(d.turn)) transport.broadcast(d.event.toJson());
+      if (d.removal || settled.contains(d.turn)) _send(d.event.toJson());
     }
     for (final t in settled) {
       _sendEvidence(t);
@@ -695,12 +733,20 @@ class TableClient {
     }
   }
 
-  /// Catch-up bundles in hand: one per turn answered, refilled at
-  /// [catchUpPerSecond] up to [catchUpBurst].
+  /// One catch-up event, if the budget has it.
+  void _send(Map<String, Object?> json) {
+    _refillCatchUp();
+    if (_catchUpTokens < 1) return;
+    _catchUpTokens -= 1;
+    transport.broadcast(json);
+  }
+
+  /// Catch-up events in hand, refilled at [catchUpPerSecond] up to
+  /// [catchUpBurst].
   double _catchUpTokens = catchUpBurst.toDouble();
   int _catchUpRefilledAt = 0;
-  static const catchUpPerSecond = 1;
-  static const catchUpBurst = 4;
+  static const catchUpPerSecond = 12;
+  static const catchUpBurst = 48;
 
   void _refillCatchUp() {
     final now = clock.nowMs;
@@ -714,13 +760,13 @@ class TableClient {
     final race = _races[turn];
     if (race != null) {
       for (final b in race.boots) {
-        transport.broadcast(b.toJson());
+        _send(b.toJson());
       }
       for (final w in race.witnessEvents) {
-        transport.broadcast(w.toJson());
+        _send(w.toJson());
       }
       final mine = _myWitnessEvents[turn];
-      if (mine != null && !race.witnessEvents.contains(mine)) transport.broadcast(mine.toJson());
+      if (mine != null && !race.witnessEvents.contains(mine)) _send(mine.toJson());
     }
   }
 
@@ -1043,6 +1089,12 @@ class TableClient {
     for (final e in List.of(_races.entries)) {
       final race = e.value;
       if (race.settled) continue;
+      // A split race changes only when the jury comes, or the network
+      // heals and evidence arrives on its own; repeating its evidence
+      // every two seconds to peers who already have it is noise on a
+      // shared relay. Every half minute is enough to say it is still
+      // split.
+      if (race.split && _repeatTick % 30 != 0) continue;
       if (race.action != null) transport.broadcast(race.action!.toJson());
       for (final b in race.boots) {
         transport.broadcast(b.toJson());

@@ -321,8 +321,15 @@ says where its sender stands, and a peer that is behind hears back the
 turns it is missing, a few at a time, without having to ask — which is
 also how a peer learns of a leave it never received, since every
 departure in the record travels with every answer. Catching up is
-budgeted, a bundle a second or so: unbudgeted, two peers carrying two
-others forward sent a public relay forty events a second between them.
+budgeted, a dozen events a second, and one peer at a time — the lowest
+key among those present answers a heartbeat, the others only once the
+asker has stayed behind through two more; a seat already removed is
+carried only as far as the turn that removed it, and only every ten
+seconds; and a split race repeats its evidence every half minute, not
+every two seconds. Unbudgeted and unshared, two peers carrying two
+others forward sent a public relay forty events a second between them,
+and a phone that had been booted and kept sending its old position was
+answered with the whole record by everyone, forever.
 And a relay subscription that stops delivering without closing looks
 like a quiet table, except that a peer's own events come back on its
 own subscription; nothing at all for twenty-five seconds after
