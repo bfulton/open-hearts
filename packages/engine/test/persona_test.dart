@@ -15,19 +15,21 @@ void main() {
   });
 
   test('a character may be rash or patient, never bad', () {
-    // Fair share is a quarter. With forty characters and ~800 seats
-    // each the standard error on a win rate is about 1.5 points, so a
-    // floor four points under fair share is about two and a half sigma
-    // per character — and with forty of them, one straying that far by
-    // chance is a one-in-twenty run. (Three points under, at two sigma,
-    // tripped on a different innocent character every other run.) The
-    // arena is seeded, so a persona that trips it is weaker, not
-    // unlucky, and tool/knobs.dart says which setting to blame.
+    // Fair share is a quarter. The floor is three and a third standard
+    // errors under it, from each character's own number of seats (about
+    // 1.5 points at eight hundred): with forty characters, one straying
+    // that far by chance is a one-in-fifty run. (A fixed floor three
+    // points under tripped on a different innocent character every
+    // other run.) The arena is seeded, so a persona that trips it is
+    // weaker, not unlucky, and tool/knobs.dart says which setting to
+    // blame; the mean score, far less noisy, is held within six of the
+    // best.
     final standings = Arena.play(8000);
     final best = standings.map((s) => s.meanScore).reduce(min);
     for (final s in standings) {
       expect(s.seats, greaterThan(500), reason: '${s.persona} sat enough');
-      expect(s.winRate, greaterThanOrEqualTo(0.21),
+      final sigma = sqrt(0.25 * 0.75 / s.seats);
+      expect(s.winRate, greaterThanOrEqualTo(0.25 - 3.3 * sigma),
           reason: '${s.persona} wins ${(100 * s.winRate).toStringAsFixed(1)}% of tables');
       expect(s.meanScore - best, lessThanOrEqualTo(6),
           reason: '${s.persona} averages ${s.meanScore.toStringAsFixed(1)} '
