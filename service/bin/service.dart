@@ -1,4 +1,5 @@
-/// Runs the local service: the relay, and the matchmaker on it.
+/// Runs the local service: the relay. Matchmaking is the players' own
+/// business on it (packages/table, matching.dart).
 ///
 ///     cd service && dart run bin/service.dart            # relay on 7447
 ///     dart run bin/service.dart --port 0 --quiet         # any free port
@@ -18,8 +19,6 @@ Future<void> main(List<String> args) async {
   }
   final relay = Relay(log: quiet ? null : print);
   await relay.serve(port: port);
-  final matchmaker = Matchmaker(relayUrl: relay.url, log: quiet ? null : print);
-  await matchmaker.start();
   // Always say where, even when quiet: a test harness reads this line.
   print('relay ${relay.url}');
 }

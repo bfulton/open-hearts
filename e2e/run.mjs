@@ -108,11 +108,20 @@ async function click(page, re) {
   if (!ok) throw new Error(`nothing to click for ${re}\nsaw: ${(await texts(page)).join(' | ')}`);
 }
 
+/// Types into a field by its label: focus, let the framework attach
+/// its editing connection, select everything, and type over it — a
+/// plain fill can race the attach and end up appended to the old text.
 async function type(page, label, value) {
   const input = page.locator(`flt-semantics[aria-label="${label}"] input, input[aria-label="${label}"]`).first();
   await input.waitFor({ timeout: 15000 });
   await input.click();
-  await input.fill(value);
+  await sleep(300);
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type(value, { delay: 5 });
+  await sleep(150);
+  const got = await input.inputValue();
+  if (got !== value) throw new Error(`typing ${label}: wanted ${JSON.stringify(value)}, field holds ${JSON.stringify(got)}`);
 }
 
 const cardName = /^(2|3|4|5|6|7|8|9|10|jack|queen|king|ace) of (clubs|diamonds|spades|hearts)$/;
@@ -194,7 +203,7 @@ async function main() {
     for (let i = 0; i < 4; i++) {
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' });
       const page = await ctx.newPage();
-      page.on('pageerror', (e) => log(`page ${names[i]} error: ${e.message}`));
+      page.on('pageerror', (e) => log(`page ${names[i]} error: ${e.message}\n${(e.stack || '').slice(0, 600)}`));
       page.on('console', (m) => { if (m.type() === 'error') log(`page ${names[i]}: ${m.text()}`); });
       await page.goto(`${app.url}/?e2e=1`);
       contexts.push(ctx);

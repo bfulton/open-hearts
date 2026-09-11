@@ -71,16 +71,25 @@ seat is the same computable consequence as any other.
 
 What the app does today, ahead of the jury. **Play live** on the solo
 table opens a lobby: a name, and the choice — *Rated* or *Unrated* —
-then a waiting screen and nothing to do. The matchmaker in the service
-(`service/lib/src/matchmaker.dart`) runs a round every five seconds
-over each pool: everyone waiting, in random order, four to a table;
-whoever is left over goes first in the next round; and once someone
-has waited ten seconds without a full table they get one, with bots in
-the seats nobody came for. Players say they are waiting on the relay
-every three seconds while they wait, and the seating is one signed
-event per table naming the seats, from which everyone builds the same
-table and meets on its own tag. A rated table says so on the rail and
-in its record. Below that, *With friends*: *Host a table* — a
+then a waiting screen and nothing to do. There is no matchmaker.
+Players who want a game say so on the relay every couple of seconds,
+in the pool they chose, with their rating and how long they have
+waited; everyone waiting sees everyone else. Time is cut into rounds
+of five seconds, and in each round the lowest key present acts as
+host: it runs the seating rule (`packages/table/lib/src/matching.dart`)
+over everyone it has heard from and publishes one signed event per
+table naming the seats, the same start event a friends' room uses.
+The rule: whoever has waited through a round already is seated first,
+then the rest at random; a table is four ratings within a window that
+widens a hundred points for every round the first of them has waited;
+and once someone has waited ten seconds without a full table they get
+one, with bots at their rating in the seats nobody came for. If the
+host says nothing for a round, the next key steps in — a host can only
+waste five seconds, and it cannot forge a play. Two hosts with
+different views may seat someone twice; they take the seating with the
+lower table id, and the other table's empty seat is booted at its first
+turn. A rated table says so on the rail and in its record, and every
+name on it carries a rating. Below that, *With friends*: *Host a table* — a
 four-letter code to read out — or *Join* with one; the room is the
 relay's business too (`Room`), and it starts ten seconds after the
 last person arrives, or at four, or on *Start now*, by the same kind
@@ -99,6 +108,39 @@ the player at seat 2 with three simulated people and plays a hand,
 watches one leave and boots one for silence; the browser suite
 (`e2e/`) matches three strangers with a bot and a fourth with three,
 then plays the friends' room through its departures.
+
+## Ratings
+
+**One rule for people and bots, from the same results.** A finished
+rated game is one rating period with three opponents, scored pairwise
+by final total — the lower total wins the pair, equal totals halve —
+and folded by Glicko: a rating and a deviation, the deviation saying
+how much the rating is worth (`packages/table/lib/src/rating.dart`). A
+bot that sat down at the deal is rated exactly like a person, one
+rating per persona, from every table it ever sat at; that is what makes
+a table of one person and three bots worth playing, and worth the
+same as any other — the bots' ratings float on real results, so any
+edge a person finds against them is priced in within a few hundred
+games rather than farmed. A bot that took over a leaver's seat has no
+stake in the result. A leaver finishes last, whatever their seat scored
+after they went.
+
+**Results are signed and public.** At the end of a rated game every
+human at the table publishes the same result — the table, the seats,
+the totals, who was there from the deal and who left — signed with
+their key, on the relay under one tag (`results.dart`). A table's
+result stands when a majority of the humans who sat down published the
+same one; a stranger's word counts for nothing. Anyone can fold every
+standing result, oldest first, into every rating; the app does so when
+it opens the lobby, shows the player theirs, and states it when
+waiting to be seated. Lying there only changes who you sit with.
+
+**Provisional, for now.** Until the verifiable deal ([doc
+03](03-fair-deal.md)) and the juror exist, the deal is a seed everyone
+at the table can read, and a table of one human is attested by that
+one human. So these ratings are a reward, not yet a claim, and the
+lobby says "provisionally" until a rating has settled. The two steps
+that make them a claim are the next two on the roadmap.
 
 ## Filling and emptying seats
 

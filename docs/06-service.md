@@ -82,14 +82,16 @@ code and different adapters:
 | Sign-in | Apple/Google public keys | a test token naming a `sub` |
 | Entitlement | purchase webhook | a test endpoint that marks a key entitled |
 | TURN | Cloudflare | none; localhost connects directly |
-| Signalling | public relays | a minimal NIP-01 relay in the repo |
+| Signalling, waiting rooms, results | public relays | a minimal NIP-01 relay in the repo |
 | Last-resort juror | woken on demand | always available |
 
 One process, one flag.
 
 ## The relay, and the table over it
 
-`service/` is, so far, the local relay: a NIP-01 subset in a few
+`service/` is, so far, the local relay — and only that: matchmaking
+is the players' own business on the relay (doc 04, "The live table"),
+and so are results and ratings. The relay is a NIP-01 subset in a few
 hundred lines of Dart — `EVENT`, `REQ` with filters on ids, authors,
 kinds, `since`, `until`, `limit` and single-letter tags, `CLOSE`, and
 `OK`, `EOSE` and `NOTICE` back. Every event's id and BIP-340 signature

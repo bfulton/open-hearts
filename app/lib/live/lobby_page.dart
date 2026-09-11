@@ -10,8 +10,8 @@ import 'package:table/table.dart';
 import '../identity.dart';
 import '../live_controller.dart';
 import '../net/mesh_transport.dart';
-import '../net/queue.dart';
 import '../net/room.dart';
+import '../net/standing.dart';
 import '../theme.dart';
 import 'live_page.dart';
 
@@ -37,9 +37,11 @@ class _LobbyPageState extends State<LobbyPage> {
   String? _error;
   bool _busy = false;
   Room? _room;
-  Queue? _queue;
+  WaitingRoom? _queue;
   RelayTransport? _transport;
   Signer? _signer;
+  Standing? _standing;
+  Timer? _waitClock;
 
   @override
   void initState() {
@@ -49,12 +51,24 @@ class _LobbyPageState extends State<LobbyPage> {
     });
   }
 
+  /// Ratings, from the relay that just answered — never from an
+  /// address nobody has confirmed.
+  Future<void> _loadStanding(Uri relay, Signer signer) async {
+    try {
+      final standing = await Standing.load(relay, signer);
+      if (mounted) setState(() => _standing = standing);
+    } catch (_) {
+      // The rating shows next time.
+    }
+  }
+
   @override
   void dispose() {
     _room?.removeListener(_onRoom);
     _room?.dispose();
-    _queue?.removeListener(_onQueue);
-    _queue?.dispose();
+    _queueSub?.cancel();
+    _queue?.close();
+    _waitClock?.cancel();
     _transport?.close(); // a matched or started table has its own
     _name.dispose();
     _code.dispose();
@@ -76,8 +90,10 @@ class _LobbyPageState extends State<LobbyPage> {
     try {
       await Identity.setName(name);
       final signer = _signer ??= await Identity.signer();
-      final transport = RelayTransport(url: Uri.parse(_relay.text.trim()), signer: signer, table: tag);
+      final url = Uri.parse(_relay.text.trim());
+      final transport = RelayTransport(url: url, signer: signer, table: tag);
       await transport.ready.timeout(const Duration(seconds: 8));
+      if (_standing == null) await _loadStanding(url, signer);
       setState(() {
         _transport = transport;
         _busy = false;
@@ -97,22 +113,28 @@ class _LobbyPageState extends State<LobbyPage> {
     return null;
   }
 
-  /// Rated or unrated: into the pool, and wait to be seated.
-  Future<void> _play(String pool) async {
-    final transport = await _connect(Queue.poolTag(pool));
-    if (transport == null) return;
-    final queue = Queue(relay: transport, pool: pool, name: _name.text.trim());
-    queue.addListener(_onQueue);
-    setState(() => _queue = queue);
-  }
+  StreamSubscription<TableSpec>? _queueSub;
 
-  void _onQueue() {
-    final queue = _queue;
-    if (queue == null || !mounted) return;
-    final spec = queue.spec;
-    if (spec == null) return setState(() {});
-    queue.removeListener(_onQueue);
-    _toTable(spec, queue.seatNames);
+  /// Rated or unrated: into the pool, and wait to be seated — by
+  /// whoever among the waiting has the lowest key, this device
+  /// included.
+  Future<void> _play(String pool) async {
+    final transport = await _connect(poolTag(pool));
+    if (transport == null) return;
+    final ledger = _standing?.ledger ?? Ledger();
+    final queue = WaitingRoom(
+      relay: transport,
+      pool: pool,
+      name: _name.text.trim(),
+      rating: (_standing?.mine ?? Rating.fresh).shown,
+      botRating: Standing.botPicker(ledger),
+    );
+    _queueSub = queue.seated.listen((spec) {
+      if (!mounted) return;
+      _toTable(spec, queue.seatNames);
+    });
+    _waitClock = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    setState(() => _queue = queue);
   }
 
   /// The seated table has its own tag on the relay: a fresh transport
@@ -121,11 +143,15 @@ class _LobbyPageState extends State<LobbyPage> {
     final signer = _signer!;
     final relay = RelayTransport(url: Uri.parse(_relay.text.trim()), signer: signer, table: spec.id);
     final peers = [for (final h in spec.seats) if (h is HumanSeat) h.key];
+    final relayUrl = Uri.parse(_relay.text.trim());
+    final ledger = _standing?.ledger ?? Ledger();
     final controller = LiveController(
       spec: spec,
       seatNames: seatNames,
       signer: signer,
       transport: MeshTransport(relay: relay, peers: peers),
+      ratingOf: spec.rated ? (id) => ledger.of(id) : null,
+      onResult: (result) => Standing.publish(relayUrl, signer, result),
     );
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => LivePage(controller: controller)));
   }
@@ -205,8 +231,14 @@ class _LobbyPageState extends State<LobbyPage> {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.gold)),
         const SizedBox(height: 6),
-        const Text('Four seats, filled with whoever is waiting. Rated games count.',
-            textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Palette.chromeDim)),
+        Text(
+          _standing == null
+              ? 'Four seats, filled with whoever is waiting. Rated games count.'
+              : 'You are rated ${_standing!.mine.shown}${_standing!.mine.provisional ? ', provisionally' : ''}, '
+                  'from ${_standing!.ledger.gamesOf(_standing!.me)} rated game${_standing!.ledger.gamesOf(_standing!.me) == 1 ? '' : 's'}.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
+        ),
         const SizedBox(height: 22),
         TextField(
           controller: _name,
@@ -316,11 +348,13 @@ class _LobbyPageState extends State<LobbyPage> {
 class _WaitingView extends StatelessWidget {
   const _WaitingView({required this.queue, required this.onCancel});
 
-  final Queue queue;
+  final WaitingRoom queue;
   final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
+    final waited = (DateTime.now().millisecondsSinceEpoch - queue.since) ~/ 1000;
+    final others = queue.present.length - 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -334,7 +368,7 @@ class _WaitingView extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.gold)),
         const SizedBox(height: 6),
-        Text('${queue.waitedSeconds} s — bots fill any seat still empty at ten',
+        Text('$waited s${others > 0 ? ', $others other${others == 1 ? '' : 's'} waiting' : ''} — bots fill any seat still empty at ten',
             textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
         const SizedBox(height: 26),
         TextButton(onPressed: onCancel, child: const Text('Cancel', style: TextStyle(color: Palette.chromeDim))),
