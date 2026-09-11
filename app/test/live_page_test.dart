@@ -45,9 +45,13 @@ class LiveHarness {
   late final LiveController controller;
   final Map<int, ScriptedHuman> people = {};
 
-  /// Lets [ms] of virtual time pass, and the widgets catch up.
+  /// Lets [ms] of virtual time pass at the table and on the screen
+  /// alike — the view paces itself by timers of its own, and a screen
+  /// that fell behind the table would be booted from it — and the
+  /// widgets catch up.
   Future<void> advance(WidgetTester tester, int ms) async {
     clock.advance(ms);
+    await tester.pump(Duration(milliseconds: ms));
     await tester.pumpAndSettle();
   }
 }
@@ -134,5 +138,60 @@ void main() {
     expect(find.textContaining('2 of 4 here'), findsOneWidget);
     expect(live.controller.tableState, TableState.playing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a person booted for silence takes the seat back: the bot shown to the end of the hand, then them', (tester) async {
+    final live = await pumpLive(tester);
+    await act(tester, live);
+    await live.advance(tester, 2000);
+
+    // Bao goes quiet and is booted at fifteen seconds.
+    live.people[1]!.depart(Exit.idle);
+    for (var guard = 0; guard < 200 && !live.controller.canBoot(1); guard++) {
+      await act(tester, live);
+      await live.advance(tester, 1000);
+    }
+    await tester.tap(find.text('Boot Bao'));
+    await live.advance(tester, 3000);
+    expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
+    expect(find.textContaining('3 of 4 here'), findsOneWidget);
+    final hand = live.controller.game.handNumber;
+
+    // Bao's phone comes out of the pocket and asks for the seat. The
+    // claim carries during this hand, and the view goes on showing
+    // the bot, whose plays are the table's, until the hand is out.
+    live.people[1]!.comeBack();
+    for (var i = 0; i < 12; i++) {
+      await act(tester, live);
+      await live.advance(tester, 1000);
+      expect(tester.takeException(), isNull);
+    }
+    expect(live.controller.game.handNumber, hand);
+    expect(live.controller.personaAt(1), isNotNull, reason: 'the bot plays this hand out');
+    expect(find.textContaining('3 of 4 here'), findsOneWidget);
+
+    for (var guard = 0; guard < 400 && live.controller.game.handNumber == hand; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+      expect(tester.takeException(), isNull);
+    }
+    expect(live.controller.game.handNumber, hand + 1, reason: 'the hand finished');
+    await tester.tap(find.text('On with it'));
+    await tester.pumpAndSettle();
+
+    // The next hand is dealt to Bao: named at the table, counted, and
+    // playing.
+    expect(live.controller.personaAt(1), isNull, reason: 'Bao holds seat 1 again');
+    expect(find.text('Bao'), findsWidgets);
+    expect(find.textContaining('4 of 4 here'), findsOneWidget);
+    expect(live.people[1]!.client.amSeated, isTrue);
+    for (var i = 0; i < 24; i++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+      expect(tester.takeException(), isNull);
+    }
+    expect(live.controller.game.phase, engine.Phase.playing);
+    expect(live.controller.game.tricksPlayed, greaterThan(0), reason: 'play goes on with Bao in it');
+    expect(live.controller.tableState, TableState.playing);
   });
 }

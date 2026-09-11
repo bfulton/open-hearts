@@ -1354,6 +1354,11 @@ class TableClient {
 
   void _heartbeat() {
     if (_closed) return;
+    // A phone back from its pocket asks for the seat before it has
+    // heard anyone; the claim goes out on the first tick that finds it
+    // caught up and connected, and again for the hand after if the
+    // hand it named opened without it carrying.
+    _tryRetake();
     if ((amSeated && !_left) || _wantBack) {
       _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step, if (_wantBack) 'back': true});
     }
