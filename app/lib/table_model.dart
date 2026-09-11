@@ -35,6 +35,14 @@ abstract class TableModel implements Listenable {
   /// Plays [card] for the player; null on success, else why not.
   String? playCard(Card card);
 
+  /// The player's card on the table ahead of the table's word on it —
+  /// a live table shows it the instant it is tapped. Null elsewhere.
+  Card? get pendingPlay => null;
+
+  /// Cards the player has committed that the game as shown has not yet
+  /// taken from the hand: a pending play, a pending pass.
+  Set<Card> get inFlight => const {};
+
   /// Where a seat sits on screen: 0 is the player at the bottom, then
   /// clockwise — 1 left, 2 across, 3 right.
   int positionOf(int seat) => (seat - mySeat + seatCount) % seatCount;

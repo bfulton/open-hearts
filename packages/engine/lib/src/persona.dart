@@ -145,10 +145,10 @@ class Persona {
   /// From a run of twenty thousand tables, each a random four from the
   /// ladder at nearby rungs, fitted by Bradley–Terry (the model behind
   /// a rating's expected score) to two or three points a rung. The
-  /// whole ladder spans about 230 points: a first game finishes ahead
+  /// whole ladder spans about 240 points: a first game finishes ahead
   /// of the character itself in one pair of three. The characters at
-  /// one rung sit within fifteen points of each other.
-  static const priors = [1269, 1305, 1323, 1351, 1391, 1411, 1454, 1489, 1500];
+  /// one rung sit within about twenty-five points of each other.
+  static const priors = [1259, 1301, 1325, 1345, 1386, 1413, 1455, 1487, 1500];
 
   /// One line, in the table's voice, for the seat and the lobby.
   final String epithet;
@@ -265,7 +265,6 @@ class Persona {
   static const buttercup = Persona(
     name: 'Buttercup',
     epithet: 'Ducks everything, and wins anyway.',
-    flushMinSmallSpades: 2,
     moonDefenseTrigger: 3,
     pace: Pace.slow,
   );
@@ -280,7 +279,6 @@ class Persona {
   static const juliet = Persona(
     name: 'Juliet',
     epithet: 'Waits for the moment. Then it is yours.',
-    flushMinSmallSpades: 2,
     passStyle: PassStyle.keepQueen,
     pace: Pace.slow,
   );
@@ -288,21 +286,18 @@ class Persona {
   static const cyrano = Persona(
     name: 'Cyrano',
     epithet: 'Lets a run go a long way before spoiling it.',
-    flushMinSmallSpades: 2,
     moonDefenseTrigger: 8,
   );
 
   static const roxane = Persona(
     name: 'Roxane',
     epithet: 'Sees the moon coming before anyone.',
-    flushMinSmallSpades: 2,
     moonDefenseTrigger: 3,
   );
 
   static const casanova = Persona(
     name: 'Casanova',
     epithet: 'Keeps the queen close and the spades closer.',
-    flushMinSmallSpades: 2,
     moonDefenseTrigger: 6,
     passStyle: PassStyle.keepQueen,
   );
@@ -315,6 +310,208 @@ class Persona {
     pace: Pace.quick,
   );
 
+  static const paolo = Persona(
+    name: 'Paolo',
+    epithet: 'Reads to the end of the page before he moves.',
+    moonDefenseTrigger: 10,
+    pace: Pace.slow,
+  );
+
+  static const francesca = Persona(
+    name: 'Francesca',
+    epithet: 'Blames the book, and keeps the queen.',
+    passStyle: PassStyle.keepQueen,
+  );
+
+  static const lancelot = Persona(
+    name: 'Lancelot',
+    epithet: 'Charges when the odds are merely good.',
+    shootLoserShare: 3,
+    shootPassMaxLosers: 6,
+    pace: Pace.quick,
+  );
+
+  static const guinevere = Persona(
+    name: 'Guinevere',
+    epithet: 'Sends the queen away before anyone asks.',
+    moonDefenseTrigger: 3,
+    passStyle: PassStyle.dumpQueen,
+    pace: Pace.slow,
+  );
+
+  static const aragorn = Persona(
+    name: 'Aragorn',
+    epithet: 'Waits for the moment, then takes the field.',
+    moonDefenseTrigger: 6,
+    shootPassMaxLosers: 6,
+  );
+
+  static const arwen = Persona(
+    name: 'Arwen',
+    epithet: 'Gives up the queen slowly, and only once.',
+    pace: Pace.slow,
+  );
+
+  static const orpheus = Persona(
+    name: 'Orpheus',
+    epithet: 'Holds the queen, looks back, loses her.',
+    passStyle: PassStyle.keepQueen,
+    moonDefenseTrigger: 8,
+  );
+
+  static const eurydice = Persona(
+    name: 'Eurydice',
+    epithet: 'Gone before the second trick.',
+    passStyle: PassStyle.dumpQueen,
+    pace: Pace.quick,
+  );
+
+  static const markAntony = Persona(
+    name: 'Mark Antony',
+    epithet: 'Bets the empire on one hand.',
+    shootLoserShare: 3,
+    shootPassMaxLosers: 7,
+    pace: Pace.quick,
+  );
+
+  static const cleopatra = Persona(
+    name: 'Cleopatra',
+    epithet: 'The queen stays until she chooses to go.',
+    passStyle: PassStyle.keepQueen,
+    moonDefenseTrigger: 6,
+    pace: Pace.slow,
+  );
+
+  static const shahJahan = Persona(
+    name: 'Shah Jahan',
+    epithet: 'Builds the long game one careful trick at a time.',
+    moonDefenseTrigger: 10,
+    pace: Pace.slow,
+  );
+
+  static const mumtazMahal = Persona(
+    name: 'Mumtaz Mahal',
+    epithet: 'Sees a run coming from the first heart.',
+    moonDefenseTrigger: 3,
+  );
+
+  static const marieCurie = Persona(
+    name: 'Marie Curie',
+    epithet: 'Runs at the moon only when the numbers say so.',
+    shootPassMaxLosers: 4,
+  );
+
+  static const pierreCurie = Persona(
+    name: 'Pierre Curie',
+    epithet: 'Patient, exact, and rarely caught with the queen.',
+    moonDefenseTrigger: 6,
+    pace: Pace.slow,
+  );
+
+  static const bonnie = Persona(
+    name: 'Bonnie',
+    epithet: 'Runs at the moon with the lights on.',
+    shootLoserShare: 3,
+    shootPassMaxLosers: 7,
+    pace: Pace.quick,
+  );
+
+  static const clyde = Persona(
+    name: 'Clyde',
+    epithet: 'Drives the getaway, whatever the odds.',
+    shootLoserShare: 3,
+    shootPassMaxLosers: 6,
+    moonDefenseTrigger: 8,
+    pace: Pace.quick,
+  );
+
+  static const diegoRivera = Persona(
+    name: 'Diego Rivera',
+    epithet: 'Works on a big wall, slowly.',
+    moonDefenseTrigger: 10,
+    pace: Pace.slow,
+  );
+
+  static const fridaKahlo = Persona(
+    name: 'Frida Kahlo',
+    epithet: 'Keeps the queen, and paints her.',
+    passStyle: PassStyle.keepQueen,
+  );
+
+  static const sid = Persona(
+    name: 'Sid',
+    epithet: 'Throws everything, all at once.',
+    passStyle: PassStyle.dumpQueen,
+    shootLoserShare: 3,
+    shootPassMaxLosers: 7,
+    pace: Pace.quick,
+  );
+
+  static const nancy = Persona(
+    name: 'Nancy',
+    epithet: 'Wants the queen gone yesterday.',
+    passStyle: PassStyle.dumpQueen,
+    moonDefenseTrigger: 3,
+    pace: Pace.quick,
+  );
+
+  static const han = Persona(
+    name: 'Han',
+    epithet: 'Never tell him the odds.',
+    shootPassMaxLosers: 7,
+    pace: Pace.quick,
+  );
+
+  static const leia = Persona(
+    name: 'Leia',
+    epithet: 'Holds the queen, holds the line.',
+    passStyle: PassStyle.keepQueen,
+    moonDefenseTrigger: 6,
+  );
+
+  static const heathcliff = Persona(
+    name: 'Heathcliff',
+    epithet: "Takes it all, or ruins everyone's evening.",
+    shootPassMaxLosers: 6,
+    moonDefenseTrigger: 3,
+  );
+
+  static const catherine = Persona(
+    name: 'Catherine',
+    epithet: 'Feels the moon coming in her bones.',
+    moonDefenseTrigger: 3,
+    pace: Pace.slow,
+  );
+
+  static const darcy = Persona(
+    name: 'Darcy',
+    epithet: 'Too proud to give up a queen.',
+    passStyle: PassStyle.keepQueen,
+    moonDefenseTrigger: 8,
+    pace: Pace.slow,
+  );
+
+  static const elizabeth = Persona(
+    name: 'Elizabeth',
+    epithet: 'Reads the whole table, then passes lightly.',
+    moonDefenseTrigger: 6,
+  );
+
+  static const cupid = Persona(
+    name: 'Cupid',
+    epithet: 'Aims high, and now and then hits.',
+    shootPassMaxLosers: 7,
+    moonDefenseTrigger: 4,
+    pace: Pace.quick,
+  );
+
+  static const psyche = Persona(
+    name: 'Psyche',
+    epithet: 'Trusts everyone until the lamp is lit.',
+    moonDefenseTrigger: 10,
+    pace: Pace.slow,
+  );
+
   /// Everyone who might sit down. Order is not rank.
   static const roster = [
     westley,
@@ -325,6 +522,34 @@ class Persona {
     roxane,
     casanova,
     donJuan,
+    paolo,
+    francesca,
+    lancelot,
+    guinevere,
+    aragorn,
+    arwen,
+    orpheus,
+    eurydice,
+    markAntony,
+    cleopatra,
+    shahJahan,
+    mumtazMahal,
+    marieCurie,
+    pierreCurie,
+    bonnie,
+    clyde,
+    diegoRivera,
+    fridaKahlo,
+    sid,
+    nancy,
+    han,
+    leia,
+    heathcliff,
+    catherine,
+    darcy,
+    elizabeth,
+    cupid,
+    psyche,
   ];
 
   /// The roster plus any character still being measured before it is

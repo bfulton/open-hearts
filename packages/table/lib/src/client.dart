@@ -136,7 +136,7 @@ class TableClient {
     required this.transport,
     required this.clock,
     this.bootAfterMs = 15000,
-    this.silenceAfterMs = 30000,
+    this.silenceAfterMs = 90000,
     this.heartbeatMs = 5000,
   })  : game = HeartsGame(seed: spec.seed),
         holders = List.of(spec.seats),
@@ -839,7 +839,7 @@ class TableClient {
       // side can still reach a majority: the action needs everyone who
       // has not backed the boot, the boot everyone but the seat itself
       // who has not witnessed the action — and no vote is coming from
-      // anyone this peer has not heard from for thirty seconds, who
+      // anyone this peer has not heard from for ninety seconds, who
       // cannot be removed before their own turn. Only the jury breaks a
       // deadlock.
       final holder = holders[seat];
@@ -912,7 +912,7 @@ class TableClient {
 
   // ---- silence -----------------------------------------------------------
   //
-  // A seat not heard from for thirty seconds is booted at its own turn
+  // A seat not heard from for ninety seconds is booted at its own turn
   // without the fifteen-second wait, and nowhere else. An earlier
   // version let a peer claim the seat gone at whatever position it was
   // on, so that a turn of someone else's stuck for want of the silent
@@ -967,7 +967,7 @@ class TableClient {
       } else if (connectedToMajority && _pause == Pause.waitingForPeers && !_races.values.any((r) => r.forRemoval.isNotEmpty)) {
         _pause = null;
       }
-      // Anyone not heard from for thirty seconds whose turn is open is
+      // Anyone not heard from for ninety seconds whose turn is open is
       // booted at once, for silence.
       for (final e in List.of(_races.entries)) {
         final race = e.value;

@@ -21,6 +21,15 @@ import 'card.dart';
 import 'persona.dart';
 import 'rules.dart';
 
+/// The version of the bots' play. Every client at a live table computes
+/// the bots' cards itself, from the same cards, so two clients agree
+/// only while they run the same policy; a table where they do not forks
+/// silently, each side rejecting the other's legal plays. So a start
+/// event carries this number, and a client whose number differs does
+/// not sit down. Bump it whenever a change to bot.dart, persona.dart
+/// or the pass and play rules they read could change a single card.
+const botPolicyVersion = 3;
+
 /// The public information a bot decides from.
 class BotView {
   BotView({

@@ -19,9 +19,12 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 class RoomMember {
-  const RoomMember(this.key, this.name);
+  const RoomMember(this.key, this.name, {this.at = 0});
   final PublicKey key;
   final String name;
+
+  /// Relay time of the join, seconds.
+  final int at;
 }
 
 class Room extends ChangeNotifier {
@@ -31,7 +34,7 @@ class Room extends ChangeNotifier {
   factory Room.host({required RelayTransport relay, required String code, required String name}) {
     final r = Room._(relay: relay, code: code, myName: name, isHost: true);
     r._listen();
-    relay.announce({'kind': 'host', 'name': name, 'seed': Random.secure().nextInt(1 << 31)});
+    relay.announce({'kind': 'host', 'name': name, 'seed': Random.secure().nextInt(1 << 31), 'policy': botPolicyVersion});
     return r;
   }
 
@@ -58,6 +61,11 @@ class Room extends ChangeNotifier {
   final bool isHost;
 
   PublicKey? host;
+  int _hostAt = 0;
+
+  /// Why this device will not sit at the table that started, if so:
+  /// the host's bots play by a different version of the policy.
+  String? refusal;
   int? _seed;
   final List<RoomMember> _members = [];
   int _lastJoinAt = 0; // relay time, seconds
@@ -105,15 +113,27 @@ class Room extends ChangeNotifier {
     } catch (_) {
       return;
     }
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     switch (c['kind']) {
       case 'host':
-        if (host != null && host != e.pubkey) return; // one host per code: first wins
+        // One host per code: the newest wins, so a code reused after an
+        // earlier table (a dev loop's fixed code, or chance) is not
+        // captured by a host long gone; and nothing older than half an
+        // hour counts at all.
+        if (spec != null || now - e.createdAt > 1800) return;
+        if (host != null && e.createdAt <= _hostAt) return;
         host = e.pubkey;
+        _hostAt = e.createdAt;
         _seed = c['seed'] as int?;
-        _add(RoomMember(e.pubkey, c['name'] as String? ?? 'Host'), e.createdAt, first: true);
+        // Joins to an earlier host's room are not joins to this one.
+        _members.removeWhere((m) => m.at < _hostAt);
+        _add(RoomMember(e.pubkey, c['name'] as String? ?? 'Host', at: e.createdAt), e.createdAt, first: true);
+        if (!isHost && c['policy'] != botPolicyVersion) refusal = _mismatch;
       case 'join':
         if (spec != null) return; // late; not this game
-        _add(RoomMember(e.pubkey, c['name'] as String? ?? 'Someone'), e.createdAt);
+        if (host != null && e.createdAt < _hostAt) return; // someone else's room, earlier
+        if (now - e.createdAt > 1800) return;
+        _add(RoomMember(e.pubkey, c['name'] as String? ?? 'Someone', at: e.createdAt), e.createdAt);
         if (isHost && _members.length >= seatCount) start();
       case 'start':
         if (e.pubkey != host || spec != null) return;
@@ -145,10 +165,19 @@ class Room extends ChangeNotifier {
         seats.add({'bot': draw[s].id});
       }
     }
-    relay.announce({'kind': 'start', 'seed': _seed, 'seats': seats});
+    relay.announce({'kind': 'start', 'seed': _seed, 'seats': seats, 'policy': botPolicyVersion});
   }
 
+  static const _mismatch = "The host's app plays its bots differently from yours — one of you is on an older build. "
+      'Update, and try again.';
+
   void _applyStart(Map<String, Object?> c) {
+    // Every client computes the bots' plays itself; two versions of the
+    // policy at one table fork it. Better not to sit down.
+    if (c['policy'] != botPolicyVersion) {
+      refusal = _mismatch;
+      return;
+    }
     final seed = c['seed'] as int;
     final seats = <SeatHolder>[];
     final names = <int, String>{};

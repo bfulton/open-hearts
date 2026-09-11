@@ -265,12 +265,20 @@ class ActionBar extends StatelessWidget {
             // is read off the table rather than out of the sentence.
             Icon(_towards(controller.positionOf(from)), size: 14, color: Palette.chromeDim),
             const SizedBox(width: 3),
-            Text('${controller.names[from]} passed you',
-                style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
+            // A long name gives way before the cards do.
+            Flexible(
+              child: Text('${controller.names[from]} passed you',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
+            ),
             for (final card in received)
               Padding(
                 padding: const EdgeInsets.only(left: 9),
-                child: CardChip(card: card, size: 14, onFelt: true),
+                child: Semantics(
+                  label: card.spoken,
+                  child: ExcludeSemantics(child: CardChip(card: card, size: 14, onFelt: true)),
+                ),
               ),
           ],
         ),

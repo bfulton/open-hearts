@@ -1,12 +1,26 @@
 /// Drives the table's widgets from a live table: a [TableClient] over
 /// a real transport, with the protocol deciding whose turn it is and
-/// what has settled. The engine is the client's; this only adds what
-/// a view needs — the pass selection, the score sheet of the hand just
-/// finished, and the buttons a live table has that a solo one does
-/// not: boot, and leave.
+/// what has settled. The engine is the client's; this adds what a view
+/// needs — the pass selection, the score sheet of the hand just
+/// finished, the buttons a live table has that a solo one does not —
+/// and, above all, pace.
+///
+/// The client's game jumps: the moment a person's play settles, every
+/// bot that follows plays at once, and a finished trick is swept in the
+/// same instant. A person watching that sees their own card, two bots'
+/// cards and the sweep land in one frame, if they see them at all. So
+/// the view is fed a second game, replayed from the client's record at
+/// a human pace — each bot thinks for its persona's beat, a finished
+/// trick sits for a moment, another person's card lands a beat after
+/// the last — exactly as the solo table paces itself. The replay is the
+/// verifier's (record.dart): the record's passes and plays, with the
+/// bots recomputed, so it can only ever show what the table agreed.
+/// Meanwhile the player's own card goes on the table the instant it is
+/// tapped, ahead of the settlement that will confirm it.
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
@@ -23,7 +37,10 @@ class LiveController extends ChangeNotifier implements TableModel {
     Clock? clock,
     this.ratingOf,
     this.onResult,
+    this.paced = true,
   }) : client = TableClient(spec: spec, signer: signer, transport: transport, clock: clock ?? WallClock()) {
+    _shown = HeartsGame(seed: spec.seed);
+    _shownHolders = List.of(spec.seats);
     _sub = client.changes.listen((_) => _onChange());
     client.start();
   }
@@ -38,30 +55,244 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   /// Where a finished game's result goes, once, when the game ends.
   final void Function(GameResult result)? onResult;
+
+  /// Whether the view is paced. Tests turn it off.
+  final bool paced;
+
   bool _reported = false;
   StreamSubscription<void>? _sub;
   final Set<Card> _selected = {};
 
   /// The score sheet of the hand just finished, until dismissed.
   ({int hand, List<int> scores, List<int> totals, int? moonShooter})? handJustEnded;
-  int _shownHand = -1;
   Timer? _sheetTimer;
 
+  // ---- the paced view ---------------------------------------------------
+
+  late HeartsGame _shown;
+  late List<SeatHolder> _shownHolders;
+  final Set<Card> _shownPlayed = {};
+
+  /// The decisions of the client's record the view has shown, in order.
+  final List<Decision> _consumed = [];
+
+  /// The player's card on the table before its settlement, and their
+  /// pass before its settlement.
+  Card? _pendingPlay;
+  Set<Card> _pendingPass = const {};
+
+  bool _pumping = false;
+  bool _disposed = false;
+  final _rhythm = Random();
+  int _lastCardAt = 0;
+
+  static const _trickHold = Duration(milliseconds: 950);
+  static const _cardBeat = Duration(milliseconds: 320);
+
+  Duration _botThink(int seat) {
+    final pace = (_shownHolders[seat] as BotSeat).persona.pace;
+    return Duration(milliseconds: pace.minMs + _rhythm.nextInt(pace.maxMs - pace.minMs + 1));
+  }
+
+  /// Enough of a pause after the last card shown that two cards never
+  /// land as one.
+  Duration _beat() {
+    final since = DateTime.now().millisecondsSinceEpoch - _lastCardAt;
+    return since >= _cardBeat.inMilliseconds ? Duration.zero : Duration(milliseconds: _cardBeat.inMilliseconds - since);
+  }
+
   void _onChange() {
-    final last = client.lastHand;
-    if (last != null && last.hand > _shownHand) {
-      _shownHand = last.hand;
-      handJustEnded = last;
-      _sheetTimer?.cancel();
-      _sheetTimer = Timer(const Duration(seconds: 6), dismissHandSheet);
-    }
-    if (!awaitingPass) _selected.clear();
-    if (done && !_reported) {
+    if (client.done && !_reported) {
       _reported = true;
-      onResult?.call(GameResult.of(client.spec, client.holders, game.totals));
+      onResult?.call(GameResult.of(client.spec, client.holders, client.game.totals));
     }
+    if (!client.awaitingMyPass) _selected.clear();
+    unawaited(_pump());
     notifyListeners();
   }
+
+  /// Whether the shown decisions are still the record's first ones —
+  /// the record is kept in turn order, so a late decision about an
+  /// earlier turn can land behind what has been shown.
+  bool _inSync(List<Decision> record) {
+    if (_consumed.length > record.length) return false;
+    for (var i = 0; i < _consumed.length; i++) {
+      if (!identical(record[i], _consumed[i])) return false;
+    }
+    return true;
+  }
+
+  /// Replays the whole record at once. A jump, for the rare case where
+  /// the shown past was rewritten.
+  void _rebuild(List<Decision> record) {
+    _shown = HeartsGame(seed: client.spec.seed);
+    _shownHolders = List.of(client.spec.seats);
+    _shownPlayed.clear();
+    _consumed.clear();
+    for (var guard = 0; guard < 10000; guard++) {
+      final step = _next(record);
+      if (step == null) break;
+      step.act();
+    }
+  }
+
+  void _botActs(int seat, {required bool passing}) {
+    final bot = Bot(persona: (_shownHolders[seat] as BotSeat).persona);
+    if (passing) {
+      _shown.setPass(seat, bot.choosePass(_shown.handOf(seat)));
+    } else {
+      final view = BotView(
+        seat: seat,
+        hand: _shown.handOf(seat),
+        trick: _shown.trick,
+        played: _shownPlayed,
+        heartsBroken: _shown.heartsBroken,
+        isFirstTrick: _shown.isFirstTrick,
+        taken: _shown.taken,
+      );
+      final card = bot.chooseCard(view, _shown.legalPlaysFor(seat));
+      _shown.play(seat, card);
+      _shownPlayed.add(card);
+      _lastCardAt = DateTime.now().millisecondsSinceEpoch;
+    }
+  }
+
+  /// The next thing the view should show, and how long to wait before
+  /// showing it; null when the view is waiting on a person, or the
+  /// game is over.
+  ({Duration delay, void Function() act})? _next(List<Decision> record) {
+    // Departures recorded next take effect at once.
+    if (_consumed.length < record.length && record[_consumed.length].removal) {
+      final d = record[_consumed.length];
+      return (
+        delay: Duration.zero,
+        act: () {
+          _consumed.add(d);
+          final seat = d.event.seat;
+          if (_shownHolders[seat] is HumanSeat) {
+            _shownHolders[seat] = BotSeat(client.spec.replacementFor(seat));
+            if (seat == mySeat) {
+              _pendingPlay = null;
+              _pendingPass = const {};
+            }
+          }
+        }
+      );
+    }
+    if (_shown.phase == Phase.passing) {
+      for (var s = 0; s < seatCount; s++) {
+        if (_shownHolders[s] is BotSeat && _shown.passOf(s) == null) {
+          return (delay: Duration.zero, act: () => _botActs(s, passing: true));
+        }
+      }
+      if (_consumed.length >= record.length) return null; // a person's pass is owed
+      final d = record[_consumed.length];
+      if (d.event.kind != EventKind.pass) return null; // not what the replay expects: leave it to a rebuild
+      return (
+        delay: Duration.zero,
+        act: () {
+          _consumed.add(d);
+          _shown.setPass(d.event.seat, [for (final c in d.event.body['cards'] as List) Card.parse(c as String)]);
+          if (d.event.seat == mySeat) _pendingPass = const {};
+        }
+      );
+    }
+    if (_shown.phase == Phase.gameOver) return null;
+    if (_shown.pendingTrick != null) {
+      return (
+        delay: _trickHold,
+        act: () {
+          _shown.collectTrick();
+          if (_shown.phase == Phase.handOver) {
+            handJustEnded = (
+              hand: _shown.handNumber,
+              scores: _shown.handScores,
+              totals: _shown.totals,
+              moonShooter: _shown.moonShooter,
+            );
+            _sheetTimer?.cancel();
+            _sheetTimer = Timer(const Duration(seconds: 6), dismissHandSheet);
+            _shown.nextHand();
+            _shownPlayed.clear();
+          }
+        }
+      );
+    }
+    final seat = _shown.currentSeat!;
+    if (_shownHolders[seat] is BotSeat) {
+      return (delay: _botThink(seat), act: () => _botActs(seat, passing: false));
+    }
+    if (_consumed.length >= record.length) return null; // a person's play is owed
+    final d = record[_consumed.length];
+    if (d.event.kind != EventKind.play || d.event.seat != seat) return null;
+    return (
+      delay: seat == mySeat ? Duration.zero : _beat(),
+      act: () {
+        _consumed.add(d);
+        final card = Card.parse(d.event.body['card'] as String);
+        _shown.play(seat, card);
+        _shownPlayed.add(card);
+        _lastCardAt = DateTime.now().millisecondsSinceEpoch;
+        if (seat == mySeat) _pendingPlay = null;
+      }
+    );
+  }
+
+  /// Advances the shown game as far as the record allows, at pace. One
+  /// loop runs at a time; a change that arrives while it runs is picked
+  /// up on its next step.
+  Future<void> _pump() async {
+    if (_pumping) return;
+    _pumping = true;
+    try {
+      var rebuilt = false;
+      while (!_disposed) {
+        final record = client.record;
+        if (!_inSync(record)) {
+          _rebuild(record);
+          rebuilt = true;
+          notifyListeners();
+          continue;
+        }
+        final step = _next(record);
+        if (step == null) {
+          // Nothing to show — unless the record holds more than the
+          // replay expects, which one rebuild settles.
+          if (_consumed.length < record.length && !rebuilt) {
+            _rebuild(record);
+            rebuilt = true;
+            notifyListeners();
+            continue;
+          }
+          break;
+        }
+        if (paced && step.delay > Duration.zero) {
+          await _wait(step.delay);
+          if (_disposed) return;
+          if (!_inSync(client.record)) continue; // the past changed while waiting
+        }
+        step.act();
+        notifyListeners();
+      }
+    } finally {
+      _pumping = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Timer? _waitTimer;
+
+  /// A pause the controller can cancel: nothing outlives the widget.
+  Future<void> _wait(Duration d) {
+    final done = Completer<void>();
+    _waitTimer?.cancel();
+    _waitTimer = Timer(d, done.complete);
+    return done.future;
+  }
+
+  /// Whether the view has shown everything the table has settled, so
+  /// the player is looking at the position they are asked to play.
+  bool get _caughtUp => !_pumping && _consumed.length == client.record.length;
 
   /// A seat's name with its rating: "Roxane 1520". The rating is the
   /// seat's as dealt — a bot that took over a leaver's seat shows the
@@ -85,8 +316,9 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   // ---- TableModel -------------------------------------------------------
 
+  /// The game as shown: the client's, replayed at pace.
   @override
-  HeartsGame get game => client.game;
+  HeartsGame get game => _shown;
 
   @override
   int get mySeat => client.mySeat ?? 0;
@@ -103,34 +335,41 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   String _plainName(int s) => s == client.mySeat
       ? 'You'
-      : switch (client.holders[s]) {
+      : switch (_shownHolders[s]) {
           BotSeat(:final persona) => persona.name,
           _ => seatNames[s] ?? 'Seat ${s + 1}',
         };
 
   @override
-  Persona? personaAt(int seat) => switch (client.holders[seat]) {
+  Persona? personaAt(int seat) => switch (_shownHolders[seat]) {
         BotSeat(:final persona) => persona,
         _ => null,
       };
 
   @override
-  Set<Card> get playedThisHand => Set.unmodifiable(client.played);
+  Set<Card> get playedThisHand => Set.unmodifiable(_shownPlayed);
 
   @override
   Set<Card> get selected => Set.unmodifiable(_selected);
 
   @override
-  bool get awaitingPass => client.awaitingMyPass;
+  bool get awaitingPass =>
+      client.awaitingMyPass && _shown.phase == Phase.passing && _shown.passOf(mySeat) == null && _pendingPass.isEmpty;
 
   @override
   bool get canConfirmPass => awaitingPass && _selected.length == passSize;
 
   @override
-  bool get awaitingPlay => client.awaitingMyPlay;
+  bool get awaitingPlay => client.awaitingMyPlay && _caughtUp && _pendingPlay == null;
 
   @override
-  Set<Card> get legalNow => awaitingPlay ? game.legalPlaysFor(mySeat).toSet() : const {};
+  Set<Card> get legalNow => awaitingPlay ? _shown.legalPlaysFor(mySeat).toSet() : const {};
+
+  @override
+  Card? get pendingPlay => _pendingPlay;
+
+  @override
+  Set<Card> get inFlight => {?_pendingPlay, ..._pendingPass};
 
   @override
   void toggleSelected(Card card) {
@@ -145,15 +384,24 @@ class LiveController extends ChangeNotifier implements TableModel {
   @override
   void confirmPass() {
     if (!canConfirmPass) return;
-    client.pass(_selected.toList());
+    final cards = _selected.toList();
+    // Marked in flight before the client hears of it: at a table of one
+    // person the pass settles inside the call, and the settlement is
+    // what clears the mark.
+    _pendingPass = cards.toSet();
     _selected.clear();
+    client.pass(cards);
     notifyListeners();
   }
 
   @override
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
-    if (!game.legalPlaysFor(mySeat).contains(card)) return refusalFor(game, mySeat, card);
+    if (!_shown.legalPlaysFor(mySeat).contains(card)) return refusalFor(_shown, mySeat, card);
+    // Pending before the client hears of it, for the same reason as the
+    // pass: the settlement that clears it can come back synchronously.
+    _pendingPlay = card;
+    _lastCardAt = DateTime.now().millisecondsSinceEpoch;
     client.play(card);
     notifyListeners();
     return null;
@@ -162,7 +410,9 @@ class LiveController extends ChangeNotifier implements TableModel {
   // ---- what a live table has besides -----------------------------------
 
   bool get amSeated => client.amSeated;
-  bool get done => client.done;
+
+  /// Over, as shown: the last trick has been seen.
+  bool get done => _shown.phase == Phase.gameOver;
   TableState get tableState => client.tableState;
   Pause? get pause => client.pause;
   SeatState seatStateOf(int seat) => client.seatStateOf(seat);
@@ -182,10 +432,12 @@ class LiveController extends ChangeNotifier implements TableModel {
   int get participants => client.participants.length;
 
   /// The record so far, as the verifier sees it.
-  Verification verification() => verifyRecord(client.spec, client.record, allowPartial: !done);
+  Verification verification() => verifyRecord(client.spec, client.record, allowPartial: !client.done);
 
   @override
   void dispose() {
+    _disposed = true;
+    _waitTimer?.cancel();
     _sheetTimer?.cancel();
     _sub?.cancel();
     client.close();

@@ -136,6 +136,7 @@ async function act(page) {
       const re = new RegExp(src);
       let n = 0;
       for (const e of document.querySelectorAll('flt-semantics')) {
+        if (e.getAttribute('role') !== 'button') continue; // the passed-you chips carry card names too
         if (re.test(labelOf(e)) && e.getAttribute('aria-disabled') !== 'true' && n < 3) {
           e.click();
           n++;
@@ -155,6 +156,7 @@ async function act(page) {
       const labelOf = ${labelOf};
       const re = new RegExp(src);
       for (const e of document.querySelectorAll('flt-semantics')) {
+        if (e.getAttribute('role') !== 'button') continue;
         const t = labelOf(e);
         if (re.test(t) && e.getAttribute('aria-disabled') !== 'true') {
           e.click();
@@ -169,14 +171,19 @@ async function act(page) {
 }
 
 /// Plays on every live page until [done] holds on every one of them.
+/// A page counts as done from the first poll that finds it so: the
+/// pages pace their own tables, so a state that comes and goes — the
+/// hand's score sheet — need not show on every screen at once.
 async function playUntil(pages, done, { timeout = 120000, idle = [] } = {}) {
   const until = Date.now() + timeout;
+  const finished = new Set();
   while (Date.now() < until) {
     let all = true;
     for (const [i, page] of pages.entries()) {
       if (page.isClosed()) continue;
       if (!idle.includes(i)) await act(page);
-      if (!(await done(page, i))) all = false;
+      if (!finished.has(i) && (await done(page, i))) finished.add(i);
+      if (!finished.has(i)) all = false;
     }
     if (all) return;
     await sleep(300);
@@ -262,12 +269,13 @@ async function main() {
     for (const page of pages) await waitFor(page, /^Hand 2/, { what: 'hand 2' });
 
     // Cell 2: Dee's browser goes, mid-hand. The others see three, and a
-    // bot in her seat once her turn comes and the silence is answered.
+    // bot in her seat once her turn comes and the silence is answered —
+    // ninety seconds of it.
     await contexts[3].close();
     log('Dee closed her browser');
     const others = pages.slice(0, 3);
-    await playUntil(others, (p) => has(p, /^3 of 4 here/), { timeout: 90000 });
-    await playUntil(others, async (p) => (await texts(p)).some((t) => roster.test(t)), { timeout: 90000 });
+    await playUntil(others, (p) => has(p, /^3 of 4 here/), { timeout: 150000 });
+    await playUntil(others, async (p) => (await texts(p)).some((t) => roster.test(t)), { timeout: 150000 });
     log('a bot took Dee\'s seat');
 
     // Cell 3: Cara stops acting. On her turn the clock runs; at fifteen

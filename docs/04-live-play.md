@@ -39,8 +39,12 @@ by the fourth hand. The state is always on screen — how many seats are
 bots, and a note when somebody sits down.
 
 **The bots have names, and the names are famous lovers.** Romeo and
-Juliet, Cyrano and Roxane, Westley and Buttercup, Casanova, Don Juan —
-open hearts. Each is a temperament: the one policy with a few of its
+Juliet, Cyrano and Roxane, Westley and Buttercup, Paolo and Francesca,
+Lancelot and Guinevere, Aragorn and Arwen, Orpheus and Eurydice, Mark
+Antony and Cleopatra, Shah Jahan and Mumtaz Mahal, Marie and Pierre
+Curie, Bonnie and Clyde, Diego Rivera and Frida Kahlo, Sid and Nancy,
+Han and Leia, Heathcliff and Catherine, Darcy and Elizabeth, Cupid and
+Psyche, Casanova, Don Juan — open hearts. Each is a temperament: the one policy with a few of its
 thresholds moved, so Romeo cannot hold a queen and Juliet waits for the
 moment and Cyrano lets a run go a long way before spoiling it and Don
 Juan runs at the moon on a hand the others would not. Every setting is
@@ -91,10 +95,10 @@ so defending the moon is not a rung, it is the floor. The ladder is
 calibrated in the arena (`packages/table/tool/ladder.dart`): twenty
 thousand tables of random fours from nearby rungs, fitted by the same
 model a rating's expected score uses, to two or three points a rung.
-It spans about 230 points — a first game finishes ahead of the whole
-policy in one pair of three — with rungs eighteen to forty-three
-points apart and the eight characters at a rung within fifteen points
-of each other. Those are the ratings a bot starts from; from there it
+It spans about 240 points — a first game finishes ahead of the whole
+policy in one pair of three — with rungs thirteen to forty-two points
+apart and the thirty-six characters at a rung within about twenty-five
+points of each other. Those are the ratings a bot starts from; from there it
 floats on its results like anyone, one rating per character per rung.
 A bot's identity is its name and its rung: `Westley` at the top,
 `Westley/3` on the third rung up from a first game.
@@ -234,9 +238,12 @@ pocketing their phone during another player's turn is enough to wedge
 things. The timeout is what prevents that, so it is load-bearing rather
 than hygiene.
 
-Longer than the boot clock — say thirty seconds of silence against
-fifteen on-turn — so an active table always resolves through the visible,
-explicable path and the timeout only catches what boot cannot see.
+Longer than the boot clock — ninety seconds of silence against fifteen
+on-turn — so an active table always resolves through the visible,
+explicable path and the timeout only catches what boot cannot see. It
+was thirty, until a phone that switched apps for a moment came back to
+find a bot in its seat; a table that finds ninety seconds too long has
+the Boot button from fifteen.
 
 All three doors produce the same event: **"seat N is out as of game state
 S."** One code path for the consequences, three ways in.
@@ -269,7 +276,7 @@ turn**. Only then does the next turn open, so nothing is ever rolled
 back. A signed Leave is evidence and needs no majority.
 
 **Silence is answered at the seat's own turn, and nowhere else.** A
-peer that has heard nothing from a seat for thirty seconds boots it the
+peer that has heard nothing from a seat for ninety seconds boots it the
 moment its turn is open, without the fifteen-second wait; the removal is
 the race's own decision, and a seat removed that way has no later votes
 for anyone to disagree about. What it cannot do is remove a silent seat

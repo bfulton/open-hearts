@@ -17,7 +17,23 @@ import 'live_page.dart';
 
 /// Where the relay is: the local one while the app is served from a
 /// dev machine, a public one otherwise. Editable on the page.
+/// What the relay says back — a refusal, a notice, a drop — goes to the
+/// console, where a person debugging a table can read it.
+void _relayLog(String line) => debugPrint('relay: $line');
+
+/// With `?e2e` in the address the table's every transition and the
+/// mesh's every channel change go to the console too.
+final _debugging = Uri.base.queryParameters.containsKey('e2e');
+
+/// A dev loop's shortcuts: a build made with `--dart-define=DEV_RELAY=…`
+/// and `DEV_ROOM=…` opens the lobby with that relay filled in and that
+/// room code in the field, and hosts under that code, so a table of
+/// people testing a branch is one tap away. Unset in a normal build.
+const devRelay = String.fromEnvironment('DEV_RELAY');
+const devRoom = String.fromEnvironment('DEV_ROOM');
+
 String defaultRelayUrl() {
+  if (devRelay.isNotEmpty) return devRelay;
   final host = Uri.base.host;
   if (host == 'localhost' || host == '127.0.0.1' || host.isEmpty) return 'ws://localhost:7447';
   return 'wss://relay.damus.io';
@@ -32,7 +48,7 @@ class LobbyPage extends StatefulWidget {
 
 class _LobbyPageState extends State<LobbyPage> {
   final _name = TextEditingController();
-  final _code = TextEditingController();
+  final _code = TextEditingController(text: devRoom);
   late final TextEditingController _relay = TextEditingController(text: defaultRelayUrl());
   String? _error;
   bool _busy = false;
@@ -91,7 +107,7 @@ class _LobbyPageState extends State<LobbyPage> {
       await Identity.setName(name);
       final signer = _signer ??= await Identity.signer();
       final url = Uri.parse(_relay.text.trim());
-      final transport = RelayTransport(url: url, signer: signer, table: tag);
+      final transport = RelayTransport(url: url, signer: signer, table: tag, log: _relayLog);
       await transport.ready.timeout(const Duration(seconds: 8));
       if (_standing == null) await _loadStanding(url, signer);
       setState(() {
@@ -141,7 +157,7 @@ class _LobbyPageState extends State<LobbyPage> {
   /// there, WebRTC over it, and the live page.
   void _toTable(TableSpec spec, Map<int, String> seatNames) {
     final signer = _signer!;
-    final relay = RelayTransport(url: Uri.parse(_relay.text.trim()), signer: signer, table: spec.id);
+    final relay = RelayTransport(url: Uri.parse(_relay.text.trim()), signer: signer, table: spec.id, log: _relayLog);
     final peers = [for (final h in spec.seats) if (h is HumanSeat) h.key];
     final relayUrl = Uri.parse(_relay.text.trim());
     final ledger = _standing?.ledger ?? Ledger();
@@ -149,15 +165,16 @@ class _LobbyPageState extends State<LobbyPage> {
       spec: spec,
       seatNames: seatNames,
       signer: signer,
-      transport: MeshTransport(relay: relay, peers: peers),
+      transport: MeshTransport(relay: relay, peers: peers, log: _debugging ? (l) => debugPrint('mesh: $l') : null),
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
       onResult: (result) => Standing.publish(relayUrl, signer, result),
     );
+    if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => LivePage(controller: controller)));
   }
 
   Future<void> _enter({required bool host}) async {
-    final code = host ? Room.newCode() : _code.text.trim().toUpperCase();
+    final code = host ? (devRoom.isNotEmpty ? devRoom : Room.newCode()) : _code.text.trim().toUpperCase();
     if (!host && code.length != 4) return setState(() => _error = 'A room code is four letters');
     final transport = await _connect(code);
     if (transport == null) return;
@@ -185,6 +202,15 @@ class _LobbyPageState extends State<LobbyPage> {
     final room = _room;
     if (room == null || !mounted) return;
     final spec = room.spec;
+    if (room.refusal != null) {
+      room.removeListener(_onRoom);
+      room.dispose();
+      setState(() {
+        _room = null;
+        _error = room.refusal;
+      });
+      return;
+    }
     if (spec != null) {
       room.removeListener(_onRoom);
       if (!room.seated) {

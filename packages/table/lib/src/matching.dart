@@ -250,7 +250,15 @@ class WaitingRoom {
           seats.add({'bot': bots[s - humans.length].id});
         }
       }
-      relay.announce({'kind': 'match', 'round': round, 'table': id, 'seed': seed, 'rated': pool == 'rated', 'seats': seats});
+      relay.announce({
+        'kind': 'match',
+        'round': round,
+        'table': id,
+        'seed': seed,
+        'rated': pool == 'rated',
+        'seats': seats,
+        'policy': botPolicyVersion,
+      });
     }
   }
 
@@ -284,6 +292,9 @@ class WaitingRoom {
   }
 
   void _maybeSeated(Map<String, Object?> c) {
+    // A table whose host computes the bots by another version of the
+    // policy would fork on the first bot's card: not one to sit at.
+    if (c['policy'] != botPolicyVersion) return;
     final seats = <SeatHolder>[];
     final names = <int, String>{};
     var mine = false;

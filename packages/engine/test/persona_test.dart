@@ -16,11 +16,11 @@ void main() {
 
   test('a character may be rash or patient, never bad', () {
     // Fair share is a quarter. With ~700 seats each the standard error
-    // on a win rate is about 1.7 points, so a floor three points under
+    // on a win rate is about 1.6 points, so a floor three points under
     // fair share is about two sigma; the arena is seeded, so a persona
     // that trips it is weaker, not unlucky, and tool/knobs.dart says
     // which setting to blame.
-    final standings = Arena.play(1200);
+    final standings = Arena.play(6000);
     final best = standings.map((s) => s.meanScore).reduce(min);
     for (final s in standings) {
       expect(s.seats, greaterThan(500), reason: '${s.persona} sat enough');

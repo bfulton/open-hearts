@@ -57,6 +57,8 @@ cp -r site/. "$STAGE"/
     --no-web-resources-cdn \
     --base-href /play/ \
     --dart-define=BUILD="$BUILD_TAG" \
+    --dart-define=DEV_RELAY="${DEV_RELAY:-}" \
+    --dart-define=DEV_ROOM="${DEV_ROOM:-}" \
     --dart-define=BUILD_DATE="$BUILD_DATE" \
     --dart-define=UPDATE_CHECK=on )
 

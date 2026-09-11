@@ -68,6 +68,22 @@ class _LivePageState extends State<LivePage> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// With `?e2e` in the address, the client's own account of the table
+  /// (participants, open races, who was heard when) sits in the
+  /// accessibility tree, invisible: for a test or a tool driving the
+  /// app, and for anyone reading a stuck table.
+  Widget _debugState() {
+    if (!Uri.base.queryParameters.containsKey('e2e')) return const SizedBox.shrink();
+    return Opacity(
+      opacity: 0,
+      alwaysIncludeSemantics: true,
+      child: SizedBox(
+        height: 1,
+        child: Text('debug: ${_c.client.describe()}', overflow: TextOverflow.clip, maxLines: 1),
+      ),
+    );
+  }
+
   /// The rail's line: a pause and why, or a boot clock on the seat
   /// holding everyone up, or nothing special.
   Widget? _liveNote() {
@@ -81,11 +97,19 @@ class _LivePageState extends State<LivePage> {
       final left = _c.bootCountdownMs(seat);
       if (left == null) continue;
       if (_c.canBoot(seat)) {
+        // Sized to the rail's line, which is thirty pixels: a button at
+        // its default height was clipped top and bottom.
         return TextButton.icon(
           onPressed: () => _c.boot(seat),
           icon: const Icon(Icons.timer_off_outlined, size: 15),
-          label: Text('Boot ${_c.names[seat]}'),
-          style: TextButton.styleFrom(foregroundColor: Palette.danger),
+          label: Text('Boot ${_c.names[seat]}', style: const TextStyle(fontSize: 12)),
+          style: TextButton.styleFrom(
+            foregroundColor: Palette.danger,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            minimumSize: const Size(0, 26),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
         );
       }
       if (left < 10000) return _note('${_c.names[seat]} has ${(left / 1000).ceil()} s');
@@ -99,7 +123,8 @@ class _LivePageState extends State<LivePage> {
   @override
   Widget build(BuildContext context) {
     final game = _c.game;
-    final hand = game.handOf(_c.mySeat);
+    // What the player has committed is already off the hand.
+    final hand = game.handOf(_c.mySeat).where((c) => !_c.inFlight.contains(c)).toList();
     final legal = _c.legalNow;
     final passing = _c.awaitingPass;
     final ended = _c.handJustEnded;
@@ -134,6 +159,7 @@ class _LivePageState extends State<LivePage> {
                       ],
                     ),
                   ),
+                  _debugState(),
                   ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),

@@ -91,7 +91,11 @@ class TableView extends StatelessWidget {
                           _trickOffset[position]!.dy * cardHeight * 1.02,
                         ),
                         child: _TrickSlot(
-                          card: _cardFrom(game, controller.seatAt(position)),
+                          card: _cardFrom(game, controller.seatAt(position)) ??
+                              (position == 0 ? controller.pendingPlay : null),
+                          name: controller.names[controller.seatAt(position)],
+                          order: _orderOf(game, controller.seatAt(position)) ??
+                              (position == 0 && controller.pendingPlay != null ? game.trick.length : null),
                           width: cardWidth,
                           winning: pending != null && pending.winner == controller.seatAt(position),
                         ),
@@ -127,17 +131,41 @@ class TableView extends StatelessWidget {
     }
     return null;
   }
+
+  /// Where in the trick [seat]'s card was played: 0 led it.
+  int? _orderOf(HeartsGame game, int seat) {
+    for (var i = 0; i < game.trick.length; i++) {
+      if (game.trick[i].seat == seat) return i;
+    }
+    return null;
+  }
 }
 
 class _TrickSlot extends StatelessWidget {
-  const _TrickSlot({required this.card, required this.width, required this.winning});
+  const _TrickSlot({
+    required this.card,
+    required this.name,
+    required this.order,
+    required this.width,
+    required this.winning,
+  });
 
   final engine.Card? card;
+  final String name;
+  final int? order;
   final double width;
   final bool winning;
 
   @override
   Widget build(BuildContext context) {
+    // Spoken as "Cyrano led the ace of clubs" / "Juliet played the 5 of
+    // clubs": a screen reader hears the trick, and so does anything
+    // else that reads the table through the accessibility tree.
+    final label = card == null
+        ? null
+        : order == 0
+            ? '$name led the ${card!.spoken}'
+            : '$name played the ${card!.spoken}';
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 190),
       switchInCurve: Curves.easeOutBack,
@@ -147,11 +175,16 @@ class _TrickSlot extends StatelessWidget {
       ),
       child: card == null
           ? CardGhost(key: const ValueKey('empty'), width: width)
-          : CardView(
+          : Semantics(
               key: ValueKey(card!.code),
-              card: card!,
-              width: width,
-              highlighted: winning,
+              label: label,
+              child: ExcludeSemantics(
+                child: CardView(
+                  card: card!,
+                  width: width,
+                  highlighted: winning,
+                ),
+              ),
             ),
     );
   }
@@ -179,6 +212,15 @@ class _SeatBadge extends StatelessWidget {
     final cards = game.handOf(seat).length;
     final taken = game.taken[seat];
 
+    // One spoken line per seat: who, how many cards, how many points
+    // this hand, and whether it is their turn.
+    return Semantics(
+      label: '$name: $cards cards, $taken points this hand${onTurn ? ', on turn' : ''}',
+      child: ExcludeSemantics(child: _badge(cards, taken)),
+    );
+  }
+
+  Widget _badge(int cards, int taken) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),

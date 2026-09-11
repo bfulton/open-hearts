@@ -78,12 +78,18 @@ class _SeatScore extends StatelessWidget {
     final taken = game.taken[seat];
     return Column(
       children: [
-        Text(
-          name,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isYou ? FontWeight.w700 : FontWeight.w500,
-            color: isYou ? Palette.gold : Palette.chromeDim,
+        // A long name — Mumtaz Mahal, Mark Antony — scales down to its
+        // quarter of the strip rather than spilling into the next.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            name,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isYou ? FontWeight.w700 : FontWeight.w500,
+              color: isYou ? Palette.gold : Palette.chromeDim,
+            ),
           ),
         ),
         const SizedBox(height: 1),

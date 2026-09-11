@@ -167,6 +167,12 @@ class GameController extends ChangeNotifier implements TableModel {
   /// reason the card is not playable — the message the table shows when
   /// a dimmed card is tapped.
   @override
+  Card? get pendingPlay => null;
+
+  @override
+  Set<Card> get inFlight => const {};
+
+  @override
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
     final legal = _game.legalPlaysFor(humanSeat);
