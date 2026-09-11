@@ -160,31 +160,16 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// The next thing the view should show, and how long to wait before
   /// showing it; null when the view is waiting on a person, or the
   /// game is over.
-  /// The record entry the replay consumes next: the first not yet
-  /// shown — unless that is a seat taken back at a hand the shown game
-  /// has not reached, which waits there for that hand to open. The
-  /// table gave the seat back at that hand's start, and the record
-  /// holds the bot's hand out before it; the view must show the same.
-  Decision? _upcoming(List<Decision> record) {
-    if (_consumed.length >= record.length) return null;
-    final d = record[_consumed.length];
-    if (d.retake && d.turn.hand > _shown.handNumber) return null;
-    return d;
-  }
-
   ({Duration delay, void Function() act})? _next(List<Decision> record) {
-    final up = _upcoming(record);
-    // Departures, and seats taken back at this hand, take effect at once.
-    if (up != null && (up.removal || up.retake)) {
-      final d = up;
+    // Departures recorded next take effect at once.
+    if (_consumed.length < record.length && record[_consumed.length].removal) {
+      final d = record[_consumed.length];
       return (
         delay: Duration.zero,
         act: () {
           _consumed.add(d);
           final seat = d.event.seat;
-          if (d.retake) {
-            _shownHolders[seat] = HumanSeat(d.event.author);
-          } else if (_shownHolders[seat] is HumanSeat) {
+          if (_shownHolders[seat] is HumanSeat) {
             _shownHolders[seat] = BotSeat(client.spec.replacementFor(seat));
             if (seat == mySeat) {
               _pendingPlay = null;
@@ -200,8 +185,8 @@ class LiveController extends ChangeNotifier implements TableModel {
           return (delay: Duration.zero, act: () => _botActs(s, passing: true));
         }
       }
-      if (up == null) return null; // a person's pass is owed
-      final d = up;
+      if (_consumed.length >= record.length) return null; // a person's pass is owed
+      final d = record[_consumed.length];
       if (d.event.kind != EventKind.pass) return null; // not what the replay expects: leave it to a rebuild
       return (
         delay: Duration.zero,
@@ -237,8 +222,8 @@ class LiveController extends ChangeNotifier implements TableModel {
     if (_shownHolders[seat] is BotSeat) {
       return (delay: _botThink(seat), act: () => _botActs(seat, passing: false));
     }
-    if (up == null) return null; // a person's play is owed
-    final d = up;
+    if (_consumed.length >= record.length) return null; // a person's play is owed
+    final d = record[_consumed.length];
     if (d.event.kind != EventKind.play || d.event.seat != seat) return null;
     return (
       delay: seat == mySeat ? Duration.zero : _beat(),
@@ -273,7 +258,7 @@ class LiveController extends ChangeNotifier implements TableModel {
         if (step == null) {
           // Nothing to show — unless the record holds more than the
           // replay expects, which one rebuild settles.
-          if (_upcoming(record) != null && !rebuilt) {
+          if (_consumed.length < record.length && !rebuilt) {
             _rebuild(record);
             rebuilt = true;
             notifyListeners();
@@ -307,7 +292,7 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   /// Whether the view has shown everything the table has settled, so
   /// the player is looking at the position they are asked to play.
-  bool get _caughtUp => !_pumping && _upcoming(client.record) == null;
+  bool get _caughtUp => !_pumping && _consumed.length == client.record.length;
 
   /// A seat's name with its rating: "Roxane 1520". The rating is the
   /// seat's as dealt — a bot that took over a leaver's seat shows the
@@ -442,15 +427,6 @@ class LiveController extends ChangeNotifier implements TableModel {
     client.leave();
     notifyListeners();
   }
-
-  /// Asks for the seat back after a boot; the table seats the player
-  /// again from the next hand, the bot playing until then.
-  void rejoin() {
-    client.rejoin();
-    notifyListeners();
-  }
-
-  bool get wantsBack => client.wantsBack;
 
   /// Humans still at the table, by seat.
   int get participants => client.participants.length;

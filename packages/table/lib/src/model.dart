@@ -72,10 +72,9 @@ const turnTransitions = <TurnState, Set<TurnState>>{
 
 const seatTransitions = <SeatState, Set<SeatState>>{
   SeatState.human: {SeatState.left, SeatState.booted, SeatState.absent},
-  // A person gone can take the seat back from the next hand.
-  SeatState.left: {SeatState.human},
-  SeatState.booted: {SeatState.human},
-  SeatState.absent: {SeatState.human},
+  SeatState.left: {},
+  SeatState.booted: {},
+  SeatState.absent: {},
   SeatState.bot: {},
 };
 

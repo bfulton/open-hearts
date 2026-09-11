@@ -44,11 +44,10 @@ final tableClosure = closure(tableTransitions);
 /// different actions, or an action by a seat that the other record
 /// removed at that very turn instead. (A seat that passed and was then
 /// claimed gone at its pass position holds both, in that order, and
-/// that is one story, not two; so is a seat taken back at its pass
-/// turn and then the pass by the person back in it.)
+/// that is one story, not two.)
 String? conflict(List<Decision> a, List<Decision> b) {
-  final actionsA = {for (final d in a) if (!d.removal && !d.retake) d.turn: d};
-  final actionsB = {for (final d in b) if (!d.removal && !d.retake) d.turn: d};
+  final actionsA = {for (final d in a) if (!d.removal) d.turn: d};
+  final actionsB = {for (final d in b) if (!d.removal) d.turn: d};
   for (final t in actionsA.keys) {
     final x = actionsA[t]!;
     final y = actionsB[t];
@@ -61,12 +60,12 @@ String? conflict(List<Decision> a, List<Decision> b) {
     return null;
   }
   for (final d in a) {
-    if (d.removal || d.retake) continue;
+    if (d.removal) continue;
     final why = instead(b, actionsB, d);
     if (why != null) return why;
   }
   for (final d in b) {
-    if (d.removal || d.retake) continue;
+    if (d.removal) continue;
     final why = instead(a, actionsA, d);
     if (why != null) return why;
   }

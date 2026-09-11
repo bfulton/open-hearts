@@ -98,18 +98,6 @@ class ChaosScenario {
             exits++;
             faults.add('${how.name} seat ${who.client.mySeat} at ${t.clock.nowMs}');
             who.depart(how);
-            // A phone back from its pocket, half the time: asks for the
-            // seat back, and gets it from the next hand if the claim
-            // carries before the game ends.
-            if (how == Exit.idle && rng.nextBool()) {
-              final back = 20000 + rng.nextInt(150000);
-              t.clock.schedule(back, () {
-                if (who.gone && who.exit == Exit.idle) {
-                  faults.add('back seat ${who.client.mySeat} at ${t.clock.nowMs}');
-                  who.comeBack();
-                }
-              });
-            }
           });
         case 2:
           final side = <PublicKey>{};

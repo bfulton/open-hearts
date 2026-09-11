@@ -77,13 +77,8 @@ class Decision {
     required this.event,
     required this.witnesses,
     this.removal = false,
-    this.retake = false,
     this.among = const {},
   });
-
-  /// True when this seats its original person again (see
-  /// [TableClient.rejoin]), at the pass turn it names.
-  final bool retake;
 
   /// The turn settled, or the turn at which a departure was made.
   final TurnId turn;
@@ -113,11 +108,7 @@ class Decision {
   /// the decision, and peers may hold different evidence for it: one
   /// the boot pressed at fifteen seconds, another the boot made for
   /// silence, a third the seat's own leave.
-  String get key => retake
-      ? 'back@$turn#${event.seat}'
-      : removal
-          ? 'out@$turn#${event.seat}'
-          : event.id;
+  String get key => removal ? 'out@$turn#${event.seat}' : event.id;
 
   /// Canonical position in a record. Pass turns are concurrent and
   /// settle in a different order at every peer; ordering by turn, with
@@ -130,8 +121,6 @@ class Decision {
     final a = turn.isPass ? -1 : turn.index;
     final b = other.turn.isPass ? -1 : other.turn.index;
     if (a != b) return a.compareTo(b);
-    // At one position: seats taken back, then departures, then actions.
-    if (retake != other.retake) return retake ? -1 : 1;
     if (removal != other.removal) return removal ? -1 : 1;
     return event.seat.compareTo(other.event.seat);
   }
@@ -147,7 +136,7 @@ class TableClient {
     required this.transport,
     required this.clock,
     this.bootAfterMs = 15000,
-    this.silenceAfterMs = 90000,
+    this.silenceAfterMs = 120000,
     this.heartbeatMs = 5000,
   })  : game = HeartsGame(seed: spec.seed),
         holders = List.of(spec.seats),
@@ -161,8 +150,7 @@ class TableClient {
   final int silenceAfterMs;
   final int heartbeatMs;
 
-  /// The game as settled. Replaced only by [_rebuild].
-  HeartsGame game;
+  final HeartsGame game;
 
   /// Who holds each seat now; humans become bots as they go.
   final List<SeatHolder> holders;
@@ -307,12 +295,6 @@ class TableClient {
           'needed ${_majority(_participantsAt(e.key))} of ${_participantsAt(e.key).length}');
     }
     if (_future.isNotEmpty) b.writeln('  deferred ${_future.length}: ${_future.take(4).map((e) => '${e.kind.name}@${e.turn}')}');
-    if (_wantBack) b.writeln('  wants the seat back; claimed hand $_myRetakeHand');
-    for (final e in _retakeRaces.entries) {
-      b.writeln('  retake ${e.key}: ${e.value.action?.author.substring(0, 4)} for it ${e.value.forAction.map((k) => k.substring(0, 4))}'
-          '${e.value.settled ? ' carried' : ''}');
-    }
-    if (_retakenAt.isNotEmpty) b.writeln('  back from: ${_retakenAt.map((k, t) => MapEntry(k.substring(0, 4), t))}');
     b.writeln('  connected ${connectedToMajority ? 'yes' : 'no'}; heard '
         '${_humans.where((k) => k != signer.publicKey).map((k) => '${k.substring(0, 4)} '
             '${_lastHeard[k] == null ? 'never' : '${clock.nowMs - _lastHeard[k]!} ms ago'}').join(', ')}');
@@ -457,15 +439,9 @@ class TableClient {
     return ai <= bi;
   }
 
-  /// The set a majority at [turn] is of: everyone not removed by then,
-  /// and anyone removed who has taken the seat back by then.
-  Set<PublicKey> _participantsAt(TurnId turn) => {
-        for (final k in _humans)
-          if (!_removedAt.containsKey(k) ||
-              !_atOrBefore(_removedAt[k]!, turn) ||
-              (_retakenAt[k] != null && _atOrBefore(_retakenAt[k]!, turn)))
-            k,
-      };
+  /// The set a majority at [turn] is of: everyone not removed by then.
+  Set<PublicKey> _participantsAt(TurnId turn) =>
+      {for (final k in _humans) if (!_removedAt.containsKey(k) || !_atOrBefore(_removedAt[k]!, turn)) k};
 
   static int _majority(Set<PublicKey> of) => of.length ~/ 2 + 1;
 
@@ -474,10 +450,6 @@ class TableClient {
   void _openHand() {
     played.clear();
     step = 0;
-    // Seats taken back come first, whatever the pass direction: a hand
-    // without a pass opens straight into play.
-    _applyRetakes();
-    _tryRetake();
     if (game.phase == Phase.passing) {
       // Every pass turn opens before any bot passes: a bot's pass closes
       // its turn and drains what was deferred, and a human's pass held
@@ -589,15 +561,13 @@ class TableClient {
     }
     if (event.kind == EventKind.heartbeat) {
       if (event.author != from) return;
-      if (!_isParticipant(from) && event.body['back'] != true) {
+      if (!_isParticipant(from)) {
         // A seat removed from the table, still sending: it is behind
         // for good, and what it needs is the turns up to the one that
         // removed it, so that it learns so in order — and no more, and
         // not often. Carrying it forward like anyone else used to have
         // every peer at the table answering its every heartbeat with
-        // the whole record, forever. (One asking for the seat back is
-        // carried all the way, like anyone: it needs the table's present
-        // to claim the next hand.)
+        // the whole record, forever.
         final last = _lastTold[from];
         if (last != null && clock.nowMs - last < 10000) return;
         _lastTold[from] = clock.nowMs;
@@ -652,8 +622,6 @@ class TableClient {
         _onBoot(event);
       case EventKind.leave:
         _onLeave(event);
-      case EventKind.retake:
-        _onRetake(event);
     }
   }
 
@@ -755,27 +723,14 @@ class TableClient {
     // the asker has long settled — a leave is placed where the leaver
     // stood, not where the table noticed.
     for (final d in record) {
-      if (d.removal || d.retake || settled.contains(d.turn)) _send(d.event.toJson());
+      if (d.removal || settled.contains(d.turn)) _send(d.event.toJson());
     }
     for (final t in settled) {
       _sendEvidence(t);
     }
     for (final d in record) {
-      if (d.retake) _sendRetake(d.turn);
       if (d.removal && !settled.contains(d.turn)) _sendEvidence(d.turn);
     }
-  }
-
-  /// A retake claim for [turn] and the witnesses this peer holds for it.
-  void _sendRetake(TurnId turn) {
-    final race = _retakeRaces[turn];
-    if (race == null || race.action == null) return;
-    _send(race.action!.toJson());
-    for (final w in race.witnessEvents) {
-      _send(w.toJson());
-    }
-    final mine = _myRetakeWitnessEvents[turn];
-    if (mine != null && !race.witnessEvents.contains(mine)) _send(mine.toJson());
   }
 
   /// One catch-up event, if the budget has it.
@@ -918,21 +873,6 @@ class TableClient {
     if (!_humans.contains(event.author)) return;
     final id = event.witnessed;
     final turn = event.turn;
-    final back = _retakeRaces[turn];
-    if (back != null && back.action?.id == id) {
-      if (back.settled) return _sendRetake(turn);
-      back.forAction.add(event.author);
-      back.witnessEvents.add(event);
-      return _settleRetake(turn);
-    }
-    if (event.body['retake'] == true) {
-      // For a claim not seen yet, about a hand still to come: kept by
-      // the claim's id, never deferred — deferred, it would surface only
-      // once that hand had opened, too late to count.
-      _earlyWitnesses.putIfAbsent(id, () => {}).add(event.author);
-      _earlyWitnessEvents.putIfAbsent(id, () => []).add(event);
-      return;
-    }
     final race = _races[turn];
     if (race != null) {
       if (race.settled) return _catchUp(turn);
@@ -989,7 +929,7 @@ class TableClient {
       // side can still reach a majority: the action needs everyone who
       // has not backed the boot, the boot everyone but the seat itself
       // who has not witnessed the action — and no vote is coming from
-      // anyone this peer has not heard from for ninety seconds, who
+      // anyone this peer has not heard from for two minutes, who
       // cannot be removed before their own turn. Only the jury breaks a
       // deadlock.
       final holder = holders[seat];
@@ -1039,272 +979,6 @@ class TableClient {
     }
   }
 
-  // ---- taking a seat back ------------------------------------------------
-
-  /// Asks for this device's seat back: a person booted for silence, or
-  /// gone quiet with the phone in a pocket, comes back to a bot in the
-  /// seat and takes it from the next hand. The claim names that hand's
-  /// pass turn; the others witness it — while that hand is still to
-  /// come for them — and once a majority has, the seat is theirs again
-  /// when the hand opens, everywhere at once. The bot's plays in
-  /// between stand: everyone computed the same ones.
-  void rejoin() {
-    if (_closed || mySeat == null) return;
-    // A phone back from its pocket still believes it is seated: it has
-    // not heard that it was booted. The wish is kept, its heartbeats
-    // say so, the others carry it up to date, and the claim goes out
-    // once it knows where the table is.
-    _wantBack = true;
-    _tryRetake();
-    _notify();
-  }
-
-  /// Whether this device is asking for its seat back.
-  bool get wantsBack => _wantBack && !amSeated;
-
-  bool _wantBack = false;
-  int? _myRetakeHand;
-  final Map<TurnId, _Race> _retakeRaces = {};
-  final Map<PublicKey, TurnId> _retakenAt = {};
-  final Map<TurnId, String> _myRetakeWitness = {};
-  final Map<TurnId, TableEvent> _myRetakeWitnessEvents = {};
-
-  /// Claims the next hand, once this peer has caught up enough to know
-  /// which hand that is; again for the hand after if that one opens
-  /// without the claim having carried.
-  void _tryRetake() {
-    if (!_wantBack || amSeated || _closed || mySeat == null) return;
-    if (_future.isNotEmpty || !connectedToMajority) return;
-    final h = game.handNumber + 1;
-    if (_myRetakeHand != null && _myRetakeHand! >= h) return;
-    _myRetakeHand = h;
-    _emit(EventKind.retake, {'hand': h, 'turn': mySeat!, 'seat': mySeat!});
-  }
-
-  void _onRetake(TableEvent event) {
-    final seat = event.seat;
-    if (seat < 0 || seat >= seatCount) return;
-    final turn = event.turn;
-    if (!turn.isPass || turn.index != seat) return;
-    final original = spec.seats[seat];
-    if (original is! HumanSeat || original.key != event.author) return;
-    if (!_removedAt.containsKey(event.author)) return; // not out, or back already
-    final race = _retakeRaces.putIfAbsent(turn, () => _Race());
-    if (race.settled) return _sendRetake(turn);
-    if (race.action != null && race.action!.id != event.id) return; // one claim a turn: the first stands
-    race.action = event;
-    race.forAction.add(event.author);
-    race.forAction.addAll(_earlyWitnesses.remove(event.id) ?? const {});
-    race.witnessEvents.addAll(_earlyWitnessEvents.remove(event.id) ?? const []);
-    // Vouch for it only while the hand it names is still to come here:
-    // a witness is a promise to seat them when that hand opens.
-    if (amSeated && event.author != signer.publicKey && turn.hand > game.handNumber && !_myRetakeWitness.containsKey(turn)) {
-      _witnessRetake(turn, event);
-    }
-    _settleRetake(turn);
-  }
-
-  void _witnessRetake(TurnId turn, TableEvent of) {
-    _myRetakeWitness[turn] = of.id;
-    final w = TableEvent.sign(signer, table: spec.id, kind: EventKind.witness, body: {
-      'event': of.id,
-      'hand': turn.hand,
-      'turn': turn.index,
-      'seat': of.seat,
-      'retake': true,
-    });
-    transport.broadcast(w.toJson());
-    _myRetakeWitnessEvents[turn] = w;
-    _accept(w);
-  }
-
-  void _settleRetake(TurnId turn) {
-    final race = _retakeRaces[turn]!;
-    if (race.settled || race.action == null) return;
-    final of = _participantsAt(turn);
-    if (race.forAction.intersection(of).length < _majority(of)) return;
-    race.settled = true;
-    final e = race.action!;
-    _log(Decision(turn: turn, event: e, witnesses: Set.of(race.forAction), among: of, retake: true));
-    _retakenAt[e.author] = turn;
-    _trace('seat ${e.seat} back to ${e.author.substring(0, 4)} from $turn, carried by ${race.forAction.length}');
-    if (turn.hand < game.handNumber || (turn.hand == game.handNumber && (step > 0 || game.phase != Phase.passing))) {
-      // Carried after this peer opened the hand it names, with the bot
-      // still in the seat: the majority has the person there. The
-      // record says exactly what stands; rebuild from it.
-      _rebuild();
-    } else if (turn.hand == game.handNumber) {
-      // Carried at the very start of the hand, before anything settled
-      // here: the seat can simply be taken now.
-      _applyRetakes();
-    }
-    _notify();
-  }
-
-  /// Seats taken back at this hand's pass turn, before it opens.
-  void _applyRetakes() {
-    for (final e in List.of(_retakenAt.entries)) {
-      if (e.value.hand != game.handNumber) continue;
-      final seat = spec.seatOf(e.key);
-      if (seat == null) continue;
-      holders[seat] = HumanSeat(e.key);
-      _removedAt.remove(e.key);
-      _removedHow.remove(e.key);
-      _retakenAt.remove(e.key);
-      _lastHeard[e.key] = clock.nowMs;
-      _lastPosition.remove(e.key);
-      if (e.key == signer.publicKey) {
-        _wantBack = false;
-        _myRetakeHand = null;
-      }
-      _trace('seat $seat is ${e.key.substring(0, 4)} again');
-    }
-  }
-
-  /// The game, the seats and this hand's position, replayed from the
-  /// record — the way the verifier replays it, trusting what is there,
-  /// since every decision in it was checked as it was logged. For the
-  /// one case the record and this peer's game disagree: a seat taken
-  /// back at a hand this peer had already opened with the bot.
-  void _rebuild() {
-    _trace('rebuilding from the record');
-    final fresh = HeartsGame(seed: spec.seed);
-    final seats = List.of(spec.seats);
-    final gone = <Card>{};
-    final removedAt = <PublicKey, TurnId>{};
-    final removedHow = <PublicKey, EventKind>{};
-    var index = 0;
-    var stepsThisHand = 0;
-
-    void botActs(int seat, {required bool passing}) {
-      final bot = Bot(persona: (seats[seat] as BotSeat).persona);
-      if (passing) {
-        fresh.setPass(seat, bot.choosePass(fresh.handOf(seat)));
-      } else {
-        final view = BotView(
-          seat: seat,
-          hand: fresh.handOf(seat),
-          trick: fresh.trick,
-          played: gone,
-          heartsBroken: fresh.heartsBroken,
-          isFirstTrick: fresh.isFirstTrick,
-          taken: fresh.taken,
-        );
-        final card = bot.chooseCard(view, fresh.legalPlaysFor(seat));
-        fresh.play(seat, card);
-        gone.add(card);
-      }
-      stepsThisHand++;
-    }
-
-    void sweep() {
-      if (fresh.pendingTrick != null) fresh.collectTrick();
-      if (fresh.phase == Phase.handOver) {
-        fresh.nextHand();
-        gone.clear();
-        stepsThisHand = 0;
-      }
-    }
-
-    // Departures and retakes recorded next, whatever they name, apply
-    // as the replay reaches them.
-    void takeSeatChanges() {
-      while (index < record.length && (record[index].removal || record[index].retake)) {
-        if (record[index].retake && record[index].turn.hand > fresh.handNumber) break; // still to come
-        final d = record[index++];
-        final seat = d.event.seat;
-        if (d.retake) {
-          seats[seat] = HumanSeat(d.event.author);
-          removedAt.remove(d.event.author);
-          removedHow.remove(d.event.author);
-        } else if (seats[seat] is HumanSeat) {
-          final key = (seats[seat] as HumanSeat).key;
-          removedAt[key] = d.turn;
-          removedHow[key] = d.event.kind;
-          seats[seat] = BotSeat(spec.replacementFor(seat));
-        }
-      }
-    }
-
-    var guard = 0;
-    while (fresh.phase != Phase.gameOver && guard++ < 100000) {
-      takeSeatChanges();
-      if (fresh.phase == Phase.passing) {
-        var acted = false;
-        for (var s = 0; s < seatCount; s++) {
-          if (seats[s] is BotSeat && fresh.passOf(s) == null) {
-            botActs(s, passing: true);
-            acted = true;
-          }
-        }
-        if (acted && fresh.phase != Phase.passing) continue;
-        if (index >= record.length || record[index].event.kind != EventKind.pass) break;
-        final d = record[index++];
-        fresh.setPass(d.event.seat, [for (final c in d.event.body['cards'] as List) Card.parse(c as String)]);
-        stepsThisHand++;
-        continue;
-      }
-      final seat = fresh.currentSeat!;
-      if (seats[seat] is BotSeat) {
-        botActs(seat, passing: false);
-        sweep();
-        continue;
-      }
-      if (index >= record.length || record[index].event.kind != EventKind.play) break;
-      final d = record[index++];
-      final card = Card.parse(d.event.body['card'] as String);
-      fresh.play(seat, card);
-      gone.add(card);
-      stepsThisHand++;
-      sweep();
-    }
-
-    game = fresh;
-    for (var s = 0; s < seatCount; s++) {
-      final now = seats[s];
-      if (holders[s] is BotSeat && now is HumanSeat) {
-        // Seated by the replay: heard as of now, like a seat taken back
-        // at the hand's opening.
-        _lastHeard[now.key] = clock.nowMs;
-        _lastPosition.remove(now.key);
-        if (now.key == signer.publicKey) {
-          _wantBack = false;
-          _myRetakeHand = null;
-        }
-      }
-    }
-    holders.setAll(0, seats);
-    played
-      ..clear()
-      ..addAll(gone);
-    step = stepsThisHand;
-    _removedAt
-      ..clear()
-      ..addAll(removedAt);
-    _removedHow
-      ..clear()
-      ..addAll(removedHow);
-    _retakenAt.removeWhere((k, t) => t.hand <= game.handNumber);
-    // Open turns are the present's; the past's races stay as evidence.
-    for (final t in List.of(_races.keys)) {
-      if (_compare(t) >= 0 && !_races[t]!.settled) {
-        _races.remove(t);
-        _turnSeat.remove(t);
-        _openedAt.remove(t);
-        _myWitness.remove(t);
-        _myWitnessEvents.remove(t);
-      }
-    }
-    if (game.phase == Phase.passing) {
-      for (var s = 0; s < seatCount; s++) {
-        if (game.passOf(s) == null) _openTurn(TurnId.pass(game.handNumber, s), s, botActs: false);
-      }
-    } else if (game.phase == Phase.playing) {
-      _openPlayTurn();
-    }
-    _drainFuture();
-  }
-
   void _onLeave(TableEvent event) {
     final seat = event.seat;
     if (seat < 0 || seat >= seatCount) return;
@@ -1328,7 +1002,7 @@ class TableClient {
 
   // ---- silence -----------------------------------------------------------
   //
-  // A seat not heard from for ninety seconds is booted at its own turn
+  // A seat not heard from for two minutes is booted at its own turn
   // without the fifteen-second wait, and nowhere else. An earlier
   // version let a peer claim the seat gone at whatever position it was
   // on, so that a turn of someone else's stuck for want of the silent
@@ -1354,13 +1028,8 @@ class TableClient {
 
   void _heartbeat() {
     if (_closed) return;
-    // A phone back from its pocket asks for the seat before it has
-    // heard anyone; the claim goes out on the first tick that finds it
-    // caught up and connected, and again for the hand after if the
-    // hand it named opened without it carrying.
-    _tryRetake();
-    if ((amSeated && !_left) || _wantBack) {
-      _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step, if (_wantBack) 'back': true});
+    if (amSeated && !_left) {
+      _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step});
     }
     // Behind a peer heard lately: say so every second, since a heartbeat
     // is what brings the missing turns.
@@ -1388,7 +1057,7 @@ class TableClient {
       } else if (connectedToMajority && _pause == Pause.waitingForPeers && !_races.values.any((r) => r.forRemoval.isNotEmpty)) {
         _pause = null;
       }
-      // Anyone not heard from for ninety seconds whose turn is open is
+      // Anyone not heard from for two minutes whose turn is open is
       // booted at once, for silence.
       for (final e in List.of(_races.entries)) {
         final race = e.value;
@@ -1433,13 +1102,6 @@ class TableClient {
     }
     for (final e in _myWitnessEvents.entries) {
       if (_races[e.key]?.settled == false) transport.broadcast(e.value.toJson());
-    }
-    for (final e in _retakeRaces.entries) {
-      final claim = e.value.action;
-      if (!e.value.settled && claim != null && claim.author == signer.publicKey) transport.broadcast(claim.toJson());
-    }
-    for (final e in _myRetakeWitnessEvents.entries) {
-      if (_retakeRaces[e.key]?.settled == false) transport.broadcast(e.value.toJson());
     }
   }
 

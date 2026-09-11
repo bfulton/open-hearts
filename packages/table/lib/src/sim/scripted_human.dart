@@ -110,19 +110,6 @@ class ScriptedHuman {
     }
   }
 
-  /// Back from a quiet spell — the phone out of the pocket — and asking
-  /// for the seat. Only a person gone quiet can come back; one who
-  /// left, or whose process died, is gone.
-  void comeBack() {
-    if (!gone || exit != Exit.idle) return;
-    net.comeOnline(client.signer.publicKey);
-    gone = false;
-    exit = null;
-    exitAt = null;
-    client.rejoin();
-    _react();
-  }
-
   /// Leaves now, by [how], whatever the scenario said.
   void depart(Exit how) {
     if (gone) return;

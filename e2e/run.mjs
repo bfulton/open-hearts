@@ -285,7 +285,7 @@ async function main() {
 
     // Cell 2: Dee's browser goes, mid-hand. The others see three, and a
     // bot in her seat once her turn comes and the silence is answered —
-    // ninety seconds of it.
+    // two minutes of it.
     await contexts[3].close();
     log('Dee closed her browser');
     const others = pages.slice(0, 3);
@@ -302,12 +302,6 @@ async function main() {
     await waitFor(pages[2], /^A bot took your seat$/, { what: "Cara's replacement notice", timeout: 30000 });
     log('Cara booted, and told');
 
-    // Cell 5: Cara asks for the seat back. Her claim names the next
-    // hand; the others witness it while that hand is still to come.
-    await click(pages[2], /^Take it back$/);
-    await waitFor(pages[2], /^Your seat is yours again next hand$/, { what: "Cara's claim", timeout: 15000 });
-    log('Cara asked for her seat back');
-
     // Cell 4: Bao leaves. Ada plays on with three bots.
     await click(pages[1], /^Leave$/);
     await playUntil([pages[0]], (p) => has(p, /^1 of 4 here/), { timeout: 60000 });
@@ -316,18 +310,6 @@ async function main() {
     await playUntil([pages[0]], (p) => has(p, /^On with it$/), { timeout: 180000 });
     log(`Ada finished the hand that began as "${before}"`);
 
-    // Cell 5, continued: the next hand is dealt to Cara. Both screens
-    // count two people, Cara's replacement notice is gone, and she
-    // plays the hand out with Ada.
-    const back = [pages[0], pages[2]];
-    for (const page of back) if (await has(page, /^On with it$/)) await click(page, /^On with it$/);
-    await playUntil(back, async (p) => (await has(p, /^Hand 3/)) && (await has(p, /^2 of 4 here/)), { timeout: 90000 });
-    if (await has(pages[2], /^(A bot took your seat|Your seat is yours again next hand)$/)) {
-      throw new Error(`Cara still shown as replaced\nsaw: ${(await texts(pages[2])).join(' | ')}`);
-    }
-    log('Cara has her seat back for hand 3');
-    await playUntil(back, (p) => has(p, /^On with it$/), { timeout: 180000 });
-    log('hand 3 played with Cara back in her seat');
     log('PASS');
   } catch (e) {
     failed = true;
