@@ -214,6 +214,28 @@ void main() {
       t.stop();
     });
 
+    test('a seat that only one peer hears directly is carried, not booted', () {
+      // Two links dead both ways without anyone noticing: seat 1 reaches
+      // seat 0 alone. Seats 2 and 3 get seat 1's plays only as seat 0
+      // relays them — which once counted as no hearing at all, so at
+      // seat 1's turn they booted it while seat 0 witnessed its play,
+      // two against two, and the table split for the jury. Fresh work
+      // by a seat, however it arrives, is the seat.
+      final t = SimTable(humans: 4, seed: 53);
+      final keys = t.signers.map((s) => s.publicKey).toList();
+      t.start();
+      t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 3600000);
+      t.net.cut(keys[1], keys[2]);
+      t.net.cut(keys[1], keys[3]);
+      expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 4 * 3600000), isTrue,
+          reason: 'the table finishes with every seat carried');
+      for (final c in t.clients) {
+        expect(c.participants.length, 4, reason: 'nobody was removed');
+      }
+      checkFinished(t, departedSeats: {});
+      t.stop();
+    });
+
     test('three humans split two and one: the majority carries on, the one is out', () {
       final t = SimTable(humans: 3, seed: 52);
       final keys = t.signers.map((s) => s.publicKey).toList();

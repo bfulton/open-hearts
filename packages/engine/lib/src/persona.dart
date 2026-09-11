@@ -512,6 +512,37 @@ class Persona {
     pace: Pace.slow,
   );
 
+  static const dimitri = Persona(
+    name: 'Dimitri',
+    epithet: 'All in, on every hand that might be it.',
+    shootLoserShare: 3,
+    shootPassMaxLosers: 7,
+    pace: Pace.quick,
+  );
+
+  static const grushenka = Persona(
+    name: 'Grushenka',
+    epithet: 'Keeps the queen, and everyone guessing.',
+    passStyle: PassStyle.keepQueen,
+    moonDefenseTrigger: 3,
+    pace: Pace.slow,
+  );
+
+  static const pip = Persona(
+    name: 'Pip',
+    epithet: 'Gets rid of the queen, and has expectations.',
+    passStyle: PassStyle.dumpQueen,
+    moonDefenseTrigger: 6,
+  );
+
+  static const estella = Persona(
+    name: 'Estella',
+    epithet: 'Cold to the run until it is nearly done.',
+    passStyle: PassStyle.keepQueen,
+    moonDefenseTrigger: 10,
+    pace: Pace.slow,
+  );
+
   /// Everyone who might sit down. Order is not rank.
   static const roster = [
     westley,
@@ -550,6 +581,10 @@ class Persona {
     elizabeth,
     cupid,
     psyche,
+    dimitri,
+    grushenka,
+    pip,
+    estella,
   ];
 
   /// The roster plus any character still being measured before it is

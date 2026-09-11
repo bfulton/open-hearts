@@ -56,11 +56,22 @@ class SimNetwork {
 
   /// Only peers on the same side can reach each other.
   void partition(List<Set<PublicKey>> sides) => _partition = sides;
-  void heal() => _partition = const [];
+
+  /// One link dead both ways, without either end noticing — a WebRTC
+  /// channel that never opened, a relay subscription gone quiet — while
+  /// every other link works.
+  void cut(PublicKey a, PublicKey b) => _cuts.add({a, b});
+  final List<Set<PublicKey>> _cuts = [];
+
+  void heal() {
+    _partition = const [];
+    _cuts.clear();
+  }
 
   bool _reachable(PublicKey from, PublicKey to) {
     if (_dead.contains(from) || _dead.contains(to)) return false;
     if (_offline.contains(from) || _offline.contains(to)) return false;
+    if (_cuts.any((c) => c.contains(from) && c.contains(to))) return false;
     for (final side in _partition) {
       if (side.contains(from) != side.contains(to)) return false;
     }

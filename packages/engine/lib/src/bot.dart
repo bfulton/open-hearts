@@ -28,7 +28,7 @@ import 'rules.dart';
 /// event carries this number, and a client whose number differs does
 /// not sit down. Bump it whenever a change to bot.dart, persona.dart
 /// or the pass and play rules they read could change a single card.
-const botPolicyVersion = 3;
+const botPolicyVersion = 4;
 
 /// The public information a bot decides from.
 class BotView {

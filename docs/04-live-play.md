@@ -44,7 +44,8 @@ Lancelot and Guinevere, Aragorn and Arwen, Orpheus and Eurydice, Mark
 Antony and Cleopatra, Shah Jahan and Mumtaz Mahal, Marie and Pierre
 Curie, Bonnie and Clyde, Diego Rivera and Frida Kahlo, Sid and Nancy,
 Han and Leia, Heathcliff and Catherine, Darcy and Elizabeth, Cupid and
-Psyche, Casanova, Don Juan — open hearts. Each is a temperament: the one policy with a few of its
+Psyche, Dimitri and Grushenka, Pip and Estella, Casanova, Don Juan —
+open hearts. Each is a temperament: the one policy with a few of its
 thresholds moved, so Romeo cannot hold a queen and Juliet waits for the
 moment and Cyrano lets a run go a long way before spoiling it and Don
 Juan runs at the moon on a hand the others would not. Every setting is
@@ -97,7 +98,7 @@ thousand tables of random fours from nearby rungs, fitted by the same
 model a rating's expected score uses, to two or three points a rung.
 It spans about 240 points — a first game finishes ahead of the whole
 policy in one pair of three — with rungs thirteen to forty-two points
-apart and the thirty-six characters at a rung within about twenty-five
+apart and the forty characters at a rung within about twenty-five
 points of each other. Those are the ratings a bot starts from; from there it
 floats on its results like anyone, one rating per character per rung.
 A bot's identity is its name and its rung: `Westley` at the top,
@@ -303,16 +304,30 @@ whole decision they missed. Split it 2–1 and the two proceed correctly;
 the one learns it is out when the network heals, and goes back to
 matchmaking.
 
-**Hearing is direct, and a peer behind is carried forward.** Peers relay
-each other's signed events when catching someone up, so a relayed play
-says nothing about whether its author is still there: a peer counts as
-heard from only when it sent something itself. (Before that rule, three
+**Hearing is direct, or fresh, and a peer behind is carried forward.**
+A peer counts as heard from when it sent something itself, and when
+its own signed work arrives for the first time at or past where the
+hearer stands — a play it made at this turn, however it was carried.
+Not a relayed copy of something already seen: peers relay each other's
+events when catching someone up, and before that distinction three
 live peers re-sent a crashed seat's old witness to each other every two
-seconds and each took it for a sign of life, forever.) A heartbeat says
-where its sender stands, and a peer that is behind hears back the turns
-it is missing, a few at a time, without having to ask — which is also
-how a peer learns of a leave it never received, since every departure in
-the record travels with every answer.
+seconds and each took it for a sign of life, forever. The other half of
+the rule came from a real table where one seat reached one peer only
+(its channels to the other two never opened and its relay subscription
+had gone quiet): the two that heard it only second-hand booted it at
+its turn, the one that heard it witnessed its play, two against two,
+and the table split for a jury that does not exist yet. A heartbeat
+says where its sender stands, and a peer that is behind hears back the
+turns it is missing, a few at a time, without having to ask — which is
+also how a peer learns of a leave it never received, since every
+departure in the record travels with every answer. Catching up is
+budgeted, a bundle a second or so: unbudgeted, two peers carrying two
+others forward sent a public relay forty events a second between them.
+And a relay subscription that stops delivering without closing looks
+like a quiet table, except that a peer's own events come back on its
+own subscription; nothing at all for twenty-five seconds after
+publishing means the subscription is dead, and the socket is dropped
+and remade.
 
 **The record is the belt and braces.** Every settled turn and every
 departure goes into it with the signatures that carried it, in an

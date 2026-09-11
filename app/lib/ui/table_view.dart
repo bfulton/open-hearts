@@ -115,7 +115,7 @@ class TableView extends StatelessWidget {
                       name: controller.names[pending.winner],
                       points: pointsIn(pending.plays.map((p) => p.card)),
                     )
-                  : game.phase == Phase.playing
+                  : game.phase == Phase.playing && controller.pendingPlay == null
                       ? _TurnHint(game: game, mySeat: controller.mySeat)
                       : const SizedBox.shrink(),
             ),

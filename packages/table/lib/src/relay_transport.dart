@@ -42,6 +42,18 @@ class RelayTransport implements Transport {
   WebSocketChannel? _channel;
   bool _closed = false;
   int _retryMs = 500;
+
+  /// A relay that stops delivering without closing the socket looks,
+  /// from here, exactly like a quiet table — except that this peer's
+  /// own events come back on its own subscription, so while it is
+  /// publishing it should be hearing at least itself. Nothing at all
+  /// for [quietMs] after publishing is a dead subscription: drop the
+  /// socket and let the reconnect subscribe afresh.
+  static const quietMs = 25000;
+  int _lastMessageMs = 0;
+  int _lastPublishMs = 0;
+  Timer? _liveness;
+  static int get _nowMs => DateTime.now().millisecondsSinceEpoch;
   final Set<String> _seen = {};
 
   /// Resolves once the relay has acknowledged the subscription.
@@ -94,7 +106,19 @@ class RelayTransport implements Transport {
     if (ch == null) return; // between connections: the protocol repeats
     try {
       ch.sink.add(jsonEncode(['EVENT', e.toJson()]));
+      _lastPublishMs = _nowMs;
     } catch (_) {}
+  }
+
+  void _checkLiveness() {
+    final ch = _channel;
+    if (ch == null || _closed) return;
+    final now = _nowMs;
+    if (now - _lastPublishMs > quietMs || now - _lastMessageMs < quietMs) return;
+    log?.call('nothing heard back for ${quietMs ~/ 1000} s; reconnecting');
+    _channel = null;
+    ch.sink.close();
+    _onDropped();
   }
 
   void _connect() {
@@ -104,6 +128,8 @@ class RelayTransport implements Transport {
     ch.stream.listen(_onMessage, onDone: _onDropped, onError: (_) => _onDropped());
     ch.ready.then((_) {
       _retryMs = 500;
+      _lastMessageMs = _nowMs;
+      _liveness ??= Timer.periodic(const Duration(seconds: 5), (_) => _checkLiveness());
       ch.sink.add(jsonEncode([
         'REQ',
         'table',
@@ -120,6 +146,7 @@ class RelayTransport implements Transport {
   void _onDropped() {
     if (_closed) return;
     _channel = null;
+    _lastMessageMs = _nowMs;
     if (!_ready.isCompleted) {
       // Nothing was ever acknowledged: keep the same future for the caller.
     } else {
@@ -131,6 +158,7 @@ class RelayTransport implements Transport {
   }
 
   void _onMessage(Object? raw) {
+    _lastMessageMs = _nowMs;
     List<Object?> m;
     try {
       m = jsonDecode(raw as String) as List<Object?>;
@@ -171,6 +199,7 @@ class RelayTransport implements Transport {
 
   @override
   void close() {
+    _liveness?.cancel();
     _closed = true;
     _channel?.sink.close();
     _channel = null;

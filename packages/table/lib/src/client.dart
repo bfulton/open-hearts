@@ -545,10 +545,20 @@ class TableClient {
     if (_closed) return;
     final event = TableEvent.parse(json);
     if (event == null || event.table != spec.id) return;
-    // Hearing is direct. Peers relay each other's events when catching
-    // someone up, and a relayed play says nothing about whether its
-    // author is still there.
+    // Hearing is direct: whoever delivered this is here now.
     _lastHeard[from] = clock.nowMs;
+    // And an event this peer has never seen, by someone else, made at
+    // or after where this peer stands, is that author's own work at
+    // this peer's level: they were here for it. Peers relay each
+    // other's events when catching someone up, and a relayed copy of
+    // something already seen says nothing — the commonest thing
+    // re-sent is a departed seat's last play — but a table where only
+    // some peers hear a seat directly (one relay socket gone quiet,
+    // one WebRTC channel of three) used to split at that seat's turn,
+    // the deaf peers booting it while the others witnessed its play.
+    if (event.author != from && _humans.contains(event.author) && !_seen.contains(event.id) && !_alreadyPast(event)) {
+      _lastHeard[event.author] = clock.nowMs;
+    }
     if (event.kind == EventKind.heartbeat) {
       if (event.author != from) return;
       _lastPosition[from] = (event.hand, event.step);
@@ -563,6 +573,17 @@ class TableClient {
     }
     _accept(event);
     _notify();
+  }
+
+  /// Whether [event] is about a position this peer has already passed.
+  bool _alreadyPast(TableEvent event) {
+    if (event.kind == EventKind.heartbeat) {
+      return event.hand < game.handNumber || (event.hand == game.handNumber && event.step < step);
+    }
+    final t = event.turn;
+    if (t.hand != game.handNumber) return t.hand < game.handNumber;
+    final here = game.phase == Phase.passing ? 0 : TurnId.passTurns + game.tricksPlayed * seatCount + game.trick.length;
+    return t.index < here;
   }
 
   void _onDisconnected(PublicKey key) {
@@ -648,7 +669,16 @@ class TableClient {
     final key = turns.first;
     final last = _lastCatchUp[key];
     if (last != null && clock.nowMs - last < 2000) return;
+    // And a budget over all turns: a peer far behind asks about a
+    // window of them per heartbeat, and each answer is several events.
+    // Unbudgeted, two peers carrying two others forward sent a public
+    // relay forty events a second between them, which is how relays
+    // come to ban you. Refilled at a few a second; a turn skipped now
+    // is asked for again on the next heartbeat.
+    _refillCatchUp();
+    if (_catchUpTokens < 1) return;
     _lastCatchUp[key] = clock.nowMs;
+    _catchUpTokens -= 1;
     // Everything that decided these positions, and every departure in
     // the record wherever it sits: a removal the asker missed is the
     // commonest reason to be stuck, and it may have been made at a turn
@@ -663,6 +693,20 @@ class TableClient {
     for (final d in record) {
       if (d.removal && !settled.contains(d.turn)) _sendEvidence(d.turn);
     }
+  }
+
+  /// Catch-up bundles in hand: one per turn answered, refilled at
+  /// [catchUpPerSecond] up to [catchUpBurst].
+  double _catchUpTokens = catchUpBurst.toDouble();
+  int _catchUpRefilledAt = 0;
+  static const catchUpPerSecond = 1;
+  static const catchUpBurst = 4;
+
+  void _refillCatchUp() {
+    final now = clock.nowMs;
+    if (_catchUpRefilledAt == 0) _catchUpRefilledAt = now;
+    _catchUpTokens = (_catchUpTokens + (now - _catchUpRefilledAt) * catchUpPerSecond / 1000).clamp(0, catchUpBurst).toDouble();
+    _catchUpRefilledAt = now;
   }
 
   /// The claims and witnesses this peer holds for [turn].

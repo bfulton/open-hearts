@@ -194,7 +194,8 @@ async function playUntil(pages, done, { timeout = 120000, idle = [] } = {}) {
 // ---- the scenarios -------------------------------------------------------
 
 const names = ['Ada', 'Bao', 'Cara', 'Dee'];
-const roster = /^(Westley|Buttercup|Romeo|Juliet|Cyrano|Roxane|Casanova|Don Juan)$/;
+/// A seat badge that is not one of the four people: a bot took a seat.
+const roster = /^(?!Ada:|Bao:|Cara:|Dee:)[A-Z][\w ]+: \d+ cards, \d+ points this hand/;
 
 async function main() {
   // RELAY_URL=wss://… runs the suite against a relay that already
