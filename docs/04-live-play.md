@@ -192,6 +192,25 @@ whoever was holding that seat.
 opposite rule for the opposite reason: three people should not lose a
 game because a fourth got on a train.
 
+**A seat can be taken back.** A phone in a pocket for two minutes
+comes back to a bot in its seat, and that used to be the end of the
+game for its owner. Now the person asks for the seat (`rejoin`): their
+heartbeats say so, the others carry them up to date, and their claim
+names the next hand's pass turn for their seat. Everyone still at the
+table witnesses it — a witness is a promise to seat them when that hand
+opens, so it is given only while the hand is still to come — and once a
+majority has, the decision goes into the record at that turn and the
+seat is theirs again the moment the hand opens, everywhere at once. The
+bot's plays in between stand; everyone computed the same ones. A peer
+that learns of the decision only after it opened that hand with the bot
+still seated — its link to the claimant dead, say, so that it saw the
+witnesses but never the claim, until it fell behind and was carried
+forward — rebuilds its game from the record, which says exactly what
+stands, and carries on. The verifier replays a seat taken back at the
+pass turn it names, by the seat's original person, from a bot, carried
+by a majority of everyone present less themselves. The simulation's
+chaos runs now include people who go quiet and come back.
+
 ## Leaving, through three doors
 
 Strangers leave. That is not misbehaviour, it is the medium, and the

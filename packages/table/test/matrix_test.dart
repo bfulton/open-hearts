@@ -236,6 +236,68 @@ void main() {
       t.stop();
     });
 
+    test('a seat booted for silence is taken back from the next hand', () {
+      // A phone in a pocket: seat 2 goes quiet mid-hand, is booted at
+      // its turn for silence, and a bot plays it. Forty seconds later
+      // the person is back and asks for the seat; the others carry the
+      // claim, and from the next hand the seat is theirs again. Everyone
+      // finishes with everyone seated, on one record the verifier
+      // accepts.
+      final t = SimTable(humans: 4, seed: 54);
+      t.start();
+      t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 3600000);
+      final who = t.people[2];
+      final key = who.client.signer.publicKey;
+      who.depart(Exit.idle);
+      final others = [t.people[0], t.people[1], t.people[3]].map((p) => p.client).toList();
+      expect(t.clock.runUntil(() => others.every((c) => c.holders[2] is BotSeat), limitMs: 600000), isTrue,
+          reason: 'the silent seat goes to a bot');
+      final bootedInHand = others.first.game.handNumber;
+      t.clock.advance(40000);
+      who.comeBack();
+      expect(t.clock.runUntil(() => t.clients.every((c) => c.holders[2] is HumanSeat), limitMs: 1200000), isTrue,
+          reason: 'the seat is the person\'s again everywhere');
+      for (final c in t.clients) {
+        expect(c.holders[2], isA<HumanSeat>().having((h) => h.key, 'key', key));
+        expect(c.game.handNumber, greaterThan(bootedInHand), reason: 'back from a later hand, not mid-hand');
+        expect(c.participants.length, 4);
+      }
+      expect(who.client.amSeated, isTrue);
+      expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 4 * 3600000), isTrue);
+      checkAgreement(t, among: t.clients);
+      final v = verifyRecord(t.spec, t.clients.first.record);
+      expect(v.ok && v.complete, isTrue, reason: v.reason);
+      expect(v.finalHolders[2], isA<HumanSeat>());
+      t.stop();
+    });
+
+    test('a peer that learns of a seat taken back only after opening the hand rebuilds and carries on', () {
+      // Seat 2 is booted and comes back, but its link to seat 3 is dead:
+      // seat 3 never hears the claim itself, only its witnesses, and
+      // opens the next hand with the bot still in seat 2 while the other
+      // three seat the person. Seat 3 is then behind at the pass, is
+      // carried forward, receives the decision late, rebuilds its game
+      // from the record, and finishes with everyone.
+      final t = SimTable(humans: 4, seed: 55);
+      final keys = t.signers.map((s) => s.publicKey).toList();
+      t.start();
+      t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 3600000);
+      final who = t.people[2];
+      who.depart(Exit.idle);
+      final others = [t.people[0], t.people[1], t.people[3]].map((p) => p.client).toList();
+      expect(t.clock.runUntil(() => others.every((c) => c.holders[2] is BotSeat), limitMs: 600000), isTrue);
+      t.net.cut(keys[2], keys[3]);
+      t.clock.advance(20000);
+      who.comeBack();
+      expect(t.clock.runUntil(() => t.clients.every((c) => c.holders[2] is HumanSeat), limitMs: 1200000), isTrue,
+          reason: 'the seat is the person\'s again everywhere, seat 3 included');
+      expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 4 * 3600000), isTrue);
+      checkAgreement(t, among: t.clients);
+      final v = verifyRecord(t.spec, t.clients.first.record);
+      expect(v.ok && v.complete, isTrue, reason: v.reason);
+      t.stop();
+    });
+
     test('three humans split two and one: the majority carries on, the one is out', () {
       final t = SimTable(humans: 3, seed: 52);
       final keys = t.signers.map((s) => s.publicKey).toList();

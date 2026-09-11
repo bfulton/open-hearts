@@ -197,7 +197,12 @@ class _LivePageState extends State<LivePage> {
                   action: 'Back to the lobby',
                   onNewGame: () => Navigator.of(context).pop(),
                 ),
-              if (!_c.amSeated && !_c.done) _Replaced(onBack: () => Navigator.of(context).pop()),
+              if (!_c.amSeated && !_c.done)
+                _Replaced(
+                  waiting: _c.wantsBack,
+                  onRetake: _c.rejoin,
+                  onBack: () => Navigator.of(context).pop(),
+                ),
             ],
           ),
         ),
@@ -232,8 +237,11 @@ class _Presence extends StatelessWidget {
 
 /// The table went on without you.
 class _Replaced extends StatelessWidget {
-  const _Replaced({required this.onBack});
+  const _Replaced({required this.waiting, required this.onRetake, required this.onBack});
 
+  /// The seat has been asked for; it comes back with the next hand.
+  final bool waiting;
+  final VoidCallback onRetake;
   final VoidCallback onBack;
 
   @override
@@ -248,21 +256,33 @@ class _Replaced extends StatelessWidget {
           decoration: BoxDecoration(
             color: Felt.mid,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Palette.danger.withValues(alpha: 0.45)),
+            border: Border.all(color: (waiting ? Palette.gold : Palette.danger).withValues(alpha: 0.45)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('A bot took your seat',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
+              Text(waiting ? 'Your seat is yours again next hand' : 'A bot took your seat',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: waiting ? Palette.gold : Palette.danger)),
               const SizedBox(height: 6),
-              const Text('The table could not hear from you, and went on.',
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Palette.chromeDim)),
+              Text(
+                waiting
+                    ? 'The bot plays out this hand for you. Stay here, and the next hand is dealt to you.'
+                    : 'The table could not hear from you, and went on. You can have the seat back from the next hand.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
+              ),
               const SizedBox(height: 16),
-              FilledButton(
+              if (!waiting)
+                FilledButton(
+                  onPressed: onRetake,
+                  style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
+                  child: const Text('Take it back'),
+                ),
+              TextButton(
                 onPressed: onBack,
-                style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
-                child: const Text('Back'),
+                style: TextButton.styleFrom(foregroundColor: Palette.chromeDim),
+                child: const Text('Leave'),
               ),
             ],
           ),

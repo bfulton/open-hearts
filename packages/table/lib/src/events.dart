@@ -13,7 +13,7 @@ import 'dart:typed_data';
 
 import 'signing.dart';
 
-enum EventKind { pass, play, leave, boot, absent, witness, heartbeat }
+enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, retake }
 
 /// Which moment of a hand an event is about. A hand has four pass turns
 /// (one per seat, all open at once) followed by fifty-two play turns.

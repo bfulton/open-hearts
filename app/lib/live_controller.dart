@@ -161,15 +161,17 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// showing it; null when the view is waiting on a person, or the
   /// game is over.
   ({Duration delay, void Function() act})? _next(List<Decision> record) {
-    // Departures recorded next take effect at once.
-    if (_consumed.length < record.length && record[_consumed.length].removal) {
+    // Departures and seats taken back, recorded next, take effect at once.
+    if (_consumed.length < record.length && (record[_consumed.length].removal || record[_consumed.length].retake)) {
       final d = record[_consumed.length];
       return (
         delay: Duration.zero,
         act: () {
           _consumed.add(d);
           final seat = d.event.seat;
-          if (_shownHolders[seat] is HumanSeat) {
+          if (d.retake) {
+            _shownHolders[seat] = HumanSeat(d.event.author);
+          } else if (_shownHolders[seat] is HumanSeat) {
             _shownHolders[seat] = BotSeat(client.spec.replacementFor(seat));
             if (seat == mySeat) {
               _pendingPlay = null;
@@ -427,6 +429,15 @@ class LiveController extends ChangeNotifier implements TableModel {
     client.leave();
     notifyListeners();
   }
+
+  /// Asks for the seat back after a boot; the table seats the player
+  /// again from the next hand, the bot playing until then.
+  void rejoin() {
+    client.rejoin();
+    notifyListeners();
+  }
+
+  bool get wantsBack => client.wantsBack;
 
   /// Humans still at the table, by seat.
   int get participants => client.participants.length;

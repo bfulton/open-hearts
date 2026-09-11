@@ -71,30 +71,47 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
     return ai <= bi;
   }
 
-  // Every removal in the record, wherever it sits: the smallest set a
-  // peer could legitimately have measured against at a turn is everyone
-  // less all of these made by then — including ones recorded at the
-  // same position but later in the record's order.
-  final allRemovals = <PublicKey, TurnId>{};
+  // Every change of a seat's holder in the record, wherever it sits —
+  // removals, and seats taken back — in record order per person. The
+  // smallest set a peer could legitimately have measured against at a
+  // turn is everyone less those out by then, including ones recorded at
+  // the same position but later in the record's order.
+  final changes = <PublicKey, List<(TurnId, bool)>>{};
   for (final d in record) {
-    if (!d.removal) continue;
+    if (!d.removal && !d.retake) continue;
     final h = spec.seats[d.event.seat];
-    if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
+    if (h is HumanSeat) changes.putIfAbsent(h.key, () => []).add((d.turn, d.removal));
   }
-  Set<PublicKey> floorAt(TurnId turn) =>
-      {for (final k in humans) if (!allRemovals.containsKey(k) || !atOrBefore(allRemovals[k]!, turn)) k};
+  bool presentAt(PublicKey k, TurnId turn, {TurnId? beforeRetakeAt}) {
+    var present = true;
+    for (final (at, removed) in changes[k] ?? const <(TurnId, bool)>[]) {
+      if (!atOrBefore(at, turn)) break;
+      if (!removed && beforeRetakeAt == at) break;
+      present = !removed;
+    }
+    return present;
+  }
+
+  /// The floor at [turn]: everyone who sat down less those out by then.
+  /// For the check of a retake itself, as of just before it.
+  Set<PublicKey> floorAt(TurnId turn, {TurnId? beforeRetakeAt}) =>
+      {for (final k in humans) if (presentAt(k, turn, beforeRetakeAt: beforeRetakeAt)) k};
 
   /// Whether a decision carries: a strict majority of [among], the set
   /// the peer measured against — which must be a legitimate one, every
   /// human who sat down less some of the removals made by [turn], never
   /// fewer than that.
-  bool carried(Set<PublicKey> witnesses, TurnId turn, Set<PublicKey> among) {
+  bool carried(Set<PublicKey> witnesses, TurnId turn, Set<PublicKey> among, {TurnId? beforeRetakeAt}) {
     if (among.isEmpty || !humans.containsAll(among)) return false;
-    if (!among.containsAll(floorAt(turn))) return false;
+    if (!among.containsAll(floorAt(turn, beforeRetakeAt: beforeRetakeAt))) return false;
     return witnesses.intersection(among).length >= among.length ~/ 2 + 1;
   }
 
   int playIndex() => game.tricksPlayed * seatCount + game.trick.length;
+
+  /// No settled action next: the record's end, or a seat taken back at
+  /// a hand the replay has not reached.
+  bool endOfActions() => index >= record.length || record[index].retake;
 
   void botActs(int seat, {required bool passing}) {
     final bot = Bot(persona: (holders[seat] as BotSeat).persona);
@@ -124,13 +141,42 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
     }
   }
 
-  /// Applies the departures recorded next, each checked against the
-  /// participants at the turn it names.
+  /// Applies the departures and the seats taken back recorded next,
+  /// each checked against the participants at the turn it names.
   String? takeRemovals() {
-    while (index < record.length && record[index].removal) {
+    while (index < record.length && (record[index].removal || record[index].retake)) {
+      // A seat taken back at a hand still to come stays where it is
+      // until the replay opens that hand; the actions settled before
+      // it are all in the record ahead of it.
+      if (record[index].retake && record[index].turn.hand > game.handNumber) break;
       final d = record[index++];
       final e = d.event;
       final seat = e.seat;
+      if (d.retake) {
+        // A seat taken back: by its original person, from a bot, at
+        // the pass turn of the hand the replay is opening, carried by a
+        // majority of everyone present less themselves.
+        final original = spec.seats[seat];
+        if (e.kind != EventKind.retake || original is! HumanSeat || original.key != e.author) {
+          return 'a retake of seat $seat by someone other than its person';
+        }
+        if (holders[seat] is! BotSeat || !removedAt.containsKey(e.author)) return 'a retake of a seat not given up';
+        // At the start of the hand it names — before this seat's pass,
+        // or before any card on a hand with no pass.
+        final atStart = game.tricksPlayed == 0 &&
+            game.trick.isEmpty &&
+            (game.phase == Phase.passing ? game.passOf(seat) == null : game.phase == Phase.playing);
+        if (!atStart || d.turn != TurnId.pass(game.handNumber, seat)) {
+          return 'a retake of seat $seat at ${d.turn} out of place';
+        }
+        if (!carried(d.witnesses, d.turn, d.among, beforeRetakeAt: d.turn)) {
+          return 'a retake of seat $seat at ${d.turn} without a majority behind it '
+              '(${d.witnesses.intersection(d.among).length} of ${d.among.length})';
+        }
+        holders[seat] = HumanSeat(e.author);
+        removedAt.remove(e.author);
+        continue;
+      }
       final holder = holders[seat];
       if (holder is! HumanSeat) continue;
       if (e.kind == EventKind.leave) {
@@ -156,7 +202,7 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
         if (holders[s] is BotSeat && game.passOf(s) == null) botActs(s, passing: true);
       }
       if (game.phase != Phase.passing) continue;
-      if (index >= record.length) return allowPartial ? partial() : fail('the record ends mid-pass');
+      if (endOfActions()) return allowPartial ? partial() : fail('the record ends mid-pass');
       final d = record[index++];
       final e = d.event;
       if (e.kind != EventKind.pass) return fail('expected a pass, saw ${e.kind.name}');
@@ -179,7 +225,7 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
       sweep();
       continue;
     }
-    if (index >= record.length) return allowPartial ? partial() : fail('the record ends with seat $seat to play');
+    if (endOfActions()) return allowPartial ? partial() : fail('the record ends with seat $seat to play');
     final d = record[index++];
     final e = d.event;
     if (e.kind != EventKind.play) return fail('expected a play, saw ${e.kind.name}');
