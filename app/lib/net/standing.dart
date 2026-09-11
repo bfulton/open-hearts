@@ -21,7 +21,7 @@ class Standing {
     final t = RelayTransport(url: relay, signer: signer, table: GameResult.tag);
     try {
       await t.ready.timeout(const Duration(seconds: 8));
-      return Standing(Ledger.from(t.lobbySoFar), signer.publicKey);
+      return Standing(Ledger.from(t.lobbySoFar, prior: prior), signer.publicKey);
     } finally {
       t.close();
     }
@@ -39,11 +39,33 @@ class Standing {
     }
   }
 
-  /// The bot to seat at a table of people rated about [rating]: the
-  /// persona whose rating is nearest, ties broken by the draw.
-  static Persona Function(int rating, int seat, Random random) botPicker(Ledger ledger) => (rating, seat, random) {
-        final ranked = List.of(Persona.roster)..shuffle(random);
-        ranked.sort((a, b) => (ledger.of(a.name).mu - rating).abs().compareTo((ledger.of(b.name).mu - rating).abs()));
-        return ranked[seat % (ranked.length ~/ 2 + 1)];
+  /// Where a bot with no results yet starts: its level's calibrated
+  /// rating. A person starts fresh.
+  static Rating? prior(String id) {
+    if (id.length == 64) return null; // a key
+    try {
+      return Rating(mu: Persona.named(id).level.let(Persona.priorRating).toDouble(), phi: 120);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The bots to seat at a table of people rated about [rating]:
+  /// personas at the levels nearest it, no name twice, ties broken by
+  /// the draw.
+  static List<Persona> Function(int rating, int count, Random random) botPicker(Ledger ledger) => (rating, count, random) {
+        final ranked = List.of(Persona.all)..shuffle(random);
+        ranked.sort((a, b) => (ledger.of(a.id).mu - rating).abs().compareTo((ledger.of(b.id).mu - rating).abs()));
+        final picked = <Persona>[];
+        for (final p in ranked) {
+          if (picked.any((x) => x.name == p.name)) continue;
+          picked.add(p);
+          if (picked.length == count) break;
+        }
+        return picked;
       };
+}
+
+extension<T> on T {
+  R let<R>(R Function(T) f) => f(this);
 }

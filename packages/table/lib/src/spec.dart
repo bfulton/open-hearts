@@ -21,7 +21,7 @@ class BotSeat extends SeatHolder {
   const BotSeat(this.persona);
   final Persona persona;
   @override
-  String toString() => 'bot ${persona.name}';
+  String toString() => 'bot ${persona.id}';
 }
 
 class TableSpec {

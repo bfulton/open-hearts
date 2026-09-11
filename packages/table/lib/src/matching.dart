@@ -160,9 +160,9 @@ class WaitingRoom {
   final int since;
   final void Function(String line)? log;
 
-  /// The rating a bot should be seated at, for a table of humans at
-  /// [rating]: the host picks the persona nearest it. Null seats any.
-  final Persona Function(int rating, int seat, Random random)? botRating;
+  /// The bots for a table of people rated about [rating], [count] of
+  /// them, no persona twice. Null seats the roster at the top.
+  final List<Persona> Function(int rating, int count, Random random)? botRating;
 
   late final Random _random;
   final Map<PublicKey, Waiter> _others = {};
@@ -239,15 +239,15 @@ class WaitingRoom {
       final id = 'm${_random.nextInt(1 << 16).toRadixString(16).padLeft(4, '0')}'
           '${_random.nextInt(1 << 16).toRadixString(16).padLeft(4, '0')}';
       final seed = _random.nextInt(1 << 31);
-      final draw = List.of(Persona.roster)..shuffle(Random(seed));
       final mean = humans.map((w) => w.rating).reduce((a, b) => a + b) ~/ humans.length;
+      final wanted = seatCount - humans.length;
+      final bots = botRating?.call(mean, wanted, Random(seed)) ?? (List.of(Persona.roster)..shuffle(Random(seed))).take(wanted).toList();
       final seats = <Map<String, Object?>>[];
       for (var s = 0; s < seatCount; s++) {
         if (s < humans.length) {
           seats.add({'key': humans[s].key, 'name': humans[s].name});
         } else {
-          final persona = botRating?.call(mean, s, Random(seed + s)) ?? draw[s];
-          seats.add({'bot': persona.name});
+          seats.add({'bot': bots[s - humans.length].id});
         }
       }
       relay.announce({'kind': 'match', 'round': round, 'table': id, 'seed': seed, 'rated': pool == 'rated', 'seats': seats});

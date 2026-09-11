@@ -42,30 +42,62 @@ bots, and a note when somebody sits down.
 Juliet, Cyrano and Roxane, Westley and Buttercup, Casanova, Don Juan —
 open hearts. Each is a temperament: the one policy with a few of its
 thresholds moved, so Romeo cannot hold a queen and Juliet waits for the
-moment and Cyrano leads from his long suit and Don Juan runs at the
-moon on a hand the others would not. Every setting is a choice a strong
-player might make, and that is measured, not assumed: a tool plays each
-setting alone against the baseline, and a tournament test seats random
-fours from the roster and fails if any persona falls behind — a
-character may be rash or patient, never bad. The measuring keeps moving
-things from style to rule: emptying a short suit in the pass is worth a
-third of tables instead of a quarter, and never shooting the moon costs
-six points of tables, so every bot voids and every bot shoots when the
-hand is plainly a shot, and every bot keeps a top heart back while no
-points are out, because that is what stops a shot. A tool that looks
-for self-destructive plays in bot-versus-bot games
-(`packages/engine/tool/blunders.dart`) then found four more, each
-worth two or three points of tables, and every bot now plays them:
-never lead the queen of spades, or a spade above her, while she is out;
-throw the highest club on the first trick, where no point can fall; do
-not take points to break up a "run" that is exactly thirteen —
-somebody caught with the queen, not somebody collecting; and void in
-the led suit, throw a heart, any heart, before a side-suit card. The
-last had been a threshold each persona set, and every setting of it
-measured worse than none. The roster is
-data in `packages/engine/lib/src/persona.dart`; the oblivious circuit
-takes the same settings as constants, so a named bot holding a departed
-seat is the same computable consequence as any other.
+moment and Cyrano lets a run go a long way before spoiling it and Don
+Juan runs at the moon on a hand the others would not. Every setting is
+a choice a strong player might make, and that is measured, not
+assumed: a tool plays each setting alone against the baseline, and a
+tournament test seats random fours from the roster and fails if any
+persona falls behind — a character may be rash or patient, never bad.
+The measuring keeps moving things from style to rule: emptying a short
+suit in the pass is worth a third of tables instead of a quarter, and
+never shooting the moon costs six points of tables, so every bot voids
+and every bot shoots when the hand is plainly a shot. A tool that
+looks for self-destructive plays in bot-versus-bot games
+(`packages/engine/tool/blunders.dart`) found more, each worth two or
+three points of tables, and every bot now plays them: throw the
+highest club on the first trick, where no point can fall; do not take
+points to break up a "run" that is exactly thirteen — somebody caught
+with the queen, not somebody collecting; and void in the led suit,
+throw a heart, any heart, before a side-suit card. The lead went the
+same way: the lowest card in the hand, whatever its suit, measured two
+points of tables better than the lowest card of the shortest suit and
+three and a half better than the long suit Cyrano used to lead from,
+so everyone leads it now, and the rule against leading a high spade
+into the queen has nothing left to do. Two habits went the other way,
+out — keeping the top heart back as a stopper for a moon, and a
+choice of suit to lead from — because they measured worse at every
+table where the others do what every bot does. The roster is data in
+`packages/engine/lib/src/persona.dart`; the oblivious circuit takes
+the same settings as constants, so a named bot holding a departed seat
+is the same computable consequence as any other.
+
+**Every character comes at nine strengths.** A person is seated with
+bots near their own rating, so each persona is also a ladder
+(`Persona.at`): the top is the whole policy, and each rung down takes
+away one thing a player learns, in about the order people learn it. A
+first game — rung 0 — passes its three highest cards, leads its
+lowest, follows with its lowest and throws its highest card when void:
+the rules, and nothing else. Then, one rung at a time: duck as high as
+you can instead of as low; last to play and taking the trick anyway,
+throw the top card; void, throw the queen and the hearts before
+anything else; pass by the shape of the hand, not just by height; lead
+small spades to flush the queen; void, throw a heart before a side
+card; throw the top club on the first trick; and at the top, run at
+the moon. One thing every rung does is break up someone else's run. A
+table that never does is a rating pump for anyone who runs at every
+chance — 44% of tables against three that never defend — and a bot
+that could be farmed that way would poison every rating it touched;
+so defending the moon is not a rung, it is the floor. The ladder is
+calibrated in the arena (`packages/table/tool/ladder.dart`): twenty
+thousand tables of random fours from nearby rungs, fitted by the same
+model a rating's expected score uses, to two or three points a rung.
+It spans about 230 points — a first game finishes ahead of the whole
+policy in one pair of three — with rungs eighteen to forty-three
+points apart and the eight characters at a rung within fifteen points
+of each other. Those are the ratings a bot starts from; from there it
+floats on its results like anyone, one rating per character per rung.
+A bot's identity is its name and its rung: `Westley` at the top,
+`Westley/3` on the third rung up from a first game.
 
 ## The live table, as it stands
 
@@ -83,7 +115,8 @@ The rule: whoever has waited through a round already is seated first,
 then the rest at random; a table is four ratings within a window that
 widens a hundred points for every round the first of them has waited;
 and once someone has waited ten seconds without a full table they get
-one, with bots at their rating in the seats nobody came for. If the
+one, with bots at their rating — the ladder above has every character
+at every strength — in the seats nobody came for. If the
 host says nothing for a round, the next key steps in — a host can only
 waste five seconds, and it cannot forge a play. Two hosts with
 different views may seat someone twice; they take the seating with the
@@ -117,7 +150,8 @@ by final total — the lower total wins the pair, equal totals halve —
 and folded by Glicko: a rating and a deviation, the deviation saying
 how much the rating is worth (`packages/table/lib/src/rating.dart`). A
 bot that sat down at the deal is rated exactly like a person, one
-rating per persona, from every table it ever sat at; that is what makes
+rating per persona per rung of its ladder, starting from the rung's
+calibrated prior, from every table it ever sat at; that is what makes
 a table of one person and three bots worth playing, and worth the
 same as any other — the bots' ratings float on real results, so any
 edge a person finds against them is priced in within a few hundred
@@ -329,10 +363,10 @@ Counted, in AND gates — what a garbled circuit costs; XOR is free:
 
 | | AND gates |
 |---|---|
-| one play, legality included | 2,597 |
-| the same, hand in as thirteen dealt positions and position out | 3,676 |
-| one pass | 10,933 |
-| a bot seat for a whole hand: one pass and thirteen plays | 58,721 |
+| one play, legality included | 2,237 |
+| the same, hand in as thirteen dealt positions and position out | 3,316 |
+| one pass | 10,618 |
+| a bot seat for a whole hand: one pass and thirteen plays | 53,726 |
 
 About half of a play is the run at the moon — knowing which cards are
 sure winners takes the whole played set as public input. At two

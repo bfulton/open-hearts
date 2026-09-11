@@ -142,7 +142,7 @@ class Room extends ChangeNotifier {
       if (s < _members.length) {
         seats.add({'key': _members[s].key, 'name': _members[s].name});
       } else {
-        seats.add({'bot': draw[s].name});
+        seats.add({'bot': draw[s].id});
       }
     }
     relay.announce({'kind': 'start', 'seed': _seed, 'seats': seats});

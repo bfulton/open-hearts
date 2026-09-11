@@ -111,7 +111,19 @@ void main() {
   });
 
   group('the oblivious bot', () {
-    for (final persona in Persona.candidates) {
+    // Every persona at the top, and a few down the ladder: the circuit
+    // takes the same settings as constants at every level.
+    for (final persona in [
+      ...Persona.candidates,
+      Persona.westley.at(0),
+      Persona.buttercup.at(1),
+      Persona.romeo.at(2),
+      Persona.juliet.at(3),
+      Persona.cyrano.at(4),
+      Persona.roxane.at(5),
+      Persona.casanova.at(6),
+      Persona.donJuan.at(7),
+    ]) {
       test('agrees with ${persona.name} on every decision of 8 games', () {
         var plays = 0, passes = 0;
         int? playGates, passGates, legalGates, positionGates;
@@ -121,17 +133,30 @@ void main() {
           (view, legal, chosen) {
             final lc = Circuit();
             final lb = ObliviousBot(lc, persona: persona);
-            final r = lb.legal(lb.secretHand(view.hand), PublicPlay(lc, view, persona: persona));
+            final r = lb.legal(
+              lb.secretHand(view.hand),
+              PublicPlay(lc, view, persona: persona),
+            );
             expect(ObliviousBot.decodeSet(r.legal), unorderedEquals(legal));
-            expect(r.hasFollowing.value,
-                view.trick.isNotEmpty && legal.first.suit == view.trick.first.card.suit);
+            expect(
+              r.hasFollowing.value,
+              view.trick.isNotEmpty &&
+                  legal.first.suit == view.trick.first.card.suit,
+            );
             legalGates ??= lc.ands;
             expect(lc.ands, legalGates, reason: 'the circuit has one shape');
 
             final c = Circuit();
             final ob = ObliviousBot(c, persona: persona);
-            final out = ob.chooseCard(ob.secretHand(view.hand), PublicPlay(c, view, persona: persona));
-            expect(ObliviousBot.decode(out), chosen, reason: 'hand ${view.hand} trick ${view.trick}');
+            final out = ob.chooseCard(
+              ob.secretHand(view.hand),
+              PublicPlay(c, view, persona: persona),
+            );
+            expect(
+              ObliviousBot.decode(out),
+              chosen,
+              reason: 'hand ${view.hand} trick ${view.trick}',
+            );
             expect(c.secretInputs, 52);
             playGates ??= c.ands;
             expect(c.ands, playGates, reason: 'the circuit has one shape');
@@ -141,18 +166,34 @@ void main() {
             // the circuit must ignore whatever sits there.
             final pc = Circuit();
             final pb = ObliviousBot(pc, persona: persona);
-            final gone = view.played.where((c) => !view.hand.contains(c)).toList();
-            final positions = [...view.hand, ...gone.take(13 - view.hand.length)]
-              ..shuffle(Random(plays));
+            final gone = view.played
+                .where((c) => !view.hand.contains(c))
+                .toList();
+            final positions = [
+              ...view.hand,
+              ...gone.take(13 - view.hand.length),
+            ]..shuffle(Random(plays));
             expect(positions.length, 13);
             final dealt = [
               for (final card in positions)
-                [for (var k = 0; k < 6; k++) pc.secret((card.index >> k) & 1 == 1)],
+                [
+                  for (var k = 0; k < 6; k++)
+                    pc.secret((card.index >> k) & 1 == 1),
+                ],
             ];
-            final held = [for (final card in positions) pc.public(view.hand.contains(card))];
-            final at = pb.chooseCardAt(dealt, held, PublicPlay(pc, view, persona: persona));
+            final held = [
+              for (final card in positions) pc.public(view.hand.contains(card)),
+            ];
+            final at = pb.chooseCardAt(
+              dealt,
+              held,
+              PublicPlay(pc, view, persona: persona),
+            );
             expect(ObliviousBot.decode(at.chosen), chosen);
-            final opened = [for (var k = 0; k < 13; k++) if (at.heldAt[k].value) k];
+            final opened = [
+              for (var k = 0; k < 13; k++)
+                if (at.heldAt[k].value) k,
+            ];
             expect(opened, [positions.indexOf(chosen)]);
             positionGates ??= pc.ands;
             expect(pc.ands, positionGates, reason: 'the circuit has one shape');
@@ -161,7 +202,9 @@ void main() {
           (hand, chosen) {
             final c = Circuit();
             final ob = ObliviousBot(c, persona: persona);
-            final out = ObliviousBot.decodeSet(ob.choosePass(ob.secretHand(hand)));
+            final out = ObliviousBot.decodeSet(
+              ob.choosePass(ob.secretHand(hand)),
+            );
             expect(out, unorderedEquals(chosen), reason: 'hand $hand');
             passGates ??= c.ands;
             expect(c.ands, passGates, reason: 'the circuit has one shape');
@@ -174,18 +217,16 @@ void main() {
     }
 
     test('folding the public inputs never changes the answer', () {
-      eachDecision(
-        5,
-        Persona.westley,
-        (view, legal, chosen) {
-          final c = Circuit(foldPublic: true);
-          final ob = ObliviousBot(c);
-          final out = ob.chooseCard(ob.secretHand(view.hand), PublicPlay(c, view));
-          expect(ObliviousBot.decode(out), chosen);
-          expect(c.publicInputs, 0);
-        },
-        (hand, chosen) {},
-      );
+      eachDecision(5, Persona.westley, (view, legal, chosen) {
+        final c = Circuit(foldPublic: true);
+        final ob = ObliviousBot(c);
+        final out = ob.chooseCard(
+          ob.secretHand(view.hand),
+          PublicPlay(c, view),
+        );
+        expect(ObliviousBot.decode(out), chosen);
+        expect(c.publicInputs, 0);
+      }, (hand, chosen) {});
     });
   });
 }

@@ -33,7 +33,8 @@ class SeatResult {
   /// The human's key, or null for a bot.
   final PublicKey? key;
 
-  /// The bot's identity — its persona name — or null for a human.
+  /// The bot's identity — its persona at its level, `Persona.id` — or
+  /// null for a human.
   final String? bot;
 
   /// The seat's final total.
@@ -120,11 +121,11 @@ class GameResult {
       if (start is HumanSeat && end is BotSeat) {
         // Left: the human finishes last, the bot has no stake.
         seats.add(SeatResult(human: true, key: start.key, total: totals[s], fromStart: true, left: true));
-        seats.add(SeatResult(human: false, bot: end.persona.name, total: totals[s], fromStart: false));
+        seats.add(SeatResult(human: false, bot: end.persona.id, total: totals[s], fromStart: false));
       } else if (start is HumanSeat) {
         seats.add(SeatResult(human: true, key: start.key, total: totals[s], fromStart: true));
       } else {
-        seats.add(SeatResult(human: false, bot: (start as BotSeat).persona.name, total: totals[s], fromStart: true));
+        seats.add(SeatResult(human: false, bot: (start as BotSeat).persona.id, total: totals[s], fromStart: true));
       }
     }
     return GameResult(table: spec.id, rated: spec.rated, seats: seats, at: 0);
@@ -136,11 +137,18 @@ class GameResult {
 
 /// Ratings from results: fold every result that stands, in order.
 class Ledger {
+  Ledger({this.prior});
+
+  /// Where an identity with no results yet starts: a person at
+  /// [Rating.fresh]; a bot at its level's calibrated rating, if the
+  /// caller says so ([Persona.priorRating]).
+  final Rating? Function(String id)? prior;
+
   final Map<String, Rating> _ratings = {};
   final Map<String, int> _games = {};
 
-  /// A person's key or a bot's persona name.
-  Rating of(String id) => _ratings[id] ?? Rating.fresh;
+  /// A person's key or a bot's `Persona.id`.
+  Rating of(String id) => _ratings[id] ?? prior?.call(id) ?? Rating.fresh;
   int gamesOf(String id) => _games[id] ?? 0;
 
   /// Applies one result. Every seat with a stake — a human, or a bot
@@ -173,7 +181,7 @@ class Ledger {
   /// Folds every result on the relay that stands: grouped by table,
   /// the version a majority of the table's humans published, oldest
   /// first.
-  static Ledger from(Iterable<NostrEvent> events) {
+  static Ledger from(Iterable<NostrEvent> events, {Rating? Function(String id)? prior}) {
     final byTable = <String, Map<String, ({GameResult result, Set<PublicKey> signers})>>{};
     for (final e in events) {
       final r = GameResult.parse(e);
@@ -192,7 +200,7 @@ class Ledger {
       }
     }
     standing.sort((a, b) => a.at.compareTo(b.at));
-    final ledger = Ledger();
+    final ledger = Ledger(prior: prior);
     for (final r in standing) {
       ledger.apply(r);
     }

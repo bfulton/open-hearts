@@ -33,7 +33,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// The humans' names by seat, from the lobby.
   final Map<int, String> seatNames;
 
-  /// Ratings by key or persona name, on a rated table; null elsewhere.
+  /// Ratings by key or persona id, on a rated table; null elsewhere.
   final Rating Function(String id)? ratingOf;
 
   /// Where a finished game's result goes, once, when the game ends.
@@ -71,7 +71,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     if (r == null) return _plainName(seat);
     final id = switch (client.spec.seats[seat]) {
       HumanSeat(:final key) => key,
-      BotSeat(:final persona) => persona.name,
+      BotSeat(:final persona) => persona.id,
     };
     return '${_plainName(seat)} ${r(id).shown}';
   }

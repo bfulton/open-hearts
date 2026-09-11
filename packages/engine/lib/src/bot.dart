@@ -63,7 +63,7 @@ class BotView {
   /// stray heart. [Persona.moonDefenseTrigger] moves it.
   int? get moonThreat => moonThreatAt(4);
 
-  int? moonThreatAt(int trigger) {
+  int? moonThreatAt(int trigger, {bool queenAloneIsSafe = true}) {
     final total = taken.fold(0, (a, b) => a + b);
     if (total < trigger) return null;
     final holder = taken.indexOf(total);
@@ -73,7 +73,7 @@ class BotView {
     // random tables in ten, taking points to break "that" run cost the
     // defender two points a game — tool/knobs.dart.) Thirteen with the
     // queen still to come is every heart, and very much a run.
-    if (total == 13 && queenGone) return null;
+    if (queenAloneIsSafe && total == 13 && queenGone) return null;
     return holder;
   }
 
@@ -92,8 +92,10 @@ class Bot {
 
   final Persona persona;
 
-  int? _moonThreat(BotView view) =>
-      view.moonThreatAt(persona.moonDefenseTrigger);
+  int? _moonThreat(BotView view) => view.moonThreatAt(
+    persona.moonDefenseTrigger,
+    queenAloneIsSafe: persona.queenAloneIsSafe,
+  );
 
   // ---- passing --------------------------------------------------------
 
@@ -113,7 +115,8 @@ class Bot {
   /// three slots, so it is taken only when it falls out of the ranking
   /// for free.
   List<Card> choosePass(List<Card> hand) {
-    if (persona.shoots && strength(hand, const {}).losers <= persona.shootPassMaxLosers) {
+    if (persona.shoots &&
+        strength(hand, const {}).losers <= persona.shootPassMaxLosers) {
       // A shot in the making: the three lowest go, ties to the lower
       // suit, and the hand keeps its height.
       final byRank = List.of(hand)
@@ -123,25 +126,28 @@ class Bot {
         });
       return byRank.take(passSize).toList();
     }
-    final scored = [
-      for (final c in hand) (card: c, danger: _passDanger(c, hand)),
-    ]..sort((a, b) {
-        final d = b.danger.compareTo(a.danger);
-        return d != 0 ? d : a.card.compareTo(b.card);
-      });
+    final scored =
+        [for (final c in hand) (card: c, danger: _passDanger(c, hand))]
+          ..sort((a, b) {
+            final d = b.danger.compareTo(a.danger);
+            return d != 0 ? d : a.card.compareTo(b.card);
+          });
     return [for (final s in scored.take(passSize)) s.card];
   }
 
   /// How much a card wants to leave the hand. Higher is more urgent.
   /// Whole numbers throughout, so the circuit can carry them.
   int _passDanger(Card card, List<Card> hand) {
+    // A first game passes its three highest cards and nothing cleverer.
+    if (!persona.passesShape) return card.rank.value;
     final spades = hand.where((c) => c.suit == Suit.spades).length;
     // Below the queen, spades are the protection; with enough of them
     // you can duck the queen out of someone else's hand. How many is
     // enough, and how much she is then worth keeping, is temperament.
     final spadesProtected = spades >= persona.queenProtectedAt;
-    final belowQueen =
-        hand.where((c) => c.suit == Suit.spades && c.rank.value < 12).length;
+    final belowQueen = hand
+        .where((c) => c.suit == Suit.spades && c.rank.value < 12)
+        .length;
     final highSpadesCovered = belowQueen >= persona.highSpadesCoveredAt;
 
     switch (card.suit) {
@@ -158,12 +164,11 @@ class Bot {
         return -10 + card.rank.value;
       case Suit.hearts:
         // Hearts cost a point every time one lands, and high ones land.
-        // A stopper-keeper discounts the top heart, queen or better: the
-        // one card that can break up a moon later.
-        final stopper = persona.keepsStopper &&
-            card.rank.value >= 12 &&
-            !hand.any((c) => c.suit == Suit.hearts && c.rank.value > card.rank.value);
-        return card.rank.value * 2 + (card.rank.value >= 12 ? 12 : 0) - (stopper ? 20 : 0);
+        // (Keeping the top heart back as a stopper for a moon, in the
+        // pass and when void, measured a point of tables worse at every
+        // table where the others break up runs — which every bot does —
+        // so no one keeps one.)
+        return card.rank.value * 2 + (card.rank.value >= 12 ? 12 : 0);
       case Suit.clubs:
       case Suit.diamonds:
         final length = hand.where((c) => c.suit == card.suit).length;
@@ -219,7 +224,10 @@ class Bot {
   /// of each suit among the cards still unplayed, plus the cards that
   /// will be top once those have drawn out what is outside the hand.
   /// Everything else is a loser.
-  static ({int winners, int losers}) strength(List<Card> hand, Set<Card> played) {
+  static ({int winners, int losers}) strength(
+    List<Card> hand,
+    Set<Card> played,
+  ) {
     var winners = 0;
     for (final suit in Suit.values) {
       final mine = hand.where((c) => c.suit == suit).length;
@@ -299,44 +307,24 @@ class Bot {
   /// spade above her, leading small spades drags her out of whoever does
   /// hold her — the standard "flush the queen" line; how many small
   /// spades it takes to try is [Persona.flushMinSmallSpades]. Otherwise
-  /// lead the lowest card of the shortest suit, which both keeps the
-  /// trick cheap and works toward the void that makes discarding
-  /// possible — or of the longest, whose low cards are the safest leads
-  /// in the hand ([Persona.leadFrom]).
+  /// the lowest card in the hand, whatever its suit, a heart included
+  /// once hearts may be led: the one lead that cannot take the trick
+  /// unless everyone is void. It measured two points of tables better
+  /// than the lowest card of the shortest suit (the old default, chosen
+  /// for the void it works towards), three and a half better than the
+  /// longest suit's low card, and five better than the lowest card that
+  /// is not a heart (tool/knobs.dart, before those settings went).
   Card _lead(BotView view, List<Card> legal) {
     if (!view.queenGone) {
       final spades = legal.where((c) => c.suit == Suit.spades).toList();
-      final holdsHighSpade =
-          view.hand.any((c) => c.suit == Suit.spades && c.rank.value >= 12);
+      final holdsHighSpade = view.hand.any(
+        (c) => c.suit == Suit.spades && c.rank.value >= 12,
+      );
       if (spades.length >= persona.flushMinSmallSpades && !holdsHighSpade) {
         return _lowest(spades);
       }
-      // Never the queen herself, nor the ace or king above her, while
-      // she is out: whoever holds her drops her on it. Given any other
-      // card. Worth three points of tables (tool/knobs.dart).
-      final safe = legal.where((c) => c.suit != Suit.spades || c.rank.value < 12).toList();
-      if (safe.isNotEmpty) legal = safe;
     }
-    // Hearts last, since leading them hands out points on purpose.
-    final bySuit = <Suit, List<Card>>{};
-    for (final c in legal) {
-      bySuit.putIfAbsent(c.suit, () => []).add(c);
-    }
-    List<Suit> ordered({required bool longest}) => bySuit.keys.toList()
-      ..sort((a, b) {
-        if ((a == Suit.hearts) != (b == Suit.hearts)) {
-          return a == Suit.hearts ? 1 : -1;
-        }
-        final d = bySuit[a]!.length.compareTo(bySuit[b]!.length);
-        if (d != 0) return longest ? -d : d;
-        return a.index.compareTo(b.index);
-      });
-    if (persona.leadFrom == LeadFrom.longestWhileLow) {
-      final long = ordered(longest: true).first;
-      final low = _lowest(bySuit[long]!);
-      if (long != Suit.hearts && low.rank.value <= persona.longLeadMaxRank) return low;
-    }
-    return _lowest(bySuit[ordered(longest: false).first]!);
+    return _lowest(legal);
   }
 
   /// Following suit.
@@ -361,17 +349,23 @@ class Bot {
     // points of tables (tool/knobs.dart). (Taking a pointless trick
     // later with the top card, a "free" trick, measured neutral: the
     // lead it costs is worth about what the card shed is.)
-    if (view.isFirstTrick) return _highest(legal);
-
-    final isLastSeat = view.trick.length == seatCountInTrick - 1;
+    if (persona.firstTrickHigh && view.isFirstTrick) return _highest(legal);
 
     // With the moon live, ducking is the losing move: one point taken
     // here costs one, and letting the run finish costs twenty-six. Win
-    // as cheaply as the suit allows.
+    // as cheaply as the suit allows. Every rung of the ladder does this,
+    // whatever else it has not learned: a table that never breaks up a
+    // run is a rating pump for anyone who runs at every chance (tool/
+    // knobs.dart: 44% of tables against three that never defend).
     if (_moonThreat(view) != null) {
       final over = legal.where((c) => c.rank.value > high).toList();
       if (over.isNotEmpty) return _lowest(over);
     }
+
+    // A first game follows low, always, and keeps its height for later.
+    if (!persona.ducksHigh) return _lowest(legal);
+
+    final isLastSeat = view.trick.length == seatCountInTrick - 1;
 
     final under = legal.where((c) => c.rank.value < high).toList();
     if (under.isNotEmpty) {
@@ -383,7 +377,7 @@ class Bot {
     }
 
     // Taking the trick is now certain (last seat) or likely.
-    if (isLastSeat) {
+    if (isLastSeat && persona.takesHigh) {
       // Except when winning it cheap is what avoids the queen: with the
       // queen still out and spades led, the smallest winner risks least
       // on the tricks still to come.
@@ -408,28 +402,23 @@ class Bot {
       if (safe.isNotEmpty) return _highest(safe);
     }
 
+    // A first game throws its highest card, whatever it is.
+    if (!persona.discardsPoints) return _highest(legal);
+
     if (legal.contains(queenOfSpades)) return queenOfSpades;
 
-    final highSpades =
-        legal.where((c) => c.suit == Suit.spades && c.rank.value > 12).toList();
+    final highSpades = legal
+        .where((c) => c.suit == Suit.spades && c.rank.value > 12)
+        .toList();
     if (highSpades.isNotEmpty && !view.queenGone) return _highest(highSpades);
 
-    var hearts = legal.where((c) => c.suit == Suit.hearts).toList();
-    // A stopper-keeper holds the top heart, queen or better, while no
-    // points are out at all: it is what breaks up a moon later.
-    if (persona.keepsStopper &&
-        view.taken.every((t) => t == 0) &&
-        hearts.isNotEmpty &&
-        _highest(hearts).rank.value >= 12) {
-      final stopper = _highest(hearts);
-      hearts = hearts.where((c) => c != stopper).toList();
-    }
+    final hearts = legal.where((c) => c.suit == Suit.hearts).toList();
     // Any heart, from the top: a point handed to whoever takes the trick
     // is worth more than a high side-suit card kept. This used to be a
     // threshold a persona could set — throw only a heart this high —
     // and every setting of it measured worse than none, by three points
     // of tables at the old default of ten (tool/knobs.dart).
-    if (hearts.isNotEmpty) return _highest(hearts);
+    if (persona.dumpsHearts && hearts.isNotEmpty) return _highest(hearts);
 
     final side = legal
         .where((c) => c.suit != Suit.hearts && c.suit != Suit.spades)

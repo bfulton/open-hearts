@@ -48,7 +48,7 @@ rigged. Roughly in order:
 2. **The engine as a package**, shared by the app and the service.
 3. **Two measurements before anything is built on them** — taken
    ([measurements](measurements/README.md)). The bot policy as a boolean
-   circuit: 3,676 AND gates a play, proven equal to the bot
+   circuit: 3,316 AND gates a play, proven equal to the bot
    ([doc 04](docs/04-live-play.md)). A verifiable 52-card deal in wasm:
    2.1 s critical path on a desktop core with the reference crate, so
    four to six on a phone — implement, then optimise
@@ -133,18 +133,28 @@ cd packages/engine && dart run --define=GAMES=2000 tool/bot_stats.dart
 ```
 
 ```
-wins by seat        : [503, 510, 498, 533]   (fair share 500)
-mean final score    : [76.5, 76.2, 76.5, 75.7]
-queen taken by seat : [5146, 5078, 5035, 4926]
-moons shot          : 1633  (8.1% of hands)
+wins by seat        : [538, 486, 518, 504]   (fair share 500)
+mean final score    : [75.5, 76.7, 77.2, 76.5]
+queen taken by seat : [5057, 5193, 5207, 5168]
+moons shot          : 1453  (7.0% of hands)
 ```
 
 All four seats run the same bot, so **wins by seat should be flat** — a
 persistent skew is a positional bug rather than strategy. And **moons
 shot** gauges attack against defence: every bot runs at the moon on a
 hand that is plainly a shot, and with four of them one lands in about
-one hand in twelve; before any bot shot, defence alone had it at 1.7%.
+one hand in fourteen; before any bot shot, defence alone had it at 1.7%.
 Run it before and after touching `bot.dart`.
+
+The bots have names and temperaments (`persona.dart`), and each comes at
+nine strengths, so a person is seated with bots near their own rating:
+the top is the whole policy, and each rung down takes away one thing a
+player learns, down to a first game that leads its lowest card and
+passes its highest three. What each rung is worth is measured, not
+guessed — `tool/knobs.dart` takes one setting away at a time, and
+`packages/table/tool/ladder.dart` plays the whole ladder against itself
+and fits the ratings each rung starts from ([doc
+04](docs/04-live-play.md)).
 
 Known gaps, in the order they are worth closing: the bot does not read
 what an opponent's discards say about their hand, and counts the cards
