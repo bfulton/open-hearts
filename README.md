@@ -86,6 +86,25 @@ rigged. Roughly in order:
    ([doc 05](docs/05-form-factors.md)).
 8. **The stores.**
 
+### Backlog
+
+Ideas agreed on and not yet placed in the order above.
+
+- **A time bank per hand.** The Boot button only removes someone who is
+  absent; a player who takes fourteen seconds over every card is never
+  booted and costs the table three minutes a hand. A few seconds of
+  grace per card plus a bank of thinking time per hand, and Boot the
+  moment the bank is empty. A change to the boot rule in
+  [doc 04](docs/04-live-play.md), so a design conversation first.
+- **A pace history**, kept with the rating from the same signed
+  results, and **matchmaking by pace**, so slow players find each other.
+- **Tables of two.** A majority of two is both, and a silent seat cannot
+  be booted before its own turn, so one person going quiet on the
+  other's turn stalls the table for good. The jury's juror of last
+  resort covers it; until then a rule for two-person tables is needed.
+- **The jury** itself ([doc 04](docs/04-live-play.md)): an even split is
+  still a dead end that says so.
+
 ## Developing
 
 ```bash
