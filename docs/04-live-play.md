@@ -69,15 +69,22 @@ seat is the same computable consequence as any other.
 
 ## The live table, as it stands
 
-What the app does today, ahead of matchmaking and the jury. **Play
-live** on the solo table opens a lobby: a name, and either *Host a
-table* — a four-letter code to read out — or *Join* with one. The lobby
-is the relay's business (`Room` in `app/lib/net/room.dart`): the host
-announces the room, joiners announce themselves, and ten seconds after
-the last person arrives, or when four are in, or when the host presses
-*Start now*, the host publishes one signed start event naming the seats
-— people in the order they came, bots in the rest — and everyone builds
-the same table from it. The transport is a WebRTC data channel to every
+What the app does today, ahead of the jury. **Play live** on the solo
+table opens a lobby: a name, and the choice — *Rated* or *Unrated* —
+then a waiting screen and nothing to do. The matchmaker in the service
+(`service/lib/src/matchmaker.dart`) runs a round every five seconds
+over each pool: everyone waiting, in random order, four to a table;
+whoever is left over goes first in the next round; and once someone
+has waited ten seconds without a full table they get one, with bots in
+the seats nobody came for. Players say they are waiting on the relay
+every three seconds while they wait, and the seating is one signed
+event per table naming the seats, from which everyone builds the same
+table and meets on its own tag. A rated table says so on the rail and
+in its record. Below that, *With friends*: *Host a table* — a
+four-letter code to read out — or *Join* with one; the room is the
+relay's business too (`Room`), and it starts ten seconds after the
+last person arrives, or at four, or on *Start now*, by the same kind
+of start event. The transport is a WebRTC data channel to every
 other person, set up over the relay's signalling and carrying the
 table's events directly, with the relay as the path of last resort
 while a channel is not open (`MeshTransport`). The table is drawn from
@@ -89,7 +96,9 @@ sees *A bot took your seat*. The device's key is minted the first time
 it is needed and kept; on the web every signature goes through the wasm
 ([measurements/sign](../measurements/README.md)). A widget test seats
 the player at seat 2 with three simulated people and plays a hand,
-watches one leave and boots one for silence.
+watches one leave and boots one for silence; the browser suite
+(`e2e/`) matches three strangers with a bot and a fourth with three,
+then plays the friends' room through its departures.
 
 ## Filling and emptying seats
 

@@ -25,9 +25,14 @@ class BotSeat extends SeatHolder {
 }
 
 class TableSpec {
-  const TableSpec({required this.id, required this.seed, required this.seats});
+  const TableSpec({required this.id, required this.seed, required this.seats, this.rated = false});
 
   final String id;
+
+  /// Whether the record counts for the players' ratings. A pool the
+  /// player chose; carried in the table so every seat and the record
+  /// agree.
+  final bool rated;
 
   /// The deal's seed. Interim: every seat can compute every hand from
   /// it, which is why doc 03's deal replaces it before anything ships.

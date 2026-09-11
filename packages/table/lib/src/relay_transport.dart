@@ -66,9 +66,10 @@ class RelayTransport implements Transport {
   /// Every lobby event received so far, in order.
   final List<NostrEvent> lobbySoFar = [];
 
-  /// Publishes a lobby event, tagged with the table id.
-  void announce(Map<String, Object?> content) {
-    _publish(NostrEvent.sign(signer, kind: TableKinds.lobby, content: jsonEncode(content), tags: [
+  /// Publishes a lobby event, tagged with the table id: stored by the
+  /// relay, or [ephemeral] — a waiting heartbeat nobody needs later.
+  void announce(Map<String, Object?> content, {bool ephemeral = false}) {
+    _publish(NostrEvent.sign(signer, kind: ephemeral ? TableKinds.waiting : TableKinds.lobby, content: jsonEncode(content), tags: [
       ['t', table],
     ]));
   }
@@ -108,7 +109,7 @@ class RelayTransport implements Transport {
         'table',
         const Filter(kinds: [TableKinds.table]).toJson()..['#t'] = [table],
         Filter(kinds: const [TableKinds.signal], tags: {'p': [signer.publicKey]}).toJson()..['#t'] = [table],
-        const Filter(kinds: [TableKinds.lobby]).toJson()..['#t'] = [table],
+        const Filter(kinds: [TableKinds.lobby, TableKinds.waiting]).toJson()..['#t'] = [table],
       ]));
       log?.call('connected to $url');
     }).catchError((Object e) {
@@ -146,8 +147,8 @@ class RelayTransport implements Transport {
         if (e == null || e.tag('t') != table) return;
         if (!_seen.add(e.id)) return;
         if (_seen.length > 50000) _seen.clear();
-        if (e.kind == TableKinds.lobby) {
-          lobbySoFar.add(e);
+        if (e.kind == TableKinds.lobby || e.kind == TableKinds.waiting) {
+          if (e.kind == TableKinds.lobby) lobbySoFar.add(e);
           _lobby.add(e);
           return;
         }

@@ -85,7 +85,7 @@ void main() {
     expect(find.text('You'), findsWidgets);
     expect(find.text('Ada'), findsWidgets);
     expect(find.text('Dee'), findsWidgets);
-    expect(find.text('4 of 4 here'), findsOneWidget);
+    expect(find.textContaining('4 of 4 here'), findsOneWidget);
     expect(find.text('Pass'), findsOneWidget);
 
     // Pass, and let the others pass; the play begins.
@@ -116,7 +116,7 @@ void main() {
     live.people[0]!.depart(Exit.leave);
     await live.advance(tester, 500);
     expect(live.controller.personaAt(0), isNotNull, reason: 'a bot holds seat 0');
-    expect(find.text('3 of 4 here'), findsOneWidget);
+    expect(find.textContaining('3 of 4 here'), findsOneWidget);
     expect(find.text(live.controller.names[0]), findsWidgets, reason: 'the bot is named on the table');
 
     // Bao, at seat 1, goes quiet. When it is Bao's turn the clock runs,
@@ -131,7 +131,7 @@ void main() {
     await tester.tap(find.text('Boot Bao'));
     await live.advance(tester, 3000); // Dee agrees on her own clock
     expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
-    expect(find.text('2 of 4 here'), findsOneWidget);
+    expect(find.textContaining('2 of 4 here'), findsOneWidget);
     expect(live.controller.tableState, TableState.playing);
     expect(tester.takeException(), isNull);
   });

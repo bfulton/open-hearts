@@ -201,26 +201,49 @@ async function main() {
       pages.push(page);
     }
     // Everyone to the lobby.
-    for (const page of pages) {
+    for (const [i, page] of pages.entries()) {
       await waitFor(page, /^Play live$/, { what: 'the solo table' });
       await click(page, /^Play live$/);
       await waitFor(page, /^Host a table$/);
       await type(page, 'Relay', relay.url);
+      await type(page, 'Your name', names[i]);
     }
+
+    // Cell 0: matchmaking. Three ask for an unrated game and are seated
+    // together with a bot at the round after ten seconds; the fourth,
+    // alone in the rated pool, gets three bots.
+    for (const page of pages.slice(0, 3)) await click(page, /^Unrated$/);
+    await click(pages[3], /^Rated$/);
+    for (const page of pages) await waitFor(page, /^Finding players$/);
+    for (const page of pages.slice(0, 3)) await waitFor(page, /^3 of 3 here  ·  unrated$/, { what: 'the unrated table', timeout: 40000 });
+    await waitFor(pages[3], /^1 of 1 here  ·  rated$/, { what: 'the rated table', timeout: 40000 });
+    log('matched: three together, one with bots');
+    await playUntil(pages, (p) => has(p, /^On with it$/), { timeout: 180000 });
+    log('a matched hand played on every screen');
+    // Back to the lobby for the rest: Leave, then Play live again. The
+    // score sheet goes on its own after a few seconds, so it may be
+    // gone by the time a page is reached.
+    for (const page of pages) {
+      if (await has(page, /^On with it$/)) await click(page, /^On with it$/);
+      await click(page, /^Leave$/);
+      await waitFor(page, /^Play live$/, { what: 'the solo table again' });
+      await click(page, /^Play live$/);
+      await waitFor(page, /^Host a table$/);
+      await type(page, 'Relay', relay.url);
+    }
+
     // Ada hosts; the code is the only four-capital-letter text on her screen.
-    await type(pages[0], 'Your name', names[0]);
     await click(pages[0], /^Host a table$/);
     await waitFor(pages[0], /^Read the code out/, { what: 'the room' });
     const code = (await texts(pages[0])).find((t) => /^[A-Z]{4}$/.test(t));
     if (!code) throw new Error('no room code shown');
     log(`room ${code}`);
     for (let i = 1; i < 4; i++) {
-      await type(pages[i], 'Your name', names[i]);
       await type(pages[i], 'Room code', code);
       await click(pages[i], /^Join$/);
     }
     // Four in: the host starts on its own.
-    for (const page of pages) await waitFor(page, /^4 of 4 here$/, { what: 'the live table', timeout: 40000 });
+    for (const page of pages) await waitFor(page, /^4 of 4 here  ·  unrated$/, { what: 'the live table', timeout: 40000 });
     log('all four at the table');
 
     // Cell 1: a whole hand over WebRTC.
@@ -234,7 +257,7 @@ async function main() {
     await contexts[3].close();
     log('Dee closed her browser');
     const others = pages.slice(0, 3);
-    await playUntil(others, (p) => has(p, /^3 of 4 here$/), { timeout: 90000 });
+    await playUntil(others, (p) => has(p, /^3 of 4 here/), { timeout: 90000 });
     await playUntil(others, async (p) => (await texts(p)).some((t) => roster.test(t)), { timeout: 90000 });
     log('a bot took Dee\'s seat');
 
@@ -243,13 +266,13 @@ async function main() {
     await playUntil(others, (p, i) => i === 2 || has(p, /^Boot Cara$/), { timeout: 120000, idle: [2] });
     await click(pages[0], /^Boot Cara$/);
     log('Ada pressed Boot');
-    await playUntil([pages[0], pages[1]], (p) => has(p, /^2 of 4 here$/), { timeout: 60000 });
+    await playUntil([pages[0], pages[1]], (p) => has(p, /^2 of 4 here/), { timeout: 60000 });
     await waitFor(pages[2], /^A bot took your seat$/, { what: "Cara's replacement notice", timeout: 30000 });
     log('Cara booted, and told');
 
     // Cell 4: Bao leaves. Ada plays on with three bots.
     await click(pages[1], /^Leave$/);
-    await playUntil([pages[0]], (p) => has(p, /^1 of 4 here$/), { timeout: 60000 });
+    await playUntil([pages[0]], (p) => has(p, /^1 of 4 here/), { timeout: 60000 });
     log('Bao left; Ada alone with three bots');
     const before = (await texts(pages[0])).find((t) => /^Hand \d/.test(t));
     await playUntil([pages[0]], (p) => has(p, /^On with it$/), { timeout: 180000 });

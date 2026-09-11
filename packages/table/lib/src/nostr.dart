@@ -186,7 +186,13 @@ abstract final class TableKinds {
   static const signal = 24243;
 
   /// The lobby: hosting a table, joining it, starting it, tagged `t`
-  /// with the room code. Stored, not ephemeral, so a relay hands a
+  /// with the room code — or, tagged with a pool, the matchmaker's
+  /// seating of a table. Stored, not ephemeral, so a relay hands a
   /// joiner the room that was announced before it arrived.
   static const lobby = 4244;
+
+  /// A player waiting to be matched, tagged `t` with the pool, sent
+  /// every few seconds while they wait. Ephemeral: whoever is listening
+  /// at the time is the whole audience.
+  static const waiting = 24245;
 }

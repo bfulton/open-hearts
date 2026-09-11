@@ -60,13 +60,16 @@ rigged. Roughly in order:
    fork or a deadlock ([doc 06](docs/06-service.md), `packages/table`).
    The local relay exists (`service/`, a NIP-01 subset), the same
    clients play a hand over it with real keys and real sockets, and
-   the app has a live table: **Play live**, host a four-letter code or
-   join one, and the four of you are on WebRTC data channels with the
-   relay as fallback, signing in wasm since Dart-to-JavaScript
-   signatures cost 100 ms each ([measurements](measurements/README.md)).
-   Four headless browsers prove it on every commit — a hand over
-   WebRTC, a browser closed mid-hand, a stalled one booted, a leaver
-   (`e2e/`). Still to come: a relay that is not on localhost.
+   the app has live play: **Play live**, pick rated or unrated, and
+   the matchmaker seats whoever is waiting four to a table every five
+   seconds, leftovers first next time, bots after ten; or host a
+   four-letter code for friends. Either way the four of you are on
+   WebRTC data channels with the relay as fallback, signing in wasm
+   since Dart-to-JavaScript signatures cost 100 ms each
+   ([measurements](measurements/README.md)). Four headless browsers
+   prove it on every commit — matched, a hand over WebRTC, a browser
+   closed mid-hand, a stalled one booted, a leaver (`e2e/`). Still to
+   come: a relay and a matchmaker that are not on localhost.
    Meanwhile every solo game is kept on the device as a
    record — the deal, the bots, your own passes and plays — and **Copy
    record** on the game-over sheet hands it over as a line of text that

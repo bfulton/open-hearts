@@ -197,7 +197,7 @@ class _Presence extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        '$here of ${humans.length} here',
+        '$here of ${humans.length} here  ·  ${controller.client.spec.rated ? 'rated' : 'unrated'}',
         style: TextStyle(fontSize: 10.5, color: here == humans.length ? Palette.chromeDim : Palette.danger),
       ),
     );
