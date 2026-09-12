@@ -98,6 +98,34 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  for (final exit in [Exit.leave, Exit.crash]) {
+    test('a person who ${exit == Exit.leave ? 'leaves' : 'crashes'} during the pass, after a pass into their seat, has that pass opened with their hand', () {
+      // Three people: the one passing into the leaver is a person, so
+      // the pass is sealed to the leaver and taken as unknown by all —
+      // until the leaver's secret is rebuilt and the bot in the seat
+      // needs the hand, pass included.
+      final t = SimTable(humans: 3, seed: 12, crypto: crypto, jurors: 4);
+      // Slower than the others, so a person's pass reaches the leaver
+      // before the leaver's own; and the moment asks for a person's.
+      t.people[1].thinkMs = 3000;
+      t.people[1].exitAt = Moment('during the pass, after a person\'s pass into me', (c) {
+        if (!c.awaitingMyPass) return false;
+        final from = (c.mySeat! - c.game.passDirection.seatOffset) % seatCount;
+        return c.spec.seats[from] is HumanSeat && c.game.hasPassed(from);
+      });
+      t.people[1].exit = exit;
+      t.start();
+      expect(t.run(), isTrue);
+      expect(t.people[1].gone, isTrue, reason: 'the moment came');
+      for (final c in t.survivors) {
+        expect(c.game.knowsHand(1), isTrue);
+        expect(c.pause, isNull);
+      }
+      agree(t);
+      t.stop();
+    }, timeout: const Timeout(Duration(minutes: 5)));
+  }
+
   test('a person who leaves during the deal is a bot from there, and the deal goes on', () {
     final t = SimTable(humans: 3, seed: 10, crypto: crypto, jurors: 4);
     t.people[1].exitAt = Moment('during the deal', (c) => c.game.phase == Phase.dealing && c.deal!.hasKeys(1) && c.deal!.deck == null);

@@ -67,6 +67,7 @@ import 'package:engine/engine.dart';
 import 'clock.dart';
 import 'events.dart';
 import 'model.dart';
+import 'sealed_pass.dart';
 import 'signing.dart';
 import 'spec.dart';
 import 'jury.dart';
@@ -674,6 +675,13 @@ class TableClient {
         return;
       }
       if (!game.knowsHand(seat)) {
+        // A pass into this seat taken as unknown is opened first: a
+        // seen hand takes what came in. One that will not open holds
+        // the seat, as a secret still awaited does.
+        if (!openPassInto(d, game, seat)) {
+          _trace('seat $seat\'s hand waits: the pass into it is not open here');
+          return _stall(turn, seat);
+        }
         // As the engine holds it: the hand as dealt while the pass is
         // unresolved, since the deal moves positions as each pass
         // settles and the engine only when all four have.
@@ -1626,6 +1634,16 @@ class TableClient {
       cards.add(Card.deck[c]);
     }
     _declareLead();
+    final to = (seat + game.passDirection.seatOffset) % seatCount;
+    if (cards.length != positions.length && game.knowsHand(to)) {
+      // Into a seat whose hand is seen here — a departed seat's, opened
+      // from escrow — a pass has to open too, and this one will not:
+      // sealed to a secret nobody holds, or garbage (docs/03). The
+      // engine waits at the pass rather than take a hand it cannot
+      // fill.
+      _trace('a pass into seat $to, whose hand is seen here, that will not open: $e');
+      return;
+    }
     game.setPass(seat, cards.length == positions.length ? cards : null);
   }
 

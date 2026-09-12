@@ -17,6 +17,7 @@ import 'package:engine/engine.dart';
 import 'client.dart';
 import 'events.dart';
 import 'jury.dart';
+import 'sealed_pass.dart';
 import 'signing.dart';
 import 'spec.dart';
 
@@ -266,8 +267,10 @@ Verification verifyRecord(
   String? botActs(int seat, {required bool passing}) {
     final d = deal;
     if (d != null && !game.knowsHand(seat)) {
-      // As the engine holds it: dealt while the pass is unresolved,
-      // current during play (the client's rule).
+      // The pass into the seat first, as the client does; then the
+      // hand as the engine holds it: dealt while the pass is
+      // unresolved, current during play.
+      if (!openPassInto(d, game, seat)) return 'the pass into seat $seat was never opened';
       final cards = game.phase == Phase.playing ? d.handOf(seat) : d.dealtHandOf(seat);
       if (cards == null) return 'seat $seat\'s hand was never opened';
       game.revealHand(seat, [for (final i in cards) Card.deck[i]]);

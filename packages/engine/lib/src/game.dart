@@ -223,6 +223,16 @@ class HeartsGame {
     if (cards.length != _sizes[seat]) {
       throw ArgumentError('seat $seat holds ${_sizes[seat]} cards, not ${cards.length}');
     }
+    if (_phase == Phase.passing) {
+      // A seen hand takes what is passed into it when the swap
+      // resolves, so a pass into it taken as unknown has to be filled
+      // in first (amendPass) — a departed seat's, opened from escrow
+      // while the others' passes to it were still sealed.
+      final from = (seat - passDirection.seatOffset) % seatCount;
+      if (from != seat && _passed[from] && _passes[from] == null) {
+        throw StateError('seat $seat\'s hand cannot be seen while seat $from\'s pass into it is unknown');
+      }
+    }
     for (final c in cards) {
       for (var s = 0; s < seatCount; s++) {
         if (_hands[s]?.contains(c) == true) throw ArgumentError('$c is in seat $s\'s hand');
@@ -317,8 +327,34 @@ class HeartsGame {
     if (_passed.every((p) => p)) _resolvePass();
   }
 
+  /// Fills in a pass taken as unknown — from a hidden hand into a
+  /// hidden one — before the swap resolves: the receiver's hand is
+  /// about to be seen, and a seen hand takes what came into it.
+  void amendPass(int seat, List<Card> cards) {
+    if (_phase != Phase.passing) throw StateError('not passing (phase: $_phase)');
+    if (!_passed[seat]) throw StateError('seat $seat has not passed');
+    if (_passes[seat] != null) throw StateError('seat $seat\'s pass is known');
+    if (cards.length != passSize || cards.toSet().length != passSize) {
+      throw ArgumentError('a pass is exactly $passSize different cards, got $cards');
+    }
+    for (final c in cards) {
+      for (var s = 0; s < seatCount; s++) {
+        if (_hands[s]?.contains(c) == true) throw ArgumentError('$c is in seat $s\'s hand, not seat $seat\'s');
+      }
+    }
+    _passes[seat] = List.of(cards);
+  }
+
   void _resolvePass() {
     final offset = passDirection.seatOffset;
+    for (var s = 0; s < seatCount; s++) {
+      final to = (s + offset) % seatCount;
+      if (_hands[to] != null && _passes[s] == null) {
+        // revealHand and setPass keep this from happening; a throw
+        // here leaves the swap untouched rather than half done.
+        throw StateError('seat $to\'s hand is seen but seat $s\'s pass into it is unknown');
+      }
+    }
     // Remove every pass before delivering any: a card must not be
     // passable and receivable in the same step.
     for (var s = 0; s < seatCount; s++) {
@@ -330,7 +366,7 @@ class HeartsGame {
       final to = (s + offset) % seatCount;
       final cards = _passes[s];
       _received[to] = cards == null ? const [] : List.of(cards);
-      _hands[to]?.addAll(cards!);
+      if (cards != null) _hands[to]?.addAll(cards);
       _sizes[to] += passSize;
     }
     for (final h in _hands) {

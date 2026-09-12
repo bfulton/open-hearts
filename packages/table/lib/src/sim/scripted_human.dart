@@ -46,7 +46,9 @@ class ScriptedHuman {
   final SimNetwork net;
   final VirtualClock clock;
   final Persona persona;
-  final int thinkMs;
+  /// How long a move takes; a test makes one person slower than the
+  /// rest to put a departure after the others have acted.
+  int thinkMs;
   final int pressBootMs;
 
   Exit? exit;

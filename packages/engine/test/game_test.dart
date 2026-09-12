@@ -409,6 +409,35 @@ void sealedTests() {
       expect(game.receivedBy(1), hands[0].take(3).toList(), reason: 'what a seen seat passed is seen, whoever got it');
     });
 
+    test('a pass taken as unknown is filled in before its receiver\'s hand is seen', () {
+      final hands = handsFrom(6);
+      // Seats 0 and 1 hidden: seat 0's pass to seat 1 is unknown here.
+      final game = HeartsGame(sealed: true)..deal([null, null, hands[2], hands[3]]);
+      game.declareLeader(hands.indexWhere((h) => h.contains(twoOfClubs)));
+      expect(game.passDirection, PassDirection.left);
+      game.setPass(0, null);
+      expect(() => game.amendPass(1, hands[1].take(3).toList()), throwsStateError, reason: 'seat 1 has not passed');
+      // Seat 1 leaves and its hand is opened: not until the pass into
+      // it is known.
+      expect(() => game.revealHand(1, hands[1]), throwsStateError);
+      expect(() => game.amendPass(0, hands[2].take(3).toList()), throwsArgumentError, reason: 'seat 2 holds those');
+      expect(() => game.amendPass(0, hands[0].take(2).toList()), throwsArgumentError);
+      final passed = hands[0].take(3).toList();
+      game.amendPass(0, passed);
+      expect(() => game.amendPass(0, passed), throwsStateError, reason: 'known now');
+      expect(game.passOf(0), passed);
+      game.revealHand(1, hands[1]);
+      expect(game.knowsHand(1), isTrue);
+      game.setPass(1, hands[1].take(3).toList());
+      game.setPass(2, hands[2].take(3).toList());
+      game.setPass(3, hands[3].take(3).toList());
+      expect(game.phase, Phase.playing);
+      expect(game.handOf(1), containsAll(passed));
+      expect(game.handOf(1), isNot(contains(hands[1].first)));
+      expect(game.receivedBy(1), passed);
+      expect(() => game.amendPass(0, passed), throwsStateError, reason: 'the swap has resolved');
+    });
+
     test('a seen seat cannot pass unknown cards, and a hidden seat cannot pass a seen card', () {
       final hands = handsFrom(4);
       final game = HeartsGame(sealed: true)..deal([hands[0], null, null, null]);
