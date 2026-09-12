@@ -104,12 +104,20 @@ Future<void> installFastSchnorr() async {
 Signer signerFromSecret(String secretHex) => _wasm == null ? SchnorrSigner.fromSecret(secretHex) : _WasmSigner(secretHex);
 
 class _WasmSigner implements Signer {
-  _WasmSigner(this._secretHex) : publicKey = SchnorrSigner.fromSecret(_secretHex).publicKey;
+  _WasmSigner(this._secretHex) : _dart = SchnorrSigner.fromSecret(_secretHex);
 
   final String _secretHex;
 
+  /// The Dart signer with the same secret, for what the wasm does not
+  /// do: a shared secret is a handful of point multiplications per
+  /// hand, not per play, and the Dart curve is fine for that.
+  final SchnorrSigner _dart;
+
   @override
-  final PublicKey publicKey;
+  PublicKey get publicKey => _dart.publicKey;
+
+  @override
+  Uint8List sharedSecretWith(PublicKey other) => _dart.sharedSecretWith(other);
 
   @override
   String sign(String digestHex) {

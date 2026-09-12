@@ -30,4 +30,36 @@ void main() {
     expect(verify(s.publicKey, msg, ref), isTrue);
     expect(verify(s.publicKey, msg, s.sign(msg)), isTrue);
   });
+
+  test('two real keys share one secret, from either end, and no third key has it', () {
+    final a = SchnorrSigner.generate();
+    final b = SchnorrSigner.generate();
+    final c = SchnorrSigner.generate();
+    final ab = a.sharedSecretWith(b.publicKey);
+    expect(ab.length, 32);
+    expect(b.sharedSecretWith(a.publicKey), ab);
+    expect(c.sharedSecretWith(a.publicKey), isNot(ab));
+    expect(a.sharedSecretWith(c.publicKey), isNot(ab));
+    expect(() => a.sharedSecretWith('00' * 32), throwsArgumentError, reason: 'x = 0 is not on the curve');
+  });
+
+  test('the shared secret is the ECDH value an independent implementation gives', () {
+    // Secret 6 has an odd-y point, so this also checks that the
+    // negated secret an x-only key implies does not change the x
+    // coordinate the two ends hash. The expected value was computed
+    // with a separate, pure-Python secp256k1.
+    final a = SchnorrSigner.fromSecret('0000000000000000000000000000000000000000000000000000000000000006');
+    final b = SchnorrSigner.fromSecret('b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef');
+    expect(a.publicKey, 'fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556');
+    final hex = a.sharedSecretWith(b.publicKey).map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    expect(hex, 'a98a1a2583e0d2a38598be875fc73f634844eadcb4039527eb9b21e9d0e04b88');
+    expect(b.sharedSecretWith(a.publicKey), a.sharedSecretWith(b.publicKey));
+  });
+
+  test('fake keys share a hash, symmetric, that a real key never produces', () {
+    final a = FakeSigner('a');
+    final b = FakeSigner('b');
+    expect(a.sharedSecretWith(b.publicKey), b.sharedSecretWith(a.publicKey));
+    expect(a.sharedSecretWith(b.publicKey), isNot(a.sharedSecretWith(FakeSigner('c').publicKey)));
+  });
 }
