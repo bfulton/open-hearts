@@ -1,0 +1,15 @@
+name: deal
+description: The verifiable deal (docs/03-fair-deal.md) — the Rust crate in crypto/deal, bound for the Dart VM over FFI and for the browser over its wasm, behind one interface.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  crypto: ^3.0.0
+  ffi: ^2.1.0
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.0
