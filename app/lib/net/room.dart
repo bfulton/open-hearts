@@ -18,6 +18,8 @@ import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
+import '../crypto/deal.dart';
+
 class RoomMember {
   const RoomMember(this.key, this.name, {this.at = 0});
   final PublicKey key;
@@ -165,11 +167,11 @@ class Room extends ChangeNotifier {
         seats.add({'bot': draw[s].id});
       }
     }
-    relay.announce({'kind': 'start', 'seed': _seed, 'seats': seats, 'policy': botPolicyVersion});
+    relay.announce({'kind': 'start', 'seed': _seed, 'seats': seats, 'policy': botPolicyVersion, 'sealed': dealCrypto != null});
   }
 
-  static const _mismatch = "The host's app plays its bots differently from yours — one of you is on an older build. "
-      'Update, and try again.';
+  static const _mismatch = "The host's app is on another build than yours — one of you is older. Update, and try again.";
+  static const _noDeal = "This browser can't run the deal that keeps the cards honest. Try a current Chrome, Firefox or Safari.";
 
   void _applyStart(Map<String, Object?> c) {
     // Every client computes the bots' plays itself; two versions of the
@@ -193,7 +195,12 @@ class Room extends ChangeNotifier {
       s++;
     }
     if (seats.length != seatCount) return;
-    spec = TableSpec(id: code, seed: seed, seats: seats);
+    final sealed = c['sealed'] == true;
+    if (sealed && dealCrypto == null) {
+      refusal = _noDeal;
+      return;
+    }
+    spec = TableSpec(id: code, seed: seed, seats: seats, sealed: sealed);
     seatNames = names;
   }
 

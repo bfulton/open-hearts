@@ -8,6 +8,7 @@
 /// in the lobby.
 library;
 
+import 'package:deal/deal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:table/table.dart';
 
@@ -21,13 +22,15 @@ class Duty {
   static Duty? _current;
 
   /// The duty on [url], started if need be; a new relay replaces it.
-  static Duty on(Uri url, Signer signer, {bool log = false}) {
+  /// With [crypto] the juror can serve sealed tables, holding a piece
+  /// of every person's deal secret there.
+  static Duty on(Uri url, Signer signer, {bool log = false, DealCrypto? crypto}) {
     final d = _current;
     if (d != null && d.url == url) return d;
     d?.close();
     void Function(String)? logger = log ? (l) => debugPrint('duty: $l') : null;
     final presence = RelayPresence(url: url, signer: signer, log: logger);
-    final juror = JurorDuty(url: url, signer: signer, presence: presence, log: logger)..start();
+    final juror = JurorDuty(url: url, signer: signer, presence: presence, log: logger, crypto: crypto)..start();
     return _current = Duty._(url, presence, juror);
   }
 

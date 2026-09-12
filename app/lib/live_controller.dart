@@ -22,6 +22,7 @@ library;
 import 'dart:async';
 import 'dart:math';
 
+import 'package:deal/deal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
@@ -36,17 +37,23 @@ class LiveController extends ChangeNotifier implements TableModel {
     required Transport transport,
     Clock? clock,
     Presence? presence,
+    DealCrypto? crypto,
     this.ratingOf,
     this.onResult,
     this.paced = true,
-  }) : client = TableClient(spec: spec, signer: signer, transport: transport, clock: clock ?? WallClock(), presence: presence) {
-    _shown = HeartsGame(seed: spec.seed);
+  })  : _crypto = crypto,
+        client = TableClient(
+            spec: spec, signer: signer, transport: transport, clock: clock ?? WallClock(), presence: presence, crypto: crypto) {
+    _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed);
     _shownHolders = List.of(spec.seats);
     _sub = client.changes.listen((_) => _onChange());
     client.start();
   }
 
   final TableClient client;
+
+  /// The deal's primitives, at a sealed table; for the verifier.
+  final DealCrypto? _crypto;
 
   /// The humans' names by seat, from the lobby.
   final Map<int, String> seatNames;
@@ -126,7 +133,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Replays the whole record at once. A jump, for the rare case where
   /// the shown past was rewritten.
   void _rebuild(List<Decision> record) {
-    _shown = HeartsGame(seed: client.spec.seed);
+    _shown = HeartsGame(seed: client.spec.seed, sealed: client.spec.sealed);
     _shownHolders = List.of(client.spec.seats);
     _shownPlayed.clear();
     _consumed.clear();
@@ -137,9 +144,21 @@ class LiveController extends ChangeNotifier implements TableModel {
     }
   }
 
+  /// A bot seat's hand, for the shown game to compute its move: dealt
+  /// open, or a departed person's opened from escrow since. False
+  /// while it is still closed.
+  bool _seesHand(int seat) {
+    if (_shown.knowsHand(seat)) return true;
+    final cards = client.dealOf(_shown.handNumber)?.handOf(seat);
+    if (cards == null) return false;
+    _shown.revealHand(seat, [for (final i in cards) Card.deck[i]]);
+    return true;
+  }
+
   void _botActs(int seat, {required bool passing}) {
     final bot = Bot(persona: (_shownHolders[seat] as BotSeat).persona);
     if (passing) {
+      _declareLead();
       _shown.setPass(seat, bot.choosePass(_shown.handOf(seat)));
     } else {
       final view = BotView(
@@ -156,6 +175,29 @@ class LiveController extends ChangeNotifier implements TableModel {
       _shownPlayed.add(card);
       _lastCardAt = DateTime.now().millisecondsSinceEpoch;
     }
+  }
+
+  /// Tells the shown game who leads, from where the deal has the 2♣.
+  void _declareLead() {
+    final leader = client.dealOf(_shown.handNumber)?.leader;
+    if (leader != null && (_shown.phase == Phase.dealing || _shown.phase == Phase.passing)) _shown.declareLeader(leader);
+  }
+
+  /// The cards of a settled pass, as this side can see them: from the
+  /// event at a seeded table; at a sealed one from the deal, which
+  /// opened them when they are this side's own, a bot's, or a departed
+  /// seat's — null otherwise.
+  List<Card>? _passCards(Decision d) {
+    if (!client.spec.sealed) return [for (final c in d.event.body['cards'] as List) Card.parse(c as String)];
+    final deal = client.dealOf(d.turn.hand);
+    if (deal == null) return null;
+    final cards = <Card>[];
+    for (final p in d.event.body['positions'] as List) {
+      final c = deal.openedCardAt(p as int);
+      if (c == null) return null;
+      cards.add(Card.deck[c]);
+    }
+    return cards;
   }
 
   /// The next thing the view should show, and how long to wait before
@@ -180,20 +222,52 @@ class LiveController extends ChangeNotifier implements TableModel {
         }
       );
     }
+    // The deal's own steps and the audit are the table's, not the
+    // view's: taken as read the moment they are there.
+    if (_consumed.length < record.length && (record[_consumed.length].turn.isDeal || record[_consumed.length].turn.isAudit)) {
+      final d = record[_consumed.length];
+      return (delay: Duration.zero, act: () => _consumed.add(d));
+    }
+    if (_shown.phase == Phase.dealing) {
+      // Shown once the table has the hand: what this side can see of
+      // it, the rest as card backs.
+      final hand = _shown.handNumber;
+      final deal = client.dealOf(hand);
+      final dealt = deal != null && (client.game.handNumber > hand || client.game.phase != Phase.dealing);
+      if (!dealt) return null;
+      final leader = deal.leader;
+      if (leader == null) return null;
+      return (
+        delay: Duration.zero,
+        act: () {
+          _shown.declareLeader(leader);
+          _shown.deal([
+            for (var s = 0; s < seatCount; s++)
+              switch (deal.dealtHandOf(s)) {
+                null => null,
+                final cards => [for (final i in cards) Card.deck[i]],
+              },
+          ]);
+        }
+      );
+    }
     if (_shown.phase == Phase.passing) {
       for (var s = 0; s < seatCount; s++) {
-        if (_shownHolders[s] is BotSeat && _shown.passOf(s) == null) {
+        if (_shownHolders[s] is BotSeat && !_shown.hasPassed(s)) {
+          if (!_seesHand(s)) return null; // a departed seat's hand, not open here yet
           return (delay: Duration.zero, act: () => _botActs(s, passing: true));
         }
       }
       if (_consumed.length >= record.length) return null; // a person's pass is owed
       final d = record[_consumed.length];
       if (d.event.kind != EventKind.pass) return null; // not what the replay expects: leave it to a rebuild
+      final cards = _passCards(d);
       return (
         delay: Duration.zero,
         act: () {
           _consumed.add(d);
-          _shown.setPass(d.event.seat, [for (final c in d.event.body['cards'] as List) Card.parse(c as String)]);
+          _declareLead();
+          _shown.setPass(d.event.seat, cards);
           if (d.event.seat == mySeat) _pendingPass = const {};
         }
       );
@@ -221,6 +295,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     }
     final seat = _shown.currentSeat!;
     if (_shownHolders[seat] is BotSeat) {
+      if (!_seesHand(seat)) return null; // a departed seat's hand, not open here yet
       return (delay: _botThink(seat), act: () => _botActs(seat, passing: false));
     }
     if (_consumed.length >= record.length) return null; // a person's play is owed
@@ -355,7 +430,7 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   @override
   bool get awaitingPass =>
-      client.awaitingMyPass && _shown.phase == Phase.passing && _shown.passOf(mySeat) == null && _pendingPass.isEmpty;
+      client.awaitingMyPass && _shown.phase == Phase.passing && !_shown.hasPassed(mySeat) && _pendingPass.isEmpty;
 
   @override
   bool get canConfirmPass => awaitingPass && _selected.length == passSize;
@@ -438,8 +513,23 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// The table found nobody online to draw a jury from.
   bool get needsJuror => client.needsJuror;
 
+  /// What the deal is doing, while the table deals; null otherwise.
+  String? get dealNote {
+    if (client.game.phase != Phase.dealing) return null;
+    final d = client.deal;
+    if (d == null) return 'Dealing';
+    return switch (d.phase) {
+      DealPhase.keys => 'Dealing — keys',
+      DealPhase.shuffles => 'Shuffling (${(d.nextShuffler ?? 3) + 1} of 4)',
+      DealPhase.tokens => 'Dealing the cards',
+      DealPhase.declare => 'Opening the cards',
+      _ => 'Dealing',
+    };
+  }
+
   /// The record so far, as the verifier sees it.
-  Verification verification() => verifyRecord(client.spec, client.record, allowPartial: !client.done, juries: client.juries);
+  Verification verification() =>
+      verifyRecord(client.spec, client.record, allowPartial: !client.done, juries: client.juries, crypto: _crypto);
 
   @override
   void dispose() {

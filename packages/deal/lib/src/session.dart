@@ -76,11 +76,10 @@ class DealSession {
     this.mySeat,
     this.myKey,
     this.wrap,
-    List<String> custodians = const [],
+    this.custodians = const [],
     Uint8List? mySecret,
     Random? random,
-  })  : _random = random ?? Random.secure(),
-        custodians = List.unmodifiable(custodians) {
+  })  : _random = random ?? Random.secure() {
     if (seats.length != _seats) throw ArgumentError('four seats');
     if (mySeat != null && seats[mySeat!] is! HumanDealSeat) throw ArgumentError('a person\'s seat');
     if (mySeat != null && wrap == null) throw ArgumentError('a seat wraps its escrow');
@@ -94,6 +93,7 @@ class DealSession {
     for (final s in _secrets.keys) {
       _pks[s] = crypto.keygen(_secrets[s]!);
     }
+    _afterKeys(); // a table of one person and three bots has every key already
   }
 
   final DealCrypto crypto;
@@ -117,8 +117,10 @@ class DealSession {
   /// verifier, which opens nothing.
   final Uint8List Function(String otherKey)? wrap;
 
-  /// Table keys of the jurors this seat escrows to.
-  final List<String> custodians;
+  /// Table keys of the jurors this seat escrows to. Settable until
+  /// the keys message is made, since a jury can carry after the hand
+  /// opens.
+  List<String> custodians;
 
   final Random _random;
   final Map<int, Uint8List> _secrets = {};
@@ -238,6 +240,19 @@ class DealSession {
     return cards;
   }
 
+  /// The seat's hand as dealt — its thirteen positions' cards, passes
+  /// and plays notwithstanding — as far as this side has opened them,
+  /// or null if any is closed. What a replay of the hand starts from.
+  List<int>? dealtHandOf(int seat) {
+    final cards = <int>[];
+    for (var p = seat * _handSize; p < (seat + 1) * _handSize; p++) {
+      final c = _cards[p];
+      if (c == null) return null;
+      cards.add(c);
+    }
+    return cards;
+  }
+
   /// How many positions [seat] holds.
   int handSizeOf(int seat) => _holderOf.where((h) => h == seat).length;
 
@@ -326,20 +341,45 @@ class DealSession {
 
   Uint8List _pad(Uint8List key, String label) => Uint8List.fromList(sha256.convert([...key, ...utf8.encode('|$label')]).bytes);
 
-  /// Another seat's keys: kept when the proof holds, and whatever was
-  /// escrowed to this side opened. False for a bot's, which everyone
-  /// computes, and for anything that does not verify.
-  bool acceptKeys(Map<String, Object?> m) {
+  /// Whether a seat's keys message is well formed and its proof
+  /// holds. Changes nothing.
+  bool verifyKeys(Map<String, Object?> m) {
     try {
       final seat = m['seat'] as int;
       if (seat < 0 || seat >= _seats || !_human(seat)) return false;
-      if (_pks.containsKey(seat)) return true; // the same seat again
       final pk = _unb64(m['pk']);
       final proof = _unb64(m['proof']);
-      if (!crypto.verifyKey(pk, _name(seat), proof)) return false;
       final custodianKeys = [for (final k in m['custodians'] as List) k as String];
       final custody = [for (final c in m['custody'] as List) _unb64(c)];
-      if (custody.length != custodianKeys.length) return false;
+      if (custody.length != custodianKeys.length || custody.any((c) => c.length != 32)) return false;
+      final pieces = Map<String, Object?>.from(m['pieces'] as Map);
+      for (final e in pieces.entries) {
+        final to = int.parse(e.key);
+        if (to < 0 || to >= _seats || to == seat || _unb64(e.value).length != 32) return false;
+      }
+      return pk.length == pointBytes && crypto.verifyKey(pk, _name(seat), proof);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Another seat's keys: kept when the proof holds, and whatever was
+  /// escrowed to this side opened. False for a bot's, which everyone
+  /// computes, and for anything that does not verify. [verified]
+  /// skips the check for a message checked on arrival.
+  bool acceptKeys(Map<String, Object?> m, {bool verified = false}) {
+    try {
+      final seat = m['seat'] as int;
+      if (seat < 0 || seat >= _seats || !_human(seat)) return false;
+      if (_pks.containsKey(seat)) {
+        _afterKeys(); // the same seat again — or this side's own, whose keys were here from the start
+        return true;
+      }
+      if (!verified && !verifyKeys(m)) return false;
+      final pk = _unb64(m['pk']);
+      final proof = _unb64(m['proof']);
+      final custodianKeys = [for (final k in m['custodians'] as List) k as String];
+      final custody = [for (final c in m['custody'] as List) _unb64(c)];
       final pieces = Map<String, Object?>.from(m['pieces'] as Map);
       _pks[seat] = pk;
       _keyProofs[seat] = proof;
@@ -384,13 +424,15 @@ class DealSession {
     _computeWhatCan();
   }
 
-  /// A seat whose secret everyone holds: a bot's, a departed
-  /// person's once rebuilt, anyone's after the audit. This side's own
-  /// is not public, however well it knows it.
-  bool _public(int seat) => seat != mySeat && _secrets.containsKey(seat);
+  /// A seat whose steps are everyone's to compute: a bot's, or a
+  /// departed person's once its secret is rebuilt. A person still at
+  /// the table makes its own, even to a side that has come to know
+  /// its secret — the verifier, reading the audit ahead.
+  bool _public(int seat) => seat != mySeat && (!_human(seat) || _gone.contains(seat)) && _secrets.containsKey(seat);
 
   /// Every step of a seat whose secret is public here is public work:
-  /// shuffles as far as they are next, tokens, the lead card found.
+  /// shuffles as far as they are next; and with the deck done, tokens
+  /// for every seat whose secret this side holds, to open its cards.
   void _computeWhatCan() {
     while (nextShuffler != null && _public(nextShuffler!)) {
       final s = nextShuffler!;
@@ -400,9 +442,19 @@ class DealSession {
     }
     if (deck == null) return;
     for (var s = 0; s < _seats; s++) {
-      if (_public(s)) _tokensBy(s, everyPosition: true);
+      if (s != mySeat && _secrets.containsKey(s)) _tokensBy(s, everyPosition: true);
     }
     _openWhatCan();
+  }
+
+  /// A seat's secret from elsewhere — an audit read ahead — kept when
+  /// it is the one behind the seat's key.
+  bool provideSecret(int seat, Uint8List secret) {
+    if (!_human(seat) || !_pks.containsKey(seat)) return false;
+    if (_secrets.containsKey(seat)) return true;
+    if (secret.length != 32 || !_same(crypto.keygen(secret), _pks[seat]!)) return false;
+    _learnSecret(seat, secret);
+    return true;
   }
 
   /// Public randomness for a bot seat's step: from its public secret.
@@ -422,16 +474,30 @@ class DealSession {
     return {'seat': me, 'deck': _b64(r.deck), 'proof': _b64(r.proof)};
   }
 
+  /// Whether a seat's shuffle is its to make now and its argument
+  /// verifies against the deck before it. Changes nothing.
+  bool verifyShuffle(Map<String, Object?> m) {
+    try {
+      final seat = m['seat'] as int;
+      if (nextShuffler != seat || !_human(seat) || _public(seat)) return false;
+      final next = _unb64(m['deck']);
+      final proof = _unb64(m['proof']);
+      return next.length == deckBytes && crypto.verifyShuffle(_joint!, _decks.last, next, proof);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// A seat's shuffle: kept when it is that seat's turn and the
   /// argument verifies against the deck before it.
-  bool acceptShuffle(Map<String, Object?> m) {
+  bool acceptShuffle(Map<String, Object?> m, {bool verified = false}) {
     try {
       final seat = m['seat'] as int;
       if (_shuffleProofs.containsKey(seat)) return true;
       if (nextShuffler != seat || !_human(seat) || _public(seat)) return false;
+      if (!verified && !verifyShuffle(m)) return false;
       final next = _unb64(m['deck']);
       final proof = _unb64(m['proof']);
-      if (next.length != deckBytes || !crypto.verifyShuffle(_joint!, _decks.last, next, proof)) return false;
       _decks.add(next);
       _shuffleProofs[seat] = proof;
       _computeWhatCan();
@@ -469,21 +535,45 @@ class DealSession {
     };
   }
 
-  /// A seat's tokens for the positions not its own, each checked
-  /// against its key and the dealt deck.
-  bool acceptTokens(Map<String, Object?> m) {
+  /// Whether a seat's tokens are one for every position not its own,
+  /// each verifying against its key and the dealt deck. Changes
+  /// nothing.
+  bool verifyTokens(Map<String, Object?> m) => _checkTokens(m) != null;
+
+  Map<int, Uint8List>? _checkTokens(Map<String, Object?> m) {
     try {
       final seat = m['seat'] as int;
-      if (!_human(seat) || deck == null || _public(seat)) return false;
-      if (hasTokens(seat)) return true;
+      if (!_human(seat) || deck == null || _public(seat)) return null;
       final pk = _pks[seat]!;
       final given = Map<String, Object?>.from(m['tokens'] as Map);
       final checked = <int, Uint8List>{};
       for (var p = 0; p < deckSize; p++) {
         if (p ~/ _handSize == seat) continue;
         final t = _unb64(given['$p']);
-        if (!crypto.verifyToken(pk, _masked(p), t)) return false;
+        if (!crypto.verifyToken(pk, _masked(p), t)) return null;
         checked[p] = t;
+      }
+      return checked;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// A seat's tokens for the positions not its own, each checked
+  /// against its key and the dealt deck.
+  bool acceptTokens(Map<String, Object?> m, {bool verified = false}) {
+    try {
+      final seat = m['seat'] as int;
+      if (!_human(seat) || deck == null || _public(seat)) return false;
+      if (hasTokens(seat)) return true;
+      final Map<int, Uint8List> checked;
+      if (verified) {
+        final given = Map<String, Object?>.from(m['tokens'] as Map);
+        checked = {for (var p = 0; p < deckSize; p++) if (p ~/ _handSize != seat) p: _unb64(given['$p'])};
+      } else {
+        final c = _checkTokens(m);
+        if (c == null) return false;
+        checked = c;
       }
       _tokens.putIfAbsent(seat, () => {}).addAll(checked);
       _openWhatCan();
@@ -521,7 +611,7 @@ class DealSession {
         pks.add(_pks[s]!);
       }
       if (tokens.length < _seats) continue;
-      final c = crypto.unmask(pks, tokens, maskedAt(d, p));
+      final c = crypto.unmask(pks, tokens, maskedAt(d, p), verified: true);
       if (c != null) _cards[p] = c;
     }
   }
@@ -539,24 +629,69 @@ class DealSession {
     return {'seat': me, 'position': p, 'token': _b64(_tokens[me]![p]!)};
   }
 
+  /// Whether a seat's word on the lead card holds: nowhere, or a
+  /// position of its own at the deal that its token opens to the lead
+  /// card. Changes nothing.
+  bool verifyDeclaration(Map<String, Object?> m) {
+    try {
+      final seat = m['seat'] as int;
+      if (!_human(seat) || deck == null) return false;
+      final p = m['position'] as int;
+      if (p < 0) return true;
+      if (p ~/ _handSize != seat) return false;
+      return _openWith(seat, p, _unb64(m['token'])) == leadCard;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The card at [p] given [token] as [owner]'s, without keeping
+  /// either: null unless the token verifies and every other token for
+  /// the position is in. Remembered, so that taking the same token
+  /// after checking it costs nothing more.
+  int? _openWith(int owner, int p, Uint8List token) {
+    final seen = _checked[p];
+    if (seen != null && _same(seen.token, token)) return seen.card;
+    if (!crypto.verifyToken(_pks[owner]!, _masked(p), token)) return null;
+    final tokens = <Uint8List>[];
+    final pks = <Uint8List>[];
+    for (var s = 0; s < _seats; s++) {
+      final t = s == owner ? token : _tokens[s]?[p];
+      if (t == null) return null;
+      tokens.add(t);
+      pks.add(_pks[s]!);
+    }
+    final card = crypto.unmask(pks, tokens, _masked(p), verified: true);
+    if (card != null) _checked[p] = (token: token, card: card);
+    return card;
+  }
+
+  /// Positions opened in a check, with the token that did it.
+  final Map<int, ({Uint8List token, int card})> _checked = {};
+
+  /// Keeps a token that was checked to open [p]: the card without
+  /// unmasking again.
+  void _keepChecked(int owner, int p, Uint8List token) {
+    _tokens.putIfAbsent(owner, () => {})[p] = token;
+    final seen = _checked[p];
+    if (seen != null && _same(seen.token, token)) _cards[p] ??= seen.card;
+  }
+
   /// A seat's word on the lead card. A position must be the seat's
   /// own at the deal and open, with its token, to the lead card.
-  bool acceptDeclaration(Map<String, Object?> m) {
+  bool acceptDeclaration(Map<String, Object?> m, {bool verified = false}) {
     try {
       final seat = m['seat'] as int;
       if (!_human(seat) || deck == null) return false;
       if (_declared.containsKey(seat)) return true;
+      if (!verified && !verifyDeclaration(m)) return false;
       final p = m['position'] as int;
       if (p < 0) {
         _declared[seat] = -1;
         return true;
       }
-      if (p ~/ _handSize != seat) return false;
-      final t = _unb64(m['token']);
-      if (!crypto.verifyToken(_pks[seat]!, _masked(p), t)) return false;
-      _tokens.putIfAbsent(seat, () => {})[p] = t;
+      _keepChecked(seat, p, _unb64(m['token']));
       _openWhatCan();
-      if (_cards[p] != leadCard) return false;
       _declared[seat] = p;
       return true;
     } catch (_) {
@@ -576,17 +711,30 @@ class DealSession {
     return {'position': position, 'token': _b64(t)};
   }
 
+  /// The card a play would open — the position's missing token,
+  /// checked against the key of the seat that held the position at
+  /// the deal, the position [seat]'s now — or null. Changes nothing.
+  int? verifyPlay(int seat, Map<String, Object?> m) {
+    try {
+      final p = m['position'] as int;
+      if (p < 0 || p >= deckSize || _holderOf[p] != seat || deck == null) return null;
+      return _openWith(p ~/ _handSize, p, _unb64(m['token']));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// A play: the position's missing token, checked against the key of
   /// the seat that held the position at the deal; the position must
   /// be [seat]'s now. Returns the card opened, or null.
-  int? acceptPlay(int seat, Map<String, Object?> m) {
+  int? acceptPlay(int seat, Map<String, Object?> m, {bool verified = false}) {
     try {
       final p = m['position'] as int;
       if (p < 0 || p >= deckSize || _holderOf[p] != seat || deck == null) return null;
       final owner = p ~/ _handSize;
       final t = _unb64(m['token']);
-      if (!crypto.verifyToken(_pks[owner]!, _masked(p), t)) return null;
-      _tokens.putIfAbsent(owner, () => {})[p] = t;
+      if (!verified && !crypto.verifyToken(_pks[owner]!, _masked(p), t)) return null;
+      _keepChecked(owner, p, t);
       _openWhatCan();
       final card = _cards[p];
       if (card != null) _holderOf[p] = -1; // played
@@ -631,13 +779,14 @@ class DealSession {
     };
   }
 
-  /// A pass, from a person: the positions change hands; tokens in the
-  /// clear are checked by all, sealed ones by whoever holds the
-  /// receiver's secret — the receiver, or everyone once it has left.
-  bool acceptPass(Map<String, Object?> m) {
+  /// Whether a pass is well formed — positions the passer holds, a
+  /// token for each, in the clear verifying, sealed the right size.
+  /// Changes nothing.
+  bool verifyPass(Map<String, Object?> m) {
     try {
       final from = m['from'] as int;
       final to = m['to'] as int;
+      if (to < 0 || to >= _seats || to == from) return false;
       final positions = [for (final p in m['positions'] as List) p as int];
       if (positions.any((p) => p < 0 || p >= deckSize || _holderOf[p] != from)) return false;
       if (positions.toSet().length != positions.length) return false;
@@ -649,6 +798,32 @@ class DealSession {
           final p = positions[i];
           if (!crypto.verifyToken(_pks[p ~/ _handSize]!, _masked(p), tokens[i])) return false;
         }
+        return true;
+      }
+      final sealed = [for (final s in m['sealed'] as List) _unb64(s)];
+      final proofs = [for (final s in m['proofs'] as List) _unb64(s)];
+      if (sealed.length != positions.length || proofs.length != positions.length) return false;
+      return sealed.every((s) => s.length == sealedBytes) && proofs.every((p) => p.length == tokenBytes - pointBytes);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// A pass, from a person: the positions change hands; tokens in the
+  /// clear are checked by all, sealed ones by whoever holds the
+  /// receiver's secret — the receiver, or everyone once it has left.
+  bool acceptPass(Map<String, Object?> m, {bool verified = false}) {
+    try {
+      if (!verified && !verifyPass(m)) return false;
+      final from = m['from'] as int;
+      final to = m['to'] as int;
+      final positions = [for (final p in m['positions'] as List) p as int];
+      if (positions.any((p) => p < 0 || p >= deckSize || _holderOf[p] != from)) return false;
+      if (positions.toSet().length != positions.length) return false;
+      final clear = m['tokens'];
+      if (clear != null) {
+        final tokens = [for (final t in clear as List) _unb64(t)];
+        if (tokens.length != positions.length) return false;
         for (var i = 0; i < positions.length; i++) {
           _tokens.putIfAbsent(positions[i] ~/ _handSize, () => {})[positions[i]] = tokens[i];
         }
@@ -658,7 +833,6 @@ class DealSession {
         if (sealed.length != positions.length || proofs.length != positions.length) return false;
         final keep = _sealedTo.putIfAbsent(to, () => {});
         for (var i = 0; i < positions.length; i++) {
-          if (sealed[i].length != sealedBytes || proofs[i].length != tokenBytes - pointBytes) return false;
           keep[positions[i]] = Uint8List.fromList([...sealed[i], ...proofs[i]]);
         }
       }
@@ -772,16 +946,40 @@ class DealSession {
     };
   }
 
+  /// Whether a seat's audit holds: its secret is the one behind its
+  /// key, and every secret it vouches for is behind that seat's.
+  /// Changes nothing.
+  bool verifyAudit(Map<String, Object?> m) {
+    try {
+      final seat = m['seat'] as int;
+      if (!_human(seat) || !_pks.containsKey(seat)) return false;
+      final secret = _unb64(m['secret']);
+      if (secret.length != 32 || !_same(crypto.keygen(secret), _pks[seat]!)) return false;
+      final known = m['known'];
+      if (known is Map) {
+        for (final e in known.entries) {
+          final s = int.parse(e.key as String);
+          if (!_human(s) || !_pks.containsKey(s)) return false;
+          final other = _unb64(e.value);
+          if (other.length != 32 || !_same(crypto.keygen(other), _pks[s]!)) return false;
+        }
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// A seat's secret at the audit, with any it vouches for: each kept
   /// when it is the one behind that seat's key; then every card those
   /// seats held is open.
-  bool acceptAudit(Map<String, Object?> m) {
+  bool acceptAudit(Map<String, Object?> m, {bool verified = false}) {
     try {
       final seat = m['seat'] as int;
       if (!_human(seat)) return false;
+      if (!verified && !verifyAudit(m)) return false;
       final secret = _unb64(m['secret']);
       if (!_secrets.containsKey(seat)) {
-        if (!_same(crypto.keygen(secret), _pks[seat]!)) return false;
         _learnSecret(seat, secret);
       }
       final known = m['known'];
@@ -789,8 +987,7 @@ class DealSession {
         for (final e in known.entries) {
           final s = int.parse(e.key as String);
           if (_secrets.containsKey(s) || !_human(s)) continue;
-          final other = _unb64(e.value);
-          if (_same(crypto.keygen(other), _pks[s]!)) _learnSecret(s, other);
+          _learnSecret(s, _unb64(e.value));
         }
       }
       return true;

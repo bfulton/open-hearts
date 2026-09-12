@@ -18,7 +18,7 @@ typedef _Shuffle = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>
 typedef _VerifyShuffle = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Size);
 typedef _RevealToken = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _VerifyToken = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
-typedef _Unmask = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size, Pointer<Uint8>);
+typedef _Unmask = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size, Pointer<Uint8>, Uint8);
 typedef _Seal = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _Open = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _Shared = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
@@ -55,7 +55,7 @@ class _Ffi implements DealCrypto {
         _verifyShuffle = lib.lookupFunction<_VerifyShuffle, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, int)>('deal_verify_shuffle'),
         _revealToken = lib.lookupFunction<_RevealToken, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_reveal_token'),
         _verifyToken = lib.lookupFunction<_VerifyToken, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_verify_token'),
-        _unmask = lib.lookupFunction<_Unmask, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>)>('deal_unmask'),
+        _unmask = lib.lookupFunction<_Unmask, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>, int)>('deal_unmask'),
         _seal = lib.lookupFunction<_Seal, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_seal'),
         _open = lib.lookupFunction<_Open, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_open'),
         _shared = lib.lookupFunction<_Shared, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_shared_secret') {
@@ -71,7 +71,7 @@ class _Ffi implements DealCrypto {
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, int) _verifyShuffle;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _revealToken;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _verifyToken;
-  final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>) _unmask;
+  final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>, int) _unmask;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _seal;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _open;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _shared;
@@ -146,12 +146,12 @@ class _Ffi implements DealCrypto {
       _call([pk, masked, token], 0, (i, o) => _verifyToken(i[0], i[1], i[2]) == 1 ? 0 : -1) != null;
 
   @override
-  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked) {
+  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked, {bool verified = false}) {
     final allPks = Uint8List.fromList([for (final p in pks) ...p]);
     final allTokens = Uint8List.fromList([for (final t in tokens) ...t]);
     int? card;
     _call([allPks, allTokens, masked], 0, (i, o) {
-      final r = _unmask(i[0], i[1], pks.length, i[2]);
+      final r = _unmask(i[0], i[1], pks.length, i[2], verified ? 0 : 1);
       card = r < 0 ? null : r;
       return 0;
     });

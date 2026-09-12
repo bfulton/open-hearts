@@ -53,8 +53,10 @@ abstract class DealCrypto {
   bool verifyToken(Uint8List pk, Uint8List masked, Uint8List token);
 
   /// The card behind [masked] given every seat's token, each checked
-  /// against its key; null if a token is bad or the result is no card.
-  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked);
+  /// against its key unless [verified] — for tokens checked on arrival,
+  /// since checking a proof twice is most of the cost of a card; null
+  /// if a token is bad or the result is no card.
+  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked, {bool verified = false});
 
   /// A token for one seat's eyes: encrypted to its key.
   Uint8List seal(Uint8List pk, Uint8List token, Uint8List seed);

@@ -5,9 +5,12 @@
 /// anyone, and never forged. The kinds are few: the two things a seat
 /// does at the table (pass, play), the three doors out (leave, and the
 /// two inferred ones, boot and absent), a witness signature over any of
-/// those, and a heartbeat; and the jury's four (jury.dart): a proposal
+/// those, and a heartbeat; the jury's four (jury.dart): a proposal
 /// of who the hand's jurors are, a juror's heartbeat while it serves,
-/// an appeal of a turn the players cannot settle, and a verdict.
+/// an appeal of a turn the players cannot settle, and a verdict; and
+/// the sealed deal's two (docs/03-fair-deal.md): a step of the deal —
+/// keys, a shuffle, tokens, the lead declared, the audit — and the
+/// release of a piece of a departed seat's secret.
 library;
 
 import 'dart:convert';
@@ -15,30 +18,67 @@ import 'dart:typed_data';
 
 import 'signing.dart';
 
-enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, jury, serve, appeal, verdict }
+enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, jury, serve, appeal, verdict, deal, release }
 
 /// Which moment of a hand an event is about. A hand has four pass turns
 /// (one per seat, all open at once) followed by fifty-two play turns.
+/// At a sealed table (docs/03-fair-deal.md) they are preceded by the
+/// deal's turns — four rounds of four, one per seat: keys, shuffle,
+/// tokens, the lead declared — and followed by four audit turns.
 class TurnId {
   const TurnId(this.hand, this.index);
 
   const TurnId.pass(int hand, int seat) : this(hand, seat);
   const TurnId.play(int hand, int play) : this(hand, passTurns + play);
+  const TurnId.deal(int hand, int round, int seat) : this(hand, dealBase + round * 4 + seat);
+  const TurnId.audit(int hand, int seat) : this(hand, passTurns + plays + seat);
 
   final int hand;
   final int index;
 
   static const passTurns = 4;
+  static const plays = 52;
 
-  bool get isPass => index < passTurns;
+  /// The deal's rounds: keys, shuffle, tokens, declare.
+  static const dealRounds = 4;
+
+  /// Deal turns sit below zero, so a seeded table's indices are what
+  /// they always were.
+  static const dealBase = -(dealRounds * 4);
+
+  bool get isDeal => index < 0;
+  bool get isPass => index >= 0 && index < passTurns;
+  bool get isPlay => index >= passTurns && index < passTurns + plays;
+  bool get isAudit => index >= passTurns + plays;
   int get playIndex => index - passTurns;
+  int get dealRound => (index - dealBase) ~/ 4;
+  int get dealSeat => (index - dealBase) % 4;
+  int get auditSeat => index - passTurns - plays;
+
+  /// Where the turn sits in the hand, for ordering: the turns of a
+  /// deal round share one position, as do the pass turns and the
+  /// audit turns — each set is open at once and settles in a different
+  /// order at every peer — while each play is its own.
+  int get position => isDeal
+      ? dealBase + dealRound * 4
+      : isPass
+          ? -1
+          : isAudit
+              ? passTurns + plays
+              : index;
 
   @override
   bool operator ==(Object other) => other is TurnId && other.hand == hand && other.index == index;
   @override
   int get hashCode => Object.hash(hand, index);
   @override
-  String toString() => isPass ? 'h$hand/pass' : 'h$hand/t$playIndex';
+  String toString() => isDeal
+      ? 'h$hand/deal$dealRound.$dealSeat'
+      : isPass
+          ? 'h$hand/pass'
+          : isAudit
+              ? 'h$hand/audit$auditSeat'
+              : 'h$hand/t$playIndex';
 }
 
 class TableEvent {
@@ -125,6 +165,13 @@ class TableEvent {
 
   /// For verdict: which side of the race the juror ruled for.
   String get side => body['side'] as String;
+
+  /// For deal: which round the step is — 0 keys, 1 shuffle, 2 tokens,
+  /// 3 declare, 4 audit.
+  int get round => body['round'] as int;
+
+  /// For release: the seat whose secret the piece is of.
+  int get about => body['about'] as int;
 
   /// For verdict: the event that wins — the seat's action, or the
   /// claim that removes it — carried whole, so a peer that never saw

@@ -19,7 +19,7 @@ use ark_ff::{to_bytes, PrimeField, UniformRand};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{One, Zero};
 use barnett_smart_card_protocol::discrete_log_cards::{self, DLCards, Parameters};
-use barnett_smart_card_protocol::BarnettSmartProtocol;
+use barnett_smart_card_protocol::{BarnettSmartProtocol, Reveal};
 use proof_essentials::homomorphic_encryption::el_gamal::Plaintext;
 use proof_essentials::utils::permutation::Permutation;
 use rand::SeedableRng;
@@ -238,7 +238,11 @@ pub fn verify_token(pk: &[u8], masked: &[u8], token: &[u8]) -> bool {
 /// Opens a masked card with every seat's token (each checked against
 /// its key): the card's index, 0 to 51, or none if a token is bad or
 /// the result is no card.
-pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8]) -> Option<usize> {
+/// The card behind [masked] given every seat's token. With [check],
+/// each token's proof is verified against its key first; without, the
+/// tokens are combined as given — for a caller that verified each on
+/// arrival, since a proof checked twice is most of the cost of a card.
+pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8], check: bool) -> Option<usize> {
     let f = fixed();
     let masked = read::<Masked>(masked)?;
     let n = pks.len() / POINT;
@@ -253,7 +257,15 @@ pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8]) -> Option<usize> {
         let proof = read::<RevealProof>(&t[POINT..])?;
         key.push((token, proof, pk));
     }
-    let card = Protocol::unmask(&f.pp, &key, &masked).ok()?;
+    let card = if check {
+        Protocol::unmask(&f.pp, &key, &masked).ok()?
+    } else {
+        let mut aggregate = Token::zero();
+        for (token, _, _) in &key {
+            aggregate = aggregate + *token;
+        }
+        aggregate.reveal(&masked).ok()?
+    };
     f.cards.iter().position(|c| *c == card)
 }
 
@@ -385,8 +397,8 @@ pub unsafe extern "C" fn deal_verify_token(pk: *const u8, masked: *const u8, tok
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn deal_unmask(pks: *const u8, tokens: *const u8, count: usize, masked: *const u8) -> i32 {
-    done(unmask(input(pks, count * POINT), input(tokens, count * TOKEN), input(masked, MASKED)))
+pub unsafe extern "C" fn deal_unmask(pks: *const u8, tokens: *const u8, count: usize, masked: *const u8, check: u8) -> i32 {
+    done(unmask(input(pks, count * POINT), input(tokens, count * TOKEN), input(masked, MASKED), check != 0))
 }
 
 #[no_mangle]
@@ -455,11 +467,12 @@ mod tests {
                 assert_eq!(reveal_token(s, masked, &seed(40 + i as u8), &mut tokens[i * TOKEN..(i + 1) * TOKEN]), Some(TOKEN));
                 assert!(verify_token(&pks[i * POINT..(i + 1) * POINT], masked, &tokens[i * TOKEN..(i + 1) * TOKEN]));
             }
-            let card = unmask(&pks, &tokens, masked).expect("a card");
+            let card = unmask(&pks, &tokens, masked, true).expect("a card");
+            assert_eq!(unmask(&pks, &tokens, masked, false), Some(card), "unchecked, the same card");
             assert!(!seen[card], "card {card} dealt twice");
             seen[card] = true;
             // Without one token the card stays closed.
-            assert_eq!(unmask(&pks[..3 * POINT], &tokens[..3 * TOKEN], masked), None);
+            assert_eq!(unmask(&pks[..3 * POINT], &tokens[..3 * TOKEN], masked, true), None);
         }
         assert!(seen.iter().all(|s| *s));
 

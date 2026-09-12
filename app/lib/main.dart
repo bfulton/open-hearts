@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import 'crypto/deal.dart';
 import 'crypto/schnorr.dart';
 import 'table_page.dart';
 import 'theme.dart';
@@ -13,6 +14,7 @@ Future<void> main() async {
     SemanticsBinding.instance.ensureSemantics();
   }
   await installFastSchnorr();
+  await loadDeal();
   runApp(const OpenHeartsApp());
 }
 

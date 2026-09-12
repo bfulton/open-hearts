@@ -54,7 +54,7 @@ extension type _Exports._(JSObject _) implements JSObject {
   // ignore: non_constant_identifier_names
   external JSNumber deal_verify_token(JSNumber pk, JSNumber masked, JSNumber token);
   // ignore: non_constant_identifier_names
-  external JSNumber deal_unmask(JSNumber pks, JSNumber tokens, JSNumber count, JSNumber masked);
+  external JSNumber deal_unmask(JSNumber pks, JSNumber tokens, JSNumber count, JSNumber masked, JSNumber check);
   // ignore: non_constant_identifier_names
   external JSNumber deal_seal(JSNumber pk, JSNumber token, JSNumber seed, JSNumber out);
   // ignore: non_constant_identifier_names
@@ -165,12 +165,12 @@ class _Wasm implements DealCrypto {
       _call([pk, masked, token], 0, (i, o) => e.deal_verify_token(i[0].toJS, i[1].toJS, i[2].toJS).toDartInt == 1 ? 0 : -1) != null;
 
   @override
-  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked) {
+  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked, {bool verified = false}) {
     final allPks = Uint8List.fromList([for (final p in pks) ...p]);
     final allTokens = Uint8List.fromList([for (final t in tokens) ...t]);
     int? card;
     _call([allPks, allTokens, masked], 0, (i, o) {
-      final r = e.deal_unmask(i[0].toJS, i[1].toJS, pks.length.toJS, i[2].toJS).toDartInt;
+      final r = e.deal_unmask(i[0].toJS, i[1].toJS, pks.length.toJS, i[2].toJS, (verified ? 0 : 1).toJS).toDartInt;
       card = r < 0 ? null : r;
       return 0;
     });

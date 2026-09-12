@@ -137,6 +137,7 @@ class WaitingRoom {
     Random? random,
     this.log,
     this.botRating,
+    this.sealed = false,
   }) : since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
     _random = random ?? Random.secure();
     for (final e in List.of(relay.lobbySoFar)) {
@@ -150,6 +151,10 @@ class WaitingRoom {
   final RelayTransport relay;
   final String pool;
   final String name;
+
+  /// Whether this device deals sealed tables (docs/03): the tables it
+  /// seats are sealed, and it sits only at sealed ones.
+  final bool sealed;
   final int rating;
   final int roundMs;
   final int botsAfterMs;
@@ -256,6 +261,7 @@ class WaitingRoom {
         'table': id,
         'seed': seed,
         'rated': pool == 'rated',
+        'sealed': sealed,
         'seats': seats,
         'policy': botPolicyVersion,
       });
@@ -295,6 +301,9 @@ class WaitingRoom {
     // A table whose host computes the bots by another version of the
     // policy would fork on the first bot's card: not one to sit at.
     if (c['policy'] != botPolicyVersion) return;
+    // A device that cannot run the deal cannot sit at a sealed table,
+    // and one that can does not sit at an unsealed one.
+    if ((c['sealed'] == true) != sealed) return;
     final seats = <SeatHolder>[];
     final names = <int, String>{};
     var mine = false;
@@ -313,7 +322,10 @@ class WaitingRoom {
         s++;
       }
       if (!mine || seats.length != seatCount) return;
-      _offers.add((TableSpec(id: c['table'] as String, seed: c['seed'] as int, seats: seats, rated: c['rated'] == true), names));
+      _offers.add((
+        TableSpec(id: c['table'] as String, seed: c['seed'] as int, seats: seats, rated: c['rated'] == true, sealed: c['sealed'] == true),
+        names,
+      ));
     } catch (_) {
       return;
     }

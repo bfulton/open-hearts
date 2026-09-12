@@ -2,6 +2,7 @@
 /// the trace tool share.
 library;
 
+import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import '../client.dart';
 import '../signing.dart';
@@ -13,21 +14,29 @@ import 'sim_presence.dart';
 import 'virtual_clock.dart';
 
 /// A simulated table: [humans] scripted people in the first seats,
-/// bots in the rest.
+/// bots in the rest. With [crypto] the table is sealed: the cards come
+/// from the verifiable deal, run for real on the virtual clock.
 class SimTable {
-  SimTable({required this.humans, int seed = 1, int netSeed = 1, int jurors = 0, bool lastResort = false, bool withPresence = false})
-      : clock = VirtualClock(),
+  SimTable({
+    required this.humans,
+    int seed = 1,
+    int netSeed = 1,
+    int jurors = 0,
+    bool lastResort = false,
+    bool withPresence = false,
+    this.crypto,
+  })  : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
     if (jurors > 0 || lastResort || withPresence) {
       final p = presence = SimPresence(net, clock);
       for (var j = 0; j < jurors; j++) {
-        final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock);
+        final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock, crypto: crypto);
         this.jurors.add(juror);
         p.register(juror);
       }
       if (lastResort) {
-        final juror = SimJuror(FakeSigner('last-resort-$seed'), net, clock);
+        final juror = SimJuror(FakeSigner('last-resort-$seed'), net, clock, crypto: crypto);
         this.jurors.add(juror);
         p.register(juror);
         p.lastResort = juror;
@@ -36,19 +45,23 @@ class SimTable {
     spec = TableSpec(
       id: 'table-$seed',
       seed: seed,
+      sealed: crypto != null,
       seats: [
         for (var s = 0; s < seatCount; s++)
           s < humans ? HumanSeat(signers[s].publicKey) : BotSeat(Persona.roster[(s + seed) % Persona.roster.length]),
       ],
     );
     for (var i = 0; i < humans; i++) {
-      final client =
-          TableClient(spec: spec, signer: signers[i], transport: net.attach(signers[i].publicKey), clock: clock, presence: presence);
+      final client = TableClient(
+          spec: spec, signer: signers[i], transport: net.attach(signers[i].publicKey), clock: clock, presence: presence, crypto: crypto);
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }
   }
 
   final int humans;
+
+  /// The deal's primitives, at a sealed table.
+  final DealCrypto? crypto;
   final VirtualClock clock;
   final List<FakeSigner> signers;
   late final SimNetwork net;

@@ -25,17 +25,24 @@ class BotSeat extends SeatHolder {
 }
 
 class TableSpec {
-  const TableSpec({required this.id, required this.seed, required this.seats, this.rated = false});
+  const TableSpec({required this.id, required this.seed, required this.seats, this.rated = false, this.sealed = false});
 
   final String id;
+
+  /// Whether the cards come from the verifiable deal (docs/03) rather
+  /// than the seed: every hand shuffled by every seat with proofs, each
+  /// person's cards known to them alone. Every live table; solo play
+  /// and most of the simulator deal from the seed.
+  final bool sealed;
 
   /// Whether the record counts for the players' ratings. A pool the
   /// player chose; carried in the table so every seat and the record
   /// agree.
   final bool rated;
 
-  /// The deal's seed. Interim: every seat can compute every hand from
-  /// it, which is why doc 03's deal replaces it before anything ships.
+  /// The deal's seed at an unsealed table, where every seat can compute
+  /// every hand from it; at a sealed one, the randomness of the jury
+  /// draw and of the bots' public deal secrets.
   final int seed;
 
   /// Seat order, four holders.
@@ -46,6 +53,7 @@ class TableSpec {
         'id': id,
         'seed': seed,
         'rated': rated,
+        'sealed': sealed,
         'seats': [
           for (final h in seats)
             switch (h) {
@@ -65,7 +73,8 @@ class TableSpec {
         seats.add(s['bot'] is String ? BotSeat(Persona.named(s['bot'] as String)) : HumanSeat(s['key'] as String));
       }
       if (seats.length != seatCount) return null;
-      return TableSpec(id: m['id'] as String, seed: m['seed'] as int, seats: seats, rated: m['rated'] == true);
+      return TableSpec(
+          id: m['id'] as String, seed: m['seed'] as int, seats: seats, rated: m['rated'] == true, sealed: m['sealed'] == true);
     } catch (_) {
       return null;
     }

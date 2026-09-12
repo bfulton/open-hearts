@@ -42,7 +42,16 @@ void main() {
       final card = d.unmask(pks, tokens, masked);
       expect(card, isNotNull);
       expect(seen.add(card!), isTrue, reason: 'card $card dealt twice');
+      expect(d.unmask(pks, tokens, masked, verified: true), card, reason: 'unchecked, the same card');
       expect(d.unmask(pks.sublist(0, 3), tokens.sublist(0, 3), masked), isNull, reason: 'three tokens open nothing');
+      if (c == 0) {
+        // A token for another position: caught when checked; combined
+        // blindly it opens nothing, or the wrong thing, which is why
+        // unchecked is only for tokens checked on arrival.
+        final wrong = [...tokens.sublist(0, 3), d.revealToken(secrets[3], maskedAt(deck, 1), seed(41))];
+        expect(d.unmask(pks, wrong, masked), isNull);
+        expect(d.unmask(pks, wrong, masked, verified: true), isNot(card));
+      }
     }
     expect(seen.length, deckSize);
 

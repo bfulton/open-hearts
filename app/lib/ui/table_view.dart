@@ -209,7 +209,7 @@ class _SeatBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cards = game.handOf(seat).length;
+    final cards = game.handSizeOf(seat);
     final taken = game.taken[seat];
 
     // One spoken line per seat: who, how many cards, how many points

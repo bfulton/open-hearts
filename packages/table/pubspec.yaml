@@ -9,6 +9,8 @@ environment:
 dependencies:
   bip340: ^0.3.1
   crypto: ^3.0.6
+  deal:
+    path: ../deal
   engine:
     path: ../engine
   pointycastle: ^4.0.0

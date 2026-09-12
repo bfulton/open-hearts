@@ -15,6 +15,7 @@ library;
 // ignore_for_file: avoid_print
 
 import 'package:service/service.dart';
+import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 
 Future<void> main(List<String> args) async {
@@ -32,7 +33,13 @@ Future<void> main(List<String> args) async {
   print('relay ${relay.url}');
   if (juror) {
     // Its few lines are worth having even when the relay is quiet.
-    final j = LastResortJuror(url: relay.url, signer: SchnorrSigner.generate(), log: print);
+    DealCrypto? crypto;
+    try {
+      crypto = await DealCrypto.load();
+    } catch (e) {
+      print('juror: no deal cryptography ($e); sealed tables cannot be served');
+    }
+    final j = LastResortJuror(url: relay.url, signer: SchnorrSigner.generate(), log: print, crypto: crypto);
     j.start();
     print('juror of last resort ${j.presence.signer.publicKey.substring(0, 8)} listening');
   }

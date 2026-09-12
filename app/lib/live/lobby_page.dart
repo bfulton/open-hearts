@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:table/table.dart';
 
+import '../crypto/deal.dart';
 import '../identity.dart';
 import '../live_controller.dart';
 import '../net/duty.dart';
@@ -112,7 +113,7 @@ class _LobbyPageState extends State<LobbyPage> {
       await transport.ready.timeout(const Duration(seconds: 8));
       // The relay answered: from here on this device is online to
       // everyone, and a juror when drawn.
-      Duty.on(url, signer, log: _debugging);
+      Duty.on(url, signer, log: _debugging, crypto: dealCrypto);
       if (_standing == null) await _loadStanding(url, signer);
       setState(() {
         _transport = transport;
@@ -148,6 +149,7 @@ class _LobbyPageState extends State<LobbyPage> {
       name: _name.text.trim(),
       rating: (_standing?.mine ?? Rating.fresh).shown,
       botRating: Standing.botPicker(ledger),
+      sealed: dealCrypto != null,
     );
     _queueSub = queue.seated.listen((spec) {
       if (!mounted) return;
@@ -170,7 +172,8 @@ class _LobbyPageState extends State<LobbyPage> {
       seatNames: seatNames,
       signer: signer,
       transport: MeshTransport(relay: relay, peers: peers, log: _debugging ? (l) => debugPrint('mesh: $l') : null),
-      presence: Duty.on(relayUrl, signer, log: _debugging).presence,
+      presence: Duty.on(relayUrl, signer, log: _debugging, crypto: dealCrypto).presence,
+      crypto: dealCrypto,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
       onResult: (result) => Standing.publish(relayUrl, signer, result),
     );

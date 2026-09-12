@@ -207,7 +207,9 @@ void main() {
       expect(all[s].fullDeal, all[0].fullDeal);
     }
     expect(juror.fullDeal, all[0].fullDeal);
-    expect(all[0].acceptAudit({'seat': 1, 'secret': base64Encode(Uint8List(32))}), isTrue, reason: 'a second audit for a seat is ignored');
+    expect(all[0].acceptAudit({'seat': 1, 'secret': base64Encode(Uint8List(32))}), isFalse,
+        reason: 'a wrong secret is refused, for a seat already known too');
+    expect(all[0].acceptAudit(all[1].myAudit()!), isTrue, reason: 'the true one again is fine');
   });
 
   test('a verifier that saw every message ends with the whole deal, and refuses what does not verify', () {

@@ -8,6 +8,10 @@
 /// ratings fall out of the replay by doc 04's two rules.
 library;
 
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 
 import 'client.dart';
@@ -58,8 +62,18 @@ class Verification {
 /// participants of its moment and be the draw its snapshot gives; a
 /// verdict must be by a juror of the hand, about this turn and this
 /// seat, ruling for the very event recorded.
-Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPartial = false, List<Decision> juries = const []}) {
-  final game = HeartsGame(seed: spec.seed);
+///
+/// A sealed record (docs/03-fair-deal.md) is replayed through the deal
+/// as well, with [crypto]: every key's proof, every shuffle's
+/// argument, every token, the lead card's declaration; then the
+/// secrets from the hand's audit open every card, each play's token
+/// must open the card it names, and the hands are checked as fully as
+/// a seeded game's. Until a hand's audit is in, its plays can only be
+/// checked as far as the rules allow without the hands, and the
+/// verification is [Verification.complete] false.
+Verification verifyRecord(TableSpec spec, List<Decision> record,
+    {bool allowPartial = false, List<Decision> juries = const [], DealCrypto? crypto}) {
+  final game = HeartsGame(seed: spec.seed, sealed: spec.sealed);
   final holders = List.of(spec.seats);
   final humans = {for (final h in spec.seats) if (h is HumanSeat) h.key};
   final removedAt = <PublicKey, TurnId>{};
@@ -69,14 +83,75 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
   Verification fail(String why) =>
       Verification(ok: false, reason: why, winners: const [], ratings: const {}, finalHolders: holders);
 
+  if (spec.sealed && crypto == null) return fail('a sealed record needs the deal\'s cryptography to check');
+
+  /// The deal of the hand being replayed, at a sealed table.
+  DealSession? deal;
+  var auditsScanned = -1;
+
+  /// The secrets the hand's audits carry, read ahead and held back:
+  /// given to the deal for a departed seat when its steps are owed,
+  /// and for everyone once the deal is dealt. Given sooner, a present
+  /// seat's steps would be computed rather than checked.
+  final pending = <int, Uint8List>{};
+
+  DealSession startDeal() => deal = DealSession(
+        crypto!,
+        tableId: spec.id,
+        tableSeed: spec.seed,
+        hand: game.handNumber,
+        seats: [
+          for (final h in holders)
+            switch (h) {
+              HumanSeat(:final key) => HumanDealSeat(key),
+              BotSeat() => const BotDealSeat(),
+            },
+        ],
+        leadCard: twoOfClubs.index,
+      );
+
+  /// The hand's audits, read ahead once every key is in: the secrets
+  /// they carry open the cards the replay needs before it gets there
+  /// — a departed seat's hand for its bot's plays, above all.
+  void scanAudits(DealSession d) {
+    final hand = game.handNumber;
+    if (auditsScanned == hand) return;
+    for (var s = 0; s < seatCount; s++) {
+      if (!d.hasKeys(s)) return;
+    }
+    auditsScanned = hand;
+    pending.clear();
+    for (var i = index; i < record.length && record[i].turn.hand == hand; i++) {
+      final e = record[i].event;
+      if (e.kind != EventKind.deal || record[i].removal || e.round != 4) continue;
+      try {
+        pending[e.seat] = Uint8List.fromList(base64.decode(e.body['secret'] as String));
+        final known = e.body['known'];
+        if (known is Map) {
+          for (final k in known.entries) {
+            pending[int.parse(k.key as String)] = Uint8List.fromList(base64.decode(k.value as String));
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  /// Gives the deal the secrets it may have now: a departed seat's,
+  /// or everyone's once dealt.
+  void feedSecrets(DealSession d, {required bool all}) {
+    for (final e in List.of(pending.entries)) {
+      if (all || d.awaitsSecret(e.key)) {
+        if (d.provideSecret(e.key, e.value)) pending.remove(e.key);
+      }
+    }
+  }
+
   Verification partial() => Verification(
       ok: true, reason: 'verified so far', winners: const [], ratings: const {}, finalHolders: holders, complete: false);
 
   bool atOrBefore(TurnId a, TurnId b) {
     if (a.hand != b.hand) return a.hand < b.hand;
-    final ai = a.isPass ? -1 : a.index;
-    final bi = b.isPass ? -1 : b.index;
-    return ai <= bi;
+    return a.position <= b.position;
   }
 
   // Every removal in the record, wherever it sits: the smallest set a
@@ -155,10 +230,24 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
 
   int playIndex() => game.tricksPlayed * seatCount + game.trick.length;
 
-  void botActs(int seat, {required bool passing}) {
+  /// A bot's move, recomputed. Null when it could be; otherwise why not:
+  /// at a sealed table a departed seat's hand may not be open yet.
+  String? botActs(int seat, {required bool passing}) {
+    final d = deal;
+    if (d != null && !game.knowsHand(seat)) {
+      final cards = d.handOf(seat);
+      if (cards == null) return 'seat $seat\'s hand was never opened';
+      game.revealHand(seat, [for (final i in cards) Card.deck[i]]);
+    }
     final bot = Bot(persona: (holders[seat] as BotSeat).persona);
     if (passing) {
-      game.setPass(seat, bot.choosePass(game.handOf(seat)));
+      final cards = bot.choosePass(game.handOf(seat));
+      if (d != null) {
+        d.passOpen(seat, (seat + game.passDirection.seatOffset) % seatCount, [for (final c in cards) d.positionOf(seat, c.index)!]);
+        final leader = d.leader;
+        if (leader != null) game.declareLeader(leader);
+      }
+      game.setPass(seat, cards);
     } else {
       final view = BotView(
         seat: seat,
@@ -170,16 +259,18 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
         taken: game.taken,
       );
       final card = bot.chooseCard(view, game.legalPlaysFor(seat));
+      if (d != null) d.playOpen(seat, d.positionOf(seat, card.index)!);
       game.play(seat, card);
       played.add(card);
     }
+    return null;
   }
 
   void sweep() {
     if (game.pendingTrick != null) game.collectTrick();
     if (game.phase == Phase.handOver) {
-      game.nextHand();
       played.clear();
+      if (!spec.sealed) game.nextHand();
     }
   }
 
@@ -203,16 +294,124 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
       }
       removedAt[holder.key] = d.turn;
       holders[seat] = BotSeat(spec.replacementFor(seat));
+      deal?.seatLeft(seat);
     }
     return null;
   }
 
+  /// The next decision, which must be a human's action at [turn] by
+  /// the key holding [seat], carried; or the reason it is not.
+  (Decision?, String?) takeAction(TurnId turn, int seat, EventKind kind, {String? at}) {
+    if (index >= record.length) return (null, allowPartial ? null : 'the record ends with seat $seat to ${kind.name}');
+    final d = record[index++];
+    final e = d.event;
+    if (e.kind != kind) return (null, 'expected a ${kind.name}, saw ${e.kind.name}');
+    final holder = holders[seat];
+    if (holder is! HumanSeat || holder.key != e.author || e.seat != seat) {
+      return (null, 'a ${kind.name} by a key that did not hold seat $seat');
+    }
+    if (d.turn != turn) return (null, 'a ${kind.name} recorded at $turn as ${d.turn}');
+    if (!carried(d.witnesses, turn, d.among) && !byVerdict(d)) {
+      return (null, 'a ${kind.name} at $turn by seat $seat without a majority behind it (${d.witnesses.length} of ${d.among.length})');
+    }
+    return (d, null);
+  }
+
+  /// Whether the next decision is one of the current hand's audits.
+  bool nextIsAudit() =>
+      index < record.length && record[index].turn.hand == game.handNumber && record[index].turn.isAudit && !record[index].removal;
+
+  /// The hand's audits, one per person still seated, each the secret
+  /// behind the seat's key; null when they are all in and open every
+  /// card, else the verification to return.
+  Verification? takeAudits() {
+    final d = deal!;
+    while (nextIsAudit()) {
+      final dec = record[index++];
+      final e = dec.event;
+      final seat = dec.turn.auditSeat;
+      final holder = holders[seat];
+      if (e.kind != EventKind.deal || e.round != 4 || e.seat != seat) return fail('expected an audit by seat $seat, saw ${e.kind.name}');
+      if (holder is! HumanSeat || holder.key != e.author) return fail('an audit by a key that did not hold seat $seat');
+      if (!carried(dec.witnesses, dec.turn, dec.among) && !byVerdict(dec)) {
+        return fail('an audit at ${dec.turn} by seat $seat without a majority behind it (${dec.witnesses.length} of ${dec.among.length})');
+      }
+      if (!d.acceptAudit(Map<String, Object?>.from(e.body))) return fail('an audit by seat $seat that is not the secret behind its key');
+      final why = takeRemovals();
+      if (why != null) return fail(why);
+    }
+    final ended = index >= record.length;
+    for (var s = 0; s < seatCount; s++) {
+      if (holders[s] is HumanSeat && !d.knowsSecret(s)) {
+        if (ended && allowPartial) return partial();
+        return fail('hand ${game.handNumber}: seat $s never audited');
+      }
+    }
+    if (d.fullDeal == null) return fail('hand ${game.handNumber}: the audit does not open every card');
+    return null;
+  }
+
+  var incomplete = false;
+
   while (game.phase != Phase.gameOver) {
     final why = takeRemovals();
     if (why != null) return fail(why);
+    if (game.phase == Phase.dealing) {
+      final d = deal ?? startDeal();
+      scanAudits(d);
+      feedSecrets(d, all: false);
+      final dealDone = !(index < record.length && record[index].turn.hand == game.handNumber && record[index].turn.isDeal) ||
+          d.phase == DealPhase.dealt ||
+          d.phase == DealPhase.audited;
+      if (dealDone) {
+        if (d.phase != DealPhase.dealt && d.phase != DealPhase.audited) {
+          if (allowPartial && index >= record.length) return partial();
+          return fail('hand ${game.handNumber}: the deal is not complete (${d.phase.name})');
+        }
+        feedSecrets(d, all: true);
+        final leader = d.leader;
+        if (leader == null) return fail('hand ${game.handNumber}: nobody declared the lead card');
+        final hands = <List<Card>?>[];
+        for (var s = 0; s < seatCount; s++) {
+          final cards = d.dealtHandOf(s);
+          if (cards == null && !allowPartial) return fail('hand ${game.handNumber}: seat $s\'s cards were never opened');
+          if (cards == null) incomplete = true;
+          hands.add(cards == null ? null : [for (final i in cards) Card.deck[i]]);
+        }
+        game.declareLeader(leader);
+        game.deal(hands);
+        continue;
+      }
+      // The next step owed: the first unsettled seat of the round the
+      // deal is at, in the order the table opens them.
+      final round = switch (d.phase) { DealPhase.keys => 0, DealPhase.shuffles => 1, DealPhase.tokens => 2, _ => 3 };
+      if (index >= record.length) return allowPartial ? partial() : fail('the record ends mid-deal');
+      final next = record[index];
+      final e = next.event;
+      if (e.kind != EventKind.deal || !next.turn.isDeal) return fail('hand ${game.handNumber}: expected a deal step, saw ${e.kind.name}');
+      if (next.turn.dealRound != round || e.round != round) {
+        return fail('hand ${game.handNumber}: a deal step of round ${e.round} where round $round is owed');
+      }
+      final seat = next.turn.dealSeat;
+      final (dec, whyNot) = takeAction(next.turn, seat, EventKind.deal);
+      if (whyNot != null) return fail(whyNot);
+      if (dec == null) return partial();
+      final b = Map<String, Object?>.from(e.body);
+      final ok = switch (round) {
+        0 => d.acceptKeys(b),
+        1 => d.acceptShuffle(b),
+        2 => d.acceptTokens(b),
+        _ => d.acceptDeclaration(b),
+      };
+      if (!ok) return fail('hand ${game.handNumber}: a deal step by seat $seat that does not verify (round $round)');
+      continue;
+    }
     if (game.phase == Phase.passing) {
       for (var s = 0; s < seatCount; s++) {
-        if (holders[s] is BotSeat && game.passOf(s) == null) botActs(s, passing: true);
+        if (holders[s] is BotSeat && !game.hasPassed(s)) {
+          final whyNot = botActs(s, passing: true);
+          if (whyNot != null) return allowPartial ? partial() : fail(whyNot);
+        }
       }
       if (game.phase != Phase.passing) continue;
       if (index >= record.length) return allowPartial ? partial() : fail('the record ends mid-pass');
@@ -225,6 +424,29 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
         return fail('a pass at ${d.turn} by seat ${e.seat} without a majority behind it '
             '(${d.witnesses.length} of ${d.among.length})');
       }
+      final dl = deal;
+      if (dl != null) {
+        final b = Map<String, Object?>.from(e.body);
+        final to = (e.seat + game.passDirection.seatOffset) % seatCount;
+        if (b['from'] != e.seat || b['to'] != to) return fail('a pass by seat ${e.seat} not to seat $to');
+        final positions = [for (final p in b['positions'] as List) p as int];
+        if (positions.length != passSize || !dl.acceptPass(b)) return fail('a pass by seat ${e.seat} the deal does not take');
+        final cards = <Card>[];
+        for (final p in positions) {
+          final c = dl.openedCardAt(p);
+          if (c == null) break;
+          cards.add(Card.deck[c]);
+        }
+        final leader = dl.leader;
+        if (leader != null) game.declareLeader(leader);
+        try {
+          game.setPass(e.seat, cards.length == passSize ? cards : null);
+        } catch (_) {
+          return fail('an illegal pass by seat ${e.seat}');
+        }
+        if (cards.length != passSize) incomplete = true;
+        continue;
+      }
       try {
         game.setPass(e.seat, [for (final c in e.body['cards'] as List) Card.parse(c as String)]);
       } catch (_) {
@@ -232,9 +454,19 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
       }
       continue;
     }
+    if (game.phase == Phase.handOver) {
+      // A sealed hand ends with its audits, one per person still
+      // seated; then the next deal.
+      final v = takeAudits();
+      if (v != null) return v;
+      game.nextHand();
+      deal = null;
+      continue;
+    }
     final seat = game.currentSeat!;
     if (holders[seat] is BotSeat) {
-      botActs(seat, passing: false);
+      final whyNot = botActs(seat, passing: false);
+      if (whyNot != null) return allowPartial ? partial() : fail(whyNot);
       sweep();
       continue;
     }
@@ -253,11 +485,29 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
           '(${d.witnesses.length} of ${d.among.length})');
     }
     final card = Card.parse(e.body['card'] as String);
-    if (!game.legalPlaysFor(seat).contains(card)) return fail('an illegal play by seat $seat: $card');
+    final dl = deal;
+    if (dl != null) {
+      final opened = dl.acceptPlay(seat, Map<String, Object?>.from(e.body));
+      if (opened != card.index) return fail('a play at $turn by seat $seat whose token does not open $card');
+      if (game.knowsHand(seat)) {
+        if (!game.legalPlaysFor(seat).contains(card)) return fail('an illegal play by seat $seat: $card');
+      } else {
+        if (!game.allows(seat, card)) return fail('an illegal play by seat $seat: $card');
+        incomplete = true;
+      }
+    } else if (!game.legalPlaysFor(seat).contains(card)) {
+      return fail('an illegal play by seat $seat: $card');
+    }
     game.play(seat, card);
     played.add(card);
     sweep();
   }
+  if (deal != null) {
+    // The last hand is audited too.
+    final v = takeAudits();
+    if (v != null) return v;
+  }
+  if (incomplete) return partial();
 
   final winners = game.winners;
   final ratings = <PublicKey, int>{};

@@ -12,6 +12,8 @@ dependencies:
   web_socket_channel: ^3.0.3
   table:
     path: ../packages/table
+  deal:
+    path: ../packages/deal
   engine:
     path: ../packages/engine
 

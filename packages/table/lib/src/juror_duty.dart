@@ -9,6 +9,8 @@ library;
 
 import 'dart:async';
 
+import 'package:deal/deal.dart';
+
 import 'client.dart';
 import 'clock.dart';
 import 'presence_relay.dart';
@@ -16,7 +18,7 @@ import 'relay_transport.dart';
 import 'signing.dart';
 
 class JurorDuty {
-  JurorDuty({required this.url, required this.signer, required this.presence, this.log, Clock? clock, this.silenceAfterMs = 120000})
+  JurorDuty({required this.url, required this.signer, required this.presence, this.log, Clock? clock, this.silenceAfterMs = 120000, this.crypto})
       : clock = clock ?? WallClock();
 
   final Uri url;
@@ -28,6 +30,9 @@ class JurorDuty {
   /// The silence a juror's clients count as absence; the protocol's
   /// two minutes, shorter in a test.
   final int silenceAfterMs;
+
+  /// The deal's primitives, to serve at sealed tables.
+  final DealCrypto? crypto;
 
   final Map<String, ({TableClient client, RelayTransport transport})> _tables = {};
   StreamSubscription<Summons>? _sub;
@@ -48,7 +53,12 @@ class JurorDuty {
     var t = _tables[s.spec.id];
     if (t == null) {
       final transport = RelayTransport(url: url, signer: signer, table: s.spec.id, log: log);
-      final client = TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, silenceAfterMs: silenceAfterMs);
+      if (s.spec.sealed && crypto == null) {
+        log?.call('duty: summoned to a sealed table without the deal\'s cryptography; cannot serve');
+        return;
+      }
+      final client =
+          TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, silenceAfterMs: silenceAfterMs, crypto: crypto);
       client.log = log;
       t = _tables[s.spec.id] = (client: client, transport: transport);
       client.changes.listen((_) {
@@ -87,9 +97,10 @@ class JurorDuty {
 /// every other juror runs — and quiet again once it has been idle for
 /// a while.
 class LastResortJuror {
-  LastResortJuror({required this.url, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int silenceAfterMs = 120000}) {
+  LastResortJuror(
+      {required this.url, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int silenceAfterMs = 120000, DealCrypto? crypto}) {
     presence = RelayPresence(url: url, signer: signer, status: 'last-resort', log: log)..silent = true;
-    duty = JurorDuty(url: url, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs);
+    duty = JurorDuty(url: url, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs, crypto: crypto);
   }
 
   final Uri url;

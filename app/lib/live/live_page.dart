@@ -94,6 +94,10 @@ class _LivePageState extends State<LivePage> {
       if (_c.needsJuror) return _note('Nobody online to draw a jury from — waiting for one');
       return _note('Waiting for the jury');
     }
+    if (_c.pause == Pause.openingHand) return _note("Opening a departed player's hand");
+    if (_c.pause == Pause.waitingForLead) return _note('Nobody claims the 2♣ — the deal is stuck');
+    final dealing = _c.dealNote;
+    if (dealing != null) return _note(dealing);
     if (game.phase != Phase.playing && game.phase != Phase.passing) return null;
     // The seat everyone is waiting on, if it is a person other than me.
     for (var seat = 0; seat < seatCount; seat++) {
@@ -128,7 +132,8 @@ class _LivePageState extends State<LivePage> {
   Widget build(BuildContext context) {
     final game = _c.game;
     // What the player has committed is already off the hand.
-    final hand = game.handOf(_c.mySeat).where((c) => !_c.inFlight.contains(c)).toList();
+    // Nothing yet while a sealed table deals.
+    final hand = game.knowsHand(_c.mySeat) ? game.handOf(_c.mySeat).where((c) => !_c.inFlight.contains(c)).toList() : <engine.Card>[];
     final legal = _c.legalNow;
     final passing = _c.awaitingPass;
     final ended = _c.handJustEnded;

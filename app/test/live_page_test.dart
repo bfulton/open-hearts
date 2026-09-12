@@ -4,6 +4,7 @@
 /// rotated — the same screen as solo play, from a different chair.
 library;
 
+import 'package:deal/deal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:engine/engine.dart' as engine;
@@ -18,9 +19,9 @@ import 'table_page_test.dart' show fanCards, tapCard;
 const _me = 2;
 
 class LiveHarness {
-  LiveHarness() {
+  LiveHarness({DealCrypto? crypto}) {
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
-    spec = TableSpec(id: 'widget', seed: 21, seats: [for (final s in signers) HumanSeat(s.publicKey)]);
+    spec = TableSpec(id: 'widget', seed: 21, seats: [for (final s in signers) HumanSeat(s.publicKey)], sealed: crypto != null);
     for (var s = 0; s < engine.seatCount; s++) {
       if (s == _me) {
         controller = LiveController(
@@ -29,9 +30,11 @@ class LiveHarness {
           signer: signers[s],
           transport: net.attach(signers[s].publicKey),
           clock: clock,
+          crypto: crypto,
         );
       } else {
-        final client = TableClient(spec: spec, signer: signers[s], transport: net.attach(signers[s].publicKey), clock: clock);
+        final client =
+            TableClient(spec: spec, signer: signers[s], transport: net.attach(signers[s].publicKey), clock: clock, crypto: crypto);
         final person = ScriptedHuman(client, net, clock, persona: engine.Persona.westley, thinkMs: 300);
         people[s] = person;
         person.start();
@@ -56,12 +59,12 @@ class LiveHarness {
   }
 }
 
-Future<LiveHarness> pumpLive(WidgetTester tester) async {
+Future<LiveHarness> pumpLive(WidgetTester tester, {DealCrypto? crypto}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  final live = LiveHarness();
+  final live = LiveHarness(crypto: crypto);
   await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: LivePage(controller: live.controller)));
   await tester.pumpAndSettle();
   return live;
@@ -139,4 +142,37 @@ void main() {
     expect(live.controller.tableState, TableState.playing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('at a sealed table the deal shows, the others\' cards are backs, and the hand plays out', (tester) async {
+    final crypto = await DealCrypto.load();
+    final live = await pumpLive(tester, crypto: crypto);
+    // The deal runs on the virtual clock: keys wait up to ten seconds
+    // for a jury there is none of here, then the shuffles and the
+    // rest. Somewhere along it the rail says so.
+    var sawDealing = false;
+    for (var guard = 0; guard < 60 && live.controller.game.phase == engine.Phase.dealing; guard++) {
+      await live.advance(tester, 500);
+      if (find.textContaining('Shuffling').evaluate().isNotEmpty || find.textContaining('Dealing').evaluate().isNotEmpty) sawDealing = true;
+    }
+    expect(sawDealing, isTrue, reason: 'the rail showed the deal');
+    expect(live.controller.game.phase, engine.Phase.passing);
+    expect(live.controller.game.knowsHand(_me), isTrue);
+    for (var s = 0; s < engine.seatCount; s++) {
+      if (s == _me) continue;
+      expect(live.controller.game.knowsHand(s), isFalse, reason: 'seat $s\'s cards are not mine to see');
+      expect(live.controller.game.handSizeOf(s), 13);
+    }
+    expect(find.text('Pass'), findsOneWidget);
+    await act(tester, live);
+    await live.advance(tester, 2000);
+    expect(live.controller.game.phase, engine.Phase.playing);
+    for (var guard = 0; guard < 400 && live.controller.game.handNumber == 0; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(live.controller.game.handNumber, 1, reason: 'the first hand finished');
+    final v = live.controller.verification();
+    expect(v.ok, isTrue, reason: v.reason);
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 5)));
 }

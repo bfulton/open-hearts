@@ -27,8 +27,10 @@ import 'rules.dart';
 /// silently, each side rejecting the other's legal plays. So a start
 /// event carries this number, and a client whose number differs does
 /// not sit down. Bump it whenever a change to bot.dart, persona.dart
-/// or the pass and play rules they read could change a single card.
-const botPolicyVersion = 5;
+/// or the pass and play rules they read could change a single card —
+/// or to what a table is: 6 is the sealed deal (docs/03), which an
+/// older build cannot take part in.
+const botPolicyVersion = 6;
 
 /// The public information a bot decides from.
 class BotView {

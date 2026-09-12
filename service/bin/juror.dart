@@ -13,6 +13,7 @@ library;
 
 import 'dart:io';
 
+import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 
 Future<void> main(List<String> args) async {
@@ -22,7 +23,15 @@ Future<void> main(List<String> args) async {
   }
   final secret = Platform.environment['JUROR_SECRET'];
   final signer = secret != null && secret.length == 64 ? SchnorrSigner.fromSecret(secret) : SchnorrSigner.generate();
-  final juror = LastResortJuror(url: Uri.parse(relay), signer: signer, log: print);
+  // The deal's cryptography, to serve sealed tables: the cdylib built
+  // by crypto/deal/build.sh, found from here or named by DEAL_LIB.
+  DealCrypto? crypto;
+  try {
+    crypto = await DealCrypto.load();
+  } catch (e) {
+    print('juror: no deal cryptography ($e); sealed tables cannot be served');
+  }
+  final juror = LastResortJuror(url: Uri.parse(relay), signer: signer, log: print, crypto: crypto);
   juror.start();
-  print('juror of last resort ${signer.publicKey.substring(0, 8)} listening on $relay');
+  print('juror of last resort ${signer.publicKey.substring(0, 8)} listening on $relay${crypto == null ? '' : ', sealed tables too'}');
 }
