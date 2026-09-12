@@ -31,12 +31,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---- the relay and the app ----------------------------------------------
 
 async function startRelay() {
-  // The relay, and on it the juror of last resort: the four browsers
-  // are all at one table, so a jury can only come from the service.
+  // The relay; and beside it, its own process, the juror of last
+  // resort: the four browsers are all at one table, so a jury can only
+  // come from the service. Its own process, because a relay verifies
+  // every event it carries and must never wait on a juror's work.
   // RELAY_LOG=path keeps the relay's whole log for a debugging run.
   const relayLog = process.env.RELAY_LOG ? createWriteStream(process.env.RELAY_LOG) : null;
-  const args = ['run', 'bin/service.dart', '--port', '0', '--juror', ...(relayLog ? [] : ['--quiet'])];
+  const args = ['run', 'bin/service.dart', '--port', '0', ...(relayLog ? [] : ['--quiet'])];
   const proc = spawn('dart', args, { cwd: join(root, 'service') });
+  let juror = null;
   const url = await new Promise((resolveUrl, reject) => {
     let out = '';
     proc.stdout.on('data', (d) => {
@@ -45,13 +48,17 @@ async function startRelay() {
       if (m) resolveUrl(m[1]);
       // The juror of last resort's own lines, once the relay is up.
       if (relayLog) relayLog.write(d);
-      if (m) for (const line of d.toString().split('\n')) if (/juror|summoned|called|verdict|done with/.test(line)) log(`service: ${line.trim()}`);
+      if (m && !juror) {
+        juror = spawn('dart', ['run', 'bin/juror.dart', '--relay', m[1]], { cwd: join(root, 'service') });
+        juror.stdout.on('data', (d) => { for (const line of d.toString().split('\n')) if (/juror|summoned|called|verdict|done with/.test(line)) log(`juror: ${line.trim()}`); });
+        juror.stderr.on('data', (d) => process.stderr.write(d));
+      }
     });
     proc.stderr.on('data', (d) => process.stderr.write(d));
     proc.on('exit', (code) => reject(new Error(`relay exited ${code}\n${out}`)));
     setTimeout(() => reject(new Error('relay did not start')), 60000);
   });
-  return { url, stop: () => proc.kill() };
+  return { url, stop: () => { juror?.kill(); proc.kill(); } };
 }
 
 const types = {

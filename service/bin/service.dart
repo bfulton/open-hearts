@@ -1,6 +1,10 @@
 /// Runs the local service: the relay, and with `--juror` the juror of
-/// last resort on it (docs/04-live-play.md). Matchmaking is the
-/// players' own business on the relay (packages/table, matching.dart).
+/// last resort on it (docs/04-live-play.md) — in this process, which
+/// is fine on a dev machine and wrong under load, since a relay
+/// verifies every event it carries and a juror's client verifies them
+/// again; `bin/juror.dart` runs one beside the relay instead, which is
+/// what the browser suite does. Matchmaking is the players' own
+/// business on the relay (packages/table, matching.dart).
 ///
 ///     cd service && dart run bin/service.dart            # relay on 7447
 ///     dart run bin/service.dart --port 0 --quiet         # any free port
