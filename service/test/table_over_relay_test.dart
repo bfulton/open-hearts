@@ -8,11 +8,13 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:engine/engine.dart';
 import 'package:service/service.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Plays a seat the way a person would, from the client's own view.
 class Player {
@@ -98,7 +100,9 @@ void main() {
       expect(c.tableState, TableState.playing);
       expect(c.participants.length, 2);
     }
-    final keys = [for (final c in clients) c.record.map((d) => d.key).toList()];
+    // The first hand's decisions: a player may already have passed into
+    // the second before the other client hears it.
+    final keys = [for (final c in clients) c.record.where((d) => d.turn.hand == 0).map((d) => d.key).toList()];
     expect(keys[0], keys[1], reason: 'both hold the same record');
     final v = verifyRecord(spec, clients.first.record, allowPartial: true, juries: clients.first.juries);
     expect(v.ok, isTrue, reason: v.reason);
@@ -115,7 +119,7 @@ void main() {
     }
   }, timeout: const Timeout(Duration(minutes: 3)));
 
-  test('signalling goes to its addressee only', () async {
+  test('signalling goes to its addressee only, and sealed', () async {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
     final c = SchnorrSigner.generate();
@@ -127,6 +131,24 @@ void main() {
     final atC = <Signal>[];
     tb.signals.listen(atB.add);
     tc.signals.listen(atC.add);
+    // An eavesdropper on the relay sees every signal at the table, and
+    // reads none of it: each is sealed to its addressee (NIP-44).
+    final overheard = <String>[];
+    final ear = WebSocketChannel.connect(relay.url);
+    await ear.ready;
+    ear.stream.listen((raw) {
+      final m = jsonDecode(raw as String) as List;
+      if (m[0] == 'EVENT') overheard.add((m[2] as Map)['content'] as String);
+    });
+    ear.sink.add(jsonEncode([
+      'REQ',
+      'ear',
+      {
+        'kinds': [TableKinds.signal],
+        '#t': ['sig']
+      }
+    ]));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     ta.signal(b.publicKey, const Signal(from: '', type: 'offer', payload: {'sdp': 'v=0 …'}));
     ta.signal(b.publicKey, const Signal(from: '', type: 'ice', payload: {'candidate': 'candidate:1 …', 'sdpMid': '0'}));
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -134,6 +156,13 @@ void main() {
     expect(atB.first.from, a.publicKey);
     expect(atB.first.payload['sdp'], 'v=0 …');
     expect(atC, isEmpty);
+    expect(overheard, hasLength(2));
+    for (final content in overheard) {
+      expect(content, isNot(contains('v=0')));
+      expect(content, isNot(contains('candidate')));
+      expect(base64.decode(content).first, Nip44.version);
+    }
+    ear.sink.close();
     // And the reply comes back the same way.
     tb.signal(a.publicKey, const Signal(from: '', type: 'answer', payload: {'sdp': 'v=0 answer'}));
     final answer = await ta.signals.first.timeout(const Duration(seconds: 5));

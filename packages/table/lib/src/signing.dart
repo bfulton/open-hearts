@@ -38,6 +38,12 @@ abstract class Signer {
   /// escrow shares of its deal secret in (docs/03-fair-deal.md), so
   /// they can travel in the open to the seats and jurors named.
   Uint8List sharedSecretWith(PublicKey other);
+
+  /// The x coordinate of the point this key shares with the holder of
+  /// [other]: what NIP-44 (nip44.dart) makes a conversation key from,
+  /// so a message sealed here opens at the other end as it would in
+  /// any client that speaks it.
+  Uint8List sharedXWith(PublicKey other);
 }
 
 /// Checks [signatureHex] over [digestHex] by [key]. Recognises both real
@@ -97,13 +103,26 @@ class SchnorrSigner implements Signer {
   /// and both give the same x when multiplied — so the two ends agree
   /// whichever of the two each secret really is.
   @override
-  Uint8List sharedSecretWith(PublicKey other) {
+  Uint8List sharedSecretWith(PublicKey other) =>
+      Uint8List.fromList(sha256.convert([...utf8.encode('open-hearts shared secret v1|'), ...sharedXWith(other)]).bytes);
+
+  /// Throws for what is not a key or not a secret: an x with no point
+  /// on the curve, or off the field; a secret of zero or past the
+  /// curve's order.
+  @override
+  Uint8List sharedXWith(PublicKey other) {
+    final secret = BigInt.parse(_secretHex, radix: 16);
+    if (secret <= BigInt.zero || secret >= _secp256k1.n) throw ArgumentError('not a secret');
+    if (other.length != 64 || BigInt.parse(other, radix: 16) >= _fieldPrime) throw ArgumentError('not a key: $other');
     final point = _secp256k1.curve.decodePoint([2, ..._unhex(other)]);
     if (point == null) throw ArgumentError('not a key: $other');
-    final shared = (point * BigInt.parse(_secretHex, radix: 16))!;
+    final shared = point * secret;
+    if (shared == null || shared.isInfinity) throw ArgumentError('not a key: $other');
     final x = shared.x!.toBigInteger()!.toRadixString(16).padLeft(64, '0');
-    return Uint8List.fromList(sha256.convert([...utf8.encode('open-hearts shared secret v1|'), ..._unhex(x)]).bytes);
+    return Uint8List.fromList(_unhex(x));
   }
+
+  static final _fieldPrime = BigInt.parse('fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f', radix: 16);
 }
 
 List<int> _unhex(String hex) => [for (var i = 0; i < hex.length; i += 2) int.parse(hex.substring(i, i + 2), radix: 16)];
@@ -132,6 +151,12 @@ class FakeSigner implements Signer {
   Uint8List sharedSecretWith(PublicKey other) {
     final pair = [publicKey, other]..sort();
     return Uint8List.fromList(sha256.convert(utf8.encode('fake-shared:${pair[0]}|${pair[1]}')).bytes);
+  }
+
+  @override
+  Uint8List sharedXWith(PublicKey other) {
+    final pair = [publicKey, other]..sort();
+    return Uint8List.fromList(sha256.convert(utf8.encode('fake-shared-x:${pair[0]}|${pair[1]}')).bytes);
   }
 }
 

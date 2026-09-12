@@ -14,6 +14,7 @@ export 'src/jury.dart';
 export 'src/juror_duty.dart';
 export 'src/matching.dart';
 export 'src/model.dart';
+export 'src/nip44.dart';
 export 'src/nostr.dart';
 export 'src/presence_relay.dart';
 export 'src/rating.dart';

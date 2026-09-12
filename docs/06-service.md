@@ -114,9 +114,12 @@ that is the distinction "heard from" rests on. The relay says nothing
 when a peer goes, so the transport never reports a disconnect; the
 heartbeats carry that. Kind 24243 on the same wire is WebRTC
 signalling — an offer, an answer, an ICE candidate — addressed with a
-`p` tag to one recipient, who is the only one subscribed to it. Plain
-text on a local relay; encrypted to the recipient's key (NIP-44) is
-the step before a public relay carries it.
+`p` tag to one recipient, who is the only one subscribed to it, and
+sealed to that recipient's key with NIP-44 (`nip44.dart`, version 2,
+written out in Dart and pinned to the published vectors), since a
+candidate carries an address and a public relay carries the event.
+The two ends' conversation key comes from their keys' shared point
+(`Signer.sharedXWith`), the same ECDH the deal's escrow rests on.
 
 `service/test/table_over_relay_test.dart` seats two people and two bots
 on the local relay with real keys, real sockets and the wall clock, and

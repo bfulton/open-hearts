@@ -120,6 +120,9 @@ class _WasmSigner implements Signer {
   Uint8List sharedSecretWith(PublicKey other) => _dart.sharedSecretWith(other);
 
   @override
+  Uint8List sharedXWith(PublicKey other) => _dart.sharedXWith(other);
+
+  @override
   String sign(String digestHex) {
     final rng = Random.secure();
     final aux = List.generate(32, (_) => rng.nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0')).join();

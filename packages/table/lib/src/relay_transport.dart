@@ -17,7 +17,9 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'nip44.dart';
 import 'nostr.dart';
 import 'relays.dart';
 import 'signing.dart';
@@ -104,13 +106,28 @@ class RelayTransport implements Transport {
     ]));
   }
 
-  /// Sends one signalling message to [to].
+  /// Sends one signalling message to [to], sealed to its key: an
+  /// offer or a candidate carries an address, and a public relay
+  /// carries the event.
   void signal(PublicKey to, Signal s) {
-    _group.publish(NostrEvent.sign(signer, kind: TableKinds.signal, content: jsonEncode(s.toJson()), tags: [
+    final String content;
+    try {
+      content = Nip44.encrypt(_conversationKeyWith(to), jsonEncode(s.toJson()));
+    } on ArgumentError {
+      log?.call('no sealing a signal to ${to.substring(0, 6)}: not a key');
+      return;
+    }
+    _group.publish(NostrEvent.sign(signer, kind: TableKinds.signal, content: content, tags: [
       ['p', to],
       ['t', table],
     ]));
   }
+
+  final Map<PublicKey, Uint8List> _conversationKeys = {};
+
+  /// The NIP-44 conversation key with [other], made once.
+  Uint8List _conversationKeyWith(PublicKey other) =>
+      _conversationKeys.putIfAbsent(other, () => Nip44.conversationKey(signer.sharedXWith(other)));
 
   /// One event, from whichever relay delivered it first. A table
   /// event's envelope signature is not checked here: the relay checked
@@ -135,7 +152,14 @@ class RelayTransport implements Transport {
         _incoming.add((from: e.pubkey, message: message));
       } catch (_) {}
     } else if (e.kind == TableKinds.signal && e.tag('p') == signer.publicKey) {
-      final s = Signal.parse(e.pubkey, e.content);
+      final String text;
+      try {
+        text = Nip44.decrypt(_conversationKeyWith(e.pubkey), e.content);
+      } catch (_) {
+        log?.call('a signal from ${e.pubkey.substring(0, 6)} that does not open');
+        return true;
+      }
+      final s = Signal.parse(e.pubkey, text);
       if (s != null) _signals.add(s);
     }
     return true;
@@ -152,9 +176,9 @@ class RelayTransport implements Transport {
 }
 
 /// One WebRTC signalling message: an offer or answer carrying SDP, or
-/// an ICE candidate. Plain text on the relay for now — a local relay
-/// on a dev machine; encryption to the recipient's key (NIP-44) is the
-/// step before a public relay carries it.
+/// an ICE candidate. On the wire it is sealed to the recipient's key
+/// (NIP-44, nip44.dart): a candidate carries an address, and a public
+/// relay carries the event.
 class Signal {
   const Signal({required this.from, required this.type, required this.payload});
 
