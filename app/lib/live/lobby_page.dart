@@ -9,6 +9,7 @@ import 'package:table/table.dart';
 
 import '../identity.dart';
 import '../live_controller.dart';
+import '../net/duty.dart';
 import '../net/mesh_transport.dart';
 import '../net/room.dart';
 import '../net/standing.dart';
@@ -109,6 +110,9 @@ class _LobbyPageState extends State<LobbyPage> {
       final url = Uri.parse(_relay.text.trim());
       final transport = RelayTransport(url: url, signer: signer, table: tag, log: _relayLog);
       await transport.ready.timeout(const Duration(seconds: 8));
+      // The relay answered: from here on this device is online to
+      // everyone, and a juror when drawn.
+      Duty.on(url, signer, log: _debugging);
       if (_standing == null) await _loadStanding(url, signer);
       setState(() {
         _transport = transport;
@@ -166,6 +170,7 @@ class _LobbyPageState extends State<LobbyPage> {
       seatNames: seatNames,
       signer: signer,
       transport: MeshTransport(relay: relay, peers: peers, log: _debugging ? (l) => debugPrint('mesh: $l') : null),
+      presence: Duty.on(relayUrl, signer, log: _debugging).presence,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
       onResult: (result) => Standing.publish(relayUrl, signer, result),
     );

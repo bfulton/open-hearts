@@ -127,6 +127,7 @@ class RelayTransport implements Transport {
     _channel = ch;
     ch.stream.listen(_onMessage, onDone: _onDropped, onError: (_) => _onDropped());
     ch.ready.then((_) {
+      if (_channel != ch) return; // dropped, or replaced, before it was ready
       _retryMs = 500;
       _lastMessageMs = _nowMs;
       _liveness ??= Timer.periodic(const Duration(seconds: 5), (_) => _checkLiveness());

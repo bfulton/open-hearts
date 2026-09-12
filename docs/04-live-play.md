@@ -106,7 +106,7 @@ A bot's identity is its name and its rung: `Westley` at the top,
 
 ## The live table, as it stands
 
-What the app does today, ahead of the jury. **Play live** on the solo
+What the app does today. **Play live** on the solo
 table opens a lobby: a name, and the choice — *Rated* or *Unrated* —
 then a waiting screen and nothing to do. There is no matchmaker.
 Players who want a game say so on the relay every couple of seconds,
@@ -138,8 +138,11 @@ while a channel is not open (`MeshTransport`). The table is drawn from
 whichever chair you hold. On its rail: who is still here; the boot
 clock on a seat that is holding everyone up, and the *Boot* button
 when it runs out; *Leave*; and, when the table is stuck, why — waiting
-for the others, or for the jury. A seat that is booted or falls silent
-sees *A bot took your seat*. The device's key is minted the first time
+for the others, asking the jury, or waiting for a jury when nobody was
+online to draw one from. A seat that is booted or falls silent sees
+*A bot took your seat*. Every open app says it is online and serves
+as a juror when drawn (`app/lib/net/duty.dart`), at another table or
+in the lobby, without the player noticing. The device's key is minted the first time
 it is needed and kept; on the web every signature goes through the wasm
 ([measurements/sign](../measurements/README.md)). A widget test seats
 the player at seat 2 with three simulated people and plays a hand,
@@ -524,6 +527,61 @@ anything of ours, and what it carries is "a table needs a juror."
 **The draw is verifiable.** The four at the table agree a snapshot of
 who is online, and apply the deal's own randomness to it. Nobody at the
 table can steer the draw, and nobody outside it can either.
+
+### As built
+
+The jury's deadlock role is built (`packages/table`: `jury.dart`,
+`juror_duty.dart`, `presence_relay.dart`, and the client's "the jury"
+section); the shares it will hold arrive with the deal ([doc
+03](03-fair-deal.md)). On the wire:
+
+- **Presence.** Every open app announces itself on one relay topic
+  every five seconds, and listens. A summons is an event on that topic
+  addressed to one key, carrying the table's spec and the hand.
+- **The draw.** At each hand the lowest key among the participants
+  heard lately proposes: a snapshot of who is online (nobody at this
+  table), and the draw — four, foreman first — as a deterministic
+  function of the seed, the hand and the snapshot. The others witness
+  it when the draw is what the snapshot gives and the jurors are people
+  they too have seen; a majority carries it, beside the record rather
+  than in it, since two peers may hold different evidence for the same
+  authority. Everyone summons the jurors. A jury stays in force until a
+  later one carries: a table of two with one gone quiet cannot carry a
+  new one, and that is when it needs the old. A jury gone quiet is
+  redrawn from whoever is left; with nobody online to draw from the
+  table says so and calls for a juror of last resort.
+- **The juror** follows the table like any peer behind — a summoned
+  client is carried forward by the same heartbeats — and heartbeats
+  while it serves.
+- **The appeal.** A stuck turn — a race that split, or any open turn
+  while the table is paused — is appealed every ten seconds.
+- **The rule.** A juror rules only when nobody who can still vote, as
+  far as it can hear, could carry either side: votes that may yet come
+  are carried, not overruled. Then by the seat's presence to it — heard
+  and acted, the action stands; silent, the removal stands, on a boot
+  someone made or on the juror's own claim of absence. Heard and not
+  yet acted is nobody's to decide. The foreman rules first; each juror
+  behind waits five seconds more. A verdict carries the winning event
+  whole, so it settles the same turn the same way wherever it lands,
+  and a turn settled by verdict travels with its verdict when a peer
+  behind is carried forward.
+- **Carrying.** From the first appeal of a hand to its end, the first
+  juror in the draw still heard from says again at once everything it
+  hears for a turn not yet settled: a table cut in two has its votes on
+  both sides, and the juror hears both. The cut table then runs at its
+  own pace rather than an appeal's, and no verdict is needed.
+- **The verifier** checks each jury against its snapshot and its
+  majority, and each verdict against the jury in force for the hand,
+  the turn, the seat and the very event recorded.
+
+The simulator's jury rows (`packages/table/test/jury_test.dart`): a
+table of two with one gone quiet off turn and on it; four cut two and
+two with the jury reaching all; the foreman crashing; the whole jury
+going quiet; nobody online and a juror of last resort; nobody online
+and none. The chaos walk draws four jurors and lets them go too, and
+ends every seed finished, or paused only with no juror left up. The
+browser suite runs the two-person case over real sockets against the
+service's juror of last resort.
 
 ## What the jury does not change
 

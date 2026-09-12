@@ -2,13 +2,13 @@
 ///
 /// The matrix enumerates the cases someone thought of. This drives the
 /// simulator through faults nobody chose — departures, partitions,
-/// loss and latency at random times — and checks, every few seconds of
-/// virtual time, the invariants that must hold whatever happens:
-/// survivors never hold conflicting decisions, every record verifies as
-/// far as it goes, and every observed state change is one the model in
-/// model.dart allows. Once the faults stop and the network heals, the
-/// table finishes or is paused for the one reason the protocol admits
-/// in this version.
+/// loss and latency at random times, jurors going — and checks, every
+/// few seconds of virtual time, the invariants that must hold whatever
+/// happens: survivors never hold conflicting decisions, every record
+/// verifies as far as it goes, and every observed state change is one
+/// the model in model.dart allows. Once the faults stop and the network
+/// heals, the table finishes — or is paused for the one reason left:
+/// the jury is gone and nobody is online to draw another from.
 library;
 
 import 'dart:io';
@@ -97,7 +97,7 @@ void main() {
           }
         }
         for (final c in survivors) {
-          final v = verifyRecord(t.spec, c.record, allowPartial: true);
+          final v = verifyRecord(t.spec, c.record, allowPartial: true, juries: c.juries);
           expect(v.ok, isTrue, reason: '$when: ${c.signer.publicKey.substring(0, 6)} record: ${v.reason}');
         }
         for (final c in t.clients) {
@@ -147,7 +147,7 @@ void main() {
         // running has to know it has no seat, and hold a sound record.
         for (final p in t.people.where((p) => !p.gone)) {
           expect(p.client.amSeated, isFalse, reason: 'faults were [${sc.faults.join('; ')}]\n${p.client.describe()}');
-          final v = verifyRecord(t.spec, p.client.record, allowPartial: true);
+          final v = verifyRecord(t.spec, p.client.record, allowPartial: true, juries: p.client.juries);
           expect(v.ok, isTrue, reason: v.reason);
         }
       } else if (finished) {
@@ -155,7 +155,7 @@ void main() {
         for (final r in keysOf) {
           expect(r, keysOf.first, reason: 'every survivor holds the same record');
         }
-        final v = verifyRecord(t.spec, survivors.first.record);
+        final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries);
         expect(v.ok && v.complete, isTrue, reason: v.reason);
       } else {
         for (final c in survivors) {
@@ -166,6 +166,9 @@ void main() {
               reason: 'paused only because the survivors are not a majority, or a turn split evenly; '
                   'faults were [${sc.faults.join('; ')}]\n${c.describe()}');
         }
+        // With a jury there is no pause a live juror could not end.
+        expect(t.liveJurors, isEmpty,
+            reason: 'paused with a juror still up; faults were [${sc.faults.join('; ')}]\n${survivors.first.describe()}');
       }
       t.stop();
     });

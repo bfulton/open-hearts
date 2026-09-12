@@ -182,8 +182,8 @@ The axes:
 | **How** | a signed Leave; a silent drop, found by timeout; a boot at fifteen seconds on turn; a two-and-two partition, which is not a departure but looks like one from inside |
 | **When** | on the departed seat's own turn; off it; mid-trick; the last trick of a hand; during the pass; during the deal; at a hand boundary |
 
-The juror rows arrive with the jury ([doc 04](04-live-play.md)); they
-are in the matrix from the start and skipped until then.
+The juror rows run in `packages/table/test/jury_test.dart`, with the
+jury of [doc 04](04-live-play.md).
 
 **The chaos test** is the matrix's complement: random walks through
 the same simulator — departures, partitions, blips, loss and latency at
@@ -206,7 +206,7 @@ survivor holding the same record. CI walks forty seeds on every commit;
 What every cell asserts:
 
 - **The game reaches its end** with a bot in every departed seat — or,
-  at two humans with an inferred departure and no jury seated yet, the
+  at two humans with an inferred departure and no jury to be drawn, the
   table **pauses and says so**, and stays consistent while paused.
 - **Every surviving client holds the same record**, event for event,
   once the network settles.

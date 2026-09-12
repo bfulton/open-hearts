@@ -18,21 +18,23 @@
 /// ```
 ///
 /// A boot is claimed by the clock, fifteen seconds on turn, or for
-/// silence, thirty seconds unheard; both are votes in the same race,
+/// silence, two minutes unheard; both are votes in the same race,
 /// and a seat is only ever removed at its own turn or by its own signed
 /// leave (client.dart, "silence", says why). A turn stuck for want of a
 /// silent seat's vote is split. A bot's turn goes straight from open to
 /// settledByAction. A settled turn never reopens; a split one settles
-/// only when the jury decides.
+/// when the jury rules — for the action or for the removal, the same
+/// two endings (client.dart, "the jury").
 ///
 /// **A seat**: human, until one of three doors — left (signed), booted
-/// (a boot carried at its turn), absent (a silence claim carried) —
-/// after which it is a bot for good. A seat never comes back.
+/// (a boot carried at its turn), absent (a silence claim carried, by
+/// the players or by a verdict) — after which it is a bot for good. A
+/// seat never comes back.
 ///
-/// **The table**: playing, or paused waiting for the jury (a removal the
-/// players cannot decide among themselves) or for peers (not enough
-/// reachable to decide anything), or finished. A pause always lifts when
-/// a decision lands; finished is terminal.
+/// **The table**: playing, or paused waiting for the jury (a turn the
+/// players cannot settle among themselves, appealed) or for peers (not
+/// enough reachable to decide anything), or finished. A pause always
+/// lifts when a decision lands; finished is terminal.
 library;
 
 /// Where a turn's race stands.
@@ -47,7 +49,7 @@ enum TurnState {
   contested,
 
   /// Neither side can reach a majority any more. Only the jury can
-  /// settle it.
+  /// settle it, and does, for one side or the other.
   split,
 
   settledByAction,

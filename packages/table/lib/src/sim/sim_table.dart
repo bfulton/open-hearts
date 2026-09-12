@@ -7,16 +7,32 @@ import '../client.dart';
 import '../signing.dart';
 import '../spec.dart';
 import 'scripted_human.dart';
+import 'sim_juror.dart';
 import 'sim_network.dart';
+import 'sim_presence.dart';
 import 'virtual_clock.dart';
 
 /// A simulated table: [humans] scripted people in the first seats,
 /// bots in the rest.
 class SimTable {
-  SimTable({required this.humans, int seed = 1, int netSeed = 1})
+  SimTable({required this.humans, int seed = 1, int netSeed = 1, int jurors = 0, bool lastResort = false, bool withPresence = false})
       : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
+    if (jurors > 0 || lastResort || withPresence) {
+      final p = presence = SimPresence(net, clock);
+      for (var j = 0; j < jurors; j++) {
+        final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock);
+        this.jurors.add(juror);
+        p.register(juror);
+      }
+      if (lastResort) {
+        final juror = SimJuror(FakeSigner('last-resort-$seed'), net, clock);
+        this.jurors.add(juror);
+        p.register(juror);
+        p.lastResort = juror;
+      }
+    }
     spec = TableSpec(
       id: 'table-$seed',
       seed: seed,
@@ -26,7 +42,8 @@ class SimTable {
       ],
     );
     for (var i = 0; i < humans; i++) {
-      final client = TableClient(spec: spec, signer: signers[i], transport: net.attach(signers[i].publicKey), clock: clock);
+      final client =
+          TableClient(spec: spec, signer: signers[i], transport: net.attach(signers[i].publicKey), clock: clock, presence: presence);
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }
   }
@@ -38,6 +55,14 @@ class SimTable {
   late final TableSpec spec;
   final List<ScriptedHuman> people = [];
 
+  /// Strangers online who can be drawn as jurors; the last is the
+  /// juror of last resort when there is one.
+  final List<SimJuror> jurors = [];
+  SimPresence? presence;
+
+  /// Jurors still up: not gone, and not crashed or quiet.
+  Iterable<SimJuror> get liveJurors => jurors.where((j) => !j.gone && net.isUp(j.signer.publicKey));
+
   Iterable<TableClient> get clients => people.map((p) => p.client);
 
   /// Clients of people who have not left, crashed or gone quiet, and
@@ -47,6 +72,7 @@ class SimTable {
       people.where((p) => !p.gone && p.client.amSeated).map((p) => p.client);
 
   void start() {
+    presence?.start();
     for (final p in people) {
       p.start();
     }
@@ -61,6 +87,9 @@ class SimTable {
     for (final p in people) {
       p.stop();
       p.client.close();
+    }
+    for (final j in jurors) {
+      j.stop();
     }
   }
 }

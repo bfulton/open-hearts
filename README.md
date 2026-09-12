@@ -81,7 +81,8 @@ rigged. Roughly in order:
    deterministic.
 5. **The verifiable deal.**
 6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
-   matchmaking, seat handover, the jury.
+   matchmaking, seat handover, the jury: built, its deadlock role;
+   the shares it holds come with the deal.
 7. **Landscape**, then **tablet**, then **iPhone Duo**
    ([doc 05](docs/05-form-factors.md)).
 8. **The stores.**
@@ -98,12 +99,6 @@ Ideas agreed on and not yet placed in the order above.
   [doc 04](docs/04-live-play.md), so a design conversation first.
 - **A pace history**, kept with the rating from the same signed
   results, and **matchmaking by pace**, so slow players find each other.
-- **Tables of two.** A majority of two is both, and a silent seat cannot
-  be booted before its own turn, so one person going quiet on the
-  other's turn stalls the table for good. The jury's juror of last
-  resort covers it; until then a rule for two-person tables is needed.
-- **The jury** itself ([doc 04](docs/04-live-play.md)): an even split is
-  still a dead end that says so.
 
 ## Developing
 

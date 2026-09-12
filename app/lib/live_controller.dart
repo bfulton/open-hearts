@@ -35,10 +35,11 @@ class LiveController extends ChangeNotifier implements TableModel {
     required Signer signer,
     required Transport transport,
     Clock? clock,
+    Presence? presence,
     this.ratingOf,
     this.onResult,
     this.paced = true,
-  }) : client = TableClient(spec: spec, signer: signer, transport: transport, clock: clock ?? WallClock()) {
+  }) : client = TableClient(spec: spec, signer: signer, transport: transport, clock: clock ?? WallClock(), presence: presence) {
     _shown = HeartsGame(seed: spec.seed);
     _shownHolders = List.of(spec.seats);
     _sub = client.changes.listen((_) => _onChange());
@@ -431,8 +432,14 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Humans still at the table, by seat.
   int get participants => client.participants.length;
 
+  /// The hand's jury: drawn and heard from.
+  ({int drawn, int live}) get jury => client.jury;
+
+  /// The table found nobody online to draw a jury from.
+  bool get needsJuror => client.needsJuror;
+
   /// The record so far, as the verifier sees it.
-  Verification verification() => verifyRecord(client.spec, client.record, allowPartial: !client.done);
+  Verification verification() => verifyRecord(client.spec, client.record, allowPartial: !client.done, juries: client.juries);
 
   @override
   void dispose() {

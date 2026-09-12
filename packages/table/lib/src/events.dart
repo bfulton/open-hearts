@@ -5,7 +5,9 @@
 /// anyone, and never forged. The kinds are few: the two things a seat
 /// does at the table (pass, play), the three doors out (leave, and the
 /// two inferred ones, boot and absent), a witness signature over any of
-/// those, and a heartbeat.
+/// those, and a heartbeat; and the jury's four (jury.dart): a proposal
+/// of who the hand's jurors are, a juror's heartbeat while it serves,
+/// an appeal of a turn the players cannot settle, and a verdict.
 library;
 
 import 'dart:convert';
@@ -13,7 +15,7 @@ import 'dart:typed_data';
 
 import 'signing.dart';
 
-enum EventKind { pass, play, leave, boot, absent, witness, heartbeat }
+enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, jury, serve, appeal, verdict }
 
 /// Which moment of a hand an event is about. A hand has four pass turns
 /// (one per seat, all open at once) followed by fifty-two play turns.
@@ -114,6 +116,20 @@ class TableEvent {
 
   /// For witness: the id of the event witnessed.
   String get witnessed => body['event'] as String;
+
+  /// For jury: the jurors drawn, foreman first.
+  List<PublicKey> get jurors => [for (final k in body['jurors'] as List) k as String];
+
+  /// For jury: the keys online the draw was made from.
+  List<PublicKey> get snapshot => [for (final k in body['snapshot'] as List) k as String];
+
+  /// For verdict: which side of the race the juror ruled for.
+  String get side => body['side'] as String;
+
+  /// For verdict: the event that wins — the seat's action, or the
+  /// claim that removes it — carried whole, so a peer that never saw
+  /// it can apply the verdict.
+  TableEvent? get ruled => body['event'] is Map ? TableEvent.parse(Map<String, Object?>.from(body['event'] as Map)) : null;
 
   @override
   String toString() => '${kind.name}#${id.substring(0, 6)} by ${author.substring(0, 6)} $body';

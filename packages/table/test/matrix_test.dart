@@ -55,7 +55,7 @@ void checkFinished(SimTable t, {required Set<int> departedSeats}) {
     }
   }
   checkAgreement(t, among: survivors);
-  final v = verifyRecord(t.spec, survivors.first.record);
+  final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries);
   expect(v.ok, isTrue, reason: v.reason);
   expect(v.winners, survivors.first.game.winners);
   for (final s in departedSeats) {
@@ -185,7 +185,7 @@ void main() {
         expect(c.holders[0], isA<BotSeat>(), reason: 'seat 0 was booted');
         expect(c.done, isTrue);
       }
-      final v = verifyRecord(t.spec, survivors.first.record);
+      final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries);
       expect(v.ok, isTrue, reason: v.reason);
       expect(survivors.first.record.where((d) => d.removal && d.event.kind == EventKind.boot), isNotEmpty);
       t.stop();
@@ -251,7 +251,7 @@ void main() {
       for (final c in majority) {
         expect(c.holders[2], isA<BotSeat>());
       }
-      final v = verifyRecord(t.spec, majority.first.record);
+      final v = verifyRecord(t.spec, majority.first.record, juries: majority.first.juries);
       expect(v.ok, isTrue, reason: v.reason);
       final alone = t.people[2].client;
       expect(alone.done, isFalse);

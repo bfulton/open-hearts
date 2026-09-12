@@ -185,6 +185,11 @@ abstract final class TableKinds {
   /// with the recipient and `t` with the table id.
   static const signal = 24243;
 
+  /// Presence (presence_relay.dart): who is online, tagged `t` with the
+  /// one topic; a summons to a juror, tagged `p` with the juror; a
+  /// table's call for a juror of last resort.
+  static const presence = 24246;
+
   /// The lobby: hosting a table, joining it, starting it, tagged `t`
   /// with the room code — or, tagged with a pool, the matchmaker's
   /// seating of a table. Stored, not ephemeral, so a relay hands a

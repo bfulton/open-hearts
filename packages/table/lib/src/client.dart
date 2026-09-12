@@ -57,6 +57,7 @@ import 'events.dart';
 import 'model.dart';
 import 'signing.dart';
 import 'spec.dart';
+import 'jury.dart';
 import 'transport.dart';
 
 /// Why a table is not moving.
@@ -78,7 +79,19 @@ class Decision {
     required this.witnesses,
     this.removal = false,
     this.among = const {},
+    this.jury = false,
+    this.verdict,
   });
+
+  /// True for a jury proposal that carried: the hand's jurors, agreed
+  /// by the table. Kept beside the record ([TableClient.juries]), not
+  /// in it — it is authority for verdicts, not a move.
+  final bool jury;
+
+  /// The juror's verdict that settled this turn, when the players could
+  /// not: it names the winning event, and the verifier checks the juror
+  /// against the hand's jury.
+  final TableEvent? verdict;
 
   /// The turn settled, or the turn at which a departure was made.
   final TurnId turn;
@@ -108,7 +121,11 @@ class Decision {
   /// the decision, and peers may hold different evidence for it: one
   /// the boot pressed at fifteen seconds, another the boot made for
   /// silence, a third the seat's own leave.
-  String get key => removal ? 'out@$turn#${event.seat}' : event.id;
+  String get key => jury
+      ? 'jury@$turn#${event.id.substring(0, 8)}'
+      : removal
+          ? 'out@$turn#${event.seat}'
+          : event.id;
 
   /// Canonical position in a record. Pass turns are concurrent and
   /// settle in a different order at every peer; ordering by turn, with
@@ -126,7 +143,8 @@ class Decision {
   }
 
   @override
-  String toString() => '$turn ${removal ? 'OUT' : 'ok'} $event by ${witnesses.length}';
+  String toString() =>
+      '$turn ${jury ? 'JURY' : removal ? 'OUT' : 'ok'} $event by ${witnesses.length}${verdict != null ? ' by verdict' : ''}';
 }
 
 class TableClient {
@@ -138,6 +156,7 @@ class TableClient {
     this.bootAfterMs = 15000,
     this.silenceAfterMs = 120000,
     this.heartbeatMs = 5000,
+    this.presence,
   })  : game = HeartsGame(seed: spec.seed),
         holders = List.of(spec.seats),
         _humans = {for (final h in spec.seats) if (h is HumanSeat) h.key};
@@ -149,6 +168,10 @@ class TableClient {
   final int bootAfterMs;
   final int silenceAfterMs;
   final int heartbeatMs;
+
+  /// Who is online, and how a juror is summoned; null at a table that
+  /// draws no jury.
+  final Presence? presence;
 
   final HeartsGame game;
 
@@ -163,6 +186,13 @@ class TableClient {
 
   /// Every settled turn and departure, in canonical order.
   final List<Decision> record = [];
+
+  /// Every jury proposal that carried, in the order they carried: the
+  /// authority behind any verdict in the record. Two peers may hold
+  /// different ones for the same hand — a replacement drawn when a
+  /// jury went quiet, a proposal that carried late — which is why they
+  /// travel with the record rather than in it.
+  final List<Decision> juries = [];
 
   /// Turns settled in the current hand.
   int step = 0;
@@ -295,6 +325,16 @@ class TableClient {
           'needed ${_majority(_participantsAt(e.key))} of ${_participantsAt(e.key).length}');
     }
     if (_future.isNotEmpty) b.writeln('  deferred ${_future.length}: ${_future.take(4).map((e) => '${e.kind.name}@${e.turn}')}');
+    final jurors = _jurorsOf(game.handNumber);
+    if (jurors.isNotEmpty || needsJuror) {
+      b.writeln('  jury: ${jurors.map((k) => k.substring(0, 4))} live ${_liveJurors(game.handNumber).map((k) => k.substring(0, 4))}'
+          '${needsJuror ? ' — nobody to draw from' : ''}');
+    }
+    for (final e in _proposals.entries) {
+      if (e.value.settled) continue;
+      b.writeln('  proposed jury ${e.key.substring(0, 6)} by ${e.value.forAction.map((k) => k.substring(0, 4))}');
+    }
+    if (_serving.isNotEmpty) b.writeln('  serving as juror for hands ${_serving.keys.toList()}; appeals ${_appealSeenAt.keys}');
     b.writeln('  connected ${connectedToMajority ? 'yes' : 'no'}; heard '
         '${_humans.where((k) => k != signer.publicKey).map((k) => '${k.substring(0, 4)} '
             '${_lastHeard[k] == null ? 'never' : '${clock.nowMs - _lastHeard[k]!} ms ago'}').join(', ')}');
@@ -311,6 +351,34 @@ class TableClient {
   final Map<TurnId, String> _myWitness = {};
   final Map<PublicKey, TurnId> _removedAt = {};
   final Map<PublicKey, int> _lastHeard = {};
+
+  // The jury (jury.dart, and the section below).
+  //
+  // A time before any clock. Not `-1 << 30`: on the web a shift of a
+  // negative number comes out unsigned, and a sentinel that is meant
+  // to be far in the past lands far in the future.
+  static const _never = -1000000000;
+  final Map<String, _Race> _proposals = {};
+  final Map<int, String> _myJuryWitness = {};
+  final Map<String, TableEvent> _myJuryWitnessEvents = {};
+  final Map<String, int> _juryAt = {};
+  final Map<PublicKey, int> _jurorHeard = {};
+  final Map<TurnId, int> _lastAppealAt = {};
+  int _lastProposedAt = _never;
+  int _lastCalledAt = _never;
+  int _proposedForHand = -1;
+  int _proposalsThisHand = 0;
+
+  /// True when this table found nobody online to draw a jury from, and
+  /// has said so.
+  bool needsJuror = false;
+
+  // As a juror: the hands this client serves, each with the jury it was
+  // summoned into, foreman first; the appeals heard; the verdicts given.
+  final Map<int, List<PublicKey>> _serving = {};
+  final Map<TurnId, int> _appealSeenAt = {};
+  final Map<TurnId, int> _verdictAt = {};
+  final Map<TurnId, int> _waitSaidAt = {};
 
   /// Where each peer last said it stood, from its heartbeats.
   final Map<PublicKey, (int, int)> _lastPosition = {};
@@ -450,6 +518,7 @@ class TableClient {
   void _openHand() {
     played.clear();
     step = 0;
+    _proposeJury();
     if (game.phase == Phase.passing) {
       // Every pass turn opens before any bot passes: a bot's pass closes
       // its turn and drains what was deferred, and a human's pass held
@@ -556,8 +625,22 @@ class TableClient {
     // some peers hear a seat directly (one relay socket gone quiet,
     // one WebRTC channel of three) used to split at that seat's turn,
     // the deaf peers booting it while the others witnessed its play.
-    if (event.author != from && _humans.contains(event.author) && !_seen.contains(event.id) && !_alreadyPast(event)) {
+    // Not while this peer is itself behind and being carried forward:
+    // then the work arriving is the table's past, however new to this
+    // peer, and a juror that took a quiet seat's old plays for signs
+    // of life restarted its silence clock on catching up.
+    if (event.author != from && _humans.contains(event.author) && !_seen.contains(event.id) && !_alreadyPast(event) && !_behind) {
       _lastHeard[event.author] = clock.nowMs;
+    }
+    if (event.kind == EventKind.serve) {
+      // A juror's heartbeat: it says where the juror stands, and a
+      // juror is carried forward like anyone, since it has to hold the
+      // table's present to judge it.
+      if (event.author != from) return;
+      _jurorHeard[from] = clock.nowMs;
+      _lastPosition[from] = (event.hand, event.step);
+      _carryForward(from, event.hand, event.step);
+      return;
     }
     if (event.kind == EventKind.heartbeat) {
       if (event.author != from) return;
@@ -581,6 +664,11 @@ class TableClient {
     if (_seen.contains(event.id)) {
       // Seen before, and sent again: the sender is still waiting on a
       // turn this peer may have settled. Answer with what settled it.
+      // A jury proposal sent again is the same proposal — the leader
+      // says it every few seconds until it carries — and a peer that
+      // could not back it before, its presence not yet having seen
+      // the jurors, looks again.
+      if (event.kind == EventKind.jury) return _reconsiderJury(event);
       if (event.kind != EventKind.leave) _catchUp(event.turn);
       return;
     }
@@ -590,7 +678,7 @@ class TableClient {
 
   /// Whether [event] is about a position this peer has already passed.
   bool _alreadyPast(TableEvent event) {
-    if (event.kind == EventKind.heartbeat) {
+    if (event.kind == EventKind.heartbeat || event.kind == EventKind.serve) {
       return event.hand < game.handNumber || (event.hand == game.handNumber && event.step < step);
     }
     final t = event.turn;
@@ -622,6 +710,14 @@ class TableClient {
         _onBoot(event);
       case EventKind.leave:
         _onLeave(event);
+      case EventKind.jury:
+        _onJury(event);
+      case EventKind.serve:
+        _jurorHeard[event.author] = clock.nowMs;
+      case EventKind.appeal:
+        _onAppeal(event);
+      case EventKind.verdict:
+        _onVerdict(event);
     }
   }
 
@@ -661,7 +757,10 @@ class TableClient {
     // same heartbeat with the same turns is three times the traffic.
     _behindSince.putIfAbsent(asker, () => clock.nowMs);
     final live = participants.where((k) => k == signer.publicKey || _recent(k)).toList()..sort();
-    if (live.first != signer.publicKey && clock.nowMs - _behindSince[asker]! < heartbeatMs * 2 + 1000) return;
+    // A juror is no participant: it answers once the participants have
+    // had their turn to, or at once when it hears none of them.
+    final first = live.isEmpty ? null : live.first;
+    if (first != signer.publicKey && clock.nowMs - _behindSince[asker]! < heartbeatMs * 2 + 1000) return;
     var h = hand;
     var st = step;
     for (var n = 0; n < carryWindow; n++) {
@@ -731,6 +830,19 @@ class TableClient {
     for (final d in record) {
       if (d.removal && !settled.contains(d.turn)) _sendEvidence(d.turn);
     }
+    // A turn the jury settled travels with its verdict: the votes alone
+    // never made a majority, so the votes alone would leave the asker
+    // where the table was stuck.
+    for (final d in record) {
+      if (d.verdict != null && (d.removal || settled.contains(d.turn))) _send(d.verdict!.toJson());
+    }
+    // And the juries, which a verdict in any of that rests on.
+    for (final d in juries) {
+      _send(d.event.toJson());
+      for (final w in _proposals[d.event.id]?.witnessEvents ?? const <TableEvent>[]) {
+        _send(w.toJson());
+      }
+    }
   }
 
   /// One catch-up event, if the budget has it.
@@ -770,7 +882,31 @@ class TableClient {
     }
   }
 
+  /// A juror hears both sides of a table cut in two. From the first
+  /// appeal of a hand to the end of it, the first juror in the draw
+  /// still heard from says again, at once, everything it hears for a
+  /// turn not yet settled, so the votes cross the cut and the table
+  /// runs at its own pace rather than an appeal's. One juror carries,
+  /// not four: a shared relay sees each event twice, not five times.
+  void _relayIfAppealed(TableEvent event) {
+    if (mySeat != null || _carryingHand != game.handNumber) return;
+    final order = _orderFor(game.handNumber);
+    final carrier = order.where((j) => j == signer.publicKey || _jurorRecent(j)).firstOrNull;
+    if (carrier != signer.publicKey) return;
+    try {
+      final turn = event.turn;
+      if (_races[turn]?.settled == true) return;
+      transport.broadcast(event.toJson());
+    } catch (_) {}
+  }
+
+  /// The hand in which this juror last heard an appeal.
+  int _carryingHand = -1;
+
+  bool _jurorRecent(PublicKey j) => clock.nowMs - (_jurorHeard[j] ?? _never) < 30000;
+
   void _onAction(TableEvent event) {
+    _relayIfAppealed(event);
     final turn = event.turn;
     final where = _compare(turn);
     if (where > 0) return _defer(event);
@@ -812,6 +948,7 @@ class TableClient {
   /// A boot, by the clock or for silence: a vote against the seat's
   /// action in the race for its turn.
   void _onBoot(TableEvent event) {
+    _relayIfAppealed(event);
     final turn = event.turn;
     final where = _compare(turn);
     if (where > 0) return _defer(event);
@@ -871,8 +1008,23 @@ class TableClient {
 
   void _onWitness(TableEvent event) {
     if (!_humans.contains(event.author)) return;
+    _relayIfAppealed(event);
     final id = event.witnessed;
     final turn = event.turn;
+    final proposal = _proposals[id];
+    if (proposal != null) {
+      if (proposal.settled) return;
+      proposal.forAction.add(event.author);
+      proposal.witnessEvents.add(event);
+      return _settleJury(id);
+    }
+    if (event.body['jury'] == true) {
+      // For a proposal not seen yet: kept by its id, never deferred,
+      // since its position is the proposer's, not a turn of this hand.
+      _earlyWitnesses.putIfAbsent(id, () => {}).add(event.author);
+      _earlyWitnessEvents.putIfAbsent(id, () => []).add(event);
+      return;
+    }
     final race = _races[turn];
     if (race != null) {
       if (race.settled) return _catchUp(turn);
@@ -901,27 +1053,9 @@ class TableClient {
     final forAction = race.forAction.intersection(of);
     final forRemoval = race.forRemoval.intersection(of);
     if (forAction.length >= needed) {
-      race.settled = true;
-      final e = race.action!;
-      if (e.kind == EventKind.pass) {
-        game.setPass(seat, [for (final c in e.body['cards'] as List) Card.parse(c as String)]);
-      } else {
-        final card = Card.parse(e.body['card'] as String);
-        game.play(seat, card);
-        played.add(card);
-      }
-      _log(Decision(turn: turn, event: e, witnesses: Set.of(race.forAction), among: of));
-      _trace('settled $turn ${e.kind.name} by ${forAction.length}');
-      _pause = null;
-      _closeTurn(turn);
+      _carryAction(turn, race, race.action!, of);
     } else if (forRemoval.length >= needed) {
-      race.settled = true;
-      _log(Decision(turn: turn, event: race.boots.first, witnesses: Set.of(race.forRemoval), removal: true, among: of));
-      _trace('booted seat $seat at $turn by ${forRemoval.length}');
-      _remove(seat, at: turn, how: race.boots.first.kind);
-      _pause = null;
-      _botActs(turn, seat);
-      _reconsider();
+      _carryRemoval(turn, race, race.boots.first, of);
     } else if (race.split) {
       _pause = Pause.waitingForJury; // still, whatever else was reconsidered
     } else if (race.action != null || race.forRemoval.isNotEmpty) {
@@ -944,6 +1078,51 @@ class TableClient {
         _trace('split at $turn: ${forAction.length} for the action, ${forRemoval.length} against');
       }
     }
+  }
+
+  /// The seat's action wins the race for [turn]: by a majority, or by
+  /// a juror's [verdict] where no majority could be had.
+  void _carryAction(TurnId turn, _Race race, TableEvent e, Set<PublicKey> of, {TableEvent? verdict}) {
+    race.settled = true;
+    final seat = _turnSeat[turn]!;
+    if (e.kind == EventKind.pass) {
+      game.setPass(seat, [for (final c in e.body['cards'] as List) Card.parse(c as String)]);
+    } else {
+      final card = Card.parse(e.body['card'] as String);
+      game.play(seat, card);
+      played.add(card);
+    }
+    _log(Decision(
+      turn: turn,
+      event: e,
+      witnesses: {...race.forAction, if (verdict != null) verdict.author},
+      among: of,
+      verdict: verdict,
+    ));
+    _trace('settled $turn ${e.kind.name} by ${race.forAction.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
+    _pause = null;
+    _closeTurn(turn);
+  }
+
+  /// The removal wins the race for [turn]: by a majority, or by a
+  /// juror's [verdict].
+  void _carryRemoval(TurnId turn, _Race race, TableEvent claim, Set<PublicKey> of, {TableEvent? verdict}) {
+    race.settled = true;
+    _removedAtTurn.add(turn);
+    final seat = _turnSeat[turn]!;
+    _log(Decision(
+      turn: turn,
+      event: claim,
+      witnesses: {...race.forRemoval, if (verdict != null) verdict.author},
+      removal: true,
+      among: of,
+      verdict: verdict,
+    ));
+    _trace('booted seat $seat at $turn by ${race.forRemoval.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
+    _remove(seat, at: turn, how: claim.kind);
+    _pause = null;
+    _botActs(turn, seat);
+    _reconsider();
   }
 
   /// A turn whose race no participant can still carry, waiting for the
@@ -1030,6 +1209,8 @@ class TableClient {
     if (_closed) return;
     if (amSeated && !_left) {
       _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step});
+    } else if (mySeat == null && _serving.isNotEmpty && !done) {
+      _emit(EventKind.serve, {'hand': game.handNumber, 'step': step, 'serving': _serving.keys.toList()});
     }
     // Behind a peer heard lately: say so every second, since a heartbeat
     // is what brings the missing turns.
@@ -1077,6 +1258,9 @@ class TableClient {
         if (race.boots.isNotEmpty && !_myWitness.containsKey(e.key)) _considerCountersigning(e.key, race.boots.first);
         if (race.action != null || race.boots.isNotEmpty) _settle(e.key);
       }
+      _juryTick();
+    } else if (mySeat == null && _serving.isNotEmpty && !done) {
+      _judgeAppeals();
     }
     _notify();
     _timers.add(clock.schedule(1000, _tick));
@@ -1103,10 +1287,379 @@ class TableClient {
     for (final e in _myWitnessEvents.entries) {
       if (_races[e.key]?.settled == false) transport.broadcast(e.value.toJson());
     }
+    for (final p in _proposals.values) {
+      if (!p.settled && p.action!.author == signer.publicKey) transport.broadcast(p.action!.toJson());
+    }
+    for (final e in _myJuryWitnessEvents.entries) {
+      if (_proposals[e.key]?.settled == false) transport.broadcast(e.value.toJson());
+    }
   }
 
   /// This peer's own unsettled witnesses, kept to repeat.
   final Map<TurnId, TableEvent> _myWitnessEvents = {};
+
+  // ---- the jury -----------------------------------------------------------
+  //
+  // Doc 04: every hand seats a jury drawn from whoever is online, to
+  // break a deadlock the players cannot. Here: the lowest key among
+  // the participants heard lately proposes the draw over a snapshot of
+  // who is online; the others witness it when the draw is what the
+  // snapshot gives and the jurors are people they too have seen; a
+  // majority carries it, beside the record, and everyone summons the
+  // jurors. A split turn is appealed to them every ten seconds. A
+  // juror follows the table like any peer behind, and rules only when
+  // nobody who can still vote, as far as it can hear, could carry
+  // either side — then by the seat's presence to it: heard and acted,
+  // the action; silent, the removal. A verdict carries the winning
+  // event, so it settles the same turn the same way wherever it lands.
+  // A jury gone quiet is redrawn; nobody to draw from is said.
+
+  /// The juries in force at [hand]: those carried for it — or, until
+  /// one is, those of the latest hand before it that has any. A juror
+  /// serves until relieved: a table of two with one gone quiet cannot
+  /// carry a new jury, and that is exactly when it needs the old one.
+  Iterable<Decision> _juriesFor(int hand) {
+    var latest = -1;
+    for (final d in juries) {
+      if (d.event.hand <= hand && d.event.hand > latest) latest = d.event.hand;
+    }
+    return latest < 0 ? const [] : juries.where((d) => d.event.hand == latest);
+  }
+
+  /// Everyone drawn for [hand], across every jury in force at it.
+  Set<PublicKey> _jurorsOf(int hand) => {for (final d in _juriesFor(hand)) ...d.event.jurors};
+
+  /// The order this client answers appeals in at [hand]: the jury it
+  /// was summoned into most recently by then, or the one in force.
+  List<PublicKey> _orderFor(int hand) {
+    var latest = -1;
+    for (final h in _serving.keys) {
+      if (h <= hand && h > latest) latest = h;
+    }
+    if (latest >= 0) return _serving[latest]!;
+    final inForce = _juriesFor(hand);
+    return inForce.isEmpty ? const [] : inForce.first.event.jurors;
+  }
+
+  /// Jurors in force at [hand] heard from lately, or drawn too recently
+  /// to have been.
+  Set<PublicKey> _liveJurors(int hand) {
+    final live = <PublicKey>{};
+    for (final d in _juriesFor(hand)) {
+      final drawn = _juryAt[d.event.id] ?? 0;
+      for (final j in d.event.jurors) {
+        final heard = _jurorHeard[j];
+        if ((heard != null && clock.nowMs - heard < 30000) || clock.nowMs - drawn < 30000) live.add(j);
+      }
+    }
+    return live;
+  }
+
+  /// The jury of the current hand as a view shows it: how many were
+  /// drawn, how many are heard.
+  ({int drawn, int live}) get jury => (drawn: _jurorsOf(game.handNumber).length, live: _liveJurors(game.handNumber).length);
+
+  bool _recentWithin(PublicKey key, int ms) => clock.nowMs - (_lastHeard[key] ?? clock.nowMs) < ms;
+
+  /// Proposes a jury for this hand when it is this peer's place to —
+  /// the lowest key among the participants heard lately — and the hand
+  /// has no jury of its own yet, or fewer than two of its jurors are
+  /// heard from. Every ten seconds while it is needed, then every half
+  /// minute: a proposal at a table that cannot carry one is not free.
+  void _proposeJury() {
+    final p = presence;
+    if (p == null || !amSeated || _left || done) return;
+    final hand = game.handNumber;
+    final leaders = participants.where((k) => k == signer.publicKey || _recentWithin(k, 10000)).toList()..sort();
+    if (leaders.first != signer.publicKey) return;
+    if (_proposedForHand != hand) {
+      _proposedForHand = hand;
+      _proposalsThisHand = 0;
+    }
+    if (clock.nowMs - _lastProposedAt < (_proposalsThisHand < 3 ? 10000 : 30000)) return;
+    final own = juries.any((d) => d.event.hand == hand);
+    if (own && _liveJurors(hand).length >= 2) return;
+    final quiet = _jurorsOf(hand).difference(_liveJurors(hand));
+    final candidates = p.online(withinMs: 15000).difference(_humans).difference(quiet);
+    if (candidates.isEmpty) {
+      if (!needsJuror) _trace('nobody online to draw a jury from');
+      needsJuror = true;
+      if (clock.nowMs - _lastCalledAt >= 10000) {
+        _lastCalledAt = clock.nowMs;
+        p.callForJuror(spec.id);
+      }
+      return;
+    }
+    needsJuror = false;
+    // A jury already drawn is kept unless a redraw would seat someone
+    // new: with one stranger online the jury is that one, and
+    // proposing it again every ten seconds carries nothing.
+    if (own && _liveJurors(hand).isNotEmpty && candidates.every(_jurorsOf(hand).contains)) return;
+    _lastProposedAt = clock.nowMs;
+    _proposalsThisHand++;
+    final snapshot = candidates.toList()..sort();
+    final at = _positionOf(mySeat!);
+    _emit(EventKind.jury, {
+      'hand': hand,
+      'turn': at.index,
+      'seat': mySeat,
+      'jurors': drawJury(spec.seed, hand, snapshot),
+      'snapshot': snapshot,
+    });
+  }
+
+  void _onJury(TableEvent event) {
+    if (event.hand > game.handNumber) return _defer(event);
+    if (event.hand < game.handNumber || !_isParticipant(event.author)) return;
+    final race = _proposals.putIfAbsent(event.id, () => _Race()..action = event);
+    race.forAction.add(event.author);
+    race.forAction.addAll(_earlyWitnesses.remove(event.id) ?? const {});
+    race.witnessEvents.addAll(_earlyWitnessEvents.remove(event.id) ?? const []);
+    if (amSeated && !_left && event.author != signer.publicKey && _acceptableJury(event)) _witnessJury(event);
+    _settleJury(event.id);
+  }
+
+  void _reconsiderJury(TableEvent event) {
+    final race = _proposals[event.id];
+    if (race == null || race.settled) return;
+    if (!amSeated || _left || event.author == signer.publicKey) return;
+    if (_myJuryWitnessEvents.containsKey(event.id) || !_acceptableJury(event)) return;
+    _witnessJury(event);
+    _settleJury(event.id);
+  }
+
+  /// Whether to back a proposal: the draw is what the snapshot gives,
+  /// the snapshot holds nobody at this table, every juror is someone
+  /// this peer has seen online too, and this peer is not already
+  /// behind another live proposal for the hand.
+  bool _acceptableJury(TableEvent e) {
+    final snapshot = e.snapshot;
+    final jurors = e.jurors;
+    if (jurors.isEmpty || snapshot.any(_humans.contains)) return false;
+    final drawn = drawJury(spec.seed, e.hand, snapshot);
+    if (drawn.length != jurors.length || !Iterable.generate(jurors.length).every((i) => drawn[i] == jurors[i])) return false;
+    final p = presence;
+    if (p != null) {
+      final seen = p.online(withinMs: 300000);
+      if (!jurors.every(seen.contains)) return false;
+    }
+    final backed = _myJuryWitness[e.hand];
+    if (backed != null && backed != e.id) {
+      final earlier = _proposals[backed];
+      if (earlier != null && !earlier.settled && _recentWithin(earlier.action!.author, 10000)) return false;
+      if (earlier != null && earlier.settled && _liveJurors(e.hand).length >= 2) return false;
+    }
+    return true;
+  }
+
+  void _witnessJury(TableEvent of) {
+    _myJuryWitness[of.hand] = of.id;
+    final w = TableEvent.sign(signer, table: spec.id, kind: EventKind.witness, body: {
+      'event': of.id,
+      'hand': of.hand,
+      'turn': of.turn.index,
+      'seat': of.seat,
+      'jury': true,
+    });
+    transport.broadcast(w.toJson());
+    _myJuryWitnessEvents[of.id] = w;
+    _accept(w);
+  }
+
+  void _settleJury(String id) {
+    final race = _proposals[id]!;
+    if (race.settled) return;
+    final e = race.action!;
+    final of = _participantsAt(e.turn);
+    if (race.forAction.intersection(of).length < _majority(of)) return;
+    race.settled = true;
+    juries.add(Decision(turn: e.turn, event: e, witnesses: Set.of(race.forAction), among: of, jury: true));
+    _juryAt[e.id] = clock.nowMs;
+    needsJuror = false;
+    _trace('jury for hand ${e.hand}: ${e.jurors.map((k) => k.substring(0, 4))} by ${race.forAction.length}');
+    final p = presence;
+    if (p != null && amSeated) {
+      for (final j in e.jurors) {
+        p.summon(j, {'table': spec.toJson(), 'hand': e.hand, 'jurors': e.jurors, 'jury': e.id});
+      }
+    }
+    _notify();
+  }
+
+  /// Once a second at a seat: propose when it is this peer's place to,
+  /// and appeal every stuck turn to the jury, every ten seconds. Stuck
+  /// is a race that split, or any open turn while the table is paused
+  /// — a table of two with one gone quiet claims nothing, by design,
+  /// and has nothing to split; it asks.
+  void _juryTick() {
+    _proposeJury();
+    for (final e in List.of(_races.entries)) {
+      final race = e.value;
+      if (race.settled || !(race.split || _pause != null)) continue;
+      if (_jurorsOf(e.key.hand).isEmpty) continue;
+      final last = _lastAppealAt[e.key];
+      if (last != null && clock.nowMs - last < 10000) continue;
+      _lastAppealAt[e.key] = clock.nowMs;
+      _emit(EventKind.appeal, {'hand': e.key.hand, 'turn': e.key.index, 'seat': _turnSeat[e.key]});
+    }
+  }
+
+  // ---- as a juror ----
+
+  /// Summoned into the jury of [hand] at this table, [jurors] being
+  /// the draw, foreman first. The client follows the table from then
+  /// on and answers appeals in its place in the order.
+  void serveFor(int hand, List<PublicKey> jurors) {
+    if (mySeat != null) return;
+    _serving[hand] = jurors;
+    _notify();
+  }
+
+  /// Whether this client is still a juror of the hand in play or one
+  /// to come; false once the table has moved past every hand it served,
+  /// the game is over, or nobody at the table has been heard for five
+  /// minutes — a table everyone walked away from is nobody's to serve.
+  bool get serving =>
+      mySeat == null &&
+      !done &&
+      (_serving.keys.any((h) => h >= game.handNumber) || _jurorsOf(game.handNumber).contains(signer.publicKey)) &&
+      participants.any((k) => clock.nowMs - (_lastHeard[k] ?? 0) < 5 * 60 * 1000);
+
+  /// A juror that stops: no more heartbeats, no more verdicts. The
+  /// table notices the silence and draws another.
+  void stopServing() {
+    _serving.clear();
+    _appealSeenAt.clear();
+  }
+
+  void _onAppeal(TableEvent event) {
+    if (mySeat != null || !_isParticipant(event.author)) return;
+    if (!_orderFor(event.hand).contains(signer.publicKey)) return;
+    _appealSeenAt.putIfAbsent(event.turn, () => clock.nowMs);
+    _carryingHand = event.hand;
+    _judgeAppeals();
+  }
+
+  final Map<TurnId, int> _relayedAt = {};
+
+  void _judgeAppeals() {
+    for (final turn in List.of(_appealSeenAt.keys)) {
+      final race = _races[turn];
+      if (race == null) continue; // still catching up to it
+      if (race.settled) {
+        _appealSeenAt.remove(turn);
+        _relayedAt.remove(turn);
+        continue;
+      }
+      // What this juror holds for the turn, said again every five
+      // seconds while the appeal stands: a table cut in two has its
+      // votes on both sides, and the juror is the one who hears both.
+      final last = _relayedAt[turn];
+      if (last == null || clock.nowMs - last >= 5000) {
+        _relayedAt[turn] = clock.nowMs;
+        if (race.action != null) transport.broadcast(race.action!.toJson());
+        for (final b in race.boots) {
+          transport.broadcast(b.toJson());
+        }
+        for (final w in race.witnessEvents) {
+          transport.broadcast(w.toJson());
+        }
+      }
+      _judge(turn, race);
+    }
+  }
+
+  /// The rule. A juror rules only when nobody who can still vote, as
+  /// far as it can hear, could carry either side — votes that may yet
+  /// come are carried, not overruled — and then by the seat's presence
+  /// to it: heard and acted, the action stands; silent, the removal.
+  /// Heard and not yet acted is nobody's to decide; the seat's own
+  /// clock runs. The foreman rules first; each juror behind waits five
+  /// seconds more.
+  void _judge(TurnId turn, _Race race) {
+    final order = _orderFor(turn.hand);
+    final place = order.indexOf(signer.publicKey);
+    if (place < 0 || clock.nowMs - _appealSeenAt[turn]! < place * 5000) return;
+    final last = _verdictAt[turn];
+    if (last != null && clock.nowMs - last < 10000) return;
+    final seat = _turnSeat[turn]!;
+    final holder = holders[seat];
+    if (holder is! HumanSeat) return;
+    final of = _participantsAt(turn);
+    final needed = _majority(of);
+    final forAction = race.forAction.intersection(of);
+    final forRemoval = race.forRemoval.intersection(of);
+    final awake = of.difference(forAction).difference(forRemoval).where((k) => !_silent(k)).toSet();
+    final actionPossible = forAction.length + awake.length >= needed;
+    final removalPossible = forRemoval.length + awake.difference({holder.key}).length >= needed;
+    final said = _waitSaidAt[turn];
+    if (said == null || clock.nowMs - said >= 10000) {
+      _waitSaidAt[turn] = clock.nowMs;
+      _trace('appeal at $turn: ${forAction.length} for, ${forRemoval.length} against, of ${of.length}; '
+          'awake ${awake.map((k) => '${k.substring(0, 4)} ${clock.nowMs - (_lastHeard[k] ?? clock.nowMs)} ms ago')}; '
+          'action ${race.action != null}; seat ${_silent(holder.key) ? 'silent' : 'heard'}');
+    }
+    if (actionPossible || removalPossible) return;
+    TableEvent winner;
+    String side;
+    if (!_silent(holder.key)) {
+      if (race.action == null) return;
+      winner = race.action!;
+      side = 'action';
+    } else {
+      winner = race.boots.isNotEmpty
+          ? race.boots.first
+          : TableEvent.sign(signer, table: spec.id, kind: EventKind.absent, body: {
+              'hand': turn.hand,
+              'turn': turn.index,
+              'seat': seat,
+            });
+      side = 'removal';
+    }
+    _verdictAt[turn] = clock.nowMs;
+    _emit(EventKind.verdict, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'side': side, 'event': winner.toJson()});
+  }
+
+  /// A verdict, by a juror of the hand as this peer knows the jury,
+  /// about a turn open here: the side it names wins, with the event it
+  /// carries.
+  void _onVerdict(TableEvent event) {
+    final turn = event.turn;
+    if (!_jurorsOf(turn.hand).contains(event.author) && !_orderFor(turn.hand).contains(event.author)) return;
+    final where = _compare(turn);
+    if (where > 0) return _defer(event);
+    if (where < 0) return _catchUp(turn);
+    final race = _races[turn];
+    if (race == null) return _defer(event);
+    if (race.settled) return _catchUp(turn);
+    final seat = _turnSeat[turn]!;
+    if (event.seat != seat) return;
+    final holder = holders[seat];
+    if (holder is! HumanSeat) return;
+    final ruled = event.ruled;
+    if (ruled == null || ruled.table != spec.id || ruled.seat != seat || ruled.turn != turn) return;
+    final of = _participantsAt(turn);
+    if (event.side == 'action') {
+      if (ruled.author != holder.key || (ruled.kind != EventKind.pass && ruled.kind != EventKind.play)) return;
+      if (!_valid(ruled, seat)) return;
+      race.action = ruled;
+      race.forAction.add(ruled.author);
+      _seen.add(ruled.id);
+      _trace('verdict at $turn by ${event.author.substring(0, 4)}: the action stands');
+      _carryAction(turn, race, ruled, of, verdict: event);
+    } else if (event.side == 'removal') {
+      if (ruled.kind != EventKind.boot && ruled.kind != EventKind.absent) return;
+      if (ruled.author == holder.key) return;
+      if (!_isParticipant(ruled.author) && ruled.author != event.author) return;
+      if (!race.boots.any((b) => b.id == ruled.id)) {
+        race.boots.add(ruled);
+        _seen.add(ruled.id);
+      }
+      if (_isParticipant(ruled.author)) race.forRemoval.add(ruled.author);
+      _trace('verdict at $turn by ${event.author.substring(0, 4)}: seat $seat is out');
+      _carryRemoval(turn, race, ruled, of, verdict: event);
+    }
+  }
 
   void _log(Decision d) {
     var i = record.length;

@@ -62,10 +62,14 @@ class MatrixCell {
 /// A random walk: departures, partitions, blips, loss and latency at
 /// random times over the first few minutes, then quiet.
 class ChaosScenario {
-  ChaosScenario(this.seed) : rng = Random(seed) {
+  ChaosScenario(this.seed, {this.jurors = 4}) : rng = Random(seed) {
     humans = 2 + rng.nextInt(3);
-    table = SimTable(humans: humans, seed: 100 + seed, netSeed: seed);
+    table = SimTable(humans: humans, seed: 100 + seed, netSeed: seed, jurors: jurors);
   }
+
+  /// Strangers online to draw a jury from; zero for the players' own
+  /// protocol alone.
+  final int jurors;
 
   final int seed;
   final Random rng;
@@ -86,7 +90,7 @@ class ChaosScenario {
     final count = 3 + rng.nextInt(6);
     for (var f = 0; f < count; f++) {
       final when = at;
-      switch (rng.nextInt(6)) {
+      switch (rng.nextInt(jurors > 0 ? 8 : 6)) {
         case 0:
         case 1:
           t.clock.schedule(when, () {
@@ -141,6 +145,19 @@ class ChaosScenario {
           t.clock.schedule(when + hold, () {
             t.net.minLatencyMs = 20;
             t.net.maxLatencyMs = 80;
+          });
+        case 6:
+        case 7:
+          // A juror goes — one, or the foreman, or several at once, up
+          // to the whole jury.
+          final n = 1 + rng.nextInt(t.jurors.length);
+          final how = Exit.values[rng.nextInt(Exit.values.length)];
+          t.clock.schedule(when, () {
+            final up = t.jurors.where((j) => !j.gone).toList();
+            for (final j in up.take(n)) {
+              j.depart(how);
+              faults.add('juror ${j.signer.publicKey.substring(0, 4)} ${how.name}s at ${t.clock.nowMs}');
+            }
           });
       }
       at += 3000 + rng.nextInt(30000);

@@ -12,6 +12,7 @@ import 'package:engine/engine.dart';
 
 import 'client.dart';
 import 'events.dart';
+import 'jury.dart';
 import 'signing.dart';
 import 'spec.dart';
 
@@ -50,7 +51,14 @@ class Verification {
 /// reached it yet, so a removed member who witnessed still counts, in
 /// the denominator as well as the count. Nobody gains by that: it can
 /// only raise the bar.
-Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPartial = false}) {
+///
+/// A decision the players could not carry may be carried by a juror's
+/// verdict instead ([juries]: the jury proposals that carried at this
+/// peer). Each jury must itself be carried by a majority of the
+/// participants of its moment and be the draw its snapshot gives; a
+/// verdict must be by a juror of the hand, about this turn and this
+/// seat, ruling for the very event recorded.
+Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPartial = false, List<Decision> juries = const []}) {
   final game = HeartsGame(seed: spec.seed);
   final holders = List.of(spec.seats);
   final humans = {for (final h in spec.seats) if (h is HumanSeat) h.key};
@@ -92,6 +100,57 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
     if (among.isEmpty || !humans.containsAll(among)) return false;
     if (!among.containsAll(floorAt(turn))) return false;
     return witnesses.intersection(among).length >= among.length ~/ 2 + 1;
+  }
+
+  final jurors = <int, Set<PublicKey>>{};
+  for (final d in juries) {
+    final e = d.event;
+    if (!d.jury || e.kind != EventKind.jury) return fail('a jury that is not a jury proposal');
+    if (!humans.contains(e.author)) return fail('a jury proposed by someone not at the table');
+    List<PublicKey> snapshot;
+    List<PublicKey> drawn;
+    try {
+      snapshot = e.snapshot;
+      drawn = e.jurors;
+    } catch (_) {
+      return fail('a malformed jury proposal');
+    }
+    if (snapshot.any(humans.contains)) return fail('a jury drawn from the table itself');
+    final expected = drawJury(spec.seed, e.hand, snapshot);
+    if (expected.length != drawn.length || Iterable.generate(drawn.length).any((i) => expected[i] != drawn[i])) {
+      return fail('a jury for hand ${e.hand} that is not the draw its snapshot gives');
+    }
+    if (!carried(d.witnesses, d.turn, d.among)) {
+      return fail('a jury for hand ${e.hand} without a majority behind it (${d.witnesses.length} of ${d.among.length})');
+    }
+    jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
+  }
+
+  /// The jurors in force at [hand]: its own, or until it has any, the
+  /// latest earlier hand's — the client's rule, a juror serves until
+  /// relieved.
+  Set<PublicKey> jurorsAt(int hand) {
+    var latest = -1;
+    for (final h in jurors.keys) {
+      if (h <= hand && h > latest) latest = h;
+    }
+    return latest < 0 ? const {} : jurors[latest]!;
+  }
+
+  /// Whether [d] is carried by a verdict: a juror of the hand ruled
+  /// for exactly this event at exactly this turn.
+  bool byVerdict(Decision d) {
+    final v = d.verdict;
+    if (v == null || v.kind != EventKind.verdict) return false;
+    if (!jurorsAt(d.turn.hand).contains(v.author)) return false;
+    try {
+      if (v.turn != d.turn || v.seat != d.event.seat) return false;
+      if ((v.side == 'removal') != d.removal) return false;
+      final ruled = v.ruled;
+      return ruled != null && ruled.id == d.event.id;
+    } catch (_) {
+      return false;
+    }
   }
 
   int playIndex() => game.tricksPlayed * seatCount + game.trick.length;
@@ -137,7 +196,7 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
         if (e.author != holder.key) return 'a leave signed by someone else';
       } else {
         final backers = Set.of(d.witnesses)..remove(holder.key);
-        if (!carried(backers, d.turn, d.among)) {
+        if (!carried(backers, d.turn, d.among) && !byVerdict(d)) {
           return 'a ${e.kind.name} of seat $seat at ${d.turn} without a majority behind it '
               '(${backers.length} of ${d.among.length})';
         }
@@ -162,7 +221,7 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
       if (e.kind != EventKind.pass) return fail('expected a pass, saw ${e.kind.name}');
       final holder = holders[e.seat];
       if (holder is! HumanSeat || holder.key != e.author) return fail('a pass by a key that did not hold seat ${e.seat}');
-      if (!carried(d.witnesses, d.turn, d.among)) {
+      if (!carried(d.witnesses, d.turn, d.among) && !byVerdict(d)) {
         return fail('a pass at ${d.turn} by seat ${e.seat} without a majority behind it '
             '(${d.witnesses.length} of ${d.among.length})');
       }
@@ -189,7 +248,7 @@ Verification verifyRecord(TableSpec spec, List<Decision> record, {bool allowPart
     }
     final turn = TurnId.play(game.handNumber, playIndex());
     if (d.turn != turn) return fail('a play recorded at $turn as ${d.turn}');
-    if (!carried(d.witnesses, turn, d.among)) {
+    if (!carried(d.witnesses, turn, d.among) && !byVerdict(d)) {
       return fail('a play at $turn by seat $seat without a majority behind it '
           '(${d.witnesses.length} of ${d.among.length})');
     }

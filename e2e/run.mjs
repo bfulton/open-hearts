@@ -16,6 +16,7 @@ import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,13 +31,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---- the relay and the app ----------------------------------------------
 
 async function startRelay() {
-  const proc = spawn('dart', ['run', 'bin/service.dart', '--port', '0', '--quiet'], { cwd: join(root, 'service') });
+  // The relay, and on it the juror of last resort: the four browsers
+  // are all at one table, so a jury can only come from the service.
+  // RELAY_LOG=path keeps the relay's whole log for a debugging run.
+  const relayLog = process.env.RELAY_LOG ? createWriteStream(process.env.RELAY_LOG) : null;
+  const args = ['run', 'bin/service.dart', '--port', '0', '--juror', ...(relayLog ? [] : ['--quiet'])];
+  const proc = spawn('dart', args, { cwd: join(root, 'service') });
   const url = await new Promise((resolveUrl, reject) => {
     let out = '';
     proc.stdout.on('data', (d) => {
       out += d.toString();
       const m = out.match(/relay (ws:\/\/\S+)/);
       if (m) resolveUrl(m[1]);
+      // The juror of last resort's own lines, once the relay is up.
+      if (relayLog) relayLog.write(d);
+      if (m) for (const line of d.toString().split('\n')) if (/juror|summoned|called|verdict|done with/.test(line)) log(`service: ${line.trim()}`);
     });
     proc.stderr.on('data', (d) => process.stderr.write(d));
     proc.on('exit', (code) => reject(new Error(`relay exited ${code}\n${out}`)));
@@ -226,7 +235,12 @@ async function main() {
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => log(`page ${names[i]} error: ${e.message}\n${(e.stack || '').slice(0, 600)}`));
-      page.on('console', (m) => { if (m.type() === 'error') log(`page ${names[i]}: ${m.text()}`); });
+      page.on('console', (m) => {
+        const t = m.text();
+        // Errors, and the table's and the duty's own traces about the jury.
+        const verbose = process.env.RELAY_LOG ? /^(mesh|relay): / : /$^/;
+        if (m.type() === 'error' || verbose.test(t) || /^duty: (?!.*emit )/.test(t) || /^table: .*(jury|juror|verdict|appeal|nobody online|summon)/.test(t)) log(`page ${names[i]}: ${t}`);
+      });
       await page.goto(`${app.url}/?e2e=1`);
       contexts.push(ctx);
       pages.push(page);
@@ -302,10 +316,19 @@ async function main() {
     await waitFor(pages[2], /^A bot took your seat$/, { what: "Cara's replacement notice", timeout: 30000 });
     log('Cara booted, and told');
 
-    // Cell 4: Bao leaves. Ada plays on with three bots.
-    await click(pages[1], /^Leave$/);
-    await playUntil([pages[0]], (p) => has(p, /^1 of 4 here/), { timeout: 60000 });
-    log('Bao left; Ada alone with three bots');
+    // Cell 5: two people left, and Bao's browser goes off his turn. Ada
+    // alone is no majority of two and claims nothing; her next play
+    // waits on a vote that will never come, and the table asks the
+    // jury — the service's juror of last resort, called for when this
+    // table found nobody else online. It rules once Bao has been
+    // silent two minutes: Ada's play stands, and at Bao's own turn his
+    // seat goes to a bot. Ada finishes the hand with three bots.
+    await contexts[1].close();
+    log("Bao's browser closed off his turn");
+    await playUntil([pages[0]], (p) => has(p, /^Asking the jury$/), { timeout: 150000 });
+    log('Ada is asking the jury');
+    await playUntil([pages[0]], (p) => has(p, /^1 of 4 here/), { timeout: 300000 });
+    log('the jury ruled; Ada alone with three bots');
     const before = (await texts(pages[0])).find((t) => /^Hand \d/.test(t));
     await playUntil([pages[0]], (p) => has(p, /^On with it$/), { timeout: 180000 });
     log(`Ada finished the hand that began as "${before}"`);

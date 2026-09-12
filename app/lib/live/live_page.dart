@@ -89,7 +89,11 @@ class _LivePageState extends State<LivePage> {
   Widget? _liveNote() {
     final game = _c.game;
     if (_c.pause == Pause.waitingForPeers) return _note('Waiting for the others to reconnect');
-    if (_c.pause == Pause.waitingForJury) return _note('Stuck — waiting for the jury');
+    if (_c.pause == Pause.waitingForJury) {
+      if (_c.jury.live > 0) return _note('Asking the jury');
+      if (_c.needsJuror) return _note('Nobody online to draw a jury from — waiting for one');
+      return _note('Waiting for the jury');
+    }
     if (game.phase != Phase.playing && game.phase != Phase.passing) return null;
     // The seat everyone is waiting on, if it is a person other than me.
     for (var seat = 0; seat < seatCount; seat++) {

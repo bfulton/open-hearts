@@ -41,6 +41,36 @@ class TableSpec {
   /// Seat order, four holders.
   final List<SeatHolder> seats;
 
+  /// The spec on the wire: a start event's shape, and a summons's.
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'seed': seed,
+        'rated': rated,
+        'seats': [
+          for (final h in seats)
+            switch (h) {
+              HumanSeat(:final key) => {'key': key},
+              BotSeat(:final persona) => {'bot': persona.id},
+            },
+        ],
+      };
+
+  /// Null for anything that is not a four-seat spec.
+  static TableSpec? parse(Object? json) {
+    try {
+      final m = json as Map;
+      final seats = <SeatHolder>[];
+      for (final raw in m['seats'] as List) {
+        final s = raw as Map;
+        seats.add(s['bot'] is String ? BotSeat(Persona.named(s['bot'] as String)) : HumanSeat(s['key'] as String));
+      }
+      if (seats.length != seatCount) return null;
+      return TableSpec(id: m['id'] as String, seed: m['seed'] as int, seats: seats, rated: m['rated'] == true);
+    } catch (_) {
+      return null;
+    }
+  }
+
   int? seatOf(PublicKey key) {
     for (var s = 0; s < seats.length; s++) {
       final h = seats[s];

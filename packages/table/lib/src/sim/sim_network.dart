@@ -68,6 +68,9 @@ class SimNetwork {
     _cuts.clear();
   }
 
+  /// Whether [key]'s process is running and its link is not silent.
+  bool isUp(PublicKey key) => !_dead.contains(key) && !_offline.contains(key);
+
   bool _reachable(PublicKey from, PublicKey to) {
     if (_dead.contains(from) || _dead.contains(to)) return false;
     if (_offline.contains(from) || _offline.contains(to)) return false;

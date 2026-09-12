@@ -30,7 +30,7 @@ void main() {
       for (final s in totals) {
         expect(s, totals.first);
       }
-      final v = verifyRecord(t.spec, t.clients.first.record);
+      final v = verifyRecord(t.spec, t.clients.first.record, juries: t.clients.first.juries);
       expect(v.ok, isTrue, reason: v.reason);
       expect(v.winners, t.clients.first.game.winners);
       expect(v.ratings.length, humans);

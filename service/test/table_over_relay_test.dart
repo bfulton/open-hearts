@@ -99,7 +99,7 @@ void main() {
     }
     final keys = [for (final c in clients) c.record.map((d) => d.key).toList()];
     expect(keys[0], keys[1], reason: 'both hold the same record');
-    final v = verifyRecord(spec, clients.first.record, allowPartial: true);
+    final v = verifyRecord(spec, clients.first.record, allowPartial: true, juries: clients.first.juries);
     expect(v.ok, isTrue, reason: v.reason);
     // Every human decision was witnessed by the other: two signatures each.
     expect(clients.first.record.every((d) => d.removal || d.witnesses.length == 2), isTrue);
