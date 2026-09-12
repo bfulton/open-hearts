@@ -144,6 +144,15 @@ class DealSession {
   /// Which seat holds each position now (passes move them; -1 played).
   late final List<int> _holderOf = [for (var p = 0; p < deckSize; p++) p ~/ _handSize];
 
+  /// Which seat played each position, once played.
+  final Map<int, int> _playedBy = {};
+
+  /// The cards [seat] has played, in the order it played them — every
+  /// one open, since a play opens its card for all. With [handOf], a
+  /// view running behind the table rebuilds the hand as it stood
+  /// before the plays it has yet to show.
+  List<int> playedCardsOf(int seat) => [for (final e in _playedBy.entries) if (e.value == seat) _cards[e.key]!];
+
   /// The position each person declared the lead card at, or -1 for
   /// "not held".
   final Map<int, int> _declared = {};
@@ -737,7 +746,10 @@ class DealSession {
       _keepChecked(owner, p, t);
       _openWhatCan();
       final card = _cards[p];
-      if (card != null) _holderOf[p] = -1; // played
+      if (card != null) {
+        _holderOf[p] = -1; // played
+        _playedBy[p] = seat;
+      }
       return card;
     } catch (_) {
       return null;
@@ -749,6 +761,7 @@ class DealSession {
   bool playOpen(int seat, int position) {
     if (_holderOf[position] != seat || _cards[position] == null) return false;
     _holderOf[position] = -1;
+    _playedBy[position] = seat;
     return true;
   }
 

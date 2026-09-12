@@ -21,6 +21,7 @@ import 'package:test/test.dart';
 import 'table_over_relay_test.dart' show Player;
 
 void main() {
+  setUpAll(() => installNativeSchnorr());
   late Relay relay;
   late DealCrypto crypto;
   setUpAll(() async => crypto = await DealCrypto.load());
@@ -89,7 +90,7 @@ void main() {
     expect(c.juries.first.event.jurors, [juror.presence.signer.publicKey]);
     expect(c.record.any((d) => d.verdict != null), isTrue, reason: 'a verdict settled a turn');
     if (sealed) expect(c.game.knowsHand(1), isTrue, reason: 'the quiet seat\'s hand was opened with the juror\'s piece');
-    final v = verifyRecord(spec, c.record, juries: c.juries, crypto: c0);
+    final v = verifyRecord(spec, c.record, juries: c.juries, crypto: c0, releases: c.releases);
     expect(v.ok && v.complete, isTrue, reason: v.reason);
     expect(juror.online, isTrue);
     for (final p in players) {

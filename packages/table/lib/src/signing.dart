@@ -55,11 +55,16 @@ bool verify(PublicKey key, String digestHex, String signatureHex) {
 }
 
 /// How a real signature is checked. The pure-Dart `bip340` package by
-/// default — 11 ms in the VM, fine for the service and the tests — and
-/// on the web the app swaps in its wasm, which is two hundred times
-/// faster there (measurements/sign). Set once, at startup, before any
-/// event is parsed.
+/// default — seventeen milliseconds in the VM — and on the web the app
+/// swaps in its wasm, the VM its cdylib (schnorr_native.dart), each two
+/// hundred times faster (measurements/sign). Set once, at startup,
+/// before any event is parsed.
 bool Function(PublicKey key, String digestHex, String signatureHex) schnorrVerifier = bip340.verify;
+
+/// How a real signature is made: secret, digest and thirty-two bytes of
+/// auxiliary randomness, all hex, to a 128-hex signature. Swapped along
+/// with the verifier.
+String Function(String secretHex, String digestHex, String auxHex) schnorrSigning = bip340.sign;
 
 /// A real key. Generated fresh, or loaded from the 32-byte secret.
 class SchnorrSigner implements Signer {
@@ -81,7 +86,7 @@ class SchnorrSigner implements Signer {
     // still valid with any value, and fresh is best.
     final rng = Random.secure();
     final aux = _hex(List.generate(32, (_) => rng.nextInt(256)));
-    return bip340.sign(_secretHex, digestHex, aux);
+    return schnorrSigning(_secretHex, digestHex, aux);
   }
 
   static final _secp256k1 = ECCurve_secp256k1();

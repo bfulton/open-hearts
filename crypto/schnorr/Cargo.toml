@@ -1,0 +1,18 @@
+[package]
+name = "schnorr"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "BIP-340 Schnorr over secp256k1 for the Dart VM: the same k256 the browser's wasm uses (measurements/sign), as a cdylib over FFI, since a pure-Dart signature costs seventeen milliseconds and a relay checks every event it carries"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+k256 = { version = "0.13", default-features = false, features = ["schnorr", "alloc", "std"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

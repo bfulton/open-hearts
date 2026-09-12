@@ -166,10 +166,20 @@ void main() {
     await act(tester, live);
     await live.advance(tester, 2000);
     expect(live.controller.game.phase, engine.Phase.playing);
+    // Ada leaves after a few tricks: her hand is opened from the
+    // pieces the others hold, her bot plays it at the table at once,
+    // and the shown game — behind, at its own pace — shows it right.
+    var left = false;
     for (var guard = 0; guard < 400 && live.controller.game.handNumber == 0; guard++) {
+      if (!left && live.controller.client.game.tricksPlayed >= 3) {
+        live.people[0]!.depart(Exit.leave);
+        left = true;
+      }
       await act(tester, live);
       await live.advance(tester, 500);
     }
+    expect(left, isTrue);
+    expect(live.controller.personaAt(0), isNotNull, reason: 'a bot holds seat 0');
     expect(live.controller.game.handNumber, 1, reason: 'the first hand finished');
     final v = live.controller.verification();
     expect(v.ok, isTrue, reason: v.reason);

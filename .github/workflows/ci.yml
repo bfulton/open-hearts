@@ -24,11 +24,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: crypto/deal
+          workspaces: |
+            crypto/deal
+            crypto/schnorr
       # The deal's cryptography (doc 03): the cdylib the VM tests load.
       # The browser's wasm is committed (app/web/deal.wasm).
-      - name: Deal (Rust — the cdylib for the VM)
-        run: cd crypto/deal && cargo build --release && cargo test --release
+      - name: Deal and Schnorr (Rust — the cdylibs for the VM)
+        run: |
+          cd crypto/deal && cargo build --release && cargo test --release
+          cd ../schnorr && cargo build --release && cargo test --release
       - name: Engine (pure Dart — rules, bots, 200 seeded games)
         run: cd packages/engine && dart pub get && dart analyze && dart test
       - name: Deal (the primitives over FFI, and a hand's deal among four sessions)
@@ -70,9 +74,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: crypto/deal
-      - name: Deal (Rust — the cdylib the juror of last resort loads)
-        run: cd crypto/deal && cargo build --release
+          workspaces: |
+            crypto/deal
+            crypto/schnorr
+      - name: Deal and Schnorr (Rust — the cdylibs the relay and the juror load)
+        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
       - name: Playwright
         run: npm i -g playwright@1.56.1 && npx playwright install --with-deps chromium
       - name: Build the app for the suite

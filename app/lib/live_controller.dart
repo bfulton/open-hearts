@@ -149,7 +149,19 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// while it is still closed.
   bool _seesHand(int seat) {
     if (_shown.knowsHand(seat)) return true;
-    final cards = client.dealOf(_shown.handNumber)?.handOf(seat);
+    final deal = client.dealOf(_shown.handNumber);
+    if (deal == null) return false;
+    // As the shown game holds it: dealt while its pass is unresolved;
+    // during its play, what the seat holds at the table plus whatever
+    // it has played there that this view has yet to show — the shown
+    // game runs behind the table.
+    final List<int>? cards;
+    if (_shown.phase == Phase.playing) {
+      final held = deal.handOf(seat);
+      cards = held == null ? null : [...held, for (final c in deal.playedCardsOf(seat)) if (!_shownPlayed.contains(Card.deck[c])) c];
+    } else {
+      cards = deal.dealtHandOf(seat);
+    }
     if (cards == null) return false;
     _shown.revealHand(seat, [for (final i in cards) Card.deck[i]]);
     return true;
@@ -528,8 +540,8 @@ class LiveController extends ChangeNotifier implements TableModel {
   }
 
   /// The record so far, as the verifier sees it.
-  Verification verification() =>
-      verifyRecord(client.spec, client.record, allowPartial: !client.done, juries: client.juries, crypto: _crypto);
+  Verification verification() => verifyRecord(client.spec, client.record,
+      allowPartial: !client.done, juries: client.juries, crypto: _crypto, releases: client.releases);
 
   @override
   void dispose() {

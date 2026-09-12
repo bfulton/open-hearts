@@ -231,7 +231,12 @@ offer say so, and a build that cannot run the deal does not sit down.
   together hold noise without a juror's piece, and the jury noise
   without a person's — doc 04's bound. Whoever holds a piece releases
   it when the seat goes, and again every few seconds until the secret
-  is known; the seat's turns stall meanwhile, and the rail says so.
+  is known; the seat's turns stall meanwhile, and the rail says so. A
+  hand's audit waits the same way for a seat removed at it. The price
+  of the bound: with the whole jury of a hand gone — every juror it
+  was drawn with crashed — a seat that leaves it can no longer be
+  opened, and the table pauses for the rest of the hand and says so;
+  the chaos walk reaches that state only by crashing four jurors.
 - **The interim.** Until the bot plays inside the computation
   ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's
   hand is open to everyone at the table, and so is a departed person's
@@ -252,7 +257,13 @@ offer say so, and a build that cannot run the deal does not sit down.
   its four proofs are checked again — which is why each token is
   checked once, on arrival, and the cards are opened without. A
   four-person hand costs each seat about a second of its own work, a
-  juror following the table the same.
+  juror following the table the same. What the deal exposed was not
+  its own cost but the signatures around it: a juror summoned mid-hand
+  is carried forward through every event of the hand, and at seventeen
+  milliseconds a signature in pure Dart the service's relay and juror
+  drowned in the catch-up. `crypto/schnorr` is the browser's signature
+  wasm built for the VM, two hundred times faster, and an event seen
+  before is taken by its id without a second check.
 
 Two things it does not do yet. Both take a modified client, both stall
 one table and nothing more, and both the audit would expose:

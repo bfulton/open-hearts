@@ -59,6 +59,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
@@ -177,7 +178,9 @@ class TableClient {
     this.heartbeatMs = 5000,
     this.presence,
     this.crypto,
-  })  : game = HeartsGame(seed: spec.seed, sealed: spec.sealed),
+    Random? random,
+  })  : _random = random,
+        game = HeartsGame(seed: spec.seed, sealed: spec.sealed),
         holders = List.of(spec.seats),
         _humans = {for (final h in spec.seats) if (h is HumanSeat) h.key} {
     if (spec.sealed && crypto == null) throw ArgumentError('a sealed table needs the deal\'s cryptography');
@@ -197,6 +200,10 @@ class TableClient {
 
   /// The deal's primitives, at a sealed table.
   final DealCrypto? crypto;
+
+  /// Where the deal's secrets and seeds come from: secure by default;
+  /// the simulator seeds it, so a table replays.
+  final Random? _random;
 
   final HeartsGame game;
 
@@ -352,7 +359,10 @@ class TableClient {
           '${r.forAction.map((k) => k.substring(0, 4))} boots ${r.boots.length} by ${r.forRemoval.map((k) => k.substring(0, 4))} '
           'needed ${_majority(_participantsAt(e.key))} of ${_participantsAt(e.key).length}');
     }
-    if (_future.isNotEmpty) b.writeln('  deferred ${_future.length}: ${_future.take(4).map((e) => '${e.kind.name}@${e.turn}')}');
+    if (_future.isNotEmpty) {
+      b.writeln('  deferred ${_future.length}: '
+          '${_future.take(4).map((e) => '${e.kind.name}@${e.kind == EventKind.release ? 'h${e.hand}' : e.turn}')}');
+    }
     final jurors = _jurorsOf(game.handNumber);
     if (jurors.isNotEmpty || needsJuror) {
       b.writeln('  jury: ${jurors.map((k) => k.substring(0, 4))} live ${_liveJurors(game.handNumber).map((k) => k.substring(0, 4))}'
@@ -664,7 +674,11 @@ class TableClient {
         return;
       }
       if (!game.knowsHand(seat)) {
-        game.revealHand(seat, [for (final i in d.handOf(seat)!) Card.deck[i]]);
+        // As the engine holds it: the hand as dealt while the pass is
+        // unresolved, since the deal moves positions as each pass
+        // settles and the engine only when all four have.
+        final cards = game.phase == Phase.playing ? d.handOf(seat) : d.dealtHandOf(seat);
+        game.revealHand(seat, [for (final i in cards!) Card.deck[i]]);
       }
     }
     final bot = Bot(persona: (holders[seat] as BotSeat).persona);
@@ -751,8 +765,13 @@ class TableClient {
     _openHand();
   }
 
+  /// Every audit turn settled — and none of them stalled: a seat
+  /// removed at its audit is audited by the escrow, whose pieces have
+  /// to come before the hand can close, or the record could never open
+  /// its cards.
   bool get _auditDone =>
-      Iterable<int>.generate(seatCount).every((s) => _races[TurnId.audit(game.handNumber, s)]?.settled == true);
+      Iterable<int>.generate(seatCount).every((s) => _races[TurnId.audit(game.handNumber, s)]?.settled == true) &&
+      !_stalled.keys.any((t) => t.hand == game.handNumber);
 
   TurnId? _openTurnOf(int seat) {
     for (final e in _races.entries) {
@@ -765,7 +784,11 @@ class TableClient {
 
   void _onMessage(PublicKey from, Map<String, Object?> json) {
     if (_closed) return;
-    final event = TableEvent.parse(json);
+    // An event seen before was checked before; the same id is the
+    // same bytes, and a signature checked again is milliseconds a peer
+    // being repeated at has not got.
+    final seen = _seen.contains(json['id']);
+    final event = TableEvent.parse(json, verifySignature: !seen);
     if (event == null || event.table != spec.id) return;
     // Hearing is direct: whoever delivered this is here now.
     _lastHeard[from] = clock.nowMs;
@@ -879,16 +902,23 @@ class TableClient {
 
   void _defer(TableEvent event) {
     _seen.remove(event.id);
+    // Once each: a peer far behind is repeated at for minutes, and a
+    // list that grew by every repeat was drained, and grown, at every
+    // turn it closed.
+    if (!_futureIds.add(event.id)) return;
     _future.add(event);
     if (event.kind != EventKind.witness && event.kind != EventKind.release) {
       _trace('defer ${event.kind.name}@${event.turn} from ${event.author.substring(0, 4)}');
     }
   }
 
+  final Set<String> _futureIds = {};
+
   void _drainFuture() {
     if (_future.isEmpty) return;
     final again = List.of(_future);
     _future.clear();
+    _futureIds.clear();
     for (final e in again) {
       _accept(e);
     }
@@ -958,7 +988,7 @@ class TableClient {
   }
 
   /// Turns handed over per heartbeat to a peer behind.
-  static const carryWindow = 8;
+  static const carryWindow = 12;
 
   /// When each peer was first seen behind, for the turn-taking above.
   final Map<PublicKey, int> _behindSince = {};
@@ -1052,8 +1082,13 @@ class TableClient {
   /// [catchUpBurst].
   double _catchUpTokens = catchUpBurst.toDouble();
   int _catchUpRefilledAt = 0;
-  static const catchUpPerSecond = 12;
-  static const catchUpBurst = 48;
+  // Raised from twelve and forty-eight for the sealed table, where a
+  // juror summoned mid-hand has to be current before a departed
+  // seat's hand can be opened with its piece: a hand is some eighty
+  // turns of four or five events each, and at twelve a second that
+  // was a minute and a half of everyone waiting.
+  static const catchUpPerSecond = 24;
+  static const catchUpBurst = 96;
 
   void _refillCatchUp() {
     final now = clock.nowMs;
@@ -1356,7 +1391,7 @@ class TableClient {
       verdict: verdict,
     ));
     _trace('settled $turn ${e.kind.name} by ${race.forAction.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
-    _pause = null;
+    _liftPause();
     _closeTurn(turn);
   }
 
@@ -1376,7 +1411,7 @@ class TableClient {
     ));
     _trace('booted seat $seat at $turn by ${race.forRemoval.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
     _remove(seat, at: turn, how: claim.kind);
-    _pause = null;
+    _liftPause();
     _botTurn(turn, seat);
     _reconsider();
   }
@@ -1400,9 +1435,14 @@ class TableClient {
   /// This hand's deal, at a sealed table.
   DealSession? _deal;
 
-  /// The releases heard this hand, by hand, to hand on to a peer
-  /// behind.
+  /// The releases heard, by hand, to hand on to a peer behind — and
+  /// to the verifier, which rebuilds a departed seat's secret from
+  /// them when no audit vouched for it.
   final Map<int, List<TableEvent>> _releases = {};
+
+  /// Every release of an escrow piece heard at this table, in the
+  /// order heard: evidence beside the record, like [juries].
+  List<TableEvent> get releases => [for (final h in _releases.keys.toList()..sort()) ..._releases[h]!];
 
   /// Turns of a departed seat waiting on its secret, by turn.
   final Map<TurnId, int> _stalled = {};
@@ -1439,6 +1479,7 @@ class TableClient {
       mySeat: amSeated ? mySeat : null,
       myKey: signer.publicKey,
       wrap: signer.sharedSecretWith,
+      random: _random,
     );
     _dealsByHand[game.handNumber] = _deal!;
     _stalled.clear();
@@ -1728,9 +1769,16 @@ class TableClient {
   // a seat removed that way has no later votes for anyone to disagree
   // about. The stuck turn goes to the jury instead (_settle).
 
+  /// A pause for the jury or for peers lifts when a decision lands;
+  /// the deal's own — a hand being opened from escrow, a lead nobody
+  /// declared — lift on their own conditions.
+  void _liftPause() {
+    if (_pause == Pause.waitingForJury || _pause == Pause.waitingForPeers) _pause = null;
+  }
+
   /// After a departure: a proposal that could not carry may carry now.
   void _reconsider() {
-    _pause = null;
+    _liftPause();
     for (final turn in List.of(_races.keys)) {
       if (!_races[turn]!.settled) _settle(turn);
     }
@@ -1741,15 +1789,24 @@ class TableClient {
 
   void _heartbeat() {
     if (_closed) return;
+    // The next one is booked before this one is sent — a send that
+    // throws must not end the heartbeat for good — and behind a peer
+    // heard lately, every second, since a heartbeat is what brings the
+    // missing turns.
+    _timers.add(clock.schedule(_behind ? 1000 : heartbeatMs, _heartbeat));
+    heartbeatsSent++;
     if (amSeated && !_left) {
       _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step});
     } else if (mySeat == null && _serving.isNotEmpty && !done) {
       _emit(EventKind.serve, {'hand': game.handNumber, 'step': step, 'serving': _serving.keys.toList()});
     }
-    // Behind a peer heard lately: say so every second, since a heartbeat
-    // is what brings the missing turns.
-    _timers.add(clock.schedule(_behind ? 1000 : heartbeatMs, _heartbeat));
   }
+
+  /// Heartbeats sent so far, for a log.
+  int heartbeatsSent = 0;
+
+  /// Events held for a position not yet reached, for a log.
+  int get deferred => _future.length;
 
   bool get _behind => _lastPosition.entries.any((e) {
         if (!_recent(e.key)) return false;
@@ -1763,6 +1820,7 @@ class TableClient {
   /// or a reconnect is recovered by whoever still holds it.
   void _tick() {
     if (_closed) return;
+    _timers.add(clock.schedule(1000, _tick));
     if (amSeated && !_left && !done) {
       _repeat();
       // Cut off from the table? Say so, rather than claim anything.
@@ -1800,7 +1858,6 @@ class TableClient {
       _releaseTick();
     }
     _notify();
-    _timers.add(clock.schedule(1000, _tick));
   }
 
   int _repeatTick = 0;

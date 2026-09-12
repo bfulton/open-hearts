@@ -41,6 +41,9 @@ class JurorDuty {
   /// Tables this client is following as a juror.
   int get serving => _tables.length;
 
+  /// The clients following, by table id, for a test to look at.
+  Map<String, TableClient> get clients => {for (final e in _tables.entries) e.key: e.value.client};
+
   /// Verdicts given, over every table.
   int verdicts = 0;
 
@@ -73,6 +76,10 @@ class JurorDuty {
   void _sweepTables() {
     for (final e in List.of(_tables.entries)) {
       final c = e.value.client;
+      // A line every ten seconds per table followed: where the juror
+      // stands, for a log read after the fact.
+      log?.call('following ${e.key}: hand ${c.game.handNumber} ${c.game.phase.name} step ${c.step} pause ${c.pause?.name} '
+          'heartbeats ${c.heartbeatsSent} deferred ${c.deferred} serving ${c.serving}');
       if (c.serving) continue;
       log?.call('done with ${e.key}');
       c.close();

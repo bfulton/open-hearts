@@ -21,6 +21,8 @@ Future<void> main(List<String> args) async {
   for (var i = 0; i < args.length; i++) {
     if (args[i] == '--relay' && i + 1 < args.length) relay = args[++i];
   }
+  final native = await installNativeSchnorr();
+  if (!native) print('schnorr: no native library (crypto/schnorr/build.sh); signatures in Dart, seventeen milliseconds each');
   final secret = Platform.environment['JUROR_SECRET'];
   final signer = secret != null && secret.length == 64 ? SchnorrSigner.fromSecret(secret) : SchnorrSigner.generate();
   // The deal's cryptography, to serve sealed tables: the cdylib built

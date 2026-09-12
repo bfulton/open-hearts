@@ -111,7 +111,10 @@ class TableEvent {
 
   /// Parses a received event and checks its hash and signature. Returns
   /// null for anything malformed or unsigned by its claimed author.
-  static TableEvent? parse(Map<String, Object?> json) {
+  /// With [verifySignature] off only the hash is checked — for an
+  /// event already seen, whose signature was checked the first time:
+  /// the same id is the same bytes.
+  static TableEvent? parse(Map<String, Object?> json, {bool verifySignature = true}) {
     try {
       final table = json['table'] as String;
       final author = json['author'] as String;
@@ -120,7 +123,7 @@ class TableEvent {
       final sig = json['sig'] as String;
       final id = digestOf(_canonical(table, author, kind, body));
       if (id != json['id']) return null;
-      if (!verify(author, id, sig)) return null;
+      if (verifySignature && !verify(author, id, sig)) return null;
       return TableEvent._(id: id, table: table, author: author, kind: kind, body: Map.unmodifiable(body), sig: sig);
     } catch (_) {
       return null;

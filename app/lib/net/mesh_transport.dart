@@ -1,10 +1,13 @@
 /// The app's transport: a WebRTC data channel to every other human at
-/// the table, set up through the relay, with the relay itself as the
-/// fallback path while a channel is not open.
+/// the table, set up through the relay, and the relay itself beside
+/// them — the path to a peer whose channel is not open, and the only
+/// path to a juror, which follows the table from the relay alone.
 ///
-/// Every message goes to every peer once — over their channel when it
-/// is open, else through the relay envelope — and the table's own
-/// dedup by event id absorbs anything that arrives twice. What arrives
+/// Every message goes over every open channel and, once, through the
+/// relay envelope; the table's own dedup by event id absorbs what
+/// arrives twice. Sending to the relay only while a channel was down
+/// left a juror deaf at a table whose four channels were all up — and
+/// at a table of one person, who has no channels at all. What arrives
 /// on a channel is from the peer at its far end; what arrives from the
 /// relay is from the envelope's signer. A channel closing or failing is
 /// reported as a disconnect, which the protocol treats as most of the
@@ -61,18 +64,14 @@ class MeshTransport implements Transport {
   @override
   void broadcast(Map<String, Object?> message) {
     final wire = jsonEncode(message);
-    var viaRelay = false;
     for (final p in peers) {
       if (p == relay.signer.publicKey) continue;
       final link = _links[p];
-      if (link != null && link.open) {
-        link.channel!.send(RTCDataChannelMessage(wire));
-      } else {
-        viaRelay = true;
-      }
+      if (link != null && link.open) link.channel!.send(RTCDataChannelMessage(wire));
     }
-    // One envelope reaches everyone still on the relay path.
-    if (viaRelay) relay.broadcast(message);
+    // One envelope reaches everyone on the relay path: a peer whose
+    // channel is down, and every juror following.
+    relay.broadcast(message);
   }
 
   Future<RTCPeerConnection> _connection(PublicKey peer) async {

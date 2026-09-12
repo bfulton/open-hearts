@@ -19,6 +19,7 @@ export 'src/presence_relay.dart';
 export 'src/rating.dart';
 export 'src/record.dart';
 export 'src/results.dart';
+export 'src/schnorr_native.dart';
 export 'src/relay_transport.dart';
 export 'src/signing.dart';
 export 'src/spec.dart';

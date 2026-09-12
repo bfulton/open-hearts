@@ -62,4 +62,30 @@ void main() {
     expect(a.sharedSecretWith(b.publicKey), b.sharedSecretWith(a.publicKey));
     expect(a.sharedSecretWith(b.publicKey), isNot(a.sharedSecretWith(FakeSigner('c').publicKey)));
   });
+
+  test('the native library signs and checks what the Dart implementation does, and is two hundred times faster', () async {
+    final before = (schnorrVerifier, schnorrSigning);
+    try {
+      expect(await installNativeSchnorr(), isTrue, reason: 'crypto/schnorr/build.sh has been run');
+      final s = SchnorrSigner.generate();
+      final digest = sha256Hex([9, 9, 9]);
+      final native = s.sign(digest);
+      expect(verify(s.publicKey, digest, native), isTrue);
+      schnorrVerifier = before.$1;
+      expect(verify(s.publicKey, digest, native), isTrue, reason: 'a native signature checks in Dart');
+      schnorrSigning = before.$2;
+      final dart = s.sign(digest);
+      expect(await installNativeSchnorr(), isTrue);
+      expect(verify(s.publicKey, digest, dart), isTrue, reason: 'a Dart signature checks natively');
+      expect(verify(s.publicKey, sha256Hex([1]), dart), isFalse);
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < 200; i++) {
+        verify(s.publicKey, digest, native);
+      }
+      expect(sw.elapsedMilliseconds, lessThan(200), reason: '200 checks in under a fifth of a second');
+    } finally {
+      schnorrVerifier = before.$1;
+      schnorrSigning = before.$2;
+    }
+  });
 }

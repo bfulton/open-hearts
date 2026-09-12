@@ -3,6 +3,8 @@
 /// person can — quietly, by crashing, or by simply stopping.
 library;
 
+import 'dart:math';
+
 import 'package:deal/deal.dart';
 
 import '../client.dart';
@@ -37,7 +39,8 @@ class SimJuror {
     var c = client;
     if (c == null || c.spec.id != spec.id) {
       c?.close();
-      c = TableClient(spec: spec, signer: signer, transport: net.attach(signer.publicKey), clock: clock, crypto: crypto);
+      c = TableClient(
+          spec: spec, signer: signer, transport: net.attach(signer.publicKey), clock: clock, crypto: crypto, random: Random(signer.publicKey.hashCode));
       client = c;
       c.start();
       c.changes.listen((_) => verdicts = c!.record.where((d) => d.verdict?.author == signer.publicKey).length);

@@ -71,19 +71,55 @@ class Verification {
 /// a seeded game's. Until a hand's audit is in, its plays can only be
 /// checked as far as the rules allow without the hands, and the
 /// verification is [Verification.complete] false.
-Verification verifyRecord(TableSpec spec, List<Decision> record,
-    {bool allowPartial = false, List<Decision> juries = const [], DealCrypto? crypto}) {
+///
+/// [releases] are the escrow pieces released at this peer's table for
+/// departed seats: a seat's secret the audits do not vouch for — one
+/// removed at its own audit turn, after the others audited — is
+/// rebuilt from them, a person's piece and a juror's.
+Verification verifyRecord(
+  TableSpec spec,
+  List<Decision> record, {
+  bool allowPartial = false,
+  List<Decision> juries = const [],
+  DealCrypto? crypto,
+  List<TableEvent> releases = const [],
+}) {
   final game = HeartsGame(seed: spec.seed, sealed: spec.sealed);
   final holders = List.of(spec.seats);
-  final humans = {for (final h in spec.seats) if (h is HumanSeat) h.key};
+  final humans = {
+    for (final h in spec.seats)
+      if (h is HumanSeat) h.key,
+  };
   final removedAt = <PublicKey, TurnId>{};
   final played = <Card>{};
   var index = 0;
 
-  Verification fail(String why) =>
-      Verification(ok: false, reason: why, winners: const [], ratings: const {}, finalHolders: holders);
+  Verification fail(String why) => Verification(ok: false, reason: why, winners: const [], ratings: const {}, finalHolders: holders);
 
   if (spec.sealed && crypto == null) return fail('a sealed record needs the deal\'s cryptography to check');
+
+  Verification partial() =>
+      Verification(ok: true, reason: 'verified so far', winners: const [], ratings: const {}, finalHolders: holders, complete: false);
+
+  bool atOrBefore(TurnId a, TurnId b) {
+    if (a.hand != b.hand) return a.hand < b.hand;
+    return a.position <= b.position;
+  }
+
+  // Every removal in the record, wherever it sits: the smallest set a
+  // peer could legitimately have measured against at a turn is everyone
+  // less all of these made by then — including ones recorded at the
+  // same position but later in the record's order.
+  final allRemovals = <PublicKey, TurnId>{};
+  for (final d in record) {
+    if (!d.removal) continue;
+    final h = spec.seats[d.event.seat];
+    if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
+  }
+  Set<PublicKey> floorAt(TurnId turn) => {
+    for (final k in humans)
+      if (!allRemovals.containsKey(k) || !atOrBefore(allRemovals[k]!, turn)) k,
+  };
 
   /// The deal of the hand being replayed, at a sealed table.
   DealSession? deal;
@@ -96,19 +132,19 @@ Verification verifyRecord(TableSpec spec, List<Decision> record,
   final pending = <int, Uint8List>{};
 
   DealSession startDeal() => deal = DealSession(
-        crypto!,
-        tableId: spec.id,
-        tableSeed: spec.seed,
-        hand: game.handNumber,
-        seats: [
-          for (final h in holders)
-            switch (h) {
-              HumanSeat(:final key) => HumanDealSeat(key),
-              BotSeat() => const BotDealSeat(),
-            },
-        ],
-        leadCard: twoOfClubs.index,
-      );
+    crypto!,
+    tableId: spec.id,
+    tableSeed: spec.seed,
+    hand: game.handNumber,
+    seats: [
+      for (final h in holders)
+        switch (h) {
+          HumanSeat(:final key) => HumanDealSeat(key),
+          BotSeat() => const BotDealSeat(),
+        },
+    ],
+    leadCard: twoOfClubs.index,
+  );
 
   /// The hand's audits, read ahead once every key is in: the secrets
   /// they carry open the cards the replay needs before it gets there
@@ -137,35 +173,30 @@ Verification verifyRecord(TableSpec spec, List<Decision> record,
   }
 
   /// Gives the deal the secrets it may have now: a departed seat's,
-  /// or everyone's once dealt.
+  /// or everyone's once dealt — from the audits read ahead, and from
+  /// the pieces released for a seat that is gone, or that the record
+  /// removes later in the hand: with the deal dealt, its steps all
+  /// checked, a seat the hand will lose may be opened from its escrow
+  /// ahead of time, since the replay needs every hand from the start.
   void feedSecrets(DealSession d, {required bool all}) {
     for (final e in List.of(pending.entries)) {
       if (all || d.awaitsSecret(e.key)) {
         if (d.provideSecret(e.key, e.value)) pending.remove(e.key);
       }
     }
+    for (final r in releases) {
+      try {
+        if (r.kind != EventKind.release || r.hand != game.handNumber) continue;
+        final about = r.about;
+        if (all && !d.gone.contains(about) && !d.knowsSecret(about)) {
+          final h = holders[about];
+          if (h is HumanSeat && allRemovals[h.key]?.hand == game.handNumber) d.seatLeft(about);
+        }
+        if (!d.awaitsSecret(about)) continue;
+        d.acceptRelease({'about': about, 'holder': r.author, 'share': r.body['share']});
+      } catch (_) {}
+    }
   }
-
-  Verification partial() => Verification(
-      ok: true, reason: 'verified so far', winners: const [], ratings: const {}, finalHolders: holders, complete: false);
-
-  bool atOrBefore(TurnId a, TurnId b) {
-    if (a.hand != b.hand) return a.hand < b.hand;
-    return a.position <= b.position;
-  }
-
-  // Every removal in the record, wherever it sits: the smallest set a
-  // peer could legitimately have measured against at a turn is everyone
-  // less all of these made by then — including ones recorded at the
-  // same position but later in the record's order.
-  final allRemovals = <PublicKey, TurnId>{};
-  for (final d in record) {
-    if (!d.removal) continue;
-    final h = spec.seats[d.event.seat];
-    if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
-  }
-  Set<PublicKey> floorAt(TurnId turn) =>
-      {for (final k in humans) if (!allRemovals.containsKey(k) || !atOrBefore(allRemovals[k]!, turn)) k};
 
   /// Whether a decision carries: a strict majority of [among], the set
   /// the peer measured against — which must be a legitimate one, every
@@ -235,7 +266,9 @@ Verification verifyRecord(TableSpec spec, List<Decision> record,
   String? botActs(int seat, {required bool passing}) {
     final d = deal;
     if (d != null && !game.knowsHand(seat)) {
-      final cards = d.handOf(seat);
+      // As the engine holds it: dealt while the pass is unresolved,
+      // current during play (the client's rule).
+      final cards = game.phase == Phase.playing ? d.handOf(seat) : d.dealtHandOf(seat);
       if (cards == null) return 'seat $seat\'s hand was never opened';
       game.revealHand(seat, [for (final i in cards) Card.deck[i]]);
     }
@@ -360,7 +393,8 @@ Verification verifyRecord(TableSpec spec, List<Decision> record,
       final d = deal ?? startDeal();
       scanAudits(d);
       feedSecrets(d, all: false);
-      final dealDone = !(index < record.length && record[index].turn.hand == game.handNumber && record[index].turn.isDeal) ||
+      final dealDone =
+          !(index < record.length && record[index].turn.hand == game.handNumber && record[index].turn.isDeal) ||
           d.phase == DealPhase.dealt ||
           d.phase == DealPhase.audited;
       if (dealDone) {
@@ -384,7 +418,12 @@ Verification verifyRecord(TableSpec spec, List<Decision> record,
       }
       // The next step owed: the first unsettled seat of the round the
       // deal is at, in the order the table opens them.
-      final round = switch (d.phase) { DealPhase.keys => 0, DealPhase.shuffles => 1, DealPhase.tokens => 2, _ => 3 };
+      final round = switch (d.phase) {
+        DealPhase.keys => 0,
+        DealPhase.shuffles => 1,
+        DealPhase.tokens => 2,
+        _ => 3,
+      };
       if (index >= record.length) return allowPartial ? partial() : fail('the record ends mid-deal');
       final next = record[index];
       final e = next.event;
@@ -421,8 +460,10 @@ Verification verifyRecord(TableSpec spec, List<Decision> record,
       final holder = holders[e.seat];
       if (holder is! HumanSeat || holder.key != e.author) return fail('a pass by a key that did not hold seat ${e.seat}');
       if (!carried(d.witnesses, d.turn, d.among) && !byVerdict(d)) {
-        return fail('a pass at ${d.turn} by seat ${e.seat} without a majority behind it '
-            '(${d.witnesses.length} of ${d.among.length})');
+        return fail(
+          'a pass at ${d.turn} by seat ${e.seat} without a majority behind it '
+          '(${d.witnesses.length} of ${d.among.length})',
+        );
       }
       final dl = deal;
       if (dl != null) {
@@ -481,8 +522,10 @@ Verification verifyRecord(TableSpec spec, List<Decision> record,
     final turn = TurnId.play(game.handNumber, playIndex());
     if (d.turn != turn) return fail('a play recorded at $turn as ${d.turn}');
     if (!carried(d.witnesses, turn, d.among) && !byVerdict(d)) {
-      return fail('a play at $turn by seat $seat without a majority behind it '
-          '(${d.witnesses.length} of ${d.among.length})');
+      return fail(
+        'a play at $turn by seat $seat without a majority behind it '
+        '(${d.witnesses.length} of ${d.among.length})',
+      );
     }
     final card = Card.parse(e.body['card'] as String);
     final dl = deal;

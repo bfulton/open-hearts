@@ -133,8 +133,9 @@ relay's business too (`Room`), and it starts ten seconds after the
 last person arrives, or at four, or on *Start now*, by the same kind
 of start event. The transport is a WebRTC data channel to every
 other person, set up over the relay's signalling and carrying the
-table's events directly, with the relay as the path of last resort
-while a channel is not open (`MeshTransport`). The table is drawn from
+table's events directly, and through the relay as well — the path to a
+peer whose channel is not open, and the only path to a juror, which
+follows from the relay alone (`MeshTransport`). The table is drawn from
 whichever chair you hold. On its rail: who is still here; the boot
 clock on a seat that is holding everyone up, and the *Boot* button
 when it runs out; *Leave*; and, when the table is stuck, why — waiting

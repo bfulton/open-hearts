@@ -2,6 +2,8 @@
 /// the trace tool share.
 library;
 
+import 'dart:math';
+
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import '../client.dart';
@@ -53,7 +55,13 @@ class SimTable {
     );
     for (var i = 0; i < humans; i++) {
       final client = TableClient(
-          spec: spec, signer: signers[i], transport: net.attach(signers[i].publicKey), clock: clock, presence: presence, crypto: crypto);
+          spec: spec,
+          signer: signers[i],
+          transport: net.attach(signers[i].publicKey),
+          clock: clock,
+          presence: presence,
+          crypto: crypto,
+          random: Random(seed * 1000 + i));
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }
   }

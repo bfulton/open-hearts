@@ -27,6 +27,10 @@ Future<void> main(List<String> args) async {
     if (args[i] == '--quiet') quiet = true;
     if (args[i] == '--juror') juror = true;
   }
+  // Signatures through the native cdylib when it is built: the relay
+  // checks every event it carries.
+  final native = await installNativeSchnorr();
+  if (!native) print('schnorr: no native library (crypto/schnorr/build.sh); signatures in Dart, seventeen milliseconds each');
   final relay = Relay(log: quiet ? null : print);
   await relay.serve(port: port);
   // Always say where, even when quiet: a test harness reads this line.

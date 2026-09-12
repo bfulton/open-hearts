@@ -65,7 +65,7 @@ rigged. Roughly in order:
    every five seconds — no matchmaker, the lowest key present hosts
    the round — leftovers first next time, bots at your rating after
    ten; or host a four-letter code for friends. Either way the four of
-   you are on WebRTC data channels with the relay as fallback, signing
+   you are on WebRTC data channels, the relay beside them, signing
    in wasm since Dart-to-JavaScript signatures cost 100 ms each
    ([measurements](measurements/README.md)). Rated games move a
    rating, yours and the bots', from results everyone at the table
@@ -121,6 +121,7 @@ Ideas agreed on and not yet placed in the order above.
 
 ```bash
 crypto/deal/build.sh                # the deal's cryptography, for the VM and the browser (Rust)
+crypto/schnorr/build.sh             # signatures for the VM: the relay, the juror, the tests (Rust)
 cd packages/engine && dart test     # the rules, the bots, 200 seeded games
 cd packages/deal && dart test       # the deal's primitives, and a hand's deal among four sessions
 cd packages/table && dart test      # the protocol on a simulated network, sealed tables included
@@ -135,7 +136,11 @@ at `crypto/deal/target/release/`, or where `DEAL_LIB` points — and a
 wasm the browser loads, committed at `app/web/deal.wasm` so the web
 build needs no Rust. Building needs a stable Rust with the
 `wasm32-unknown-unknown` target; the reference crate is a git
-dependency pinned by revision.
+dependency pinned by revision. `crypto/schnorr` is the browser's
+signature wasm built for the VM instead: without it the relay, the
+juror and the tests sign and check in pure Dart at seventeen
+milliseconds a signature, which a table's traffic turns into most of
+a core.
 
 Publish the current commit to the dev branch page:
 

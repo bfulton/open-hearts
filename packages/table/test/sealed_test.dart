@@ -24,7 +24,7 @@ void main() {
       expect(s, totals.first);
     }
     final first = t.survivors.first;
-    final v = verifyRecord(t.spec, first.record, juries: first.juries, crypto: crypto);
+    final v = verifyRecord(t.spec, first.record, juries: first.juries, crypto: crypto, releases: first.releases);
     expect(v.ok, isTrue, reason: v.reason);
     expect(v.complete, isTrue, reason: 'a finished sealed game verifies to the end');
     expect(v.winners, first.game.winners);

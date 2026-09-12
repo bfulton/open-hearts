@@ -188,7 +188,13 @@ with the verifiable deal of [doc 03](03-fair-deal.md) run for real, its
 proofs made and checked on the virtual clock — run in
 `packages/table/test/sealed_test.dart`: whole games at one, two and
 four people, a leaver mid-hand and during the deal, a table of two
-surviving a crash by the jury's verdict and a juror's escrow piece.
+surviving a crash by the jury's verdict and a juror's escrow piece, and
+a lone player leaving during the pass while their client looks on. The
+chaos walk runs sealed on request (`CHAOS_SEALED=5`), a minute or two a
+seed. Over real sockets (`service/test`): the jury over the relay,
+seeded and sealed; and a juror of last resort summoned into a sealed
+table of four with real keys, carried through the hand it never saw
+dealt while it heartbeats throughout.
 
 **The chaos test** is the matrix's complement: random walks through
 the same simulator — departures, partitions, blips, loss and latency at

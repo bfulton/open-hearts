@@ -2,6 +2,7 @@
 /// be replayed with a transition log.
 library;
 
+import 'package:deal/deal.dart';
 import 'dart:math';
 
 import '../signing.dart';
@@ -62,9 +63,9 @@ class MatrixCell {
 /// A random walk: departures, partitions, blips, loss and latency at
 /// random times over the first few minutes, then quiet.
 class ChaosScenario {
-  ChaosScenario(this.seed, {this.jurors = 4}) : rng = Random(seed) {
+  ChaosScenario(this.seed, {this.jurors = 4, DealCrypto? crypto}) : rng = Random(seed) {
     humans = 2 + rng.nextInt(3);
-    table = SimTable(humans: humans, seed: 100 + seed, netSeed: seed, jurors: jurors);
+    table = SimTable(humans: humans, seed: 100 + seed, netSeed: seed, jurors: jurors, crypto: crypto);
   }
 
   /// Strangers online to draw a jury from; zero for the players' own

@@ -172,7 +172,20 @@ class RelayTransport implements Transport {
         if (!_ready.isCompleted) _ready.complete();
       case 'EVENT':
         if (m.length != 3) return;
-        final e = NostrEvent.parse(m[2]);
+        // An event seen before costs nothing: its id names it, and a
+        // stranger's event under a stolen id fails its check and is not
+        // remembered, so the real one still gets in. A table event's
+        // envelope signature is not checked here: the relay checked it
+        // before carrying the event, what the envelope carries is
+        // signed by the same key and checked by the client, and every
+        // signature checked is milliseconds a peer flooded with repeats
+        // has not got — a juror behind a whole hand drowned in them.
+        // Every other kind is checked here, as before.
+        final raw = m[2];
+        if (raw is! Map) return;
+        final id = raw['id'];
+        if (id is! String || _seen.contains(id)) return;
+        final e = NostrEvent.parse(raw, verifySignature: raw['kind'] != TableKinds.table);
         if (e == null || e.tag('t') != table) return;
         if (!_seen.add(e.id)) return;
         if (_seen.length > 50000) _seen.clear();

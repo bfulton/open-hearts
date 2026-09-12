@@ -50,7 +50,8 @@ async function startRelay() {
       if (relayLog) relayLog.write(d);
       if (m && !juror) {
         juror = spawn('dart', ['run', 'bin/juror.dart', '--relay', m[1]], { cwd: join(root, 'service') });
-        juror.stdout.on('data', (d) => { for (const line of d.toString().split('\n')) if (/juror|summoned|called|verdict|done with/.test(line)) log(`juror: ${line.trim()}`); });
+        // Its whole log goes with the relay's, for a debugging run.
+        juror.stdout.on('data', (d) => { if (relayLog) relayLog.write(d); for (const line of d.toString().split('\n')) if (/juror|summoned|called|verdict|done with/.test(line)) log(`juror: ${line.trim()}`); });
         juror.stderr.on('data', (d) => process.stderr.write(d));
       }
     });
@@ -301,7 +302,12 @@ async function main() {
     // Cell 1: a whole hand over WebRTC.
     await playUntil(pages, (p) => has(p, /^On with it$/), { timeout: 180000 });
     log('hand 1 played on every screen');
-    for (const page of pages) await click(page, /^On with it$/);
+    // The sheet goes on its own after a few seconds, and the screens
+    // reach the end of a hand a few seconds apart, so one may be gone
+    // by the time all four have shown it.
+    for (const page of pages) {
+      if (await has(page, /^On with it$/)) await click(page, /^On with it$/);
+    }
     for (const page of pages) await waitFor(page, /^Hand 2/, { what: 'hand 2' });
 
     // Cell 2: Dee's browser goes, mid-hand. The others see three, and a

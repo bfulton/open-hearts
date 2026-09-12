@@ -54,6 +54,7 @@ class Player {
 }
 
 void main() {
+  setUpAll(() => installNativeSchnorr());
   late Relay relay;
   setUp(() async {
     relay = Relay();

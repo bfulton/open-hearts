@@ -47,7 +47,11 @@ class NostrEvent {
 
   /// Parses and checks. Null for anything malformed, misidentified or
   /// not signed by its claimed author.
-  static NostrEvent? parse(Object? json) {
+  /// Parses and checks an event: its id is the hash of its content,
+  /// and its signature holds — unless [verifySignature] is off, for an
+  /// envelope whose contents are signed and checked on their own,
+  /// since a signature is what an event costs to take.
+  static NostrEvent? parse(Object? json, {bool verifySignature = true}) {
     try {
       final m = json as Map;
       final pubkey = m['pubkey'] as String;
@@ -58,7 +62,7 @@ class NostrEvent {
       final sig = m['sig'] as String;
       final id = digestOf(canonical(pubkey, createdAt, kind, tags, content));
       if (id != m['id']) return null;
-      if (!verify(pubkey, id, sig)) return null;
+      if (verifySignature && !verify(pubkey, id, sig)) return null;
       return NostrEvent._(
         id: id,
         pubkey: pubkey,

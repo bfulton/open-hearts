@@ -11,6 +11,7 @@
 /// the jury is gone and nobody is online to draw another from.
 library;
 
+import 'package:deal/deal.dart';
 import 'dart:io';
 
 import 'package:engine/engine.dart';
@@ -80,11 +81,18 @@ class Observed {
 
 void main() {
   // CHAOS_SEEDS=250 dart test test/chaos_test.dart — for a longer walk.
+  // CHAOS_SEALED=5 walks that many seeds at sealed tables too, the
+  // verifiable deal run for real: a minute or two a seed, so opt-in.
   final seeds = int.parse(Platform.environment['CHAOS_SEEDS'] ?? '40');
+  final sealedSeeds = int.parse(Platform.environment['CHAOS_SEALED'] ?? '0');
+  DealCrypto? crypto;
+  if (sealedSeeds > 0) setUpAll(() async => crypto = await DealCrypto.load());
 
-  for (var seed = 0; seed < seeds; seed++) {
-    test('chaos $seed', () {
-      final sc = ChaosScenario(seed);
+  for (var n = 0; n < seeds + sealedSeeds; n++) {
+    final sealed = n >= seeds;
+    final seed = sealed ? n - seeds : n;
+    test('chaos $seed${sealed ? ' sealed' : ''}', () {
+      final sc = ChaosScenario(seed, crypto: sealed ? crypto : null);
       final t = sc.table;
       final observed = {for (final c in t.clients) c: Observed()};
 
@@ -97,7 +105,7 @@ void main() {
           }
         }
         for (final c in survivors) {
-          final v = verifyRecord(t.spec, c.record, allowPartial: true, juries: c.juries);
+          final v = verifyRecord(t.spec, c.record, allowPartial: true, juries: c.juries, crypto: t.crypto, releases: c.releases);
           expect(v.ok, isTrue, reason: '$when: ${c.signer.publicKey.substring(0, 6)} record: ${v.reason}');
         }
         for (final c in t.clients) {
@@ -147,7 +155,8 @@ void main() {
         // running has to know it has no seat, and hold a sound record.
         for (final p in t.people.where((p) => !p.gone)) {
           expect(p.client.amSeated, isFalse, reason: 'faults were [${sc.faults.join('; ')}]\n${p.client.describe()}');
-          final v = verifyRecord(t.spec, p.client.record, allowPartial: true, juries: p.client.juries);
+          final v = verifyRecord(t.spec, p.client.record,
+              allowPartial: true, juries: p.client.juries, crypto: t.crypto, releases: p.client.releases);
           expect(v.ok, isTrue, reason: v.reason);
         }
       } else if (finished) {
@@ -155,12 +164,19 @@ void main() {
         for (final r in keysOf) {
           expect(r, keysOf.first, reason: 'every survivor holds the same record');
         }
-        final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries);
+        final v = verifyRecord(t.spec, survivors.first.record,
+            juries: survivors.first.juries, crypto: t.crypto, releases: survivors.first.releases);
         expect(v.ok && v.complete, isTrue, reason: v.reason);
       } else {
         for (final c in survivors) {
-          expect(c.tableState, anyOf(TableState.pausedForJury, TableState.pausedForPeers),
+          expect(c.tableState, anyOf(TableState.pausedForJury, TableState.pausedForPeers, TableState.pausedForDeal),
               reason: 'not finished, so paused and saying why; faults were [${sc.faults.join('; ')}]\n${c.describe()}');
+          if (c.tableState == TableState.pausedForDeal) {
+            // A departed seat's hand that no juror is left to open: the
+            // escrow's price, and only ever with the whole jury gone.
+            expect(c.pause, Pause.openingHand, reason: 'faults were [${sc.faults.join('; ')}]\n${c.describe()}');
+            continue;
+          }
           final notAMajority = survivors.length < c.participants.length ~/ 2 + 1;
           expect(notAMajority || c.stuckSplit != null, isTrue,
               reason: 'paused only because the survivors are not a majority, or a turn split evenly; '
