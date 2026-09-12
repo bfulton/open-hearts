@@ -61,7 +61,7 @@ void main() {
 
     Future<(RelayTransport, WaitingRoom)> join(String name, {int rating = 1500}) async {
       final s = SchnorrSigner.generate();
-      final t = RelayTransport(url: relay.url, signer: s, table: poolTag('unrated'));
+      final t = RelayTransport(relays: [relay.url], signer: s, table: poolTag('unrated'));
       await t.ready;
       final room = WaitingRoom(relay: t, pool: 'unrated', name: name, rating: rating, roundMs: 2000, botsAfterMs: 3000, heartbeatMs: 500, staleMs: 2000);
       return (t, room);

@@ -82,7 +82,7 @@ code and different adapters:
 | Sign-in | Apple/Google public keys | a test token naming a `sub` |
 | Entitlement | purchase webhook | a test endpoint that marks a key entitled |
 | TURN | Cloudflare | none; localhost connects directly |
-| Signalling, waiting rooms, results | public relays | a minimal NIP-01 relay in the repo |
+| Signalling, waiting rooms, results | a few public relays, listened on together and written to one at a time | a minimal NIP-01 relay in the repo |
 | Last-resort juror | woken on demand | always available |
 
 One process, one flag.
@@ -104,7 +104,11 @@ a game.
 `packages/table` has the other side: `RelayTransport`, a [Transport]
 that wraps each table message in an ephemeral event of kind 24242,
 tagged with the table id and signed by the sender, and subscribes to
-the same. What arrives is stamped *from* the envelope's signer — the
+the same — on every relay in its list, writing to the first that has
+not refused it lately and moving a refused event on to the next
+(`relays.dart`; doc 04, "The live table"). The local relay takes a
+`refuse` policy so a test can be the public relay that turns on a
+client. What arrives is stamped *from* the envelope's signer — the
 peer that sent it, which for a relayed message is not the author — and
 that is the distinction "heard from" rests on. The relay says nothing
 when a peer goes, so the transport never reports a disconnect; the

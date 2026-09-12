@@ -23,13 +23,18 @@ import 'package:table/table.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class Relay {
-  Relay({this.keep = 10000, this.log});
+  Relay({this.keep = 10000, this.log, this.refuse});
 
   /// How many stored events to hold before the oldest go.
   final int keep;
 
   /// Receives one line per connection, subscription and rejected event.
   final void Function(String line)? log;
+
+  /// A policy, for a test: the reason to refuse an event that checks
+  /// out, or null to take it — what a public relay does when it
+  /// demands proof of work or rate-limits a client.
+  String? Function(NostrEvent event)? refuse;
 
   final List<NostrEvent> _stored = [];
   final Set<String> _seen = {};
@@ -119,6 +124,11 @@ class Relay {
       final id = json is Map ? json['id'] : null;
       _log('rejected ${id is String ? id.substring(0, 6) : '?'}');
       return from.send(['OK', id is String ? id : '', false, 'invalid: bad id or signature']);
+    }
+    final why = refuse?.call(event);
+    if (why != null) {
+      _log('refused ${event.id.substring(0, 6)}: $why');
+      return from.send(['OK', event.id, false, why]);
     }
     if (!_seen.add(event.id)) return from.send(['OK', event.id, true, 'duplicate: already have this event']);
     if (!event.ephemeral) {

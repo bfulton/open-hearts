@@ -21,6 +21,7 @@ export 'src/record.dart';
 export 'src/results.dart';
 export 'src/schnorr_native.dart';
 export 'src/relay_transport.dart';
+export 'src/relays.dart';
 export 'src/signing.dart';
 export 'src/spec.dart';
 export 'src/transport.dart';

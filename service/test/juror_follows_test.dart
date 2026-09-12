@@ -38,15 +38,15 @@ void main() {
     final logPath = Platform.environment['JUROR_LOG'];
     final sink = logPath == null ? null : File(logPath).openWrite();
     final juror = LastResortJuror(
-        url: relay.url,
+        relays: [relay.url],
         signer: SchnorrSigner.generate(),
         silenceAfterMs: silence,
         crypto: crypto,
         log: sink == null ? null : (l) => sink.writeln('juror $l'))
       ..start();
     final startedAt = DateTime.now();
-    final presences = [for (final s in signers) RelayPresence(url: relay.url, signer: s)];
-    final transports = [for (final s in signers) RelayTransport(url: relay.url, signer: s, table: spec.id)];
+    final presences = [for (final s in signers) RelayPresence(relays: [relay.url], signer: s)];
+    final transports = [for (final s in signers) RelayTransport(relays: [relay.url], signer: s, table: spec.id)];
     await Future.wait(transports.map((t) => t.ready));
     final clients = [
       for (var i = 0; i < 4; i++)

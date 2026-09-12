@@ -35,6 +35,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     required this.seatNames,
     required Signer signer,
     required Transport transport,
+    RelayTransport? relay,
     Clock? clock,
     Presence? presence,
     DealCrypto? crypto,
@@ -47,10 +48,20 @@ class LiveController extends ChangeNotifier implements TableModel {
     _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed);
     _shownHolders = List.of(spec.seats);
     _sub = client.changes.listen((_) => _onChange());
+    _refusals = relay?.refusals.listen((reason) {
+      relayRefusal = reason;
+      if (!_disposed) notifyListeners();
+    });
     client.start();
   }
 
   final TableClient client;
+
+  /// The reason the relays gave when every one of them refused this
+  /// device's latest event; null while one takes them. A table cut
+  /// off from the relays looks alive until it is said.
+  String? relayRefusal;
+  StreamSubscription<String?>? _refusals;
 
   /// The deal's primitives, at a sealed table; for the verifier.
   final DealCrypto? _crypto;
@@ -516,8 +527,8 @@ class LiveController extends ChangeNotifier implements TableModel {
     notifyListeners();
   }
 
-  /// Humans still at the table, by seat.
-  int get participants => client.participants.length;
+  /// Humans at the table and heard from lately, this device included.
+  int get here => client.heardLately.length;
 
   /// The hand's jury: drawn and heard from.
   ({int drawn, int live}) get jury => client.jury;
@@ -549,6 +560,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     _waitTimer?.cancel();
     _sheetTimer?.cancel();
     _sub?.cancel();
+    _refusals?.cancel();
     client.close();
     super.dispose();
   }

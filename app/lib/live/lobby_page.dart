@@ -28,17 +28,22 @@ void _relayLog(String line) => debugPrint('relay: $line');
 final _debugging = Uri.base.queryParameters.containsKey('e2e');
 
 /// A dev loop's shortcuts: a build made with `--dart-define=DEV_RELAY=…`
-/// and `DEV_ROOM=…` opens the lobby with that relay filled in and that
+/// and `DEV_ROOM=…` opens the lobby with those relays filled in and that
 /// room code in the field, and hosts under that code, so a table of
 /// people testing a branch is one tap away. Unset in a normal build.
 const devRelay = String.fromEnvironment('DEV_RELAY');
 const devRoom = String.fromEnvironment('DEV_ROOM');
 
-String defaultRelayUrl() {
+/// The relays a build starts with: a dev build's own, the local relay
+/// when the app is served from localhost, and otherwise a few public
+/// ones — listened on together, written to one at a time (packages/
+/// table, relays.dart), so one relay turning on a table is not the end
+/// of it.
+String defaultRelays() {
   if (devRelay.isNotEmpty) return devRelay;
   final host = Uri.base.host;
   if (host == 'localhost' || host == '127.0.0.1' || host.isEmpty) return 'ws://localhost:7447';
-  return 'wss://relay.damus.io';
+  return 'wss://relay.damus.io, wss://relay.primal.net, wss://nos.lol';
 }
 
 class LobbyPage extends StatefulWidget {
@@ -51,7 +56,7 @@ class LobbyPage extends StatefulWidget {
 class _LobbyPageState extends State<LobbyPage> {
   final _name = TextEditingController();
   final _code = TextEditingController(text: devRoom);
-  late final TextEditingController _relay = TextEditingController(text: defaultRelayUrl());
+  late final TextEditingController _relay = TextEditingController(text: defaultRelays());
   String? _error;
   bool _busy = false;
   Room? _room;
@@ -61,6 +66,12 @@ class _LobbyPageState extends State<LobbyPage> {
   Standing? _standing;
   Timer? _waitClock;
 
+  /// What the relays said when every one of them refused this device's
+  /// latest event, while it waits or sits in a room; null while one
+  /// takes them.
+  String? _relayNote;
+  StreamSubscription<String?>? _refusalSub;
+
   @override
   void initState() {
     super.initState();
@@ -69,11 +80,11 @@ class _LobbyPageState extends State<LobbyPage> {
     });
   }
 
-  /// Ratings, from the relay that just answered — never from an
+  /// Ratings, from the relays that just answered — never from an
   /// address nobody has confirmed.
-  Future<void> _loadStanding(Uri relay, Signer signer) async {
+  Future<void> _loadStanding(List<Uri> relays, Signer signer) async {
     try {
-      final standing = await Standing.load(relay, signer);
+      final standing = await Standing.load(relays, signer);
       if (mounted) setState(() => _standing = standing);
     } catch (_) {
       // The rating shows next time.
@@ -87,6 +98,7 @@ class _LobbyPageState extends State<LobbyPage> {
     _queueSub?.cancel();
     _queue?.close();
     _waitClock?.cancel();
+    _refusalSub?.cancel();
     _transport?.close(); // a matched or started table has its own
     _name.dispose();
     _code.dispose();
@@ -94,13 +106,30 @@ class _LobbyPageState extends State<LobbyPage> {
     super.dispose();
   }
 
-  /// Connects to the relay on [tag], or explains why not.
+  /// The relays as typed, or null with the field's trouble shown.
+  List<Uri>? _relays() {
+    try {
+      final relays = Relays.parse(_relay.text);
+      if (relays.isEmpty) throw const FormatException('none');
+      for (final r in relays) {
+        if (r.scheme != 'ws' && r.scheme != 'wss' || r.host.isEmpty) throw FormatException('$r');
+      }
+      return relays;
+    } on FormatException {
+      setState(() => _error = 'Relays are ws:// or wss:// addresses, commas between');
+      return null;
+    }
+  }
+
+  /// Connects to the relays on [tag], or explains why not.
   Future<RelayTransport?> _connect(String tag) async {
     final name = _name.text.trim();
     if (name.isEmpty) {
       setState(() => _error = 'A name, so the others know who they are playing');
       return null;
     }
+    final relays = _relays();
+    if (relays == null) return null;
     setState(() {
       _busy = true;
       _error = null;
@@ -108,13 +137,16 @@ class _LobbyPageState extends State<LobbyPage> {
     try {
       await Identity.setName(name);
       final signer = _signer ??= await Identity.signer();
-      final url = Uri.parse(_relay.text.trim());
-      final transport = RelayTransport(url: url, signer: signer, table: tag, log: _relayLog);
+      final transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog);
+      _refusalSub?.cancel();
+      _refusalSub = transport.refusals.listen((r) {
+        if (mounted) setState(() => _relayNote = r == null ? null : 'No relay will take this device\'s events: $r');
+      });
       await transport.ready.timeout(const Duration(seconds: 8));
-      // The relay answered: from here on this device is online to
+      // A relay answered: from here on this device is online to
       // everyone, and a juror when drawn.
-      Duty.on(url, signer, log: _debugging, crypto: dealCrypto);
-      if (_standing == null) await _loadStanding(url, signer);
+      Duty.on(relays, signer, log: _debugging, crypto: dealCrypto);
+      if (_standing == null) await _loadStanding(relays, signer);
       setState(() {
         _transport = transport;
         _busy = false;
@@ -123,7 +155,7 @@ class _LobbyPageState extends State<LobbyPage> {
     } on TimeoutException {
       setState(() {
         _busy = false;
-        _error = 'No relay at ${_relay.text.trim()}';
+        _error = 'No relay answered at ${_relay.text.trim()}';
       });
     } catch (e) {
       setState(() {
@@ -159,23 +191,24 @@ class _LobbyPageState extends State<LobbyPage> {
     setState(() => _queue = queue);
   }
 
-  /// The seated table has its own tag on the relay: a fresh transport
+  /// The seated table has its own tag on the relays: a fresh transport
   /// there, WebRTC over it, and the live page.
   void _toTable(TableSpec spec, Map<int, String> seatNames) {
     final signer = _signer!;
-    final relay = RelayTransport(url: Uri.parse(_relay.text.trim()), signer: signer, table: spec.id, log: _relayLog);
+    final relays = _relays() ?? Relays.parse(defaultRelays());
+    final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog);
     final peers = [for (final h in spec.seats) if (h is HumanSeat) h.key];
-    final relayUrl = Uri.parse(_relay.text.trim());
     final ledger = _standing?.ledger ?? Ledger();
     final controller = LiveController(
       spec: spec,
       seatNames: seatNames,
       signer: signer,
       transport: MeshTransport(relay: relay, peers: peers, log: _debugging ? (l) => debugPrint('mesh: $l') : null),
-      presence: Duty.on(relayUrl, signer, log: _debugging, crypto: dealCrypto).presence,
+      relay: relay,
+      presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto).presence,
       crypto: dealCrypto,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
-      onResult: (result) => Standing.publish(relayUrl, signer, result),
+      onResult: (result) => Standing.publish(relays, signer, result),
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => LivePage(controller: controller)));
@@ -196,7 +229,7 @@ class _LobbyPageState extends State<LobbyPage> {
     } on TimeoutException {
       setState(() {
         _busy = false;
-        _error = 'No relay at ${_relay.text.trim()}';
+        _error = 'No relay answered at ${_relay.text.trim()}';
       });
     } catch (e) {
       setState(() {
@@ -244,11 +277,21 @@ class _LobbyPageState extends State<LobbyPage> {
               padding: const EdgeInsets.all(22),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 380),
-                child: queue != null
-                    ? _WaitingView(queue: queue, onCancel: () => Navigator.of(context).pop())
-                    : room == null
-                        ? _entry()
-                        : _RoomView(room: room, onLeave: () => Navigator.of(context).pop()),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    queue != null
+                        ? _WaitingView(queue: queue, onCancel: () => Navigator.of(context).pop())
+                        : room == null
+                            ? _entry()
+                            : _RoomView(room: room, onLeave: () => Navigator.of(context).pop()),
+                    if (_relayNote != null && (queue != null || room != null)) ...[
+                      const SizedBox(height: 14),
+                      Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -333,7 +376,7 @@ class _LobbyPageState extends State<LobbyPage> {
         const SizedBox(height: 26),
         TextField(
           controller: _relay,
-          decoration: _field('Relay'),
+          decoration: _field('Relays'),
           style: const TextStyle(color: Palette.chromeDim, fontSize: 12),
         ),
         if (_error != null) ...[

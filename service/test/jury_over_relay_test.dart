@@ -42,9 +42,9 @@ void main() {
       BotSeat(Persona.roster[4]),
     ]);
     final c0 = sealed ? crypto : null;
-    final juror = LastResortJuror(url: relay.url, signer: FakeSigner('last-resort'), silenceAfterMs: silence, crypto: c0)..start();
-    final presences = [for (final s in signers) RelayPresence(url: relay.url, signer: s)];
-    final transports = [for (final s in signers) RelayTransport(url: relay.url, signer: s, table: spec.id)];
+    final juror = LastResortJuror(relays: [relay.url], signer: FakeSigner('last-resort'), silenceAfterMs: silence, crypto: c0)..start();
+    final presences = [for (final s in signers) RelayPresence(relays: [relay.url], signer: s)];
+    final transports = [for (final s in signers) RelayTransport(relays: [relay.url], signer: s, table: spec.id)];
     await Future.wait(transports.map((t) => t.ready));
     final clients = [
       for (var i = 0; i < 2; i++)

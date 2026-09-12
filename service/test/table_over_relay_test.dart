@@ -70,7 +70,7 @@ void main() {
       HumanSeat(signers[1].publicKey),
       const BotSeat(Persona.juliet),
     ]);
-    final transports = [for (final s in signers) RelayTransport(url: relay.url, signer: s, table: spec.id)];
+    final transports = [for (final s in signers) RelayTransport(relays: [relay.url], signer: s, table: spec.id)];
     await Future.wait(transports.map((t) => t.ready));
     final clock = WallClock();
     final clients = [
@@ -119,9 +119,9 @@ void main() {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();
     final c = SchnorrSigner.generate();
-    final ta = RelayTransport(url: relay.url, signer: a, table: 'sig');
-    final tb = RelayTransport(url: relay.url, signer: b, table: 'sig');
-    final tc = RelayTransport(url: relay.url, signer: c, table: 'sig');
+    final ta = RelayTransport(relays: [relay.url], signer: a, table: 'sig');
+    final tb = RelayTransport(relays: [relay.url], signer: b, table: 'sig');
+    final tc = RelayTransport(relays: [relay.url], signer: c, table: 'sig');
     await Future.wait([ta.ready, tb.ready, tc.ready]);
     final atB = <Signal>[];
     final atC = <Signal>[];

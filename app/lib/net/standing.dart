@@ -1,4 +1,4 @@
-/// Ratings, as this device knows them: every result on the relay,
+/// Ratings, as this device knows them: every result on the relays,
 /// folded into a ledger, and this device's own line in it.
 library;
 
@@ -15,12 +15,15 @@ class Standing {
 
   Rating get mine => ledger.of(me);
 
-  /// Loads every result the relay holds and folds it. A few seconds on
-  /// a busy relay; instant on an empty one.
-  static Future<Standing> load(Uri relay, Signer signer) async {
-    final t = RelayTransport(url: relay, signer: signer, table: GameResult.tag);
+  /// Loads every result the relays hold and folds it. A few seconds on
+  /// a busy relay; instant on an empty one. Each relay holds the
+  /// results written to it, so the fold waits for all of them, within
+  /// reason.
+  static Future<Standing> load(List<Uri> relays, Signer signer) async {
+    final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag);
     try {
       await t.ready.timeout(const Duration(seconds: 8));
+      await t.allReady.timeout(const Duration(seconds: 4)).catchError((_) {});
       return Standing(Ledger.from(t.lobbySoFar, prior: prior), signer.publicKey);
     } finally {
       t.close();
@@ -28,8 +31,8 @@ class Standing {
   }
 
   /// Publishes a finished game's result, signed by this device.
-  static Future<void> publish(Uri relay, Signer signer, GameResult result) async {
-    final t = RelayTransport(url: relay, signer: signer, table: GameResult.tag);
+  static Future<void> publish(List<Uri> relays, Signer signer, GameResult result) async {
+    final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag);
     try {
       await t.ready.timeout(const Duration(seconds: 8));
       t.announce(result.toJson());

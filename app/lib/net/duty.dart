@@ -1,8 +1,8 @@
 /// What every open app does for the tables it is not at: says it is
 /// online, and serves as a juror when drawn (docs/04-live-play.md).
 ///
-/// One presence socket for the life of the app, made the first time a
-/// relay answers; a juror client per table summoned to, closed when
+/// One presence connection per relay for the life of the app, made the
+/// first time a relay answers; a juror client per table summoned to, closed when
 /// the table moves on. A player at a table is a juror elsewhere at the
 /// same time — the draw is from whoever is online, at other tables or
 /// in the lobby.
@@ -13,25 +13,25 @@ import 'package:flutter/foundation.dart';
 import 'package:table/table.dart';
 
 class Duty {
-  Duty._(this.url, this.presence, this.juror);
+  Duty._(this.relays, this.presence, this.juror);
 
-  final Uri url;
+  final List<Uri> relays;
   final RelayPresence presence;
   final JurorDuty juror;
 
   static Duty? _current;
 
-  /// The duty on [url], started if need be; a new relay replaces it.
+  /// The duty on [relays], started if need be; a new list replaces it.
   /// With [crypto] the juror can serve sealed tables, holding a piece
   /// of every person's deal secret there.
-  static Duty on(Uri url, Signer signer, {bool log = false, DealCrypto? crypto}) {
+  static Duty on(List<Uri> relays, Signer signer, {bool log = false, DealCrypto? crypto}) {
     final d = _current;
-    if (d != null && d.url == url) return d;
+    if (d != null && listEquals(d.relays, relays)) return d;
     d?.close();
     void Function(String)? logger = log ? (l) => debugPrint('duty: $l') : null;
-    final presence = RelayPresence(url: url, signer: signer, log: logger);
-    final juror = JurorDuty(url: url, signer: signer, presence: presence, log: logger, crypto: crypto)..start();
-    return _current = Duty._(url, presence, juror);
+    final presence = RelayPresence(relays: relays, signer: signer, log: logger);
+    final juror = JurorDuty(relays: relays, signer: signer, presence: presence, log: logger, crypto: crypto)..start();
+    return _current = Duty._(relays, presence, juror);
   }
 
   static Duty? get current => _current;

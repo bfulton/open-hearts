@@ -43,7 +43,7 @@ Future<void> main(List<String> args) async {
     } catch (e) {
       print('juror: no deal cryptography ($e); sealed tables cannot be served');
     }
-    final j = LastResortJuror(url: relay.url, signer: SchnorrSigner.generate(), log: print, crypto: crypto);
+    final j = LastResortJuror(relays: [relay.url], signer: SchnorrSigner.generate(), log: print, crypto: crypto);
     j.start();
     print('juror of last resort ${j.presence.signer.publicKey.substring(0, 8)} listening');
   }

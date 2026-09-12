@@ -88,6 +88,10 @@ class _LivePageState extends State<LivePage> {
   /// holding everyone up, or nothing special.
   Widget? _liveNote() {
     final game = _c.game;
+    // Cut off from every relay comes first: it is the cause of most of
+    // what follows, and the one thing the player can act on.
+    final refused = _c.relayRefusal;
+    if (refused != null) return _note('No relay will take this device\'s events: ${_short(refused)}');
     if (_c.pause == Pause.waitingForPeers) return _note('Waiting for the others to reconnect');
     if (_c.pause == Pause.waitingForJury) {
       if (_c.jury.live > 0) return _note('Asking the jury');
@@ -127,6 +131,9 @@ class _LivePageState extends State<LivePage> {
 
   static Widget _note(String text) =>
       Text(text, style: const TextStyle(fontSize: 12, color: Palette.chromeDim));
+
+  /// A relay's reason, cut to the rail's line.
+  static String _short(String reason) => reason.length > 40 ? '${reason.substring(0, 39)}…' : reason;
 
   @override
   Widget build(BuildContext context) {
@@ -224,7 +231,7 @@ class _Presence extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final humans = [for (var s = 0; s < seatCount; s++) if (controller.client.spec.seats[s] is HumanSeat) s];
-    final here = controller.participants;
+    final here = controller.here;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(

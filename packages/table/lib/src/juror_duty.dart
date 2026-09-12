@@ -18,10 +18,12 @@ import 'relay_transport.dart';
 import 'signing.dart';
 
 class JurorDuty {
-  JurorDuty({required this.url, required this.signer, required this.presence, this.log, Clock? clock, this.silenceAfterMs = 120000, this.crypto})
+  JurorDuty({required this.relays, required this.signer, required this.presence, this.log, Clock? clock, this.silenceAfterMs = 120000, this.crypto})
       : clock = clock ?? WallClock();
 
-  final Uri url;
+  /// The relays a summoned client follows a table on; every one of
+  /// them, whichever the table's peers write to (relays.dart).
+  final List<Uri> relays;
   final Signer signer;
   final RelayPresence presence;
   final void Function(String line)? log;
@@ -55,7 +57,7 @@ class JurorDuty {
   void _onSummons(Summons s) {
     var t = _tables[s.spec.id];
     if (t == null) {
-      final transport = RelayTransport(url: url, signer: signer, table: s.spec.id, log: log);
+      final transport = RelayTransport(relays: relays, signer: signer, table: s.spec.id, log: log);
       if (s.spec.sealed && crypto == null) {
         log?.call('duty: summoned to a sealed table without the deal\'s cryptography; cannot serve');
         return;
@@ -105,12 +107,12 @@ class JurorDuty {
 /// a while.
 class LastResortJuror {
   LastResortJuror(
-      {required this.url, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int silenceAfterMs = 120000, DealCrypto? crypto}) {
-    presence = RelayPresence(url: url, signer: signer, status: 'last-resort', log: log)..silent = true;
-    duty = JurorDuty(url: url, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs, crypto: crypto);
+      {required this.relays, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int silenceAfterMs = 120000, DealCrypto? crypto}) {
+    presence = RelayPresence(relays: relays, signer: signer, status: 'last-resort', log: log)..silent = true;
+    duty = JurorDuty(relays: relays, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs, crypto: crypto);
   }
 
-  final Uri url;
+  final List<Uri> relays;
   final Signer signer;
   final void Function(String line)? log;
 

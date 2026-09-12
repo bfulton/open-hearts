@@ -1704,11 +1704,14 @@ class TableClient {
   /// Whether this peer has heard from a majority of the participants
   /// lately — itself included. A peer that has not is the one cut off,
   /// and has no business removing anyone.
-  bool get connectedToMajority {
-    final now = participants;
-    final heard = now.where((k) => k == signer.publicKey || _recent(k)).length;
-    return heard >= _majority(now);
-  }
+  bool get connectedToMajority => heardLately.length >= _majority(participants);
+
+  /// The participants heard from within a couple of heartbeats, this
+  /// peer among them: who is here, as against who has a seat.
+  Set<PublicKey> get heardLately => {
+        for (final k in participants)
+          if (k == signer.publicKey || _recent(k)) k,
+      };
 
   /// Heard from within a couple of heartbeats.
   bool _recent(PublicKey key) => clock.nowMs - (_lastHeard[key] ?? clock.nowMs) < heartbeatMs * 2 + 2000;

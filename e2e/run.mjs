@@ -258,7 +258,7 @@ async function main() {
       await waitFor(page, /^Play live$/, { what: 'the solo table' });
       await click(page, /^Play live$/);
       await waitFor(page, /^Host a table$/);
-      await type(page, 'Relay', relay.url);
+      await type(page, 'Relays', relay.url);
       await type(page, 'Your name', names[i]);
     }
 
@@ -282,7 +282,7 @@ async function main() {
       await waitFor(page, /^Play live$/, { what: 'the solo table again' });
       await click(page, /^Play live$/);
       await waitFor(page, /^Host a table$/);
-      await type(page, 'Relay', relay.url);
+      await type(page, 'Relays', relay.url);
     }
 
     // Ada hosts; the code is the only four-capital-letter text on her screen.

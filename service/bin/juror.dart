@@ -2,10 +2,12 @@
 /// says it has nobody to draw a jury from, then online to serve it.
 ///
 ///     dart run bin/juror.dart --relay ws://localhost:7447
-///     JUROR_SECRET=<64 hex> dart run bin/juror.dart --relay wss://…
+///     JUROR_SECRET=<64 hex> dart run bin/juror.dart --relay wss://a,wss://b
 ///
 /// A real key — a fresh one, or the secret given — so a public relay
-/// takes its events; the local one takes anything.
+/// takes its events; the local one takes anything. Several relays,
+/// comma-separated or `--relay` repeated, are listened on together and
+/// written to one at a time (packages/table, relays.dart).
 library;
 
 // A server's output is its log.
@@ -17,10 +19,11 @@ import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 
 Future<void> main(List<String> args) async {
-  var relay = 'ws://localhost:7447';
+  final relays = <Uri>[];
   for (var i = 0; i < args.length; i++) {
-    if (args[i] == '--relay' && i + 1 < args.length) relay = args[++i];
+    if (args[i] == '--relay' && i + 1 < args.length) relays.addAll(Relays.parse(args[++i]));
   }
+  if (relays.isEmpty) relays.add(Uri.parse('ws://localhost:7447'));
   final native = await installNativeSchnorr();
   if (!native) print('schnorr: no native library (crypto/schnorr/build.sh); signatures in Dart, seventeen milliseconds each');
   final secret = Platform.environment['JUROR_SECRET'];
@@ -33,7 +36,7 @@ Future<void> main(List<String> args) async {
   } catch (e) {
     print('juror: no deal cryptography ($e); sealed tables cannot be served');
   }
-  final juror = LastResortJuror(url: Uri.parse(relay), signer: signer, log: print, crypto: crypto);
+  final juror = LastResortJuror(relays: relays, signer: signer, log: print, crypto: crypto);
   juror.start();
-  print('juror of last resort ${signer.publicKey.substring(0, 8)} listening on $relay${crypto == null ? '' : ', sealed tables too'}');
+  print('juror of last resort ${signer.publicKey.substring(0, 8)} listening on ${Relays.format(relays)}${crypto == null ? '' : ', sealed tables too'}');
 }
