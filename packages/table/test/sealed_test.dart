@@ -84,6 +84,20 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  test('a lone person who leaves during the pass sees the bots play the game out, their own seat included', () {
+    final t = SimTable(humans: 1, seed: 11, crypto: crypto, jurors: 2);
+    t.people[0].exitAt = Moment.duringPass;
+    t.people[0].exit = Exit.leave;
+    t.start();
+    // Nobody is left to finish for: the leaver's client looks on as
+    // four bots play, its own seat's moves computed from the secret
+    // it still holds, until the game ends.
+    expect(t.clock.runUntil(() => t.clients.first.done, limitMs: 3 * 60 * 60 * 1000), isTrue);
+    expect(t.people[0].gone, isTrue);
+    expect(t.clients.first.pause, isNull);
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   test('a person who leaves during the deal is a bot from there, and the deal goes on', () {
     final t = SimTable(humans: 3, seed: 10, crypto: crypto, jurors: 4);
     t.people[1].exitAt = Moment('during the deal', (c) => c.game.phase == Phase.dealing && c.deal!.hasKeys(1) && c.deal!.deck == null);

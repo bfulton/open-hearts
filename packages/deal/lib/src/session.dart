@@ -846,10 +846,11 @@ class DealSession {
     }
   }
 
-  /// A pass from a seat whose secret is public here — a bot's — needs
-  /// no message: the positions move, and everyone can open them.
+  /// A pass from a seat whose secret this side holds — a bot's, or
+  /// its own once it has left and a bot plays its seat — needs no
+  /// message: the positions move, and everyone can open them.
   bool passOpen(int from, int to, List<int> positions) {
-    if (!_public(from)) return false;
+    if (!_secrets.containsKey(from)) return false;
     if (positions.any((p) => _holderOf[p] != from)) return false;
     for (final p in positions) {
       _holderOf[p] = to;

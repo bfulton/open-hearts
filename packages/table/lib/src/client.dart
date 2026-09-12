@@ -602,7 +602,7 @@ class TableClient {
         _openTurn(TurnId.pass(game.handNumber, s), s, botActs: false);
       }
       for (var s = 0; s < seatCount; s++) {
-        if (holders[s] is BotSeat) _botActs(TurnId.pass(game.handNumber, s), s);
+        if (holders[s] is BotSeat) _botTurn(TurnId.pass(game.handNumber, s), s);
       }
     } else if (game.phase == Phase.playing) {
       _openPlayTurn();
@@ -622,9 +622,32 @@ class TableClient {
     _turnSeat[turn] = seat;
     _trace('open $turn for seat $seat (${holders[seat]})');
     if (botActs && holders[seat] is BotSeat) {
-      _botActs(turn, seat);
+      _botTurn(turn, seat);
     }
   }
+
+  /// A bot's turn, taken once the stack is clear of the turn before
+  /// it. A bot's move closes its turn, which opens the next, which may
+  /// be a bot's too: run as a loop, a table of bots plays a whole game
+  /// — a deserted table, a leaver's client looking on — in one call
+  /// without the stack growing by a frame per card, which in a browser
+  /// was a stack overflow by hand two.
+  void _botTurn(TurnId turn, int seat) {
+    _botQueue.add((turn, seat));
+    if (_runningBots) return;
+    _runningBots = true;
+    try {
+      while (_botQueue.isNotEmpty && !_closed) {
+        final (t, s) = _botQueue.removeAt(0);
+        _botActs(t, s);
+      }
+    } finally {
+      _runningBots = false;
+    }
+  }
+
+  final List<(TurnId, int)> _botQueue = [];
+  bool _runningBots = false;
 
   /// A bot's turn: its move is a function of the deal and the record,
   /// computed here and settled at once. At a sealed table its deal
@@ -1354,7 +1377,7 @@ class TableClient {
     _trace('booted seat $seat at $turn by ${race.forRemoval.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
     _remove(seat, at: turn, how: claim.kind);
     _pause = null;
-    _botActs(turn, seat);
+    _botTurn(turn, seat);
     _reconsider();
   }
 
@@ -1581,7 +1604,7 @@ class TableClient {
     for (final e in List.of(_stalled.entries)) {
       if (d.awaitsSecret(e.value)) continue;
       _stalled.remove(e.key);
-      _botActs(e.key, e.value);
+      _botTurn(e.key, e.value);
     }
     if (_stalled.isEmpty && _pause == Pause.openingHand) _pause = null;
   }
@@ -1683,7 +1706,7 @@ class TableClient {
     final open = _openTurnOf(seat);
     if (open != null) {
       _races[open]!.settled = true;
-      _botActs(open, seat);
+      _botTurn(open, seat);
     }
     _reconsider();
   }
