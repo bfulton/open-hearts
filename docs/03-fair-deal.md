@@ -183,6 +183,99 @@ browser P2P poker without a server ships today. **No part of this is
 unproven.** What is missing is that nobody has put them together for
 Hearts.
 
+## As built
+
+The deal is built — `crypto/deal` and `crypto/vendor`, `packages/deal`,
+and "the deal" section of `packages/table/lib/src/client.dart` — and
+every live table is sealed: the room's start event and the matchmaking
+offer say so, and a build that cannot run the deal does not sit down.
+
+- **The primitives** are the reference crate measured above —
+  Barnett–Smart with the Bayer–Groth argument on the Starknet curve,
+  m = 2 and n = 26 — wrapped as flat functions over bytes: keys and
+  their proof of ownership, the joint key, the initial deck, a shuffle
+  with its argument, reveal tokens with their proofs, unmasking, and
+  sealing a token to one key. One Rust crate builds twice: a cdylib
+  the Dart VM loads over FFI (the tests, the verifier, the service's
+  juror) and a 400 KB wasm the browser loads bare, no glue. Every
+  random value comes in as a seed the caller drew; the wasm has no
+  entropy source and refuses to pretend it has one. Two of the
+  reference's proof crates are vendored for one fix: a point written
+  into a proof's transcript is normalised first, because a proof made
+  from Jacobian coordinates and verified from its bytes hashed two
+  different things, and every proof here crosses a wire.
+- **A hand's deal is turns of the table** ([doc 04](04-live-play.md)).
+  Four rounds of one turn per seat before the pass — keys, a shuffle
+  in seat order, reveal tokens for the other seats' thirty-nine
+  positions, and the lead card declared by its holder with the token
+  that opens it for everyone — and four audit turns after the last
+  trick, each person's deal secret for all, so the hand replays. Each
+  is a race like any other turn: the seat wins it by acting, checked
+  by everyone on arrival, or loses it by removal. A bot's step is
+  public work everyone computes, from a secret that is a hash of what
+  everyone knows.
+- **A pass** moves positions, for all to see, with the tokens that
+  open them sealed to the receiver (ElGamal under its deal key, the
+  proof in the clear, which says nothing without the point) — or in
+  the clear when the receiver is a bot. **A play** is the token that
+  opens its position for everyone; the card it names must be the card
+  that opens, and it is legal as far as the rules can tell without the
+  hand — the first trick is led with the 2♣ — with the rest checked at
+  the audit.
+- **Escrow.** With its keys, each person splits its deal secret into
+  two pieces: one to every other person at the table, one to every
+  juror of the hand ([doc 04](04-live-play.md)), each copy wrapped in
+  a secret the two table keys share — Diffie–Hellman on the curve the
+  keys already live on. Any one person and any one juror rebuild a
+  departed seat's secret once the table has removed it; all the people
+  together hold noise without a juror's piece, and the jury noise
+  without a person's — doc 04's bound. Whoever holds a piece releases
+  it when the seat goes, and again every few seconds until the secret
+  is known; the seat's turns stall meanwhile, and the rail says so.
+- **The interim.** Until the bot plays inside the computation
+  ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's
+  hand is open to everyone at the table, and so is a departed person's
+  once the escrow opens it. So at a table of two people and two bots,
+  each person sees their own cards and the bots', never the other
+  person's; at four, nobody sees anyone's. The shuffle's guarantee
+  holds regardless: one honest shuffler is enough.
+- **The verifier** replays a sealed record through the deal: every
+  key's proof, every shuffle's argument against the deck before it,
+  every token, the lead card's declaration; then the audit's secrets
+  open every card, each play's token must open the card it named, and
+  every play is checked against the hand it came from as fully as a
+  seeded game's. Until a hand's audit is in, its plays are checked as
+  far as the rules allow and the verification says it is not complete.
+- **Measured here**, the reference crate on this machine's core,
+  native: a shuffle with its argument 110 ms, verifying one 108 ms, a
+  token 1.1 ms to make and 2.3 ms to check, a card 7.5 ms to open when
+  its four proofs are checked again — which is why each token is
+  checked once, on arrival, and the cards are opened without. A
+  four-person hand costs each seat about a second of its own work, a
+  juror following the table the same.
+
+Two things it does not do yet. Both take a modified client, both stall
+one table and nothing more, and both the audit would expose:
+
+- A holder who declares the 2♣ nowhere stalls the hand before it
+  starts; the rail says nobody claims it. The remedy is an early audit
+  and a redeal without the liar.
+- A passer who seals garbage to the receiver leaves it three cards it
+  cannot open until the audit; a third party cannot tell whose fault
+  that is. The remedy is a verifiable encryption of the token, or a
+  complaint the passer must answer by opening the three in public.
+
+**Tests.** `packages/deal`: every primitive round trips, and four
+sessions in one process deal, pass, play, lose a seat and rebuild it,
+and audit, with a verifier that saw only the messages.
+`packages/table/test/sealed_test.dart`: whole sealed games at one, two
+and four people that verify to the end; a person leaving mid-hand and
+during the deal; a table of two surviving a crash on turn by the
+jury's verdict and a juror's piece. The jury over real sockets
+(`service/test`) runs sealed as well as seeded; the app's widget test
+plays a sealed hand from seat 2; and the browser suite's four headless
+browsers deal every hand this way.
+
 ## References
 
 - Shamir, Rivest and Adleman, *Mental Poker*, MIT Technical Memo
@@ -218,6 +311,6 @@ revealing the permutation.
 3. Benchmark a 52-card verifiable shuffle in wasm. **Done on a desktop
    core** (above); the phone's number is a tap away on the dev site.
 4. If the number holds, implement Barnett–Smart and make the fair deal
-   the default for tables with strangers.
-
-Steps 2 and 3 are independent and can run in either order.
+   the default for tables with strangers. **Built** ("As built",
+   above), for every live table. What remains is the bot inside the
+   computation ([doc 04](04-live-play.md)), and the two gaps above.

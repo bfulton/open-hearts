@@ -9,7 +9,7 @@ description = "The verifiable deal (docs/03-fair-deal.md): Barnett–Smart menta
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-barnett-smart-card-protocol = { git = "https://github.com/geometryxyz/mental-poker.git" }
+barnett-smart-card-protocol = { git = "https://github.com/geometryxyz/mental-poker.git", rev = "b1313f3" }
 # The proof library and the curve, vendored (crypto/vendor) with one
 # fix: points in a transcript normalised, so proofs survive their bytes.
 proof-essentials = { path = "../vendor/proof-essentials" }

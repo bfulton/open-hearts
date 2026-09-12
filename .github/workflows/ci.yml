@@ -13,7 +13,7 @@ on:
 jobs:
   app:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -21,9 +21,19 @@ jobs:
           channel: stable
           flutter-version: 3.47.2
           cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crypto/deal
+      # The deal's cryptography (doc 03): the cdylib the VM tests load.
+      # The browser's wasm is committed (app/web/deal.wasm).
+      - name: Deal (Rust — the cdylib for the VM)
+        run: cd crypto/deal && cargo build --release && cargo test --release
       - name: Engine (pure Dart — rules, bots, 200 seeded games)
         run: cd packages/engine && dart pub get && dart analyze && dart test
-      - name: Table (the protocol over a simulated network — the departure matrix)
+      - name: Deal (the primitives over FFI, and a hand's deal among four sessions)
+        run: cd packages/deal && dart pub get && dart analyze && dart test
+      - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
         run: cd packages/table && dart pub get && dart analyze && dart test
       - name: Service (the local relay, and a hand played over it with real signatures)
         run: cd service && dart pub get && dart analyze && dart test
@@ -46,7 +56,7 @@ jobs:
   # browser can show (e2e/README.md).
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -57,6 +67,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crypto/deal
+      - name: Deal (Rust — the cdylib the juror of last resort loads)
+        run: cd crypto/deal && cargo build --release
       - name: Playwright
         run: npm i -g playwright@1.56.1 && npx playwright install --with-deps chromium
       - name: Build the app for the suite

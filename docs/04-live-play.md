@@ -138,9 +138,14 @@ while a channel is not open (`MeshTransport`). The table is drawn from
 whichever chair you hold. On its rail: who is still here; the boot
 clock on a seat that is holding everyone up, and the *Boot* button
 when it runs out; *Leave*; and, when the table is stuck, why — waiting
-for the others, asking the jury, or waiting for a jury when nobody was
-online to draw one from. A seat that is booted or falls silent sees
-*A bot took your seat*. Every open app says it is online and serves
+for the others, asking the jury, waiting for a jury when nobody was
+online to draw one from, or opening a departed player's hand from its
+escrow. A seat that is booted or falls silent sees *A bot took your
+seat*. Every table is sealed ([doc 03](03-fair-deal.md), "As built"):
+the rail shows the deal at each hand — the keys, the shuffling, the
+cards dealt and opened — for a couple of seconds on a desktop and a few
+on a phone, and the other people's cards are backs that nobody but
+their holder can turn. Every open app says it is online and serves
 as a juror when drawn (`app/lib/net/duty.dart`), at another table or
 in the lobby, without the player noticing. The device's key is minted the first time
 it is needed and kept; on the web every signature goes through the wasm
@@ -177,12 +182,13 @@ standing result, oldest first, into every rating; the app does so when
 it opens the lobby, shows the player theirs, and states it when
 waiting to be seated. Lying there only changes who you sit with.
 
-**Provisional, for now.** Until the verifiable deal ([doc
-03](03-fair-deal.md)) and the juror exist, the deal is a seed everyone
-at the table can read, and a table of one human is attested by that
-one human. So these ratings are a reward, not yet a claim, and the
-lobby says "provisionally" until a rating has settled. The two steps
-that make them a claim are the next two on the roadmap.
+**Backed by the deal.** Every live table is sealed ([doc
+03](03-fair-deal.md), "As built"): its cards come from a deal nobody
+at it could rig, and its record replays through that deal, every
+proof checked, so a rating is a claim anyone can verify. One interim
+remains, and doc 03 names it: a bot's hand, and a departed person's,
+is open to the table until the bot plays inside the computation
+(below). The lobby says "provisionally" until a rating has settled.
 
 ## Filling and emptying seats
 
@@ -388,6 +394,15 @@ against a player who already took the rating loss for leaving. Until
 then the worst case is one bot playing the cheater's own seat a little
 wrong.
 
+**As built, for now.** The escrow is built — a piece of each person's
+deal secret with every other person and every juror, and any one of
+each rebuilds it (doc 03, "Escrow") — and what it opens is the whole
+hand, to every survivor, for the bot to play in the open. The
+computation over fragments that never meet is the design this section
+describes and the next step; the leaver's false hand is caught the
+same way either way, since the secret rebuilt is the secret the deal
+was made with.
+
 **The policy as a circuit.** `packages/engine/lib/src/oblivious.dart` is
 the bot rewritten without a branch on secret data, and its test proves
 it picks the same card as the bot on every decision of forty games.
@@ -532,8 +547,8 @@ table can steer the draw, and nobody outside it can either.
 
 The jury's deadlock role is built (`packages/table`: `jury.dart`,
 `juror_duty.dart`, `presence_relay.dart`, and the client's "the jury"
-section); the shares it will hold arrive with the deal ([doc
-03](03-fair-deal.md)). On the wire:
+section), and its escrow role ([doc 03](03-fair-deal.md), "Escrow").
+On the wire:
 
 - **Presence.** Every open app announces itself on one relay topic
   every five seconds, and listens. A summons is an event on that topic
@@ -573,6 +588,10 @@ section); the shares it will hold arrive with the deal ([doc
 - **The verifier** checks each jury against its snapshot and its
   majority, and each verdict against the jury in force for the hand,
   the turn, the seat and the very event recorded.
+- **Escrow.** At a sealed table a juror holds a piece of each
+  person's deal secret ([doc 03](03-fair-deal.md), "Escrow"), given
+  with the person's keys, and releases it when the table removes the
+  seat — with a person's piece, the seat's hand opens for its bot.
 
 The simulator's jury rows (`packages/table/test/jury_test.dart`): a
 table of two with one gone quiet off turn and on it; four cut two and

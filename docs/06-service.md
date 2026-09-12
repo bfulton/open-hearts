@@ -183,7 +183,12 @@ The axes:
 | **When** | on the departed seat's own turn; off it; mid-trick; the last trick of a hand; during the pass; during the deal; at a hand boundary |
 
 The juror rows run in `packages/table/test/jury_test.dart`, with the
-jury of [doc 04](04-live-play.md).
+jury of [doc 04](04-live-play.md). The sealed rows — the same simulator
+with the verifiable deal of [doc 03](03-fair-deal.md) run for real, its
+proofs made and checked on the virtual clock — run in
+`packages/table/test/sealed_test.dart`: whole games at one, two and
+four people, a leaver mid-hand and during the deal, a table of two
+surviving a crash by the jury's verdict and a juror's escrow piece.
 
 **The chaos test** is the matrix's complement: random walks through
 the same simulator — departures, partitions, blips, loss and latency at
@@ -211,7 +216,9 @@ What every cell asserts:
 - **Every surviving client holds the same record**, event for event,
   once the network settles.
 - **The record verifies**: every human play signed by its seat's key and
-  legal under the engine, every bot play recomputable from the deal.
+  legal under the engine, every bot play recomputable from the deal —
+  and at a sealed table, every proof of the deal, every token, every
+  audit, with every play checked against the hand it came from.
 - **Ratings follow doc 04's two rules**: a bot in the winning seat moves
   nobody; a live winner moves everyone, leavers included.
 - **A play at 14.9 seconds beats a boot at 15.0**, and a peer holding

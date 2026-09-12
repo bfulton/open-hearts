@@ -69,7 +69,7 @@ rigged. Roughly in order:
    in wasm since Dart-to-JavaScript signatures cost 100 ms each
    ([measurements](measurements/README.md)). Rated games move a
    rating, yours and the bots', from results everyone at the table
-   signs — provisional until the verifiable deal, and the docs say so.
+   signs — and every table is dealt by the verifiable deal (5).
    Four headless browsers prove it on every commit — matched, a hand
    over WebRTC, a browser closed mid-hand, a stalled one booted, a
    leaver (`e2e/`). Still to come: a relay that is not on localhost.
@@ -79,10 +79,19 @@ rigged. Roughly in order:
    `packages/engine/tool/replay.dart` turns back into every trick.
    Bot moves are recomputed from it, which is why the bots are
    deterministic.
-5. **The verifiable deal.**
+5. **The verifiable deal.** Built ([doc 03](docs/03-fair-deal.md),
+   "As built"): Barnett–Smart with the Bayer–Groth argument, the
+   reference Rust crate compiled once for the browser's wasm and once
+   for the Dart VM (`crypto/deal`, `packages/deal`), and the deal run
+   as turns of the table protocol at every live table — every seat
+   shuffles with a proof, each person's cards are theirs alone to see,
+   a departed seat's hand is opened from escrow held by the others and
+   the jury, every hand is audited, and the verifier replays it all.
+   Bots' hands are open to the table until the bot plays inside the
+   computation ([doc 04](docs/04-live-play.md)).
 6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
-   matchmaking, seat handover, the jury: built, its deadlock role;
-   the shares it holds come with the deal.
+   matchmaking, seat handover, the jury: built, its deadlock role and
+   its escrow of the deal.
 7. **Landscape**, then **tablet**, then **iPhone Duo**
    ([doc 05](docs/05-form-factors.md)).
 8. **The stores.**
@@ -99,14 +108,34 @@ Ideas agreed on and not yet placed in the order above.
   [doc 04](docs/04-live-play.md), so a design conversation first.
 - **A pace history**, kept with the rating from the same signed
   results, and **matchmaking by pace**, so slow players find each other.
+- **The bot inside the computation**, so a bot's hand is open to
+  nobody ([doc 04](docs/04-live-play.md), "Playing a seat nobody
+  holds"); until then bots' hands are open to the table.
+- **Two holes only a modified client can open** ([doc
+  03](docs/03-fair-deal.md), "As built"): a holder who declares the
+  2♣ nowhere — the remedy is an early audit and a redeal without the
+  liar — and a pass sealed with garbage — a verifiable encryption, or
+  a complaint the passer answers by opening the cards in public.
 
 ## Developing
 
 ```bash
+crypto/deal/build.sh                # the deal's cryptography, for the VM and the browser (Rust)
 cd packages/engine && dart test     # the rules, the bots, 200 seeded games
+cd packages/deal && dart test       # the deal's primitives, and a hand's deal among four sessions
+cd packages/table && dart test      # the protocol on a simulated network, sealed tables included
 cd app && flutter test              # the widgets
 cd app && flutter run -d chrome
 ```
+
+The deal ([doc 03](docs/03-fair-deal.md)) is one Rust crate built
+twice by `crypto/deal/build.sh`: a cdylib the Dart VM loads over FFI —
+the table and app tests, the verifier and the service's juror find it
+at `crypto/deal/target/release/`, or where `DEAL_LIB` points — and a
+wasm the browser loads, committed at `app/web/deal.wasm` so the web
+build needs no Rust. Building needs a stable Rust with the
+`wasm32-unknown-unknown` target; the reference crate is a git
+dependency pinned by revision.
 
 Publish the current commit to the dev branch page:
 
