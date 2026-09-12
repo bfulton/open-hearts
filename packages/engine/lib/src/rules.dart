@@ -129,6 +129,17 @@ List<Card> legalPlays({
   return candidates;
 }
 
+/// What can be said of [card] as a play from a hand nobody on this
+/// side can see (a sealed table, docs/03-fair-deal.md): the one rule
+/// that needs no hand. Leading the first trick, it must be the 2♣.
+/// Following suit, the first trick's no-points rule and leading a
+/// heart before hearts are broken all turn on what else the hand
+/// holds, and are checked when the hand is opened at the audit.
+bool legalFromHidden({required Card card, required List<Play> trick, required bool isFirstTrick}) {
+  if (trick.isEmpty && isFirstTrick) return card == twoOfClubs;
+  return true;
+}
+
 /// Turns one deal's per-seat trick take into per-seat scores, applying
 /// the shot-moon rule.
 ///

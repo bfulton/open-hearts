@@ -113,6 +113,8 @@ void main() {
           played.clear();
         case Phase.gameOver:
           break;
+        case Phase.dealing:
+          throw StateError('a seeded game deals itself');
       }
     }
   }

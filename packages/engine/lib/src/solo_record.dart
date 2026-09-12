@@ -138,6 +138,8 @@ class SoloRecord {
           played.clear();
         case Phase.gameOver:
           break;
+        case Phase.dealing:
+          throw StateError('a seeded game deals itself');
       }
     }
     hands.add(ReplayedHand(handIndex, List.of(tricks), game.handScores, game.moonShooter, passed));

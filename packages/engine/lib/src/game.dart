@@ -9,6 +9,12 @@
 /// [collectTrick] and [nextHand]. A completed trick sits on the table
 /// until the caller sweeps it, which is what gives the UI a beat to show
 /// the fourth card without the engine knowing about time.
+///
+/// A **sealed** game (docs/03-fair-deal.md) takes its cards from outside
+/// rather than from the seed, and may not know every hand: a seat's
+/// cards can be hidden from this side, in which case the engine tracks
+/// how many it holds and checks its plays as far as the rules allow
+/// without seeing them. The rest is the audit's, at the end of the hand.
 library;
 
 import 'dart:math';
@@ -18,6 +24,10 @@ import 'rules.dart';
 
 /// Where the game is between calls.
 enum Phase {
+  /// A sealed game's cards are still being dealt: nothing to see until
+  /// [HeartsGame.deal]. A seeded game never rests here.
+  dealing,
+
   /// Every seat owes three cards. Skipped on a hold hand.
   passing,
 
@@ -41,11 +51,16 @@ const humanSeat = 0;
 const seatCount = 4;
 
 class HeartsGame {
-  HeartsGame({int? seed}) : _random = Random(seed) {
+  HeartsGame({int? seed, this.sealed = false}) : _random = Random(seed) {
     _startHand();
   }
 
   final Random _random;
+
+  /// Whether the cards come from outside — the verifiable deal — rather
+  /// than from the seed. Every hand of a sealed game begins in
+  /// [Phase.dealing] and waits for [deal].
+  final bool sealed;
 
   Phase get phase => _phase;
   Phase _phase = Phase.passing;
@@ -73,8 +88,23 @@ class HeartsGame {
   int? get moonShooter => _moonShooter;
   int? _moonShooter;
 
-  List<Card> handOf(int seat) => List.unmodifiable(_hands[seat]);
-  late List<List<Card>> _hands;
+  /// A seat's cards. Throws for a hand hidden from this side; ask
+  /// [knowsHand] first at a sealed table.
+  List<Card> handOf(int seat) {
+    final h = _hands[seat];
+    if (h == null) throw StateError('seat $seat\'s hand is hidden');
+    return List.unmodifiable(h);
+  }
+
+  /// Whether this side can see [seat]'s cards. Always at a seeded
+  /// table; at a sealed one, its own, the bots', and any revealed.
+  bool knowsHand(int seat) => _hands[seat] != null;
+
+  /// How many cards [seat] holds, seen or not.
+  int handSizeOf(int seat) => _sizes[seat];
+
+  late List<List<Card>?> _hands;
+  late List<int> _sizes;
 
   /// Cards on the table right now, in play order.
   List<Play> get trick => List.unmodifiable(_trick);
@@ -105,9 +135,15 @@ class HeartsGame {
     return (_leader + _trick.length) % seatCount;
   }
 
-  /// Cards a seat has committed to pass this hand; null until it chooses.
+  /// Cards a seat has committed to pass this hand; null until it
+  /// chooses — and null after, when the passer's hand is hidden and the
+  /// cards are not this side's to see. [hasPassed] tells those apart.
   List<Card>? passOf(int seat) => _passes[seat];
   late List<List<Card>?> _passes;
+
+  /// Whether [seat] has committed its pass, seen or not.
+  bool hasPassed(int seat) => _passed[seat];
+  late List<bool> _passed;
 
   /// Cards this seat was handed by its passing neighbour, so the UI can
   /// call them out on the first look at the new hand. Empty on a hold hand.
@@ -123,12 +159,8 @@ class HeartsGame {
   // ---- setup ----------------------------------------------------------
 
   void _startHand() {
-    final deck = List.of(Card.deck)..shuffle(_random);
-    _hands = [
-      for (var s = 0; s < seatCount; s++)
-        deck.sublist(s * 13, s * 13 + 13)..sort(),
-    ];
     _passes = List.filled(seatCount, null);
+    _passed = List.filled(seatCount, false);
     _received = [for (var s = 0; s < seatCount; s++) <Card>[]];
     _trick.clear();
     _pendingTrick = null;
@@ -136,9 +168,46 @@ class HeartsGame {
     _heartsBroken = false;
     _handScores = const [];
     _moonShooter = null;
+    _declaredLeader = null;
     for (var s = 0; s < seatCount; s++) {
       _taken[s] = 0;
     }
+    if (sealed) {
+      _hands = List.filled(seatCount, null);
+      _sizes = List.filled(seatCount, 0);
+      _phase = Phase.dealing;
+      return;
+    }
+    final deck = List.of(Card.deck)..shuffle(_random);
+    _hands = [
+      for (var s = 0; s < seatCount; s++)
+        deck.sublist(s * 13, s * 13 + 13)..sort(),
+    ];
+    _sizes = List.filled(seatCount, 13);
+    _dealt();
+  }
+
+  /// The cards of a sealed hand, as this side knows them: thirteen for
+  /// each seat it can see, null for each it cannot. Only valid in
+  /// [Phase.dealing].
+  void deal(List<List<Card>?> hands) {
+    if (!sealed) throw StateError('a seeded game deals itself');
+    if (_phase != Phase.dealing) throw StateError('not dealing (phase: $_phase)');
+    if (hands.length != seatCount) throw ArgumentError('a deal is $seatCount hands, got ${hands.length}');
+    final seen = <Card>{};
+    for (final h in hands) {
+      if (h == null) continue;
+      if (h.length != 13) throw ArgumentError('a hand is 13 cards, got ${h.length}');
+      for (final c in h) {
+        if (!seen.add(c)) throw ArgumentError('$c dealt twice');
+      }
+    }
+    _hands = [for (final h in hands) h == null ? null : (List.of(h)..sort())];
+    _sizes = List.filled(seatCount, 13);
+    _dealt();
+  }
+
+  void _dealt() {
     if (passDirection == PassDirection.hold) {
       _beginPlay();
     } else {
@@ -146,33 +215,106 @@ class HeartsGame {
     }
   }
 
+  /// A hidden hand, seen: what [seat] holds now, once its cards are
+  /// opened to this side — a departed seat's, or everyone's at the
+  /// audit. Must be as many as the seat holds.
+  void revealHand(int seat, List<Card> cards) {
+    if (_hands[seat] != null) throw StateError('seat $seat\'s hand is not hidden');
+    if (cards.length != _sizes[seat]) {
+      throw ArgumentError('seat $seat holds ${_sizes[seat]} cards, not ${cards.length}');
+    }
+    for (final c in cards) {
+      for (var s = 0; s < seatCount; s++) {
+        if (_hands[s]?.contains(c) == true) throw ArgumentError('$c is in seat $s\'s hand');
+      }
+    }
+    _hands[seat] = List.of(cards)..sort();
+  }
+
+  /// Who leads the first trick when no hand this side can see holds
+  /// the 2♣: told from outside, where the deal knows. Before play.
+  void declareLeader(int seat) {
+    if (_phase != Phase.dealing && _phase != Phase.passing) {
+      throw StateError('the lead is settled (phase: $_phase)');
+    }
+    _declaredLeader = seat;
+  }
+
+  int? _declaredLeader;
+
   void _beginPlay() {
+    _leader = _leaderNow();
     _phase = Phase.playing;
-    _leader = _hands.indexWhere((h) => h.contains(twoOfClubs));
-    assert(_leader >= 0, 'someone holds the 2♣');
+  }
+
+  /// The seat to lead: whoever is seen to hold the 2♣, else the
+  /// declared leader. Throws when there is neither.
+  int _leaderNow() {
+    final seen = _hands.indexWhere((h) => h != null && h.contains(twoOfClubs));
+    if (seen >= 0) return seen;
+    final declared = _declaredLeader;
+    if (declared == null) throw StateError('nobody seen holds the 2♣ and no leader was declared');
+    return declared;
+  }
+
+  /// Whether the lead can be found once [seat] passes [cards] and the
+  /// swap resolves: a seen hand ends up with the 2♣, or a leader was
+  /// declared. Checked before the last pass is taken, so a refusal
+  /// leaves nothing half done.
+  bool _leadKnownAfter(int seat, List<Card>? cards) {
+    if (_declaredLeader != null) return true;
+    final offset = passDirection.seatOffset;
+    for (var s = 0; s < seatCount; s++) {
+      final pass = s == seat ? cards : _passes[s];
+      final hand = _hands[s];
+      if (hand != null && hand.contains(twoOfClubs) && !(pass?.contains(twoOfClubs) ?? false)) return true;
+      if (pass != null && pass.contains(twoOfClubs) && _hands[(s + offset) % seatCount] != null) return true;
+    }
+    return false;
   }
 
   // ---- passing --------------------------------------------------------
 
   /// Commits [cards] as [seat]'s pass. Once all four seats have chosen,
   /// the swap resolves and the phase advances to [Phase.playing].
-  void setPass(int seat, List<Card> cards) {
+  ///
+  /// From a hidden hand the cards may be unknown to this side — null —
+  /// unless the receiver's hand is one this side sees, whose cards
+  /// have to be known to be added to it.
+  void setPass(int seat, List<Card>? cards) {
     if (_phase != Phase.passing) {
       throw StateError('not passing (phase: $_phase)');
     }
-    if (cards.length != passSize) {
-      throw ArgumentError('a pass is exactly $passSize cards, got ${cards.length}');
-    }
-    if (cards.toSet().length != passSize) {
-      throw ArgumentError('a pass cannot repeat a card: $cards');
-    }
-    for (final c in cards) {
-      if (!_hands[seat].contains(c)) {
-        throw ArgumentError('seat $seat does not hold $c');
+    if (_passed[seat]) throw StateError('seat $seat has passed');
+    final hand = _hands[seat];
+    if (cards == null) {
+      if (hand != null) throw ArgumentError('seat $seat\'s cards are seen; its pass must be too');
+      final to = (seat + passDirection.seatOffset) % seatCount;
+      if (_hands[to] != null) throw ArgumentError('seat $seat\'s pass to seat $to, whose hand is seen, must be known');
+    } else {
+      if (cards.length != passSize) {
+        throw ArgumentError('a pass is exactly $passSize cards, got ${cards.length}');
+      }
+      if (cards.toSet().length != passSize) {
+        throw ArgumentError('a pass cannot repeat a card: $cards');
+      }
+      for (final c in cards) {
+        if (hand != null && !hand.contains(c)) {
+          throw ArgumentError('seat $seat does not hold $c');
+        }
+        if (hand == null) {
+          for (var s = 0; s < seatCount; s++) {
+            if (_hands[s]?.contains(c) == true) throw ArgumentError('$c is in seat $s\'s hand, not seat $seat\'s');
+          }
+        }
       }
     }
-    _passes[seat] = List.of(cards);
-    if (_passes.every((p) => p != null)) _resolvePass();
+    if (_passed.where((p) => p).length == seatCount - 1 && !_leadKnownAfter(seat, cards)) {
+      throw StateError('nobody seen would hold the 2♣ and no leader was declared');
+    }
+    _passes[seat] = cards == null ? null : List.of(cards);
+    _passed[seat] = true;
+    if (_passed.every((p) => p)) _resolvePass();
   }
 
   void _resolvePass() {
@@ -180,15 +322,19 @@ class HeartsGame {
     // Remove every pass before delivering any: a card must not be
     // passable and receivable in the same step.
     for (var s = 0; s < seatCount; s++) {
-      _hands[s].removeWhere((c) => _passes[s]!.contains(c));
+      final hand = _hands[s];
+      if (hand != null) hand.removeWhere((c) => _passes[s]!.contains(c));
+      _sizes[s] -= passSize;
     }
     for (var s = 0; s < seatCount; s++) {
       final to = (s + offset) % seatCount;
-      _received[to] = List.of(_passes[s]!);
-      _hands[to].addAll(_passes[s]!);
+      final cards = _passes[s];
+      _received[to] = cards == null ? const [] : List.of(cards);
+      _hands[to]?.addAll(cards!);
+      _sizes[to] += passSize;
     }
     for (final h in _hands) {
-      h.sort();
+      h?.sort();
     }
     _beginPlay();
   }
@@ -196,30 +342,50 @@ class HeartsGame {
   // ---- playing --------------------------------------------------------
 
   /// The cards [seat] may legally play right now. Throws unless it is
-  /// [seat]'s turn.
+  /// [seat]'s turn, or when its hand is hidden from this side.
   List<Card> legalPlaysFor(int seat) {
     if (currentSeat != seat) {
       throw StateError('not seat $seat\'s turn (current: $currentSeat)');
     }
     return legalPlays(
-      hand: _hands[seat],
+      hand: handOf(seat),
       trick: _trick,
       heartsBroken: _heartsBroken,
       isFirstTrick: isFirstTrick,
     );
   }
 
+  /// Whether [card] can be [play]ed by [seat] now, as far as this side
+  /// can tell: the full rules over a hand it sees, [legalFromHidden]
+  /// over one it does not.
+  bool allows(int seat, Card card) {
+    if (currentSeat != seat) return false;
+    final hand = _hands[seat];
+    if (hand == null) return legalFromHidden(card: card, trick: _trick, isFirstTrick: isFirstTrick);
+    return legalPlays(hand: hand, trick: _trick, heartsBroken: _heartsBroken, isFirstTrick: isFirstTrick).contains(card);
+  }
+
   /// Plays [card] from [seat]. Throws [StateError] out of turn and
   /// [ArgumentError] on an illegal card — an illegal play is a bug in the
-  /// caller, never a rule the engine quietly bends.
+  /// caller, never a rule the engine quietly bends. From a hidden hand
+  /// the card is checked as far as the rules allow without the hand.
   void play(int seat, Card card) {
     if (currentSeat != seat) {
       throw StateError('not seat $seat\'s turn (current: $currentSeat)');
     }
-    if (!legalPlaysFor(seat).contains(card)) {
+    if (!allows(seat, card)) {
       throw ArgumentError('$card is not a legal play for seat $seat');
     }
-    _hands[seat].remove(card);
+    final hand = _hands[seat];
+    if (hand == null) {
+      if (_sizes[seat] == 0) throw StateError('seat $seat has no cards');
+      for (var s = 0; s < seatCount; s++) {
+        if (_hands[s]?.contains(card) == true) throw ArgumentError('$card is in seat $s\'s hand, not seat $seat\'s');
+      }
+    } else {
+      hand.remove(card);
+    }
+    _sizes[seat]--;
     _trick.add(Play(seat, card));
     if (card.suit == Suit.hearts) _heartsBroken = true;
     if (_trick.length == seatCount) {

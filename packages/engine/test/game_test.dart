@@ -5,12 +5,15 @@ import 'package:test/test.dart';
 
 /// Plays [game] to its end with [bot] in every seat, asserting the
 /// invariants that must hold at every step. Returns the number of hands.
-int playOut(HeartsGame game, Bot bot, {int handLimit = 200}) {
+int playOut(HeartsGame game, Bot bot, {int handLimit = 200, List<List<Card>?> Function()? dealer}) {
   var hands = 0;
   final played = <Card>{};
 
   while (game.phase != Phase.gameOver) {
     switch (game.phase) {
+      case Phase.dealing when dealer != null:
+        game.deal(dealer());
+        break;
       case Phase.passing:
         for (var s = 0; s < seatCount; s++) {
           final hand = game.handOf(s);
@@ -83,12 +86,17 @@ int playOut(HeartsGame game, Bot bot, {int handLimit = 200}) {
 
       case Phase.gameOver:
         break;
+
+      case Phase.dealing:
+
+        throw StateError('a seeded game deals itself');
     }
   }
   return hands + 1;
 }
 
 void main() {
+  sealedTests();
   group('dealing', () {
     test('deals four distinct 13-card hands from one deck', () {
       final game = HeartsGame(seed: 7);
@@ -338,4 +346,173 @@ void _finishHandQuickly(HeartsGame game, Bot bot) {
   while (game.phase == Phase.playing) {
     _step(game, bot);
   }
+}
+
+/// A sealed game: the cards come from outside, and some hands are not
+/// this side's to see.
+void sealedTests() {
+  /// Four hands from a seeded deal, to hand to a sealed game.
+  List<List<Card>> handsFrom(int seed) {
+    final g = HeartsGame(seed: seed);
+    return [for (var s = 0; s < seatCount; s++) g.handOf(s)];
+  }
+
+  group('sealed', () {
+    test('rests in dealing until dealt, then plays out like any game when every hand is seen', () {
+      final game = HeartsGame(sealed: true);
+      expect(game.phase, Phase.dealing);
+      expect(() => game.setPass(0, []), throwsStateError);
+      game.deal(handsFrom(5));
+      expect(game.phase, Phase.passing);
+      for (var s = 0; s < seatCount; s++) {
+        expect(game.knowsHand(s), isTrue);
+        expect(game.handSizeOf(s), 13);
+      }
+      var next = 6;
+      expect(playOut(game, Bot(persona: Persona.roster.first), dealer: () => handsFrom(next++)), greaterThan(1));
+    });
+
+    test('a seeded game does not take a deal, and a sealed one does not deal twice', () {
+      expect(() => HeartsGame(seed: 1).deal(handsFrom(1)), throwsStateError);
+      final game = HeartsGame(sealed: true)..deal(handsFrom(1));
+      expect(() => game.deal(handsFrom(1)), throwsStateError);
+    });
+
+    test('a deal is checked: thirteen a hand, no card twice among the seen', () {
+      final hands = handsFrom(2);
+      expect(() => HeartsGame(sealed: true).deal([hands[0], hands[1], hands[2]]), throwsArgumentError);
+      expect(() => HeartsGame(sealed: true).deal([hands[0].sublist(1), hands[1], hands[2], hands[3]]), throwsArgumentError);
+      expect(() => HeartsGame(sealed: true).deal([hands[0], hands[0], null, null]), throwsArgumentError);
+    });
+
+    test('a hidden hand has a size and no cards, and its pass may be unknown', () {
+      final hands = handsFrom(3);
+      final game = HeartsGame(sealed: true)..deal([hands[0], null, hands[2], null]);
+      game.declareLeader(hands.indexWhere((h) => h.contains(twoOfClubs)));
+      expect(game.knowsHand(1), isFalse);
+      expect(() => game.handOf(1), throwsStateError);
+      expect(game.handSizeOf(1), 13);
+      expect(game.passDirection, PassDirection.left);
+      // Seat 1 passes to seat 2, which is seen: its cards must be known.
+      expect(() => game.setPass(1, null), throwsArgumentError);
+      // Seat 3 passes to seat 0, seen: same. Seat 0 passes to 1, hidden:
+      // its cards are seen anyway. Seat 2 passes to 3, hidden.
+      game.setPass(0, hands[0].take(3).toList());
+      game.setPass(1, hands[1].take(3).toList());
+      game.setPass(2, hands[2].take(3).toList());
+      game.setPass(3, hands[3].take(3).toList());
+      expect(game.phase, Phase.playing);
+      expect(game.handSizeOf(1), 13);
+      expect(game.handOf(2), containsAll(hands[1].take(3)));
+      expect(game.handOf(0), containsAll(hands[3].take(3)));
+      expect(game.receivedBy(0), hands[3].take(3).toList());
+      expect(game.receivedBy(1), hands[0].take(3).toList(), reason: 'what a seen seat passed is seen, whoever got it');
+    });
+
+    test('a seen seat cannot pass unknown cards, and a hidden seat cannot pass a seen card', () {
+      final hands = handsFrom(4);
+      final game = HeartsGame(sealed: true)..deal([hands[0], null, null, null]);
+      expect(() => game.setPass(0, null), throwsArgumentError);
+      expect(() => game.setPass(2, hands[0].take(3).toList()), throwsArgumentError, reason: 'seat 0 holds those');
+      expect(game.hasPassed(2), isFalse);
+      game.setPass(2, null);
+      expect(game.hasPassed(2), isTrue);
+      expect(game.passOf(2), isNull);
+      expect(() => game.setPass(2, null), throwsStateError);
+      // A pass into a seen hand is always known to this side: the seen
+      // hand is its own, a bot's or one revealed, none of which takes
+      // cards it cannot see.
+      expect(() => game.setPass(3, null), throwsArgumentError);
+    });
+
+    test('a hand holding the 2♣ unseen needs the leader declared', () {
+      final hands = handsFrom(6);
+      final holder = hands.indexWhere((h) => h.contains(twoOfClubs));
+      final dealt = [for (var s = 0; s < seatCount; s++) s == holder ? null : hands[s]];
+      final game = HeartsGame(sealed: true)..deal(dealt);
+      for (var s = 0; s < seatCount; s++) {
+        if (s != holder) game.setPass(s, hands[s].take(3).toList());
+      }
+      // The last pass would begin play, and nobody seen holds the 2♣.
+      final kept = hands[holder].where((c) => c != twoOfClubs).take(3).toList();
+      expect(() => game.setPass(holder, kept), throwsStateError);
+      game.declareLeader(holder);
+      game.setPass(holder, kept);
+      expect(game.phase, Phase.playing);
+      expect(game.leader, holder);
+    });
+
+    test('a seen hand holding the 2♣ leads whatever was declared', () {
+      final hands = handsFrom(6);
+      final holder = hands.indexWhere((h) => h.contains(twoOfClubs));
+      final game = HeartsGame(sealed: true)
+        ..declareLeader((holder + 2) % seatCount)
+        ..deal(hands);
+      for (var s = 0; s < seatCount; s++) {
+        game.setPass(s, hands[s].skip(1).take(3).toList());
+      }
+      expect(game.leader, holder);
+    });
+
+    test('a play from a hidden hand is checked as far as the rules allow, and shrinks it', () {
+      final hands = handsFrom(8);
+      final holder = hands.indexWhere((h) => h.contains(twoOfClubs));
+      final game = HeartsGame(sealed: true)..declareLeader(holder);
+      // A hold hand: no pass. Hand 3 holds; deal three hands to get there.
+      game.deal([for (var s = 0; s < seatCount; s++) s == holder ? null : hands[s]]);
+      expect(game.phase, Phase.passing);
+      for (var s = 0; s < seatCount; s++) {
+        game.setPass(s, hands[s].where((c) => c != twoOfClubs).take(3).toList());
+      }
+      expect(game.currentSeat, holder);
+      expect(() => game.legalPlaysFor(holder), throwsStateError, reason: 'no hand to list from');
+      expect(game.allows(holder, Card.parse('3C')), isFalse, reason: 'the first trick is led with the 2♣');
+      expect(game.allows(holder, twoOfClubs), isTrue);
+      expect(() => game.play(holder, hands[(holder + 1) % 4].first), throwsArgumentError, reason: 'a seen seat holds that');
+      game.play(holder, twoOfClubs);
+      expect(game.handSizeOf(holder), 12);
+      expect(game.trick.single.card, twoOfClubs);
+      // The next seat, seen, must follow; the hidden seat's later
+      // plays are taken on trust of the audit: any card not seen elsewhere.
+      final next = (holder + 1) % seatCount;
+      final clubs = game.handOf(next).where((c) => c.suit == Suit.clubs);
+      if (clubs.isNotEmpty) expect(game.legalPlaysFor(next), everyElement(predicate<Card>((c) => c.suit == Suit.clubs)));
+    });
+
+    test('a hidden hand can be revealed, once, with as many cards as it holds', () {
+      final hands = handsFrom(9);
+      final game = HeartsGame(sealed: true)..deal([hands[0], hands[1], hands[2], null]);
+      expect(() => game.revealHand(3, hands[3].sublist(1)), throwsArgumentError);
+      expect(() => game.revealHand(3, [...hands[3].sublist(1), hands[0].first]), throwsArgumentError);
+      game.revealHand(3, hands[3]);
+      expect(game.knowsHand(3), isTrue);
+      expect(game.handOf(3), orderedEquals(List.of(hands[3])..sort()));
+      expect(() => game.revealHand(3, hands[3]), throwsStateError);
+      expect(() => game.revealHand(0, hands[0]), throwsStateError);
+    });
+
+    test('the next hand of a sealed game waits to be dealt again', () {
+      final game = HeartsGame(sealed: true)..deal(handsFrom(10));
+      final bot = Bot(persona: Persona.roster.first);
+      while (game.phase != Phase.handOver) {
+        if (game.phase == Phase.passing) {
+          for (var s = 0; s < seatCount; s++) {
+            game.setPass(s, bot.choosePass(game.handOf(s)));
+          }
+        } else if (game.pendingTrick != null) {
+          game.collectTrick();
+        } else {
+          final s = game.currentSeat!;
+          game.play(s, game.legalPlaysFor(s).first);
+        }
+      }
+      game.nextHand();
+      expect(game.phase, Phase.dealing);
+      expect(game.handNumber, 1);
+      expect(game.handSizeOf(0), 0);
+      game.deal(handsFrom(11));
+      expect(game.phase, Phase.passing);
+      expect(game.passDirection, PassDirection.right);
+    });
+  });
 }
