@@ -75,7 +75,9 @@ rigged. Roughly in order:
    leaver (`e2e/`). A deployed build starts on a few public relays,
    listening on all of them and writing to one at a time, so one relay
    turning on a table is not the end of it (`packages/table`,
-   `relays.dart`); `DEV_RELAY` takes a comma-separated list.
+   `relays.dart`); `DEV_RELAY` takes a comma-separated list. The
+   deployed site's worker mints TURN credentials for the pairs no
+   direct path serves (`service/functions/`, doc 06).
    Meanwhile every solo game is kept on the device as a
    record — the deal, the bots, your own passes and plays — and **Copy
    record** on the game-over sheet hands it over as a line of text that

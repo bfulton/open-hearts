@@ -19,6 +19,22 @@ left is identity, entitlement, and a juror when the room is empty.
 Each is a point lookup and a signature. None is in a game's latency path
 and none is needed by a table already playing.
 
+**As built.** The handlers run as the Cloudflare Pages worker beside the
+site and the app: `service/functions/worker.mjs`, published by
+`deploy.sh` as `_worker.js`, answers `/api/…` and hands everything else
+to the static assets; `node --test service/functions` runs it against
+a stand-in upstream. Built so far: **turn-creds**, `POST /api/turn`
+with the caller's table key, answering Cloudflare Realtime TURN
+credentials good for four hours, minted from a TURN key that lives in
+the project's secrets (`TURN_KEY_ID`, `TURN_API_TOKEN`) and never in
+the repo. Without them it says so, and the app falls back to STUN
+alone; on localhost the app asks nothing and peers connect directly.
+The key is taken as given for now — attesting it is the sign-in
+handler's, not built — so the credentials' short life is the only
+limit on their use. The app fetches them when a device connects to the
+relays (`app/lib/net/turn.dart`) and hands them to every peer
+connection at its next table.
+
 ## Storage
 
 Everything the service keeps fits one key-value table. Every access is

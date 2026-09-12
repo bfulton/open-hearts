@@ -4,6 +4,8 @@
 # Assembles one directory and uploads it once:
 #
 #   /            the marketing site (site/, copied verbatim)
+#   /api/        the service's handlers (service/functions/worker.mjs,
+#                published as _worker.js)
 #   /play/       the Flutter web build, base-href /play/
 #   /measure/    benchmarks meant to be run on a phone (only the ones
 #                that have been built; see measurements/README.md)
@@ -47,6 +49,11 @@ echo "==> building $BUILD_TAG -> $LABEL"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp -r site/. "$STAGE"/
+# The service's handlers (docs/06-service.md) run as the Pages worker:
+# _worker.js at the root of what is published answers /api/…, and
+# hands everything else to the static assets. Its secrets — the TURN
+# key — are the project's, set in the Pages dashboard, never here.
+cp service/functions/worker.mjs "$STAGE/_worker.js"
 
 # UPDATE_CHECK=on is what turns on the "new build is up" pill, and it is
 # passed HERE and nowhere else. Inferring it from a real-looking build

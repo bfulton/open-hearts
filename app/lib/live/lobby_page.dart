@@ -14,6 +14,7 @@ import '../net/duty.dart';
 import '../net/mesh_transport.dart';
 import '../net/room.dart';
 import '../net/standing.dart';
+import '../net/turn.dart';
 import '../theme.dart';
 import 'live_page.dart';
 
@@ -71,6 +72,11 @@ class _LobbyPageState extends State<LobbyPage> {
   /// takes them.
   String? _relayNote;
   StreamSubscription<String?>? _refusalSub;
+
+  /// The ICE servers for this device's next table, fetched once the
+  /// relays answer (turn.dart); none until then, and none at all on
+  /// localhost.
+  List<Map<String, Object?>>? _iceServers;
 
   @override
   void initState() {
@@ -146,6 +152,8 @@ class _LobbyPageState extends State<LobbyPage> {
       // A relay answered: from here on this device is online to
       // everyone, and a juror when drawn.
       Duty.on(relays, signer, log: _debugging, crypto: dealCrypto);
+      _iceServers ??= const [];
+      iceServersFor(signer).then((servers) => _iceServers = servers);
       if (_standing == null) await _loadStanding(relays, signer);
       setState(() {
         _transport = transport;
@@ -203,7 +211,12 @@ class _LobbyPageState extends State<LobbyPage> {
       spec: spec,
       seatNames: seatNames,
       signer: signer,
-      transport: MeshTransport(relay: relay, peers: peers, log: _debugging ? (l) => debugPrint('mesh: $l') : null),
+      transport: MeshTransport(
+        relay: relay,
+        peers: peers,
+        iceServers: _iceServers ?? const [],
+        log: _debugging ? (l) => debugPrint('mesh: $l') : null,
+      ),
       relay: relay,
       presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto).presence,
       crypto: dealCrypto,
