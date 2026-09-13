@@ -10,6 +10,11 @@ import '../theme.dart';
 import 'card_view.dart';
 import 'pip.dart';
 
+/// The badges' inset from the felt's edge, and the least gap between a
+/// side badge and the trick's outer card.
+const _badgeInset = 6.0;
+const _badgeGap = 8.0;
+
 /// Where each seat's badge sits: pinned to the rail, well clear of the
 /// trick. Seat 0 is the player at the bottom and has no badge — the
 /// score line under the felt and the hand say everything about them.
@@ -58,18 +63,28 @@ class TableView extends StatelessWidget {
         // The trick has to fit four cards in a diamond AND leave the
         // badges their rail, so it is sized from whichever dimension
         // runs out first rather than from the width alone.
-        final cardWidth = [
+        var cardWidth = [
           box.width * (wide ? 0.16 : 0.21),
           box.height * (wide ? 0.215 : 0.155),
           76.0,
         ].reduce((a, b) => a < b ? a : b).clamp(34.0, 76.0);
+        // The side badges' room: from the felt's edge to the trick's
+        // outer card, less a gap. A name has to fit it, wrapped if it
+        // must; and on a felt too narrow for both, the trick gives way
+        // rather than running under the badges.
+        final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
+        double sideRoomFor(double cw) => box.width / 2 - cw * reach - _badgeInset - _badgeGap;
+        if (sideRoomFor(cardWidth) < _SeatBadge.minWidth) {
+          cardWidth = ((box.width / 2 - _badgeInset - _badgeGap - _SeatBadge.minWidth) / reach).clamp(34.0, cardWidth);
+        }
+        final sideRoom = sideRoomFor(cardWidth).clamp(_SeatBadge.minWidth, box.width);
         final cardHeight = cardHeightFor(cardWidth);
         final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
 
         return Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: _badgeInset),
               child: Stack(
                 children: [
                   for (var position = 1; position < seatCount; position++)
@@ -82,6 +97,7 @@ class TableView extends StatelessWidget {
                         onTurn: game.currentSeat == controller.seatAt(position),
                         won: pending?.winner == controller.seatAt(position),
                         compact: wide,
+                        maxWidth: position == 2 ? box.width - 2 * _badgeInset : sideRoom,
                       ),
                     ),
                 ],
@@ -214,6 +230,7 @@ class _SeatBadge extends StatelessWidget {
     required this.game,
     required this.onTurn,
     required this.won,
+    required this.maxWidth,
     this.compact = false,
   });
 
@@ -223,8 +240,16 @@ class _SeatBadge extends StatelessWidget {
   final bool onTurn;
   final bool won;
 
+  /// The room the badge has: a side badge's runs from the felt's edge
+  /// to the trick's outer card.
+  final double maxWidth;
+
   /// One line — name, total, points — where the felt is short.
   final bool compact;
+
+  /// The least a badge is given: a two-word name wrapped, or most of
+  /// the roster's one-word names on a line, at 58 points of text.
+  static const minWidth = 80.0;
 
   @override
   Widget build(BuildContext context) {
@@ -235,65 +260,102 @@ class _SeatBadge extends StatelessWidget {
     // this hand, and whether it is their turn.
     return Semantics(
       label: '$name: $total in the game, $taken this hand${onTurn ? ', on turn' : ''}',
-      child: ExcludeSemantics(child: _badge(total, taken)),
+      child: ExcludeSemantics(child: _badge(context, total, taken)),
     );
   }
 
-  Widget _badge(int total, int taken) {
-    final nameText = Text(
-      name,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: onTurn ? Palette.gold : Palette.chrome,
-      ),
+  EdgeInsets get _padding => compact ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 11, vertical: 7);
+
+  /// The name, in the room it has: on one line when it fits, else — a
+  /// long name, Mumtaz Mahal in the east seat of a phone — wrapped at
+  /// its spaces, and a single word wider than the room scaled to it.
+  Widget _name(BuildContext context, double room) {
+    final style = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: onTurn ? Palette.gold : Palette.chrome,
     );
-    final numbers = Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        Text('$total',
-            style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
-                color: Palette.chrome.withValues(alpha: 0.85))),
-        if (taken > 0) ...[
-          const SizedBox(width: 7),
-          Pip(
-              suit: engine.Suit.hearts,
-              size: 10,
-              color: Palette.danger.withValues(alpha: 0.9)),
-          const SizedBox(width: 3),
-          Text('$taken',
+    final scaler = MediaQuery.textScalerOf(context);
+    double widthOf(String text) => (TextPainter(
+          text: TextSpan(text: text, style: style),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout())
+        .width;
+    if (widthOf(name) <= room) return Text(name, style: style, maxLines: 1);
+    final words = name.split(' ');
+    if (words.length > 1 && words.every((w) => widthOf(w) <= room)) {
+      return Text(
+        name,
+        style: style,
+        textAlign: TextAlign.center,
+        maxLines: words.length,
+        // As wide as its longest line, not as the room: the badge hugs
+        // the name.
+        textWidthBasis: TextWidthBasis.longestLine,
+      );
+    }
+    return FittedBox(fit: BoxFit.scaleDown, child: Text(name, style: style, maxLines: 1));
+  }
+
+  Widget _badge(BuildContext context, int total, int taken) {
+    final nameText = _name(context, maxWidth - _padding.horizontal);
+    // A three-digit total beside a two-digit hand is the widest this
+    // gets, and it is a hair inside a side badge's room: scaled down
+    // rather than clipped should a font run wider.
+    final numbers = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text('$total',
               style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: Palette.danger.withValues(alpha: 0.95))),
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: Palette.chrome.withValues(alpha: 0.85))),
+          if (taken > 0) ...[
+            const SizedBox(width: 7),
+            Pip(
+                suit: engine.Suit.hearts,
+                size: 10,
+                color: Palette.danger.withValues(alpha: 0.9)),
+            const SizedBox(width: 3),
+            Text('$taken',
+                style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Palette.danger.withValues(alpha: 0.95))),
+          ],
         ],
-      ],
-    );
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: compact ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: onTurn ? 0.42 : 0.24),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: onTurn || won ? Palette.gold : Colors.white.withValues(alpha: 0.10),
-          width: onTurn || won ? 1.6 : 1,
-        ),
       ),
-      child: compact
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [nameText, const SizedBox(width: 8), numbers],
-            )
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [nameText, const SizedBox(height: 3), numbers],
-            ),
+    );
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: _padding,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: onTurn ? 0.42 : 0.24),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: onTurn || won ? Palette.gold : Colors.white.withValues(alpha: 0.10),
+            width: onTurn || won ? 1.6 : 1,
+          ),
+        ),
+        child: compact
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [Flexible(child: nameText), const SizedBox(width: 8), numbers],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [nameText, const SizedBox(height: 3), numbers],
+              ),
+      ),
     );
   }
 }

@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/about_page.dart';
+import 'package:open_hearts/game_controller.dart';
+import 'package:open_hearts/record_store.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
@@ -26,14 +28,16 @@ const _phone = Size(390, 844);
 /// composition is a different one (docs/05-form-factors.md).
 const _sideways = Size(844, 390);
 
-Future<void> pumpTable(WidgetTester tester, {int seed = 4, Size size = _phone, bool paced = false}) async {
+/// A second table in the same test needs a [key] of its own: the page
+/// keeps its game across a rebuild, as it should.
+Future<void> pumpTable(WidgetTester tester, {int seed = 4, Size size = _phone, bool paced = false, Key? key}) async {
   tester.view
     ..physicalSize = size
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(MaterialApp(
     theme: buildTheme(),
-    home: TablePage(seed: seed, paced: paced),
+    home: TablePage(key: key, seed: seed, paced: paced),
   ));
   await tester.pumpAndSettle();
 }
@@ -365,6 +369,59 @@ void main() {
     expect(mine.bottom, lessThanOrEqualTo(hand.top));
   });
 
+  testWidgets('a long name wraps on its badge rather than running under the trick', (tester) async {
+    // The test font draws every glyph an em wide, so names here are
+    // twice their width on a phone: "Mumtaz Mahal" is too wide even
+    // wrapped and is scaled to the room, while "Don Juan" wraps. Both
+    // in the east seat, where the room is narrowest — found by
+    // searching the seeds.
+    int? seedFor(String name) {
+      for (var s = 0; s < 500; s++) {
+        final c = GameController(seed: s, paced: false, store: MemoryRecordStore());
+        final found = c.names[3] == name;
+        c.dispose();
+        if (found) return s;
+      }
+      return null;
+    }
+    for (final name in ['Mumtaz Mahal', 'Don Juan']) {
+      final seed = seedFor(name);
+      expect(seed, isNotNull, reason: 'the roster seats $name east somewhere in 500 deals');
+      await pumpTable(tester, seed: seed!, key: ValueKey(name));
+      expect(tester.takeException(), isNull);
+      final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
+      final east = tester.getRect(find.bySemanticsLabel(RegExp('^$name: ')));
+      expect(east.right, lessThanOrEqualTo(_phone.width - 6));
+      for (final slot in _trickSlots(tester)) {
+        expect(east.overlaps(slot), isFalse, reason: '$name\'s badge stays clear of the trick');
+      }
+      expect(find.text(name), findsOneWidget, reason: 'the whole name, on the badge');
+      if (name == 'Don Juan') {
+        // Wrapped to two lines: taller than the north badge, which has
+        // the whole width and stays on one.
+        final north = tester.getRect(find.bySemanticsLabel(RegExp('^${names[2]}: ')));
+        expect(east.height, greaterThan(north.height + 10));
+        expect(tester.widget<Text>(find.text(name)).maxLines, 2);
+      }
+    }
+  });
+
+  testWidgets('on a felt too narrow for both, the trick gives way to the badges', (tester) async {
+    await pumpTable(tester, size: const Size(340, 720));
+    expect(tester.takeException(), isNull);
+    final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
+    final slots = _trickSlots(tester);
+    for (var seat = 1; seat < engine.seatCount; seat++) {
+      final badge = tester.getRect(find.bySemanticsLabel(RegExp('^${names[seat]}: ')));
+      for (final slot in slots) {
+        expect(badge.overlaps(slot), isFalse, reason: '${names[seat]}\'s badge stays clear of the trick');
+      }
+    }
+    // Shrunk from what the width alone would allow: 340 × 0.21 = 71.
+    final slotWidth = slots.map((r) => r.width).reduce((a, b) => a > b ? a : b);
+    expect(slotWidth, lessThan(60));
+  });
+
   testWidgets('sideways, the same header, a shorter and wider hand', (tester) async {
     await pumpTable(tester, size: _sideways);
     expect(tester.takeException(), isNull);
@@ -439,6 +496,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Hand 2  ·  Pass right  ·  to 100'), findsOneWidget);
   });
+}
+
+/// The four slots of the trick, empty or not, as rectangles on screen.
+List<Rect> _trickSlots(WidgetTester tester) {
+  final felt = find.byType(TableView);
+  final ghosts = find.descendant(of: felt, matching: find.byType(CardGhost));
+  final cards = find.descendant(of: felt, matching: find.byType(CardView));
+  return [
+    for (final w in tester.widgetList(ghosts)) tester.getRect(find.byWidget(w)),
+    for (final w in tester.widgetList(cards)) tester.getRect(find.byWidget(w)),
+  ];
 }
 
 /// Picks the first three cards and passes them.
