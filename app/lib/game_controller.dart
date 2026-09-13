@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:engine/engine.dart';
 
+import 'avatar.dart';
 import 'record_store.dart';
 import 'table_model.dart';
 
@@ -185,6 +186,16 @@ class GameController extends ChangeNotifier implements TableModel {
 
   @override
   Set<Card> get inFlight => const {};
+
+  @override
+  String iconSeedOf(int seat) => seat == humanSeat ? 'you' : _bots[seat]!.persona.name;
+
+  /// The player's own avatar, once the page has read it off the
+  /// device; the bots' are their own.
+  Avatar myAvatar = Avatar.none;
+
+  @override
+  Avatar avatarOf(int seat) => seat == humanSeat ? myAvatar : Avatar.forBot(_bots[seat]!.persona.name);
 
   /// No clock at a solo table: the bots wait for you.
   @override

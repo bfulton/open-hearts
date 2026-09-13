@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
+import '../avatar.dart';
 import '../table_model.dart';
 import '../theme.dart';
 import 'card_view.dart';
 import 'pip.dart';
+import 'player_icon.dart';
 
 /// The badges' inset from the felt's edge, and the least gap between a
 /// side badge and the trick's outer card.
@@ -97,6 +99,8 @@ class TableView extends StatelessWidget {
                         onTurn: game.currentSeat == controller.seatAt(position),
                         won: pending?.winner == controller.seatAt(position),
                         clockMs: controller.clockMs(controller.seatAt(position)),
+                        iconSeed: controller.iconSeedOf(controller.seatAt(position)),
+                        avatar: controller.avatarOf(controller.seatAt(position)),
                         compact: wide,
                         maxWidth: position == 2 ? box.width - 2 * _badgeInset : sideRoom,
                       ),
@@ -232,12 +236,20 @@ class _SeatBadge extends StatelessWidget {
     required this.onTurn,
     required this.won,
     required this.maxWidth,
+    required this.iconSeed,
+    required this.avatar,
     this.clockMs,
     this.compact = false,
   });
 
   final int seat;
   final String name;
+
+  /// What the seat's icon is coloured from.
+  final String iconSeed;
+
+  /// How the seat chose to look.
+  final Avatar avatar;
   final HeartsGame game;
   final bool onTurn;
   final bool won;
@@ -308,7 +320,11 @@ class _SeatBadge extends StatelessWidget {
   }
 
   Widget _badge(BuildContext context, int total, int taken) {
-    final nameText = _name(context, maxWidth - _padding.horizontal);
+    // The icon sits above the name where the felt is tall and beside
+    // it where it is short, so a side badge keeps its room for the
+    // name either way.
+    final icon = PlayerIcon(name: name, seed: iconSeed, avatar: avatar, size: compact ? 18 : 22);
+    final nameText = _name(context, maxWidth - _padding.horizontal - (compact ? 24 : 0));
     // A three-digit total beside a two-digit hand is the widest this
     // gets, and it is a hair inside a side badge's room: scaled down
     // rather than clipped should a font run wider.
@@ -361,11 +377,11 @@ class _SeatBadge extends StatelessWidget {
         child: compact
             ? Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [Flexible(child: nameText), const SizedBox(width: 8), numbers],
+                children: [icon, const SizedBox(width: 6), Flexible(child: nameText), const SizedBox(width: 8), numbers],
               )
             : Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [nameText, const SizedBox(height: 3), numbers],
+                children: [icon, const SizedBox(height: 4), nameText, const SizedBox(height: 3), numbers],
               ),
       ),
     );

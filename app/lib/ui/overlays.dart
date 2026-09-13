@@ -5,7 +5,9 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart';
+import '../avatar.dart';
 import '../theme.dart';
+import 'player_icon.dart';
 
 class HandOverSheet extends StatelessWidget {
   const HandOverSheet({
@@ -16,19 +18,23 @@ class HandOverSheet extends StatelessWidget {
     required this.moonShooter,
     required this.names,
     required this.onNext,
+    this.seeds,
+    this.avatars,
     this.mySeat = humanSeat,
     this.action = 'Next hand',
   });
 
   /// Takes the numbers rather than the game: at a live table the game
   /// has already moved on to the next deal by the time this shows.
-  factory HandOverSheet.of(HeartsGame game, {required List<String> names, required VoidCallback onNext}) =>
+  factory HandOverSheet.of(HeartsGame game, {required List<String> names, List<String>? seeds, List<Avatar>? avatars, required VoidCallback onNext}) =>
       HandOverSheet(
         handNumber: game.handNumber,
         scores: game.handScores,
         totals: game.totals,
         moonShooter: game.moonShooter,
         names: names,
+        seeds: seeds,
+        avatars: avatars,
         onNext: onNext,
       );
 
@@ -37,6 +43,13 @@ class HandOverSheet extends StatelessWidget {
   final List<int> totals;
   final int? moonShooter;
   final List<String> names;
+
+  /// What each seat's icon is coloured from, seat order; the names
+  /// when null.
+  final List<String>? seeds;
+
+  /// How each seat chose to look, seat order; nothing when null.
+  final List<Avatar>? avatars;
   final VoidCallback onNext;
   final int mySeat;
 
@@ -63,6 +76,8 @@ class HandOverSheet extends StatelessWidget {
         for (var seat = 0; seat < seatCount; seat++)
           (
             name: names[seat],
+            seed: (seeds ?? names)[seat],
+            avatar: avatars?[seat],
             delta: scores[seat],
             total: totals[seat],
             you: seat == mySeat,
@@ -81,12 +96,21 @@ class GameOverSheet extends StatelessWidget {
     required this.names,
     required this.onNewGame,
     this.onCopyRecord,
+    this.seeds,
+    this.avatars,
     this.mySeat = humanSeat,
     this.action = 'New game',
   });
 
   final HeartsGame game;
   final List<String> names;
+
+  /// What each seat's icon is coloured from, seat order; the names
+  /// when null.
+  final List<String>? seeds;
+
+  /// How each seat chose to look, seat order; nothing when null.
+  final List<Avatar>? avatars;
   final VoidCallback onNewGame;
   final int mySeat;
   final String action;
@@ -113,6 +137,8 @@ class GameOverSheet extends StatelessWidget {
         for (var seat = 0; seat < seatCount; seat++)
           (
             name: names[seat],
+            seed: (seeds ?? names)[seat],
+            avatar: avatars?[seat],
             delta: game.handScores[seat],
             total: game.totals[seat],
             you: seat == mySeat,
@@ -126,7 +152,7 @@ class GameOverSheet extends StatelessWidget {
   }
 }
 
-typedef _Row = ({String name, int delta, int total, bool you});
+typedef _Row = ({String name, String seed, Avatar? avatar, int delta, int total, bool you});
 
 class _Sheet extends StatelessWidget {
   const _Sheet({
@@ -247,6 +273,8 @@ class _ScoreRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
+          PlayerIcon(name: row.name, seed: row.seed, avatar: row.avatar, size: 22),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               row.name,

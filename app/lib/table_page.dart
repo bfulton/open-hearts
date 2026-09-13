@@ -11,9 +11,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'about_page.dart';
+import 'avatar.dart';
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
 import 'game_controller.dart';
+import 'identity.dart';
 import 'table_model.dart';
 import 'theme.dart';
 import 'ui/hand_fan.dart';
@@ -47,9 +49,16 @@ class _TablePageState extends State<TablePage> {
     super.initState();
     _controller = GameController(seed: widget.seed, paced: widget.paced)
       ..addListener(_onGameChanged);
+    // Your avatar, as chosen in the lobby, on your line here too.
+    Identity.avatar().then((a) {
+      if (mounted) setState(() => _controller.myAvatar = a);
+    });
   }
 
   void _onGameChanged() => setState(() {});
+
+  List<String> get _seeds => [for (var s = 0; s < seatCount; s++) _controller.iconSeedOf(s)];
+  List<Avatar> get _avatars => [for (var s = 0; s < seatCount; s++) _controller.avatarOf(s)];
 
   @override
   void dispose() {
@@ -136,11 +145,13 @@ class _TablePageState extends State<TablePage> {
               ),
 
               if (game.phase == Phase.handOver && _controller.sheetDue)
-                HandOverSheet.of(game, names: _controller.names, onNext: _controller.nextHand),
+                HandOverSheet.of(game, names: _controller.names, seeds: _seeds, avatars: _avatars, onNext: _controller.nextHand),
               if (game.phase == Phase.gameOver && _controller.sheetDue)
                 GameOverSheet(
                   game: game,
                   names: _controller.names,
+                  seeds: _seeds,
+                  avatars: _avatars,
                   onNewGame: _controller.newGame,
                   onCopyRecord: _copyRecord,
                 ),

@@ -107,8 +107,12 @@ A bot's identity is its name and its rung: `Westley` at the top,
 ## The live table, as it stands
 
 What the app does today. **Play live** on the home
-screen opens a lobby: how many devices are online, a name, and the
-choice — *Rated* or *Unrated* —
+screen opens a lobby: how many devices are online, a name and an
+avatar — one of a set of icons on a colour, or a picture of your own,
+sixty-four pixels square, kept on the device with the name and
+carried to the others with it: the icon and colour in every beat, the
+picture once, as a stored event — and the choice — *Rated* or
+*Unrated* —
 then a waiting screen and nothing to do. There is no matchmaker.
 Players who want a game say so on the relay every couple of seconds,
 in the pool they chose, with their rating and how long they have

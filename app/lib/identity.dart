@@ -3,11 +3,13 @@
 /// and the secret never leaves (docs/04-live-play.md).
 library;
 
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
+import 'avatar.dart';
 import 'crypto/schnorr.dart';
 
 class Identity {
@@ -27,6 +29,23 @@ class Identity {
   }
 
   static Future<String?> name() async => (await SharedPreferences.getInstance()).getString(_nameKey);
+
+  static const _avatarKey = 'identity_avatar';
+
+  /// The avatar chosen on this device, as it was saved; none until one
+  /// is.
+  static Future<Avatar> avatar() async {
+    final raw = (await SharedPreferences.getInstance()).getString(_avatarKey);
+    if (raw == null) return Avatar.none;
+    try {
+      return Avatar.fromJson(jsonDecode(raw));
+    } catch (_) {
+      return Avatar.none;
+    }
+  }
+
+  static Future<void> setAvatar(Avatar avatar) async =>
+      (await SharedPreferences.getInstance()).setString(_avatarKey, jsonEncode(avatar.toJson()));
 
   static Future<void> setName(String name) async =>
       (await SharedPreferences.getInstance()).setString(_nameKey, name.trim());

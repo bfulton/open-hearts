@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 
 import 'package:engine/engine.dart';
 
+import 'avatar.dart';
+
 abstract class TableModel implements Listenable {
   HeartsGame get game;
 
@@ -42,6 +44,13 @@ abstract class TableModel implements Listenable {
   /// Cards the player has committed that the game as shown has not yet
   /// taken from the hand: a pending play, a pending pass.
   Set<Card> get inFlight => const {};
+
+  /// What [seat]'s icon is coloured from (ui/player_icon.dart): a
+  /// person's key, a bot's name — the same on every screen.
+  String iconSeedOf(int seat);
+
+  /// How [seat] chose to look (avatar.dart); a bot's is its own.
+  Avatar avatarOf(int seat);
 
   /// Milliseconds [seat] has left on its clock, once the grace on its
   /// open decision is spent (docs/04, "Boot"); null while there is no

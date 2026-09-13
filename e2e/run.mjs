@@ -308,6 +308,13 @@ async function main() {
       await waitFor(page, /^Play with friends$/);
     }
 
+    // Ada picks an avatar first: the picker opens from her icon by the
+    // name, an icon is chosen, and Done keeps it.
+    await click(pages[0], /^Your avatar$/);
+    await waitFor(pages[0], /^Rocket$/, { what: 'the avatar picker' });
+    await click(pages[0], /^Rocket$/);
+    await click(pages[0], /^Done$/);
+    await waitFor(pages[0], /^Play with friends$/);
     // Ada goes in with no code, so a new one is drawn: the only
     // four-capital-letter text on her screen. Nobody hosts; whoever
     // is at a code is the table.

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../table_model.dart';
 import '../theme.dart';
+import 'player_icon.dart';
 import 'table_view.dart' show ClockText, clockSeconds;
 
 class ScoreLine extends StatelessWidget {
@@ -30,9 +31,10 @@ class ScoreLine extends StatelessWidget {
           height: height,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              PlayerIcon(name: controller.names[seat], seed: controller.iconSeedOf(seat), avatar: controller.avatarOf(seat), size: 18),
+              const SizedBox(width: 6),
               Text(
                 controller.names[seat],
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Palette.gold),

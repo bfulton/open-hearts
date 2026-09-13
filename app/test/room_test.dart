@@ -6,10 +6,12 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:engine/engine.dart' show botPolicyVersion;
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:table/table.dart';
 
@@ -214,6 +216,33 @@ void main() {
       async.elapse(const Duration(seconds: 1));
       expect(c.spec, isNull, reason: 'dropped after the stale window');
       c.dispose();
+    });
+  });
+
+  test('how you look travels with you: the icon and colour in every beat, the picture once, and all of it into the seats', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      final picture = Uint8List.fromList(List.generate(200, (i) => (i * 7) % 256));
+      final a = Room(channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', myAvatar: Avatar(icon: 'rocket', color: 3, picture: picture), nowMs: now);
+      final b = Room(channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', myAvatar: const Avatar(icon: 'cake'), nowMs: now);
+      async.elapse(const Duration(seconds: 3));
+      final adaAtB = b.members.firstWhere((m) => m.name == 'Ada');
+      expect(adaAtB.avatar, Avatar(icon: 'rocket', color: 3, picture: picture), reason: 'icon, colour and picture');
+      expect(a.members.firstWhere((m) => m.name == 'Bao').avatar, const Avatar(icon: 'cake'));
+      // A third arrives after the picture went by: the relay kept it.
+      final c = Room(channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      async.elapse(const Duration(seconds: 3));
+      expect(c.members.firstWhere((m) => m.name == 'Ada').avatar.picture, picture);
+      async.elapse(const Duration(seconds: 10));
+      expect(c.spec, isNotNull);
+      final adaSeat = c.spec!.seats.indexWhere((h) => h is HumanSeat && h.key == a.me);
+      expect(c.seatAvatars[adaSeat], Avatar(icon: 'rocket', color: 3, picture: picture));
+      final caraSeat = c.spec!.seats.indexWhere((h) => h is HumanSeat && h.key == c.me);
+      expect(c.seatAvatars[caraSeat], Avatar.none);
+      for (final r in [a, b, c]) {
+        r.dispose();
+      }
     });
   });
 

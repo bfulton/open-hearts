@@ -3,6 +3,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,7 +19,10 @@ import '../net/room.dart';
 import '../net/share.dart';
 import '../net/standing.dart';
 import '../net/turn.dart';
+import '../avatar.dart';
 import '../theme.dart';
+import '../ui/player_icon.dart';
+import 'avatar_picker.dart';
 import 'live_page.dart';
 
 /// What the relays say back — a refusal, a notice, a drop — goes to
@@ -49,6 +53,10 @@ class LobbyPage extends StatefulWidget {
 class _LobbyPageState extends State<LobbyPage> {
   final _name = TextEditingController();
   late final _code = TextEditingController(text: widget.code ?? devRoom);
+
+  /// How you look to the others: read off the device with the name,
+  /// changed by tapping it.
+  Avatar _avatar = Avatar.none;
   final List<Uri> _relays = appRelays();
   String? _error;
   bool _busy = false;
@@ -80,6 +88,9 @@ class _LobbyPageState extends State<LobbyPage> {
   @override
   void initState() {
     super.initState();
+    Identity.avatar().then((a) {
+      if (mounted) setState(() => _avatar = a);
+    });
     Identity.name().then((n) {
       if (!mounted) return;
       if (n != null) _name.text = n;
@@ -204,10 +215,26 @@ class _LobbyPageState extends State<LobbyPage> {
       rating: (_standing?.mine ?? Rating.fresh).shown,
       botRating: Standing.botPicker(ledger),
       sealed: dealCrypto != null,
+      avatar: _avatar.isDefault ? null : _avatar.toJson(withPicture: false),
+      picture: _avatar.picture == null ? null : base64Encode(_avatar.picture!),
     );
     _queueSub = queue.seated.listen((spec) {
       if (!mounted) return;
-      _toTable(spec, queue.seatNames);
+      // The seating carried each seat's icon and colour; pictures came
+      // on their own, by key.
+      final avatars = <int, Avatar>{};
+      for (var s = 0; s < spec.seats.length; s++) {
+        final h = spec.seats[s];
+        if (h is! HumanSeat) continue;
+        if (h.key == _signer!.publicKey) {
+          avatars[s] = _avatar;
+          continue;
+        }
+        final chosen = Avatar.fromJson(queue.seatAvatars[s]);
+        final picture = queue.pictures[h.key];
+        avatars[s] = picture == null ? chosen : chosen.copyWith(picture: Avatar.fromJson({'picture': picture}).picture);
+      }
+      _toTable(spec, queue.seatNames, avatars);
     });
     _waitClock = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
     setState(() => _queue = queue);
@@ -215,7 +242,7 @@ class _LobbyPageState extends State<LobbyPage> {
 
   /// The seated table has its own tag on the relays: a fresh transport
   /// there, WebRTC over it, and the live page.
-  void _toTable(TableSpec spec, Map<int, String> seatNames) {
+  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars) {
     final signer = _signer!;
     final relays = _relays;
     final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog);
@@ -224,6 +251,7 @@ class _LobbyPageState extends State<LobbyPage> {
     final controller = LiveController(
       spec: spec,
       seatNames: seatNames,
+      seatAvatars: seatAvatars,
       signer: signer,
       transport: MeshTransport(
         relay: relay,
@@ -252,7 +280,7 @@ class _LobbyPageState extends State<LobbyPage> {
     if (transport == null) return;
     try {
       final name = _name.text.trim();
-      final room = Room.enter(relay: transport, code: code, name: name);
+      final room = Room.enter(relay: transport, code: code, name: name, avatar: _avatar);
       room.addListener(_onRoom);
       setState(() => _room = room);
     } on TimeoutException {
@@ -266,6 +294,13 @@ class _LobbyPageState extends State<LobbyPage> {
         _error = 'Could not connect: $e';
       });
     }
+  }
+
+  Future<void> _pickAvatar() async {
+    final chosen = await showAvatarPicker(context, current: _avatar, name: _name.text.isEmpty ? '?' : _name.text, seed: _signer?.publicKey ?? '');
+    if (chosen == null || !mounted) return;
+    setState(() => _avatar = chosen);
+    await Identity.setAvatar(chosen);
   }
 
   /// The link to this room: the phone's share sheet where there is
@@ -299,7 +334,7 @@ class _LobbyPageState extends State<LobbyPage> {
         setState(() => _error = 'That table filled up without you');
         return;
       }
-      _toTable(spec, room.seatNames);
+      _toTable(spec, room.seatNames, room.seatAvatars);
       return;
     }
     setState(() {});
@@ -363,7 +398,25 @@ class _LobbyPageState extends State<LobbyPage> {
         TextField(
           controller: _name,
           textCapitalization: TextCapitalization.words,
-          decoration: _field('Your name'),
+          decoration: _field('Your name').copyWith(
+            // Your icon, as the others will see it: your initials on
+            // your colour, which is your key's.
+            prefixIcon: Semantics(
+              button: true,
+              label: 'Your avatar',
+              onTap: _pickAvatar,
+              child: InkWell(
+                onTap: _pickAvatar,
+                customBorder: const CircleBorder(),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10, right: 6, top: 4, bottom: 4),
+                  child: PlayerIcon(name: _name.text.isEmpty ? '?' : _name.text, seed: _signer?.publicKey ?? '', avatar: _avatar, size: 28),
+                ),
+              ),
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 36),
+          ),
+          onChanged: (_) => setState(() {}),
           style: const TextStyle(color: Palette.chrome),
         ),
         const SizedBox(height: 14),
@@ -550,8 +603,9 @@ class _RoomView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 5),
             child: Row(
               children: [
-                Icon(i < members.length ? Icons.person : Icons.smart_toy_outlined,
-                    size: 16, color: i < members.length ? Palette.gold : Palette.chromeDim),
+                i < members.length
+                    ? PlayerIcon(name: members[i].name, seed: members[i].key, avatar: members[i].avatar, size: 22)
+                    : const SizedBox(width: 22, height: 22, child: Icon(Icons.smart_toy_outlined, size: 16, color: Palette.chromeDim)),
                 const SizedBox(width: 10),
                 Text(
                   i < members.length

@@ -10,6 +10,7 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 import '../about_page.dart';
+import '../avatar.dart';
 import '../live_controller.dart';
 import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
@@ -40,6 +41,9 @@ class _LivePageState extends State<LivePage> {
   }
 
   void _changed() => setState(() {});
+
+  List<String> get _seeds => [for (var s = 0; s < seatCount; s++) _c.iconSeedOf(s)];
+  List<Avatar> get _avatars => [for (var s = 0; s < seatCount; s++) _c.avatarOf(s)];
 
   @override
   void dispose() {
@@ -198,6 +202,8 @@ class _LivePageState extends State<LivePage> {
                   totals: ended.totals,
                   moonShooter: ended.moonShooter,
                   names: _c.names,
+                  seeds: _seeds,
+                  avatars: _avatars,
                   mySeat: _c.mySeat,
                   action: 'On with it',
                   onNext: _c.dismissHandSheet,
@@ -206,6 +212,8 @@ class _LivePageState extends State<LivePage> {
                 GameOverSheet(
                   game: game,
                   names: _c.names,
+                  seeds: _seeds,
+                  avatars: _avatars,
                   mySeat: _c.mySeat,
                   action: 'Home',
                   onNewGame: () => Navigator.of(context).pop(),

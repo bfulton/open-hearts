@@ -16,6 +16,7 @@ import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
 import 'package:open_hearts/ui/header.dart';
+import 'package:open_hearts/ui/player_icon.dart';
 import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
@@ -420,6 +421,31 @@ void main() {
     // Shrunk from what the width alone would allow: 340 × 0.21 = 71.
     final slotWidth = slots.map((r) => r.width).reduce((a, b) => a > b ? a : b);
     expect(slotWidth, lessThan(60));
+  });
+
+  testWidgets('every player has an icon: their initials on their colour, on the badges, your line and the sheet', (tester) async {
+    await pumpTable(tester);
+    final model = tester.widget<TableView>(find.byType(TableView)).controller;
+    final icons = tester.widgetList<PlayerIcon>(find.byType(PlayerIcon)).toList();
+    expect(icons.length, engine.seatCount, reason: 'three badges and your own line');
+    for (var seat = 0; seat < engine.seatCount; seat++) {
+      final mine = icons.where((i) => i.name == model.names[seat]).toList();
+      expect(mine, hasLength(1), reason: '${model.names[seat]} has one icon');
+      expect(mine.single.seed, model.iconSeedOf(seat));
+    }
+    // A bot's colour is its own, the same at every table; yours is yours.
+    expect(icons.map((i) => PlayerIcon.colorOf(i.seed)).toSet().length, greaterThanOrEqualTo(2));
+    // The sheet at the end of the hand shows them again.
+    await _passAnything(tester);
+    for (var guard = 0; guard < 60; guard++) {
+      await tester.pumpAndSettle();
+      if (find.text('Next hand').evaluate().isNotEmpty) break;
+      final playable = fanCards(tester).where((c) => !c.dimmed).toList();
+      if (playable.isEmpty) continue;
+      await tapCard(tester, playable.first.card);
+    }
+    expect(find.text('Next hand'), findsOneWidget);
+    expect(find.byType(PlayerIcon), findsNWidgets(engine.seatCount * 2), reason: 'the table\'s four, and the sheet\'s four');
   });
 
   testWidgets('sideways, the same header, a shorter and wider hand', (tester) async {

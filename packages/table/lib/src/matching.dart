@@ -31,10 +31,14 @@ import 'spec.dart';
 
 /// Someone waiting, as the others see them.
 class Waiter {
-  Waiter({required this.key, required this.name, required this.rating, required this.since});
+  Waiter({required this.key, required this.name, required this.rating, required this.since, this.avatar});
 
   final PublicKey key;
   final String name;
+
+  /// How they chose to look, as they said it — the app's business;
+  /// the table carries it to the seating unread.
+  final Map<String, Object?>? avatar;
 
   /// Their rating, as they state it — it decides who they sit with,
   /// and nothing else, since the game's effect on ratings is computed
@@ -138,6 +142,8 @@ class WaitingRoom {
     this.log,
     this.botRating,
     this.sealed = false,
+    this.avatar,
+    this.picture,
   }) : since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
     _random = random ?? Random.secure();
     for (final e in List.of(relay.lobbySoFar)) {
@@ -145,6 +151,9 @@ class WaitingRoom {
     }
     _sub = relay.lobby.listen(_onLobby);
     _say();
+    // A picture is heavy for a heartbeat: once, stored under the pool,
+    // so whoever is seated with this player has it.
+    if (picture != null) relay.announce({'kind': 'picture', 'jpeg': picture});
     _timer = Timer.periodic(Duration(milliseconds: roundMs ~/ 20), (_) => _tick());
   }
 
@@ -156,6 +165,13 @@ class WaitingRoom {
   /// seats are sealed, and it sits only at sealed ones.
   final bool sealed;
   final int rating;
+
+  /// How this player looks, for the others: carried in every
+  /// heartbeat and into the seating. Null for nothing chosen.
+  final Map<String, Object?>? avatar;
+
+  /// A picture of this player, base64, sent once; null for none.
+  final String? picture;
   final int roundMs;
   final int botsAfterMs;
   final int heartbeatMs;
@@ -179,13 +195,19 @@ class WaitingRoom {
   /// Set once seated.
   TableSpec? spec;
   Map<int, String> seatNames = const {};
+
+  /// Seat number to how that human looks, as the seating carried it.
+  Map<int, Map<String, Object?>> seatAvatars = const {};
+
+  /// Pictures by key, base64, from the events that carried them.
+  final Map<PublicKey, String> pictures = {};
   final _seated = StreamController<TableSpec>.broadcast();
   Stream<TableSpec> get seated => _seated.stream;
 
   /// Seatings that name this player, gathered for a moment before one
   /// is taken: two hosts with different views may both have seated
   /// them, and everyone takes the lowest table id.
-  final List<(TableSpec, Map<int, String>)> _offers = [];
+  final List<(TableSpec, Map<int, String>, Map<int, Map<String, Object?>>)> _offers = [];
   Timer? _commit;
 
   PublicKey get me => relay.signer.publicKey;
@@ -196,7 +218,7 @@ class WaitingRoom {
   List<Waiter> get present {
     final now = _now;
     final all = [
-      Waiter(key: me, name: name, rating: rating, since: since)..lastSeen = now,
+      Waiter(key: me, name: name, rating: rating, since: since, avatar: avatar)..lastSeen = now,
       ..._others.values.where((w) => now - w.lastSeen <= staleMs),
     ];
     all.sort((a, b) => a.key.compareTo(b.key));
@@ -208,7 +230,7 @@ class WaitingRoom {
 
   void _say() {
     if (spec != null) return;
-    relay.announce({'kind': 'wait', 'name': name, 'rating': rating, 'since': since}, ephemeral: true);
+    relay.announce({'kind': 'wait', 'name': name, 'rating': rating, 'since': since, if (avatar != null) 'avatar': avatar}, ephemeral: true);
     _lastSaid = _now;
   }
 
@@ -250,7 +272,7 @@ class WaitingRoom {
       final seats = <Map<String, Object?>>[];
       for (var s = 0; s < seatCount; s++) {
         if (s < humans.length) {
-          seats.add({'key': humans[s].key, 'name': humans[s].name});
+          seats.add({'key': humans[s].key, 'name': humans[s].name, if (humans[s].avatar != null) 'avatar': humans[s].avatar});
         } else {
           seats.add({'bot': bots[s - humans.length].id});
         }
@@ -277,6 +299,10 @@ class WaitingRoom {
       return;
     }
     switch (c['kind']) {
+      case 'picture':
+        if (e.kind != TableKinds.lobby) return;
+        final jpeg = c['jpeg'];
+        if (jpeg is String && jpeg.length <= 20000) pictures[e.pubkey] = jpeg;
       case 'wait':
         if (e.kind != TableKinds.waiting || e.pubkey == me) return;
         final w = _others.putIfAbsent(
@@ -286,6 +312,7 @@ class WaitingRoom {
             name: (c['name'] as String?)?.trim() ?? '',
             rating: c['rating'] as int? ?? 1500,
             since: c['since'] as int? ?? _now,
+            avatar: c['avatar'] is Map ? Map<String, Object?>.from(c['avatar'] as Map) : null,
           ),
         );
         w.lastSeen = _now;
@@ -306,6 +333,7 @@ class WaitingRoom {
     if ((c['sealed'] == true) != sealed) return;
     final seats = <SeatHolder>[];
     final names = <int, String>{};
+    final avatars = <int, Map<String, Object?>>{};
     var mine = false;
     var s = 0;
     try {
@@ -318,6 +346,7 @@ class WaitingRoom {
           if (key == me) mine = true;
           seats.add(HumanSeat(key));
           names[s] = m['name'] as String? ?? 'Someone';
+          if (m['avatar'] is Map) avatars[s] = Map<String, Object?>.from(m['avatar'] as Map);
         }
         s++;
       }
@@ -325,6 +354,7 @@ class WaitingRoom {
       _offers.add((
         TableSpec(id: c['table'] as String, seed: c['seed'] as int, seats: seats, rated: c['rated'] == true, sealed: c['sealed'] == true),
         names,
+        avatars,
       ));
     } catch (_) {
       return;
@@ -333,6 +363,7 @@ class WaitingRoom {
       _offers.sort((a, b) => a.$1.id.compareTo(b.$1.id));
       spec = _offers.first.$1;
       seatNames = _offers.first.$2;
+      seatAvatars = _offers.first.$3;
       log?.call('$pool: seated at ${spec!.id}${_offers.length > 1 ? ' (of ${_offers.length} offers)' : ''}');
       _timer?.cancel();
       _seated.add(spec!);

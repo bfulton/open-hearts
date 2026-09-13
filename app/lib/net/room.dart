@@ -25,15 +25,20 @@ import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
+import '../avatar.dart';
 import '../crypto/deal.dart';
 
 class RoomMember {
-  const RoomMember(this.key, this.name, {this.since = 0});
+  const RoomMember(this.key, this.name, {this.since = 0, this.avatar = Avatar.none});
   final PublicKey key;
   final String name;
 
   /// When they arrived, by their own clock (ms): the seat order.
   final int since;
+
+  /// As they chose to look: the icon and colour from their beats, the
+  /// picture from the one event that carried it.
+  final Avatar avatar;
 }
 
 /// What a room needs of the relay: the lobby events under its code,
@@ -76,6 +81,7 @@ class Room extends ChangeNotifier {
     required this.channel,
     required this.code,
     required this.myName,
+    this.myAvatar = Avatar.none,
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
     this.startAfterMs = 10000,
@@ -89,12 +95,17 @@ class Room extends ChangeNotifier {
     }
     _sub = channel.lobby.listen(_onLobby);
     _say();
+    // The picture is heavy for a beat: once, stored under the code, so
+    // whoever comes later reads it with the rest of the lobby.
+    final picture = myAvatar.picture;
+    if (picture != null) channel.announce({'kind': 'picture', 'jpeg': base64Encode(picture)});
     _timer = Timer.periodic(const Duration(milliseconds: 500), (_) => _tick());
   }
 
-  /// Into the room under [code] on [relay], as [name].
-  factory Room.enter({required RelayTransport relay, required String code, required String name}) =>
-      Room(channel: RelayRoomChannel(relay), code: code, myName: name);
+  /// Into the room under [code] on [relay], as [name], looking like
+  /// [avatar].
+  factory Room.enter({required RelayTransport relay, required String code, required String name, Avatar avatar = Avatar.none}) =>
+      Room(channel: RelayRoomChannel(relay), code: code, myName: name, myAvatar: avatar);
 
   static const startAfter = Duration(seconds: 10);
 
@@ -111,6 +122,7 @@ class Room extends ChangeNotifier {
   final RoomChannel channel;
   final String code;
   final String myName;
+  final Avatar myAvatar;
   final int heartbeatMs;
 
   /// A member not heard from for this long has left.
@@ -132,6 +144,10 @@ class Room extends ChangeNotifier {
 
   final Map<PublicKey, _Present> _others = {};
 
+  /// Pictures by key, from the events that carried them — kept apart
+  /// from presence, since one arrives once and may arrive first.
+  final Map<PublicKey, Uint8List> _pictures = {};
+
   /// A start that seats this device, from someone not heard from yet
   /// — the leader saw four and started before its own first beat
   /// reached here — held for their beat, which is at most two seconds
@@ -149,6 +165,10 @@ class Room extends ChangeNotifier {
   /// Seat number to the human's name, from the start event.
   Map<int, String> seatNames = const {};
 
+  /// Seat number to the human's avatar, from the start event and the
+  /// pictures seen.
+  Map<int, Avatar> seatAvatars = const {};
+
   PublicKey get me => channel.me;
 
   /// Everyone present, this device included, in the order they
@@ -156,9 +176,9 @@ class Room extends ChangeNotifier {
   List<RoomMember> get members {
     final now = _nowMs();
     final all = [
-      RoomMember(me, myName, since: since),
+      RoomMember(me, myName, since: since, avatar: myAvatar),
       for (final p in _others.values)
-        if (now - p.lastHeard <= staleMs) p.member,
+        if (now - p.lastHeard <= staleMs) _withPicture(p.member),
     ];
     all.sort((a, b) => a.since != b.since ? a.since.compareTo(b.since) : a.key.compareTo(b.key));
     return List.unmodifiable(all);
@@ -177,9 +197,21 @@ class Room extends ChangeNotifier {
     return ((startAfterMs - elapsed) / 1000).ceil().clamp(0, startAfterMs ~/ 1000);
   }
 
+  RoomMember _withPicture(RoomMember m) {
+    final picture = _pictures[m.key];
+    return picture == null ? m : RoomMember(m.key, m.name, since: m.since, avatar: m.avatar.copyWith(picture: picture));
+  }
+
   void _say() {
     if (spec != null) return;
-    channel.announce({'kind': 'here', 'name': myName, 'seed': seed, 'since': since, 'policy': botPolicyVersion}, ephemeral: true);
+    channel.announce({
+      'kind': 'here',
+      'name': myName,
+      'seed': seed,
+      'since': since,
+      'policy': botPolicyVersion,
+      'avatar': myAvatar.toJson(withPicture: false),
+    }, ephemeral: true);
     _lastSaid = _nowMs();
   }
 
@@ -212,10 +244,19 @@ class Room extends ChangeNotifier {
     if (e.pubkey == me && c['kind'] != 'start') return;
     final now = _nowMs();
     switch (c['kind']) {
+      case 'picture':
+        final raw = c['jpeg'];
+        if (raw is! String) return;
+        try {
+          final bytes = base64Decode(raw);
+          if (bytes.length <= Avatar.maxPictureBytes) _pictures[e.pubkey] = bytes;
+        } catch (_) {
+          return;
+        }
       case 'here':
         if (spec != null) return;
         final p = _others[e.pubkey];
-        final member = RoomMember(e.pubkey, c['name'] as String? ?? 'Someone', since: c['since'] as int? ?? now);
+        final member = RoomMember(e.pubkey, c['name'] as String? ?? 'Someone', since: c['since'] as int? ?? now, avatar: Avatar.fromJson(c['avatar']));
         if (p == null || now - p.lastHeard > staleMs) {
           // New, or back after going quiet: an arrival either way, and
           // the countdown starts over.
@@ -265,7 +306,7 @@ class Room extends ChangeNotifier {
     final seats = <Map<String, Object?>>[];
     for (var s = 0; s < seatCount; s++) {
       if (s < here.length) {
-        seats.add({'key': here[s].key, 'name': here[s].name});
+        seats.add({'key': here[s].key, 'name': here[s].name, 'avatar': here[s].avatar.toJson(withPicture: false)});
       } else {
         seats.add({'bot': draw[s].id});
       }
@@ -287,6 +328,7 @@ class Room extends ChangeNotifier {
     final seed = c['seed'] as int;
     final seats = <SeatHolder>[];
     final names = <int, String>{};
+    final avatars = <int, Avatar>{};
     var s = 0;
     try {
       for (final raw in c['seats'] as List) {
@@ -294,8 +336,12 @@ class Room extends ChangeNotifier {
         if (m['bot'] is String) {
           seats.add(BotSeat(Persona.named(m['bot'] as String)));
         } else {
-          seats.add(HumanSeat(m['key'] as String));
+          final key = m['key'] as String;
+          seats.add(HumanSeat(key));
           names[s] = m['name'] as String? ?? 'Someone';
+          final chosen = key == me ? myAvatar : Avatar.fromJson(m['avatar']);
+          final picture = key == me ? myAvatar.picture : _pictures[key];
+          avatars[s] = picture == null ? chosen : chosen.copyWith(picture: picture);
         }
         s++;
       }
@@ -318,6 +364,7 @@ class Room extends ChangeNotifier {
     }
     spec = TableSpec(id: code, seed: seed, seats: seats, sealed: sealed);
     seatNames = names;
+    seatAvatars = avatars;
   }
 
   /// Whether this device holds a seat once the table starts.

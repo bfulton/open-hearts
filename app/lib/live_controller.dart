@@ -27,12 +27,14 @@ import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
+import 'avatar.dart';
 import 'table_model.dart';
 
 class LiveController extends ChangeNotifier implements TableModel {
   LiveController({
     required TableSpec spec,
     required this.seatNames,
+    this.seatAvatars = const {},
     required Signer signer,
     required Transport transport,
     RelayTransport? relay,
@@ -68,6 +70,9 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   /// The humans' names by seat, from the lobby.
   final Map<int, String> seatNames;
+
+  /// The humans' avatars by seat, from the lobby.
+  final Map<int, Avatar> seatAvatars;
 
   /// Ratings by key or persona id, on a rated table; null elsewhere.
   final Rating Function(String id)? ratingOf;
@@ -557,6 +562,18 @@ class LiveController extends ChangeNotifier implements TableModel {
   int? bootCountdownMs(int seat) => client.bootCountdownMs(seat);
   @override
   int? clockMs(int seat) => client.clockMs(seat);
+
+  @override
+  String iconSeedOf(int seat) => switch (_shownHolders[seat]) {
+        HumanSeat(:final key) => key,
+        BotSeat(:final persona) => persona.name,
+      };
+
+  @override
+  Avatar avatarOf(int seat) => switch (_shownHolders[seat]) {
+        HumanSeat() => seatAvatars[seat] ?? Avatar.none,
+        BotSeat(:final persona) => Avatar.forBot(persona.name),
+      };
   void boot(int seat) {
     client.boot(seat);
     notifyListeners();
