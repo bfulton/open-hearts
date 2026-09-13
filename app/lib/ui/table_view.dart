@@ -12,8 +12,9 @@ import 'pip.dart';
 
 /// Where each seat's badge sits: pinned to the rail, well clear of the
 /// trick. Seat 0 is the player at the bottom and has no badge — the
-/// scoreboard and the hand say everything about them. Play runs 0-1-2-3,
-/// which reads clockwise once the seats are laid out this way.
+/// score line under the felt and the hand say everything about them.
+/// Play runs 0-1-2-3, which reads clockwise once the seats are laid out
+/// this way.
 const _badgeAt = <int, Alignment>{
   1: Alignment(-1, -0.18),
   2: Alignment(0, -1),
@@ -203,8 +204,9 @@ class _TrickSlot extends StatelessWidget {
   }
 }
 
-/// An opponent: who they are, how many cards they hold, what they have
-/// taken this hand.
+/// An opponent: who they are, where they stand in the game, what they
+/// have taken this hand. Not how many cards they hold — everyone holds
+/// as many as you do.
 class _SeatBadge extends StatelessWidget {
   const _SeatBadge({
     required this.seat,
@@ -221,23 +223,23 @@ class _SeatBadge extends StatelessWidget {
   final bool onTurn;
   final bool won;
 
-  /// One line — name, cards, points — where the felt is short.
+  /// One line — name, total, points — where the felt is short.
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final cards = game.handSizeOf(seat);
+    final total = game.totals[seat];
     final taken = game.taken[seat];
 
-    // One spoken line per seat: who, how many cards, how many points
+    // One spoken line per seat: who, where they stand, how many points
     // this hand, and whether it is their turn.
     return Semantics(
-      label: '$name: $cards cards, $taken points this hand${onTurn ? ', on turn' : ''}',
-      child: ExcludeSemantics(child: _badge(cards, taken)),
+      label: '$name: $total in the game, $taken this hand${onTurn ? ', on turn' : ''}',
+      child: ExcludeSemantics(child: _badge(total, taken)),
     );
   }
 
-  Widget _badge(int cards, int taken) {
+  Widget _badge(int total, int taken) {
     final nameText = Text(
       name,
       style: TextStyle(
@@ -246,12 +248,17 @@ class _SeatBadge extends StatelessWidget {
         color: onTurn ? Palette.gold : Palette.chrome,
       ),
     );
-    final counts = Row(
+    final numbers = Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
-        Icon(Icons.style, size: 11, color: Palette.chromeDim),
-        const SizedBox(width: 3),
-        Text('$cards', style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
+        Text('$total',
+            style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: Palette.chrome.withValues(alpha: 0.85))),
         if (taken > 0) ...[
           const SizedBox(width: 7),
           Pip(
@@ -281,11 +288,11 @@ class _SeatBadge extends StatelessWidget {
       child: compact
           ? Row(
               mainAxisSize: MainAxisSize.min,
-              children: [nameText, const SizedBox(width: 8), counts],
+              children: [nameText, const SizedBox(width: 8), numbers],
             )
           : Column(
               mainAxisSize: MainAxisSize.min,
-              children: [nameText, const SizedBox(height: 3), counts],
+              children: [nameText, const SizedBox(height: 3), numbers],
             ),
     );
   }
@@ -318,12 +325,9 @@ class _TurnHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final seat = game.currentSeat;
     if (seat == null) return const SizedBox.shrink();
-    if (seat == mySeat) {
-      return _Pill(
-        text: game.trick.isEmpty ? 'Your lead' : 'Your turn',
-        tone: Palette.gold,
-      );
-    }
+    // "Your turn" whether leading or following: "your lead" reads as
+    // a standing in the game, and in Hearts leading is no prize.
+    if (seat == mySeat) return const _Pill(text: 'Your turn', tone: Palette.gold);
     return const SizedBox.shrink();
   }
 }

@@ -1,28 +1,29 @@
-/// The whole game on one screen: scores along the top or down the side,
-/// as the screen's shape decides (ui/table_layout.dart), felt in the
-/// middle, your hand along the bottom.
+/// The whole game on one screen: the header along the top, the felt in
+/// the middle, your score under it, your hand along the bottom
+/// (ui/table_layout.dart).
 ///
 /// One screen on purpose. On a phone the game is the app, and anything
-/// that pushes the table off-screen — a menu, a route, a dialog — costs
-/// more than it gives.
+/// that pushes the table off-screen — a route, a dialog — costs more
+/// than it gives. The menu is the one way off it.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'build_info.dart';
+import 'about_page.dart';
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
 import 'game_controller.dart';
-import 'live/lobby_page.dart';
 import 'table_model.dart';
 import 'theme.dart';
 import 'ui/hand_fan.dart';
+import 'ui/header.dart';
 import 'ui/overlays.dart';
 import 'ui/pip.dart';
 import 'ui/scoreboard.dart';
 import 'ui/table_layout.dart';
 import 'ui/table_view.dart';
+import 'ui/update_pill.dart';
 
 class TablePage extends StatefulWidget {
   const TablePage({super.key, this.seed, this.paced = true});
@@ -38,43 +39,20 @@ class TablePage extends StatefulWidget {
   State<TablePage> createState() => _TablePageState();
 }
 
-class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
+class _TablePageState extends State<TablePage> {
   late final GameController _controller;
-
-  /// A newer deploy's tag, once one is seen. Drives the update pill.
-  String? _newBuild;
 
   @override
   void initState() {
     super.initState();
     _controller = GameController(seed: widget.seed, paced: widget.paced)
       ..addListener(_onGameChanged);
-    WidgetsBinding.instance.addObserver(this);
-    if (updateCheckEnabled) _checkForUpdate();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // No polling: a foreground return is the installed-app equivalent of
-    // a page load, and that is the only moment the answer can matter.
-    if (state == AppLifecycleState.resumed && updateCheckEnabled) {
-      _checkForUpdate();
-    }
-  }
-
-  Future<void> _checkForUpdate() async {
-    final deployed = await publishedBuild();
-    if (!mounted) return;
-    setState(() {
-      _newBuild = (deployed != null && deployed != buildTag) ? deployed : null;
-    });
   }
 
   void _onGameChanged() => setState(() {});
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _controller
       ..removeListener(_onGameChanged)
       ..dispose();
@@ -110,7 +88,7 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final game = _controller.game;
-    final hand = game.handOf(_controller.mySeat);
+    final hand = _controller.handShown;
     final legal = _controller.legalNow;
     final passing = _controller.awaitingPass;
 
@@ -121,27 +99,22 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
           child: Stack(
             children: [
               TableLayout(
-                scoreboard: (axis) => Scoreboard(game: game, names: _controller.names, axis: axis),
+                header: TableHeader(
+                  game: game,
+                  menu: [
+                    MenuAction('Leave the table', icon: Icons.logout, onSelected: () => Navigator.of(context).maybePop()),
+                    MenuAction('About', icon: Icons.info_outline, onSelected: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
+                    }),
+                  ],
+                ),
                 felt: Stack(
                   children: [
                     TableView(controller: _controller),
-                    Positioned(
-                      right: 6,
-                      bottom: 2,
-                      child: _BuildStamp(
-                          newBuild: _newBuild, onReload: _reload),
-                    ),
-                    Positioned(
-                      left: 6,
-                      bottom: 2,
-                      child: _LivePill(onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(builder: (_) => const LobbyPage()),
-                        );
-                      }),
-                    ),
+                    const Positioned(right: 6, bottom: 2, child: UpdatePill()),
                   ],
                 ),
+                score: ScoreLine(controller: _controller),
                 action: ActionBar(
                   controller: _controller,
                   onPass: _controller.confirmPass,
@@ -178,8 +151,6 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
       ),
     );
   }
-
-  void _reload() => reloadPage();
 }
 
 /// The line between the felt and your hand: what the game wants from you,
@@ -249,40 +220,29 @@ class ActionBar extends StatelessWidget {
         game.tricksPlayed == 0 &&
         received.isNotEmpty) {
       final from = game.passerTo(controller.mySeat);
-      return SizedBox(
-        height: 30,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Points at the seat the cards came from, so the direction
-            // is read off the table rather than out of the sentence.
-            Icon(_towards(controller.positionOf(from)), size: 14, color: Palette.chromeDim),
-            const SizedBox(width: 3),
-            // A long name gives way before the cards do.
-            Flexible(
-              child: Text('${controller.names[from]} passed you',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
-            ),
-            for (final card in received)
-              Padding(
-                padding: const EdgeInsets.only(left: 9),
-                child: Semantics(
-                  label: card.spoken,
-                  child: ExcludeSemantics(child: CardChip(card: card, size: 14, onFelt: true)),
-                ),
-              ),
-          ],
-        ),
+      return _cardsLine(
+        position: controller.positionOf(from),
+        text: '${controller.names[from]} passed you',
+        cards: received,
       );
     }
 
+    // While the others choose: what you passed, and to whom — out of
+    // the hand, where it would only read as still yours.
+    final passed = controller.passed;
+    if (game.phase == Phase.passing && passed.isNotEmpty) {
+      final to = (controller.mySeat + game.passDirection.seatOffset) % seatCount;
+      return _cardsLine(
+        position: controller.positionOf(to),
+        text: 'Passed to ${controller.names[to]}',
+        cards: passed.toList()..sort(),
+      );
+    }
+
+    // Nothing to say through most of the play: the heart in the header
+    // says whether hearts are broken, and the felt says whose turn.
     final note = switch (game.phase) {
       Phase.passing => 'Waiting for the others',
-      Phase.playing when controller.awaitingPlay => game.heartsBroken
-          ? 'Hearts are broken'
-          : 'Hearts not broken',
       _ => '',
     };
 
@@ -298,6 +258,37 @@ class ActionBar extends StatelessWidget {
   }
 }
 
+/// Three cards and a line about them, with an arrow at the seat they
+/// came from or went to, so the direction is read off the table rather
+/// than out of the sentence.
+Widget _cardsLine({required int position, required String text, required List<engine.Card> cards}) {
+  return SizedBox(
+    height: 30,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(_towards(position), size: 14, color: Palette.chromeDim),
+        const SizedBox(width: 3),
+        // A long name gives way before the cards do.
+        Flexible(
+          child: Text(text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
+        ),
+        for (final card in cards)
+          Padding(
+            padding: const EdgeInsets.only(left: 9),
+            child: Semantics(
+              label: card.spoken,
+              child: ExcludeSemantics(child: CardChip(card: card, size: 14, onFelt: true)),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
 /// Which way a seat lies from the player, as an arrow, by its position
 /// on screen: left, across, right.
 IconData _towards(int position) => switch (position) {
@@ -305,84 +296,3 @@ IconData _towards(int position) => switch (position) {
       2 => Icons.arrow_upward,
       _ => Icons.arrow_forward,
     };
-
-/// The running build, and the tap target that picks up a newer one.
-///
-/// The dev loop publishes on every commit; without this the honest
-/// answer to "is this the new build?" is a hard refresh and a guess.
-class _BuildStamp extends StatelessWidget {
-  const _BuildStamp({required this.newBuild, required this.onReload});
-
-  final String? newBuild;
-  final VoidCallback onReload;
-
-  @override
-  Widget build(BuildContext context) {
-    if (newBuild != null) {
-      return GestureDetector(
-        onTap: onReload,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-          decoration: BoxDecoration(
-            color: Palette.gold,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.refresh, size: 13, color: Felt.dark),
-              const SizedBox(width: 5),
-              Text('$newBuild is up',
-                  style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: Felt.dark)),
-            ],
-          ),
-        ),
-      );
-    }
-    return Text(
-      buildTag,
-      style: TextStyle(
-        fontSize: 9.5,
-        color: Palette.chrome.withValues(alpha: 0.22),
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ),
-    );
-  }
-}
-
-/// The way to a live table: small, and out of the felt's way.
-class _LivePill extends StatelessWidget {
-  const _LivePill({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Palette.gold.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.people_outline, size: 13, color: Palette.gold),
-            const SizedBox(width: 5),
-            Text('Play live',
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Palette.gold.withValues(alpha: 0.9))),
-          ],
-        ),
-      ),
-    );
-  }
-}

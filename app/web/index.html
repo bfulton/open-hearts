@@ -30,8 +30,13 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <!-- The felt, so the address bar and the boot screen do not flash
-       white before the app paints. -->
+       white before the app paints — and the page itself, so what a
+       browser shows past the app's edges (behind a translucent
+       toolbar, on an overscroll) is the table's colour and not white. -->
   <meta name="theme-color" content="#06231A">
+  <style>
+    html, body { background: #06231A; margin: 0; padding: 0; height: 100%; }
+  </style>
   <title>Open Hearts</title>
   <link rel="manifest" href="manifest.json">
 </head>

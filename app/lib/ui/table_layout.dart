@@ -1,15 +1,14 @@
 /// The table's composition, chosen from the space it is given
 /// (docs/05-form-factors.md).
 ///
-/// Portrait and landscape have opposite scarcities. In portrait width
-/// runs out: thirteen cards fan across 390 points, so the score strip
-/// can sit along the top. In landscape there is width to spare and only
-/// 390 points of height, and the strip along the top would take a third
-/// of it before the trick got any — so the strip becomes a rail down
-/// the side, the trick gets its height back, and the hand keeps the
-/// bottom edge near the thumbs, shorter, with more of each card showing.
-/// One layout with the scoreboard on a different edge; everything under
-/// it is shared.
+/// Top to bottom: the header (menu, where the game stands, the heart),
+/// the felt, the player's own score, the action line, the hand. The
+/// same order in portrait and landscape; what changes with the shape
+/// is the hand. In portrait width runs out — thirteen cards fan across
+/// 390 points — so the fan overlaps hard and the cards take the height
+/// they need. In landscape there is width to spare and only 390 points
+/// of height, so the hand is shorter and its fan steps wider, showing
+/// more of each card, and the felt keeps what height is left.
 ///
 /// Chosen from the constraints, never from the device: a phone turning,
 /// a window dragged narrower and a foldable opening are one event, and
@@ -21,28 +20,31 @@ import 'package:flutter/material.dart';
 class TableLayout extends StatelessWidget {
   const TableLayout({
     super.key,
-    required this.scoreboard,
+    required this.header,
     required this.felt,
+    required this.score,
     required this.action,
     required this.hand,
     this.below,
   });
 
-  /// The scoreboard for the edge it gets: a strip ([Axis.horizontal])
-  /// along the top, or a rail ([Axis.vertical]) down the left.
-  final Widget Function(Axis axis) scoreboard;
+  /// The line along the top: the menu, the hand and the pass, the heart.
+  final Widget header;
 
   /// The felt: the trick, the seats, and whatever floats over them.
   final Widget felt;
 
-  /// The line between the felt and the hand.
+  /// The player's own score, just under the felt.
+  final Widget score;
+
+  /// The line between the score and the hand: what the game wants.
   final Widget action;
 
   /// The hand, told whether width is spare — a landscape fan shows more
   /// of each card.
   final Widget Function(bool landscape) hand;
 
-  /// A line between the felt and the action, when a page has one.
+  /// A line between the score and the action, when a page has one.
   final Widget? below;
 
   /// Wider than tall by a margin: a near-square window is laid out as
@@ -54,18 +56,16 @@ class TableLayout extends StatelessWidget {
   static const portraitHandHeight = 128.0;
   static const landscapeHandHeight = 100.0;
 
-  /// The rail's width: four names and totals, and the hand's line.
-  static const railWidth = 118.0;
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final landscape = isLandscape(constraints);
-        final column = Column(
+        return Column(
           children: [
-            if (!landscape) scoreboard(Axis.horizontal),
+            header,
             Expanded(child: felt),
+            score,
             ?below,
             action,
             Padding(
@@ -75,14 +75,6 @@ class TableLayout extends StatelessWidget {
                 child: hand(landscape),
               ),
             ),
-          ],
-        );
-        if (!landscape) return column;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(width: railWidth, child: scoreboard(Axis.vertical)),
-            Expanded(child: column),
           ],
         );
       },

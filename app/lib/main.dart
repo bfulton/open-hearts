@@ -3,7 +3,7 @@ import 'package:flutter/semantics.dart';
 
 import 'crypto/deal.dart';
 import 'crypto/schnorr.dart';
-import 'table_page.dart';
+import 'home_page.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -27,7 +27,7 @@ class OpenHeartsApp extends StatelessWidget {
       title: 'Open Hearts',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: const TablePage(),
+      home: const HomePage(),
     );
   }
 }

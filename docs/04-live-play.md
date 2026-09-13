@@ -106,8 +106,8 @@ A bot's identity is its name and its rung: `Westley` at the top,
 
 ## The live table, as it stands
 
-What the app does today. **Play live** on the solo
-table opens a lobby: a name, and the choice — *Rated* or *Unrated* —
+What the app does today. **Play live** on the home
+screen opens a lobby: a name, and the choice — *Rated* or *Unrated* —
 then a waiting screen and nothing to do. There is no matchmaker.
 Players who want a game say so on the relay every couple of seconds,
 in the pool they chose, with their rating and how long they have
@@ -126,7 +126,7 @@ host says nothing for a round, the next key steps in — a host can only
 waste five seconds, and it cannot forge a play. Two hosts with
 different views may seat someone twice; they take the seating with the
 lower table id, and the other table's empty seat is booted at its first
-turn. A rated table says so on the rail and in its record, and every
+turn. A rated table says so on the felt and in its record, and every
 name on it carries a rating. Below that, *With friends*: *Host a table* — a
 four-letter code to read out — or *Join* with one; the room is the
 relay's business too (`Room`), and it starts ten seconds after the
@@ -143,19 +143,21 @@ limits and no uptime promise, and one turned on a live table six
 minutes in — every event answered with a proof-of-work demand, the
 play on its way reaching nobody, the seat booted for silence — so a
 refusal moves the event on to the next relay, and when every relay
-refuses, the rail says so. Writing to one keeps the relays' cost what
+refuses, the line under the felt says so. Writing to one keeps the relays' cost what
 it was; listening on all is what lets peers that write to different
 ones hear each other. The list's order is turned by a hash of the
 table id, so tables spread over the relays. The table is drawn from
-whichever chair you hold. On its rail: who has been heard from lately;
-the boot clock on a seat that is holding everyone up, and the *Boot*
-button when it runs out; *Leave*; and, when the table is stuck, why —
+whichever chair you hold. On the felt, who has been heard from lately;
+on the line under it, the boot clock on a seat that is holding everyone
+up, and the *Boot* button when it runs out, and, when the table is
+stuck, why —
 no relay taking this device's events, waiting for the others, asking
 the jury, waiting for a jury when nobody was
 online to draw one from, or opening a departed player's hand from its
-escrow. A seat that is booted or falls silent sees *A bot took your
+escrow. *Leave the table* is on the menu. A seat that is booted or
+falls silent sees *A bot took your
 seat*. Every table is sealed ([doc 03](03-fair-deal.md), "As built"):
-the rail shows the deal at each hand — the keys, the shuffling, the
+the line shows the deal at each hand — the keys, the shuffling, the
 cards dealt and opened — for a couple of seconds on a desktop and a few
 on a phone, and the other people's cards are backs that nobody but
 their holder can turn. Every open app says it is online and serves

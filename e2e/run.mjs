@@ -226,7 +226,7 @@ async function playUntil(pages, done, { timeout = 120000, idle = [] } = {}) {
 
 const names = ['Ada', 'Bao', 'Cara', 'Dee'];
 /// A seat badge that is not one of the four people: a bot took a seat.
-const roster = /^(?!Ada:|Bao:|Cara:|Dee:)[A-Z][\w ]+: \d+ cards, \d+ points this hand/;
+const roster = /^(?!Ada:|Bao:|Cara:|Dee:)[A-Z][\w ]+: \d+ in the game, \d+ this hand/;
 
 async function main() {
   // RELAY_URL=wss://… runs the suite against a relay that already
@@ -253,9 +253,9 @@ async function main() {
       contexts.push(ctx);
       pages.push(page);
     }
-    // Everyone to the lobby.
+    // Everyone to the lobby, from the front door.
     for (const [i, page] of pages.entries()) {
-      await waitFor(page, /^Play live$/, { what: 'the solo table' });
+      await waitFor(page, /^Play live$/, { what: 'the home screen' });
       await click(page, /^Play live$/);
       await waitFor(page, /^Host a table$/);
       await type(page, 'Relays', relay.url);
@@ -273,13 +273,15 @@ async function main() {
     log('matched: three together, one with bots');
     await playUntil(pages, (p) => has(p, /^On with it$/), { timeout: 180000 });
     log('a matched hand played on every screen');
-    // Back to the lobby for the rest: Leave, then Play live again. The
-    // score sheet goes on its own after a few seconds, so it may be
-    // gone by the time a page is reached.
+    // Back to the lobby for the rest: leave by the menu, then Play live
+    // again from the home screen. The score sheet goes on its own after
+    // a few seconds, so it may be gone by the time a page is reached.
     for (const page of pages) {
       if (await has(page, /^On with it$/)) await click(page, /^On with it$/);
-      await click(page, /^Leave$/);
-      await waitFor(page, /^Play live$/, { what: 'the solo table again' });
+      await click(page, /^Menu$/);
+      await waitFor(page, /^Leave the table$/, { what: 'the menu' });
+      await click(page, /^Leave the table$/);
+      await waitFor(page, /^Play live$/, { what: 'the home screen again' });
       await click(page, /^Play live$/);
       await waitFor(page, /^Host a table$/);
       await type(page, 'Relays', relay.url);

@@ -43,12 +43,26 @@ abstract class TableModel implements Listenable {
   /// taken from the hand: a pending play, a pending pass.
   Set<Card> get inFlight => const {};
 
+  /// The three the player passed, while the others are still choosing:
+  /// off the hand and up on the line, so what went is in view until the
+  /// pass resolves. Empty at every other moment.
+  Set<Card> get passed => const {};
+
   /// Where a seat sits on screen: 0 is the player at the bottom, then
   /// clockwise — 1 left, 2 across, 3 right.
   int positionOf(int seat) => (seat - mySeat + seatCount) % seatCount;
 
   /// The inverse of [positionOf].
   int seatAt(int position) => (position + mySeat) % seatCount;
+}
+
+extension TableModelHand on TableModel {
+  /// The hand as the player holds it: what the game deals them, less
+  /// what they have committed.
+  List<Card> get handShown => [
+        for (final c in game.handOf(mySeat))
+          if (!inFlight.contains(c) && !passed.contains(c)) c,
+      ];
 }
 
 /// Why a card cannot be played right now, phrased as the rule: a Hearts

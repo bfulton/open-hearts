@@ -120,7 +120,9 @@ class GameController extends ChangeNotifier implements TableModel {
     return Duration(milliseconds: pace.minMs + _rhythm.nextInt(pace.maxMs - pace.minMs + 1));
   }
   Duration get _trickHold => paced ? const Duration(milliseconds: 950) : Duration.zero;
-  Duration get _passBeat => paced ? const Duration(milliseconds: 350) : Duration.zero;
+  /// How long the player's three sit on the line, gone from the hand,
+  /// before the others' come back: the swap is seen as a swap.
+  Duration get _passBeat => paced ? const Duration(milliseconds: 900) : Duration.zero;
 
   /// After the last trick of a hand is swept, a beat of bare felt
   /// before the sheet: long enough for the cards to fade out as every
@@ -185,6 +187,10 @@ class GameController extends ChangeNotifier implements TableModel {
   Set<Card> get inFlight => const {};
 
   @override
+  Set<Card> get passed =>
+      _game.phase == Phase.passing ? (_game.passOf(humanSeat) ?? const []).toSet() : const {};
+
+  @override
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
     final legal = _game.legalPlaysFor(humanSeat);
@@ -225,12 +231,15 @@ class GameController extends ChangeNotifier implements TableModel {
       while (!_disposed) {
         if (_game.phase == Phase.passing) {
           if (_game.passOf(humanSeat) == null) break; // the player owes cards
+          // The bots take a moment over theirs, with the player's three
+          // already off the hand and on the line; then the pass resolves
+          // and three come back.
+          if (!await _wait(_passBeat)) return;
           for (var s = 0; s < seatCount; s++) {
             if (s != humanSeat && _game.passOf(s) == null) {
               _game.setPass(s, _bots[s]!.choosePass(_game.handOf(s)));
             }
           }
-          if (!await _wait(_passBeat)) return;
           notifyListeners();
           continue;
         }

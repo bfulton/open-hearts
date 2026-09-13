@@ -41,7 +41,7 @@ content-addressed, so a redeploy typically re-uploads under ten files.
 A phone keeps a page alive for days. Without help, "did my change land?"
 is a hard refresh and a guess. So:
 
-- the running build's sha is stamped in the corner of the table;
+- the running build's sha and date are on the About page, off the menu;
 - `deploy.sh` passes `--dart-define=UPDATE_CHECK=on`, and only deploy.sh
   does. The app then fetches `build-info.json` at launch and on every
   return to the foreground, and shows a tap-to-reload pill when the

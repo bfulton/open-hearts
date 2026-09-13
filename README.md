@@ -99,9 +99,9 @@ rigged. Roughly in order:
    its escrow of the deal.
 7. **Landscape**, then **tablet**, then **iPhone Duo**
    ([doc 05](docs/05-form-factors.md)). Landscape is built: the phone
-   on its side gets the second composition, the score rail down the
-   side and the hand shorter and wider, chosen from the space the
-   table is given and never from the device; a turn mid-hand keeps the
+   on its side gets the second composition, the hand shorter and
+   wider under the same slim header, chosen from the space the table
+   is given and never from the device; a turn mid-hand keeps the
    game. Tablet and the Duo are next.
 8. **The stores.**
 

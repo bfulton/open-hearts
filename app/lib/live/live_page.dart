@@ -1,7 +1,7 @@
 /// A live table: the same screen as solo play, driven by the protocol.
-/// What is different is on the felt's rail — who is connected, the
-/// boot clock on a seat that is holding everyone up, a pause and why —
-/// and the one button solo play does not have: Leave.
+/// What is different is on the felt and its line — who is connected,
+/// the boot clock on a seat that is holding everyone up, a pause and
+/// why — and what leaving means: a bot takes the seat.
 library;
 
 import 'package:flutter/material.dart';
@@ -9,10 +9,13 @@ import 'package:engine/engine.dart' as engine;
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
+import '../about_page.dart';
 import '../live_controller.dart';
+import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
 import '../ui/hand_fan.dart';
+import '../ui/header.dart';
 import '../ui/overlays.dart';
 import '../ui/scoreboard.dart';
 import '../ui/table_layout.dart';
@@ -63,9 +66,11 @@ class _LivePageState extends State<LivePage> {
   }
 
   Future<void> _leave() async {
-    _c.leave();
-    // Let the leave reach the wire before the transport goes.
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (_c.amSeated && !_c.done) {
+      _c.leave();
+      // Let the leave reach the wire before the transport goes.
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+    }
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -85,8 +90,8 @@ class _LivePageState extends State<LivePage> {
     );
   }
 
-  /// The rail's line: a pause and why, or a boot clock on the seat
-  /// holding everyone up, or nothing special.
+  /// The line under the felt: a pause and why, or a boot clock on the
+  /// seat holding everyone up, or nothing special.
   Widget? _liveNote() {
     final game = _c.game;
     // Cut off from every relay comes first: it is the cause of most of
@@ -110,8 +115,8 @@ class _LivePageState extends State<LivePage> {
       final left = _c.bootCountdownMs(seat);
       if (left == null) continue;
       if (_c.canBoot(seat)) {
-        // Sized to the rail's line, which is thirty pixels: a button at
-        // its default height was clipped top and bottom.
+        // Sized to the line, which is thirty pixels: a button at its
+        // default height was clipped top and bottom.
         return TextButton.icon(
           onPressed: () => _c.boot(seat),
           icon: const Icon(Icons.timer_off_outlined, size: 15),
@@ -133,7 +138,7 @@ class _LivePageState extends State<LivePage> {
   static Widget _note(String text) =>
       Text(text, style: const TextStyle(fontSize: 12, color: Palette.chromeDim));
 
-  /// A relay's reason, cut to the rail's line.
+  /// A relay's reason, cut to the line.
   static String _short(String reason) => reason.length > 40 ? '${reason.substring(0, 39)}…' : reason;
 
   @override
@@ -141,7 +146,7 @@ class _LivePageState extends State<LivePage> {
     final game = _c.game;
     // What the player has committed is already off the hand.
     // Nothing yet while a sealed table deals.
-    final hand = game.knowsHand(_c.mySeat) ? game.handOf(_c.mySeat).where((c) => !_c.inFlight.contains(c)).toList() : <engine.Card>[];
+    final hand = game.knowsHand(_c.mySeat) ? _c.handShown : <engine.Card>[];
     final legal = _c.legalNow;
     final passing = _c.awaitingPass;
     final ended = _c.handJustEnded;
@@ -153,7 +158,15 @@ class _LivePageState extends State<LivePage> {
           child: Stack(
             children: [
               TableLayout(
-                scoreboard: (axis) => Scoreboard(game: game, names: _c.names, mySeat: _c.mySeat, axis: axis),
+                header: TableHeader(
+                  game: game,
+                  menu: [
+                    MenuAction('Leave the table', icon: Icons.logout, onSelected: _leave),
+                    MenuAction('About', icon: Icons.info_outline, onSelected: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
+                    }),
+                  ],
+                ),
                 felt: Stack(
                   children: [
                     TableView(controller: _c),
@@ -162,17 +175,9 @@ class _LivePageState extends State<LivePage> {
                       top: 4,
                       child: _Presence(controller: _c),
                     ),
-                    Positioned(
-                      right: 6,
-                      top: 4,
-                      child: TextButton(
-                        onPressed: _c.amSeated && !_c.done ? _leave : null,
-                        style: TextButton.styleFrom(foregroundColor: Palette.chromeDim),
-                        child: const Text('Leave', style: TextStyle(fontSize: 12)),
-                      ),
-                    ),
                   ],
                 ),
+                score: ScoreLine(controller: _c),
                 below: _debugState(),
                 action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
                 hand: (landscape) => HandFan(
@@ -202,7 +207,7 @@ class _LivePageState extends State<LivePage> {
                   game: game,
                   names: _c.names,
                   mySeat: _c.mySeat,
-                  action: 'Back to the lobby',
+                  action: 'Home',
                   onNewGame: () => Navigator.of(context).pop(),
                 ),
               if (!_c.amSeated && !_c.done) _Replaced(onBack: () => Navigator.of(context).pop()),

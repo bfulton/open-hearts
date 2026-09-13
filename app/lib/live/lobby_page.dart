@@ -399,7 +399,7 @@ class _LobbyPageState extends State<LobbyPage> {
         const SizedBox(height: 18),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Back to the table', style: TextStyle(color: Palette.chromeDim)),
+          child: const Text('Back', style: TextStyle(color: Palette.chromeDim)),
         ),
       ],
     );

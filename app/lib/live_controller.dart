@@ -502,6 +502,13 @@ class LiveController extends ChangeNotifier implements TableModel {
   Set<Card> get inFlight => {?_pendingPlay, ..._pendingPass};
 
   @override
+  Set<Card> get passed {
+    if (_pendingPass.isNotEmpty) return _pendingPass;
+    if (_shown.phase == Phase.passing && _shown.hasPassed(mySeat)) return (_shown.passOf(mySeat) ?? const []).toSet();
+    return const {};
+  }
+
+  @override
   void toggleSelected(Card card) {
     if (!awaitingPass) return;
     if (!_selected.remove(card)) {
