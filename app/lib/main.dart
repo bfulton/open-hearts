@@ -4,6 +4,7 @@ import 'package:flutter/semantics.dart';
 import 'crypto/deal.dart';
 import 'crypto/schnorr.dart';
 import 'home_page.dart';
+import 'net/room.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -23,11 +24,14 @@ class OpenHeartsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A shared link carries a room code: the front door opens onto
+    // that room.
+    final room = Uri.base.queryParameters['room']?.trim().toUpperCase();
     return MaterialApp(
       title: 'Open Hearts',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: const HomePage(),
+      home: HomePage(openRoom: room != null && Room.validCode(room) ? room : null),
     );
   }
 }

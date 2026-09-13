@@ -9,8 +9,27 @@ import 'table_page.dart';
 import 'theme.dart';
 import 'ui/update_pill.dart';
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key, this.openRoom});
+
+  /// A room to open onto, from a shared link.
+  final String? openRoom;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    final code = widget.openRoom;
+    if (code != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _go(context, LobbyPage(code: code));
+      });
+    }
+  }
 
   void _go(BuildContext context, Widget page) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));

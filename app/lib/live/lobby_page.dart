@@ -5,6 +5,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:table/table.dart';
 
 import '../crypto/deal.dart';
@@ -14,6 +15,7 @@ import '../net/duty.dart';
 import '../net/relays.dart';
 import '../net/mesh_transport.dart';
 import '../net/room.dart';
+import '../net/share.dart';
 import '../net/standing.dart';
 import '../net/turn.dart';
 import '../theme.dart';
@@ -35,7 +37,10 @@ final _debugging = Uri.base.queryParameters.containsKey('e2e');
 const devRoom = String.fromEnvironment('DEV_ROOM');
 
 class LobbyPage extends StatefulWidget {
-  const LobbyPage({super.key});
+  const LobbyPage({super.key, this.code});
+
+  /// A room to go straight into: the code from a shared link.
+  final String? code;
 
   @override
   State<LobbyPage> createState() => _LobbyPageState();
@@ -43,7 +48,7 @@ class LobbyPage extends StatefulWidget {
 
 class _LobbyPageState extends State<LobbyPage> {
   final _name = TextEditingController();
-  final _code = TextEditingController(text: devRoom);
+  late final _code = TextEditingController(text: widget.code ?? devRoom);
   final List<Uri> _relays = appRelays();
   String? _error;
   bool _busy = false;
@@ -65,12 +70,46 @@ class _LobbyPageState extends State<LobbyPage> {
   /// localhost.
   List<Map<String, Object?>>? _iceServers;
 
+  /// Since when this device has been listening on the relays for who
+  /// is online; null until they answer. The count is not shown for the
+  /// first announcement period after, since the announcements are
+  /// ephemeral and nobody is heard until they say so again.
+  int? _listeningSinceMs;
+  Timer? _onlineClock;
+
   @override
   void initState() {
     super.initState();
     Identity.name().then((n) {
-      if (n != null && mounted) _name.text = n;
+      if (!mounted) return;
+      if (n != null) _name.text = n;
+      // Here by a link, with a name already: straight into the room.
+      if (widget.code != null && n != null && n.isNotEmpty) _enter();
     });
+    // Online from the lobby, not only from a table: this device is a
+    // juror to draw on as soon as the app is open here, and it sees
+    // who else is.
+    Identity.signer().then((signer) {
+      if (!mounted) return;
+      _signer = signer;
+      final duty = Duty.on(_relays, signer, log: _debugging, crypto: dealCrypto);
+      duty.presence.ready.then((_) {
+        if (mounted) setState(() => _listeningSinceMs = DateTime.now().millisecondsSinceEpoch);
+      });
+      _onlineClock = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    });
+  }
+
+  /// How many devices are online, this one included, once this device
+  /// has listened long enough to have heard everyone; null before.
+  int? get _online {
+    final since = _listeningSinceMs;
+    final duty = Duty.current;
+    if (since == null || duty == null) return null;
+    if (DateTime.now().millisecondsSinceEpoch - since < duty.presence.everyMs + 1500) return null;
+    return duty.presence.online(withinMs: 15000).length;
   }
 
   /// Ratings, from the relays that just answered — never from an
@@ -91,6 +130,7 @@ class _LobbyPageState extends State<LobbyPage> {
     _queueSub?.cancel();
     _queue?.close();
     _waitClock?.cancel();
+    _onlineClock?.cancel();
     _refusalSub?.cancel();
     _transport?.close(); // a matched or started table has its own
     _name.dispose();
@@ -201,16 +241,18 @@ class _LobbyPageState extends State<LobbyPage> {
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => LivePage(controller: controller)));
   }
 
-  Future<void> _enter({required bool host}) async {
-    final code = host ? (devRoom.isNotEmpty ? devRoom : Room.newCode()) : _code.text.trim().toUpperCase();
-    if (!host && code.length != 4) return setState(() => _error = 'A room code is four letters');
+  /// Into the room at the code typed, or at a new one when the field
+  /// is empty: whoever is there is the table, and the first to arrive
+  /// is nobody special.
+  Future<void> _enter() async {
+    final typed = _code.text.trim().toUpperCase();
+    final code = typed.isEmpty ? Room.newCode() : typed;
+    if (!Room.validCode(code)) return setState(() => _error = 'A room code is four letters or digits');
     final transport = await _connect(code);
     if (transport == null) return;
     try {
       final name = _name.text.trim();
-      final room = host
-          ? Room.host(relay: transport, code: code, name: name)
-          : Room.join(relay: transport, code: code, name: name);
+      final room = Room.enter(relay: transport, code: code, name: name);
       room.addListener(_onRoom);
       setState(() => _room = room);
     } on TimeoutException {
@@ -224,6 +266,18 @@ class _LobbyPageState extends State<LobbyPage> {
         _error = 'Could not connect: $e';
       });
     }
+  }
+
+  /// The link to this room: the phone's share sheet where there is
+  /// one, else onto the clipboard, and said so.
+  Future<void> _share(String code) async {
+    final link = roomLink(code);
+    if (await shareLink(link)) return;
+    await Clipboard.setData(ClipboardData(text: link.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Link copied', textAlign: TextAlign.center), duration: Duration(milliseconds: 1600), width: 200));
   }
 
   void _onRoom() {
@@ -272,7 +326,7 @@ class _LobbyPageState extends State<LobbyPage> {
                         ? _WaitingView(queue: queue, onCancel: () => Navigator.of(context).pop())
                         : room == null
                             ? _entry()
-                            : _RoomView(room: room, onLeave: () => Navigator.of(context).pop()),
+                            : _RoomView(room: room, onLeave: () => Navigator.of(context).pop(), onShare: () => _share(room.code)),
                     if (_relayNote != null && (queue != null || room != null)) ...[
                       const SizedBox(height: 14),
                       Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
@@ -303,7 +357,9 @@ class _LobbyPageState extends State<LobbyPage> {
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 10),
+        _OnlineLine(count: _online),
+        const SizedBox(height: 12),
         TextField(
           controller: _name,
           textCapitalization: TextCapitalization.words,
@@ -335,30 +391,44 @@ class _LobbyPageState extends State<LobbyPage> {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.chromeDim, letterSpacing: 0.4)),
         const SizedBox(height: 10),
-        OutlinedButton(
-          onPressed: _busy ? null : () => _enter(host: true),
-          style: _secondary(),
-          child: const Text('Host a table', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        ),
-        const SizedBox(height: 10),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            SizedBox(
+              width: 132,
               child: TextField(
                 controller: _code,
+                // A code is four letters or digits, typed as such: no
+                // capitalising, correcting or suggesting, and nothing
+                // else gets in.
                 textCapitalization: TextCapitalization.characters,
+                autocorrect: false,
+                enableSuggestions: false,
+                smartDashesType: SmartDashesType.disabled,
+                smartQuotesType: SmartQuotesType.disabled,
+                keyboardType: TextInputType.visiblePassword,
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')), LengthLimitingTextInputFormatter(4)],
                 maxLength: 4,
                 decoration: _field('Room code').copyWith(counterText: ''),
                 style: const TextStyle(color: Palette.chrome, letterSpacing: 4, fontWeight: FontWeight.w700),
+                onSubmitted: (_) => _busy ? null : _enter(),
               ),
             ),
             const SizedBox(width: 10),
-            OutlinedButton(
-              onPressed: _busy ? null : () => _enter(host: false),
-              style: _secondary(),
-              child: const Text('Join', style: TextStyle(fontWeight: FontWeight.w600)),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _busy ? null : _enter,
+                style: _secondary().copyWith(padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 15, horizontal: 12))),
+                child: const Text('Play with friends', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              ),
             ),
           ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'A code from a friend, or none for a new table to share.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11.5, color: Palette.chromeDim),
         ),
         if (_error != null) ...[
           const SizedBox(height: 14),
@@ -436,19 +506,23 @@ class _WaitingView extends StatelessWidget {
 }
 
 /// The room while it fills: the code, who is here, and the countdown.
+/// The same screen for everyone in it; the one who leads sees Start
+/// now, and that is the whole of the difference.
 class _RoomView extends StatelessWidget {
-  const _RoomView({required this.room, required this.onLeave});
+  const _RoomView({required this.room, required this.onLeave, required this.onShare});
 
   final Room room;
   final VoidCallback onLeave;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
     final seconds = room.secondsToStart;
+    final members = room.members;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(room.isHost ? 'Your table' : 'Table ${room.code}',
+        Text('Table ${room.code}',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 14, color: Palette.chromeDim, letterSpacing: 0.4)),
         const SizedBox(height: 6),
@@ -457,46 +531,88 @@ class _RoomView extends StatelessWidget {
             style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w800, color: Palette.gold, letterSpacing: 10)),
         const SizedBox(height: 4),
         Text(
-          !room.found
-              ? 'Looking for that table…'
-              : seconds == null
-                  ? (room.isHost ? 'Read the code out. The table starts ten seconds after someone joins.' : 'Waiting for the host')
-                  : 'Starting in $seconds s — empty seats go to bots',
+          seconds == null
+              ? 'Read the code out, or share the link. The table starts ten seconds after someone joins.'
+              : 'Starting in $seconds s — empty seats go to bots',
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
+        TextButton.icon(
+          onPressed: onShare,
+          icon: const Icon(Icons.ios_share, size: 17),
+          label: const Text('Share the link', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          style: TextButton.styleFrom(foregroundColor: Palette.gold),
+        ),
+        const SizedBox(height: 10),
         for (var i = 0; i < 4; i++)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 5),
             child: Row(
               children: [
-                Icon(i < room.members.length ? Icons.person : Icons.smart_toy_outlined,
-                    size: 16, color: i < room.members.length ? Palette.gold : Palette.chromeDim),
+                Icon(i < members.length ? Icons.person : Icons.smart_toy_outlined,
+                    size: 16, color: i < members.length ? Palette.gold : Palette.chromeDim),
                 const SizedBox(width: 10),
                 Text(
-                  i < room.members.length
-                      ? (room.members[i].key == room.me ? '${room.members[i].name} (you)' : room.members[i].name)
+                  i < members.length
+                      ? (members[i].key == room.me ? '${members[i].name} (you)' : members[i].name)
                       : 'a bot, unless someone joins',
                   style: TextStyle(
                     fontSize: 15,
-                    color: i < room.members.length ? Palette.chrome : Palette.chromeDim,
-                    fontWeight: i < room.members.length ? FontWeight.w600 : FontWeight.w400,
+                    color: i < members.length ? Palette.chrome : Palette.chromeDim,
+                    fontWeight: i < members.length ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
               ],
             ),
           ),
         const SizedBox(height: 22),
-        if (room.isHost)
+        if (room.amLeader)
           FilledButton(
-            onPressed: room.members.length >= 2 ? room.start : null,
+            onPressed: members.length >= 2 ? room.start : null,
             style: _LobbyPageState._primary(),
             child: const Text('Start now', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
         const SizedBox(height: 8),
         TextButton(onPressed: onLeave, child: const Text('Leave', style: TextStyle(color: Palette.chromeDim))),
       ],
+    );
+  }
+}
+
+/// Who else has the app open, from the relays' presence: a count with
+/// this device in it, or nothing while there is nothing to say yet.
+/// One spoken line, "3 online", so a screen reader and the suite read
+/// the same thing.
+class _OnlineLine extends StatelessWidget {
+  const _OnlineLine({required this.count});
+
+  /// Devices online, this one included; null before the relays have
+  /// been heard from.
+  final int? count;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = count;
+    // Holds its line while there is nothing to say, so the page does
+    // not jump when the count arrives.
+    if (n == null) return const SizedBox(height: 18);
+    final text = n <= 1 ? 'Nobody else online' : '$n online';
+    return Semantics(
+      label: text,
+      child: ExcludeSemantics(
+        child: SizedBox(
+          height: 18,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.people_outline, size: 14, color: n <= 1 ? Palette.chromeDim : Palette.gold.withValues(alpha: 0.85)),
+              const SizedBox(width: 5),
+              Text(text, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: n <= 1 ? Palette.chromeDim : Palette.gold.withValues(alpha: 0.9))),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

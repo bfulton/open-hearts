@@ -64,7 +64,7 @@ rigged. Roughly in order:
    whoever is waiting on the relay seats each other four to a table
    every five seconds — no matchmaker, the lowest key present hosts
    the round — leftovers first next time, bots at your rating after
-   ten; or host a four-letter code for friends. Either way the four of
+   ten; or a four-letter code, or a link, for friends. Either way the four of
    you are on WebRTC data channels, the relay beside them, signing
    in wasm since Dart-to-JavaScript signatures cost 100 ms each
    ([measurements](measurements/README.md)). Rated games move a

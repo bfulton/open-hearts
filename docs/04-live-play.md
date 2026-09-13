@@ -107,7 +107,8 @@ A bot's identity is its name and its rung: `Westley` at the top,
 ## The live table, as it stands
 
 What the app does today. **Play live** on the home
-screen opens a lobby: a name, and the choice — *Rated* or *Unrated* —
+screen opens a lobby: how many devices are online, a name, and the
+choice — *Rated* or *Unrated* —
 then a waiting screen and nothing to do. There is no matchmaker.
 Players who want a game say so on the relay every couple of seconds,
 in the pool they chose, with their rating and how long they have
@@ -127,11 +128,17 @@ waste five seconds, and it cannot forge a play. Two hosts with
 different views may seat someone twice; they take the seating with the
 lower table id, and the other table's empty seat is booted at its first
 turn. A rated table says so on the felt and in its record, and every
-name on it carries a rating. Below that, *With friends*: *Host a table* — a
-four-letter code to read out — or *Join* with one; the room is the
-relay's business too (`Room`), and it starts ten seconds after the
-last person arrives, or at four, or on *Start now*, by the same kind
-of start event. The transport is a WebRTC data channel to every
+name on it carries a rating. Below that, *With friends*: a room code —
+four letters or digits, a friend's, or none for a new one — and one
+button, *Play with friends*; the room shows the code and a *Share the
+link* that carries it, and a link opened lands in the room. Nobody
+hosts a room: everyone at a code says so on the relay every two
+seconds, whoever has been heard lately is the table in the order they
+arrived, and the lowest key present leads — it starts the table ten
+seconds after the last arrival, at once at four, or on *Start now*,
+by the same kind of start event, and a leader who leaves is simply no
+longer present (`Room`). A start counts only from someone present and
+only if recent, since the relay keeps them and a code gets reused. The transport is a WebRTC data channel to every
 other person, set up over the relays' signalling and carrying the
 table's events directly, and through a relay as well — the path to a
 peer whose channel is not open, and the only path to a juror, which

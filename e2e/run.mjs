@@ -276,9 +276,13 @@ async function main() {
     for (const [i, page] of pages.entries()) {
       await waitFor(page, /^Play live$/, { what: 'the home screen' });
       await click(page, /^Play live$/);
-      await waitFor(page, /^Host a table$/);
+      await waitFor(page, /^Play with friends$/);
       await type(page, 'Your name', names[i]);
     }
+    // Every device is online from the lobby, and each one sees the
+    // other three: presence over the relay, before anyone sits down.
+    for (const page of pages) await waitFor(page, /^4 online$/, { what: 'everyone online in the lobby', timeout: 40000 });
+    log('four online in the lobby');
 
     // Cell 0: matchmaking. Three ask for an unrated game and are seated
     // together with a bot at the round after ten seconds; the fourth,
@@ -301,20 +305,26 @@ async function main() {
       await click(page, /^Leave the table$/);
       await waitFor(page, /^Play live$/, { what: 'the home screen again' });
       await click(page, /^Play live$/);
-      await waitFor(page, /^Host a table$/);
+      await waitFor(page, /^Play with friends$/);
     }
 
-    // Ada hosts; the code is the only four-capital-letter text on her screen.
-    await click(pages[0], /^Host a table$/);
+    // Ada goes in with no code, so a new one is drawn: the only
+    // four-capital-letter text on her screen. Nobody hosts; whoever
+    // is at a code is the table.
+    await click(pages[0], /^Play with friends$/);
     await waitFor(pages[0], /^Read the code out/, { what: 'the room' });
     const code = (await texts(pages[0])).find((t) => /^[A-Z]{4}$/.test(t));
     if (!code) throw new Error('no room code shown');
     log(`room ${code}`);
-    for (let i = 1; i < 4; i++) {
+    // Bao arrives by the shared link — the app's own address with the
+    // code — and, with a name already, lands straight in the room.
+    await pages[1].goto(`${app.url}/?e2e=1&room=${code}`);
+    await waitFor(pages[1], new RegExp(`^Table ${code}$`), { what: 'the room, by its link', timeout: 60000 });
+    for (let i = 2; i < 4; i++) {
       await type(pages[i], 'Room code', code);
-      await click(pages[i], /^Join$/);
+      await click(pages[i], /^Play with friends$/);
     }
-    // Four in: the host starts on its own.
+    // Four in: whoever leads starts on its own.
     for (const page of pages) await waitFor(page, /^4 of 4 here  ·  unrated$/, { what: 'the live table', timeout: 40000 });
     log('all four at the table');
 
