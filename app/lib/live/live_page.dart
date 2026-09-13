@@ -147,6 +147,17 @@ class _LivePageState extends State<LivePage> {
 
   @override
   Widget build(BuildContext context) {
+    // A seat that is no longer this player's — booted, or ruled absent
+    // by a jury — shows no table at all: watching a bot play your cards
+    // is not a thing to look at. Just what happened, and the way back.
+    if (!_c.amSeated) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(gradient: Felt.gradient),
+          child: SafeArea(child: _Replaced(onBack: () => Navigator.of(context).pop())),
+        ),
+      );
+    }
     final game = _c.game;
     // What the player has committed is already off the hand.
     // Nothing yet while a sealed table deals.
@@ -218,7 +229,6 @@ class _LivePageState extends State<LivePage> {
                   action: 'Home',
                   onNewGame: () => Navigator.of(context).pop(),
                 ),
-              if (!_c.amSeated && !_c.done) _Replaced(onBack: () => Navigator.of(context).pop()),
             ],
           ),
         ),
@@ -259,34 +269,31 @@ class _Replaced extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black.withValues(alpha: 0.62),
-      child: Center(
-        child: Container(
-          margin: const EdgeInsets.all(22),
-          padding: const EdgeInsets.all(22),
-          constraints: const BoxConstraints(maxWidth: 380),
-          decoration: BoxDecoration(
-            color: Felt.mid,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Palette.danger.withValues(alpha: 0.45)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('A bot took your seat',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
-              const SizedBox(height: 6),
-              const Text('The table could not hear from you, and went on.',
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Palette.chromeDim)),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: onBack,
-                style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
-                child: const Text('Back'),
-              ),
-            ],
-          ),
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(22),
+        constraints: const BoxConstraints(maxWidth: 380),
+        decoration: BoxDecoration(
+          color: Felt.mid,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Palette.danger.withValues(alpha: 0.45)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('A bot took your seat',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
+            const SizedBox(height: 6),
+            const Text('The table could not hear from you, and went on without you.',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Palette.chromeDim)),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: onBack,
+              style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
+              child: const Text('Back'),
+            ),
+          ],
         ),
       ),
     );

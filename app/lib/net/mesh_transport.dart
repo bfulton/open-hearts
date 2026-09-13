@@ -62,7 +62,7 @@ class MeshTransport implements Transport {
   Iterable<PublicKey> get connected => _links.entries.where((e) => e.value.open).map((e) => e.key);
 
   @override
-  void broadcast(Map<String, Object?> message) {
+  void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
     final wire = jsonEncode(message);
     for (final p in peers) {
       if (p == relay.signer.publicKey) continue;
@@ -71,8 +71,14 @@ class MeshTransport implements Transport {
     }
     // One envelope reaches everyone on the relay path: a peer whose
     // channel is down, and every juror following.
-    relay.broadcast(message);
+    relay.broadcast(message, everywhere: everywhere);
   }
+
+  @override
+  List<String> get paths => relay.paths;
+
+  @override
+  void heard(PublicKey peer, List<String> paths) => relay.heard(peer, paths);
 
   Future<RTCPeerConnection> _connection(PublicKey peer) async {
     final pc = await createPeerConnection({'iceServers': iceServers});

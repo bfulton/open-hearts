@@ -555,7 +555,7 @@ class TableClient {
     var at = _positionOf(mySeat!);
     final votedHere = _myWitness.keys.any((t) => _atOrBefore(t, at) && _atOrBefore(at, t));
     if (_acted(at) || votedHere) at = _positionAfter(at, mySeat!);
-    _emit(EventKind.leave, {'hand': at.hand, 'turn': at.index, 'seat': mySeat});
+    _emit(EventKind.leave, {'hand': at.hand, 'turn': at.index, 'seat': mySeat}, everywhere: true);
   }
 
   /// Presses Boot on [seat]. A no-op unless [canBoot].
@@ -563,13 +563,18 @@ class TableClient {
     if (!canBoot(seat)) return;
     final turn = _openTurnOf(seat)!;
     if (_myWitness.containsKey(turn)) return;
-    _emit(EventKind.boot, {'hand': turn.hand, 'turn': turn.index, 'seat': seat});
+    _emit(EventKind.boot, {'hand': turn.hand, 'turn': turn.index, 'seat': seat}, everywhere: true);
   }
 
-  void _emit(EventKind kind, Map<String, Object?> body) {
+  /// Signs, sends and accepts one event of this peer's own.
+  /// [everywhere] sends it by every path the transport has: the rare
+  /// events that decide something for someone else — a boot, a claim
+  /// of absence, an appeal, a verdict, a leave — must reach a peer or
+  /// a juror that cannot read the relay this device writes to.
+  void _emit(EventKind kind, Map<String, Object?> body, {bool everywhere = false}) {
     final event = TableEvent.sign(signer, table: spec.id, kind: kind, body: body);
     if (kind != EventKind.heartbeat) _trace('emit ${kind.name} $body');
-    transport.broadcast(event.toJson());
+    transport.broadcast(event.toJson(), everywhere: everywhere);
     _accept(event);
   }
 
@@ -869,6 +874,7 @@ class TableClient {
       // juror is carried forward like anyone, since it has to hold the
       // table's present to judge it.
       if (event.author != from) return;
+      _noteReads(event);
       _jurorHeard[from] = clock.nowMs;
       _lastPosition[from] = (event.hand, event.step);
       _carryForward(from, event.hand, event.step);
@@ -876,6 +882,7 @@ class TableClient {
     }
     if (event.kind == EventKind.heartbeat) {
       if (event.author != from) return;
+      _noteReads(event);
       if (!_isParticipant(from)) {
         // A seat removed from the table, still sending: it is behind
         // for good, and what it needs is the turns up to the one that
@@ -906,6 +913,13 @@ class TableClient {
     }
     _accept(event);
     _notify();
+  }
+
+  /// A heartbeat, a person's or a juror's, says what its sender reads;
+  /// the transport picks where to write from that (transport.dart).
+  void _noteReads(TableEvent event) {
+    final reads = event.body['reads'];
+    if (reads is List) transport.heard(event.author, reads.whereType<String>().toList());
   }
 
   /// Whether [event] is about a position this peer has already passed.
@@ -1310,16 +1324,40 @@ class TableClient {
     _settle(turn);
   }
 
+  /// Said again by every path, when someone claims this seat is not
+  /// here: its action for [turn] if it has one, else a heartbeat. A
+  /// boot, a claim of absence or an appeal against this seat means
+  /// the one making it did not hear this device — most likely it
+  /// cannot read the relay this device writes to — and the one way to
+  /// be heard is to say it where they read. At most once in five
+  /// seconds a turn, since a boot is repeated every two.
+  void _insist(TurnId turn) {
+    if (!amSeated || _left) return;
+    final last = _insistedAt[turn];
+    if (last != null && clock.nowMs - last < 5000) return;
+    _insistedAt[turn] = clock.nowMs;
+    final action = _races[turn]?.action;
+    if (action != null && action.author == signer.publicKey) {
+      transport.broadcast(action.toJson(), everywhere: true);
+    } else {
+      _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step, 'reads': transport.paths}, everywhere: true);
+    }
+  }
+
+  final Map<TurnId, int> _insistedAt = {};
+
   /// The rule for a boot: countersign when this peer agrees of its own
   /// knowledge — the seat has been on turn fifteen seconds by this
   /// clock, or has not been heard from for thirty — and it holds no
   /// play for the turn; holding the play, rebroadcast that instead,
   /// since the boot may only have been a dropped message.
   void _considerCountersigning(TurnId turn, TableEvent boot) {
-    if (!amSeated || _turnSeat[turn] == mySeat) return;
+    if (!amSeated) return;
     final race = _races[turn]!;
+    if (_turnSeat[turn] == mySeat) return _insist(turn);
     if (race.action != null) {
-      transport.broadcast(race.action!.toJson());
+      // The booter did not hear it; say it where they can.
+      transport.broadcast(race.action!.toJson(), everywhere: true);
       return;
     }
     if (_myWitness.containsKey(turn) || !connectedToMajority) return;
@@ -1868,10 +1906,18 @@ class TableClient {
     // missing turns.
     _timers.add(clock.schedule(_behind ? 1000 : heartbeatMs, _heartbeat));
     heartbeatsSent++;
+    // Every sixth — half a minute at the usual pace — goes by every
+    // path: a peer or a juror that cannot read the relay this device
+    // writes to still hears it alive, well inside the silence that
+    // would let it be booted.
+    final everywhere = heartbeatsSent % 6 == 0;
+    // And each says which paths this peer reads, so that a writer can
+    // pick one it can hear (transport.dart).
     if (amSeated && !_left) {
-      _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step});
+      _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step, 'reads': transport.paths}, everywhere: everywhere);
     } else if (mySeat == null && _serving.isNotEmpty && !done) {
-      _emit(EventKind.serve, {'hand': game.handNumber, 'step': step, 'serving': _serving.keys.toList()});
+      _emit(EventKind.serve, {'hand': game.handNumber, 'step': step, 'serving': _serving.keys.toList(), 'reads': transport.paths},
+          everywhere: everywhere);
     }
   }
 
@@ -1912,7 +1958,7 @@ class TableClient {
         final h = holders[seat];
         if (h is! HumanSeat || h.key == signer.publicKey || !_isParticipant(h.key)) continue;
         if (!_silent(h.key) || !connectedToMajority) continue;
-        _emit(EventKind.absent, {'hand': e.key.hand, 'turn': e.key.index, 'seat': seat});
+        _emit(EventKind.absent, {'hand': e.key.hand, 'turn': e.key.index, 'seat': seat}, everywhere: true);
       }
       // Boots this peer held back on until its own clock agreed; and
       // every voted race looked at again, since a deadlock can arrive
@@ -1937,6 +1983,13 @@ class TableClient {
 
   void _repeat() {
     if (++_repeatTick % 2 != 0) return;
+    // What stays unsettled is said again every two seconds, by the
+    // usual path; the second time, and every tenth second after, by
+    // every path. An action settles in a moment when everyone heard
+    // it, so one still open after four seconds may have gone to a
+    // relay someone at the table cannot read, and the only way to
+    // find out is to say it where they can hear.
+    final insist = _repeatTick % 10 == 0;
     for (final e in List.of(_races.entries)) {
       final race = e.value;
       if (race.settled) continue;
@@ -1946,19 +1999,22 @@ class TableClient {
       // shared relay. Every half minute is enough to say it is still
       // split.
       if (race.split && _repeatTick % 30 != 0) continue;
-      if (race.action != null) transport.broadcast(race.action!.toJson());
+      if (race.action == null && race.boots.isEmpty) continue; // nothing to say yet
+      race.repeats++;
+      final everywhere = race.repeats == 2 || insist;
+      if (race.action != null) transport.broadcast(race.action!.toJson(), everywhere: everywhere);
       for (final b in race.boots) {
-        transport.broadcast(b.toJson());
+        transport.broadcast(b.toJson(), everywhere: everywhere);
       }
     }
     for (final e in _myWitnessEvents.entries) {
-      if (_races[e.key]?.settled == false) transport.broadcast(e.value.toJson());
+      if (_races[e.key]?.settled == false) transport.broadcast(e.value.toJson(), everywhere: insist);
     }
     for (final p in _proposals.values) {
-      if (!p.settled && p.action!.author == signer.publicKey) transport.broadcast(p.action!.toJson());
+      if (!p.settled && p.action!.author == signer.publicKey) transport.broadcast(p.action!.toJson(), everywhere: insist);
     }
     for (final e in _myJuryWitnessEvents.entries) {
-      if (_proposals[e.key]?.settled == false) transport.broadcast(e.value.toJson());
+      if (_proposals[e.key]?.settled == false) transport.broadcast(e.value.toJson(), everywhere: insist);
     }
   }
 
@@ -2170,7 +2226,7 @@ class TableClient {
       final last = _lastAppealAt[e.key];
       if (last != null && clock.nowMs - last < 10000) continue;
       _lastAppealAt[e.key] = clock.nowMs;
-      _emit(EventKind.appeal, {'hand': e.key.hand, 'turn': e.key.index, 'seat': _turnSeat[e.key]});
+      _emit(EventKind.appeal, {'hand': e.key.hand, 'turn': e.key.index, 'seat': _turnSeat[e.key]}, everywhere: true);
     }
   }
 
@@ -2203,6 +2259,7 @@ class TableClient {
   }
 
   void _onAppeal(TableEvent event) {
+    if (mySeat != null && event.seat == mySeat && event.author != signer.publicKey) _insist(event.turn);
     if (mySeat != null || !_isParticipant(event.author)) return;
     if (!_orderFor(event.hand).contains(signer.publicKey)) return;
     _appealSeenAt.putIfAbsent(event.turn, () => clock.nowMs);
@@ -2227,12 +2284,14 @@ class TableClient {
       final last = _relayedAt[turn];
       if (last == null || clock.nowMs - last >= 5000) {
         _relayedAt[turn] = clock.nowMs;
-        if (race.action != null) transport.broadcast(race.action!.toJson());
+        // By every path: the two sides of a cut table may read
+        // different relays, and the juror is here to be heard by both.
+        if (race.action != null) transport.broadcast(race.action!.toJson(), everywhere: true);
         for (final b in race.boots) {
-          transport.broadcast(b.toJson());
+          transport.broadcast(b.toJson(), everywhere: true);
         }
         for (final w in race.witnessEvents) {
-          transport.broadcast(w.toJson());
+          transport.broadcast(w.toJson(), everywhere: true);
         }
       }
       _judge(turn, race);
@@ -2287,7 +2346,7 @@ class TableClient {
       side = 'removal';
     }
     _verdictAt[turn] = clock.nowMs;
-    _emit(EventKind.verdict, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'side': side, 'event': winner.toJson()});
+    _emit(EventKind.verdict, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'side': side, 'event': winner.toJson()}, everywhere: true);
   }
 
   /// A verdict, by a juror of the hand as this peer knows the jury,
@@ -2358,6 +2417,9 @@ class TableClient {
 class _Race {
   TableEvent? action;
   final List<TableEvent> boots = [];
+
+  /// How many times this peer has said the race's evidence again.
+  int repeats = 0;
 
   /// Every witness received, so the whole decision can be handed to a
   /// peer that missed some of it.

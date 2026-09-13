@@ -103,10 +103,42 @@ class RelayTransport implements Transport {
   }
 
   @override
-  void broadcast(Map<String, Object?> message) {
+  void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.table, content: jsonEncode(message), tags: [
       ['t', table],
-    ]));
+    ]), everywhere: everywhere, readBy: everywhere ? null : _readBy());
+  }
+
+  @override
+  List<String> get paths => [for (final u in _group.reading) u.toString()];
+
+  /// What each peer last said it reads, and when: a peer not heard
+  /// from in two minutes is out of the reckoning, as it is out of the
+  /// table's.
+  final Map<PublicKey, ({Set<Uri> reads, int at})> _peerReads = {};
+
+  @override
+  void heard(PublicKey peer, List<String> paths) {
+    final reads = <Uri>{};
+    for (final p in paths) {
+      final u = Uri.tryParse(p);
+      if (u != null) reads.add(u);
+    }
+    if (reads.isEmpty) return; // a peer with nothing to say about it
+    _peerReads[peer] = (reads: reads, at: DateTime.now().millisecondsSinceEpoch);
+  }
+
+  /// The relays every peer heard from lately reads; null when no peer
+  /// has said, so the writer's own order decides.
+  Set<Uri>? _readBy() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _peerReads.removeWhere((_, v) => now - v.at > 120000);
+    if (_peerReads.isEmpty) return null;
+    Set<Uri>? all;
+    for (final v in _peerReads.values) {
+      all = all == null ? Set.of(v.reads) : all.intersection(v.reads);
+    }
+    return all;
   }
 
   /// Sends one signalling message to [to], sealed to its key: an

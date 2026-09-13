@@ -153,7 +153,20 @@ them and writes each table event to the first that has not refused it
 lately (`relays.dart`); what forms a room and what sets up a channel —
 a lobby's beats and starts, presence, signalling — goes to every
 relay, since a device that has lost one relay must still be seen and
-reached on the others, or two tables start under one code. A public
+reached on the others, or two tables start under one code. Which one
+relay a table event goes to is chosen for its readers: every heartbeat
+says which relays its sender is reading, and a writer takes the first
+relay in its order that everyone heard from lately reads — every relay
+that is up, when there is no such one — so a device that has lost a
+relay, or never had it, is written to where it can hear. And what goes
+unanswered goes the same way: an action still unwitnessed after four
+seconds, and every ten after, a boot, a claim of absence, an appeal, a
+verdict, a leave, every sixth heartbeat, whatever a juror carries, and
+— the moment a boot or an appeal names this seat — its own action for
+the turn, or a heartbeat if it has none. A reader that cannot read the
+relay this device writes to cannot say so, and is exactly the one that
+must hear it: a table that took a seat's silence for absence when the
+silence was its own deafness is the failure this prevents. A public
 relay is volunteer infrastructure with rate limits and no uptime
 promise, and one turned on a live table six minutes in — every event
 answered with a proof-of-work demand, the play on its way reaching
@@ -625,7 +638,9 @@ On the wire:
   are carried, not overruled. Then by the seat's presence to it — heard
   and acted, the action stands; silent, the removal stands, on a boot
   someone made or on the juror's own claim of absence. Heard and not
-  yet acted is nobody's to decide. The foreman rules first; each juror
+  yet acted is nobody's to decide. A seat named by an appeal or a boot
+  says its action again on every relay, so a juror that cannot read
+  the relay it wrote to hears it before ruling. The foreman rules first; each juror
   behind waits five seconds more. A verdict carries the winning event
   whole, so it settles the same turn the same way wherever it lands,
   and a turn settled by verdict travels with its verdict when a peer

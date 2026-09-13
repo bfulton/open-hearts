@@ -231,15 +231,26 @@ class RelayGroup {
   /// has to be seen by a peer that can read only some of the relays —
   /// a lobby's beats, presence, a signal — one relay is not enough,
   /// since the writer cannot tell which relay a reader has lost.
-  void publish(NostrEvent e, {bool everywhere = false}) {
-    if (!everywhere) return _send(e, const {}, null);
+  /// With [readBy], the relays the readers can read: the one relay
+  /// written to is the first in order among those, and when none of
+  /// them is up and taking events the event goes to every relay that
+  /// is, since a relay nobody can read is no place for it.
+  void publish(NostrEvent e, {bool everywhere = false, Set<Uri>? readBy}) {
     if (_closed) return;
     final now = _nowMs;
-    for (final c in connections) {
-      if (!c.connected || (_refusedUntil[c.url] ?? 0) > now) continue;
-      c.publish(e);
+    final up = [for (final c in connections) if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c];
+    if (everywhere || (readBy != null && up.isNotEmpty && !up.any((c) => readBy.contains(c.url)))) {
+      for (final c in up) {
+        c.publish(e);
+      }
+      return;
     }
+    if (readBy == null) return _send(e, const {}, null);
+    _send(e, {for (final c in connections) if (!readBy.contains(c.url)) c.url}, null);
   }
+
+  /// The relays this group is connected to right now.
+  Set<Uri> get reading => {for (final c in connections) if (c.connected) c.url};
 
   void _send(NostrEvent e, Set<Uri> tried, String? lastReason) {
     if (_closed) return;

@@ -115,7 +115,13 @@ class SimTransport implements Transport {
   final _disconnected = StreamController<PublicKey>(sync: true);
 
   @override
-  void broadcast(Map<String, Object?> message) => _net._broadcast(key, message);
+  void broadcast(Map<String, Object?> message, {bool everywhere = false}) => _net._broadcast(key, message);
+
+  @override
+  List<String> get paths => const [];
+
+  @override
+  void heard(PublicKey peer, List<String> paths) {}
 
   @override
   Stream<({PublicKey from, Map<String, Object?> message})> get incoming => _incoming.stream;

@@ -11,7 +11,7 @@ import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/live/live_page.dart';
 import 'package:open_hearts/live_controller.dart';
 import 'package:open_hearts/theme.dart';
-import 'package:open_hearts/ui/table_view.dart' show ClockText;
+import 'package:open_hearts/ui/table_view.dart' show ClockText, TableView;
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 
@@ -141,6 +141,27 @@ void main() {
     expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
     expect(find.textContaining('2 of 4 here'), findsOneWidget);
     expect(live.controller.tableState, TableState.playing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a seat the others boot sees no table, only that a bot took it', (tester) async {
+    final live = await pumpLive(tester);
+    await act(tester, live);
+    await live.advance(tester, 2000);
+    expect(live.controller.game.phase, engine.Phase.playing);
+    // Say nothing on turn: the others' clocks on this seat run out,
+    // they boot it, and a bot has the seat.
+    for (var guard = 0; guard < 200 && live.controller.amSeated; guard++) {
+      await live.advance(tester, 1000);
+    }
+    expect(live.controller.amSeated, isFalse, reason: 'the others booted this seat');
+    expect(find.text('A bot took your seat'), findsOneWidget);
+    expect(find.text('Back'), findsOneWidget);
+    expect(find.byType(TableView), findsNothing, reason: 'no table to watch');
+    expect(find.bySemanticsLabel('Menu'), findsNothing);
+    // And it stays that way as the table plays on.
+    await live.advance(tester, 5000);
+    expect(find.byType(TableView), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
