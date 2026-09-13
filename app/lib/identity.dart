@@ -1,6 +1,6 @@
 /// Who this device is: one keypair, made the first time it is needed
-/// and kept on the device. No account, no email — the public key is
-/// the identity and the secret never leaves (docs/04-live-play.md).
+/// and kept on the device. The public key is the identity at a table
+/// and the secret never leaves (docs/04-live-play.md).
 library;
 
 import 'dart:math';

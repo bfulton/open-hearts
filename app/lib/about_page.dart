@@ -31,7 +31,7 @@ class AboutPage extends StatelessWidget {
                 const Text('Open Hearts', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.gold)),
                 const SizedBox(height: 8),
                 const Text(
-                  'Hearts — free, open source, no accounts. Play alone against the house, or live: '
+                  'Hearts, open source. Play alone against the house, or live: '
                   'the four of you deal the cards between you, and no server sees a hand.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13.5, height: 1.45, color: Palette.chromeDim),
