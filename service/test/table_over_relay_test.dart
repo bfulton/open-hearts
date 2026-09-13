@@ -18,20 +18,25 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Plays a seat the way a person would, from the client's own view.
 class Player {
-  Player(this.client) : bot = Bot() {
+  Player(this.client, {this.thinkMs = 30}) : bot = Bot() {
     _sub = client.changes.listen((_) => _react());
     _react();
   }
 
   final TableClient client;
   final Bot bot;
+
+  /// How long each decision takes. Thirty milliseconds plays a game in
+  /// seconds; a test that needs the game to outlast something slower —
+  /// the summoning of a juror — asks for more.
+  final int thinkMs;
   StreamSubscription<void>? _sub;
   bool _thinking = false;
 
   void _react() {
     if (_thinking || !(client.awaitingMyPass || client.awaitingMyPlay)) return;
     _thinking = true;
-    Future<void>.delayed(const Duration(milliseconds: 30), () {
+    Future<void>.delayed(Duration(milliseconds: thinkMs), () {
       _thinking = false;
       final seat = client.mySeat!;
       if (client.awaitingMyPass) {

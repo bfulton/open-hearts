@@ -126,11 +126,11 @@ void main() {
       Persona.casanova.at(6),
       Persona.donJuan.at(7),
     ]) {
-      test('agrees with ${persona.name} on every decision of 8 games', () {
+      test('agrees with ${persona.name} on every decision of 16 games', () {
         var plays = 0, passes = 0;
         int? playGates, passGates, legalGates, positionGates;
         eachDecision(
-          8,
+          16,
           persona,
           (view, legal, chosen) {
             final lc = Circuit();

@@ -156,8 +156,10 @@ List<int> scoreHand(List<int> takenPoints) {
 }
 
 /// The score at which the game ends. Play stops at the end of the hand in
-/// which any player reaches it; lowest total wins.
-const gameOverScore = 100;
+/// which any player reaches it; lowest total wins. Fifty: a game of a
+/// few hands rather than an evening, the length a phone is picked up
+/// for.
+const gameOverScore = 50;
 
 /// The seats holding the lowest total. Once [gameOverScore] has been
 /// reached these are the winners; more than one seat can be returned,

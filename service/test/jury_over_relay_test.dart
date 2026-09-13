@@ -57,7 +57,11 @@ void main() {
             silenceAfterMs: silence,
             crypto: c0),
     ];
-    final players = [for (final c in clients) Player(c)];
+    // A quarter of a second a decision: at a seeded table nothing waits
+    // for the jury, and a game to fifty played in thirty-millisecond
+    // decisions is over before the juror of last resort is so much as
+    // called for — ten seconds of nobody else online.
+    final players = [for (final c in clients) Player(c, thinkMs: 250)];
     for (final c in clients) {
       c.start();
     }

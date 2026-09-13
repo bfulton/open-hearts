@@ -253,8 +253,8 @@ void main() {
         final game = HeartsGame(seed: seed);
         final bot = Bot();
         final hands = playOut(game, bot);
-        expect(hands, greaterThanOrEqualTo(4),
-            reason: 'reaching $gameOverScore takes several hands');
+        expect(hands, greaterThanOrEqualTo(2),
+            reason: 'reaching $gameOverScore takes at least two hands: a hand is 26 points at most');
         expect(game.totals.any((t) => t >= gameOverScore), isTrue);
         expect(game.winners, isNotEmpty);
         final low = game.totals.reduce(min);

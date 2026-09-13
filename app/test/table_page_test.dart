@@ -85,7 +85,7 @@ void main() {
     await pumpTable(tester);
     expect(find.textContaining('Choose 3 more to pass'), findsOneWidget);
     expect(find.text('Pass'), findsOneWidget);
-    expect(find.text('Hand 1  ·  Pass left  ·  to 100'), findsOneWidget);
+    expect(find.text('Hand 1  ·  Pass left  ·  to 50'), findsOneWidget);
   });
 
   testWidgets('the Pass button waits for exactly three cards', (tester) async {
@@ -274,7 +274,7 @@ void main() {
 
     await tester.tap(find.text('Next hand'));
     await tester.pumpAndSettle();
-    expect(find.text('Hand 2  ·  Pass right  ·  to 100'), findsOneWidget);
+    expect(find.text('Hand 2  ·  Pass right  ·  to 50'), findsOneWidget);
   });
 
   testWidgets('the hand fan fits a phone without overflowing', (tester) async {
@@ -425,7 +425,7 @@ void main() {
   testWidgets('sideways, the same header, a shorter and wider hand', (tester) async {
     await pumpTable(tester, size: _sideways);
     expect(tester.takeException(), isNull);
-    expect(find.text('Hand 1  ·  Pass left  ·  to 100'), findsOneWidget);
+    expect(find.text('Hand 1  ·  Pass left  ·  to 50'), findsOneWidget);
     expect(tester.getRect(find.byType(TableHeader)).width, _sideways.width);
     // Thirteen cards, each shorter than the portrait hand allows and
     // showing more of itself than the portrait fan can.
@@ -448,7 +448,7 @@ void main() {
     await tapCard(tester, playable.card);
     final hand = fanCards(tester).map((c) => c.card).toList();
     expect(hand.length, 12);
-    final strip = find.text('Hand 1  ·  Pass left  ·  to 100');
+    final strip = find.text('Hand 1  ·  Pass left  ·  to 50');
     expect(strip, findsOneWidget);
     // The game as the table holds it: the same controller, with the
     // same tricks and the same trick under way, on both sides of a turn.
@@ -494,7 +494,7 @@ void main() {
     expect(find.text('Next hand'), findsOneWidget);
     await tester.tap(find.text('Next hand'));
     await tester.pumpAndSettle();
-    expect(find.text('Hand 2  ·  Pass right  ·  to 100'), findsOneWidget);
+    expect(find.text('Hand 2  ·  Pass right  ·  to 50'), findsOneWidget);
   });
 }
 
