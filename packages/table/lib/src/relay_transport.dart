@@ -93,10 +93,13 @@ class RelayTransport implements Transport {
 
   /// Publishes a lobby event, tagged with the table id: stored by the
   /// relay, or [ephemeral] — a waiting heartbeat nobody needs later.
+  /// To every relay, not one: a room forms from who hears whom, and a
+  /// peer that has lost one relay must still hear this device on the
+  /// others, or two tables start under one code.
   void announce(Map<String, Object?> content, {bool ephemeral = false}) {
     _group.publish(NostrEvent.sign(signer, kind: ephemeral ? TableKinds.waiting : TableKinds.lobby, content: jsonEncode(content), tags: [
       ['t', table],
-    ]));
+    ]), everywhere: true);
   }
 
   @override
@@ -108,7 +111,9 @@ class RelayTransport implements Transport {
 
   /// Sends one signalling message to [to], sealed to its key: an
   /// offer or a candidate carries an address, and a public relay
-  /// carries the event.
+  /// carries the event — every relay, since a peer that cannot read
+  /// one of them still has to be reached, and there are a dozen of
+  /// these a table.
   void signal(PublicKey to, Signal s) {
     final String content;
     try {
@@ -120,7 +125,7 @@ class RelayTransport implements Transport {
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.signal, content: content, tags: [
       ['p', to],
       ['t', table],
-    ]));
+    ]), everywhere: true);
   }
 
   final Map<PublicKey, Uint8List> _conversationKeys = {};

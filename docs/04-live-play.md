@@ -149,19 +149,23 @@ peer whose channel is not open, and the only path to a juror, which
 follows from the relays alone (`MeshTransport`). Relays, plural: a
 client holds a short list — the build's, not a setting anyone types
 (`app/lib/net/relays.dart`) — keeps a subscription on every one of
-them and writes each event to the first that has not refused it lately
-(`relays.dart`). A public relay is volunteer infrastructure with rate
-limits and no uptime promise, and one turned on a live table six
-minutes in — every event answered with a proof-of-work demand, the
-play on its way reaching nobody, the seat booted for silence — so a
-refusal moves the event on to the next relay, and when every relay
-refuses, the line under the felt says so. Writing to one keeps the relays' cost what
-it was; listening on all is what lets peers that write to different
-ones hear each other. The list's order is turned by a hash of the
-table id, so tables spread over the relays. The table is drawn from
-whichever chair you hold. On the felt, who has been heard from lately;
-on the line under it, the boot clock on a seat that is holding everyone
-up, and the *Boot* button when it runs out, and, when the table is
+them and writes each table event to the first that has not refused it
+lately (`relays.dart`); what forms a room and what sets up a channel —
+a lobby's beats and starts, presence, signalling — goes to every
+relay, since a device that has lost one relay must still be seen and
+reached on the others, or two tables start under one code. A public
+relay is volunteer infrastructure with rate limits and no uptime
+promise, and one turned on a live table six minutes in — every event
+answered with a proof-of-work demand, the play on its way reaching
+nobody, the seat booted for silence — so a refusal moves the event on
+to the next relay, and when every relay refuses, the line under the
+felt says so. Writing to one keeps the relays' cost what it was;
+listening on all is what lets peers that write to different ones hear
+each other. The list's order is turned by a hash of the table id, so
+tables spread over the relays. The table is drawn from whichever chair
+you hold. On the felt, who has been heard from lately; on the line
+under it, the boot clock on a seat that is holding everyone up, and
+the *Boot* button when it runs out, and, when the table is
 stuck, why —
 no relay taking this device's events, waiting for the others, asking
 the jury, waiting for a jury when nobody was
@@ -594,8 +598,8 @@ section), and its escrow role ([doc 03](03-fair-deal.md), "Escrow").
 On the wire:
 
 - **Presence.** Every open app announces itself on one topic every
-  five seconds — written to one of its relays, listened for on all of
-  them — and keeps who was heard when. A summons is an event on that
+  five seconds — written to every relay, listened for on all of them
+  — and keeps who was heard when. A summons is an event on that
   topic addressed to one key, carrying the table's spec and the hand.
   A juror follows the table on its own relay list, so a table on
   relays a juror does not listen to has no jurors from that pool.

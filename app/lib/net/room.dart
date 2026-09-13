@@ -362,7 +362,10 @@ class Room extends ChangeNotifier {
       refusal = _noDeal;
       return;
     }
-    spec = TableSpec(id: code, seed: seed, seats: seats, sealed: sealed);
+    // The table's own id, not the code: a code is reused, and two
+    // tables that start under one code — two halves of a room that
+    // could not hear each other — must not hear each other's plays.
+    spec = TableSpec(id: '$code-${seed.toRadixString(36)}-${(c['at'] as int).toRadixString(36)}', seed: seed, seats: seats, sealed: sealed);
     seatNames = names;
     seatAvatars = avatars;
   }

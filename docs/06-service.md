@@ -98,7 +98,7 @@ code and different adapters:
 | Sign-in | Apple/Google public keys | a test token naming a `sub` |
 | Entitlement | purchase webhook | a test endpoint that marks a key entitled |
 | TURN | Cloudflare | none; localhost connects directly |
-| Signalling, waiting rooms, results | a few public relays, listened on together and written to one at a time | a minimal NIP-01 relay in the repo |
+| Signalling, waiting rooms, results | a few public relays, listened on together; table events written to one at a time, lobby and signalling to all | a minimal NIP-01 relay in the repo |
 | Last-resort juror | woken on demand | always available |
 
 One process, one flag.

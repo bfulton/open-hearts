@@ -6,8 +6,9 @@
 /// an event on the same tag addressed to one key, carrying the table's
 /// spec and the hand; a juror of last resort listens for a table's
 /// call on the tag as well. Its own sockets, apart from any table's:
-/// one to every relay in the list, the announcements written to one of
-/// them (relays.dart).
+/// one to every relay in the list, the announcements written to all
+/// of them, since who is online has to be seen by devices that can
+/// read only some of the relays (relays.dart).
 library;
 
 import 'dart:async';
@@ -112,21 +113,21 @@ class RelayPresence implements Presence {
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'summons', ...summons}), tags: [
       ['t', topic],
       ['p', juror],
-    ]));
+    ]), everywhere: true);
   }
 
   @override
   void callForJuror(String table) {
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'call', 'table': table}), tags: [
       ['t', topic],
-    ]));
+    ]), everywhere: true);
   }
 
   void _announce() {
     if (_silent || _closed) return;
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'here', 'status': status}), tags: [
       ['t', topic],
-    ]));
+    ]), everywhere: true);
   }
 
   bool _onEvent(Map<String, Object?> raw) {

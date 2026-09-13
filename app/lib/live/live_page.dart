@@ -97,7 +97,6 @@ class _LivePageState extends State<LivePage> {
   /// The line under the felt: a pause and why, or a boot clock on the
   /// seat holding everyone up, or nothing special.
   Widget? _liveNote() {
-    final game = _c.game;
     // Cut off from every relay comes first: it is the cause of most of
     // what follows, and the one thing the player can act on.
     final refused = _c.relayRefusal;
@@ -110,11 +109,10 @@ class _LivePageState extends State<LivePage> {
     }
     if (_c.pause == Pause.openingHand) return _note("Opening a departed player's hand");
     if (_c.pause == Pause.waitingForLead) return _note('Nobody claims the 2♣ — the deal is stuck');
-    final dealing = _c.dealNote;
-    if (dealing != null) return _note(dealing);
-    if (game.phase != Phase.playing && game.phase != Phase.passing) return null;
     // The seat everyone is waiting on, if it is a person other than me
-    // and its clock has run out.
+    // and its clock has run out — during the deal as much as the play:
+    // a seat that never sends its keys is the one thing that stalls a
+    // deal, and Boot is the way past it.
     for (var seat = 0; seat < seatCount; seat++) {
       if (seat == _c.mySeat || _c.personaAt(seat) != null) continue;
       if (_c.bootCountdownMs(seat) == null) continue;
@@ -136,6 +134,8 @@ class _LivePageState extends State<LivePage> {
       }
       // The seat's own badge shows its clock running; nothing more here.
     }
+    final dealing = _c.dealNote;
+    if (dealing != null) return _note(dealing);
     return null;
   }
 

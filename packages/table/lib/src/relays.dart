@@ -227,7 +227,19 @@ class RelayGroup {
 
   /// Writes [e] to the first relay in order that is up and has not
   /// refused this client lately; a refusal moves it on to the next.
-  void publish(NostrEvent e) => _send(e, const {}, null);
+  /// Or, [everywhere], to every relay up and not refusing: for what
+  /// has to be seen by a peer that can read only some of the relays —
+  /// a lobby's beats, presence, a signal — one relay is not enough,
+  /// since the writer cannot tell which relay a reader has lost.
+  void publish(NostrEvent e, {bool everywhere = false}) {
+    if (!everywhere) return _send(e, const {}, null);
+    if (_closed) return;
+    final now = _nowMs;
+    for (final c in connections) {
+      if (!c.connected || (_refusedUntil[c.url] ?? 0) > now) continue;
+      c.publish(e);
+    }
+  }
 
   void _send(NostrEvent e, Set<Uri> tried, String? lastReason) {
     if (_closed) return;
@@ -273,10 +285,11 @@ class RelayGroup {
           _setRefusal(null);
           return;
         }
-        if (p == null) return; // not this client's, or given up on
         log?.call('${from.url} refused ${id.substring(0, 8)}: $reason');
         _refusedUntil[from.url] = _nowMs + refusalMs;
-        _send(p.event, p.tried, reason);
+        // Sent to one relay: on to the next. Sent everywhere, or given
+        // up on: the others have it.
+        if (p != null) _send(p.event, p.tried, reason);
       case 'NOTICE':
         log?.call('${from.url}: ${m.length > 1 ? m[1] : ''}');
     }

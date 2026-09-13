@@ -4,6 +4,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:service/service.dart';
 import 'package:table/table.dart';
@@ -46,6 +47,30 @@ void main() {
     expect(await heardByA, {'n': 2});
     expect(ta.refusal, isNull);
     expect(tb.refusal, isNull);
+    ta.close();
+    tb.close();
+  });
+
+  test('a lobby announcement and a signal reach a peer that reads only one of the relays', () async {
+    final a = SchnorrSigner.generate();
+    final b = SchnorrSigner.generate();
+    // a writes its table events to the first relay it gets; b can read
+    // only the other. What forms a room, and what sets up a channel,
+    // goes to every relay, so b hears it anyway.
+    final ta = RelayTransport(relays: [r1.url, r2.url], signer: a, table: 'half-deaf');
+    await ta.allReady.timeout(const Duration(seconds: 5));
+    // b reads only the relay a does not write its table events to.
+    final other = ta.relays.first == r1.url ? r2.url : r1.url;
+    final tb = RelayTransport(relays: [other], signer: b, table: 'half-deaf');
+    await tb.allReady.timeout(const Duration(seconds: 5));
+
+    final beat = tb.lobby.first.timeout(const Duration(seconds: 5));
+    ta.announce({'kind': 'here', 'name': 'Ada'}, ephemeral: true);
+    expect(jsonDecode((await beat).content), {'kind': 'here', 'name': 'Ada'});
+
+    final signal = tb.signals.first.timeout(const Duration(seconds: 5));
+    ta.signal(b.publicKey, Signal(from: a.publicKey, type: 'offer', payload: const {'sdp': 'x'}));
+    expect((await signal).type, 'offer');
     ta.close();
     tb.close();
   });

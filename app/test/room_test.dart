@@ -95,6 +95,11 @@ void main() {
       expect(a.seated && b.seated, isTrue);
       expect(a.spec!.seats.whereType<HumanSeat>().map((h) => h.key), [signers[0].publicKey, signers[1].publicKey]);
       expect(a.spec!.seats.whereType<BotSeat>().length, 2);
+      // The table's id is its own, under the code: a reused code must
+      // not put two tables' events on one tag.
+      expect(a.spec!.id, startsWith('ROOM-'));
+      expect(a.spec!.id, b.spec!.id);
+      expect(a.spec!.id, isNot('ROOM'));
       a.dispose();
       b.dispose();
     });

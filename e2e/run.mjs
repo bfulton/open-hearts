@@ -378,8 +378,12 @@ async function main() {
     log('Ada is asking the jury');
     await playUntil([pages[0]], (p) => has(p, /^1 of 4 here/), { timeout: 300000 });
     log('the jury ruled; Ada alone with three bots');
+    // The hand ends when the header moves on to the next one — a sheet
+    // that comes and goes is not the thing to wait for — or the game
+    // ends, which a game to fifty can do here.
     const before = (await texts(pages[0])).find((t) => /^Hand \d/.test(t));
-    await playUntil([pages[0]], (p) => has(p, /^On with it$/), { timeout: 180000 });
+    const next = `Hand ${Number(before.match(/^Hand (\d+)/)[1]) + 1}`;
+    await playUntil([pages[0]], async (p) => (await has(p, new RegExp(`^${next} `))) || (await has(p, /^Home$/)), { timeout: 180000 });
     log(`Ada finished the hand that began as "${before}"`);
 
     log('PASS');
