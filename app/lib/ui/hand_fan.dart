@@ -28,6 +28,7 @@ class HandFan extends StatelessWidget {
     this.dimUnplayable = false,
     this.forced,
     this.justReceived = const {},
+    this.spread = 0.64,
   });
 
   /// Sorted; the fan draws it in the order given.
@@ -53,6 +54,11 @@ class HandFan extends StatelessWidget {
   /// three new cards are findable in a hand you have already read once.
   final Set<engine.Card> justReceived;
 
+  /// How much of each card the fan shows at most, as a fraction of its
+  /// width: the step between neighbours never exceeds this. A landscape
+  /// hand has the width to show more of every card.
+  final double spread;
+
   @override
   Widget build(BuildContext context) {
     if (hand.isEmpty) return const SizedBox.shrink();
@@ -70,7 +76,7 @@ class HandFan extends StatelessWidget {
             : 62.0;
         width = width.clamp(40.0, 76.0);
         // Then shrunk if even at full overlap the row would spill.
-        final maxStep = width * 0.64;
+        final maxStep = width * spread;
         var step = n > 1 ? (available - width) / (n - 1) : 0.0;
         if (step > maxStep) step = maxStep;
         if (step < width * 0.22) {

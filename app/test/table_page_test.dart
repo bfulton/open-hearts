@@ -11,6 +11,8 @@ import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
+import 'package:open_hearts/ui/scoreboard.dart';
+import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
 
@@ -18,9 +20,13 @@ import 'package:open_hearts/theme.dart';
 /// break, and it only breaks when width is scarce.
 const _phone = Size(390, 844);
 
-Future<void> pumpTable(WidgetTester tester, {int seed = 4}) async {
+/// The same phone on its side: height is what is scarce there, and the
+/// composition is a different one (docs/05-form-factors.md).
+const _sideways = Size(844, 390);
+
+Future<void> pumpTable(WidgetTester tester, {int seed = 4, Size size = _phone}) async {
   tester.view
-    ..physicalSize = _phone
+    ..physicalSize = size
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(MaterialApp(
@@ -184,6 +190,92 @@ void main() {
   testWidgets('the running build is stamped on the table', (tester) async {
     await pumpTable(tester);
     expect(find.text('dev'), findsOneWidget);
+  });
+
+  testWidgets('sideways, the scoreboard is a rail down the side and the hand is shorter and wider', (tester) async {
+    await pumpTable(tester, size: _sideways);
+    expect(tester.takeException(), isNull);
+    final board = tester.widget<Scoreboard>(find.byType(Scoreboard));
+    expect(board.axis, Axis.vertical);
+    final railBox = tester.getRect(find.byType(Scoreboard));
+    expect(railBox.width, TableLayout.railWidth);
+    expect(railBox.height, _sideways.height, reason: 'the rail runs the full height');
+    expect(railBox.left, 0);
+    // The strip's one line is the rail's three.
+    expect(find.text('Hand 1  ·  Pass left  ·  to 100'), findsNothing);
+    expect(find.text('Hand 1'), findsOneWidget);
+    expect(find.text('Pass left'), findsOneWidget);
+    expect(find.text('to 100'), findsOneWidget);
+    // Thirteen cards, each shorter than the portrait hand allows and
+    // showing more of itself than the portrait fan can.
+    final cards = fanCards(tester);
+    expect(cards.length, 13);
+    for (final c in cards) {
+      expect(cardHeightFor(c.width), lessThanOrEqualTo(TableLayout.landscapeHandHeight));
+    }
+    final lefts = [for (final c in cards) tester.getTopLeft(cardFinder(c.card)).dx];
+    final step = lefts[1] - lefts[0];
+    expect(step, greaterThan(cards.first.width * 0.64), reason: 'a wider step than the portrait fan ever takes');
+    // The hand keeps the bottom edge, and the whole of it sits right of the rail.
+    expect(tester.getRect(find.byType(HandFan)).bottom, closeTo(_sideways.height - 8, 1));
+    expect(lefts.first, greaterThan(TableLayout.railWidth));
+  });
+
+  testWidgets('turning the phone mid-hand keeps the game', (tester) async {
+    await pumpTable(tester);
+    await _passAnything(tester);
+    final playable = fanCards(tester).firstWhere((c) => !c.dimmed);
+    await tapCard(tester, playable.card);
+    final hand = fanCards(tester).map((c) => c.card).toList();
+    expect(hand.length, 12);
+    final strip = find.text('Hand 1  ·  Pass left  ·  to 100');
+    expect(strip, findsOneWidget);
+    // The game as the table holds it: the same controller, with the
+    // same tricks and the same trick under way, on both sides of a turn.
+    final model = tester.widget<TableView>(find.byType(TableView)).controller;
+    final tricks = model.game.tricksPlayed;
+    final trick = model.game.trick.map((p) => p.card).toList();
+    final totals = model.game.totals;
+
+    // Sideways: the same game, a rail.
+    tester.view.physicalSize = _sideways;
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(fanCards(tester).map((c) => c.card).toList(), hand);
+    final turned = tester.widget<TableView>(find.byType(TableView)).controller;
+    expect(identical(turned, model), isTrue, reason: 'the turn rebuilt the layout, not the game');
+    expect(turned.game.tricksPlayed, tricks);
+    expect(turned.game.trick.map((p) => p.card).toList(), trick);
+    expect(turned.game.totals, totals);
+    expect(tester.widget<Scoreboard>(find.byType(Scoreboard)).axis, Axis.vertical);
+    expect(strip, findsNothing);
+
+    // And back.
+    tester.view.physicalSize = _phone;
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(fanCards(tester).map((c) => c.card).toList(), hand);
+    expect(identical(tester.widget<TableView>(find.byType(TableView)).controller, model), isTrue);
+    expect(tester.widget<Scoreboard>(find.byType(Scoreboard)).axis, Axis.horizontal);
+    expect(strip, findsOneWidget);
+  });
+
+  testWidgets('a whole hand plays out sideways too', (tester) async {
+    await pumpTable(tester, size: _sideways);
+    await _passAnything(tester);
+    for (var guard = 0; guard < 60; guard++) {
+      await tester.pumpAndSettle();
+      if (find.text('Next hand').evaluate().isNotEmpty) break;
+      final playable = fanCards(tester).where((c) => !c.dimmed).toList();
+      if (playable.isEmpty) continue;
+      await tapCard(tester, playable.first.card);
+    }
+    expect(tester.takeException(), isNull);
+    expect(find.text('Next hand'), findsOneWidget);
+    await tester.tap(find.text('Next hand'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hand 2'), findsOneWidget);
+    expect(find.text('Pass right'), findsOneWidget);
   });
 }
 

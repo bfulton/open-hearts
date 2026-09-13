@@ -98,7 +98,11 @@ rigged. Roughly in order:
    matchmaking, seat handover, the jury: built, its deadlock role and
    its escrow of the deal.
 7. **Landscape**, then **tablet**, then **iPhone Duo**
-   ([doc 05](docs/05-form-factors.md)).
+   ([doc 05](docs/05-form-factors.md)). Landscape is built: the phone
+   on its side gets the second composition, the score rail down the
+   side and the hand shorter and wider, chosen from the space the
+   table is given and never from the device; a turn mid-hand keeps the
+   game. Tablet and the Duo are next.
 8. **The stores.**
 
 ### Backlog

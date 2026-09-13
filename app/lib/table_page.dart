@@ -1,5 +1,6 @@
-/// The whole game on one screen: scores on top, felt in the middle, your
-/// hand along the bottom.
+/// The whole game on one screen: scores along the top or down the side,
+/// as the screen's shape decides (ui/table_layout.dart), felt in the
+/// middle, your hand along the bottom.
 ///
 /// One screen on purpose. On a phone the game is the app, and anything
 /// that pushes the table off-screen — a menu, a route, a dialog — costs
@@ -20,6 +21,7 @@ import 'ui/hand_fan.dart';
 import 'ui/overlays.dart';
 import 'ui/pip.dart';
 import 'ui/scoreboard.dart';
+import 'ui/table_layout.dart';
 import 'ui/table_view.dart';
 
 class TablePage extends StatefulWidget {
@@ -118,55 +120,46 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
         child: SafeArea(
           child: Stack(
             children: [
-              Column(
-                children: [
-                  Scoreboard(game: game, names: _controller.names),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        TableView(controller: _controller),
-                        Positioned(
-                          right: 6,
-                          bottom: 2,
-                          child: _BuildStamp(
-                              newBuild: _newBuild, onReload: _reload),
-                        ),
-                        Positioned(
-                          left: 6,
-                          bottom: 2,
-                          child: _LivePill(onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(builder: (_) => const LobbyPage()),
-                            );
-                          }),
-                        ),
-                      ],
+              TableLayout(
+                scoreboard: (axis) => Scoreboard(game: game, names: _controller.names, axis: axis),
+                felt: Stack(
+                  children: [
+                    TableView(controller: _controller),
+                    Positioned(
+                      right: 6,
+                      bottom: 2,
+                      child: _BuildStamp(
+                          newBuild: _newBuild, onReload: _reload),
                     ),
-                  ),
-                  ActionBar(
-                    controller: _controller,
-                    onPass: _controller.confirmPass,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
-                    child: SizedBox(
-                      height: 128,
-                      child: HandFan(
-                        hand: hand,
-                        onTap: _tapCard,
-                        playable: passing
-                            ? hand.toSet()
-                            : legal,
-                        selected: _controller.selected,
-                        dimUnplayable: _controller.awaitingPlay,
-                        forced: legal.length == 1 ? legal.first : null,
-                        justReceived: game.tricksPlayed == 0
-                            ? game.receivedBy(_controller.mySeat).toSet()
-                            : const {},
-                      ),
+                    Positioned(
+                      left: 6,
+                      bottom: 2,
+                      child: _LivePill(onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => const LobbyPage()),
+                        );
+                      }),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                action: ActionBar(
+                  controller: _controller,
+                  onPass: _controller.confirmPass,
+                ),
+                hand: (landscape) => HandFan(
+                  hand: hand,
+                  onTap: _tapCard,
+                  playable: passing
+                      ? hand.toSet()
+                      : legal,
+                  selected: _controller.selected,
+                  dimUnplayable: _controller.awaitingPlay,
+                  forced: legal.length == 1 ? legal.first : null,
+                  justReceived: game.tricksPlayed == 0
+                      ? game.receivedBy(_controller.mySeat).toSet()
+                      : const {},
+                  spread: landscape ? 0.8 : 0.64,
+                ),
               ),
 
               if (game.phase == Phase.handOver)

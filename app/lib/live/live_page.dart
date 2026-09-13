@@ -15,6 +15,7 @@ import '../theme.dart';
 import '../ui/hand_fan.dart';
 import '../ui/overlays.dart';
 import '../ui/scoreboard.dart';
+import '../ui/table_layout.dart';
 import '../ui/table_view.dart';
 
 class LivePage extends StatefulWidget {
@@ -151,48 +152,39 @@ class _LivePageState extends State<LivePage> {
         child: SafeArea(
           child: Stack(
             children: [
-              Column(
-                children: [
-                  Scoreboard(game: game, names: _c.names, mySeat: _c.mySeat),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        TableView(controller: _c),
-                        Positioned(
-                          left: 6,
-                          top: 4,
-                          child: _Presence(controller: _c),
-                        ),
-                        Positioned(
-                          right: 6,
-                          top: 4,
-                          child: TextButton(
-                            onPressed: _c.amSeated && !_c.done ? _leave : null,
-                            style: TextButton.styleFrom(foregroundColor: Palette.chromeDim),
-                            child: const Text('Leave', style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                      ],
+              TableLayout(
+                scoreboard: (axis) => Scoreboard(game: game, names: _c.names, mySeat: _c.mySeat, axis: axis),
+                felt: Stack(
+                  children: [
+                    TableView(controller: _c),
+                    Positioned(
+                      left: 6,
+                      top: 4,
+                      child: _Presence(controller: _c),
                     ),
-                  ),
-                  _debugState(),
-                  ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
-                    child: SizedBox(
-                      height: 128,
-                      child: HandFan(
-                        hand: hand,
-                        onTap: _tapCard,
-                        playable: passing ? hand.toSet() : legal,
-                        selected: _c.selected,
-                        dimUnplayable: _c.awaitingPlay,
-                        forced: legal.length == 1 ? legal.first : null,
-                        justReceived: game.tricksPlayed == 0 ? game.receivedBy(_c.mySeat).toSet() : const {},
+                    Positioned(
+                      right: 6,
+                      top: 4,
+                      child: TextButton(
+                        onPressed: _c.amSeated && !_c.done ? _leave : null,
+                        style: TextButton.styleFrom(foregroundColor: Palette.chromeDim),
+                        child: const Text('Leave', style: TextStyle(fontSize: 12)),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                below: _debugState(),
+                action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
+                hand: (landscape) => HandFan(
+                  hand: hand,
+                  onTap: _tapCard,
+                  playable: passing ? hand.toSet() : legal,
+                  selected: _c.selected,
+                  dimUnplayable: _c.awaitingPlay,
+                  forced: legal.length == 1 ? legal.first : null,
+                  justReceived: game.tricksPlayed == 0 ? game.receivedBy(_c.mySeat).toSet() : const {},
+                  spread: landscape ? 0.8 : 0.64,
+                ),
               ),
               if (ended != null && !_c.done)
                 HandOverSheet(

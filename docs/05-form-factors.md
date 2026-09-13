@@ -44,6 +44,28 @@ the score rail on a different edge.
 
 Rotation mid-hand must keep the game, exactly as unfolding must.
 
+### As built
+
+`app/lib/ui/table_layout.dart` chooses: wider than tall by a fifth is
+landscape, so a near-square window is laid out as portrait, where the
+fan is what needs the width. In landscape the scoreboard is a rail 118
+points wide down the left — the same four names and totals stacked,
+the hand's line at its foot — and the felt, the action line and the
+hand keep their order to its right. The hand is 100 points tall
+instead of 128 and its fan steps up to eight tenths of a card instead
+of two thirds, so shorter cards show more of themselves. On a wide
+felt the trick lies flatter — west and east further out, north and
+south closer in — and the seat badges go to one line, which is what
+gives the trick its height back. Both the solo table and the live one
+are built on it. Widget tests run the phone on its side (844 by 390): a
+rail, a hand fitting, a whole hand played out, and a turn mid-hand
+that keeps the same controller, hand, trick and totals on both sides
+of it. `node e2e/shots.mjs` screenshots the built app at the shapes in
+the table above, the pass and the first trick each, for looking at a
+layout before a phone does. Desktop web gets the landscape composition
+with more room, as step 2 says; tablets and the Duo are not designed
+yet.
+
 ## The foldable is easier than it looks
 
 Apple's [iPhone Duo](https://www.apple.com/iphone-duo/) has a 5.4″ Super

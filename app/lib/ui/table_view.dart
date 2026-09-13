@@ -21,12 +21,20 @@ const _badgeAt = <int, Alignment>{
 };
 
 /// Which way each seat's played card sits from the middle of the trick,
-/// in units of the trick card's own size.
+/// in units of the trick card's own size: a diamond where height is
+/// spare, flatter and wider where it is not (a landscape phone), so the
+/// four cards keep their size in the height the felt has.
 const _trickOffset = <int, Offset>{
   0: Offset(0, 0.78),
   1: Offset(-0.86, 0),
   2: Offset(0, -0.78),
   3: Offset(0.86, 0),
+};
+const _wideTrickOffset = <int, Offset>{
+  0: Offset(0, 0.62),
+  1: Offset(-1.12, 0),
+  2: Offset(0, -0.62),
+  3: Offset(1.12, 0),
 };
 
 class TableView extends StatelessWidget {
@@ -42,16 +50,20 @@ class TableView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final box = constraints.biggest;
+        // A wide felt — a landscape phone — lays the trick out flatter
+        // and its badges on one line, since height is what it lacks.
+        final wide = box.width > box.height * 1.3;
+        final offsets = wide ? _wideTrickOffset : _trickOffset;
         // The trick has to fit four cards in a diamond AND leave the
         // badges their rail, so it is sized from whichever dimension
         // runs out first rather than from the width alone.
         final cardWidth = [
-          box.width * 0.21,
-          box.height * 0.155,
+          box.width * (wide ? 0.16 : 0.21),
+          box.height * (wide ? 0.215 : 0.155),
           76.0,
         ].reduce((a, b) => a < b ? a : b).clamp(34.0, 76.0);
         final cardHeight = cardHeightFor(cardWidth);
-        final trickBox = Size(cardWidth * 2.9, cardHeight * 2.7);
+        final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
 
         return Stack(
           children: [
@@ -68,6 +80,7 @@ class TableView extends StatelessWidget {
                         game: game,
                         onTurn: game.currentSeat == controller.seatAt(position),
                         won: pending?.winner == controller.seatAt(position),
+                        compact: wide,
                       ),
                     ),
                 ],
@@ -77,7 +90,7 @@ class TableView extends StatelessWidget {
             // The trick, as one centred block. Slots hold their place so
             // arriving cards never shove the layout around.
             Align(
-              alignment: const Alignment(0, -0.06),
+              alignment: Alignment(0, wide ? 0.04 : -0.06),
               child: SizedBox.fromSize(
                 size: trickBox,
                 child: Stack(
@@ -87,8 +100,8 @@ class TableView extends StatelessWidget {
                     for (var position = 0; position < seatCount; position++)
                       Transform.translate(
                         offset: Offset(
-                          _trickOffset[position]!.dx * cardWidth * 1.15,
-                          _trickOffset[position]!.dy * cardHeight * 1.02,
+                          offsets[position]!.dx * cardWidth * 1.15,
+                          offsets[position]!.dy * cardHeight * 1.02,
                         ),
                         child: _TrickSlot(
                           card: _cardFrom(game, controller.seatAt(position)) ??
@@ -199,6 +212,7 @@ class _SeatBadge extends StatelessWidget {
     required this.game,
     required this.onTurn,
     required this.won,
+    this.compact = false,
   });
 
   final int seat;
@@ -206,6 +220,9 @@ class _SeatBadge extends StatelessWidget {
   final HeartsGame game;
   final bool onTurn;
   final bool won;
+
+  /// One line — name, cards, points — where the felt is short.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -221,9 +238,38 @@ class _SeatBadge extends StatelessWidget {
   }
 
   Widget _badge(int cards, int taken) {
+    final nameText = Text(
+      name,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: onTurn ? Palette.gold : Palette.chrome,
+      ),
+    );
+    final counts = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.style, size: 11, color: Palette.chromeDim),
+        const SizedBox(width: 3),
+        Text('$cards', style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
+        if (taken > 0) ...[
+          const SizedBox(width: 7),
+          Pip(
+              suit: engine.Suit.hearts,
+              size: 10,
+              color: Palette.danger.withValues(alpha: 0.9)),
+          const SizedBox(width: 3),
+          Text('$taken',
+              style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Palette.danger.withValues(alpha: 0.95))),
+        ],
+      ],
+    );
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      padding: compact ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: onTurn ? 0.42 : 0.24),
         borderRadius: BorderRadius.circular(13),
@@ -232,41 +278,15 @@ class _SeatBadge extends StatelessWidget {
           width: onTurn || won ? 1.6 : 1,
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            name,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: onTurn ? Palette.gold : Palette.chrome,
+      child: compact
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [nameText, const SizedBox(width: 8), counts],
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [nameText, const SizedBox(height: 3), counts],
             ),
-          ),
-          const SizedBox(height: 3),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.style, size: 11, color: Palette.chromeDim),
-              const SizedBox(width: 3),
-              Text('$cards', style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
-              if (taken > 0) ...[
-                const SizedBox(width: 7),
-                Pip(
-                    suit: engine.Suit.hearts,
-                    size: 10,
-                    color: Palette.danger.withValues(alpha: 0.9)),
-                const SizedBox(width: 3),
-                Text('$taken',
-                    style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: Palette.danger.withValues(alpha: 0.95))),
-              ],
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
