@@ -109,11 +109,11 @@ class _LivePageState extends State<LivePage> {
     final dealing = _c.dealNote;
     if (dealing != null) return _note(dealing);
     if (game.phase != Phase.playing && game.phase != Phase.passing) return null;
-    // The seat everyone is waiting on, if it is a person other than me.
+    // The seat everyone is waiting on, if it is a person other than me
+    // and its clock has run out.
     for (var seat = 0; seat < seatCount; seat++) {
       if (seat == _c.mySeat || _c.personaAt(seat) != null) continue;
-      final left = _c.bootCountdownMs(seat);
-      if (left == null) continue;
+      if (_c.bootCountdownMs(seat) == null) continue;
       if (_c.canBoot(seat)) {
         // Sized to the line, which is thirty pixels: a button at its
         // default height was clipped top and bottom.
@@ -130,7 +130,7 @@ class _LivePageState extends State<LivePage> {
           ),
         );
       }
-      if (left < 10000) return _note('${_c.names[seat]} has ${(left / 1000).ceil()} s');
+      // The seat's own badge shows its clock running; nothing more here.
     }
     return null;
   }

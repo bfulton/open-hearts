@@ -191,7 +191,7 @@ the cards and the state pills in the accessibility tree the app grows
 on request. Host a room, join it by code, a hand over WebRTC in under
 half a minute; then the cells only a browser can show: one closed
 mid-hand and replaced by a bot within ten seconds, one stalled on its
-turn and booted by the others at fifteen, one that leaves, and the
+turn and booted by the others when its clock runs out, one that leaves, and the
 last person finishing the hand with three bots. That is what proves
 the transport. The juror stepping in for a table drained to one human
 joins the suite with the jury. It runs in CI on every commit.
@@ -202,7 +202,7 @@ The axes:
 |---|---|
 | **Live humans at the start** | 1, 2, 3, 4 — bots in the rest. A table reaches 1 by departures too, so this axis is not independent of the others. |
 | **Who goes** | one player; two players in the same window; two in sequence; a juror; the foreman; two jurors; the whole jury |
-| **How** | a signed Leave; a silent drop, found by timeout; a boot at fifteen seconds on turn; a two-and-two partition, which is not a departure but looks like one from inside |
+| **How** | a signed Leave; a silent drop, found by timeout; a boot when the seat's clock runs out; a two-and-two partition, which is not a departure but looks like one from inside |
 | **When** | on the departed seat's own turn; off it; mid-trick; the last trick of a hand; during the pass; during the deal; at a hand boundary |
 
 The juror rows run in `packages/table/test/jury_test.dart`, with the

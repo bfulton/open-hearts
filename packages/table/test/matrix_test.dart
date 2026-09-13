@@ -158,10 +158,21 @@ void main() {
   });
 
   group('the boot clock', () {
-    test('a play at 14.9 seconds beats a boot at 15.0', () {
+    test('a card at 50.9 seconds, the bank all but spent, beats a boot at 51.0', () {
       final t = SimTable(humans: 3, seed: 41);
-      // Seat 0 dawdles just under the clock; the others press the moment it appears.
-      final slow = ScriptedHuman(t.people[0].client, t.net, t.clock, persona: Persona.westley, thinkMs: 14900);
+      // Seat 0 passes quickly, then dawdles over its first card until a
+      // tenth of a second of its bank is left — the others press the
+      // moment the button appears — and plays every card after within
+      // the grace, which costs nothing.
+      final slow = ScriptedHuman(t.people[0].client, t.net, t.clock, persona: Persona.westley, thinkMs: 1000);
+      slow.client.changes.listen((_) {
+        final c = slow.client;
+        if (c.game.phase == Phase.passing) {
+          slow.thinkMs = 1000;
+        } else {
+          slow.thinkMs = c.record.any((d) => d.turn.isPlay && d.event.seat == 0 && !d.removal) ? 5900 : 50900;
+        }
+      });
       t.people[0].stop();
       t.people[0] = slow;
       t.start();

@@ -115,6 +115,18 @@ async function waitFor(page, re, { timeout = 30000, what = String(re) } = {}) {
   throw new Error(`timed out waiting for ${what}\nsaw: ${(await texts(page)).join(' | ')}`);
 }
 
+/// Clicks the first semantics node whose label or text matches, if
+/// there is one: for a thing that goes on its own — the score sheet,
+/// a few seconds after a hand — and may be gone by the time it is
+/// reached.
+async function dismiss(page, re) {
+  try {
+    await click(page, re);
+  } catch (e) {
+    if (!String(e.message).startsWith('nothing to click')) throw e;
+  }
+}
+
 /// Clicks the first semantics node whose label or text matches.
 async function click(page, re) {
   const ok = await page.evaluate(`((src) => {
@@ -283,7 +295,7 @@ async function main() {
     // again from the home screen. The score sheet goes on its own after
     // a few seconds, so it may be gone by the time a page is reached.
     for (const page of pages) {
-      if (await has(page, /^On with it$/)) await click(page, /^On with it$/);
+      await dismiss(page, /^On with it$/);
       await click(page, /^Menu$/);
       await waitFor(page, /^Leave the table$/, { what: 'the menu' });
       await click(page, /^Leave the table$/);
@@ -313,7 +325,7 @@ async function main() {
     // reach the end of a hand a few seconds apart, so one may be gone
     // by the time all four have shown it.
     for (const page of pages) {
-      if (await has(page, /^On with it$/)) await click(page, /^On with it$/);
+      await dismiss(page, /^On with it$/);
     }
     for (const page of pages) await waitFor(page, /^Hand 2/, { what: 'hand 2' });
 

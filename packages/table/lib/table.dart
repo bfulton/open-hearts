@@ -26,4 +26,5 @@ export 'src/relay_transport.dart';
 export 'src/relays.dart';
 export 'src/signing.dart';
 export 'src/spec.dart';
+export 'src/time_bank.dart';
 export 'src/transport.dart';

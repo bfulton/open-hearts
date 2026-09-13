@@ -232,15 +232,30 @@ seat's future to the survivors directly instead of leaving them to
 reconstruct it. That is a real reason to make Leave easy and obvious
 rather than buried — the polite exit is also the cheap one.
 
-**Boot.** Fifteen seconds after a turn begins, a Boot button appears next
-to that seat. The first person to press it removes the player.
+**Boot.** Every seat plays against a clock, and the clock is a bank,
+not a limit per card. Each decision has a grace that costs nothing —
+six seconds for a card, twenty for the pass, since there are thirteen
+cards to read first — and each hand a bank of forty-five seconds of
+thinking time that the part of a decision past its grace drains. Once
+a seat's bank is empty and the grace on its current decision is spent,
+a Boot button appears next to that seat. The first person to press it
+removes the player. A player who thinks hard over three cards is never
+bothered; one who takes fourteen seconds over every card is bootable on
+their sixth. The bank refills every hand. The deal's own turns and the
+audit, which a present device answers by itself, keep a fixed fifteen
+seconds.
+
+Nothing shows while a seat is within its grace. Past it, that seat's
+remaining clock shows on its badge, and on your own score line when it
+is yours, so you know you are spending it; at empty, the button.
 
 The button is a **trigger, not a vote.** The condition is objective — the
-turn began at a known game state and fifteen seconds elapsed — and every
-peer runs the same clock derived from that state rather than from wall
-time. So a boot broadcast is countersigned by the others in milliseconds,
-because they already agree. First press wins, and the protocol underneath
-is still unanimous.
+turns opened at known game states and took what they took — and every
+peer keeps its own account of each seat's bank from the turn timings
+it observed. Peers' accounts differ by the network's tens of
+milliseconds a turn, so a boot broadcast is countersigned by the others
+within a second, once each one's own clock agrees. First press wins,
+and the protocol underneath is still unanimous.
 
 A peer that holds a signed play for that seat and turn must **rebroadcast
 the play instead of countersigning.** That covers the case where the
@@ -264,12 +279,13 @@ pocketing their phone during another player's turn is enough to wedge
 things. The timeout is what prevents that, so it is load-bearing rather
 than hygiene.
 
-Longer than the boot clock — two minutes of silence against fifteen
-on-turn — so an active table always resolves through the visible,
-explicable path and the timeout only catches what boot cannot see. It
-was thirty, until a phone that switched apps for a moment came back to
-find a bot in its seat; a table that finds two minutes too long has
-the Boot button from fifteen.
+Longer than the boot clock — two minutes of silence against a bank
+that a stalled seat empties in under a minute — so an active table
+always resolves through the visible, explicable path and the timeout
+only catches what boot cannot see. It was thirty, until a phone that
+switched apps for a moment came back to find a bot in its seat; a
+table that finds two minutes too long has the Boot button once the
+bank is spent.
 
 All three doors produce the same event: **"seat N is out as of game state
 S."** One code path for the consequences, three ways in.
@@ -294,8 +310,8 @@ in `packages/table` treats every turn as exactly that question.
 
 **A turn is a race with two sides.** On one side the seat's own action —
 its pass or play, signed by the seat — and on the other its removal: a
-boot, pressed by someone after fifteen seconds on turn, or made at once
-by a peer that has not heard from the seat for thirty. Every other
+boot, pressed by someone once the seat's clock has run out, or made at
+once by a peer that has not heard from the seat for two minutes. Every other
 participant backs one side or the other with a signature, never both,
 and a side wins with a **strict majority of the participants at that
 turn**. Only then does the next turn open, so nothing is ever rolled
@@ -303,7 +319,7 @@ back. A signed Leave is evidence and needs no majority.
 
 **Silence is answered at the seat's own turn, and nowhere else.** A
 peer that has heard nothing from a seat for two minutes boots it the
-moment its turn is open, without the fifteen-second wait; the removal is
+moment its turn is open, without waiting on its clock; the removal is
 the race's own decision, and a seat removed that way has no later votes
 for anyone to disagree about. What it cannot do is remove a silent seat
 *before* its turn — and a silent seat still counts toward every majority

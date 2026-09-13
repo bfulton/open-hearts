@@ -43,6 +43,12 @@ abstract class TableModel implements Listenable {
   /// taken from the hand: a pending play, a pending pass.
   Set<Card> get inFlight => const {};
 
+  /// Milliseconds [seat] has left on its clock, once the grace on its
+  /// open decision is spent (docs/04, "Boot"); null while there is no
+  /// clock to show — within the grace, off turn, a bot, or a solo
+  /// table, which has none.
+  int? clockMs(int seat);
+
   /// The three the player passed, while the others are still choosing:
   /// off the hand and up on the line, so what went is in view until the
   /// pass resolves. Empty at every other moment.

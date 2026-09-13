@@ -110,14 +110,9 @@ rigged. Roughly in order:
 
 Ideas agreed on and not yet placed in the order above.
 
-- **A time bank per hand.** The Boot button only removes someone who is
-  absent; a player who takes fourteen seconds over every card is never
-  booted and costs the table three minutes a hand. A few seconds of
-  grace per card plus a bank of thinking time per hand, and Boot the
-  moment the bank is empty. A change to the boot rule in
-  [doc 04](docs/04-live-play.md), so a design conversation first.
 - **A pace history**, kept with the rating from the same signed
   results, and **matchmaking by pace**, so slow players find each other.
+  The time bank's own accounting of each seat's turns is the material.
 - **The bot inside the computation**, so a bot's hand is open to
   nobody ([doc 04](docs/04-live-play.md), "Playing a seat nobody
   holds"); until then bots' hands are open to the table.

@@ -96,6 +96,7 @@ class TableView extends StatelessWidget {
                         game: game,
                         onTurn: game.currentSeat == controller.seatAt(position),
                         won: pending?.winner == controller.seatAt(position),
+                        clockMs: controller.clockMs(controller.seatAt(position)),
                         compact: wide,
                         maxWidth: position == 2 ? box.width - 2 * _badgeInset : sideRoom,
                       ),
@@ -231,6 +232,7 @@ class _SeatBadge extends StatelessWidget {
     required this.onTurn,
     required this.won,
     required this.maxWidth,
+    this.clockMs,
     this.compact = false,
   });
 
@@ -239,6 +241,10 @@ class _SeatBadge extends StatelessWidget {
   final HeartsGame game;
   final bool onTurn;
   final bool won;
+
+  /// What the seat has left on its clock, once it is past its grace;
+  /// null while there is nothing to show.
+  final int? clockMs;
 
   /// The room the badge has: a side badge's runs from the felt's edge
   /// to the trick's outer card.
@@ -257,9 +263,11 @@ class _SeatBadge extends StatelessWidget {
     final taken = game.taken[seat];
 
     // One spoken line per seat: who, where they stand, how many points
-    // this hand, and whether it is their turn.
+    // this hand, whether it is their turn, and their clock once it runs.
+    final clock = clockMs;
     return Semantics(
-      label: '$name: $total in the game, $taken this hand${onTurn ? ', on turn' : ''}',
+      label: '$name: $total in the game, $taken this hand'
+          '${onTurn ? ', on turn' : ''}${clock == null ? '' : ', ${clockSeconds(clock)} s on the clock'}',
       child: ExcludeSemantics(child: _badge(context, total, taken)),
     );
   }
@@ -329,6 +337,10 @@ class _SeatBadge extends StatelessWidget {
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                     color: Palette.danger.withValues(alpha: 0.95))),
+          ],
+          if (clockMs != null) ...[
+            const SizedBox(width: 8),
+            ClockText(ms: clockMs!),
           ],
         ],
       ),
@@ -418,6 +430,35 @@ class _Pill extends StatelessWidget {
           color: tone,
         ),
       ),
+    );
+  }
+}
+
+/// A clock's seconds, rounded up: "0 s" only once it has run out.
+int clockSeconds(int ms) => (ms / 1000).ceil();
+
+/// A seat's remaining clock, on a badge or the score line: the seconds
+/// and a small dial, red, since a running clock is the one thing on
+/// the felt that asks for haste.
+class ClockText extends StatelessWidget {
+  const ClockText({super.key, required this.ms});
+
+  final int ms;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.timer_outlined, size: 11, color: Palette.danger.withValues(alpha: 0.95)),
+        const SizedBox(width: 2),
+        Text('${clockSeconds(ms)} s',
+            style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: Palette.danger.withValues(alpha: 0.95))),
+      ],
     );
   }
 }

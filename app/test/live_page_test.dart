@@ -11,6 +11,7 @@ import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/live/live_page.dart';
 import 'package:open_hearts/live_controller.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/ui/table_view.dart' show ClockText;
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 
@@ -140,6 +141,39 @@ void main() {
     expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
     expect(find.textContaining('2 of 4 here'), findsOneWidget);
     expect(live.controller.tableState, TableState.playing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a slow seat\'s clock shows on its badge once its grace is spent, and yours on your line', (tester) async {
+    final live = await pumpLive(tester);
+    // Ada takes fourteen seconds over every card; her pass was quick.
+    live.people[0]!.thinkMs = 14000;
+    await act(tester, live);
+    await live.advance(tester, 2000);
+    expect(live.controller.game.phase, engine.Phase.playing);
+    expect(find.byType(ClockText), findsNothing, reason: 'nothing on the felt while everyone is within their grace');
+
+    // Up to Ada's turn, then past her six seconds of grace.
+    for (var guard = 0; guard < 120 && live.controller.clockMs(0) == null; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 1000);
+    }
+    expect(live.controller.clockMs(0), isNotNull, reason: 'Ada is on turn and past her grace');
+    expect(find.bySemanticsLabel(RegExp(r'^Ada: .*, on turn, \d+ s on the clock$')), findsOneWidget);
+    expect(find.byType(ClockText), findsOneWidget);
+    expect(find.text('Boot Ada'), findsNothing, reason: 'the bank is not spent');
+    expect(find.textContaining(' has '), findsNothing, reason: 'the old note is gone');
+
+    // Your own: dawdle on your turn past the grace, and the score line says so.
+    for (var guard = 0; guard < 120 && !live.controller.awaitingPlay; guard++) {
+      if (live.controller.awaitingPass) await act(tester, live);
+      await live.advance(tester, 1000);
+    }
+    expect(live.controller.awaitingPlay, isTrue);
+    expect(live.controller.clockMs(_me), isNull);
+    await live.advance(tester, 7000);
+    expect(live.controller.clockMs(_me), isNotNull);
+    expect(find.bySemanticsLabel(RegExp(r'^You: .*, \d+ s on the clock$')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

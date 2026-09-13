@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../table_model.dart';
 import '../theme.dart';
+import 'table_view.dart' show ClockText, clockSeconds;
 
 class ScoreLine extends StatelessWidget {
   const ScoreLine({super.key, required this.controller});
@@ -21,8 +22,9 @@ class ScoreLine extends StatelessWidget {
     final seat = controller.mySeat;
     final total = game.totals[seat];
     final taken = game.taken[seat];
+    final clock = controller.clockMs(seat);
     return Semantics(
-      label: 'You: $total in the game, $taken this hand',
+      label: 'You: $total in the game, $taken this hand${clock == null ? '' : ', ${clockSeconds(clock)} s on the clock'}',
       child: ExcludeSemantics(
         child: SizedBox(
           height: height,
@@ -51,6 +53,11 @@ class ScoreLine extends StatelessWidget {
                   '+$taken',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Palette.danger.withValues(alpha: 0.9)),
                 ),
+              ],
+              // Your own clock, once you are spending it.
+              if (clock != null) ...[
+                const SizedBox(width: 12),
+                ClockText(ms: clock),
               ],
             ],
           ),

@@ -186,6 +186,10 @@ class GameController extends ChangeNotifier implements TableModel {
   @override
   Set<Card> get inFlight => const {};
 
+  /// No clock at a solo table: the bots wait for you.
+  @override
+  int? clockMs(int seat) => null;
+
   @override
   Set<Card> get passed =>
       _game.phase == Phase.passing ? (_game.passOf(humanSeat) ?? const []).toSet() : const {};

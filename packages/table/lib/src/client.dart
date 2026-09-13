@@ -70,6 +70,7 @@ import 'model.dart';
 import 'sealed_pass.dart';
 import 'signing.dart';
 import 'spec.dart';
+import 'time_bank.dart';
 import 'jury.dart';
 import 'transport.dart';
 
@@ -174,7 +175,7 @@ class TableClient {
     required this.signer,
     required this.transport,
     required this.clock,
-    this.bootAfterMs = 15000,
+    this.timeBank = TimeBank.standard,
     this.silenceAfterMs = 120000,
     this.heartbeatMs = 5000,
     this.presence,
@@ -191,7 +192,10 @@ class TableClient {
   final Signer signer;
   final Transport transport;
   final Clock clock;
-  final int bootAfterMs;
+
+  /// The clock every seat plays against: a grace per decision, a bank
+  /// per hand, Boot once both are spent (time_bank.dart).
+  final TimeBank timeBank;
   final int silenceAfterMs;
   final int heartbeatMs;
 
@@ -272,14 +276,58 @@ class TableClient {
 
   bool _acted(TurnId turn) => _races[turn]?.action != null;
 
-  /// Whether the Boot button shows for [seat]: a human's turn, open for
-  /// fifteen seconds by this peer's clock.
+  /// Whether the Boot button shows for [seat]: a human's turn, open
+  /// past its grace with the seat's bank spent, by this peer's clock.
   bool canBoot(int seat) {
     if (!amSeated || seat == mySeat || holders[seat] is! HumanSeat) return false;
     if (!connectedToMajority) return false;
     if (_catchingUp((holders[seat] as HumanSeat).key)) return false;
     final t = _openTurnOf(seat);
-    return t != null && (clock.nowMs - _openedAt[t]! >= bootAfterMs || _silent((holders[seat] as HumanSeat).key));
+    return t != null && (_overdue(t, seat) || _silent((holders[seat] as HumanSeat).key));
+  }
+
+  // ---- the time bank -----------------------------------------------------
+
+  /// What each seat has spent of its bank this hand, as this peer saw
+  /// it: the part of every settled decision past its grace, measured
+  /// from the turn opening here to its action carrying here. Keyed by
+  /// hand and seat; a new hand starts from nothing.
+  final Map<(int, int), int> _spentMs = {};
+
+  /// What [seat] has left of its bank this hand, by this peer's clock.
+  int bankLeftMs(int seat) {
+    final left = timeBank.bankMs - (_spentMs[(game.handNumber, seat)] ?? 0);
+    return left < 0 ? 0 : left;
+  }
+
+  /// How long [turn] may stay open before Boot, for [seat].
+  int _allowanceMs(TurnId turn, int seat) => timeBank.allowanceMs(turn, bankLeftMs(seat));
+
+  bool _overdue(TurnId turn, int seat) => clock.nowMs - _openedAt[turn]! >= _allowanceMs(turn, seat);
+
+  /// The bank's accounting for [turn], once [seat]'s action has carried:
+  /// what it took past the grace comes off the seat's bank for the
+  /// hand. A turn this peer never saw open — one caught up on from the
+  /// record — costs nothing here, since there is nothing to measure.
+  void _spend(TurnId turn, int seat) {
+    if (!timeBank.banks(turn) || holders[seat] is! HumanSeat) return;
+    final opened = _openedAt[turn];
+    if (opened == null) return;
+    final over = clock.nowMs - opened - timeBank.graceOf(turn);
+    if (over > 0) _spentMs[(turn.hand, seat)] = (_spentMs[(turn.hand, seat)] ?? 0) + over;
+  }
+
+  /// Milliseconds [seat] has left before it can be booted, once the
+  /// grace on its open turn is spent — the clock the badge shows — or
+  /// null: no open turn, a turn still within its grace, or a bot's.
+  int? clockMs(int seat) {
+    if (holders[seat] is! HumanSeat) return null;
+    final t = _openTurnOf(seat);
+    if (t == null || !timeBank.banks(t)) return null;
+    final elapsed = clock.nowMs - _openedAt[t]!;
+    if (elapsed < timeBank.graceOf(t)) return null;
+    final left = _allowanceMs(t, seat) - elapsed;
+    return left < 0 ? 0 : left;
   }
 
   /// A peer whose recent heartbeats put it behind this one is not idle,
@@ -298,7 +346,7 @@ class TableClient {
     if (t == null) return null;
     final holder = holders[seat];
     if (holder is HumanSeat && _silent(holder.key)) return 0;
-    final left = bootAfterMs - (clock.nowMs - _openedAt[t]!);
+    final left = _allowanceMs(t, seat) - (clock.nowMs - _openedAt[t]!);
     return left < 0 ? 0 : left;
   }
 
@@ -1275,9 +1323,12 @@ class TableClient {
       return;
     }
     if (_myWitness.containsKey(turn) || !connectedToMajority) return;
-    final holder = holders[_turnSeat[turn]!];
+    final seat = _turnSeat[turn]!;
+    final holder = holders[seat];
     if (holder is! HumanSeat) return;
-    final agrees = clock.nowMs - _openedAt[turn]! >= bootAfterMs || _silent(holder.key);
+    // By this peer's own accounting of the seat's clock; the tick asks
+    // again every second until it agrees.
+    final agrees = _overdue(turn, seat) || _silent(holder.key);
     if (!agrees) return;
     _witness(turn, boot);
   }
@@ -1374,6 +1425,7 @@ class TableClient {
   void _carryAction(TurnId turn, _Race race, TableEvent e, Set<PublicKey> of, {TableEvent? verdict}) {
     race.settled = true;
     final seat = _turnSeat[turn]!;
+    _spend(turn, seat);
     final d = _deal;
     if (e.kind == EventKind.deal) {
       _applyDeal(e, seat);

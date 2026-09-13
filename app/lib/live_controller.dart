@@ -555,6 +555,8 @@ class LiveController extends ChangeNotifier implements TableModel {
   SeatState seatStateOf(int seat) => client.seatStateOf(seat);
   bool canBoot(int seat) => client.canBoot(seat);
   int? bootCountdownMs(int seat) => client.bootCountdownMs(seat);
+  @override
+  int? clockMs(int seat) => client.clockMs(seat);
   void boot(int seat) {
     client.boot(seat);
     notifyListeners();
