@@ -136,8 +136,9 @@ other person, set up over the relays' signalling and carrying the
 table's events directly, and through a relay as well — the path to a
 peer whose channel is not open, and the only path to a juror, which
 follows from the relays alone (`MeshTransport`). Relays, plural: a
-client holds a short list, keeps a subscription on every one of them
-and writes each event to the first that has not refused it lately
+client holds a short list — the build's, not a setting anyone types
+(`app/lib/net/relays.dart`) — keeps a subscription on every one of
+them and writes each event to the first that has not refused it lately
 (`relays.dart`). A public relay is volunteer infrastructure with rate
 limits and no uptime promise, and one turned on a live table six
 minutes in — every event answered with a proof-of-work demand, the

@@ -2,7 +2,13 @@
 //
 //   cd app && flutter build web -o build/e2e --base-href / --no-web-resources-cdn
 //   node e2e/run.mjs            # from the repo root; needs the global Playwright
-//   RELAY_URL=wss://relay.damus.io node e2e/run.mjs   # against a public relay
+//
+// Against a public relay instead: build the app with
+// `--dart-define=DEV_RELAY=wss://relay.damus.io` and run with
+// `RELAY_URL=wss://relay.damus.io`, so the suite starts no relay of its
+// own. The app's relays are the build's, never typed in (app/lib/net/
+// relays.dart); served from localhost it looks for the local relay at
+// its usual port, which is where the suite starts one.
 //
 // Starts the local relay and a static server for the built app, opens
 // four headless Chromium contexts — four devices, four keys — and
@@ -37,7 +43,7 @@ async function startRelay() {
   // every event it carries and must never wait on a juror's work.
   // RELAY_LOG=path keeps the relay's whole log for a debugging run.
   const relayLog = process.env.RELAY_LOG ? createWriteStream(process.env.RELAY_LOG) : null;
-  const args = ['run', 'bin/service.dart', '--port', '0', ...(relayLog ? [] : ['--quiet'])];
+  const args = ['run', 'bin/service.dart', '--port', '7447', ...(relayLog ? [] : ['--quiet'])];
   const proc = spawn('dart', args, { cwd: join(root, 'service') });
   let juror = null;
   const url = await new Promise((resolveUrl, reject) => {
@@ -230,7 +236,8 @@ const roster = /^(?!Ada:|Bao:|Cara:|Dee:)[A-Z][\w ]+: \d+ in the game, \d+ this 
 
 async function main() {
   // RELAY_URL=wss://… runs the suite against a relay that already
-  // exists — a public one, say — instead of starting the local one.
+  // exists — a public one the app was built for, say — instead of
+  // starting the local one.
   const relay = process.env.RELAY_URL ? { url: process.env.RELAY_URL, stop() {} } : await startRelay();
   const app = await serveApp();
   log(`relay ${relay.url}, app ${app.url}`);
@@ -258,7 +265,6 @@ async function main() {
       await waitFor(page, /^Play live$/, { what: 'the home screen' });
       await click(page, /^Play live$/);
       await waitFor(page, /^Host a table$/);
-      await type(page, 'Relays', relay.url);
       await type(page, 'Your name', names[i]);
     }
 
@@ -284,7 +290,6 @@ async function main() {
       await waitFor(page, /^Play live$/, { what: 'the home screen again' });
       await click(page, /^Play live$/);
       await waitFor(page, /^Host a table$/);
-      await type(page, 'Relays', relay.url);
     }
 
     // Ada hosts; the code is the only four-capital-letter text on her screen.

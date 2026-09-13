@@ -13,6 +13,9 @@ cd .. && node e2e/run.mjs
 
 Needs Dart on the path (for the relay) and a global Playwright install
 with Chromium (`npm i -g playwright && npx playwright install chromium`).
+The relay is started on port 7447, which is where a build served from
+localhost looks for it: the app's relays are the build's, never typed
+in (`app/lib/net/relays.dart`).
 The app is opened with `?e2e=1`, which turns its semantics tree on; the
 runner finds buttons, cards and the state pills by their labels and
 clicks them there, so what it exercises is the screen a person sees.

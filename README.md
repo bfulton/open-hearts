@@ -72,10 +72,11 @@ rigged. Roughly in order:
    signs — and every table is dealt by the verifiable deal (5).
    Four headless browsers prove it on every commit — matched, a hand
    over WebRTC, a browser closed mid-hand, a stalled one booted, a
-   leaver (`e2e/`). A deployed build starts on a few public relays,
-   listening on all of them and writing to one at a time, so one relay
-   turning on a table is not the end of it (`packages/table`,
-   `relays.dart`); `DEV_RELAY` takes a comma-separated list. The
+   leaver (`e2e/`). A deployed build starts on a few public relays —
+   the build's, never a setting on the page — listening on all of them
+   and writing to one at a time, so one relay turning on a table is not
+   the end of it (`packages/table`, `relays.dart`); a dev build made
+   with `DEV_RELAY`, a comma-separated list, uses those. The
    deployed site's worker mints TURN credentials for the pairs no
    direct path serves (`service/functions/`, doc 06).
    Meanwhile every solo game is kept on the device as a

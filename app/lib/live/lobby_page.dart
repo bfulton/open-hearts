@@ -11,6 +11,7 @@ import '../crypto/deal.dart';
 import '../identity.dart';
 import '../live_controller.dart';
 import '../net/duty.dart';
+import '../net/relays.dart';
 import '../net/mesh_transport.dart';
 import '../net/room.dart';
 import '../net/standing.dart';
@@ -18,34 +19,20 @@ import '../net/turn.dart';
 import '../theme.dart';
 import 'live_page.dart';
 
-/// Where the relay is: the local one while the app is served from a
-/// dev machine, a public one otherwise. Editable on the page.
-/// What the relay says back — a refusal, a notice, a drop — goes to the
-/// console, where a person debugging a table can read it.
+/// What the relays say back — a refusal, a notice, a drop — goes to
+/// the console, where a person debugging a table can read it. Which
+/// relays is the build's business (net/relays.dart), not the page's.
 void _relayLog(String line) => debugPrint('relay: $line');
 
 /// With `?e2e` in the address the table's every transition and the
 /// mesh's every channel change go to the console too.
 final _debugging = Uri.base.queryParameters.containsKey('e2e');
 
-/// A dev loop's shortcuts: a build made with `--dart-define=DEV_RELAY=…`
-/// and `DEV_ROOM=…` opens the lobby with those relays filled in and that
-/// room code in the field, and hosts under that code, so a table of
-/// people testing a branch is one tap away. Unset in a normal build.
-const devRelay = String.fromEnvironment('DEV_RELAY');
+/// A dev loop's shortcut: a build made with `--dart-define=DEV_ROOM=…`
+/// opens the lobby with that room code in the field and hosts under it,
+/// so a table of people testing a branch is one tap away. Unset in a
+/// normal build.
 const devRoom = String.fromEnvironment('DEV_ROOM');
-
-/// The relays a build starts with: a dev build's own, the local relay
-/// when the app is served from localhost, and otherwise a few public
-/// ones — listened on together, written to one at a time (packages/
-/// table, relays.dart), so one relay turning on a table is not the end
-/// of it.
-String defaultRelays() {
-  if (devRelay.isNotEmpty) return devRelay;
-  final host = Uri.base.host;
-  if (host == 'localhost' || host == '127.0.0.1' || host.isEmpty) return 'ws://localhost:7447';
-  return 'wss://relay.damus.io, wss://relay.primal.net, wss://nos.lol';
-}
 
 class LobbyPage extends StatefulWidget {
   const LobbyPage({super.key});
@@ -57,7 +44,7 @@ class LobbyPage extends StatefulWidget {
 class _LobbyPageState extends State<LobbyPage> {
   final _name = TextEditingController();
   final _code = TextEditingController(text: devRoom);
-  late final TextEditingController _relay = TextEditingController(text: defaultRelays());
+  final List<Uri> _relays = appRelays();
   String? _error;
   bool _busy = false;
   Room? _room;
@@ -108,23 +95,7 @@ class _LobbyPageState extends State<LobbyPage> {
     _transport?.close(); // a matched or started table has its own
     _name.dispose();
     _code.dispose();
-    _relay.dispose();
     super.dispose();
-  }
-
-  /// The relays as typed, or null with the field's trouble shown.
-  List<Uri>? _relays() {
-    try {
-      final relays = Relays.parse(_relay.text);
-      if (relays.isEmpty) throw const FormatException('none');
-      for (final r in relays) {
-        if (r.scheme != 'ws' && r.scheme != 'wss' || r.host.isEmpty) throw FormatException('$r');
-      }
-      return relays;
-    } on FormatException {
-      setState(() => _error = 'Relays are ws:// or wss:// addresses, commas between');
-      return null;
-    }
   }
 
   /// Connects to the relays on [tag], or explains why not.
@@ -134,8 +105,7 @@ class _LobbyPageState extends State<LobbyPage> {
       setState(() => _error = 'A name, so the others know who they are playing');
       return null;
     }
-    final relays = _relays();
-    if (relays == null) return null;
+    final relays = _relays;
     setState(() {
       _busy = true;
       _error = null;
@@ -163,7 +133,7 @@ class _LobbyPageState extends State<LobbyPage> {
     } on TimeoutException {
       setState(() {
         _busy = false;
-        _error = 'No relay answered at ${_relay.text.trim()}';
+        _error = _noRelay;
       });
     } catch (e) {
       setState(() {
@@ -173,6 +143,10 @@ class _LobbyPageState extends State<LobbyPage> {
     }
     return null;
   }
+
+  /// Nothing the player can change but the connection: the relays are
+  /// the build's.
+  static const _noRelay = 'No relay answered. Check the connection and try again.';
 
   StreamSubscription<TableSpec>? _queueSub;
 
@@ -203,7 +177,7 @@ class _LobbyPageState extends State<LobbyPage> {
   /// there, WebRTC over it, and the live page.
   void _toTable(TableSpec spec, Map<int, String> seatNames) {
     final signer = _signer!;
-    final relays = _relays() ?? Relays.parse(defaultRelays());
+    final relays = _relays;
     final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog);
     final peers = [for (final h in spec.seats) if (h is HumanSeat) h.key];
     final ledger = _standing?.ledger ?? Ledger();
@@ -242,7 +216,7 @@ class _LobbyPageState extends State<LobbyPage> {
     } on TimeoutException {
       setState(() {
         _busy = false;
-        _error = 'No relay answered at ${_relay.text.trim()}';
+        _error = _noRelay;
       });
     } catch (e) {
       setState(() {
@@ -385,12 +359,6 @@ class _LobbyPageState extends State<LobbyPage> {
               child: const Text('Join', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
           ],
-        ),
-        const SizedBox(height: 26),
-        TextField(
-          controller: _relay,
-          decoration: _field('Relays'),
-          style: const TextStyle(color: Palette.chromeDim, fontSize: 12),
         ),
         if (_error != null) ...[
           const SizedBox(height: 14),
