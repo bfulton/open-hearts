@@ -108,6 +108,17 @@ class LiveController extends ChangeNotifier implements TableModel {
   static const _trickHold = Duration(milliseconds: 950);
   static const _cardBeat = Duration(milliseconds: 320);
 
+  /// After the last trick of a hand is swept, a beat of bare felt
+  /// before the sheet, as at the solo table: the cards fade out as
+  /// every trick's do, and the hand is seen to end rather than cut.
+  static const sweepBeat = Duration(milliseconds: 420);
+  Timer? _sweepTimer;
+
+  /// The game is over as shown, and its last trick has been seen off
+  /// the table: the game's sheet may show.
+  bool get gameOverDue => _gameOverDue;
+  bool _gameOverDue = false;
+
   Duration _botThink(int seat) {
     final pace = (_shownHolders[seat] as BotSeat).persona.pace;
     return Duration(milliseconds: pace.minMs + _rhythm.nextInt(pace.maxMs - pace.minMs + 1));
@@ -296,22 +307,42 @@ class LiveController extends ChangeNotifier implements TableModel {
       );
     }
     if (_shown.phase == Phase.gameOver) return null;
+    // Between the last trick's sweep and the sheet: nothing moves.
+    if (_shown.phase == Phase.handOver) return null;
     if (_shown.pendingTrick != null) {
       return (
         delay: _trickHold,
         act: () {
           _shown.collectTrick();
-          if (_shown.phase == Phase.handOver) {
-            handJustEnded = (
-              hand: _shown.handNumber,
-              scores: _shown.handScores,
-              totals: _shown.totals,
-              moonShooter: _shown.moonShooter,
-            );
-            _sheetTimer?.cancel();
-            _sheetTimer = Timer(const Duration(seconds: 6), dismissHandSheet);
-            _shown.nextHand();
-            _shownPlayed.clear();
+          if (_shown.phase == Phase.playing) return;
+          // The hand's last trick has gone: a beat, then the sheet — and
+          // the next hand as shown, under it.
+          final ended = (
+            hand: _shown.handNumber,
+            scores: _shown.handScores,
+            totals: _shown.totals,
+            moonShooter: _shown.moonShooter,
+          );
+          final over = _shown.phase == Phase.gameOver;
+          void raise() {
+            if (_disposed) return;
+            if (over) {
+              _gameOverDue = true;
+            } else {
+              handJustEnded = ended;
+              _sheetTimer?.cancel();
+              _sheetTimer = Timer(const Duration(seconds: 6), dismissHandSheet);
+              if (_shown.phase == Phase.handOver) _shown.nextHand();
+              _shownPlayed.clear();
+            }
+            notifyListeners();
+            unawaited(_pump());
+          }
+          _sweepTimer?.cancel();
+          if (!paced) {
+            raise();
+          } else {
+            _sweepTimer = Timer(sweepBeat, raise);
           }
         }
       );
@@ -559,6 +590,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     _disposed = true;
     _waitTimer?.cancel();
     _sheetTimer?.cancel();
+    _sweepTimer?.cancel();
     _sub?.cancel();
     _refusals?.cancel();
     client.close();

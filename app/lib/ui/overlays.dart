@@ -155,8 +155,19 @@ class _Sheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final ranked = List.of(rows)..sort((a, b) => a.total.compareTo(b.total));
 
-    return Container(
-      color: Colors.black.withValues(alpha: 0.62),
+    // The sheet comes in over a quarter of a second — the scrim
+    // darkening, the card settling — rather than landing in a frame.
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) => Container(
+        color: Colors.black.withValues(alpha: 0.62 * t),
+        child: Opacity(
+          opacity: t,
+          child: Transform.scale(scale: 0.96 + 0.04 * t, child: child),
+        ),
+      ),
       child: Center(
         child: SingleChildScrollView(
           child: Container(

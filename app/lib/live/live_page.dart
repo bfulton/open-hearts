@@ -197,7 +197,7 @@ class _LivePageState extends State<LivePage> {
                   action: 'On with it',
                   onNext: _c.dismissHandSheet,
                 ),
-              if (_c.done)
+              if (_c.done && _c.gameOverDue)
                 GameOverSheet(
                   game: game,
                   names: _c.names,

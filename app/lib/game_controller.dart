@@ -51,6 +51,7 @@ class GameController extends ChangeNotifier implements TableModel {
       personas: [for (var s = 0; s < seatCount; s++) s == humanSeat ? '' : _bots[s]!.persona.name],
     );
     _saved = false;
+    _sheetDue = false;
     _played.clear();
     _selected.clear();
     _pump();
@@ -121,6 +122,17 @@ class GameController extends ChangeNotifier implements TableModel {
   Duration get _trickHold => paced ? const Duration(milliseconds: 950) : Duration.zero;
   Duration get _passBeat => paced ? const Duration(milliseconds: 350) : Duration.zero;
 
+  /// After the last trick of a hand is swept, a beat of bare felt
+  /// before the sheet: long enough for the cards to fade out as every
+  /// trick's do, so the hand is seen to end rather than cut.
+  static const sweepBeat = Duration(milliseconds: 420);
+  Duration get _sweepBeat => paced ? sweepBeat : Duration.zero;
+
+  /// Whether the score sheet may show: the hand (or the game) is over
+  /// and its last trick has been seen off the table.
+  bool get sheetDue => _sheetDue;
+  bool _sheetDue = false;
+
   // ---- what the view asks ---------------------------------------------
 
   @override
@@ -187,6 +199,7 @@ class GameController extends ChangeNotifier implements TableModel {
 
   void nextHand() {
     if (_game.phase != Phase.handOver) return;
+    _sheetDue = false;
     _game.nextHand();
     if (_game.passDirection == PassDirection.hold) _record.passes.add(null);
     _played.clear();
@@ -235,6 +248,13 @@ class GameController extends ChangeNotifier implements TableModel {
           if (!await _wait(_trickHold)) return;
           _game.collectTrick();
           notifyListeners();
+          if (_game.phase != Phase.playing) {
+            // The hand's last trick: let it be seen leaving the table
+            // before the sheet comes down over it.
+            if (!await _wait(_sweepBeat)) return;
+            _sheetDue = true;
+            notifyListeners();
+          }
           continue;
         }
 

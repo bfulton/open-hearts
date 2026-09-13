@@ -162,9 +162,9 @@ class _TablePageState extends State<TablePage> with WidgetsBindingObserver {
                 ),
               ),
 
-              if (game.phase == Phase.handOver)
+              if (game.phase == Phase.handOver && _controller.sheetDue)
                 HandOverSheet.of(game, names: _controller.names, onNext: _controller.nextHand),
-              if (game.phase == Phase.gameOver)
+              if (game.phase == Phase.gameOver && _controller.sheetDue)
                 GameOverSheet(
                   game: game,
                   names: _controller.names,
