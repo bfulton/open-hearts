@@ -390,29 +390,50 @@ class _LobbyPageState extends State<LobbyPage> {
         const SizedBox(height: 10),
         _OnlineLine(count: _online),
         const SizedBox(height: 12),
-        TextField(
-          controller: _name,
-          textCapitalization: TextCapitalization.words,
-          decoration: _field('Your name').copyWith(
-            // Your icon, as the others will see it: your initials on
-            // your colour, which is your key's.
-            prefixIcon: Semantics(
+        // How you will look at the table, big enough to see and plainly
+        // a button: tapping it opens the icons, the colours and a
+        // picture of your own (live/avatar_picker.dart).
+        Row(
+          children: [
+            Semantics(
               button: true,
               label: 'Your avatar',
               onTap: _pickAvatar,
               child: InkWell(
                 onTap: _pickAvatar,
                 customBorder: const CircleBorder(),
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 10, right: 6, top: 4, bottom: 4),
-                  child: PlayerIcon(name: _name.text.isEmpty ? '?' : _name.text, seed: _signer?.publicKey ?? '', avatar: _avatar, size: 28),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    PlayerIcon(name: _name.text.isEmpty ? '?' : _name.text, seed: _signer?.publicKey ?? '', avatar: _avatar, size: 56),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Felt.mid,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Palette.gold.withValues(alpha: 0.7)),
+                        ),
+                        child: const Icon(Icons.edit_outlined, size: 12, color: Palette.gold),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 36),
-          ),
-          onChanged: (_) => setState(() {}),
-          style: const TextStyle(color: Palette.chrome),
+            const SizedBox(width: 14),
+            Expanded(
+              child: TextField(
+                controller: _name,
+                textCapitalization: TextCapitalization.words,
+                decoration: _field('Your name'),
+                onChanged: (_) => setState(() {}),
+                style: const TextStyle(color: Palette.chrome),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         Row(
@@ -574,8 +595,8 @@ class _RoomView extends StatelessWidget {
             child: Row(
               children: [
                 i < members.length
-                    ? PlayerIcon(name: members[i].name, seed: members[i].key, avatar: members[i].avatar, size: 22)
-                    : const SizedBox(width: 22, height: 22, child: Icon(Icons.smart_toy_outlined, size: 16, color: Palette.chromeDim)),
+                    ? PlayerIcon(name: members[i].name, seed: members[i].key, avatar: members[i].avatar, size: 30)
+                    : const SizedBox(width: 30, height: 30, child: Icon(Icons.smart_toy_outlined, size: 20, color: Palette.chromeDim)),
                 const SizedBox(width: 10),
                 Text(
                   i < members.length

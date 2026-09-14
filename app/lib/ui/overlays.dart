@@ -273,7 +273,7 @@ class _ScoreRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          PlayerIcon(name: row.name, seed: row.seed, avatar: row.avatar, size: 22),
+          PlayerIcon(name: row.name, seed: row.seed, avatar: row.avatar, size: 28),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

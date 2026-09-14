@@ -68,12 +68,15 @@ class TableView extends StatelessWidget {
         // out first.
         // Portrait keeps room under the near badge for the line the
         // table says, and as much again, so the line sits in the middle
-        // of it rather than against the badge.
-        final facingRoom = 2 * (SeatBadge.lineHeight + _badgeGap) + (wide ? 0.0 : 2 * _pillRow);
-        final deep = (box.height - facingRoom) / ((wide ? 2.3 : 2.7) / cardAspect);
+        // of it rather than against the badge. And a badge is as tall
+        // as a face wants unless that would leave the cards under what
+        // a card can be read at, where it takes the smaller size back.
+        double cardsUnder(double line) =>
+            (box.height - 2 * (line + _badgeGap) - (wide ? 0.0 : 2 * _pillRow)) / ((wide ? 2.3 : 2.7) / cardAspect);
+        final line = cardsUnder(SeatBadge.line) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine;
         var cardWidth = [
           box.width * (wide ? 0.16 : 0.21),
-          deep,
+          cardsUnder(line),
           76.0,
         ].reduce((a, b) => a < b ? a : b).clamp(34.0, 76.0);
         // The side badges' room: from the felt's edge to the trick's
@@ -110,6 +113,8 @@ class TableView extends StatelessWidget {
               // first. The side badges have a strip, so they stack.
               oneLine: wide || position.isEven,
               maxWidth: !wide && position.isEven ? facing : sideRoom,
+              height: line,
+              iconSize: wide || position.isEven ? SeatBadge.iconOn(line) : SeatBadge.iconIn(cardHeight),
             );
 
         // The trick, as one centred block. Slots hold their place so
@@ -186,7 +191,7 @@ class TableView extends StatelessWidget {
 
         Widget seat(int position) => wide
             ? SizedBox(
-                height: SeatBadge.lineHeight,
+                height: line,
                 child: Stack(
                   children: [
                     // The two ghosts make the box; the badge fills it.
@@ -226,7 +231,7 @@ class TableView extends StatelessWidget {
                 // the other side of it, so the badge holds the middle
                 // whether or not there is anything to say.
                 SizedBox(
-                  height: SeatBadge.lineHeight,
+                  height: line,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -337,6 +342,8 @@ class SeatBadge extends StatelessWidget {
     required this.avatar,
     this.clockMs,
     this.oneLine = false,
+    this.height = line,
+    required this.iconSize,
   });
 
   final int seat;
@@ -365,6 +372,11 @@ class SeatBadge extends StatelessWidget {
   /// stacks instead.
   final bool oneLine;
 
+  /// How tall a one-line badge is, and how big its icon: the felt
+  /// chooses both, since it is the one that gives up the height.
+  final double height;
+  final double iconSize;
+
   /// The least a badge is given: a two-word name wrapped, or most of
   /// the roster's one-word names on a line, at 58 points of text.
   static const minWidth = 80.0;
@@ -372,8 +384,18 @@ class SeatBadge extends StatelessWidget {
   /// What a badge on one line is, exactly: the felt sizes the trick
   /// from the height the seats leave it, so a badge that grew with its
   /// name or the reader's text size would push the cards off the
-  /// bottom. It scales its contents into this instead.
-  static const lineHeight = 30.0;
+  /// bottom. It scales its contents into this instead. A face wants
+  /// the room of [line]; where the felt is too short to spare it — a
+  /// phone on its side — the badge takes [tightLine] and the smaller
+  /// icon that goes with it.
+  static const line = 42.0;
+  static const tightLine = 30.0;
+
+  /// The icon in a badge of a given height, and in a stacked one of a
+  /// given card's height: as big as the box can carry with the name
+  /// and the numbers beside or under it.
+  static double iconOn(double line) => line - 13;
+  static double iconIn(double cardHeight) => (cardHeight * 0.32).clamp(20.0, 34.0);
 
   @override
   Widget build(BuildContext context) {
@@ -388,7 +410,7 @@ class SeatBadge extends StatelessWidget {
           '${onTurn ? ', on turn' : ''}${clock == null ? '' : ', ${clockSeconds(clock)} s on the clock'}',
       child: ExcludeSemantics(
         child: oneLine
-            ? SizedBox(height: lineHeight, child: _badge(context, total, taken))
+            ? SizedBox(height: height, child: _badge(context, total, taken))
             : _badge(context, total, taken),
       ),
     );
@@ -434,8 +456,8 @@ class SeatBadge extends StatelessWidget {
     // The icon sits beside the name where the badge has the width for
     // it and above it where it does not, so a side badge keeps its room
     // for the name either way.
-    final icon = PlayerIcon(name: name, seed: iconSeed, avatar: avatar, size: oneLine ? 18 : 22);
-    final nameText = _name(context, maxWidth - _padding.horizontal - (oneLine ? 24 : 0));
+    final icon = PlayerIcon(name: name, seed: iconSeed, avatar: avatar, size: iconSize);
+    final nameText = _name(context, maxWidth - _padding.horizontal - (oneLine ? iconSize + 6 : 0));
     // A three-digit total beside a two-digit hand is the widest this
     // gets, and it is a hair inside a side badge's room: scaled down
     // rather than clipped should a font run wider.
