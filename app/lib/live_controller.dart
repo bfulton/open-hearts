@@ -243,6 +243,13 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// showing it; null when the view is waiting on a person, or the
   /// game is over.
   ({Duration delay, void Function() act})? _next(List<Decision> record) {
+    // Once this device's seat is gone the shown game stops advancing
+    // at all. The page draws the notice rather than the table, but a
+    // screen is not a guarantee: nothing should be able to move this
+    // player's cards, from a bot here or from a play recorded
+    // elsewhere. The table plays their hand out without them; this
+    // device simply stops following it.
+    if (!client.amSeated) return null;
     // Departures recorded next take effect at once.
     if (_consumed.length < record.length && record[_consumed.length].removal) {
       final d = record[_consumed.length];
