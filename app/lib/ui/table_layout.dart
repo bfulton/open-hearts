@@ -2,10 +2,9 @@
 /// (docs/05-form-factors.md).
 ///
 /// Top to bottom: the header (menu, where the game stands, the heart),
-/// the felt, the player's own score, the action line, the hand. In
-/// portrait the score is not a row of its own: the player is the fourth
-/// seat on the felt, a badge the same gap from the cards as the other
-/// three, and the action line floats in the band below. The
+/// the felt, the action line, the hand. The player's own score is not a
+/// row here: they are the fourth seat on the felt, a badge the same gap
+/// from the cards as the other three (ui/table_view.dart). The
 /// same order in portrait and landscape; what changes with the shape
 /// is the hand. In portrait width runs out — thirteen cards fan across
 /// 390 points — so the fan overlaps hard and the cards take the height
@@ -25,7 +24,6 @@ class TableLayout extends StatelessWidget {
     super.key,
     required this.header,
     required this.felt,
-    required this.score,
     required this.action,
     required this.hand,
     this.below,
@@ -36,11 +34,6 @@ class TableLayout extends StatelessWidget {
 
   /// The felt: the trick, the seats, and whatever floats over them.
   final Widget felt;
-
-  /// The player's own score, on its own row under the felt. The
-  /// portrait composition does not use it: there the player's badge is
-  /// the fourth seat on the felt itself (ui/table_view.dart).
-  final Widget score;
 
   /// The line between the score and the hand: what the game wants.
   final Widget action;
@@ -69,14 +62,12 @@ class TableLayout extends StatelessWidget {
         return Column(
           children: [
             header,
-            // In portrait the player's own badge is on the felt with
-            // the other three, so what is left under it is one band,
-            // and the action line floats in the middle of it. In
-            // landscape the felt has no height to spare for a fourth
-            // badge, so the score keeps its own row under the felt and
-            // the action line sits on the next one.
+            // The four seats are all on the felt (ui/table_view.dart).
+            // Under it, portrait floats the action line in a band of
+            // its own — a quarter of the height, the felt taking the
+            // rest — while landscape, which has no height to spare,
+            // gives it one row under the felt and no more.
             Expanded(flex: landscape ? 1 : 3, child: felt),
-            if (landscape) score,
             ?below,
             if (landscape) action else Expanded(flex: 1, child: Center(child: action)),
             Padding(

@@ -22,7 +22,6 @@ import 'ui/hand_fan.dart';
 import 'ui/header.dart';
 import 'ui/overlays.dart';
 import 'ui/pip.dart';
-import 'ui/scoreboard.dart';
 import 'ui/table_layout.dart';
 import 'ui/table_view.dart';
 import 'ui/update_pill.dart';
@@ -123,7 +122,6 @@ class _TablePageState extends State<TablePage> {
                     const Positioned(right: 6, bottom: 2, child: UpdatePill()),
                   ],
                 ),
-                score: ScoreLine(controller: _controller),
                 action: ActionBar(
                   controller: _controller,
                   onPass: _controller.confirmPass,

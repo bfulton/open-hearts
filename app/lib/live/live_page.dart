@@ -18,7 +18,6 @@ import '../theme.dart';
 import '../ui/hand_fan.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
-import '../ui/scoreboard.dart';
 import '../ui/table_layout.dart';
 import '../ui/table_view.dart';
 
@@ -192,7 +191,6 @@ class _LivePageState extends State<LivePage> {
                     ),
                   ],
                 ),
-                score: ScoreLine(controller: _c),
                 below: _debugState(),
                 action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
                 hand: (landscape) => HandFan(

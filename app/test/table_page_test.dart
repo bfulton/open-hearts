@@ -426,41 +426,51 @@ void main() {
     expect(slotWidth, lessThan(60));
   });
 
-  testWidgets('four seats, two matched pairs, each badge the same gap from the card it labels', (tester) async {
-    await pumpTable(tester);
-    final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
-    final slots = _trickSlots(tester);
-    Rect card(double Function(Rect) edge, bool most) =>
-        slots.reduce((a, b) => (most ? edge(a) > edge(b) : edge(a) < edge(b)) ? a : b);
-    Rect badge(String name) => tester.getRect(find.bySemanticsLabel(RegExp('^$name: ')));
+  for (final shape in [_phone, _sideways, const Size(1280, 800), const Size(340, 720)]) {
+    testWidgets('four seats, two matched pairs, each badge the same gap from the card it labels, at ${shape.width.toInt()}x${shape.height.toInt()}', (tester) async {
+      await pumpTable(tester, size: shape);
+      final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
+      final slots = _trickSlots(tester);
+      Rect card(double Function(Rect) edge, bool most) =>
+          slots.reduce((a, b) => (most ? edge(a) > edge(b) : edge(a) < edge(b)) ? a : b);
+      Rect badge(String name) => tester.getRect(find.bySemanticsLabel(RegExp('^$name: ')));
+      final seats = ['You', names[1], names[2], names[3]];
 
-    // Each badge labels the card on its own side of the trick, and is
-    // the same short gap from it as the other three are from theirs.
-    final gaps = <String, double>{
-      'north': card((r) => r.top, false).top - badge(names[2]).bottom,
-      'south': badge('You').top - card((r) => r.bottom, true).bottom,
-      'west': card((r) => r.left, false).left - badge(names[1]).right,
-      'east': badge(names[3]).left - card((r) => r.right, true).right,
-    };
-    for (final e in gaps.entries) {
-      expect(e.value, closeTo(gaps['north']!, 0.5), reason: '${e.key} sits as far off its card as the rest');
-    }
-    expect(gaps['north'], lessThan(16), reason: 'near enough to read as that card\'s label');
+      // Each badge labels the card on its own side of the trick, and is
+      // the same short gap from it as the other three are from theirs.
+      final gaps = <String, double>{
+        'north': card((r) => r.top, false).top - badge(names[2]).bottom,
+        'south': badge('You').top - card((r) => r.bottom, true).bottom,
+        'west': card((r) => r.left, false).left - badge(names[1]).right,
+        'east': badge(names[3]).left - card((r) => r.right, true).right,
+      };
+      for (final e in gaps.entries) {
+        expect(e.value, closeTo(gaps['north']!, 0.5), reason: '${e.key} sits as far off its card as the rest');
+      }
+      expect(gaps['north'], lessThan(16), reason: 'near enough to read as that card\'s label');
 
-    // Two pairs, each pair one size: the seat across the felt and your
-    // own at the near edge, and the two at the sides.
-    expect(find.byType(SeatBadge), findsNWidgets(engine.seatCount));
-    expect(badge('You').size, badge(names[2]).size, reason: 'you and the seat facing you');
-    expect(badge(names[1]).size, badge(names[3]).size, reason: 'the two at the sides');
+      // Two pairs, each pair one size: the seat across the felt and
+      // your own at the near edge, and the two at the sides.
+      for (final name in seats) {
+        expect(find.bySemanticsLabel(RegExp('^$name: ')), findsOneWidget, reason: '$name has one badge');
+      }
+      void samePair(Rect a, Rect b, String which) {
+        expect(a.width, closeTo(b.width, 0.5), reason: which);
+        expect(a.height, closeTo(b.height, 0.5), reason: which);
+      }
 
-    // And the action line floats in the band under the felt rather than
-    // crowding either it or the hand.
-    final felt = tester.getRect(find.byType(TableView));
-    final action = tester.getRect(find.byType(ActionBar));
-    final hand = tester.getRect(find.byType(HandFan));
-    expect(badge('You').bottom, lessThanOrEqualTo(felt.bottom));
-    expect(action.top - felt.bottom, closeTo(hand.top - action.bottom, 4), reason: 'halfway down the band');
-  });
+      samePair(badge('You'), badge(names[2]), 'you and the seat facing you');
+      samePair(badge(names[1]), badge(names[3]), 'the two at the sides');
+
+      // And nothing of the table runs off the felt.
+      final felt = tester.getRect(find.byType(TableView));
+      for (final name in seats) {
+        expect(felt.contains(badge(name).topLeft), isTrue, reason: '$name is on the felt');
+        expect(felt.contains(badge(name).bottomRight - const Offset(0.01, 0.01)), isTrue, reason: '$name is on the felt');
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('every player has an icon: their initials on their colour, on the badges, your line and the sheet', (tester) async {
     await pumpTable(tester);

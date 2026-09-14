@@ -55,27 +55,36 @@ beside what they have taken this hand (their card count is gone — it
 is the same as yours), and your own total and hand sit on one line
 with theirs.
 
-In portrait that line is the fourth seat, on the felt with the other
-three. All four badges are the same widget, and they are two matched
-pairs: the two facing each other across the trick are as wide as the
-trick's own column and one line tall, and the two at the sides are as
-tall as the card beside them and as wide as the strip left between
-that card and the felt's edge (a name that wraps to two lines is
-scaled to the box rather than overflowing it). Each badge is eight
-points from the card it labels, on all four sides, which is what makes
-it read as that card's label and not as furniture. Under the player's
-badge is a row kept for the line the table says — who took the trick,
-or that it is your turn — whether or not there is anything to say, so
-nothing jumps. What is left over is the felt's far end above the top
-badge, and the band under it where the action line floats: the felt
-takes three quarters of the height after the header and the hand, the
-band the last quarter.
+That line is the fourth seat, on the felt with the other three, in
+both compositions. All four badges are the same widget and each is
+eight points from the card it labels — on all four sides, at every
+shape — which is what makes a badge read as that card's label rather
+than as furniture along an edge. They are placed against the trick,
+not against the felt, so the felt's spare height is rail around the
+table instead of distance between a seat and its card; and because
+the badges hold to their cards, the trick is sized from the height
+they leave rather than the other way round, which is why nothing
+overflows when a name wraps or the reader turns the text up (a badge
+scales its contents into its box).
 
-Landscape is still the composition above — badges on the rail, the
-score on its own row under the felt — which puts them further from
-the cards than portrait does, furthest on a desktop window. Applying
-the portrait rule there wants somewhere for the table's line to go,
-and 390 points of height has none spare. What is left
+Each pair comes out one size. In portrait that falls out of the room:
+the two facing each other across the trick are as wide as the trick's
+own column, and the two at the sides take the strip between their card
+and the felt's edge, and the height of that card. On a wide felt there
+is no strip to fill and a box the width of the trick would be a bar
+with a word in it, so a badge hugs its name — and the two of a pair
+are each laid out over a ghost of the other, which takes up its room
+and draws nothing, so whichever name is the longer, the pair match.
+
+What the table says — who took the trick, or that it is your turn —
+has a row of its own under the player's badge in portrait, kept
+whether or not there is anything in it so nothing jumps. A wide felt
+has no height to spare for that row, and plenty of width, so there it
+sits beside the badge, with the same room kept on the other side so
+the badge holds the middle. Under the felt, portrait floats the action
+line in a band of its own — the felt takes three quarters of what is
+left after the header and the hand, the band the last quarter —
+while landscape gives it one row and no more. What is left
 along the top is a header 40 points tall in both compositions — the
 menu on the left, the hand and the pass in the middle, and on the
 right a heart, whole until hearts are broken — so the two compositions
