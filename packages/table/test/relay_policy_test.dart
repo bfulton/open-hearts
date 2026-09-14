@@ -39,8 +39,8 @@ void main() {
       expect(floodWrite(['a', 'b'], {'a'}, everywhere: true), isTrue);
       expect(floodWrite(<String>[], null, everywhere: true), isTrue);
     });
-    test('no readBy is a single write', () {
-      expect(floodWrite(['a', 'b'], null, everywhere: false), isFalse);
+    test('no readBy yet floods: one relay is taken only on evidence', () {
+      expect(floodWrite(['a', 'b'], null, everywhere: false), isTrue);
     });
     test('a readable relay up is a single write', () {
       expect(floodWrite(['a', 'b'], {'b'}, everywhere: false), isFalse);
@@ -50,6 +50,7 @@ void main() {
     });
     test('nothing up is not a flood — there is nowhere to flood to', () {
       expect(floodWrite(<String>[], {'a'}, everywhere: false), isFalse);
+      expect(floodWrite(<String>[], null, everywhere: false), isFalse);
     });
   });
 

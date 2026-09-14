@@ -27,16 +27,26 @@ Set<R>? readByFrom<K, R>(Map<K, ({Set<R> reads, int at})> reads, int nowMs, int 
   return all;
 }
 
-/// Whether a write goes to every relay that is up rather than one:
-/// when told to go [everywhere], or when the readers' common relays
-/// ([readBy]) are known and not one of them is up — a relay nobody at
-/// the table can read is no place for the event, so it goes to all
-/// that are up. [up] is the relays up and not refusing this writer.
+/// Whether a write goes to every relay that is up rather than one.
+///
+/// One relay is an optimisation, and it is taken only on evidence: a
+/// relay some peer has said it reads. Until a peer has said ([readBy]
+/// null, nobody heard from yet), and when what they read is up on none
+/// of this writer's relays, the event goes to every relay that is up.
+///
+/// The polarity matters. Narrowing by assumption is what silenced a
+/// live table: before any heartbeat has crossed, every client picked
+/// one relay of its own, and two clients that picked differently — a
+/// phone on the public relays, a client reading them through a bridge
+/// under another name — never heard each other, so the very heartbeats
+/// that would have told each where to write could not get through. A
+/// write that floods until it is told otherwise cannot fail that way.
 bool floodWrite<R>(Iterable<R> up, Set<R>? readBy, {required bool everywhere}) {
   if (everywhere) return true;
-  if (readBy == null) return false;
   final upList = up is List<R> ? up : up.toList();
-  return upList.isNotEmpty && !upList.any(readBy.contains);
+  if (upList.isEmpty) return false; // nowhere to flood to
+  if (readBy == null) return true; // no evidence yet: say it everywhere
+  return !upList.any(readBy.contains);
 }
 
 /// The single relay a write goes to when it is not [floodWrite]: the

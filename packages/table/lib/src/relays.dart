@@ -214,6 +214,11 @@ class RelayGroup {
   final Set<String> _seen = {};
   final Map<Uri, int> _refusedUntil = {};
   final Map<String, _Pending> _pending = {};
+
+  /// Events written to every relay at once, and which of those relays
+  /// have refused so far: a flood has no next relay to move on to, so
+  /// this is how the group still learns that nobody would take it.
+  final Map<String, ({Set<Uri> targets, Set<Uri> refused})> _flooded = {};
   final _refusals = StreamController<String?>.broadcast();
   String? _refusal;
   Timer? _sweeper;
@@ -245,9 +250,14 @@ class RelayGroup {
     final now = _nowMs;
     final upUrls = [for (final c in connections) if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c.url];
     if (floodWrite(upUrls, readBy, everywhere: everywhere)) {
+      final targets = <Uri>{};
       for (final c in connections) {
-        if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c.publish(e);
+        if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) {
+          targets.add(c.url);
+          c.publish(e);
+        }
       }
+      if (targets.isNotEmpty) _flooded[e.id] = (targets: targets, refused: <Uri>{});
       return;
     }
     if (readBy == null) return _send(e, const {}, null);
@@ -296,15 +306,29 @@ class RelayGroup {
         final reason = m.length > 3 ? '${m[3]}' : '';
         final taken = m[2] == true || reason.startsWith('duplicate:');
         final p = _pending.remove(id);
+        final flood = _flooded[id];
         if (taken) {
           _refusedUntil.remove(from.url);
+          _flooded.remove(id);
           _setRefusal(null);
           return;
         }
         log?.call('${from.url} refused ${id.substring(0, 8)}: $reason');
         _refusedUntil[from.url] = _nowMs + refusalMs;
-        // Sent to one relay: on to the next. Sent everywhere, or given
-        // up on: the others have it.
+        if (flood != null) {
+          // A flood has no next relay to try. It is worth saying only
+          // when every relay it went to has refused it: then nothing
+          // this device writes is getting out, which is the one thing
+          // the player can act on.
+          flood.refused.add(from.url);
+          if (flood.refused.containsAll(flood.targets)) {
+            _flooded.remove(id);
+            _setRefusal(reason);
+          }
+          return;
+        }
+        // Sent to one relay: on to the next. Given up on: the others
+        // have it.
         if (p != null) _send(p.event, p.tried, reason);
       case 'NOTICE':
         log?.call('${from.url}: ${m.length > 1 ? m[1] : ''}');
@@ -314,6 +338,7 @@ class RelayGroup {
   void _sweep() {
     final now = _nowMs;
     _pending.removeWhere((_, p) => now - p.sentMs > pendingMs);
+    if (_flooded.length > 200) _flooded.clear();
     // A relay's refusal has run out: a fresh connection, since one
     // that turned on this client may not turn back, and the next event
     // will try it.

@@ -32,6 +32,46 @@ void main() {
     t.stop();
   });
 
+  test('a write before any heartbeat reaches a peer that does not share its first relay', () {
+    // The hole that silenced a live table, at the layer it lives in.
+    // Before a heartbeat has crossed, a writer has no idea what the
+    // others read. Narrowing to one relay on that non-evidence made
+    // each client pick its own first — a phone on the public relays,
+    // a client reading the same relays through a bridge under other
+    // names — and when those differ, nothing crosses, including the
+    // heartbeats that would have said where to write. A write floods
+    // until a peer says otherwise, so it cannot fail that way.
+    final clock = VirtualClock();
+    final net = SimNetwork(clock)..relays = const ['ra', 'rb', 'rc'];
+    final a = net.attach('A');
+    final b = net.attach('B');
+    net.setReach('A', {'ra', 'rc'});
+    net.setReach('B', {'rb', 'rc'});
+    expect(a.paths, ['ra', 'rc']);
+    expect(b.paths, ['rb', 'rc']);
+    var heard = 0;
+    b.incoming.listen((_) => heard++);
+    a.broadcast({'hello': 1});
+    clock.advance(5000);
+    expect(heard, 1, reason: "a's first write reached b on the relay they share");
+  });
+
+  test('once a peer has said what it reads, the write narrows to one relay they share', () {
+    final clock = VirtualClock();
+    final net = SimNetwork(clock)..relays = const ['ra', 'rb', 'rc'];
+    final a = net.attach('A');
+    final b = net.attach('B');
+    net.setReach('A', {'ra', 'rc'});
+    net.setReach('B', {'rb', 'rc'});
+    var heard = 0;
+    b.incoming.listen((_) => heard++);
+    // b says what it reads: the one relay both reach is rc.
+    a.heard('B', b.paths);
+    a.broadcast({'hello': 1});
+    clock.advance(5000);
+    expect(heard, 1, reason: 'still delivered, now by the one relay they share');
+  });
+
   test('with no relays configured the bus is unchanged: a plain game finishes', () {
     final t = SimTable(humans: 2, seed: 9);
     expect(t.net.relays, isEmpty);

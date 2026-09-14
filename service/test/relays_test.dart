@@ -92,8 +92,9 @@ void main() {
     expect(await heard, {'n': 1});
     expect(ta.refusal, isNull);
 
-    // A second event goes straight to the relay that took the first:
-    // r1 refused once and is out of the running for a while.
+    // Once r1's refusal has landed it is out of the running for a
+    // while, and later events are not offered to it at all.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
     var refusalsAtR1 = 0;
     r1.refuse = (_) {
       refusalsAtR1++;
