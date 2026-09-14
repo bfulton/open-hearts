@@ -132,15 +132,15 @@ waste five seconds, and it cannot forge a play. Two hosts with
 different views may seat someone twice; they take the seating with the
 lower table id, and the other table's empty seat is booted at its first
 turn. A rated table says so on the felt and in its record, and every
-name on it carries a rating. Below that, *With friends*: a room code —
-four letters or digits, a friend's, or none for a new one — and one
-button, *Play with friends*; the room shows the code and a *Share the
-link* that carries it, and a link opened lands in the room. Nobody
-hosts a room: everyone at a code says so on the relay every two
+name on it carries a rating. Below that, *With friends*: one button,
+*Play with friends*, which starts a table of its own at a code drawn
+at random. Nobody types a code — the room shows its code and a *Share
+the link* that carries it, and opening that link lands in the room.
+Nobody hosts a room: everyone at a code says so on the relay every two
 seconds, whoever has been heard lately is the table in the order they
 arrived, and the lowest key present leads — it starts the table ten
-seconds after the last arrival, at once at four, or on *Start now*,
-by the same kind of start event, and a leader who leaves is simply no
+seconds after the last arrival, at once at four, or on *Start now*, by
+the same kind of start event, and a leader who leaves is simply no
 longer present (`Room`). A start counts only from someone present and
 only if recent, since the relay keeps them and a code gets reused. The transport is a WebRTC data channel to every
 other person, set up over the relays' signalling and carrying the

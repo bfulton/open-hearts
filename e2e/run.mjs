@@ -324,17 +324,16 @@ async function main() {
     // four-capital-letter text on her screen. Nobody hosts; whoever
     // is at a code is the table.
     await click(pages[0], /^Play with friends$/);
-    await waitFor(pages[0], /^Read the code out/, { what: 'the room' });
-    const code = (await texts(pages[0])).find((t) => /^[A-Z]{4}$/.test(t));
+    await waitFor(pages[0], /^Share the link$/, { what: 'the room' });
+    const code = (await texts(pages[0])).find((t) => /^[A-Z0-9]{4}$/.test(t));
     if (!code) throw new Error('no room code shown');
     log(`room ${code}`);
-    // Bao arrives by the shared link — the app's own address with the
-    // code — and, with a name already, lands straight in the room.
-    await pages[1].goto(`${app.url}/?e2e=1&room=${code}`);
-    await waitFor(pages[1], new RegExp(`^Table ${code}$`), { what: 'the room, by its link', timeout: 60000 });
-    for (let i = 2; i < 4; i++) {
-      await type(pages[i], 'Room code', code);
-      await click(pages[i], /^Play with friends$/);
+    // Nobody types a code: the others arrive by the shared link — the
+    // app's own address with the code — and, with a name already, land
+    // straight in the room.
+    for (let i = 1; i < 4; i++) {
+      await pages[i].goto(`${app.url}/?e2e=1&room=${code}`);
+      await waitFor(pages[i], new RegExp(`^Table ${code}$`), { what: 'the room, by its link', timeout: 60000 });
     }
     // Four in: whoever leads starts on its own.
     for (const page of pages) await waitFor(page, /^4 of 4 here  ·  unrated$/, { what: 'the live table', timeout: 40000 });

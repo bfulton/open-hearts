@@ -50,7 +50,6 @@ class LobbyPage extends StatefulWidget {
 
 class _LobbyPageState extends State<LobbyPage> {
   final _name = TextEditingController();
-  late final _code = TextEditingController(text: widget.code);
 
   /// How you look to the others: read off the device with the name,
   /// changed by tapping it.
@@ -143,7 +142,6 @@ class _LobbyPageState extends State<LobbyPage> {
     _refusalSub?.cancel();
     _transport?.close(); // a matched or started table has its own
     _name.dispose();
-    _code.dispose();
     super.dispose();
   }
 
@@ -267,13 +265,12 @@ class _LobbyPageState extends State<LobbyPage> {
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => LivePage(controller: controller)));
   }
 
-  /// Into the room at the code typed, or at a new one when the field
-  /// is empty: whoever is there is the table, and the first to arrive
-  /// is nobody special.
+  /// Into the room this device arrived at by a link, or a new one of
+  /// its own: nobody types a code, so a room is either started here or
+  /// opened from a link someone sent. Whoever is there is the table,
+  /// and the first to arrive is nobody special.
   Future<void> _enter() async {
-    final typed = _code.text.trim().toUpperCase();
-    final code = typed.isEmpty ? Room.newCode() : typed;
-    if (!Room.validCode(code)) return setState(() => _error = 'A room code is four letters or digits');
+    final code = widget.code ?? Room.newCode();
     final transport = await _connect(code);
     if (transport == null) return;
     try {
@@ -442,42 +439,17 @@ class _LobbyPageState extends State<LobbyPage> {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.chromeDim, letterSpacing: 0.4)),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 132,
-              child: TextField(
-                controller: _code,
-                // A code is four letters or digits, typed as such: no
-                // capitalising, correcting or suggesting, and nothing
-                // else gets in.
-                textCapitalization: TextCapitalization.characters,
-                autocorrect: false,
-                enableSuggestions: false,
-                smartDashesType: SmartDashesType.disabled,
-                smartQuotesType: SmartQuotesType.disabled,
-                keyboardType: TextInputType.visiblePassword,
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')), LengthLimitingTextInputFormatter(4)],
-                maxLength: 4,
-                decoration: _field('Room code').copyWith(counterText: ''),
-                style: const TextStyle(color: Palette.chrome, letterSpacing: 4, fontWeight: FontWeight.w700),
-                onSubmitted: (_) => _busy ? null : _enter(),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _busy ? null : _enter,
-                style: _secondary().copyWith(padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 15, horizontal: 12))),
-                child: const Text('Play with friends', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _busy ? null : _enter,
+            style: _secondary().copyWith(padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 15, horizontal: 12))),
+            child: const Text('Play with friends', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          ),
         ),
         const SizedBox(height: 6),
         const Text(
-          'A code from a friend, or none for a new table to share.',
+          'A new table, and a link to send. A link from a friend opens theirs.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 11.5, color: Palette.chromeDim),
         ),
@@ -583,7 +555,7 @@ class _RoomView extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           seconds == null
-              ? 'Read the code out, or share the link. The table starts ten seconds after someone joins.'
+              ? 'Send the link. The table starts ten seconds after someone joins.'
               : 'Starting in $seconds s — empty seats go to bots',
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
