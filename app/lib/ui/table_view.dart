@@ -398,14 +398,14 @@ class SeatBadge extends StatelessWidget {
   /// the room of [line]; where the felt is too short to spare it — a
   /// phone on its side — the badge takes [tightLine] and the smaller
   /// icon that goes with it.
-  static const line = 42.0;
+  static const line = 48.0;
   static const tightLine = 30.0;
 
   /// The icon in a badge of a given height, and in a stacked one of a
   /// given card's height: as big as the box can carry with the name
   /// and the numbers beside or under it.
   static double iconOn(double line) => line - 13;
-  static double iconIn(double cardHeight) => (cardHeight * 0.32).clamp(20.0, 34.0);
+  static double iconIn(double cardHeight) => (cardHeight * 0.38).clamp(22.0, 40.0);
 
   @override
   Widget build(BuildContext context) {
