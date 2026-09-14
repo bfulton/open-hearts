@@ -124,6 +124,32 @@ void main() {
     });
   });
 
+  test('the seat you get is drawn, not won by arriving first', () {
+    // Four people in the same order every time, at tables whose codes
+    // differ: the seating follows the table's seed, so being second
+    // through the door is not a seat.
+    final orders = <String>{};
+    for (final code in ['AAAA', 'BBBB', 'CCCC', 'DDDD', 'EEEE', 'FFFF']) {
+      fakeAsync((async) {
+        final bus = Bus();
+        int now() => async.elapsed.inMilliseconds;
+        final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(channel: bus.attach(FakeSigner(n)), code: code, myName: n, nowMs: now)];
+        async.elapse(const Duration(seconds: 3));
+        final spec = rooms.first.spec!;
+        expect(spec.seats.whereType<HumanSeat>(), hasLength(4), reason: 'everyone is seated');
+        // Every one of them, once: a draw, not a reshuffle of who is there.
+        expect(spec.seats.map((h) => (h as HumanSeat).key).toSet(), rooms.map((r) => r.me).toSet());
+        orders.add(spec.seats.map((h) => (h as HumanSeat).key).join(','));
+        // And all four build the same table from the one start event.
+        for (final r in rooms) {
+          expect(r.spec!.seats.map((h) => (h as HumanSeat).key).join(','), orders.last);
+          r.dispose();
+        }
+      });
+    }
+    expect(orders, hasLength(greaterThan(1)), reason: 'the same four do not always sit the same way');
+  });
+
   test('Start now is the leader\'s, and only with company', () {
     fakeAsync((async) {
       final bus = Bus();

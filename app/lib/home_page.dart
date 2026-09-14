@@ -53,7 +53,7 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 14),
                       const Text('Open Hearts', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: Palette.gold)),
                       const SizedBox(height: 6),
-                      const Text('Open source. Alone, or live with friends.', style: TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
+                      const Text('Open source, no ads. Play alone or live.', style: TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
                       const SizedBox(height: 40),
                       _HomeButton(
                         label: 'Play alone',

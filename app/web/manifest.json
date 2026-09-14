@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#06231A",
     "theme_color": "#06231A",
-    "description": "Hearts, open source. Play alone, or live with friends.",
+    "description": "Open source, no ads. Play alone or live.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -134,6 +134,10 @@ cd packages/deal && dart test       # the deal's primitives, and a hand's deal a
 cd packages/table && dart test      # the protocol on a simulated network, sealed tables included
 cd app && flutter test              # the widgets
 cd app && flutter run -d chrome
+
+cd app && flutter build web -o build/e2e --base-href / --no-web-resources-cdn
+node e2e/flows.mjs                  # every flow one device can drive, in a browser
+node e2e/run.mjs                    # four browsers at one table, over the local relay
 ```
 
 The deal ([doc 03](docs/03-fair-deal.md)) is one Rust crate built

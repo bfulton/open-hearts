@@ -366,7 +366,12 @@ class _LobbyPageState extends State<LobbyPage> {
                         ? _WaitingView(queue: queue, onCancel: () => Navigator.of(context).pop())
                         : room == null
                             ? _entry()
-                            : _RoomView(room: room, onLeave: () => Navigator.of(context).pop(), onShare: () => _share(room.code)),
+                            : _RoomView(
+                                room: room,
+                                ledger: _standing?.ledger,
+                                onLeave: () => Navigator.of(context).pop(),
+                                onShare: () => _share(room.code),
+                              ),
                     if (_relayNote != null && (queue != null || room != null)) ...[
                       const SizedBox(height: 14),
                       Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
@@ -452,7 +457,7 @@ class _LobbyPageState extends State<LobbyPage> {
               child: FilledButton(
                 onPressed: _busy ? null : () => _play('rated'),
                 style: _primary(),
-                child: const Text('Rated', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                child: _Trying(busy: _busy, label: 'Rated', weight: FontWeight.w700, size: 15),
               ),
             ),
             const SizedBox(width: 10),
@@ -460,7 +465,7 @@ class _LobbyPageState extends State<LobbyPage> {
               child: FilledButton(
                 onPressed: _busy ? null : () => _play('unrated'),
                 style: _primary(),
-                child: const Text('Unrated', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                child: _Trying(busy: _busy, label: 'Unrated', weight: FontWeight.w700, size: 15),
               ),
             ),
           ],
@@ -475,7 +480,7 @@ class _LobbyPageState extends State<LobbyPage> {
           child: OutlinedButton(
             onPressed: _busy ? null : _enter,
             style: _secondary().copyWith(padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 15, horizontal: 12))),
-            child: const Text('Play with friends', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            child: _Trying(busy: _busy, label: 'Play with friends'),
           ),
         ),
         const SizedBox(height: 6),
@@ -563,9 +568,14 @@ class _WaitingView extends StatelessWidget {
 /// The same screen for everyone in it; the one who leads sees Start
 /// now, and that is the whole of the difference.
 class _RoomView extends StatelessWidget {
-  const _RoomView({required this.room, required this.onLeave, required this.onShare});
+  const _RoomView({required this.room, required this.ledger, required this.onLeave, required this.onShare});
 
   final Room room;
+
+  /// Ratings for the people here, from the results everyone signs;
+  /// null until this device has read them off the relays.
+  final Ledger? ledger;
+
   final VoidCallback onLeave;
   final VoidCallback onShare;
 
@@ -576,14 +586,13 @@ class _RoomView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // The code is nobody's to type any more — the link carries it
+        // — so it is a name for the table and not the point of the
+        // screen.
         Text('Table ${room.code}',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 14, color: Palette.chromeDim, letterSpacing: 0.4)),
-        const SizedBox(height: 6),
-        Text(room.code,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w800, color: Palette.gold, letterSpacing: 10)),
-        const SizedBox(height: 4),
+        const SizedBox(height: 10),
         Text(
           seconds == null
               ? 'Send the link. The table starts ten seconds after someone joins.'
@@ -608,16 +617,22 @@ class _RoomView extends StatelessWidget {
                     ? PlayerIcon(name: members[i].name, seed: members[i].key, avatar: members[i].avatar, size: 30)
                     : const SizedBox(width: 30, height: 30, child: Icon(Icons.smart_toy_outlined, size: 20, color: Palette.chromeDim)),
                 const SizedBox(width: 10),
-                Text(
-                  i < members.length
-                      ? (members[i].key == room.me ? '${members[i].name} (you)' : members[i].name)
-                      : 'a bot, unless someone joins',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: i < members.length ? Palette.chrome : Palette.chromeDim,
-                    fontWeight: i < members.length ? FontWeight.w600 : FontWeight.w400,
+                Expanded(
+                  child: Text(
+                    i < members.length
+                        ? (members[i].key == room.me ? '${members[i].name} (you)' : members[i].name)
+                        : 'a bot, unless someone joins',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: i < members.length ? Palette.chrome : Palette.chromeDim,
+                      fontWeight: i < members.length ? FontWeight.w600 : FontWeight.w400,
+                    ),
                   ),
                 ),
+                // What they are rated, from the results everyone at
+                // their tables signed. A rating nobody has played
+                // enough games to settle carries its question mark.
+                if (i < members.length && ledger != null) _Rated(rating: ledger!.of(members[i].key)),
               ],
             ),
           ),
@@ -639,6 +654,63 @@ class _RoomView extends StatelessWidget {
 /// this device in it, or nothing while there is nothing to say yet.
 /// One spoken line, "3 online", so a screen reader and the suite read
 /// the same thing.
+/// A button's label while the relays are being reached: the word it
+/// had, and a turning ring beside it, because finding a relay takes a
+/// moment and a button that only greys out reads as a button that did
+/// nothing.
+class _Trying extends StatelessWidget {
+  const _Trying({required this.busy, required this.label, this.weight = FontWeight.w600, this.size = 14});
+
+  final bool busy;
+  final String label;
+  final FontWeight weight;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Text(label, style: TextStyle(fontSize: size, fontWeight: weight));
+    if (!busy) return text;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: size,
+          height: size,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Palette.chromeDim.withValues(alpha: 0.9)),
+        ),
+        const SizedBox(width: 9),
+        text,
+      ],
+    );
+  }
+}
+
+/// A player's rating on a roster line: the number, and a question mark
+/// while too few games have settled it.
+class _Rated extends StatelessWidget {
+  const _Rated({required this.rating});
+
+  final Rating rating;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'rated ${rating.shown}${rating.provisional ? ', provisionally' : ''}',
+      child: ExcludeSemantics(
+        child: Text(
+          '${rating.shown}${rating.provisional ? '?' : ''}',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            fontFeatures: [FontFeature.tabularFigures()],
+            color: Palette.chromeDim,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _OnlineLine extends StatelessWidget {
   const _OnlineLine({required this.count});
 

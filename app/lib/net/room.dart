@@ -295,14 +295,16 @@ class Room extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The leader starts the table now: everyone here in arrival order,
-  /// bots in the rest. A no-op for anyone else, or alone.
+  /// The leader starts the table now: everyone here, in an order drawn
+  /// from the table's own seed rather than the order they arrived in,
+  /// so the seat you get is not a prize for being early; bots in the
+  /// rest. A no-op for anyone else, or alone.
   void start() {
     if (!amLeader || spec != null || _started || members.length < 2) return;
     _started = true;
     final rng = Random(seed);
     final draw = List.of(Persona.roster)..shuffle(rng);
-    final here = members;
+    final here = List.of(members)..shuffle(rng);
     final seats = <Map<String, Object?>>[];
     for (var s = 0; s < seatCount; s++) {
       if (s < here.length) {
