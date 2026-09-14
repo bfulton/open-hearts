@@ -23,8 +23,8 @@ library;
 import 'package:engine/engine.dart';
 
 void main() {
-  final games = int.parse(const String.fromEnvironment('GAMES', defaultValue: '500'));
-  const personaName = String.fromEnvironment('PERSONA', defaultValue: 'Westley');
+  final games = int.parse(const String.fromEnvironment('OH_GAMES', defaultValue: '500'));
+  const personaName = String.fromEnvironment('OH_PERSONA', defaultValue: 'Westley');
   final persona = Persona.named(personaName);
   final wins = List.filled(4, 0);
   final totalPts = List.filled(4, 0);

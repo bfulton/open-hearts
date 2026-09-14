@@ -34,8 +34,8 @@ void main() {
     // a peer, and the juror's load is the point.
     final signers = [for (var i = 0; i < 4; i++) SchnorrSigner.generate()];
     final spec = TableSpec(id: 'follow-relay', seed: 6, sealed: true, seats: [for (final s in signers) HumanSeat(s.publicKey)]);
-    // JUROR_LOG=path keeps every client's trace, the juror's included.
-    final logPath = Platform.environment['JUROR_LOG'];
+    // OH_JUROR_LOG=path keeps every client's trace, the juror's included.
+    final logPath = Platform.environment['OH_JUROR_LOG'];
     final sink = logPath == null ? null : File(logPath).openWrite();
     final juror = LastResortJuror(
         relays: [relay.url],

@@ -16,7 +16,7 @@ import 'package:engine/engine.dart';
 
 void main() {
   final games = int.parse(
-    const String.fromEnvironment('GAMES', defaultValue: '1000'),
+    const String.fromEnvironment('OH_GAMES', defaultValue: '1000'),
   );
   const base = Persona.westley;
   final variants = <Persona>[

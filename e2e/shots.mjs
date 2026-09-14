@@ -16,8 +16,8 @@ import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const appDir = process.env.APP_DIR ?? join(root, 'app', 'build', 'e2e');
-const outDir = process.env.OUT_DIR ?? join(root, 'app', 'build', 'shots');
+const appDir = process.env.OH_APP_DIR ?? join(root, 'app', 'build', 'e2e');
+const outDir = join(root, 'app', 'build', 'shots');
 const require = createRequire(import.meta.url);
 const { chromium } = require(`${execSync('npm root -g').toString().trim()}/playwright`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

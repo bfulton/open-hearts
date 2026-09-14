@@ -55,19 +55,19 @@ cp -r site/. "$STAGE"/
 # key — are the project's, set in the Pages dashboard, never here.
 cp service/functions/worker.mjs "$STAGE/_worker.js"
 
-# UPDATE_CHECK=on is what turns on the "new build is up" pill, and it is
-# passed HERE and nowhere else. Inferring it from a real-looking build
-# tag would light the pill up in CI, where it floats over the widget
-# tests and swallows their taps.
+# OH_UPDATE_CHECK=on is what turns on the "new build is up" pill, and it
+# is passed HERE and nowhere else. Inferring it from a real-looking
+# build tag would light the pill up in CI, where it floats over the
+# widget tests and swallows their taps. OH_RELAYS is left empty so the
+# build uses its own relay list (app/lib/net/relays.dart); the local
+# rig is the only thing that sets it, to its bridges.
 ( cd app && "$FLUTTER" build web \
     --release \
     --no-web-resources-cdn \
     --base-href /play/ \
-    --dart-define=BUILD="$BUILD_TAG" \
-    --dart-define=DEV_RELAY="${DEV_RELAY:-}" \
-    --dart-define=DEV_ROOM="${DEV_ROOM:-}" \
-    --dart-define=BUILD_DATE="$BUILD_DATE" \
-    --dart-define=UPDATE_CHECK=on )
+    --dart-define=OH_BUILD="$BUILD_TAG" \
+    --dart-define=OH_RELAYS="${OH_RELAYS:-}" \
+    --dart-define=OH_UPDATE_CHECK=on )
 
 mkdir -p "$STAGE/play"
 cp -r app/build/web/. "$STAGE/play"/

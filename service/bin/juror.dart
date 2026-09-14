@@ -2,7 +2,7 @@
 /// says it has nobody to draw a jury from, then online to serve it.
 ///
 ///     dart run bin/juror.dart --relay ws://localhost:7447
-///     JUROR_SECRET=<64 hex> dart run bin/juror.dart --relay wss://a,wss://b
+///     OH_JUROR_SECRET=<64 hex> dart run bin/juror.dart --relay wss://a,wss://b
 ///
 /// A real key — a fresh one, or the secret given — so a public relay
 /// takes its events; the local one takes anything. Several relays,
@@ -26,7 +26,7 @@ Future<void> main(List<String> args) async {
   if (relays.isEmpty) relays.add(Uri.parse('ws://localhost:7447'));
   final native = await installNativeSchnorr();
   if (!native) print('schnorr: no native library (crypto/schnorr/build.sh); signatures in Dart, seventeen milliseconds each');
-  final secret = Platform.environment['JUROR_SECRET'];
+  final secret = Platform.environment['OH_JUROR_SECRET'];
   final signer = secret != null && secret.length == 64 ? SchnorrSigner.fromSecret(secret) : SchnorrSigner.generate();
   // The deal's cryptography, to serve sealed tables: the cdylib built
   // by crypto/deal/build.sh, found from here or named by DEAL_LIB.

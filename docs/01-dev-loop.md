@@ -41,15 +41,15 @@ content-addressed, so a redeploy typically re-uploads under ten files.
 A phone keeps a page alive for days. Without help, "did my change land?"
 is a hard refresh and a guess. So:
 
-- the running build's sha and date are on the About page, off the menu;
-- `deploy.sh` passes `--dart-define=UPDATE_CHECK=on`, and only deploy.sh
+- the running build's sha is on the About page, off the menu;
+- `deploy.sh` passes `--dart-define=OH_UPDATE_CHECK=on`, and only deploy.sh
   does. The app then fetches `build-info.json` at launch and on every
   return to the foreground, and shows a tap-to-reload pill when the
   published sha differs from its own;
 - `_headers` marks the entry points `no-store` so a cached bootstrap
   cannot lie about this.
 
-`UPDATE_CHECK` is passed explicitly rather than inferred from a
+`OH_UPDATE_CHECK` is passed explicitly rather than inferred from a
 real-looking build tag. Inferring it turns the pill on in CI, where it
 floats over the widget tests and eats their taps.
 

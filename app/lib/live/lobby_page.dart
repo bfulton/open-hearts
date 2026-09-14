@@ -34,11 +34,9 @@ void _relayLog(String line) => debugPrint('relay: $line');
 /// mesh's every channel change go to the console too.
 final _debugging = Uri.base.queryParameters.containsKey('e2e');
 
-/// A dev loop's shortcut: a build made with `--dart-define=DEV_ROOM=…`
 /// opens the lobby with that room code in the field and hosts under it,
 /// so a table of people testing a branch is one tap away. Unset in a
 /// normal build.
-const devRoom = String.fromEnvironment('DEV_ROOM');
 
 class LobbyPage extends StatefulWidget {
   const LobbyPage({super.key, this.code});
@@ -52,7 +50,7 @@ class LobbyPage extends StatefulWidget {
 
 class _LobbyPageState extends State<LobbyPage> {
   final _name = TextEditingController();
-  late final _code = TextEditingController(text: widget.code ?? devRoom);
+  late final _code = TextEditingController(text: widget.code);
 
   /// How you look to the others: read off the device with the name,
   /// changed by tapping it.

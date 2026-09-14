@@ -23,10 +23,10 @@ typedef _Seal = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, P
 typedef _Open = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _Shared = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 
-/// Where the cdylib is: [libraryPath], else `DEAL_LIB` in the
+/// Where the cdylib is: [libraryPath], else `OH_DEAL_LIB` in the
 /// environment, else the crate's release build next to this package.
 Future<DealCrypto> load({String? libraryPath}) async {
-  final path = libraryPath ?? Platform.environment['DEAL_LIB'] ?? _defaultPath();
+  final path = libraryPath ?? Platform.environment['OH_DEAL_LIB'] ?? _defaultPath();
   return _Ffi(DynamicLibrary.open(path));
 }
 
@@ -41,7 +41,7 @@ String _defaultPath() {
       if (File(q).existsSync()) return q;
     }
   }
-  throw StateError('the deal cdylib is not built: run crypto/deal/build.sh, or set DEAL_LIB');
+  throw StateError('the deal cdylib is not built: run crypto/deal/build.sh, or set OH_DEAL_LIB');
 }
 
 class _Ffi implements DealCrypto {

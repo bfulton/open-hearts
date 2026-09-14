@@ -20,13 +20,9 @@ import 'package:table/table.dart';
 
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 
-/// A dev build's own handler: `--dart-define=TURN_URL=https://…/api/turn`.
-const turnUrl = String.fromEnvironment('TURN_URL');
-
-/// Where credentials come from: the build's own, else the app's origin
-/// over https — the site the worker runs beside — else nowhere.
+/// Where credentials come from: the app's origin over https — the site
+/// the worker runs beside — else nowhere.
 Uri? turnEndpoint() {
-  if (turnUrl.isNotEmpty) return Uri.parse(turnUrl);
   final base = Uri.base;
   if (base.scheme != 'https' || base.host.isEmpty) return null;
   return Uri(scheme: 'https', host: base.host, port: base.hasPort ? base.port : null, path: '/api/turn');

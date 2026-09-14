@@ -26,7 +26,7 @@ to the static assets; `node --test service/functions` runs it against
 a stand-in upstream. Built so far: **turn-creds**, `POST /api/turn`
 with the caller's table key, answering Cloudflare Realtime TURN
 credentials good for four hours, minted from a TURN key that lives in
-the project's secrets (`TURN_KEY_ID`, `TURN_API_TOKEN`) and never in
+the project's secrets (`OH_TURN_KEY_ID`, `OH_TURN_API_TOKEN`) and never in
 the repo. Without them it says so, and the app falls back to STUN
 alone; on localhost the app asks nothing and peers connect directly.
 The key is taken as given for now — attesting it is the sign-in
@@ -213,7 +213,7 @@ proofs made and checked on the virtual clock — run in
 four people, a leaver mid-hand and during the deal, a table of two
 surviving a crash by the jury's verdict and a juror's escrow piece, and
 a lone player leaving during the pass while their client looks on. The
-chaos walk runs sealed on request (`CHAOS_SEALED=5`), a minute or two a
+chaos walk runs sealed on request (`OH_CHAOS_SEALED=5`), a minute or two a
 seed. Over real sockets (`service/test`): the jury over the relay,
 seeded and sealed; and a juror of last resort summoned into a sealed
 table of four with real keys, carried through the hand it never saw
@@ -235,7 +235,7 @@ a silent seat may be removed — by finding a fork in the answer that
 looked more helpful (doc 04, "Silence is answered at the seat's own
 turn"). A thousand seeds now finish or pause for the jury with every
 survivor holding the same record. CI walks forty seeds on every commit;
-`CHAOS_SEEDS=1000 dart test test/chaos_test.dart` walks a thousand.
+`OH_CHAOS_SEEDS=1000 dart test test/chaos_test.dart` walks a thousand.
 
 What every cell asserts:
 

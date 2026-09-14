@@ -14,7 +14,7 @@ const okUpstream = async (url, init) => {
   return new Response(JSON.stringify(answer), { status: 200 });
 };
 okUpstream.calls = [];
-const env = { TURN_KEY_ID: 'kid', TURN_API_TOKEN: 'tok', ASSETS: { fetch: async () => new Response('asset', { status: 200 }) } };
+const env = { OH_TURN_KEY_ID: 'kid', OH_TURN_API_TOKEN: 'tok', ASSETS: { fetch: async () => new Response('asset', { status: 200 }) } };
 const post = (body, origin) =>
   new Request('https://dev.open-hearts.pages.dev/api/turn', {
     method: 'POST',
@@ -43,7 +43,7 @@ test('servers: a list or the older single object, urls always a list', () => {
 
 test('mint: not configured is said, not guessed', async () => {
   assert.deepEqual(await mint({}, okUpstream), { status: 503, body: { error: 'turn not configured' } });
-  assert.deepEqual(await mint({ TURN_KEY_ID: 'kid' }, okUpstream), { status: 503, body: { error: 'turn not configured' } });
+  assert.deepEqual(await mint({ OH_TURN_KEY_ID: 'kid' }, okUpstream), { status: 503, body: { error: 'turn not configured' } });
 });
 
 test('mint: credentials from the upstream, with the key and a ttl of four hours', async () => {
@@ -59,11 +59,11 @@ test('mint: credentials from the upstream, with the key and a ttl of four hours'
   assert.deepEqual(JSON.parse(init.body), { ttl: 4 * 3600 });
 });
 
-test('mint: a ttl from the environment, and an upstream of its own for a test', async () => {
+test('mint: the old unprefixed secret names still work, for a dashboard mid-migration', async () => {
   okUpstream.calls.length = 0;
-  const out = await mint({ ...env, TURN_TTL: '600', TURN_UPSTREAM: 'http://127.0.0.1:1/keys' }, okUpstream);
-  assert.equal(out.body.ttl, 600);
-  assert.equal(okUpstream.calls[0].url, 'http://127.0.0.1:1/keys/kid/credentials/generate-ice-servers');
+  const out = await mint({ TURN_KEY_ID: 'kid', TURN_API_TOKEN: 'tok' }, okUpstream);
+  assert.equal(out.status, 200);
+  assert.equal(okUpstream.calls[0].url, 'https://rtc.live.cloudflare.com/v1/turn/keys/kid/credentials/generate-ice-servers');
 });
 
 test('mint: an upstream that refuses, is down, or talks nonsense is a bad gateway', async () => {
@@ -108,7 +108,7 @@ test('the worker: a key is required, then credentials come back, no-store', asyn
     const body = await res.json();
     assert.deepEqual(body.iceServers, answer.iceServers);
     assert.equal(body.ttl, 4 * 3600);
-    const unconfigured = await worker.fetch(post({ key: KEY }), { ...env, TURN_API_TOKEN: undefined });
+    const unconfigured = await worker.fetch(post({ key: KEY }), { ...env, OH_TURN_API_TOKEN: undefined });
     assert.equal(unconfigured.status, 503);
   } finally {
     globalThis.fetch = realFetch;

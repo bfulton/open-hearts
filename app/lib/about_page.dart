@@ -39,7 +39,6 @@ class AboutPage extends StatelessWidget {
                 const SizedBox(height: 30),
                 _Line(label: 'Build', value: buildTag),
                 const SizedBox(height: 8),
-                _Line(label: 'Published', value: buildDate),
               ],
             ),
           ),

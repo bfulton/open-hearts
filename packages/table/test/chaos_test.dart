@@ -80,11 +80,11 @@ class Observed {
 }
 
 void main() {
-  // CHAOS_SEEDS=250 dart test test/chaos_test.dart — for a longer walk.
-  // CHAOS_SEALED=5 walks that many seeds at sealed tables too, the
+  // OH_CHAOS_SEEDS=250 dart test test/chaos_test.dart — for a longer walk.
+  // OH_CHAOS_SEALED=5 walks that many seeds at sealed tables too, the
   // verifiable deal run for real: a minute or two a seed, so opt-in.
-  final seeds = int.parse(Platform.environment['CHAOS_SEEDS'] ?? '40');
-  final sealedSeeds = int.parse(Platform.environment['CHAOS_SEALED'] ?? '0');
+  final seeds = int.parse(Platform.environment['OH_CHAOS_SEEDS'] ?? '40');
+  final sealedSeeds = int.parse(Platform.environment['OH_CHAOS_SEALED'] ?? '0');
   DealCrypto? crypto;
   if (sealedSeeds > 0) setUpAll(() async => crypto = await DealCrypto.load());
 

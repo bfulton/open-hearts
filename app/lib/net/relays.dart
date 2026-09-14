@@ -8,7 +8,7 @@
 /// of it, and so that nobody has to know what a relay is to sit down.
 /// The deployed site and production run the same list. Two exceptions,
 /// both decided when the build is made, never on the page: a build
-/// made with `--dart-define=DEV_RELAY=…` — the local rig against its
+/// made with `--dart-define=OH_RELAYS=…` — the local rig against its
 /// bridges — uses those, and a build served from localhost (`flutter
 /// run`, the browser suite) uses the local relay (service/).
 library;
@@ -41,9 +41,9 @@ int pinnedRelays(List<Uri> relays) =>
 /// The local relay, where a build served from localhost looks.
 const localRelay = 'ws://127.0.0.1:7447';
 
-/// A dev loop's shortcut: a build made with `--dart-define=DEV_RELAY=…`
+/// A dev loop's shortcut: a build made with `--dart-define=OH_RELAYS=…`
 /// (a comma list) talks to those instead. Unset in a normal build.
-const devRelay = String.fromEnvironment('DEV_RELAY');
+const devRelay = String.fromEnvironment('OH_RELAYS');
 
 /// The relays for this build, where it is served from.
 List<Uri> appRelays({Uri? base}) {

@@ -7,7 +7,7 @@
 // turn-creds: POST /api/turn with {"key": <the caller's table key>}
 // answers {"iceServers": [...], "ttl": seconds} — Cloudflare Realtime
 // TURN credentials good for a few hours, minted from a TURN key that
-// lives in the project's secrets (TURN_KEY_ID, TURN_API_TOKEN) and
+// lives in the project's secrets (OH_TURN_KEY_ID, OH_TURN_API_TOKEN) and
 // never here. Without them the handler says so (503) and the app falls
 // back to STUN alone. The key is taken as given: attesting it is the
 // sign-in handler's job, which is not built yet.
@@ -64,11 +64,13 @@ export function serversOf(answer) {
 
 /// Mints credentials: the status and body to answer with.
 export async function mint(env, fetchImpl = fetch) {
-  const keyId = env.TURN_KEY_ID;
-  const token = env.TURN_API_TOKEN;
+  // OH_-prefixed; the old unprefixed names are still read so a project
+  // whose dashboard has not been renamed yet keeps working.
+  const keyId = env.OH_TURN_KEY_ID ?? env.TURN_KEY_ID;
+  const token = env.OH_TURN_API_TOKEN ?? env.TURN_API_TOKEN;
   if (!keyId || !token) return { status: 503, body: { error: 'turn not configured' } };
-  const ttl = Number(env.TURN_TTL) > 0 ? Number(env.TURN_TTL) : DEFAULT_TTL;
-  const upstream = `${env.TURN_UPSTREAM ?? UPSTREAM}/${keyId}/credentials/generate-ice-servers`;
+  const ttl = DEFAULT_TTL;
+  const upstream = `${UPSTREAM}/${keyId}/credentials/generate-ice-servers`;
   let res;
   try {
     res = await fetchImpl(upstream, {

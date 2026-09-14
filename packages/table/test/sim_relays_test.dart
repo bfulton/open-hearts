@@ -5,7 +5,6 @@
 /// game plays out with nobody removed and the record verifies.
 library;
 
-import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';

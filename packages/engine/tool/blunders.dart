@@ -20,8 +20,8 @@ import 'dart:math';
 import 'package:engine/engine.dart';
 
 void main() {
-  final tables = int.parse(const String.fromEnvironment('TABLES', defaultValue: '300'));
-  final show = int.parse(const String.fromEnvironment('SHOW', defaultValue: '6'));
+  final tables = int.parse(const String.fromEnvironment('OH_TABLES', defaultValue: '300'));
+  final show = int.parse(const String.fromEnvironment('OH_SHOW', defaultValue: '6'));
   final counts = <String, Map<String, int>>{};
   final examples = <String>[];
   final rng = Random(7);

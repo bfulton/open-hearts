@@ -4,8 +4,8 @@
 //   node e2e/run.mjs            # from the repo root; needs the global Playwright
 //
 // Against a public relay instead: build the app with
-// `--dart-define=DEV_RELAY=wss://relay.damus.io` and run with
-// `RELAY_URL=wss://relay.damus.io`, so the suite starts no relay of its
+// `--dart-define=OH_RELAYS=wss://relay.damus.io` and run with
+// `OH_RELAY_URL=wss://relay.damus.io`, so the suite starts no relay of its
 // own. The app's relays are the build's, never typed in (app/lib/net/
 // relays.dart); served from localhost it looks for the local relay at
 // its usual port, which is where the suite starts one.
@@ -27,7 +27,7 @@ import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const appDir = process.env.APP_DIR ?? join(root, 'app', 'build', 'e2e');
+const appDir = process.env.OH_APP_DIR ?? join(root, 'app', 'build', 'e2e');
 const require = createRequire(import.meta.url);
 const { chromium } = require(`${execSync('npm root -g').toString().trim()}/playwright`);
 
@@ -41,8 +41,8 @@ async function startRelay() {
   // resort: the four browsers are all at one table, so a jury can only
   // come from the service. Its own process, because a relay verifies
   // every event it carries and must never wait on a juror's work.
-  // RELAY_LOG=path keeps the relay's whole log for a debugging run.
-  const relayLog = process.env.RELAY_LOG ? createWriteStream(process.env.RELAY_LOG) : null;
+  // OH_RELAY_LOG=path keeps the relay's whole log for a debugging run.
+  const relayLog = process.env.OH_RELAY_LOG ? createWriteStream(process.env.OH_RELAY_LOG) : null;
   const args = ['run', 'bin/service.dart', '--port', '7447', ...(relayLog ? [] : ['--quiet'])];
   const proc = spawn('dart', args, { cwd: join(root, 'service') });
   let juror = null;
@@ -247,10 +247,10 @@ const names = ['Ada', 'Bao', 'Cara', 'Dee'];
 const roster = /^(?!Ada:|Bao:|Cara:|Dee:)[A-Z][\w ]+: \d+ in the game, \d+ this hand/;
 
 async function main() {
-  // RELAY_URL=wss://… runs the suite against a relay that already
+  // OH_RELAY_URL=wss://… runs the suite against a relay that already
   // exists — a public one the app was built for, say — instead of
   // starting the local one.
-  const relay = process.env.RELAY_URL ? { url: process.env.RELAY_URL, stop() {} } : await startRelay();
+  const relay = process.env.OH_RELAY_URL ? { url: process.env.OH_RELAY_URL, stop() {} } : await startRelay();
   const app = await serveApp();
   log(`relay ${relay.url}, app ${app.url}`);
   const browser = await chromium.launch();
@@ -265,7 +265,7 @@ async function main() {
       page.on('console', (m) => {
         const t = m.text();
         // Errors, and the table's and the duty's own traces about the jury.
-        const verbose = process.env.RELAY_LOG ? /^(mesh|relay): / : /$^/;
+        const verbose = process.env.OH_RELAY_LOG ? /^(mesh|relay): / : /$^/;
         if (m.type() === 'error' || verbose.test(t) || /^duty: (?!.*emit )/.test(t) || /^table: .*(jury|juror|verdict|appeal|nobody online|summon)/.test(t)) log(`page ${names[i]}: ${t}`);
       });
       await page.goto(`${app.url}/?e2e=1`);

@@ -14,9 +14,9 @@ library;
 import 'package:engine/engine.dart';
 
 void main() {
-  final games = int.parse(const String.fromEnvironment('GAMES', defaultValue: '1200'));
+  final games = int.parse(const String.fromEnvironment('OH_GAMES', defaultValue: '1200'));
   // ROSTER=Westley,Don Juan,... seats a chosen field; default is the roster.
-  const names = String.fromEnvironment('ROSTER');
+  const names = String.fromEnvironment('OH_ROSTER');
   final roster = names.isEmpty
       ? Persona.roster
       : [for (final n in names.split(',')) Persona.named(n.trim())];
