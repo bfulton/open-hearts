@@ -251,13 +251,18 @@ class LiveController extends ChangeNotifier implements TableModel {
         act: () {
           _consumed.add(d);
           final seat = d.event.seat;
-          if (_shownHolders[seat] is HumanSeat) {
-            _shownHolders[seat] = BotSeat(client.spec.replacementFor(seat));
-            if (seat == mySeat) {
-              _pendingPlay = null;
-              _pendingPass = const {};
-            }
+          if (_shownHolders[seat] is! HumanSeat) return;
+          if (seat == mySeat) {
+            // Never a bot on this player's own seat in the shown game.
+            // The table is not drawn once the seat is gone, but the
+            // shown game runs underneath whatever is drawn, and a bot
+            // installed here would play this player's cards — a ghost
+            // at their own hand. Their seat simply stops.
+            _pendingPlay = null;
+            _pendingPass = const {};
+            return;
           }
+          _shownHolders[seat] = BotSeat(client.spec.replacementFor(seat));
         }
       );
     }

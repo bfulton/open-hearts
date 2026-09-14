@@ -162,6 +162,16 @@ void main() {
     // And it stays that way as the table plays on.
     await live.advance(tester, 5000);
     expect(find.byType(TableView), findsNothing);
+    // And no ghost underneath: the shown game never hands this
+    // player's own seat to a bot, so nothing plays their cards while
+    // they are looking at the notice.
+    expect(live.controller.personaAt(_me), isNull, reason: 'no bot on my own seat');
+    final mine = live.controller.game.knowsHand(_me) ? live.controller.game.handOf(_me).length : null;
+    await live.advance(tester, 20000);
+    expect(live.controller.personaAt(_me), isNull, reason: 'still no bot on my own seat');
+    if (mine != null) {
+      expect(live.controller.game.handOf(_me).length, mine, reason: 'not one of my cards was played for me');
+    }
     expect(tester.takeException(), isNull);
   });
 
