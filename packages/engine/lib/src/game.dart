@@ -38,7 +38,7 @@ enum Phase {
   /// [HeartsGame.nextHand] starts the next deal.
   handOver,
 
-  /// Someone crossed [gameOverScore]; [HeartsGame.winners] is final.
+  /// Someone crossed [HeartsGame.target]; [HeartsGame.winners] is final.
   gameOver,
 }
 
@@ -51,11 +51,17 @@ const humanSeat = 0;
 const seatCount = 4;
 
 class HeartsGame {
-  HeartsGame({int? seed, this.sealed = false}) : _random = Random(seed) {
+  HeartsGame({int? seed, this.sealed = false, this.target = gameOverScore}) : _random = Random(seed) {
     _startHand();
   }
 
   final Random _random;
+
+  /// The score this game runs to: [gameOverScore] unless the table
+  /// asked for another. Every seat has to agree on it, which is why a
+  /// live table carries it in the start event everyone signs
+  /// (`TableSpec.target`).
+  final int target;
 
   /// Whether the cards come from outside — the verifiable deal — rather
   /// than from the seed. Every hand of a sealed game begins in
@@ -450,7 +456,7 @@ class HeartsGame {
     for (var s = 0; s < seatCount; s++) {
       _totals[s] += _handScores[s];
     }
-    _phase = _totals.any((t) => t >= gameOverScore) ? Phase.gameOver : Phase.handOver;
+    _phase = _totals.any((t) => t >= target) ? Phase.gameOver : Phase.handOver;
   }
 
   /// Deals the next hand. Only valid from [Phase.handOver].

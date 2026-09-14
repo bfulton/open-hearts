@@ -264,6 +264,17 @@ void main() {
       }
     });
 
+    test('a game to a hundred is the same game carried on past fifty', () {
+      final short = HeartsGame(seed: 3);
+      final long = HeartsGame(seed: 3, target: longGameScore);
+      final shortHands = playOut(short, Bot());
+      final longHands = playOut(long, Bot());
+      expect(short.totals.any((t) => t >= gameOverScore), isTrue);
+      expect(short.totals.every((t) => t < longGameScore), isTrue);
+      expect(long.totals.any((t) => t >= longGameScore), isTrue);
+      expect(longHands, greaterThan(shortHands), reason: 'the same deals, and more of them');
+    });
+
     test('every hand puts exactly 26 points on the board', () {
       final game = HeartsGame(seed: 1234);
       final bot = Bot();

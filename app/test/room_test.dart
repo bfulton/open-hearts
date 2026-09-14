@@ -93,7 +93,8 @@ void main() {
       expect(b.spec, isNotNull);
       expect(a.spec!.seats.map((s) => s.toString()), b.spec!.seats.map((s) => s.toString()), reason: 'one table');
       expect(a.seated && b.seated, isTrue);
-      expect(a.spec!.seats.whereType<HumanSeat>().map((h) => h.key), [signers[0].publicKey, signers[1].publicKey]);
+      expect(a.spec!.seats.whereType<HumanSeat>().map((h) => h.key).toSet(), {signers[0].publicKey, signers[1].publicKey},
+          reason: 'both of them, in whichever seats the draw gave');
       expect(a.spec!.seats.whereType<BotSeat>().length, 2);
       // The table's id is its own, under the code: a reused code must
       // not put two tables' events on one tag.
@@ -124,6 +125,28 @@ void main() {
     });
   });
 
+  test('the leader\'s game is the table\'s: the score it runs to rides in the start event', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      // Two devices asking for different games. Only the one that
+      // starts the table has a say, and everyone plays that game.
+      final rooms = [
+        for (final n in ['Ada', 'Bao'])
+          Room(channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, target: n == 'Ada' ? 100 : 50, nowMs: now)
+      ];
+      async.elapse(const Duration(seconds: 14));
+      final leader = rooms.firstWhere((r) => r.amLeader);
+      expect(rooms.every((r) => r.spec != null), isTrue);
+      for (final r in rooms) {
+        expect(r.spec!.target, leader.target, reason: 'one table, one game');
+      }
+      for (final r in rooms) {
+        r.dispose();
+      }
+    });
+  });
+
   test('the seat you get is drawn, not won by arriving first', () {
     // Four people in the same order every time, at tables whose codes
     // differ: the seating follows the table's seed, so being second
@@ -139,10 +162,11 @@ void main() {
         expect(spec.seats.whereType<HumanSeat>(), hasLength(4), reason: 'everyone is seated');
         // Every one of them, once: a draw, not a reshuffle of who is there.
         expect(spec.seats.map((h) => (h as HumanSeat).key).toSet(), rooms.map((r) => r.me).toSet());
-        orders.add(spec.seats.map((h) => (h as HumanSeat).key).join(','));
+        final order = spec.seats.map((h) => (h as HumanSeat).key).join(',');
+        orders.add(order);
         // And all four build the same table from the one start event.
         for (final r in rooms) {
-          expect(r.spec!.seats.map((h) => (h as HumanSeat).key).join(','), orders.last);
+          expect(r.spec!.seats.map((h) => (h as HumanSeat).key).join(','), order);
           r.dispose();
         }
       });

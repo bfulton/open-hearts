@@ -1,3 +1,4 @@
+import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
@@ -15,6 +16,19 @@ void main() {
     final real = SchnorrSigner.generate();
     final r = TableEvent.sign(real, table: 't', kind: EventKind.heartbeat, body: {'hand': 0, 'step': 0});
     expect(TableEvent.parse(r.toJson()), isNotNull);
+  });
+
+  test('a spec carries the score the game runs to; one from a build that had no say runs to fifty', () {
+    final spec = TableSpec(
+      id: 't',
+      seed: 1,
+      seats: [HumanSeat(FakeSigner('me').publicKey), for (var s = 1; s < seatCount; s++) BotSeat(Persona.roster[s])],
+      target: longGameScore,
+    );
+    expect(TableSpec.parse(spec.toJson())!.target, longGameScore);
+    expect(HeartsGame(seed: spec.seed, target: spec.target).target, longGameScore);
+    final older = Map<String, Object?>.from(spec.toJson())..remove('target');
+    expect(TableSpec.parse(older)!.target, gameOverScore);
   });
 
   for (final humans in [1, 2, 3, 4]) {

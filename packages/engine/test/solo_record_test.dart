@@ -61,6 +61,20 @@ void main() {
     expect(replay.hands.length, game.handNumber + 1);
   });
 
+  test('a game to another target says so, and replays to it', () {
+    final record = SoloRecord(seed: 42, personas: ['', 'Romeo', 'Juliet', 'Cyrano'], target: longGameScore);
+    final text = record.encode();
+    expect(text, endsWith(':$longGameScore'), reason: 'the target rides at the end');
+    final back = SoloRecord.parse(text);
+    expect(back, isNotNull);
+    expect(back!.target, longGameScore);
+    expect(back.replay().game.target, longGameScore);
+    // A game to fifty is the line it always was, and one from before
+    // there was anything to say replays to fifty.
+    expect(SoloRecord(seed: 42, personas: ['', 'Romeo', 'Juliet', 'Cyrano']).encode(), endsWith(':'));
+    expect(SoloRecord.parse('oh1:7:Romeo,Juliet,Cyrano:2C.3C.4C:')!.target, gameOverScore);
+  });
+
   test('a truncated or garbled record is refused or replays as far as it goes', () {
     expect(SoloRecord.parse('nonsense'), isNull);
     expect(SoloRecord.parse('oh1:1:Romeo,Juliet:::'), isNull);

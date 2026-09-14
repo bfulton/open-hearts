@@ -41,7 +41,7 @@ class TableHeader extends StatelessWidget {
           Expanded(
             child: Center(
               child: Text(
-                'Hand ${game.handNumber + 1}  ·  ${game.passDirection.label}  ·  to $gameOverScore',
+                'Hand ${game.handNumber + 1}  ·  ${game.passDirection.label}  ·  to ${game.target}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim, letterSpacing: 0.3),

@@ -27,10 +27,14 @@ import 'ui/table_view.dart';
 import 'ui/update_pill.dart';
 
 class TablePage extends StatefulWidget {
-  const TablePage({super.key, this.seed, this.paced = true});
+  const TablePage({super.key, this.seed, this.paced = true, this.target = gameOverScore});
 
   /// Fixes the shuffle. Tests pass one; the app never does.
   final int? seed;
+
+  /// The score the game runs to, as the front door's options ask for
+  /// it (game_options.dart).
+  final int target;
 
   /// False collapses every bot pause to zero, so a widget test can run a
   /// hand out without pumping a clock through 52 plays.
@@ -46,7 +50,7 @@ class _TablePageState extends State<TablePage> {
   @override
   void initState() {
     super.initState();
-    _controller = GameController(seed: widget.seed, paced: widget.paced)
+    _controller = GameController(seed: widget.seed, paced: widget.paced, target: widget.target)
       ..addListener(_onGameChanged);
     // Your avatar, as chosen in the lobby, on your line here too.
     Identity.avatar().then((a) {

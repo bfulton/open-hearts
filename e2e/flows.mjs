@@ -6,9 +6,9 @@
 //
 // run.mjs is the other half: four browsers at one table, which is the
 // only way to see the live flows. This one is everything else — the
-// front door, a game played out alone, the record it leaves, the
-// lobby, a picture, the phone turned — and it is the only suite that
-// presses anything with a real pointer rather than through the
+// front door, the game options, a game played out alone, the record it
+// leaves, a room to share, the phone turned — and it is the only suite
+// that presses anything with a real pointer rather than through the
 // accessibility tree, so a tap landing in the wrong place has
 // somewhere to show up.
 import { execFileSync } from 'node:child_process';
@@ -64,14 +64,45 @@ flow('the front door', async ({ open }) => {
   const page = await open();
   await waitFor(page, /^Open Hearts$/, { what: 'the home screen' });
   const seen = await texts(page);
-  for (const want of ['Open source, no ads. Play alone or live.', 'Play alone', 'Play live']) {
-    if (!seen.includes(want)) throw new Error(`the home screen has no "${want}"\nsaw: ${seen.join(' | ')}`);
+  // Everything before a game is on this one screen: who you are, the
+  // game being asked for, and the three ways in.
+  for (const want of [
+    /^Open source, no ads\. Play alone or live\.$/,
+    /^Your avatar$/,
+    /^Play bots$/,
+    /^50 points · rated$/,
+    /^Game options$/,
+    /^Play live/,
+    /^Play friends$/,
+  ]) {
+    if (!seen.some((t) => want.test(t))) throw new Error(`the home screen has nothing for ${want}\nsaw: ${seen.join(' | ')}`);
   }
+});
+
+flow('the game options', async ({ open }) => {
+  const page = await open();
+  await waitFor(page, /^50 points · rated$/, { what: 'the options line' });
+  await click(page, /^Game options$/);
+  await waitFor(page, /^100 points$/, { what: 'the options sheet' });
+  await click(page, /^100 points$/);
+  await click(page, /^Unrated$/);
+  await click(page, /^Done$/);
+  await waitFor(page, /^100 points · unrated$/, { what: 'the line, changed' });
+  // The choice is a rule of the next game, not a label: the table
+  // plays to it.
+  await click(page, /^Play bots$/);
+  await waitFor(page, /^Hand 1 .* to 100$/, { what: 'a game to a hundred' });
+  await click(page, /^Menu$/);
+  await waitFor(page, /^Leave the table$/, { what: 'the menu' });
+  await click(page, /^Leave the table$/);
+  // And it is the device's, still there when the app is opened again.
+  await page.reload();
+  await waitFor(page, /^100 points · unrated$/, { what: 'the options after a reload' });
 });
 
 flow('a hand alone', async ({ open }) => {
   const page = await open();
-  await click(page, /^Play alone$/);
+  await click(page, /^Play bots$/);
   await waitFor(page, /^Choose 3 more to pass$/, { what: 'the pass' });
   await playAlone(page, (p) => has(p, /^Next hand$/), 120000);
   await click(page, /^Next hand$/);
@@ -79,7 +110,7 @@ flow('a hand alone', async ({ open }) => {
   await click(page, /^Menu$/);
   await waitFor(page, /^Leave the table$/, { what: 'the menu' });
   await click(page, /^Leave the table$/);
-  await waitFor(page, /^Play alone$/, { what: 'the home screen again' });
+  await waitFor(page, /^Play bots$/, { what: 'the home screen again' });
 });
 
 flow('a thumb, not the tree', async ({ open }) => {
@@ -88,7 +119,7 @@ flow('a thumb, not the tree', async ({ open }) => {
   // test, so this is where a tap landing in the wrong place shows up.
   for (const [shape, viewport] of [['portrait', portrait], ['sideways', landscape]]) {
     const page = await open({ viewport, pointer: true });
-    await click(page, /^Play alone$/);
+    await click(page, /^Play bots$/);
     await waitFor(page, /^Choose 3 more to pass$/, { what: `the pass, ${shape}` });
     // Three named cards, each tapped where it is drawn: the count on
     // the line is how the app says the tap landed on that card and not
@@ -108,7 +139,7 @@ flow('a thumb, not the tree', async ({ open }) => {
 
 flow('turning the phone mid-hand', async ({ open }) => {
   const page = await open();
-  await click(page, /^Play alone$/);
+  await click(page, /^Play bots$/);
   await waitFor(page, /^Choose 3 more to pass$/, { what: 'the pass' });
   await playAlone(page, (p) => has(p, /^Your (turn|lead)$/), 60000);
   const hand = (await texts(page)).find((t) => /^Hand \d/.test(t));
@@ -125,7 +156,7 @@ flow('turning the phone mid-hand', async ({ open }) => {
 
 flow('a game alone, and the record it leaves', async ({ open, context }) => {
   const page = await open();
-  await click(page, /^Play alone$/);
+  await click(page, /^Play bots$/);
   // Hand after hand until somebody reaches fifty.
   for (let hand = 0; hand < 30; hand++) {
     await playAlone(page, (p) => has(p, /^Next hand$|^New game$/), 180000);
@@ -151,7 +182,7 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
 
 flow('the about page', async ({ open }) => {
   const page = await open();
-  await click(page, /^Play alone$/);
+  await click(page, /^Play bots$/);
   await waitFor(page, /^Menu$/, { what: 'the table' });
   await click(page, /^Menu$/);
   await waitFor(page, /^About$/, { what: 'the menu' });
@@ -167,22 +198,21 @@ flow('the about page', async ({ open }) => {
   await waitFor(page, /^Menu$/, { what: 'the table again' });
 });
 
-flow('the lobby, and a room to share', async ({ open, relay }) => {
+flow('the live area, and a room to share', async ({ open, relay }) => {
   await relay();
   const page = await open();
-  await click(page, /^Play live$/);
-  await waitFor(page, /^Play with friends$/, { what: 'the lobby' });
+  await waitFor(page, /^Play friends$/, { what: 'the home screen' });
   await type(page, 'Your name', 'Ada');
   // The avatar is chosen from the sheet behind your own icon.
   await click(page, /^Your avatar$/);
   await waitFor(page, /^Rocket$/, { what: 'the avatar picker' });
   await click(page, /^Rocket$/);
   await click(page, /^Done$/);
-  await waitFor(page, /^Play with friends$/, { what: 'the lobby again' });
-  // This device is online from the lobby, before it sits anywhere —
-  // and says so even when it is the only one.
-  await waitFor(page, /^(Nobody else online|\d+ online)$/, { what: 'the online count', timeout: 40000 });
-  await click(page, /^Play with friends$/);
+  await waitFor(page, /^Play friends$/, { what: 'the home screen again' });
+  // This device is online from the front door, before it sits
+  // anywhere, and the button says so even when it is the only one.
+  await waitFor(page, /^Play live, (nobody else online|\d+ online)$/, { what: 'the online count on the button', timeout: 40000 });
+  await click(page, /^Play friends$/);
   await waitFor(page, /^Share the link$/, { what: 'the room', timeout: 60000 });
   const seen = await texts(page);
   const code = seen.find((t) => /^Table [A-Z0-9]{4}$/.test(t));
@@ -190,9 +220,9 @@ flow('the lobby, and a room to share', async ({ open, relay }) => {
   if (seen.some((t) => /^[A-Z0-9]{4}$/.test(t))) throw new Error('the code is still shouted at the room');
   if (!seen.some((t) => /^Ada \(you\)$/.test(t))) throw new Error('the room does not say which one is you');
   if (!seen.some((t) => /^rated \d+/.test(t))) throw new Error(`no rating beside a name\nsaw: ${seen.join(' | ')}`);
-  // Leaving a room is leaving live play: back out to the front door.
+  // Leaving a room lands back on the front door.
   await click(page, /^Leave$/);
-  await waitFor(page, /^Play alone$/, { what: 'the home screen after leaving' });
+  await waitFor(page, /^Play bots$/, { what: 'the home screen after leaving' });
 });
 
 // ---- the runner ----------------------------------------------------------
@@ -250,7 +280,7 @@ async function main() {
     if (pointer) {
       await page.addStyleTag({ content: 'flt-semantics, flt-semantics * { pointer-events: none !important; }' });
     }
-    await waitFor(page, /^Open Hearts$|^Play alone$/, { what: 'the app', timeout: 60000 });
+    await waitFor(page, /^Open Hearts$|^Play bots$/, { what: 'the app', timeout: 60000 });
     return page;
   };
   for (const { name, run } of flows) {

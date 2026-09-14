@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 import 'dart:math';
 
+import 'package:engine/engine.dart';
 import 'package:service/service.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
@@ -59,11 +60,20 @@ void main() {
     });
     tearDown(() => relay.close());
 
-    Future<(RelayTransport, WaitingRoom)> join(String name, {int rating = 1500}) async {
+    Future<(RelayTransport, WaitingRoom)> join(String name, {int rating = 1500, int target = gameOverScore}) async {
       final s = SchnorrSigner.generate();
-      final t = RelayTransport(relays: [relay.url], signer: s, table: poolTag('unrated'));
+      final t = RelayTransport(relays: [relay.url], signer: s, table: poolTag('unrated', target: target));
       await t.ready;
-      final room = WaitingRoom(relay: t, pool: 'unrated', name: name, rating: rating, roundMs: 2000, botsAfterMs: 3000, heartbeatMs: 500, staleMs: 2000);
+      final room = WaitingRoom(
+          relay: t,
+          pool: 'unrated',
+          target: target,
+          name: name,
+          rating: rating,
+          roundMs: 2000,
+          botsAfterMs: 3000,
+          heartbeatMs: 500,
+          staleMs: 2000);
       return (t, room);
     }
 
@@ -74,6 +84,21 @@ void main() {
       expect(specs.first.seats.whereType<HumanSeat>().length, 3);
       expect(specs.first.seats.whereType<BotSeat>().length, 1);
       expect(specs.first.rated, isFalse);
+      for (final r in rooms) {
+        r.$2.close();
+        r.$1.close();
+      }
+    });
+
+    test('a game to another score waits in a pool of its own, and the table it gets says so', () async {
+      final rooms = [await join('Short'), await join('Long', target: longGameScore)];
+      final specs = await Future.wait(rooms.map((r) => r.$2.seated.first.timeout(const Duration(seconds: 15))));
+      expect(specs[0].target, gameOverScore);
+      expect(specs[1].target, longGameScore);
+      expect(specs[0].id, isNot(specs[1].id), reason: 'two games nobody can play at once are two tables');
+      for (final spec in specs) {
+        expect(spec.seats.whereType<HumanSeat>().length, 1, reason: 'each waited alone and got bots');
+      }
       for (final r in rooms) {
         r.$2.close();
         r.$1.close();

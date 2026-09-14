@@ -155,13 +155,16 @@ List<int> scoreHand(List<int> takenPoints) {
   return [for (var s = 0; s < 4; s++) s == shooter ? 0 : moonPoints];
 }
 
-/// The score at which the game ends. Play stops at the end of the hand in
-/// which any player reaches it; lowest total wins. Fifty: a game of a
-/// few hands rather than an evening, the length a phone is picked up
-/// for.
+/// The score a game runs to unless the table asked for another
+/// ([HeartsGame.target]). Play stops at the end of the hand in which
+/// any player reaches it; lowest total wins. Fifty: a game of a few
+/// hands rather than an evening, the length a phone is picked up for.
 const gameOverScore = 50;
 
-/// The seats holding the lowest total. Once [gameOverScore] has been
+/// The longer game, for a table that wants an evening of it.
+const longGameScore = 100;
+
+/// The seats holding the lowest total. Once the target has been
 /// reached these are the winners; more than one seat can be returned,
 /// because a tie is a real outcome and not an error to break.
 List<int> lowestTotals(List<int> totals) {

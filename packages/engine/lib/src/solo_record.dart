@@ -16,12 +16,17 @@ import 'persona.dart';
 import 'rules.dart';
 
 class SoloRecord {
-  SoloRecord({required this.seed, required this.personas, this.humanSeat = humanSeatDefault});
+  SoloRecord({required this.seed, required this.personas, this.humanSeat = humanSeatDefault, this.target = gameOverScore});
 
   static const humanSeatDefault = 0;
   static const version = 'oh1';
 
   final int seed;
+
+  /// The score the game ran to. A game to fifty leaves the line it
+  /// always did — the field is only written when the table asked for
+  /// another target — so every record ever copied out still replays.
+  final int target;
 
   /// Persona name per seat; the human's seat holds an empty string.
   final List<String> personas;
@@ -34,18 +39,21 @@ class SoloRecord {
   /// The human's plays, in order, across every hand.
   final List<Card> plays = [];
 
-  /// `oh1:seed:west,north,east:pass|pass|-|…:play,play,…`
+  /// `oh1:seed:west,north,east:pass|pass|-|…:play,play,…`, and the
+  /// target after it at a table that did not play to fifty.
   String encode() => [
         version,
         seed.toString(),
         [for (var s = 0; s < personas.length; s++) if (s != humanSeat) personas[s]].join(','),
         [for (final p in passes) p == null ? '-' : p.map((c) => c.code).join('.')].join('|'),
         plays.map((c) => c.code).join(','),
+        if (target != gameOverScore) target.toString(),
       ].join(':');
 
   static SoloRecord? parse(String text) {
     final parts = text.trim().split(':');
-    if (parts.length != 5 || parts[0] != version) return null;
+    if (parts.length != 5 && parts.length != 6) return null;
+    if (parts[0] != version) return null;
     try {
       final seed = int.parse(parts[1]);
       final bots = parts[2].split(',');
@@ -58,7 +66,7 @@ class SoloRecord {
       for (final name in personas) {
         if (name.isNotEmpty) Persona.named(name); // throws when unknown
       }
-      final r = SoloRecord(seed: seed, personas: personas);
+      final r = SoloRecord(seed: seed, personas: personas, target: parts.length == 6 ? int.parse(parts[5]) : gameOverScore);
       if (parts[3].isNotEmpty) {
         for (final p in parts[3].split('|')) {
           r.passes.add(p == '-' ? null : [for (final c in p.split('.')) Card.parse(c)]);
@@ -78,7 +86,7 @@ class SoloRecord {
   /// Replays the record through a fresh game. Stops where the record
   /// stops; [Replay.complete] says whether that was the end of the game.
   Replay replay() {
-    final game = HeartsGame(seed: seed);
+    final game = HeartsGame(seed: seed, target: target);
     final bots = [
       for (var s = 0; s < seatCount; s++)
         s == humanSeat ? null : Bot(persona: Persona.named(personas[s])),

@@ -31,14 +31,15 @@ const _sideways = Size(844, 390);
 
 /// A second table in the same test needs a [key] of its own: the page
 /// keeps its game across a rebuild, as it should.
-Future<void> pumpTable(WidgetTester tester, {int seed = 4, Size size = _phone, bool paced = false, Key? key}) async {
+Future<void> pumpTable(WidgetTester tester,
+    {int seed = 4, Size size = _phone, bool paced = false, Key? key, int target = engine.gameOverScore}) async {
   tester.view
     ..physicalSize = size
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(MaterialApp(
     theme: buildTheme(),
-    home: TablePage(key: key, seed: seed, paced: paced),
+    home: TablePage(key: key, seed: seed, paced: paced, target: target),
   ));
   await tester.pumpAndSettle();
 }
@@ -87,6 +88,12 @@ void main() {
     expect(find.textContaining('Choose 3 more to pass'), findsOneWidget);
     expect(find.text('Pass'), findsOneWidget);
     expect(find.text('Hand 1  ·  Pass left  ·  to 50'), findsOneWidget);
+  });
+
+  testWidgets('a table asked for a hundred plays to a hundred, and the header says so', (tester) async {
+    await pumpTable(tester, target: 100);
+    expect(find.text('Hand 1  ·  Pass left  ·  to 100'), findsOneWidget);
+    expect(tester.widget<TableHeader>(find.byType(TableHeader)).game.target, 100);
   });
 
   testWidgets('the Pass button waits for exactly three cards', (tester) async {
@@ -328,11 +335,11 @@ void main() {
       home: Builder(
         builder: (context) => TextButton(
           onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TablePage(seed: 4, paced: false))),
-          child: const Text('Play alone'),
+          child: const Text('Play bots'),
         ),
       ),
     ));
-    await tester.tap(find.text('Play alone'));
+    await tester.tap(find.text('Play bots'));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget);
 
@@ -352,7 +359,7 @@ void main() {
     await tester.tap(find.text('Leave the table'));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsNothing);
-    expect(find.text('Play alone'), findsOneWidget);
+    expect(find.text('Play bots'), findsOneWidget);
   });
 
   testWidgets('everyone\'s standing: on their badges, yours among them, no card counts', (tester) async {

@@ -49,7 +49,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   })  : _crypto = crypto,
         client = TableClient(
             spec: spec, signer: signer, transport: transport, clock: clock ?? WallClock(), presence: presence, crypto: crypto) {
-    _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed);
+    _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
     _shownHolders = List.of(spec.seats);
     _sub = client.changes.listen((_) => _onChange());
     pictures?.addListener(_pictured);
@@ -175,7 +175,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Replays the whole record at once. A jump, for the rare case where
   /// the shown past was rewritten.
   void _rebuild(List<Decision> record) {
-    _shown = HeartsGame(seed: client.spec.seed, sealed: client.spec.sealed);
+    _shown = HeartsGame(seed: client.spec.seed, sealed: client.spec.sealed, target: client.spec.target);
     _shownHolders = List.of(client.spec.seats);
     _shownPlayed.clear();
     _consumed.clear();

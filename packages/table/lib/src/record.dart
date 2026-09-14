@@ -85,7 +85,7 @@ Verification verifyRecord(
   DealCrypto? crypto,
   List<TableEvent> releases = const [],
 }) {
-  final game = HeartsGame(seed: spec.seed, sealed: spec.sealed);
+  final game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
   final holders = List.of(spec.seats);
   final humans = {
     for (final h in spec.seats)

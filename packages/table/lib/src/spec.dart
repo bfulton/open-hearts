@@ -25,7 +25,8 @@ class BotSeat extends SeatHolder {
 }
 
 class TableSpec {
-  const TableSpec({required this.id, required this.seed, required this.seats, this.rated = false, this.sealed = false});
+  const TableSpec(
+      {required this.id, required this.seed, required this.seats, this.rated = false, this.sealed = false, this.target = gameOverScore});
 
   final String id;
 
@@ -39,6 +40,12 @@ class TableSpec {
   /// player chose; carried in the table so every seat and the record
   /// agree.
   final bool rated;
+
+  /// The score the game runs to. The player who starts the table
+  /// chooses it; it rides in the signed start event because a table
+  /// whose seats disagree about when the game ends forks at the end of
+  /// a hand.
+  final int target;
 
   /// The deal's seed at an unsealed table, where every seat can compute
   /// every hand from it; at a sealed one, the randomness of the jury
@@ -54,6 +61,7 @@ class TableSpec {
         'seed': seed,
         'rated': rated,
         'sealed': sealed,
+        'target': target,
         'seats': [
           for (final h in seats)
             switch (h) {
@@ -74,7 +82,12 @@ class TableSpec {
       }
       if (seats.length != seatCount) return null;
       return TableSpec(
-          id: m['id'] as String, seed: m['seed'] as int, seats: seats, rated: m['rated'] == true, sealed: m['sealed'] == true);
+          id: m['id'] as String,
+          seed: m['seed'] as int,
+          seats: seats,
+          rated: m['rated'] == true,
+          sealed: m['sealed'] == true,
+          target: m['target'] as int? ?? gameOverScore);
     } catch (_) {
       return null;
     }

@@ -122,8 +122,10 @@ Plan plan(
   return Plan(tables, left);
 }
 
-/// The relay's tag for a pool's waiting room.
-String poolTag(String pool) => 'queue:$pool';
+/// The relay's tag for a pool's waiting room. The score the game runs
+/// to is part of it, so that everyone who meets there wants the same
+/// game; a game to fifty keeps the tag it always had.
+String poolTag(String pool, {int target = gameOverScore}) => 'queue:$pool${target == gameOverScore ? '' : ':$target'}';
 
 /// A player in a pool: says they are waiting, watches the others, hosts
 /// when it is their turn to, and stops when seated.
@@ -144,6 +146,7 @@ class WaitingRoom {
     this.sealed = false,
     this.avatar,
     this.picture,
+    this.target = gameOverScore,
   }) : since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
     _random = random ?? Random.secure();
     for (final e in List.of(relay.lobbySoFar)) {
@@ -160,6 +163,10 @@ class WaitingRoom {
   final RelayTransport relay;
   final String pool;
   final String name;
+
+  /// The score the tables this player sits at run to: it seats nobody
+  /// who asked for another, and the tables it hosts say so.
+  final int target;
 
   /// Whether this device deals sealed tables (docs/03): the tables it
   /// seats are sealed, and it sits only at sealed ones.
@@ -284,6 +291,7 @@ class WaitingRoom {
         'seed': seed,
         'rated': pool == 'rated',
         'sealed': sealed,
+        'target': target,
         'seats': seats,
         'policy': botPolicyVersion,
       });
@@ -331,6 +339,9 @@ class WaitingRoom {
     // A device that cannot run the deal cannot sit at a sealed table,
     // and one that can does not sit at an unsealed one.
     if ((c['sealed'] == true) != sealed) return;
+    // A host on an older build says nothing about the target, which
+    // means the game it seats runs to fifty.
+    if ((c['target'] as int? ?? gameOverScore) != target) return;
     final seats = <SeatHolder>[];
     final names = <int, String>{};
     final avatars = <int, Map<String, Object?>>{};
@@ -352,7 +363,13 @@ class WaitingRoom {
       }
       if (!mine || seats.length != seatCount) return;
       _offers.add((
-        TableSpec(id: c['table'] as String, seed: c['seed'] as int, seats: seats, rated: c['rated'] == true, sealed: c['sealed'] == true),
+        TableSpec(
+            id: c['table'] as String,
+            seed: c['seed'] as int,
+            seats: seats,
+            rated: c['rated'] == true,
+            sealed: c['sealed'] == true,
+            target: target),
         names,
         avatars,
       ));

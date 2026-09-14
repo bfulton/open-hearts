@@ -182,7 +182,7 @@ class TableClient {
     this.crypto,
     Random? random,
   })  : _random = random,
-        game = HeartsGame(seed: spec.seed, sealed: spec.sealed),
+        game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target),
         holders = List.of(spec.seats),
         _humans = {for (final h in spec.seats) if (h is HumanSeat) h.key} {
     if (spec.sealed && crypto == null) throw ArgumentError('a sealed table needs the deal\'s cryptography');

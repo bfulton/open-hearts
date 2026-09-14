@@ -60,16 +60,19 @@ rigged. Roughly in order:
    fork or a deadlock ([doc 06](docs/06-service.md), `packages/table`).
    The local relay exists (`service/`, a NIP-01 subset), the same
    clients play a hand over it with real keys and real sockets, and
-   the app has live play: **Play live**, pick rated or unrated, and
-   whoever is waiting on the relay seats each other four to a table
+   the app has live play: one screen before a game carries your name,
+   your avatar and the game you are asking for — fifty points or a
+   hundred, rated or unrated — and **Play live** puts you in the pool
+   with however many people are online, which the button says.
+   Whoever is waiting on the relay seats each other four to a table
    every five seconds — no matchmaker, the lowest key present hosts
    the round — leftovers first next time, bots at your rating after
-   ten; or a four-letter code, or a link, for friends. Either way the four of
-   you are on WebRTC data channels, the relay beside them, signing
-   in wasm since Dart-to-JavaScript signatures cost 100 ms each
-   ([measurements](measurements/README.md)). Rated games move a
-   rating, yours and the bots', from results everyone at the table
-   signs — and every table is dealt by the verifiable deal (5).
+   ten; or **Play friends**, a table of your own and a link to send.
+   Either way the four of you are on WebRTC data channels, the relay
+   beside them, signing in wasm since Dart-to-JavaScript signatures
+   cost 100 ms each ([measurements](measurements/README.md)). Rated
+   games move a rating, yours and the bots', from results everyone at
+   the table signs — and every table is dealt by the verifiable deal (5).
    Four headless browsers prove it on every commit — matched, a hand
    over WebRTC, a browser closed mid-hand, a stalled one booted, a
    leaver (`e2e/`). A deployed build starts on a few public relays —

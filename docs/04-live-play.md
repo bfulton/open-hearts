@@ -106,15 +106,23 @@ A bot's identity is its name and its rung: `Westley` at the top,
 
 ## The live table, as it stands
 
-What the app does today. **Play live** on the home
-screen opens a lobby: how many devices are online, a name and an
+What the app does today. There is one screen before a game, and
+everything that comes before one is on it: your name and your
 avatar — one of a set of icons on a colour, or a picture of your own,
 sixty-four pixels square, kept on the device with the name and
 carried to the others with it: the icon and colour in every beat, the
 picture once, as a stored event (what is done about a picture nobody
-asked for is below) — and the choice — *Rated* or
-*Unrated* —
-then a waiting screen and nothing to do. There is no matchmaker.
+asked for is below) — *Play bots*, and under it the live area, which
+carries the game being asked for on a line of its own: fifty points
+or a hundred, rated or unrated, changed in a small sheet and kept on
+the device beside the name. *Play live* is one button — the options
+say which pool — and it carries how many devices are online, since
+that is the reason to press it now or to come back later. Pressing it
+is a waiting screen and nothing to do. (The live area has one switch
+in front of it, `liveOpen` in `app/lib/home_page.dart`, for the day
+live play is something bought rather than something given; it is open
+to everyone today, and there is nothing behind the switch but a
+padlock.) There is no matchmaker.
 Players who want a game say so on the relay every couple of seconds,
 in the pool they chose, with their rating and how long they have
 waited; everyone waiting sees everyone else. Time is cut into rounds
@@ -133,10 +141,14 @@ waste five seconds, and it cannot forge a play. Two hosts with
 different views may seat someone twice; they take the seating with the
 lower table id, and the other table's empty seat is booted at its first
 turn. A rated table says so on the felt and in its record, and every
-name on it carries a rating. Below that, *With friends*: one button,
-*Play with friends*, which starts a table of its own at a code drawn
-at random. Nobody types a code — the room shows its code and a *Share
-the link* that carries it, and opening that link lands in the room.
+name on it carries a rating. The score the game runs to travels the
+same way: it is in the signed start event, since four seats that
+disagree about when the game ends fork at the end of a hand, and it
+is part of the pool's tag on the relay, so everyone who meets in a
+pool wants the same game. Beside *Play live*, *Play friends* starts a
+table of its own at a code drawn at random. Nobody types a code — the
+room shows its code and a *Share the link* that carries it, and
+opening that link lands in the room.
 Nobody hosts a room: everyone at a code says so on the relay every two
 seconds, whoever has been heard lately is the table in the order they
 arrived, and the lowest key present leads — it starts the table ten
@@ -194,8 +206,9 @@ cards dealt and opened — for a couple of seconds on a desktop and a few
 on a phone, and the other people's cards are backs that nobody but
 their holder can turn. Every open app says it is online and serves
 as a juror when drawn (`app/lib/net/duty.dart`), at another table or
-in the lobby, without the player noticing. The device's key is minted the first time
-it is needed and kept; on the web every signature goes through the wasm
+at the front door, without the player noticing. The device's key is
+minted the first time it is needed and kept; on the web every
+signature goes through the wasm
 ([measurements/sign](../measurements/README.md)). A widget test seats
 the player at seat 2 with three simulated people and plays a hand,
 watches one leave and boots one for silence; the browser suite
@@ -268,8 +281,9 @@ their key, on the relay under one tag (`results.dart`). A table's
 result stands when a majority of the humans who sat down published the
 same one; a stranger's word counts for nothing. Anyone can fold every
 standing result, oldest first, into every rating; the app does so when
-it opens the lobby, shows the player theirs, and states it when
-waiting to be seated. Lying there only changes who you sit with.
+it reaches the relays, shows the player theirs in the live area of the
+front door, and states it when waiting to be seated. Lying there only
+changes who you sit with.
 
 **Backed by the deal.** Every live table is sealed ([doc
 03](03-fair-deal.md), "As built"): its cards come from a deal nobody
@@ -277,7 +291,7 @@ at it could rig, and its record replays through that deal, every
 proof checked, so a rating is a claim anyone can verify. One interim
 remains, and doc 03 names it: a bot's hand, and a departed person's,
 is open to the table until the bot plays inside the computation
-(below). The lobby says "provisionally" until a rating has settled.
+(below). It says "provisionally" until a rating has settled.
 
 ## Filling and emptying seats
 

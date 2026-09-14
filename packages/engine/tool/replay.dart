@@ -24,7 +24,7 @@ void main(List<String> args) {
     return;
   }
   final names = [for (var s = 0; s < seatCount; s++) s == record.humanSeat ? 'You' : record.personas[s]];
-  print('seed ${record.seed}: ${names.join(', ')}');
+  print('seed ${record.seed}: ${names.join(', ')}${record.target == gameOverScore ? '' : ', to ${record.target}'}');
   final replay = record.replay();
   for (final h in replay.hands) {
     final moon = h.moonShooter == null ? '' : '   ← ${names[h.moonShooter!]} shot the moon';

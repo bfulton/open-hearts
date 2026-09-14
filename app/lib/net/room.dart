@@ -82,6 +82,7 @@ class Room extends ChangeNotifier {
     required this.code,
     required this.myName,
     this.myAvatar = Avatar.none,
+    this.target = gameOverScore,
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
     this.startAfterMs = 10000,
@@ -103,9 +104,14 @@ class Room extends ChangeNotifier {
   }
 
   /// Into the room under [code] on [relay], as [name], looking like
-  /// [avatar].
-  factory Room.enter({required RelayTransport relay, required String code, required String name, Avatar avatar = Avatar.none}) =>
-      Room(channel: RelayRoomChannel(relay), code: code, myName: name, myAvatar: avatar);
+  /// [avatar], for a game to [target].
+  factory Room.enter(
+          {required RelayTransport relay,
+          required String code,
+          required String name,
+          Avatar avatar = Avatar.none,
+          int target = gameOverScore}) =>
+      Room(channel: RelayRoomChannel(relay), code: code, myName: name, myAvatar: avatar, target: target);
 
   static const startAfter = Duration(seconds: 10);
 
@@ -123,6 +129,12 @@ class Room extends ChangeNotifier {
   final String code;
   final String myName;
   final Avatar myAvatar;
+
+  /// The score a table started here runs to, as this device's options
+  /// ask for it. Only the leader's counts, and it says so in the start
+  /// event, because the four have to agree on when the game ends.
+  final int target;
+
   final int heartbeatMs;
 
   /// A member not heard from for this long has left.
@@ -319,6 +331,7 @@ class Room extends ChangeNotifier {
       'seats': seats,
       'policy': botPolicyVersion,
       'sealed': dealCrypto != null,
+      'target': target,
       'at': _nowMs(),
     });
   }
@@ -367,7 +380,15 @@ class Room extends ChangeNotifier {
     // The table's own id, not the code: a code is reused, and two
     // tables that start under one code — two halves of a room that
     // could not hear each other — must not hear each other's plays.
-    spec = TableSpec(id: '$code-${seed.toRadixString(36)}-${(c['at'] as int).toRadixString(36)}', seed: seed, seats: seats, sealed: sealed);
+    spec = TableSpec(
+      id: '$code-${seed.toRadixString(36)}-${(c['at'] as int).toRadixString(36)}',
+      seed: seed,
+      seats: seats,
+      sealed: sealed,
+      // The leader's game, not this device's: a start event from a
+      // build that had no say says fifty.
+      target: c['target'] as int? ?? gameOverScore,
+    );
     seatNames = names;
     seatAvatars = avatars;
   }

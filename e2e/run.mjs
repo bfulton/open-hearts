@@ -60,40 +60,47 @@ async function main() {
       contexts.push(ctx);
       pages.push(page);
     }
-    // Everyone to the lobby, from the front door.
+    // Everyone names themselves on the front door, which is the whole
+    // of the lobby now.
     for (const [i, page] of pages.entries()) {
-      await waitFor(page, /^Play live$/, { what: 'the home screen' });
-      await click(page, /^Play live$/);
-      await waitFor(page, /^Play with friends$/);
+      await waitFor(page, /^Play friends$/, { what: 'the home screen' });
       await type(page, 'Your name', names[i]);
     }
-    // Every device is online from the lobby, and each one sees the
-    // other three: presence over the relay, before anyone sits down.
-    for (const page of pages) await waitFor(page, /^4 online$/, { what: 'everyone online in the lobby', timeout: 40000 });
-    log('four online in the lobby');
+    // Every device is online from the front door, and each one sees
+    // the other three: presence over the relay, before anyone sits
+    // down, counted on the button itself.
+    for (const page of pages) await waitFor(page, /^Play live, 4 online$/, { what: 'everyone online', timeout: 40000 });
+    log('four online at the front door');
 
-    // Cell 0: matchmaking. Three ask for an unrated game and are seated
-    // together with a bot at the round after ten seconds; the fourth,
-    // alone in the rated pool, gets three bots.
-    for (const page of pages.slice(0, 3)) await click(page, /^Unrated$/);
-    await click(pages[3], /^Rated$/);
+    // Cell 0: matchmaking. Three ask for an unrated game — the options
+    // are rated until someone says otherwise, so they say so — and are
+    // seated together with a bot at the round after ten seconds; the
+    // fourth presses as it stands and, alone in the rated pool, gets
+    // three bots.
+    for (const page of pages.slice(0, 3)) {
+      await click(page, /^Game options$/);
+      await waitFor(page, /^Unrated$/, { what: 'the options sheet' });
+      await click(page, /^Unrated$/);
+      await click(page, /^Done$/);
+      await waitFor(page, /^50 points · unrated$/, { what: 'an unrated game asked for' });
+      await click(page, /^Play live/);
+    }
+    await click(pages[3], /^Play live/);
     for (const page of pages) await waitFor(page, /^Finding players$/);
     for (const page of pages.slice(0, 3)) await waitFor(page, /^3 of 3 here  ·  unrated$/, { what: 'the unrated table', timeout: 40000 });
     await waitFor(pages[3], /^1 of 1 here  ·  rated$/, { what: 'the rated table', timeout: 40000 });
     log('matched: three together, one with bots');
     await playUntil(pages, (p) => has(p, /^On with it$/), { timeout: 180000 });
     log('a matched hand played on every screen');
-    // Back to the lobby for the rest: leave by the menu, then Play live
-    // again from the home screen. The score sheet goes on its own after
-    // a few seconds, so it may be gone by the time a page is reached.
+    // Back to the front door for the rest: leave by the menu. The score
+    // sheet goes on its own after a few seconds, so it may be gone by
+    // the time a page is reached.
     for (const page of pages) {
       await dismiss(page, /^On with it$/);
       await click(page, /^Menu$/);
       await waitFor(page, /^Leave the table$/, { what: 'the menu' });
       await click(page, /^Leave the table$/);
-      await waitFor(page, /^Play live$/, { what: 'the home screen again' });
-      await click(page, /^Play live$/);
-      await waitFor(page, /^Play with friends$/);
+      await waitFor(page, /^Play friends$/, { what: 'the home screen again' });
     }
 
     // Ada picks an avatar first: the picker opens from her icon by the
@@ -102,13 +109,12 @@ async function main() {
     await waitFor(pages[0], /^Rocket$/, { what: 'the avatar picker' });
     await click(pages[0], /^Rocket$/);
     await click(pages[0], /^Done$/);
-    await waitFor(pages[0], /^Play with friends$/);
-    // Ada goes in with no code, so a new one is drawn: the only
-    // four-capital-letter text on her screen. Nobody hosts; whoever
-    // is at a code is the table.
-    await click(pages[0], /^Play with friends$/);
+    await waitFor(pages[0], /^Play friends$/);
+    // Ada goes in with no code, so a new one is drawn: the room names
+    // itself by it. Nobody hosts; whoever is at a code is the table.
+    await click(pages[0], /^Play friends$/);
     await waitFor(pages[0], /^Share the link$/, { what: 'the room' });
-    const code = (await texts(pages[0])).find((t) => /^[A-Z0-9]{4}$/.test(t));
+    const code = (await texts(pages[0])).map((t) => /^Table ([A-Z0-9]{4})$/.exec(t)?.[1]).find(Boolean);
     if (!code) throw new Error('no room code shown');
     log(`room ${code}`);
     // Nobody types a code: the others arrive by the shared link — the

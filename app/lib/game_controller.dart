@@ -18,7 +18,7 @@ import 'record_store.dart';
 import 'table_model.dart';
 
 class GameController extends ChangeNotifier implements TableModel {
-  GameController({this.seed, this.paced = true, RecordStore? store})
+  GameController({this.seed, this.paced = true, this.target = gameOverScore, RecordStore? store})
       : _store = store ?? PrefsRecordStore() {
     _start();
   }
@@ -26,6 +26,10 @@ class GameController extends ChangeNotifier implements TableModel {
   /// Fixes the shuffle, so [newGame] reshuffles the same way a test
   /// expects. Null in the app, where every game is a fresh draw.
   final int? seed;
+
+  /// The score this game runs to, and every game after it on this
+  /// screen: the player's own choice (game_options.dart).
+  final int target;
 
   final RecordStore _store;
 
@@ -45,11 +49,12 @@ class GameController extends ChangeNotifier implements TableModel {
 
   void _start() {
     _dealSeed = seed ?? Random().nextInt(1 << 31);
-    _game = HeartsGame(seed: _dealSeed);
+    _game = HeartsGame(seed: _dealSeed, target: target);
     _bots = _seatBots(_dealSeed);
     _record = SoloRecord(
       seed: _dealSeed,
       personas: [for (var s = 0; s < seatCount; s++) s == humanSeat ? '' : _bots[s]!.persona.name],
+      target: target,
     );
     _saved = false;
     _sheetDue = false;
