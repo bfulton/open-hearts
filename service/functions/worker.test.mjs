@@ -59,11 +59,11 @@ test('mint: credentials from the upstream, with the key and a ttl of four hours'
   assert.deepEqual(JSON.parse(init.body), { ttl: 4 * 3600 });
 });
 
-test('mint: the old unprefixed secret names still work, for a dashboard mid-migration', async () => {
-  okUpstream.calls.length = 0;
-  const out = await mint({ TURN_KEY_ID: 'kid', TURN_API_TOKEN: 'tok' }, okUpstream);
-  assert.equal(out.status, 200);
-  assert.equal(okUpstream.calls[0].url, 'https://rtc.live.cloudflare.com/v1/turn/keys/kid/credentials/generate-ice-servers');
+test('mint: only the OH_-prefixed secret names are read', async () => {
+  assert.deepEqual(await mint({ TURN_KEY_ID: 'kid', TURN_API_TOKEN: 'tok' }, okUpstream), {
+    status: 503,
+    body: { error: 'turn not configured' },
+  });
 });
 
 test('mint: an upstream that refuses, is down, or talks nonsense is a bad gateway', async () => {

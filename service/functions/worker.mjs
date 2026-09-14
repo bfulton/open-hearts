@@ -64,10 +64,8 @@ export function serversOf(answer) {
 
 /// Mints credentials: the status and body to answer with.
 export async function mint(env, fetchImpl = fetch) {
-  // OH_-prefixed; the old unprefixed names are still read so a project
-  // whose dashboard has not been renamed yet keeps working.
-  const keyId = env.OH_TURN_KEY_ID ?? env.TURN_KEY_ID;
-  const token = env.OH_TURN_API_TOKEN ?? env.TURN_API_TOKEN;
+  const keyId = env.OH_TURN_KEY_ID;
+  const token = env.OH_TURN_API_TOKEN;
   if (!keyId || !token) return { status: 503, body: { error: 'turn not configured' } };
   const ttl = DEFAULT_TTL;
   const upstream = `${UPSTREAM}/${keyId}/credentials/generate-ice-servers`;
