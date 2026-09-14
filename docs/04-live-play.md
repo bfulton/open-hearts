@@ -111,7 +111,8 @@ screen opens a lobby: how many devices are online, a name and an
 avatar — one of a set of icons on a colour, or a picture of your own,
 sixty-four pixels square, kept on the device with the name and
 carried to the others with it: the icon and colour in every beat, the
-picture once, as a stored event — and the choice — *Rated* or
+picture once, as a stored event (what is done about a picture nobody
+asked for is below) — and the choice — *Rated* or
 *Unrated* —
 then a waiting screen and nothing to do. There is no matchmaker.
 Players who want a game say so on the relay every couple of seconds,
@@ -200,6 +201,37 @@ the player at seat 2 with three simulated people and plays a hand,
 watches one leave and boots one for silence; the browser suite
 (`e2e/`) matches three strangers with a bot and a fourth with three,
 then plays the friends' room through its departures.
+
+### A picture nobody asked for
+
+A picture arrives from a stranger's device, so the question is what to
+do about one most people would not want at a table. The answer is not a
+check on the sender's device signing that it behaved: that device
+belongs to whoever is misusing it, the signing key would ship inside
+the app, and the web has no root of trust that could say otherwise. A
+signed self-check stops carelessness and looks like a defence, which is
+the dangerous kind of feature.
+
+So the check runs on the device doing the looking
+(`app/lib/pictures.dart`), where it needs nobody's permission to be
+believed: the viewer ran it themselves. It fails open — no model at
+hand, a model that will not load, bytes it cannot read, an answer that
+does not come inside a few seconds: the picture shows. A check that is
+right most of the time is worth having; one that hides faces whenever
+it is unsure is not. A flagged picture is kept off the badge, not
+blurred, and holding the badge offers it anyway, with the note that the
+guess was made here and can be wrong.
+
+Under that is the part that needs no model at all: holding another
+player's badge hides their picture on this device, for good, and their
+name and their score stay. It is the viewer's own decision, kept with
+their identity, and it is the backstop the check fails open onto.
+
+The model itself is not shipped yet. When it is, it is fetched at
+runtime from the app's own origin rather than bundled — so it costs
+nothing on first load, and is cached after the first picture that needs
+it — and the app checks it against a hash it carries, so a compromised
+host cannot swap the model for one that likes everything.
 
 ## Ratings
 

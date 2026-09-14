@@ -68,6 +68,56 @@ class _LivePageState extends State<LivePage> {
       ));
   }
 
+  /// Holding another player's badge: what this device does with their
+  /// picture. Nothing to offer for a bot, for your own seat, or for
+  /// someone who chose no picture (pictures.dart).
+  Future<void> _aboutPicture(int seat) async {
+    final about = _c.pictureAt(seat);
+    if (about == null) return;
+    final pictures = _c.pictures!;
+    final showIt = about.hidden || about.flagged;
+    final chosen = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Felt.mid,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (about.flagged)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'This device thought this picture was one you would not want at the table. '
+                    'It is a guess, made here, and it can be wrong.',
+                    style: TextStyle(fontSize: 13, color: Palette.chromeDim),
+                  ),
+                ),
+              TextButton(
+                onPressed: () => Navigator.of(sheet).pop(showIt),
+                style: TextButton.styleFrom(foregroundColor: showIt ? Palette.gold : Palette.danger),
+                child: Text(
+                  showIt ? "Show ${about.name}'s picture" : "Hide ${about.name}'s picture",
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const Text(
+                'On this device only, and only their picture: their name and their score stay.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Palette.chromeDim),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    await (chosen ? pictures.show(about.key) : pictures.hide(about.key));
+  }
+
   Future<void> _leave() async {
     if (_c.amSeated && !_c.done) {
       _c.leave();
@@ -183,7 +233,7 @@ class _LivePageState extends State<LivePage> {
                 ),
                 felt: Stack(
                   children: [
-                    TableView(controller: _c),
+                    TableView(controller: _c, onHold: _aboutPicture),
                     Positioned(
                       left: 6,
                       top: 4,

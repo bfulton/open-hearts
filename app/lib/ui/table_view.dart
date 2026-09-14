@@ -44,9 +44,14 @@ const _wideTrickOffset = <int, Offset>{
 };
 
 class TableView extends StatelessWidget {
-  const TableView({super.key, required this.controller});
+  const TableView({super.key, required this.controller, this.onHold});
 
   final TableModel controller;
+
+  /// Holding a seat's badge, where the page has something to offer
+  /// about that player — at a live table, what to do about their
+  /// picture. Null leaves the badge alone.
+  final void Function(int seat)? onHold;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +105,7 @@ class TableView extends StatelessWidget {
         final facing = trickBox.width;
 
         Widget badge(int position) => SeatBadge(
+              onHold: onHold == null ? null : () => onHold!(controller.seatAt(position)),
               seat: controller.seatAt(position),
               name: controller.names[controller.seatAt(position)],
               game: game,
@@ -343,8 +349,12 @@ class SeatBadge extends StatelessWidget {
     this.clockMs,
     this.oneLine = false,
     this.height = line,
+    this.onHold,
     required this.iconSize,
   });
+
+  /// What a long press on the badge offers, if anything.
+  final VoidCallback? onHold;
 
   final int seat;
   final String name;
@@ -408,12 +418,20 @@ class SeatBadge extends StatelessWidget {
     return Semantics(
       label: '$name: $total in the game, $taken this hand'
           '${onTurn ? ', on turn' : ''}${clock == null ? '' : ', ${clockSeconds(clock)} s on the clock'}',
+      onLongPress: onHold,
       child: ExcludeSemantics(
         child: oneLine
-            ? SizedBox(height: height, child: _badge(context, total, taken))
-            : _badge(context, total, taken),
+            ? SizedBox(height: height, child: _held(context, total, taken))
+            : _held(context, total, taken),
       ),
     );
+  }
+
+  /// The badge, and a long press on it where there is one to make.
+  Widget _held(BuildContext context, int total, int taken) {
+    final badge = _badge(context, total, taken);
+    if (onHold == null) return badge;
+    return GestureDetector(behavior: HitTestBehavior.opaque, onLongPress: onHold, child: badge);
   }
 
   EdgeInsets get _padding => oneLine ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 11, vertical: 7);

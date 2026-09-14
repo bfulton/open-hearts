@@ -20,6 +20,7 @@ import '../net/share.dart';
 import '../net/standing.dart';
 import '../net/turn.dart';
 import '../avatar.dart';
+import '../pictures.dart';
 import '../theme.dart';
 import '../ui/player_icon.dart';
 import 'avatar_picker.dart';
@@ -54,6 +55,11 @@ class _LobbyPageState extends State<LobbyPage> {
   /// How you look to the others: read off the device with the name,
   /// changed by tapping it.
   Avatar _avatar = Avatar.none;
+
+  /// What this device does with the others' pictures: the list of
+  /// people whose pictures it does not show, and the check it runs on
+  /// the rest (pictures.dart). Read once, carried to the table.
+  Pictures? _pictures;
   final List<Uri> _relays = appRelays();
   String? _error;
   bool _busy = false;
@@ -87,6 +93,9 @@ class _LobbyPageState extends State<LobbyPage> {
     super.initState();
     Identity.avatar().then((a) {
       if (mounted) setState(() => _avatar = a);
+    });
+    Pictures.load().then((p) {
+      if (mounted) _pictures = p;
     });
     Identity.name().then((n) {
       if (!mounted) return;
@@ -260,6 +269,7 @@ class _LobbyPageState extends State<LobbyPage> {
       crypto: dealCrypto,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
       onResult: (result) => Standing.publish(relays, signer, result),
+      pictures: _pictures,
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => LivePage(controller: controller)));

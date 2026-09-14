@@ -4,15 +4,20 @@
 /// rotated — the same screen as solo play, from a different chair.
 library;
 
+import 'dart:typed_data';
+
 import 'package:deal/deal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/live/live_page.dart';
+import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/live_controller.dart';
+import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/table_view.dart' show ClockText, TableView;
 import 'package:table/src/sim/sim.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
 import 'table_page_test.dart' show fanCards, tapCard;
@@ -20,7 +25,7 @@ import 'table_page_test.dart' show fanCards, tapCard;
 const _me = 2;
 
 class LiveHarness {
-  LiveHarness({DealCrypto? crypto}) {
+  LiveHarness({DealCrypto? crypto, this.pictures, Map<int, Avatar> avatars = const {}}) {
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
     spec = TableSpec(id: 'widget', seed: 21, seats: [for (final s in signers) HumanSeat(s.publicKey)], sealed: crypto != null);
     for (var s = 0; s < engine.seatCount; s++) {
@@ -28,6 +33,8 @@ class LiveHarness {
         controller = LiveController(
           spec: spec,
           seatNames: const {0: 'Ada', 1: 'Bao', 3: 'Dee'},
+          seatAvatars: avatars,
+          pictures: pictures,
           signer: signers[s],
           transport: net.attach(signers[s].publicKey),
           clock: clock,
@@ -42,6 +49,10 @@ class LiveHarness {
       }
     }
   }
+
+  /// What this device does with the others' pictures, where a test
+  /// cares.
+  final Pictures? pictures;
 
   final clock = VirtualClock();
   late final SimNetwork net = SimNetwork(clock, seed: 3);
@@ -60,12 +71,12 @@ class LiveHarness {
   }
 }
 
-Future<LiveHarness> pumpLive(WidgetTester tester, {DealCrypto? crypto}) async {
+Future<LiveHarness> pumpLive(WidgetTester tester, {DealCrypto? crypto, Pictures? pictures, Map<int, Avatar> avatars = const {}}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  final live = LiveHarness(crypto: crypto);
+  final live = LiveHarness(crypto: crypto, pictures: pictures, avatars: avatars);
   await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: LivePage(controller: live.controller)));
   await tester.pumpAndSettle();
   return live;
@@ -175,6 +186,36 @@ void main() {
       await live.advance(tester, 1000);
     }
     expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('holding a badge hides that player\'s picture on this device, and nothing else', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final picture = Uint8List.fromList(List.generate(64, (i) => i));
+    final pictures = await Pictures.load();
+    final live = await pumpLive(tester, pictures: pictures, avatars: {1: Avatar(picture: picture)});
+    await act(tester, live);
+    await live.advance(tester, 1000);
+
+    Avatar bao() => live.controller.avatarOf(1);
+    expect(bao().picture, isNotNull, reason: 'Bao chose a picture and nothing is against it');
+
+    // Hold Bao's badge: what this device does with their picture.
+    await tester.longPress(find.bySemanticsLabel(RegExp('^Bao: ')));
+    await tester.pumpAndSettle();
+    expect(find.text("Hide Bao's picture"), findsOneWidget);
+    await tester.tap(find.text("Hide Bao's picture"));
+    await tester.pumpAndSettle();
+    expect(bao().picture, isNull, reason: 'the picture is off this device\'s table');
+    expect(pictures.isHidden((live.spec.seats[1] as HumanSeat).key), isTrue);
+    expect(find.text('Bao'), findsWidgets, reason: 'their name and their score stay');
+
+    // And it is the viewer's own decision, so it is theirs to take back.
+    await tester.longPress(find.bySemanticsLabel(RegExp('^Bao: ')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("Show Bao's picture"));
+    await tester.pumpAndSettle();
+    expect(bao().picture, isNotNull);
     expect(tester.takeException(), isNull);
   });
 

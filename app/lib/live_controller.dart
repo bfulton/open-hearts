@@ -28,6 +28,7 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 import 'avatar.dart';
+import 'pictures.dart';
 import 'table_model.dart';
 
 class LiveController extends ChangeNotifier implements TableModel {
@@ -43,6 +44,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     DealCrypto? crypto,
     this.ratingOf,
     this.onResult,
+    this.pictures,
     this.paced = true,
   })  : _crypto = crypto,
         client = TableClient(
@@ -50,6 +52,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed);
     _shownHolders = List.of(spec.seats);
     _sub = client.changes.listen((_) => _onChange());
+    pictures?.addListener(_pictured);
     _refusals = relay?.refusals.listen((reason) {
       relayRefusal = reason;
       // A device whose events no relay will take does not get to say
@@ -83,8 +86,17 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Where a finished game's result goes, once, when the game ends.
   final void Function(GameResult result)? onResult;
 
+  /// What this device does with the others' pictures: hidden by the
+  /// viewer, or kept off by its own check (pictures.dart). Null leaves
+  /// every picture alone.
+  final Pictures? pictures;
+
   /// Whether the view is paced. Tests turn it off.
   final bool paced;
+
+  void _pictured() {
+    if (!_disposed) notifyListeners();
+  }
 
   bool _reported = false;
   StreamSubscription<void>? _sub;
@@ -586,9 +598,35 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   @override
   Avatar avatarOf(int seat) => switch (_shownHolders[seat]) {
-        HumanSeat() => seatAvatars[seat] ?? Avatar.none,
+        HumanSeat(:final key) => _asShown(key, seatAvatars[seat] ?? Avatar.none),
         BotSeat(:final persona) => Avatar.forBot(persona.name),
       };
+
+  /// The avatar as this device will draw it: the icon and the colour
+  /// they chose, and their picture only if it is allowed here.
+  Avatar _asShown(String key, Avatar avatar) {
+    final picture = avatar.picture;
+    final pictures = this.pictures;
+    if (picture == null || pictures == null) return avatar;
+    return pictures.allows(key, picture) ? avatar : avatar.copyWith(clearPicture: true);
+  }
+
+  /// Whose picture the badge at [seat] is showing, for the sheet that
+  /// hides it; null for a bot, for your own seat, and for a seat whose
+  /// player chose no picture.
+  ({String key, String name, bool hidden, bool flagged})? pictureAt(int seat) {
+    final holder = _shownHolders[seat];
+    final pictures = this.pictures;
+    if (holder is! HumanSeat || pictures == null || seat == mySeat) return null;
+    final picture = (seatAvatars[seat] ?? Avatar.none).picture;
+    if (picture == null) return null;
+    return (
+      key: holder.key,
+      name: names[seat],
+      hidden: pictures.isHidden(holder.key),
+      flagged: pictures.wasFlagged(holder.key, picture),
+    );
+  }
   void boot(int seat) {
     client.boot(seat);
     notifyListeners();
@@ -634,6 +672,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     _sweepTimer?.cancel();
     _sub?.cancel();
     _refusals?.cancel();
+    pictures?.removeListener(_pictured);
     client.close();
     super.dispose();
   }
