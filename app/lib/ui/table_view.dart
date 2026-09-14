@@ -83,6 +83,91 @@ class TableView extends StatelessWidget {
         final cardHeight = cardHeightFor(cardWidth);
         final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
 
+        Widget badge(int position) => _SeatBadge(
+              seat: controller.seatAt(position),
+              name: controller.names[controller.seatAt(position)],
+              game: game,
+              onTurn: game.currentSeat == controller.seatAt(position),
+              won: pending?.winner == controller.seatAt(position),
+              clockMs: controller.clockMs(controller.seatAt(position)),
+              iconSeed: controller.iconSeedOf(controller.seatAt(position)),
+              avatar: controller.avatarOf(controller.seatAt(position)),
+              compact: wide,
+              maxWidth: position == 2 ? box.width - 2 * _badgeInset : sideRoom,
+            );
+
+        // The trick, as one centred block. Slots hold their place so
+        // arriving cards never shove the layout around.
+        final trick = SizedBox.fromSize(
+          size: trickBox,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              for (var position = 0; position < seatCount; position++)
+                Transform.translate(
+                  offset: Offset(
+                    offsets[position]!.dx * cardWidth * 1.15,
+                    offsets[position]!.dy * cardHeight * 1.02,
+                  ),
+                  child: _TrickSlot(
+                    card: _cardFrom(game, controller.seatAt(position)) ??
+                        (position == 0 ? controller.pendingPlay : null),
+                    name: controller.names[controller.seatAt(position)],
+                    order: _orderOf(game, controller.seatAt(position)) ??
+                        (position == 0 && controller.pendingPlay != null ? game.trick.length : null),
+                    width: cardWidth,
+                    winning: pending != null && pending.winner == controller.seatAt(position),
+                  ),
+                ),
+            ],
+          ),
+        );
+
+        // Under the trick, never across it: who took it, or whose turn
+        // it is.
+        final Widget pill = pending != null
+            ? _TrickResult(
+                you: pending.winner == controller.mySeat,
+                name: controller.names[pending.winner],
+                points: pointsIn(pending.plays.map((p) => p.card)),
+              )
+            : game.phase == Phase.playing && controller.pendingPlay == null
+                ? _TurnHint(game: game, mySeat: controller.mySeat)
+                : const SizedBox.shrink();
+
+        // Portrait: the four seats read as one column. The gap above the
+        // trick and the gap below it are the same, so the badge at the
+        // top of the felt and the player's own line just under it sit
+        // the same distance from the cards; the pill takes the gap
+        // below. What is left over is the felt's to give away — the
+        // action line floats in it (table_layout.dart).
+        if (!wide) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _badgeInset),
+            child: Column(
+              children: [
+                badge(2),
+                const Spacer(),
+                SizedBox(
+                  height: trickBox.height,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Align(alignment: Alignment.centerLeft, child: badge(1)),
+                      Align(alignment: Alignment.centerRight, child: badge(3)),
+                      Align(alignment: Alignment.center, child: trick),
+                    ],
+                  ),
+                ),
+                Expanded(child: Center(child: pill)),
+              ],
+            ),
+          );
+        }
+
+        // Landscape: height is what is scarce, so the badges keep to the
+        // rail and the trick lies flat across the middle of the felt.
         return Stack(
           children: [
             Padding(
@@ -90,70 +175,12 @@ class TableView extends StatelessWidget {
               child: Stack(
                 children: [
                   for (var position = 1; position < seatCount; position++)
-                    Align(
-                      alignment: _badgeAt[position]!,
-                      child: _SeatBadge(
-                        seat: controller.seatAt(position),
-                        name: controller.names[controller.seatAt(position)],
-                        game: game,
-                        onTurn: game.currentSeat == controller.seatAt(position),
-                        won: pending?.winner == controller.seatAt(position),
-                        clockMs: controller.clockMs(controller.seatAt(position)),
-                        iconSeed: controller.iconSeedOf(controller.seatAt(position)),
-                        avatar: controller.avatarOf(controller.seatAt(position)),
-                        compact: wide,
-                        maxWidth: position == 2 ? box.width - 2 * _badgeInset : sideRoom,
-                      ),
-                    ),
+                    Align(alignment: _badgeAt[position]!, child: badge(position)),
                 ],
               ),
             ),
-
-            // The trick, as one centred block. Slots hold their place so
-            // arriving cards never shove the layout around.
-            Align(
-              alignment: Alignment(0, wide ? 0.04 : -0.06),
-              child: SizedBox.fromSize(
-                size: trickBox,
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    for (var position = 0; position < seatCount; position++)
-                      Transform.translate(
-                        offset: Offset(
-                          offsets[position]!.dx * cardWidth * 1.15,
-                          offsets[position]!.dy * cardHeight * 1.02,
-                        ),
-                        child: _TrickSlot(
-                          card: _cardFrom(game, controller.seatAt(position)) ??
-                              (position == 0 ? controller.pendingPlay : null),
-                          name: controller.names[controller.seatAt(position)],
-                          order: _orderOf(game, controller.seatAt(position)) ??
-                              (position == 0 && controller.pendingPlay != null ? game.trick.length : null),
-                          width: cardWidth,
-                          winning: pending != null && pending.winner == controller.seatAt(position),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Under the trick, never across it: centred, the pill lands
-            // exactly where the west and east cards meet.
-            Align(
-              alignment: const Alignment(0, 0.88),
-              child: pending != null
-                  ? _TrickResult(
-                      you: pending.winner == controller.mySeat,
-                      name: controller.names[pending.winner],
-                      points: pointsIn(pending.plays.map((p) => p.card)),
-                    )
-                  : game.phase == Phase.playing && controller.pendingPlay == null
-                      ? _TurnHint(game: game, mySeat: controller.mySeat)
-                      : const SizedBox.shrink(),
-            ),
+            Align(alignment: const Alignment(0, 0.04), child: trick),
+            Align(alignment: const Alignment(0, 0.88), child: pill),
           ],
         );
       },

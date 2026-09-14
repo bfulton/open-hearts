@@ -53,7 +53,13 @@ taken out again, because the score chrome it moved turned out not to
 be needed on either edge: an opponent's total now sits on their badge
 beside what they have taken this hand (their card count is gone — it
 is the same as yours), and your own total and hand sit on one line
-just under the felt, where the eye goes between tricks. What is left
+just under the felt, where the eye goes between tricks. In portrait
+that line is the fourth seat rather than a footer: the felt keeps the
+gap under its bottom card equal to the gap over its top one, so your
+line and the badge across the table read the same distance from the
+cards. The felt takes seven ninths of what is left after the header,
+the line and the hand, and the last two ninths are the band the action
+line floats in, halfway between your line and your hand. What is left
 along the top is a header 40 points tall in both compositions — the
 menu on the left, the hand and the pass in the middle, and on the
 right a heart, whole until hearts are broken — so the two compositions

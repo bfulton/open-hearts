@@ -2,7 +2,10 @@
 /// (docs/05-form-factors.md).
 ///
 /// Top to bottom: the header (menu, where the game stands, the heart),
-/// the felt, the player's own score, the action line, the hand. The
+/// the felt, the player's own score, the action line, the hand. In
+/// portrait the score is part of the table — the fourth seat, read the
+/// same distance from the cards as the badge across the felt — and the
+/// action line floats between it and the hand. The
 /// same order in portrait and landscape; what changes with the shape
 /// is the hand. In portrait width runs out — thirteen cards fan across
 /// 390 points — so the fan overlaps hard and the cards take the height
@@ -64,10 +67,16 @@ class TableLayout extends StatelessWidget {
         return Column(
           children: [
             header,
-            Expanded(child: felt),
+            // In portrait the felt takes most of the height but not all
+            // of it: the score sits hard against the felt's bottom edge,
+            // as close to the cards as the badge at the felt's top, and
+            // what the felt gives up becomes the band the action line
+            // floats in, halfway between the score and the hand. In
+            // landscape there is nothing spare to give.
+            Expanded(flex: landscape ? 1 : 7, child: felt),
             score,
             ?below,
-            action,
+            if (landscape) action else Expanded(flex: 2, child: Center(child: action)),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
               child: SizedBox(

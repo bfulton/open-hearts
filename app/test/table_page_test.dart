@@ -17,6 +17,7 @@ import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
 import 'package:open_hearts/ui/header.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+import 'package:open_hearts/ui/scoreboard.dart';
 import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
@@ -421,6 +422,28 @@ void main() {
     // Shrunk from what the width alone would allow: 340 × 0.21 = 71.
     final slotWidth = slots.map((r) => r.width).reduce((a, b) => a > b ? a : b);
     expect(slotWidth, lessThan(60));
+  });
+
+  testWidgets('your line is the fourth seat: as close to the cards as the badge across the felt, with the action line floating below it', (tester) async {
+    await pumpTable(tester);
+    final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
+    final slots = _trickSlots(tester);
+    final north = tester.getRect(find.bySemanticsLabel(RegExp('^${names[2]}: ')));
+    final topCard = slots.reduce((a, b) => a.top < b.top ? a : b);
+    final bottomCard = slots.reduce((a, b) => a.bottom > b.bottom ? a : b);
+    final you = tester.getRect(find.byType(ScoreLine));
+    expect(
+      you.top - bottomCard.bottom,
+      closeTo(topCard.top - north.bottom, 2),
+      reason: 'your line reads as the seat at the bottom of the table, not as a footer under it',
+    );
+
+    // And the action line is not crowded against either: it floats in
+    // the band between your line and your hand.
+    final action = tester.getRect(find.byType(ActionBar));
+    final hand = tester.getRect(find.byType(HandFan));
+    expect(action.top, greaterThan(you.bottom));
+    expect(action.top - you.bottom, closeTo(hand.top - action.bottom, 4), reason: 'halfway between them');
   });
 
   testWidgets('every player has an icon: their initials on their colour, on the badges, your line and the sheet', (tester) async {
