@@ -52,6 +52,9 @@ class LiveController extends ChangeNotifier implements TableModel {
     _sub = client.changes.listen((_) => _onChange());
     _refusals = relay?.refusals.listen((reason) {
       relayRefusal = reason;
+      // A device whose events no relay will take does not get to say
+      // anyone else is absent (client.dart).
+      client.writesRefused = reason != null;
       if (!_disposed) notifyListeners();
     });
     client.start();

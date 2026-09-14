@@ -278,9 +278,17 @@ class TableClient {
 
   /// Whether the Boot button shows for [seat]: a human's turn, open
   /// past its grace with the seat's bank spent, by this peer's clock.
+  /// Whether this device knows its own events are not getting out —
+  /// every relay refusing them (relays.dart). A peer in that state is
+  /// the least qualified to say anyone else is absent: what looks like
+  /// their silence may be this device's own deafness, and the claim
+  /// would not reach the table anyway. So while it holds, this peer
+  /// neither claims absence, nor countersigns a boot, nor offers one.
+  bool writesRefused = false;
+
   bool canBoot(int seat) {
     if (!amSeated || seat == mySeat || holders[seat] is! HumanSeat) return false;
-    if (!connectedToMajority) return false;
+    if (!connectedToMajority || writesRefused) return false;
     if (_catchingUp((holders[seat] as HumanSeat).key)) return false;
     final t = _openTurnOf(seat);
     return t != null && (_overdue(t, seat) || _silent((holders[seat] as HumanSeat).key));
@@ -1360,7 +1368,7 @@ class TableClient {
       transport.broadcast(race.action!.toJson(), everywhere: true);
       return;
     }
-    if (_myWitness.containsKey(turn) || !connectedToMajority) return;
+    if (_myWitness.containsKey(turn) || !connectedToMajority || writesRefused) return;
     final seat = _turnSeat[turn]!;
     final holder = holders[seat];
     if (holder is! HumanSeat) return;
@@ -1957,7 +1965,7 @@ class TableClient {
         final seat = _turnSeat[e.key]!;
         final h = holders[seat];
         if (h is! HumanSeat || h.key == signer.publicKey || !_isParticipant(h.key)) continue;
-        if (!_silent(h.key) || !connectedToMajority) continue;
+        if (!_silent(h.key) || !connectedToMajority || writesRefused) continue;
         _emit(EventKind.absent, {'hand': e.key.hand, 'turn': e.key.index, 'seat': seat}, everywhere: true);
       }
       // Boots this peer held back on until its own clock agreed; and

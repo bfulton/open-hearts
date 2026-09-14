@@ -136,11 +136,45 @@ void main() {
     }
     expect(live.controller.canBoot(1), isTrue);
     expect(find.text('Boot Bao'), findsOneWidget);
+
     await tester.tap(find.text('Boot Bao'));
     await live.advance(tester, 3000); // Dee agrees on her own clock
     expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
     expect(find.textContaining('2 of 4 here'), findsOneWidget);
     expect(live.controller.tableState, TableState.playing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a device no relay will take neither offers a Boot nor settles one', (tester) async {
+    final live = await pumpLive(tester);
+    await act(tester, live);
+    await live.advance(tester, 2000);
+    live.people[0]!.depart(Exit.leave);
+    await live.advance(tester, 500);
+
+    // This device's own events are going nowhere: every relay refuses
+    // them. What looks from here like Bao's silence may be this
+    // device's own deafness, and a claim it made would not reach the
+    // table anyway. So while it is cut off it neither offers the Boot
+    // nor countersigns the one Dee raises, and Bao keeps the seat.
+    live.controller.client.writesRefused = true;
+    live.people[1]!.depart(Exit.idle);
+    for (var guard = 0; guard < 80; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 1000);
+    }
+    expect(live.controller.canBoot(1), isFalse, reason: 'cut off, so not this device to judge');
+    expect(find.text('Boot Bao'), findsNothing, reason: 'and no button to press');
+    expect(live.controller.personaAt(1), isNull, reason: 'and nothing settles Bao out of the seat');
+
+    // A relay takes its events again: it judges again, and the seat
+    // settles.
+    live.controller.client.writesRefused = false;
+    for (var guard = 0; guard < 30 && live.controller.personaAt(1) == null; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 1000);
+    }
+    expect(live.controller.personaAt(1), isNotNull, reason: 'a bot holds seat 1');
     expect(tester.takeException(), isNull);
   });
 
