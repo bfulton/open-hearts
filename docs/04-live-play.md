@@ -218,9 +218,20 @@ believed: the viewer ran it themselves. It fails open — no model at
 hand, a model that will not load, bytes it cannot read, an answer that
 does not come inside a few seconds: the picture shows. A check that is
 right most of the time is worth having; one that hides faces whenever
-it is unsure is not. A flagged picture is kept off the badge, not
-blurred, and holding the badge offers it anyway, with the note that the
-guess was made here and can be wrong.
+it is unsure is not.
+
+A picture waits on the check only where waiting is free. A check with
+its model loaded answers in a few milliseconds, so the picture is held
+for that and appears once, correctly. Everything else shows and is
+taken back if the answer says so: a model still coming down the wire, an
+answer that is taking its time, or bytes already on the table when the
+model lands. Being seen for a moment and withdrawn is what failing open
+costs, and it is cheaper than a table of blank badges every time the
+check is slow — and it is the only thing that works at all for the
+pictures already on screen when the model arrives mid-game. A picture
+kept off is kept off the badge rather than blurred, and holding the
+badge offers it anyway, with the note that the guess was made here and
+can be wrong.
 
 Under that is the part that needs no model at all: holding another
 player's badge hides their picture on this device, for good, and their

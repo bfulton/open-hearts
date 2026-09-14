@@ -29,6 +29,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// false to show it, null for no answer — which shows it.
 abstract class PictureCheck {
   Future<bool?> flagged(Uint8List jpeg);
+
+  /// Whether it can answer now. A check whose model is still coming
+  /// down the wire says false, and holds nothing up while it waits:
+  /// pictures show, and are taken back if the answer says so.
+  bool get ready => true;
 }
 
 class Pictures extends ChangeNotifier {
@@ -56,6 +61,12 @@ class Pictures extends ChangeNotifier {
   /// is read once however many badges it lands on.
   final Map<int, bool> _verdicts = {};
   final Set<int> _running = {};
+
+  /// Bytes that have been drawn once already. They are never held for
+  /// an answer after that — a picture that blinks out and back while
+  /// the check thinks about it is worse than one that is taken back
+  /// when it turns out it should be.
+  final Set<int> _drawn = {};
 
   /// The device's list, as it was left.
   static Future<Pictures> load({PictureCheck? check}) async {
@@ -87,8 +98,15 @@ class Pictures extends ChangeNotifier {
   }
 
   /// Whether [picture] may be drawn for [key], starting the check if it
-  /// has not run on these bytes yet. False for the moment an answer
-  /// takes — at most [grace] — and after that only if it flagged them.
+  /// has not run on these bytes yet.
+  ///
+  /// A picture waits only where waiting is free: a check with its model
+  /// loaded answers in a few milliseconds, and the picture appears once
+  /// and correctly. Every other case shows the picture and takes it
+  /// back if the answer says so — a model still arriving, an answer
+  /// that is taking its time, or bytes already on the table. Being seen
+  /// for a moment and withdrawn is the price of failing open, and it is
+  /// cheaper than a table of blank badges whenever the check is slow.
   bool allows(String key, Uint8List picture) {
     if (_hidden.contains(key)) return false;
     if (_asked.contains(key)) return true;
@@ -98,7 +116,9 @@ class Pictures extends ChangeNotifier {
     final verdict = _verdicts[digest];
     if (verdict != null) return !verdict;
     _start(check, digest, picture);
-    return false;
+    if (check.ready && !_drawn.contains(digest)) return false;
+    _drawn.add(digest);
+    return true;
   }
 
   void _start(PictureCheck check, int digest, Uint8List picture) {
