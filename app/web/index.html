@@ -18,6 +18,14 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+
+  <!-- Without this a phone browser lays the page out at its default
+       980 points and scales it down to fit, which is desktop mode: the
+       table comes out small, and the page can be pinched and panned,
+       which moves what you see away from where the app thinks you
+       touched. The app is a canvas that does its own scaling, so it
+       asks for the device's own width and no zoom of the browser's. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="Hearts, open source. Play alone, or live with friends.">
 
   <!-- iOS meta tags & icons -->
@@ -35,7 +43,17 @@
        toolbar, on an overscroll) is the table's colour and not white. -->
   <meta name="theme-color" content="#06231A">
   <style>
-    html, body { background: #06231A; margin: 0; padding: 0; height: 100%; }
+    /* A double tap on a canvas is two taps, not a zoom, and a drag past
+       the edge of the table is not a rubber band: either one moves what
+       you see away from where the app thinks you touched. */
+    html, body {
+      background: #06231A;
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      touch-action: manipulation;
+      overscroll-behavior: none;
+    }
   </style>
   <title>Open Hearts</title>
   <link rel="manifest" href="manifest.json">
