@@ -1,7 +1,7 @@
 /// Prints the roster's standings against each other.
 ///
-///     cd packages/engine && dart run --define=GAMES=3000 tool/arena.dart
-///     dart run --define=ROSTER="Westley,Romeo,Don Juan,Roxane" tool/arena.dart
+///     cd packages/engine && dart run tool/arena.dart --games 3000
+///     dart run tool/arena.dart --roster "Westley,Romeo,Don Juan,Roxane"
 ///
 /// Fair share of wins is 25%. The test holds every persona to at least
 /// 20% and within ten points of the best mean score; this is for seeing
@@ -13,10 +13,12 @@ library;
 
 import 'package:engine/engine.dart';
 
-void main() {
-  final games = int.parse(const String.fromEnvironment('OH_GAMES', defaultValue: '1200'));
-  // ROSTER=Westley,Don Juan,... seats a chosen field; default is the roster.
-  const names = String.fromEnvironment('OH_ROSTER');
+import 'args.dart';
+
+void main(List<String> args) {
+  final games = intArg(args, 'games', 1200);
+  // --roster "Westley,Don Juan,..." seats a chosen field; default is the roster.
+  final names = strArg(args, 'roster', '');
   final roster = names.isEmpty
       ? Persona.roster
       : [for (final n in names.split(',')) Persona.named(n.trim())];

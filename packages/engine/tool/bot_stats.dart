@@ -10,9 +10,9 @@
 ///
 /// Run it before and after touching bot.dart:
 ///
-///     cd packages/engine && dart run --define=GAMES=2000 tool/bot_stats.dart
+///     cd packages/engine && dart run tool/bot_stats.dart --games 2000
 ///
-/// `PERSONA=<name>` seats four of one persona instead of four Westleys; the
+/// `--persona <name>` seats four of one persona instead of four Westleys; the
 /// tournament in test/persona_test.dart is where they meet each other.
 library;
 
@@ -22,9 +22,11 @@ library;
 
 import 'package:engine/engine.dart';
 
-void main() {
-  final games = int.parse(const String.fromEnvironment('OH_GAMES', defaultValue: '500'));
-  const personaName = String.fromEnvironment('OH_PERSONA', defaultValue: 'Westley');
+import 'args.dart';
+
+void main(List<String> args) {
+  final games = intArg(args, 'games', 500);
+  final personaName = strArg(args, 'persona', 'Westley');
   final persona = Persona.named(personaName);
   final wins = List.filled(4, 0);
   final totalPts = List.filled(4, 0);

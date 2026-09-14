@@ -1,7 +1,7 @@
 /// Looks for self-destructive plays in bot-versus-bot games.
 ///
 ///     cd packages/engine && dart run tool/blunders.dart            # 300 tables
-///     dart run --define=TABLES=1000 --define=SHOW=12 tool/blunders.dart
+///     dart run tool/blunders.dart --tables 1000 --show 12
 ///
 /// A blunder here is a play that took points it did not have to, judged
 /// with hindsight: following suit, the bot won a trick that ended with
@@ -9,7 +9,7 @@
 /// leading, it led a card that won its own trick with points while it
 /// held a lower lead. Hindsight is unfair — a duck can be right and
 /// still lose — so the counts are a place to look, not a verdict, and
-/// SHOW prints whole tricks to look at.
+/// --show prints whole tricks to look at.
 library;
 
 // A tool's entire output is its printing.
@@ -19,9 +19,11 @@ import 'dart:math';
 
 import 'package:engine/engine.dart';
 
-void main() {
-  final tables = int.parse(const String.fromEnvironment('OH_TABLES', defaultValue: '300'));
-  final show = int.parse(const String.fromEnvironment('OH_SHOW', defaultValue: '6'));
+import 'args.dart';
+
+void main(List<String> args) {
+  final tables = intArg(args, 'tables', 300);
+  final show = intArg(args, 'show', 6);
   final counts = <String, Map<String, int>>{};
   final examples = <String>[];
   final rng = Random(7);

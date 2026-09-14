@@ -13,12 +13,12 @@ import 'signing.dart';
 typedef _SignC = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _VerifyC = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 
-/// Loads the cdylib — [libraryPath], else `OH_SCHNORR_LIB` in the
-/// environment, else the crate's release build found from the working
-/// directory — and swaps it in for signing and verifying. False, and
-/// the pure-Dart implementation stays, when there is none to load.
+/// Loads the cdylib — [libraryPath], else the crate's release build
+/// found from the working directory — and swaps it in for signing and
+/// verifying. False, and the pure-Dart implementation stays, when
+/// there is none to load.
 Future<bool> installNativeSchnorr({String? libraryPath}) async {
-  final path = libraryPath ?? Platform.environment['OH_SCHNORR_LIB'] ?? _find();
+  final path = libraryPath ?? _find();
   if (path == null) return false;
   try {
     final lib = DynamicLibrary.open(path);

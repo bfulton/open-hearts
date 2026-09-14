@@ -34,15 +34,14 @@ void main() {
     // a peer, and the juror's load is the point.
     final signers = [for (var i = 0; i < 4; i++) SchnorrSigner.generate()];
     final spec = TableSpec(id: 'follow-relay', seed: 6, sealed: true, seats: [for (final s in signers) HumanSeat(s.publicKey)]);
-    // OH_JUROR_LOG=path keeps every client's trace, the juror's included.
-    final logPath = Platform.environment['OH_JUROR_LOG'];
-    final sink = logPath == null ? null : File(logPath).openWrite();
+    // Every client's trace, the juror's included, at a known path.
+    final sink = (File('${Directory.current.path}/build/logs/juror.log')..parent.createSync(recursive: true)).openWrite();
     final juror = LastResortJuror(
         relays: [relay.url],
         signer: SchnorrSigner.generate(),
         silenceAfterMs: silence,
         crypto: crypto,
-        log: sink == null ? null : (l) => sink.writeln('juror $l'))
+        log: (l) => sink.writeln('juror $l'))
       ..start();
     final startedAt = DateTime.now();
     final presences = [for (final s in signers) RelayPresence(relays: [relay.url], signer: s)];
@@ -60,10 +59,8 @@ void main() {
             crypto: crypto),
     ];
     final players = [for (final c in clients) Player(c)];
-    if (sink != null) {
-      for (final c in clients) {
-        c.log = (l) => sink.writeln('seat ${c.mySeat} $l');
-      }
+    for (final c in clients) {
+      c.log = (l) => sink.writeln('seat ${c.mySeat} $l');
     }
     for (final c in clients) {
       c.start();
@@ -109,6 +106,6 @@ void main() {
       c.close();
     }
     juror.close();
-    await sink?.close();
+    await sink.close();
   }, timeout: const Timeout(Duration(minutes: 8)));
 }

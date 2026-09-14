@@ -139,7 +139,7 @@ cd app && flutter run -d chrome
 The deal ([doc 03](docs/03-fair-deal.md)) is one Rust crate built
 twice by `crypto/deal/build.sh`: a cdylib the Dart VM loads over FFI —
 the table and app tests, the verifier and the service's juror find it
-at `crypto/deal/target/release/`, or where `OH_DEAL_LIB` points — and a
+at `crypto/deal/target/release/` — and a
 wasm the browser loads, committed at `app/web/deal.wasm` so the web
 build needs no Rust. Building needs a stable Rust with the
 `wasm32-unknown-unknown` target; the reference crate is a git
@@ -184,7 +184,7 @@ The suite proves it never breaks a rule; it cannot prove it plays well.
 That is what the benchmark is for:
 
 ```bash
-cd packages/engine && dart run --define=OH_GAMES=2000 tool/bot_stats.dart
+cd packages/engine && dart run tool/bot_stats.dart --games 2000
 ```
 
 ```

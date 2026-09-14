@@ -1,6 +1,6 @@
 /// What each persona setting is worth on its own.
 ///
-///     cd packages/engine && dart run --define=GAMES=2000 tool/knobs.dart
+///     cd packages/engine && dart run tool/knobs.dart --games 2000
 ///
 /// Seats one bot that differs from Westley by a single setting against
 /// three Westleys, rotating the seat, and reports its win rate and mean
@@ -14,10 +14,10 @@ library;
 
 import 'package:engine/engine.dart';
 
-void main() {
-  final games = int.parse(
-    const String.fromEnvironment('OH_GAMES', defaultValue: '1000'),
-  );
+import 'args.dart';
+
+void main(List<String> args) {
+  final games = intArg(args, 'games', 1000);
   const base = Persona.westley;
   final variants = <Persona>[
     base,
