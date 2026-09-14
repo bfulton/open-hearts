@@ -3,9 +3,9 @@
 ///
 /// Top to bottom: the header (menu, where the game stands, the heart),
 /// the felt, the player's own score, the action line, the hand. In
-/// portrait the score is part of the table — the fourth seat, read the
-/// same distance from the cards as the badge across the felt — and the
-/// action line floats between it and the hand. The
+/// portrait the score is not a row of its own: the player is the fourth
+/// seat on the felt, a badge the same gap from the cards as the other
+/// three, and the action line floats in the band below. The
 /// same order in portrait and landscape; what changes with the shape
 /// is the hand. In portrait width runs out — thirteen cards fan across
 /// 390 points — so the fan overlaps hard and the cards take the height
@@ -37,7 +37,9 @@ class TableLayout extends StatelessWidget {
   /// The felt: the trick, the seats, and whatever floats over them.
   final Widget felt;
 
-  /// The player's own score, just under the felt.
+  /// The player's own score, on its own row under the felt. The
+  /// portrait composition does not use it: there the player's badge is
+  /// the fourth seat on the felt itself (ui/table_view.dart).
   final Widget score;
 
   /// The line between the score and the hand: what the game wants.
@@ -67,16 +69,16 @@ class TableLayout extends StatelessWidget {
         return Column(
           children: [
             header,
-            // In portrait the felt takes most of the height but not all
-            // of it: the score sits hard against the felt's bottom edge,
-            // as close to the cards as the badge at the felt's top, and
-            // what the felt gives up becomes the band the action line
-            // floats in, halfway between the score and the hand. In
-            // landscape there is nothing spare to give.
-            Expanded(flex: landscape ? 1 : 7, child: felt),
-            score,
+            // In portrait the player's own badge is on the felt with
+            // the other three, so what is left under it is one band,
+            // and the action line floats in the middle of it. In
+            // landscape the felt has no height to spare for a fourth
+            // badge, so the score keeps its own row under the felt and
+            // the action line sits on the next one.
+            Expanded(flex: landscape ? 1 : 3, child: felt),
+            if (landscape) score,
             ?below,
-            if (landscape) action else Expanded(flex: 2, child: Center(child: action)),
+            if (landscape) action else Expanded(flex: 1, child: Center(child: action)),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
               child: SizedBox(

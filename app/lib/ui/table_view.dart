@@ -12,10 +12,14 @@ import 'card_view.dart';
 import 'pip.dart';
 import 'player_icon.dart';
 
-/// The badges' inset from the felt's edge, and the least gap between a
-/// side badge and the trick's outer card.
+/// The badges' inset from the felt's edge, and the gap every badge
+/// keeps from the card it labels.
 const _badgeInset = 6.0;
 const _badgeGap = 8.0;
+
+/// The line under the table — who took the trick, or that it is your
+/// turn. Its room is kept whether or not it has anything in it.
+const _pillRow = 30.0;
 
 /// Where each seat's badge sits on a wide felt: pinned to the rail,
 /// well clear of the trick. Seat 0 is the player at the near edge, and
@@ -83,6 +87,14 @@ class TableView extends StatelessWidget {
         final cardHeight = cardHeightFor(cardWidth);
         final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
 
+        // The four badges are two matched pairs. The pair facing each
+        // other across the felt — the seat at the far edge and the
+        // player's own at the near one — are as wide as the trick's own
+        // column, so each reads as the label on the card above or below
+        // it. The side pair are as tall as the card beside them, and as
+        // wide as the strip left between that card and the felt's edge.
+        final facing = trickBox.width;
+
         Widget badge(int position) => SeatBadge(
               seat: controller.seatAt(position),
               name: controller.names[controller.seatAt(position)],
@@ -95,8 +107,8 @@ class TableView extends StatelessWidget {
               // The seat across the felt reads the same way as the
               // player's own line at the near edge: one line, icon
               // first. The side badges have a strip, so they stack.
-              oneLine: wide || position == 2,
-              maxWidth: position == 2 ? box.width - 2 * _badgeInset : sideRoom,
+              oneLine: wide || position.isEven,
+              maxWidth: position.isEven ? (wide ? box.width - 2 * _badgeInset : facing) : sideRoom,
             );
 
         // The trick, as one centred block. Slots hold their place so
@@ -139,31 +151,39 @@ class TableView extends StatelessWidget {
                 ? _TurnHint(game: game, mySeat: controller.mySeat)
                 : const SizedBox.shrink();
 
-        // Portrait: the four seats read as one column. The gap above the
-        // trick and the gap below it are the same, so the badge at the
-        // top of the felt and the player's own line just under it sit
-        // the same distance from the cards; the pill takes the gap
-        // below. What is left over is the felt's to give away — the
-        // action line floats in it (table_layout.dart).
+        // Portrait: all four seats are on the felt, each badge a gap
+        // from the card it labels — the same gap on all four sides, so
+        // the table reads as a table. The trick's block is a little
+        // taller than the cards in it, which the gap above and below
+        // takes off. What is left over is the felt's far end, above the
+        // seat across the table; the action line has the band under the
+        // player's own badge (table_layout.dart).
         if (!wide) {
+          final inset = trickBox.height / 2 - (offsets[2]!.dy.abs() * cardHeight * 1.02 + cardHeight / 2);
+          final gap = (_badgeGap - inset).clamp(0.0, _badgeGap);
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: _badgeInset),
             child: Column(
               children: [
-                badge(2),
                 const Spacer(),
+                SizedBox(width: facing, child: badge(2)),
+                SizedBox(height: gap),
                 SizedBox(
                   height: trickBox.height,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Align(alignment: Alignment.centerLeft, child: badge(1)),
-                      Align(alignment: Alignment.centerRight, child: badge(3)),
+                      Align(alignment: Alignment.centerLeft, child: SizedBox(width: sideRoom, height: cardHeight, child: badge(1))),
+                      Align(alignment: Alignment.centerRight, child: SizedBox(width: sideRoom, height: cardHeight, child: badge(3))),
                       Align(alignment: Alignment.center, child: trick),
                     ],
                   ),
                 ),
-                Expanded(child: Center(child: pill)),
+                SizedBox(height: gap),
+                SizedBox(width: facing, child: badge(0)),
+                // Kept whether or not there is anything to say, so the
+                // line under the table never jumps.
+                SizedBox(height: _pillRow, child: Center(child: pill)),
               ],
             ),
           );
@@ -411,11 +431,18 @@ class SeatBadge extends StatelessWidget {
         child: oneLine
             ? Row(
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [icon, const SizedBox(width: 6), Flexible(child: nameText), const SizedBox(width: 8), numbers],
               )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [icon, const SizedBox(height: 4), nameText, const SizedBox(height: 3), numbers],
+            // Scaled down rather than clipped or overflowing: a side
+            // badge is the height of the card beside it, and a name
+            // that wraps to two lines is a hair taller than that.
+            : FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [icon, const SizedBox(height: 4), nameText, const SizedBox(height: 3), numbers],
+                ),
               ),
       ),
     );

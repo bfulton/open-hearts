@@ -17,7 +17,6 @@ import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
 import 'package:open_hearts/ui/header.dart';
 import 'package:open_hearts/ui/player_icon.dart';
-import 'package:open_hearts/ui/scoreboard.dart';
 import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
@@ -356,7 +355,7 @@ void main() {
     expect(find.text('Play alone'), findsOneWidget);
   });
 
-  testWidgets('everyone\'s standing: the others\' on their badges, yours under the felt, no card counts', (tester) async {
+  testWidgets('everyone\'s standing: on their badges, yours among them, no card counts', (tester) async {
     await pumpTable(tester);
     final model = tester.widget<TableView>(find.byType(TableView)).controller;
     for (var seat = 1; seat < engine.seatCount; seat++) {
@@ -364,10 +363,13 @@ void main() {
     }
     expect(find.bySemanticsLabel(RegExp(r'\d+ cards')), findsNothing);
     expect(find.bySemanticsLabel('You: 0 in the game, 0 this hand'), findsOneWidget);
+    // In portrait your badge is the seat at the near edge of the felt:
+    // on it, below the trick, and above your hand.
     final mine = tester.getRect(find.bySemanticsLabel('You: 0 in the game, 0 this hand'));
     final felt = tester.getRect(find.byType(TableView));
     final hand = tester.getRect(find.byType(HandFan));
-    expect(mine.top, greaterThanOrEqualTo(felt.bottom));
+    expect(mine.bottom, lessThanOrEqualTo(felt.bottom));
+    expect(mine.top, greaterThan(_trickSlots(tester).map((r) => r.bottom).reduce((a, b) => a > b ? a : b)));
     expect(mine.bottom, lessThanOrEqualTo(hand.top));
   });
 
@@ -424,35 +426,40 @@ void main() {
     expect(slotWidth, lessThan(60));
   });
 
-  testWidgets('your line is the fourth seat: as close to the cards as the badge across the felt, with the action line floating below it', (tester) async {
+  testWidgets('four seats, two matched pairs, each badge the same gap from the card it labels', (tester) async {
     await pumpTable(tester);
     final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
     final slots = _trickSlots(tester);
-    final north = tester.getRect(find.bySemanticsLabel(RegExp('^${names[2]}: ')));
-    final topCard = slots.reduce((a, b) => a.top < b.top ? a : b);
-    final bottomCard = slots.reduce((a, b) => a.bottom > b.bottom ? a : b);
-    final you = tester.getRect(find.byType(ScoreLine));
-    final constraintsWidth = tester.getRect(find.byType(TableView)).width;
-    expect(
-      you.top - bottomCard.bottom,
-      closeTo(topCard.top - north.bottom, 2),
-      reason: 'your line reads as the seat at the bottom of the table, not as a footer under it',
-    );
+    Rect card(double Function(Rect) edge, bool most) =>
+        slots.reduce((a, b) => (most ? edge(a) > edge(b) : edge(a) < edge(b)) ? a : b);
+    Rect badge(String name) => tester.getRect(find.bySemanticsLabel(RegExp('^$name: ')));
 
-    // And your seat wears the badge the others wear: the same box, the
-    // same one line, so the near edge of the table reads as a seat and
-    // not as a caption under it.
+    // Each badge labels the card on its own side of the trick, and is
+    // the same short gap from it as the other three are from theirs.
+    final gaps = <String, double>{
+      'north': card((r) => r.top, false).top - badge(names[2]).bottom,
+      'south': badge('You').top - card((r) => r.bottom, true).bottom,
+      'west': card((r) => r.left, false).left - badge(names[1]).right,
+      'east': badge(names[3]).left - card((r) => r.right, true).right,
+    };
+    for (final e in gaps.entries) {
+      expect(e.value, closeTo(gaps['north']!, 0.5), reason: '${e.key} sits as far off its card as the rest');
+    }
+    expect(gaps['north'], lessThan(16), reason: 'near enough to read as that card\'s label');
+
+    // Two pairs, each pair one size: the seat across the felt and your
+    // own at the near edge, and the two at the sides.
     expect(find.byType(SeatBadge), findsNWidgets(engine.seatCount));
-    final yours = tester.getRect(find.descendant(of: find.byType(ScoreLine), matching: find.byType(SeatBadge)));
-    expect(yours.height, closeTo(north.height, 0.5), reason: 'the same badge as the seat across the felt');
-    expect(yours.width, lessThan(constraintsWidth), reason: 'a badge, not a strip across the page');
+    expect(badge('You').size, badge(names[2]).size, reason: 'you and the seat facing you');
+    expect(badge(names[1]).size, badge(names[3]).size, reason: 'the two at the sides');
 
-    // And the action line is not crowded against either: it floats in
-    // the band between your line and your hand.
+    // And the action line floats in the band under the felt rather than
+    // crowding either it or the hand.
+    final felt = tester.getRect(find.byType(TableView));
     final action = tester.getRect(find.byType(ActionBar));
     final hand = tester.getRect(find.byType(HandFan));
-    expect(action.top, greaterThan(you.bottom));
-    expect(action.top - you.bottom, closeTo(hand.top - action.bottom, 4), reason: 'halfway between them');
+    expect(badge('You').bottom, lessThanOrEqualTo(felt.bottom));
+    expect(action.top - felt.bottom, closeTo(hand.top - action.bottom, 4), reason: 'halfway down the band');
   });
 
   testWidgets('every player has an icon: their initials on their colour, on the badges, your line and the sheet', (tester) async {

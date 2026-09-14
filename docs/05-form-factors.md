@@ -53,17 +53,29 @@ taken out again, because the score chrome it moved turned out not to
 be needed on either edge: an opponent's total now sits on their badge
 beside what they have taken this hand (their card count is gone — it
 is the same as yours), and your own total and hand sit on one line
-just under the felt, where the eye goes between tricks. In portrait
-that line is the fourth seat rather than a footer. It is the same
-badge the other three wear — one line, icon first, the same box — as
-is the seat across the felt, which has the width for it; only the two
-side badges stack, because their room is a strip beside the trick. And
-the felt keeps the gap under its bottom card equal to the gap over its
-top one, so your badge and the one across the table read the same
-distance from the cards whatever height they come out. The felt takes
-seven ninths of what is left after the header, the line and the hand,
-and the last two ninths are the band the action line floats in,
-halfway between your line and your hand. What is left
+with theirs.
+
+In portrait that line is the fourth seat, on the felt with the other
+three. All four badges are the same widget, and they are two matched
+pairs: the two facing each other across the trick are as wide as the
+trick's own column and one line tall, and the two at the sides are as
+tall as the card beside them and as wide as the strip left between
+that card and the felt's edge (a name that wraps to two lines is
+scaled to the box rather than overflowing it). Each badge is eight
+points from the card it labels, on all four sides, which is what makes
+it read as that card's label and not as furniture. Under the player's
+badge is a row kept for the line the table says — who took the trick,
+or that it is your turn — whether or not there is anything to say, so
+nothing jumps. What is left over is the felt's far end above the top
+badge, and the band under it where the action line floats: the felt
+takes three quarters of the height after the header and the hand, the
+band the last quarter.
+
+Landscape is still the composition above — badges on the rail, the
+score on its own row under the felt — which puts them further from
+the cards than portrait does, furthest on a desktop window. Applying
+the portrait rule there wants somewhere for the table's line to go,
+and 390 points of height has none spare. What is left
 along the top is a header 40 points tall in both compositions — the
 menu on the left, the hand and the pass in the middle, and on the
 right a heart, whole until hearts are broken — so the two compositions
