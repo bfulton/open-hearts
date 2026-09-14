@@ -472,6 +472,26 @@ void main() {
     });
   }
 
+  testWidgets('the action line sits against the hand, and what the table says floats in the room under your badge', (tester) async {
+    await pumpTable(tester);
+    final hand = tester.getRect(find.byType(HandFan));
+    expect(
+      hand.top - tester.getRect(find.byType(ActionBar)).bottom,
+      lessThanOrEqualTo(4),
+      reason: 'the line about the hand — what you were passed, what to choose — sits against it',
+    );
+
+    // Once the pass is made it is your turn, and the table says so in
+    // the middle of the room under your own badge rather than against
+    // it.
+    await _passAnything(tester);
+    expect(find.text('Your turn'), findsOneWidget);
+    final you = tester.getRect(find.bySemanticsLabel(RegExp('^You: ')));
+    final room = Rect.fromLTRB(0, you.bottom, 1, tester.getRect(find.byType(ActionBar)).top);
+    expect(tester.getRect(find.text('Your turn')).center.dy, closeTo(room.center.dy, 2));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('every player has an icon: their initials on their colour, on the badges, your line and the sheet', (tester) async {
     await pumpTable(tester);
     final model = tester.widget<TableView>(find.byType(TableView)).controller;

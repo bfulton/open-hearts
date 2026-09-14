@@ -4,7 +4,9 @@
 /// Top to bottom: the header (menu, where the game stands, the heart),
 /// the felt, the action line, the hand. The player's own score is not a
 /// row here: they are the fourth seat on the felt, a badge the same gap
-/// from the cards as the other three (ui/table_view.dart). The
+/// from the cards as the other three (ui/table_view.dart). Nor is what
+/// the table says: that floats in the room the felt keeps under the
+/// near seat, so what sits against the hand is the line about the hand. The
 /// same order in portrait and landscape; what changes with the shape
 /// is the hand. In portrait width runs out — thirteen cards fan across
 /// 390 points — so the fan overlaps hard and the cards take the height
@@ -54,6 +56,9 @@ class TableLayout extends StatelessWidget {
   static const portraitHandHeight = 128.0;
   static const landscapeHandHeight = 100.0;
 
+  /// The action line's row: as tall as its tallest state, the pass.
+  static const actionRow = 54.0;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -62,14 +67,17 @@ class TableLayout extends StatelessWidget {
         return Column(
           children: [
             header,
-            // The four seats are all on the felt (ui/table_view.dart).
-            // Under it, portrait floats the action line in a band of
-            // its own — a quarter of the height, the felt taking the
-            // rest — while landscape, which has no height to spare,
-            // gives it one row under the felt and no more.
-            Expanded(flex: landscape ? 1 : 3, child: felt),
+            // The four seats are all on the felt (ui/table_view.dart),
+            // which takes what the rest leave: the line the table says
+            // floats in the room under the near seat, so the felt runs
+            // down to the action line.
+            Expanded(child: felt),
             ?below,
-            if (landscape) action else Expanded(flex: 1, child: Center(child: action)),
+            // The action line is about the hand, so it sits against it
+            // — and keeps a row of the same height whatever it holds,
+            // a note or the pass, so the table above never shifts
+            // under it.
+            ConstrainedBox(constraints: const BoxConstraints(minHeight: actionRow), child: action),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
               child: SizedBox(

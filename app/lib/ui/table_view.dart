@@ -18,10 +18,9 @@ const _badgeInset = 6.0;
 const _badgeGap = 8.0;
 
 /// The line the table says — who took the trick, or that it is your
-/// turn. In portrait it has a row of its own under the player's badge,
-/// kept whether or not there is anything in it, so nothing jumps; on a
-/// wide felt there is no height for that and it sits beside the badge,
-/// where there is width to spare.
+/// turn. In portrait it floats in the room the felt keeps under the
+/// player's badge; on a wide felt there is no height for that and it
+/// sits beside the badge, where there is width to spare.
 const _pillRow = 30.0;
 
 /// Play runs 0-1-2-3, which reads clockwise once the seats are laid
@@ -67,7 +66,10 @@ class TableView extends StatelessWidget {
         // under the table — come off the height before the trick is
         // sized, and it takes what is left of whichever dimension runs
         // out first.
-        final facingRoom = 2 * (SeatBadge.lineHeight + _badgeGap) + (wide ? 0.0 : _pillRow);
+        // Portrait keeps room under the near badge for the line the
+        // table says, and as much again, so the line sits in the middle
+        // of it rather than against the badge.
+        final facingRoom = 2 * (SeatBadge.lineHeight + _badgeGap) + (wide ? 0.0 : 2 * _pillRow);
         final deep = (box.height - facingRoom) / ((wide ? 2.3 : 2.7) / cardAspect);
         var cardWidth = [
           box.width * (wide ? 0.16 : 0.21),
@@ -241,7 +243,10 @@ class TableView extends StatelessWidget {
                 )
               else ...[
                 seat(0),
-                SizedBox(height: _pillRow, child: Center(child: pill)),
+                // The room under the near seat, with the line the table
+                // says in the middle of it: the action line has the row
+                // against the hand (table_layout.dart).
+                Expanded(child: Center(child: pill)),
               ],
               if (wide) const Spacer(),
             ],

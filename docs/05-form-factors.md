@@ -76,15 +76,17 @@ with a word in it, so a badge hugs its name — and the two of a pair
 are each laid out over a ghost of the other, which takes up its room
 and draws nothing, so whichever name is the longer, the pair match.
 
-What the table says — who took the trick, or that it is your turn —
-has a row of its own under the player's badge in portrait, kept
-whether or not there is anything in it so nothing jumps. A wide felt
-has no height to spare for that row, and plenty of width, so there it
-sits beside the badge, with the same room kept on the other side so
-the badge holds the middle. Under the felt, portrait floats the action
-line in a band of its own — the felt takes three quarters of what is
-left after the header and the hand, the band the last quarter —
-while landscape gives it one row and no more. What is left
+The two lines under the table say different things and sit where each
+belongs. What the table says — who took the trick, or that it is your
+turn — floats in the middle of the room the felt keeps under the
+player's badge, which is sized for it twice over so it is never
+against the badge. The action line is about the hand — what you were
+passed, how many more to choose — so it sits against the hand, in a
+row of the height of its tallest state, the pass, whatever it is
+holding: the table above it never shifts when the line changes. A wide
+felt has no height for the table's line at all, and plenty of width,
+so there it sits beside the player's badge, with the same room kept on
+the other side so the badge holds the middle. What is left
 along the top is a header 40 points tall in both compositions — the
 menu on the left, the hand and the pass in the middle, and on the
 right a heart, whole until hearts are broken — so the two compositions
