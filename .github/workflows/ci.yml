@@ -52,8 +52,7 @@ jobs:
         run: |
           cd app
           flutter build web --release --no-web-resources-cdn \
-            --base-href /play/ \
-            --dart-define=OH_BUILD=${GITHUB_SHA::7}
+            --base-href /play/
 
   # Four real browsers at one table: the local relay, the built app,
   # WebRTC between headless Chromiums, and the departure cells only a

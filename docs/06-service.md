@@ -213,7 +213,7 @@ proofs made and checked on the virtual clock — run in
 four people, a leaver mid-hand and during the deal, a table of two
 surviving a crash by the jury's verdict and a juror's escrow piece, and
 a lone player leaving during the pass while their client looks on. The
-chaos walk runs sealed on request (`OH_CHAOS_SEALED=5`), a minute or two a
+chaos walk runs sealed on request (`dart run tool/chaos.dart --sealed 5`), a minute or two a
 seed. Over real sockets (`service/test`): the jury over the relay,
 seeded and sealed; and a juror of last resort summoned into a sealed
 table of four with real keys, carried through the hand it never saw
@@ -235,7 +235,7 @@ a silent seat may be removed — by finding a fork in the answer that
 looked more helpful (doc 04, "Silence is answered at the seat's own
 turn"). A thousand seeds now finish or pause for the jury with every
 survivor holding the same record. CI walks forty seeds on every commit;
-`OH_CHAOS_SEEDS=1000 dart test test/chaos_test.dart` walks a thousand.
+`dart run tool/chaos.dart --seeds 1000` walks a thousand.
 
 What every cell asserts:
 

@@ -2,27 +2,27 @@
 ///
 /// The dev loop publishes on every commit, so the question a phone asks
 /// constantly is "am I looking at the build that was just pushed?".
-/// deploy.sh stamps [buildTag] into the binary and writes the same tag
-/// to build-info.json beside it; when the file says something else, a
-/// newer deploy has landed. Every env var this build reads is named
-/// `OH_…`.
+/// deploy.sh writes the running build's identity into
+/// `build_info.g.dart` before it builds — the one thing that has to be
+/// compiled in, since a build cannot fetch its own identity — and the
+/// same tag into build-info.json beside the published app; when the
+/// file says something else, a newer deploy has landed.
 library;
 
+import 'build_info.g.dart';
 import 'update_check.dart'
     if (dart.library.js_interop) 'update_check_web.dart' as platform;
 
-/// Short commit the running build came from. deploy.sh passes
-/// `--dart-define=OH_BUILD=<sha>`; a local `flutter run` leaves it "dev".
-const buildTag = String.fromEnvironment('OH_BUILD', defaultValue: 'dev');
+/// Short commit the running build came from; "dev" for a local run.
+const buildTag = generatedBuildTag;
 
-/// The check is opt-in, and deliberately explicit: deploy.sh passes
-/// `OH_UPDATE_CHECK=on` and nothing else does. Inferring it from a real-
-/// looking [buildTag] would turn the pill on in CI, where it floats over
-/// every widget test and eats taps.
-const _updateCheckDefine = String.fromEnvironment('OH_UPDATE_CHECK');
+/// UTC date the running build was published; "dev" for a local run.
+const buildDate = generatedBuildDate;
 
-bool get updateCheckEnabled =>
-    _updateCheckDefine == 'on' || platform.forcedByQuery;
+/// On only in a deployed build: deploy.sh generates it on, and the
+/// placeholder every other build uses has it off, so the pill never
+/// floats over the widget tests in CI and eats their taps.
+bool get updateCheckEnabled => generatedUpdateCheck || platform.forcedByQuery;
 
 /// The published build tag, or null when it cannot be read (offline, a
 /// non-web build, a deploy mid-flight). Never throws: a failed check is

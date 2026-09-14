@@ -24,7 +24,16 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const appDir = process.env.OH_APP_DIR ?? join(root, 'app', 'build', 'e2e');
+// The e2e tools take arguments, not environment: --app-dir <path>
+// points at a built app other than the default.
+const argOf = (name) => {
+  const flag = `--${name}`;
+  const i = process.argv.indexOf(flag);
+  if (i >= 0 && process.argv[i + 1] !== undefined) return process.argv[i + 1];
+  const eq = process.argv.find((a) => a.startsWith(`${flag}=`));
+  return eq === undefined ? undefined : eq.slice(flag.length + 1);
+};
+const appDir = argOf('app-dir') ?? join(root, 'app', 'build', 'e2e');
 const require = createRequire(import.meta.url);
 const { chromium } = require(`${execSync('npm root -g').toString().trim()}/playwright`);
 

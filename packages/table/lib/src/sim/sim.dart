@@ -1,6 +1,7 @@
 /// The pieces of a simulated table, together.
 library;
 
+export 'chaos_walk.dart';
 export 'scenarios.dart';
 export 'scripted_human.dart';
 export 'sim_juror.dart';
