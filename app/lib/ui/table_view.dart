@@ -17,11 +17,11 @@ import 'player_icon.dart';
 const _badgeInset = 6.0;
 const _badgeGap = 8.0;
 
-/// Where each seat's badge sits: pinned to the rail, well clear of the
-/// trick. Seat 0 is the player at the bottom and has no badge — the
-/// score line under the felt and the hand say everything about them.
-/// Play runs 0-1-2-3, which reads clockwise once the seats are laid out
-/// this way.
+/// Where each seat's badge sits on a wide felt: pinned to the rail,
+/// well clear of the trick. Seat 0 is the player at the near edge, and
+/// wears the same badge just under the felt (ui/scoreboard.dart). Play
+/// runs 0-1-2-3, which reads clockwise once the seats are laid out this
+/// way.
 const _badgeAt = <int, Alignment>{
   1: Alignment(-1, -0.18),
   2: Alignment(0, -1),
@@ -76,14 +76,14 @@ class TableView extends StatelessWidget {
         // rather than running under the badges.
         final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
         double sideRoomFor(double cw) => box.width / 2 - cw * reach - _badgeInset - _badgeGap;
-        if (sideRoomFor(cardWidth) < _SeatBadge.minWidth) {
-          cardWidth = ((box.width / 2 - _badgeInset - _badgeGap - _SeatBadge.minWidth) / reach).clamp(34.0, cardWidth);
+        if (sideRoomFor(cardWidth) < SeatBadge.minWidth) {
+          cardWidth = ((box.width / 2 - _badgeInset - _badgeGap - SeatBadge.minWidth) / reach).clamp(34.0, cardWidth);
         }
-        final sideRoom = sideRoomFor(cardWidth).clamp(_SeatBadge.minWidth, box.width);
+        final sideRoom = sideRoomFor(cardWidth).clamp(SeatBadge.minWidth, box.width);
         final cardHeight = cardHeightFor(cardWidth);
         final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
 
-        Widget badge(int position) => _SeatBadge(
+        Widget badge(int position) => SeatBadge(
               seat: controller.seatAt(position),
               name: controller.names[controller.seatAt(position)],
               game: game,
@@ -92,7 +92,10 @@ class TableView extends StatelessWidget {
               clockMs: controller.clockMs(controller.seatAt(position)),
               iconSeed: controller.iconSeedOf(controller.seatAt(position)),
               avatar: controller.avatarOf(controller.seatAt(position)),
-              compact: wide,
+              // The seat across the felt reads the same way as the
+              // player's own line at the near edge: one line, icon
+              // first. The side badges have a strip, so they stack.
+              oneLine: wide || position == 2,
               maxWidth: position == 2 ? box.width - 2 * _badgeInset : sideRoom,
             );
 
@@ -255,8 +258,9 @@ class _TrickSlot extends StatelessWidget {
 /// An opponent: who they are, where they stand in the game, what they
 /// have taken this hand. Not how many cards they hold — everyone holds
 /// as many as you do.
-class _SeatBadge extends StatelessWidget {
-  const _SeatBadge({
+class SeatBadge extends StatelessWidget {
+  const SeatBadge({
+    super.key,
     required this.seat,
     required this.name,
     required this.game,
@@ -266,7 +270,7 @@ class _SeatBadge extends StatelessWidget {
     required this.iconSeed,
     required this.avatar,
     this.clockMs,
-    this.compact = false,
+    this.oneLine = false,
   });
 
   final int seat;
@@ -289,8 +293,11 @@ class _SeatBadge extends StatelessWidget {
   /// to the trick's outer card.
   final double maxWidth;
 
-  /// One line — name, total, points — where the felt is short.
-  final bool compact;
+  /// The badge on one line — icon, name, numbers — rather than stacked.
+  /// The seat across the felt and the player's own line have the width
+  /// for it; a side badge, whose room is a strip beside the trick,
+  /// stacks instead.
+  final bool oneLine;
 
   /// The least a badge is given: a two-word name wrapped, or most of
   /// the roster's one-word names on a line, at 58 points of text.
@@ -311,7 +318,7 @@ class _SeatBadge extends StatelessWidget {
     );
   }
 
-  EdgeInsets get _padding => compact ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 11, vertical: 7);
+  EdgeInsets get _padding => oneLine ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 11, vertical: 7);
 
   /// The name, in the room it has: on one line when it fits, else — a
   /// long name, Mumtaz Mahal in the east seat of a phone — wrapped at
@@ -347,11 +354,11 @@ class _SeatBadge extends StatelessWidget {
   }
 
   Widget _badge(BuildContext context, int total, int taken) {
-    // The icon sits above the name where the felt is tall and beside
-    // it where it is short, so a side badge keeps its room for the
-    // name either way.
-    final icon = PlayerIcon(name: name, seed: iconSeed, avatar: avatar, size: compact ? 18 : 22);
-    final nameText = _name(context, maxWidth - _padding.horizontal - (compact ? 24 : 0));
+    // The icon sits beside the name where the badge has the width for
+    // it and above it where it does not, so a side badge keeps its room
+    // for the name either way.
+    final icon = PlayerIcon(name: name, seed: iconSeed, avatar: avatar, size: oneLine ? 18 : 22);
+    final nameText = _name(context, maxWidth - _padding.horizontal - (oneLine ? 24 : 0));
     // A three-digit total beside a two-digit hand is the widest this
     // gets, and it is a hair inside a side badge's room: scaled down
     // rather than clipped should a font run wider.
@@ -401,7 +408,7 @@ class _SeatBadge extends StatelessWidget {
             width: onTurn || won ? 1.6 : 1,
           ),
         ),
-        child: compact
+        child: oneLine
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [icon, const SizedBox(width: 6), Flexible(child: nameText), const SizedBox(width: 8), numbers],

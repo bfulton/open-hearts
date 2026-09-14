@@ -432,11 +432,20 @@ void main() {
     final topCard = slots.reduce((a, b) => a.top < b.top ? a : b);
     final bottomCard = slots.reduce((a, b) => a.bottom > b.bottom ? a : b);
     final you = tester.getRect(find.byType(ScoreLine));
+    final constraintsWidth = tester.getRect(find.byType(TableView)).width;
     expect(
       you.top - bottomCard.bottom,
       closeTo(topCard.top - north.bottom, 2),
       reason: 'your line reads as the seat at the bottom of the table, not as a footer under it',
     );
+
+    // And your seat wears the badge the others wear: the same box, the
+    // same one line, so the near edge of the table reads as a seat and
+    // not as a caption under it.
+    expect(find.byType(SeatBadge), findsNWidgets(engine.seatCount));
+    final yours = tester.getRect(find.descendant(of: find.byType(ScoreLine), matching: find.byType(SeatBadge)));
+    expect(yours.height, closeTo(north.height, 0.5), reason: 'the same badge as the seat across the felt');
+    expect(yours.width, lessThan(constraintsWidth), reason: 'a badge, not a strip across the page');
 
     // And the action line is not crowded against either: it floats in
     // the band between your line and your hand.
