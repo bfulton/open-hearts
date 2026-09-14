@@ -66,6 +66,14 @@ class ChaosScenario {
   ChaosScenario(this.seed, {this.jurors = 4, DealCrypto? crypto}) : rng = Random(seed) {
     humans = 2 + rng.nextInt(3);
     table = SimTable(humans: humans, seed: 100 + seed, netSeed: seed, jurors: jurors, crypto: crypto);
+    // Three relays under the table, everyone reaching all of them to
+    // start: the same as a single bus until a fault takes a relay out
+    // or leaves a peer reaching fewer, which is where a table learns
+    // whether it can still hear itself. A shorter refusal backoff than
+    // the protocol's minute, so a relay that came back is used again
+    // well inside the walk's quiet tail.
+    table.net.relays = const ['ra', 'rb', 'rc'];
+    table.net.refusalMs = 30000;
   }
 
   /// Strangers online to draw a jury from; zero for the players' own
@@ -91,7 +99,45 @@ class ChaosScenario {
     final count = 3 + rng.nextInt(6);
     for (var f = 0; f < count; f++) {
       final when = at;
-      switch (rng.nextInt(jurors > 0 ? 8 : 6)) {
+      final base = jurors > 0 ? 8 : 6;
+      final kind = rng.nextInt(base + 2);
+      if (kind >= base) {
+        if (kind == base) {
+          // A relay goes out for a while: a write to it is refused and
+          // it carries nothing, so the events that were going there
+          // must find another relay the readers share.
+          final r = t.net.relays[rng.nextInt(t.net.relays.length)];
+          final hold = 5000 + rng.nextInt(40000);
+          t.clock.schedule(when, () {
+            t.net.relayOut(r, t.clock.nowMs + hold);
+            faults.add('relay $r out at ${t.clock.nowMs} for $hold');
+          });
+        } else {
+          // A peer goes half-deaf: it loses a relay from its reach, so
+          // its own events can miss a peer that shares no other relay
+          // with it, and it can miss theirs. Players and jurors alike —
+          // a juror that cannot hear a seat is how a live seat gets
+          // taken for absent. Never its last relay, or it is simply cut.
+          final all = [
+            for (final k in keys) k,
+            for (final j in t.jurors) j.signer.publicKey,
+          ];
+          final k = all[rng.nextInt(all.length)];
+          final r = t.net.relays[rng.nextInt(t.net.relays.length)];
+          final hold = 5000 + rng.nextInt(60000);
+          t.clock.schedule(when, () {
+            final cur = t.net.reachOf(k).toSet();
+            if (cur.length <= 1) return;
+            cur.remove(r);
+            t.net.setReach(k, cur);
+            faults.add('${k.substring(0, 4)} half-deaf to $r at ${t.clock.nowMs} for $hold');
+          });
+          t.clock.schedule(when + hold, () => t.net.setReach(k, t.net.reachOf(k).toSet()..add(r)));
+        }
+        at += 3000 + rng.nextInt(30000);
+        continue;
+      }
+      switch (kind) {
         case 0:
         case 1:
           t.clock.schedule(when, () {
@@ -170,6 +216,7 @@ class ChaosScenario {
   void quiet() {
     final t = table;
     t.net.heal();
+    t.net.healRelays();
     t.net.lossRate = 0;
     t.net.minLatencyMs = 20;
     t.net.maxLatencyMs = 80;

@@ -164,7 +164,7 @@ class _LobbyPageState extends State<LobbyPage> {
     try {
       await Identity.setName(name);
       final signer = _signer ??= await Identity.signer();
-      final transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog);
+      final transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
       _refusalSub?.cancel();
       _refusalSub = transport.refusals.listen((r) {
         if (mounted) setState(() => _relayNote = r == null ? null : 'No relay will take this device\'s events: $r');
@@ -245,7 +245,7 @@ class _LobbyPageState extends State<LobbyPage> {
   void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars) {
     final signer = _signer!;
     final relays = _relays;
-    final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog);
+    final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays));
     final peers = [for (final h in spec.seats) if (h is HumanSeat) h.key];
     final ledger = _standing?.ledger ?? Ledger();
     final controller = LiveController(

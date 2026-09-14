@@ -16,6 +16,7 @@
 /// relays and one relay's bad hour is not every table's.
 library;
 
+import 'relay_policy.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -33,19 +34,23 @@ abstract final class Relays {
 
   static String format(List<Uri> relays) => relays.join(', ');
 
-  /// The same list begun at the entry a hash of [key] picks, the rest
-  /// following in order: where a client writes first is a function of
-  /// the table, so tables spread over the relays.
-  static List<Uri> turnedBy(List<Uri> relays, String key) {
-    if (relays.length < 2) return relays;
+  /// The relays past the first [pinned] begun at the entry a hash of
+  /// [key] picks, the rest following in order: where a client writes
+  /// first among the interchangeable relays is a function of the table,
+  /// so tables spread over them. The [pinned] at the front stay first —
+  /// a relay we run, primary while up, not spun out of place with the
+  /// volunteer ones.
+  static List<Uri> turnedBy(List<Uri> relays, String key, {int pinned = 0}) {
+    if (relays.length - pinned < 2) return relays;
+    final tail = relays.sublist(pinned);
     // FNV-1a over the key's code units: the same on every platform,
     // which String.hashCode is not.
     var h = 0x811c9dc5;
     for (final u in key.codeUnits) {
       h = ((h ^ u) * 0x01000193) & 0xffffffff;
     }
-    final k = h % relays.length;
-    return [...relays.sublist(k), ...relays.sublist(0, k)];
+    final k = h % tail.length;
+    return [...relays.sublist(0, pinned), ...tail.sublist(k), ...tail.sublist(0, k)];
   }
 }
 
@@ -238,10 +243,10 @@ class RelayGroup {
   void publish(NostrEvent e, {bool everywhere = false, Set<Uri>? readBy}) {
     if (_closed) return;
     final now = _nowMs;
-    final up = [for (final c in connections) if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c];
-    if (everywhere || (readBy != null && up.isNotEmpty && !up.any((c) => readBy.contains(c.url)))) {
-      for (final c in up) {
-        c.publish(e);
+    final upUrls = [for (final c in connections) if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c.url];
+    if (floodWrite(upUrls, readBy, everywhere: everywhere)) {
+      for (final c in connections) {
+        if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c.publish(e);
       }
       return;
     }

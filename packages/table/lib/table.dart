@@ -22,6 +22,7 @@ export 'src/record.dart';
 export 'src/results.dart';
 export 'src/schnorr_native.dart';
 export 'src/sealed_pass.dart';
+export 'src/relay_policy.dart';
 export 'src/relay_transport.dart';
 export 'src/relays.dart';
 export 'src/signing.dart';

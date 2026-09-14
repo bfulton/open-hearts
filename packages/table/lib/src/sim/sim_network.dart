@@ -1,11 +1,16 @@
 /// A network of peers with latency, loss, crashes and partitions, all
-/// on the virtual clock.
+/// on the virtual clock. Optionally with relays: events travel over a
+/// named relay rather than a single bus, each peer reaches some subset
+/// of them, and a relay can go out for a while — the layer where a
+/// table that could not hear itself was born, so the one the chaos
+/// walk needs to be able to break.
 library;
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import '../relay_policy.dart';
 import '../signing.dart';
 import '../transport.dart';
 import 'virtual_clock.dart';
@@ -24,11 +29,34 @@ class SimNetwork {
   /// How long the transport takes to notice a peer is gone.
   final int detectDisconnectMs;
 
+  /// The relays events travel over, in the order a writer prefers them.
+  /// Empty is the classic single bus: every peer reaches everything,
+  /// events go to all reachable peers, and the relay-aware paths below
+  /// are inert — so a table set up without relays behaves exactly as
+  /// it did before there were any.
+  List<String> relays = const [];
+
+  /// How long a writer keeps a relay out of its own running after a
+  /// write to it was refused: the protocol's minute (relays.dart).
+  int refusalMs = 60000;
+
   final Random _random;
   final Map<PublicKey, SimTransport> _peers = {};
   final Set<PublicKey> _dead = {};
   final Set<PublicKey> _offline = {};
   List<Set<PublicKey>> _partition = const [];
+
+  /// Which relays each peer reaches — reads from and writes to. Unset
+  /// means all of [relays]; a peer that has lost a relay reaches fewer,
+  /// which is the half-deaf fault: it writes and reads where it still
+  /// can, and a table event of its own can miss a peer that does not
+  /// share a relay with it.
+  final Map<PublicKey, Set<String>> _reaches = {};
+
+  /// Relays out until a virtual time: a write to one is refused (the
+  /// writer learns and backs off, as against a rate-limiting relay)
+  /// and it delivers nothing while out.
+  final Map<String, int> _relayOutUntil = {};
 
   int delivered = 0;
   int dropped = 0;
@@ -37,6 +65,24 @@ class SimNetwork {
     final t = SimTransport._(this, key);
     _peers[key] = t;
     return t;
+  }
+
+  /// The relays [key] reaches: all of them until it has lost some.
+  Set<String> reachOf(PublicKey key) => relays.isEmpty ? const {} : (_reaches[key] ?? relays.toSet());
+
+  /// Sets which relays [key] reaches — the half-deaf fault and its end.
+  void setReach(PublicKey key, Set<String> r) => _reaches[key] = r;
+
+  /// A relay goes out until [untilMs]; a write to it is refused and it
+  /// delivers nothing in the meantime.
+  void relayOut(String relay, int untilMs) => _relayOutUntil[relay] = untilMs;
+
+  bool _relayLive(String relay, int now) => (_relayOutUntil[relay] ?? 0) <= now;
+
+  /// Ends every relay fault: relays back up, every peer reaching all.
+  void healRelays() {
+    _relayOutUntil.clear();
+    _reaches.clear();
   }
 
   /// The peer's process dies: nothing more is sent or received, and the
@@ -81,7 +127,10 @@ class SimNetwork {
     return true;
   }
 
-  void _broadcast(PublicKey from, Map<String, Object?> message) {
+  int _latency() => minLatencyMs + _random.nextInt(maxLatencyMs - minLatencyMs + 1);
+
+  /// The classic bus: to every reachable peer, no relay in the way.
+  void _broadcastAll(PublicKey from, Map<String, Object?> message) {
     final wire = jsonEncode(message);
     for (final to in _peers.keys) {
       if (to == from) continue;
@@ -93,8 +142,50 @@ class SimNetwork {
         dropped++;
         continue;
       }
-      final latency = minLatencyMs + _random.nextInt(maxLatencyMs - minLatencyMs + 1);
-      clock.schedule(latency, () {
+      clock.schedule(_latency(), () {
+        if (!_reachable(from, to)) {
+          dropped++;
+          return;
+        }
+        delivered++;
+        _peers[to]!._incoming.add((from: from, message: jsonDecode(wire) as Map<String, Object?>));
+      });
+    }
+  }
+
+  /// The relay bus: written to [targets], and reaching a peer only if
+  /// that peer reaches one of them and the link is otherwise up. A
+  /// target relay that is out delivers nothing and, after a moment,
+  /// tells the writer so — as a refused write does — so its next event
+  /// goes elsewhere.
+  void _deliverVia(PublicKey from, Map<String, Object?> message, Set<String> targets) {
+    final now = clock.nowMs;
+    for (final r in targets) {
+      if (!_relayLive(r, now)) {
+        clock.schedule(_latency(), () => _peers[from]?._refused(r));
+      }
+    }
+    final live = {for (final r in targets) if (_relayLive(r, now)) r};
+    if (live.isEmpty) {
+      dropped++;
+      return;
+    }
+    final wire = jsonEncode(message);
+    for (final to in _peers.keys) {
+      if (to == from) continue;
+      if (!reachOf(to).any(live.contains)) {
+        dropped++;
+        continue;
+      }
+      if (!_reachable(from, to)) {
+        dropped++;
+        continue;
+      }
+      if (lossRate > 0 && _random.nextDouble() < lossRate) {
+        dropped++;
+        continue;
+      }
+      clock.schedule(_latency(), () {
         if (!_reachable(from, to)) {
           dropped++;
           return;
@@ -114,14 +205,48 @@ class SimTransport implements Transport {
   final _incoming = StreamController<({PublicKey from, Map<String, Object?> message})>(sync: true);
   final _disconnected = StreamController<PublicKey>(sync: true);
 
-  @override
-  void broadcast(Map<String, Object?> message, {bool everywhere = false}) => _net._broadcast(key, message);
+  /// What each peer last said it reaches, and when — the same reckoning
+  /// the real relay transport keeps, so a writer can pick a relay its
+  /// readers can read.
+  final Map<PublicKey, ({Set<String> reads, int at})> _peerReads = {};
+
+  /// Relays this peer has had a write refused by lately, out of its own
+  /// running until then.
+  final Map<String, int> _refusedUntil = {};
 
   @override
-  List<String> get paths => const [];
+  void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
+    if (_net.relays.isEmpty) return _net._broadcastAll(key, message);
+    final now = _net.clock.nowMs;
+    final reach = _net.reachOf(key);
+    final up = {
+      for (final r in _net.relays)
+        if (reach.contains(r) && (_refusedUntil[r] ?? 0) <= now) r
+    };
+    final readBy = readByFrom(_peerReads, now, 120000);
+    final Set<String> targets;
+    if (floodWrite(up, readBy, everywhere: everywhere)) {
+      targets = up;
+    } else {
+      final one = firstTarget(_net.relays, up, readBy);
+      targets = one == null ? const {} : {one};
+    }
+    if (targets.isEmpty) return;
+    _net._deliverVia(key, message, targets);
+  }
+
+  void _refused(String relay) => _refusedUntil[relay] = _net.clock.nowMs + _net.refusalMs;
 
   @override
-  void heard(PublicKey peer, List<String> paths) {}
+  List<String> get paths => [for (final r in _net.relays) if (_net.reachOf(key).contains(r)) r];
+
+  @override
+  void heard(PublicKey peer, List<String> paths) {
+    if (_net.relays.isEmpty) return;
+    final reads = paths.toSet();
+    if (reads.isEmpty) return;
+    _peerReads[peer] = (reads: reads, at: _net.clock.nowMs);
+  }
 
   @override
   Stream<({PublicKey from, Map<String, Object?> message})> get incoming => _incoming.stream;

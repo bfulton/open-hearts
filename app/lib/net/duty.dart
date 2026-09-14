@@ -12,6 +12,8 @@ import 'package:deal/deal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:table/table.dart';
 
+import 'relays.dart';
+
 class Duty {
   Duty._(this.relays, this.presence, this.juror);
 
@@ -30,7 +32,7 @@ class Duty {
     d?.close();
     void Function(String)? logger = log ? (l) => debugPrint('duty: $l') : null;
     final presence = RelayPresence(relays: relays, signer: signer, log: logger);
-    final juror = JurorDuty(relays: relays, signer: signer, presence: presence, log: logger, crypto: crypto)..start();
+    final juror = JurorDuty(relays: relays, signer: signer, presence: presence, log: logger, crypto: crypto, pinned: pinnedRelays(relays))..start();
     return _current = Duty._(relays, presence, juror);
   }
 

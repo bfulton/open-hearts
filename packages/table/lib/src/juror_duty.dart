@@ -18,7 +18,15 @@ import 'relay_transport.dart';
 import 'signing.dart';
 
 class JurorDuty {
-  JurorDuty({required this.relays, required this.signer, required this.presence, this.log, Clock? clock, this.silenceAfterMs = 120000, this.crypto})
+  JurorDuty(
+      {required this.relays,
+      required this.signer,
+      required this.presence,
+      this.log,
+      Clock? clock,
+      this.silenceAfterMs = 120000,
+      this.pinned = 0,
+      this.crypto})
       : clock = clock ?? WallClock();
 
   /// The relays a summoned client follows a table on; every one of
@@ -35,6 +43,9 @@ class JurorDuty {
 
   /// The deal's primitives, to serve at sealed tables.
   final DealCrypto? crypto;
+
+  /// Relays at the front of [relays] kept primary — ours to run.
+  final int pinned;
 
   final Map<String, ({TableClient client, RelayTransport transport})> _tables = {};
   StreamSubscription<Summons>? _sub;
@@ -57,7 +68,7 @@ class JurorDuty {
   void _onSummons(Summons s) {
     var t = _tables[s.spec.id];
     if (t == null) {
-      final transport = RelayTransport(relays: relays, signer: signer, table: s.spec.id, log: log);
+      final transport = RelayTransport(relays: relays, signer: signer, table: s.spec.id, log: log, pinned: pinned);
       if (s.spec.sealed && crypto == null) {
         log?.call('duty: summoned to a sealed table without the deal\'s cryptography; cannot serve');
         return;

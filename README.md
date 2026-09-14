@@ -73,12 +73,12 @@ rigged. Roughly in order:
    Four headless browsers prove it on every commit — matched, a hand
    over WebRTC, a browser closed mid-hand, a stalled one booted, a
    leaver (`e2e/`). A deployed build starts on a few public relays —
-   the build's, never a setting on the page — listening on all of
-   them, a table's events written to one relay everyone at the table
-   reads, what forms a table and what goes unanswered to all, so one
-   relay turning on a table, or deaf to one player, is not the end of
-   it (`packages/table`, `relays.dart`); a dev build made with
-   `DEV_RELAY`, a comma-separated list, uses those. The deployed
+   the build's, never a setting on the page — our own relay and a few
+   public ones, listening on all of them, a table's events written to
+   one relay everyone reads (ours preferred while up), what forms a
+   table and what goes unanswered to all, so one relay turning on a
+   table, or deaf to one player, is not the end of it (`packages/table`,
+   `relays.dart`); the local rig points `DEV_RELAY` at its bridges. The deployed
    site's worker mints TURN credentials for the pairs no direct path
    serves (`service/functions/`, doc 06).
    Meanwhile every solo game is kept on the device as a

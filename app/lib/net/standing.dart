@@ -7,6 +7,8 @@ import 'dart:math';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
+import 'relays.dart';
+
 class Standing {
   Standing(this.ledger, this.me);
 
@@ -20,7 +22,7 @@ class Standing {
   /// results written to it, so the fold waits for all of them, within
   /// reason.
   static Future<Standing> load(List<Uri> relays, Signer signer) async {
-    final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag);
+    final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
     try {
       await t.ready.timeout(const Duration(seconds: 8));
       await t.allReady.timeout(const Duration(seconds: 4)).catchError((_) {});
@@ -32,7 +34,7 @@ class Standing {
 
   /// Publishes a finished game's result, signed by this device.
   static Future<void> publish(List<Uri> relays, Signer signer, GameResult result) async {
-    final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag);
+    final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
     try {
       await t.ready.timeout(const Duration(seconds: 8));
       t.announce(result.toJson());

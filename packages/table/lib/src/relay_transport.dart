@@ -15,6 +15,7 @@
 /// carry that.
 library;
 
+import 'relay_policy.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -26,8 +27,9 @@ import 'signing.dart';
 import 'transport.dart';
 
 class RelayTransport implements Transport {
-  RelayTransport({required List<Uri> relays, required this.signer, required this.table, this.log, int refusalMs = RelayGroup.defaultRefusalMs})
-      : relays = Relays.turnedBy(relays, table) {
+  RelayTransport(
+      {required List<Uri> relays, required this.signer, required this.table, this.log, int pinned = 0, int refusalMs = RelayGroup.defaultRefusalMs})
+      : relays = Relays.turnedBy(relays, table, pinned: pinned) {
     _group = RelayGroup(
       urls: this.relays,
       refusalMs: refusalMs,
@@ -130,16 +132,7 @@ class RelayTransport implements Transport {
 
   /// The relays every peer heard from lately reads; null when no peer
   /// has said, so the writer's own order decides.
-  Set<Uri>? _readBy() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    _peerReads.removeWhere((_, v) => now - v.at > 120000);
-    if (_peerReads.isEmpty) return null;
-    Set<Uri>? all;
-    for (final v in _peerReads.values) {
-      all = all == null ? Set.of(v.reads) : all.intersection(v.reads);
-    }
-    return all;
-  }
+  Set<Uri>? _readBy() => readByFrom(_peerReads, DateTime.now().millisecondsSinceEpoch, 120000);
 
   /// Sends one signalling message to [to], sealed to its key: an
   /// offer or a candidate carries an address, and a public relay
