@@ -40,6 +40,7 @@ import 'net/turn.dart';
 import 'pictures.dart';
 import 'table_page.dart';
 import 'theme.dart';
+import 'ui/folding_heart.dart';
 import 'ui/player_icon.dart';
 import 'ui/update_pill.dart';
 
@@ -444,7 +445,7 @@ class _HomePageState extends State<HomePage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Icon(Icons.favorite, size: 46, color: Palette.gold),
+                        const FoldingHeart(size: 46, color: Palette.gold),
                         const SizedBox(height: 12),
                         const Text('Open Hearts',
                             textAlign: TextAlign.center,

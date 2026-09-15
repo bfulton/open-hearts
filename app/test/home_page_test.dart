@@ -16,14 +16,23 @@ import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<void> pumpHome(WidgetTester tester) async {
+Future<void> pumpHome(WidgetTester tester, {String? openRoom}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const HomePage(online: false)));
+  await tester.pumpWidget(still(HomePage(openRoom: openRoom, online: false)));
   await tester.pumpAndSettle();
 }
+
+/// The door with nothing moving on it: the heart at the top folds and
+/// opens for as long as the app is open (ui/folding_heart.dart), so a
+/// test that waits for the screen to come to rest has to ask for the
+/// same stillness a reader can ask for.
+Widget still(Widget home) => MaterialApp(
+      theme: buildTheme(),
+      home: MediaQuery(data: const MediaQueryData(disableAnimations: true), child: home),
+    );
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -81,8 +90,7 @@ void main() {
       ..physicalSize = const Size(390, 844)
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const HomePage(openRoom: 'ABCD', online: false)));
-    await tester.pumpAndSettle();
+    await pumpHome(tester, openRoom: 'ABCD');
     expect(find.text('Play bots'), findsOneWidget, reason: 'the bots are free, always');
     expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     expect(find.text('Not open yet'), findsOneWidget);
