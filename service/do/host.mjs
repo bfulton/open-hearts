@@ -147,7 +147,9 @@ async function main(argv) {
       }
     : null;
   if (control) {
-    createInterface({ input: process.stdin }).on('line', (line) => {
+    // A relay asked for over a pipe goes when the pipe does: a test
+    // that died without closing it leaves nothing behind.
+    createInterface({ input: process.stdin }).on('close', () => process.exit(0)).on('line', (line) => {
       let message;
       try {
         message = JSON.parse(line);
