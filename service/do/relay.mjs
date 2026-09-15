@@ -31,6 +31,22 @@ export const maxSubscriptions = 8;
 /// without end; past the cap it drops back to the ids actually kept.
 export const rememberedIds = 40000;
 
+/// What may name an object: one path segment, and the characters a
+/// table id, a pool or a topic are made of. A tag is a name in a
+/// global namespace, so it is worth being strict about — everything
+/// under one tag shares one object, and nothing else can reach it.
+const tagShape = /^[A-Za-z0-9._:@+-]{1,128}$/;
+
+/// The tag a path names: '' for the root, which names no tag at all,
+/// and null for a path that could not name one. The object host and
+/// the node host both ask this, so a client that reaches one reaches
+/// the other by the same URL.
+export function tagOf(pathname) {
+  const path = decodeURIComponent(pathname).replace(/^\/+/, '');
+  if (path === '') return '';
+  return tagShape.test(path) ? path : null;
+}
+
 const hex64 = /^[0-9a-f]{64}$/;
 const hex128 = /^[0-9a-f]{128}$/;
 const encoder = new TextEncoder();

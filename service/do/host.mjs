@@ -20,25 +20,41 @@
 // asking is real: a test that counts how often its policy was
 // consulted counts what the relay actually consulted.
 
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
-import { createRelay, memoryStore, schnorrVerifier } from './relay.mjs';
+import { createRelay, memoryStore, schnorrVerifier, tagOf } from './relay.mjs';
 import { listen } from './ws.mjs';
 
 /// The signature wasm the app carries, checked by the same code in the
 /// browser (app/lib/crypto/schnorr_web.dart) and here.
 export const wasmPath = new URL('../../app/web/schnorr.wasm', import.meta.url);
 
+/// The local relay takes the simulator's signatures as well as real
+/// ones, told apart by their length, which is what the Dart relay does
+/// and for the same reason: a simulated table and a real one then share
+/// every line of protocol code, half the repo's suites seat their
+/// players with a `FakeSigner`, and neither has to pay for a signature
+/// it is not testing (packages/table, signing.dart). A fake one is a
+/// hash anybody could compute, so it belongs to a machine running its
+/// own tests and nowhere else — the object on Cloudflare (worker.mjs)
+/// knows BIP-340 and refuses everything else.
+export function alsoFakeSignatures(verify) {
+  const fake = (key, digest) => createHash('sha256').update(`${key}|${digest}`).digest('hex').slice(0, 32);
+  return (key, digest, signature) => (signature.length === 32 ? fake(key, digest) === signature : verify(key, digest, signature));
+}
+
 /// A relay per tag on one port. [refuse] and [log] are handed to every
 /// relay; [onChange] is called whenever the counts a test watches move,
 /// before anything is written back to the socket that moved them.
 export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = null, refuse = null, onChange = null } = {}) {
-  const verify = await schnorrVerifier(readFileSync(wasmPath));
+  const verify = alsoFakeSignatures(await schnorrVerifier(readFileSync(wasmPath)));
   const relays = new Map();
   const relayFor = (path) => {
-    const tag = path.replace(/^\/+/, '');
+    const tag = tagOf(path);
+    if (tag === null) return null;
     let relay = relays.get(tag);
     if (!relay) {
       relay = createRelay({ verify, store: memoryStore(keep), refuse, log: log && ((line) => log(tag ? `${tag}: ${line}` : line)) });
@@ -62,6 +78,8 @@ export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = 
     host,
     onConnection: (connection) => {
       const relay = relayFor(connection.path);
+      // A path that names no object: nothing here answers to it.
+      if (!relay) return connection.close(1008);
       // The relay says everything through this: the counts it has just
       // moved are written down before the client can be told anything
       // that would make it look at them.

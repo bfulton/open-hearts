@@ -3,3 +3,4 @@
 library;
 
 export 'src/relay.dart';
+export 'src/relay_js.dart';

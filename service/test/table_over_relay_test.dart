@@ -32,12 +32,17 @@ class Player {
   final int thinkMs;
   StreamSubscription<void>? _sub;
   bool _thinking = false;
+  bool _stopped = false;
 
   void _react() {
-    if (_thinking || !(client.awaitingMyPass || client.awaitingMyPlay)) return;
+    if (_stopped || _thinking || !(client.awaitingMyPass || client.awaitingMyPlay)) return;
     _thinking = true;
     Future<void>.delayed(Duration(milliseconds: thinkMs), () {
       _thinking = false;
+      // A thought begun before the player was stopped is not played
+      // after it: the test that stopped it has taken its log, and its
+      // client, away.
+      if (_stopped) return;
       final seat = client.mySeat!;
       if (client.awaitingMyPass) {
         client.pass(bot.choosePass(client.game.handOf(seat)));
@@ -57,7 +62,10 @@ class Player {
     });
   }
 
-  void stop() => _sub?.cancel();
+  void stop() {
+    _stopped = true;
+    _sub?.cancel();
+  }
 }
 
 void main() {

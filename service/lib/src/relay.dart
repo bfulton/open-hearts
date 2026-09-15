@@ -11,6 +11,17 @@
 /// ephemeral kinds (20000–29999) are forwarded and forgotten, which is
 /// what every kind the table uses is. In production this is a public
 /// relay somebody else runs; locally it is this, one `dart run`.
+///
+/// There are two of them now (docs/06-service.md). This one, and the
+/// same subset in JavaScript for the Cloudflare object that carries
+/// presence (`service/do/`). `OH_RELAY=js` puts that one behind this
+/// class, so every suite here — the relay's own, a hand played over
+/// real sockets, the jury, the waiting room — runs against whichever
+/// relay is asked for, and the app's side of the wire is only written
+/// once:
+///
+///     cd service && dart test                 # this relay
+///     cd service && OH_RELAY=js dart test     # the one the object runs
 library;
 
 import 'dart:async';
@@ -22,8 +33,36 @@ import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:table/table.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-class Relay {
-  Relay({this.keep = 10000, this.log, this.refuse});
+import 'relay_js.dart';
+
+/// A relay a test or the local service can start and connect to,
+/// whichever of the two is running underneath.
+abstract class Relay {
+  factory Relay({int keep = 10000, void Function(String line)? log, String? Function(NostrEvent event)? refuse}) =>
+      Platform.environment['OH_RELAY'] == 'js'
+          ? JsRelay(keep: keep, log: log, refuse: refuse)
+          : DartRelay(keep: keep, log: log, refuse: refuse);
+
+  /// A policy, for a test: the reason to refuse an event that checks
+  /// out, or null to take it — what a public relay does when it
+  /// demands proof of work or rate-limits a client.
+  set refuse(String? Function(NostrEvent event)? policy);
+
+  /// The port the relay listens on once [serve] has returned.
+  int get port;
+
+  Uri get url;
+
+  /// How many clients are connected, and how many events are stored.
+  int get connections;
+  int get stored;
+
+  Future<void> serve({int port = 0});
+  Future<void> close();
+}
+
+class DartRelay implements Relay {
+  DartRelay({this.keep = 10000, this.log, this.refuse});
 
   /// How many stored events to hold before the oldest go.
   final int keep;
@@ -31,9 +70,7 @@ class Relay {
   /// Receives one line per connection, subscription and rejected event.
   final void Function(String line)? log;
 
-  /// A policy, for a test: the reason to refuse an event that checks
-  /// out, or null to take it — what a public relay does when it
-  /// demands proof of work or rate-limits a client.
+  @override
   String? Function(NostrEvent event)? refuse;
 
   final List<NostrEvent> _stored = [];
@@ -41,20 +78,26 @@ class Relay {
   final Set<_Connection> _connections = {};
   HttpServer? _server;
 
-  /// The port the relay listens on once [serve] has returned.
+  @override
   int get port => _server!.port;
 
+  @override
   Uri get url => Uri(scheme: 'ws', host: 'localhost', port: port);
 
+  @override
   int get connections => _connections.length;
+
+  @override
   int get stored => _stored.length;
 
+  @override
   Future<void> serve({int port = 0, Object? address}) async {
     final handler = webSocketHandler((WebSocketChannel channel, String? protocol) => _accept(channel));
     _server = await shelf_io.serve(handler, address ?? InternetAddress.loopbackIPv4, port);
     _log('relay on $url');
   }
 
+  @override
   Future<void> close() async {
     for (final c in List.of(_connections)) {
       await c.channel.sink.close();
