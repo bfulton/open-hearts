@@ -1,0 +1,24 @@
+# The per-tag relay (worker.mjs, docs/06-service.md).
+#
+#   cd service/do && npx wrangler@4 deploy
+#
+# The signature wasm is the app's own copy, imported from where it
+# already lives rather than duplicated here, so there is one file to
+# rebuild when the curve code changes; base_dir is the repo root
+# because that file is above this directory.
+name = "open-hearts-relay"
+main = "worker.mjs"
+base_dir = "../.."
+compatibility_date = "2025-01-01"
+
+# The binding the worker routes through. One object per tag, named by
+# the tag itself.
+[[durable_objects.bindings]]
+name = "TABLE"
+class_name = "TagRelay"
+
+# SQLite-backed objects are the ones the free plan carries, and the
+# only kind new classes may be. This one stores nothing either way.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TagRelay"]
