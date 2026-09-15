@@ -21,6 +21,16 @@ abstract final class Felt {
   );
 }
 
+/// Colour carries one meaning each here.
+///
+/// **Gold is what you can do**: a button, the card you may play, the
+/// seat it is the turn of, the thing that is waiting on you. It is the
+/// only colour that means act, so nothing that is not an action wears
+/// it — a name, a heading, or a mark in gold teaches the eye that gold
+/// means nothing in particular.
+///
+/// **White is what a thing is**: the app's own mark and name among
+/// them. **Red** is the game's own — a heart, a suit, a warning.
 abstract final class Palette {
   static const gold = Color(0xFFE4B363);
   static const goldDim = Color(0x66E4B363);
@@ -31,6 +41,10 @@ abstract final class Palette {
   static const chrome = Color(0xFFE8EFEA);
   static const chromeDim = Color(0x99E8EFEA);
   static const danger = Color(0xFFE0674F);
+
+  /// The mark: the heart the app wears and the name beside it. White,
+  /// because gold is what a button is.
+  static const mark = chrome;
 }
 
 ThemeData buildTheme() {

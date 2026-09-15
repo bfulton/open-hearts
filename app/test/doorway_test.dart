@@ -20,7 +20,7 @@ void main() {
     final heart = GlobalKey();
     Widget frame(bool title) => still(Scaffold(
           body: Doorway(
-            heart: FoldingHeart(key: heart, size: 46, color: Palette.gold),
+            heart: FoldingHeart(key: heart, size: 46, color: Palette.mark),
             title: title,
             child: const Text('Finding players'),
           ),

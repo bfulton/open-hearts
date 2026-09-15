@@ -45,7 +45,7 @@ class Doorway extends StatelessWidget {
             const SizedBox(height: 12),
             const Text('Open Hearts',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: Palette.gold)),
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: Palette.mark)),
             const SizedBox(height: 18),
             child,
           ]),

@@ -26,9 +26,9 @@ class AboutPage extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.favorite, size: 40, color: Palette.gold),
+                const Icon(Icons.favorite, size: 40, color: Palette.mark),
                 const SizedBox(height: 14),
-                const Text('Open Hearts', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.gold)),
+                const Text('Open Hearts', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
                 const SizedBox(height: 8),
                 const Text(
                   'Hearts, open source. Play alone against the house, or live: '

@@ -44,7 +44,7 @@ class _OptionsSheetState extends State<_OptionsSheet> {
             Row(
               children: [
                 const Expanded(
-                  child: Text('Game options', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Palette.gold)),
+                  child: Text('Game options', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Palette.chrome)),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(_options),

@@ -17,6 +17,7 @@ import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/ui/folding_heart.dart';
 import 'package:open_hearts/ui/header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
@@ -69,6 +70,20 @@ void main() {
       throwsA(isA<TimeoutException>()),
     );
     expect(said, 1);
+  });
+
+  testWidgets('gold is what you can do: the mark is not gold, and the buttons are', (tester) async {
+    await pumpHome(tester);
+    // The app's own name and the heart over it say what this is, not
+    // what to press, so they are not dressed as something to press.
+    final name = tester.widget<Text>(find.text('Open Hearts')).style!;
+    expect(name.color, Palette.mark);
+    expect(name.color, isNot(Palette.gold));
+    expect(tester.widget<FoldingHeart>(find.byType(FoldingHeart)).color, Palette.mark);
+
+    // And gold is still doing its job, on the thing you press.
+    final play = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Play bots'));
+    expect(play.style!.backgroundColor!.resolve({}), Palette.gold);
   });
 
   testWidgets('one screen: the three ways in, and who you are in the corner', (tester) async {

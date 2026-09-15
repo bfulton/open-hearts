@@ -525,7 +525,7 @@ class _HomePageState extends State<HomePage> {
                   _chrome(),
                   Expanded(
                     child: Doorway(
-                      heart: FoldingHeart(key: _heart, size: 46, color: Palette.gold),
+                      heart: FoldingHeart(key: _heart, size: 46, color: Palette.mark),
                       // The app's name is the door's own: a screen with
                       // one thing to say says that instead.
                       title: queue == null && room == null,
@@ -835,7 +835,7 @@ class _WaitingView extends StatelessWidget {
         const SizedBox(height: 22),
         const Text('Finding players',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.gold)),
+            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.chrome)),
         const SizedBox(height: 6),
         Text('$waited s${others > 0 ? ', $others other${others == 1 ? '' : 's'} waiting' : ''} — bots fill any seat still empty at ten',
             textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
