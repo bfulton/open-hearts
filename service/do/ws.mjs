@@ -161,7 +161,7 @@ export async function listen({ port = 0, host = '127.0.0.1', onConnection }) {
     response.writeHead(426, { 'content-type': 'text/plain', upgrade: 'websocket' });
     response.end('this is a relay: open a websocket\n');
   });
-  server.on('upgrade', (request, socket) => {
+  server.on('upgrade', (request, socket, head) => {
     const key = request.headers['sec-websocket-key'];
     if ((request.headers.upgrade ?? '').toLowerCase() !== 'websocket' || !key) {
       socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
@@ -176,7 +176,12 @@ export async function listen({ port = 0, host = '127.0.0.1', onConnection }) {
     socket.on('data', (chunk) => connection.feed(chunk));
     socket.on('error', () => connection._gone());
     socket.on('close', () => connection._gone());
+    // Handed over before a byte of it is read, since the first message
+    // may be here already: a client that writes its subscription in the
+    // same breath as its handshake has it read with the handshake, and
+    // those bytes are not coming again.
     onConnection(connection);
+    if (head?.length) connection.feed(head);
   });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
