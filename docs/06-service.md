@@ -46,7 +46,9 @@ LOGIN#apple#<hmac(sub)>    IDENTITY       key, created_at
 LOGIN#google#<hmac(sub)>   IDENTITY       key, created_at
 KEY#<key>                  META           provider, attested_at, attestation
 KEY#<key>                  SUPERSEDES     predecessor, link, at
-KEY#<key>                  ENTITLEMENT    entitled, source, txn_ref, at, revoked_at
+SUB#<subscription>         META           source, txn_ref, renews_at, cancelled_at
+SUB#<subscription>         DEVICE#<key>   bound_at
+KEY#<key>                  ENTITLEMENT    subscription, licensed_until, at
 COUNTER#<metric>#<day>     -              n
 ```
 
@@ -59,6 +61,10 @@ Three rules baked in:
   what public records carry.
 - **Entitlement is copied forward on supersession**, so a licence is a
   single read. Supersessions are rare; licences are every session.
+- **A subscription is one row and its devices are rows under it**, so
+  binding a device by QR, dropping one, and counting the five are all
+  point operations, and a renewal touches the subscription rather than
+  every device on it.
 
 Not stored: cards, plays, game state, ratings, emails, device sessions.
 Ratings are computed from public records by anyone. TURN credentials are
@@ -79,13 +85,87 @@ since relays do not promise retention; whether the service subscribes
 to relays or clients post copies is undecided, and nothing depends on
 it yet.
 
-## Purchase plumbing
+## What is paid for, and how
 
-Live play is a one-time purchase. On the stores it is an in-app
-purchase; on the web it goes through a merchant of record, which
-handles tax in the buyer's jurisdiction. Both land at **entitle** through
-one webhook, keyed by the player's public key, and the entitlement
-follows the identity across platforms. TURN is Cloudflare's.
+Live play is a subscription: **$2.99 a year**. Everything else is free
+and stays free — the bots, the records, the verifiable deal, the engine
+itself. What the money is for is the part that costs us money to run:
+relaying people to each other, TURN when a direct path will not form,
+and a juror when a table is left alone.
+
+A year rather than a month, for an unglamorous reason. At three dollars
+a month the fixed part of a card fee — thirty cents on Stripe — is ten
+per cent of the price, and a store's cut is taken on top; at three
+dollars a year the same fee is paid once. $2.99 nets about $2.60 through
+Stripe after 2.9% + 30¢, and about $2.54 on a store at the small
+business rate. The shape of the price is chosen by the fees, not the
+other way round.
+
+### The licence
+
+What a device holds is not a receipt and not an account: it is a
+**licence**, a short statement signed by the service's key —
+
+    { key: <device public key>, until: <date>, plan: 'year' }
+
+— which the app verifies against a public key baked into the build, the
+same way it verifies everything else it is told. Three things follow
+from that. A device that cannot reach us keeps playing until the date on
+its licence, which is the only sane behaviour for a game people take on
+a train. Nothing about the purchase is on the device except the
+statement, so there is nothing on it worth stealing. And the service is
+not in a game's latency path: a licence is read at the front door, not
+at a trick.
+
+The date is **short — a month — and renewed while the subscription
+lives**. That is what makes cancellation and refunds work without a
+revocation list to distribute and check: a cancelled subscription simply
+stops being renewed, and the last licence runs out. A year's
+subscription is twelve or thirteen renewals, each a single point read.
+
+### Where the money comes in
+
+| | Buying | Renewing | Telling us |
+|---|---|---|---|
+| iOS, Android | the store's own subscription | the store | App Store server notifications, Play real-time developer notifications |
+| Web | Stripe Checkout, subscription mode | Stripe | the Stripe webhook |
+
+Both land at **entitle**, keyed by the public key the buyer had when
+they bought — the key rides in the checkout session's metadata, or in
+the purchase's application username. A renewal is the same handler with
+a later date. Neither path asks the player to make an account.
+
+### A subscription is a person's, not a device's
+
+So a second device has to be able to hold the same licence, and there
+are three ways for one to get it, in the order they cost the player
+anything:
+
+- **A QR code**, which is the fast one and needs nothing typed. A
+  subscribed device shows a code carrying a one-time claim ticket: the
+  subscription's id, an expiry a few minutes out, and a signature over
+  both. The other device scans it and calls **claim**; the service
+  checks the ticket has not been used and is not stale, binds the new
+  key to the subscription, and issues it a licence. Tickets are
+  one-use, so a photograph of someone's screen an hour later is worth
+  nothing.
+- **A provider account**, which is the durable one. **attest** already
+  binds an Apple or Google sign-in to a key and entitlement already
+  follows that identity, so signing in on a new phone is enough, and a
+  lost phone is recovered the same way.
+- **An email address**, for buyers who have neither. The rule that this
+  service does not keep email addresses stands: what is stored is an
+  HMAC of the address, exactly as a provider's subject identifier is,
+  so the table joins to nothing if it leaks. Where an address is needed
+  to send a link — a web buyer recovering a lost device — Stripe
+  already holds the one they paid with, and it is asked rather than
+  kept.
+
+A subscription carries **up to five devices**, and any of them can drop
+another. Unbounded sharing by QR is a subscription shared with the
+internet; five is a household.
+
+TURN is Cloudflare's.
 
 ## Local mode
 
@@ -96,7 +176,7 @@ code and different adapters:
 |---|---|---|
 | Storage | DynamoDB | in-memory, same shape |
 | Sign-in | Apple/Google public keys | a test token naming a `sub` |
-| Entitlement | purchase webhook | a test endpoint that marks a key entitled |
+| Entitlement | store and Stripe webhooks | a test endpoint that licences a key for a month |
 | TURN | Cloudflare | none; localhost connects directly |
 | Signalling, waiting rooms, results | our own relay and a few public ones, listened on together; table events written to one relay everyone reads, ours preferred while up; lobby, signalling and whatever goes unanswered to all | a minimal NIP-01 relay in the repo |
 | Last-resort juror | woken on demand | always available |
