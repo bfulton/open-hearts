@@ -23,6 +23,23 @@ import 'package:table/table.dart';
 /// uses the others, which is why the same list is safe to ship now.
 const homeRelay = 'wss://nostr.openhearts.game';
 
+/// Our own relay again, and the one presence is carried on: a
+/// Cloudflare object per tag (docs/06-service.md, `service/do/`),
+/// which is why the tag is in the URL — the object has to be named
+/// before the socket is opened. The mark is `tagMark`
+/// (`packages/table`, presence_relay.dart) and the client that has a
+/// tag puts it there; a client with none cannot use this relay at
+/// all, which is why it is in the presence list and not in the one
+/// tables and signalling take.
+///
+/// It is preferred for what it carries and it is not relied on. Every
+/// beat still goes to the public relays as well, because a device is
+/// online for whoever can hear it and we do not get to assume what
+/// another device can reach — so the day this object is down, or has
+/// never been deployed, presence is exactly what it was before it
+/// existed.
+const homeTagRelay = 'wss://relay.openhearts.game/{tag}';
+
 /// The relays a deployed build starts on: our own first, then a few
 /// public ones. The deployed site and production use this same list.
 const publicRelays = [
@@ -37,6 +54,18 @@ const publicRelays = [
 /// leads a deployed build's list; a local or rig list has none of ours.
 int pinnedRelays(List<Uri> relays) =>
     relays.isNotEmpty && relays.first.toString() == homeRelay ? 1 : 0;
+
+/// The relays presence talks on: our per-tag object in front of the
+/// list everything else uses. A build that is not on our relays at
+/// all — a local one, or the rig against its bridges — has no object
+/// of ours to reach and takes the list as it stands.
+///
+/// This is the list [RelayPresence] and the juror's duty want
+/// (`app/lib/net/duty.dart`); [appRelays] stays what a table, its
+/// signalling and the standings are written to, since a table has not
+/// moved to the object and would have nowhere to put its tag.
+List<Uri> presenceRelays(List<Uri> relays) =>
+    pinnedRelays(relays) == 0 ? relays : [Uri.parse(homeTagRelay), ...relays];
 
 /// The local relay, where a build served from localhost looks.
 const localRelay = 'ws://127.0.0.1:7447';

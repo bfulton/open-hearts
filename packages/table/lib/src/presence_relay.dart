@@ -9,6 +9,14 @@
 /// one to every relay in the list, the announcements written to all
 /// of them, since who is online has to be seen by devices that can
 /// read only some of the relays (relays.dart).
+///
+/// One of those relays may be ours and may keep an object per tag
+/// ([tagMark], docs/06-service.md), in which case the tag goes in the
+/// URL and presence puts its own there. The rest of the list is where
+/// presence keeps working when that one does not answer, which is why
+/// the announcements still go to all of them: a device is online for
+/// whoever can hear it, and what another device can hear is not ours
+/// to assume.
 library;
 
 import 'dart:async';
@@ -44,9 +52,36 @@ class Summons {
   }
 }
 
+/// The mark a relay wears in the list when it keeps one object per tag
+/// and wants the tag in the URL: `wss://our.relay/{tag}`.
+///
+/// It has to be marked and cannot be guessed at, in either direction.
+/// A public relay serves every tag on one socket at the root and would
+/// answer a path with a 404, so a client must not put a tag on one; a
+/// relay that shards has to be told which object to open before the
+/// first message crosses, so a client must put the tag on that one.
+/// Nobody else's URL carries the mark, so the list says which is which
+/// and nothing has to be inferred from a hostname.
+///
+/// The other half of the rule: a client with no tag cannot use a
+/// marked relay at all, so a list handed to one must not carry it.
+/// Tables and signalling still take the ordinary list
+/// (`app/lib/net/relays.dart`, `relay_transport.dart`).
+const tagMark = '{tag}';
+
+/// [relays] with [tag] put where each marked relay asks for it; every
+/// other relay is left exactly as it was.
+List<Uri> relaysForTag(List<Uri> relays, String tag) => [
+      for (final relay in relays)
+        if (relay.pathSegments.contains(tagMark))
+          relay.replace(pathSegments: [for (final s in relay.pathSegments) s == tagMark ? tag : s])
+        else
+          relay,
+    ];
+
 class RelayPresence implements Presence {
   RelayPresence({required List<Uri> relays, required this.signer, this.status = 'online', this.everyMs = 5000, this.log})
-      : relays = Relays.turnedBy(relays, signer.publicKey) {
+      : relays = Relays.turnedBy(relaysForTag(relays, topic), signer.publicKey) {
     _group = RelayGroup(
       urls: this.relays,
       subscriptions: {
