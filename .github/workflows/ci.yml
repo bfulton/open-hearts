@@ -41,6 +41,10 @@ jobs:
         run: cd packages/table && dart pub get && dart analyze && dart test
       - name: Service (the local relay, and a hand played over it with real signatures)
         run: cd service && dart pub get && dart analyze && dart test
+      - name: Service, against the object's relay (the same suite, the other implementation)
+        run: cd service && OH_RELAY=js dart test
+      - name: The object's relay (its own tests, in node's test runner)
+        run: node --test service/do/relay.test.mjs service/do/host.test.mjs
       - name: Analyze
         run: cd app && flutter pub get && flutter analyze
       - name: Test (widgets)

@@ -136,6 +136,9 @@ crypto/schnorr/build.sh             # signatures for the VM: the relay, the juro
 cd packages/engine && dart test     # the rules, the bots, 200 seeded games
 cd packages/deal && dart test       # the deal's primitives, and a hand's deal among four sessions
 cd packages/table && dart test      # the protocol on a simulated network, sealed tables included
+cd service && dart test             # the local relay, and a hand played over it with real signatures
+cd service && OH_RELAY=js dart test # the same suite, against the object's relay
+node --test service/do/*.test.mjs   # that relay's own tests, and the sockets under it
 cd app && flutter test              # the widgets
 cd app && flutter run -d chrome
 

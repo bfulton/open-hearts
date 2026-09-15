@@ -31,7 +31,10 @@ class Duty {
     if (d != null && listEquals(d.relays, relays)) return d;
     d?.close();
     void Function(String)? logger = log ? (l) => debugPrint('duty: $l') : null;
-    final presence = RelayPresence(relays: relays, signer: signer, log: logger);
+    // Presence prefers our own object, one per tag, and falls back to
+    // the relays when it does not answer (net/relays.dart). Only
+    // presence: a table's events go to the relays proper.
+    final presence = RelayPresence(relays: presenceRelays(relays), signer: signer, log: logger);
     final juror = JurorDuty(relays: relays, signer: signer, presence: presence, log: logger, crypto: crypto, pinned: pinnedRelays(relays))..start();
     return _current = Duty._(relays, presence, juror);
   }

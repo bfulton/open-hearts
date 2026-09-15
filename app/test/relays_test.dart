@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/net/duty.dart';
 import 'package:open_hearts/net/relays.dart';
 import 'package:table/table.dart';
 
@@ -41,6 +42,20 @@ void main() {
     // And what a table is written to never carries it: a table has
     // nowhere to put a tag, and has not moved to the object.
     expect(deployed.any((r) => r.pathSegments.contains(tagMark)), isFalse);
+  });
+
+  test('the duty at the door listens on the object, and the juror on the relays', () {
+    // The wiring, not the list. Presence takes the marked relay and
+    // writes its own topic into the path before it opens anything, so
+    // what it holds is the object's address for the tag it is on.
+    final deployed = appRelays(base: Uri.parse('https://open-hearts.pages.dev/play/'));
+    final duty = Duty.on(deployed, FakeSigner('door'));
+    addTearDown(duty.close);
+    final object = duty.presence.relays.where((r) => r.host == Uri.parse(homeTagRelay).host).toList();
+    expect(object, hasLength(1), reason: 'presence is on our object');
+    expect(object.single.pathSegments.single, isNot(tagMark), reason: 'with the tag written in, not the mark');
+    expect(duty.presence.relays.length, deployed.length + 1, reason: 'and the relays behind it, every one');
+    expect(duty.relays, deployed, reason: 'the duty itself, and its juror, are on the relays alone');
   });
 
   test('served from localhost, the local relay', () {

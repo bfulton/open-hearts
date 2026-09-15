@@ -22,8 +22,8 @@ and none is needed by a table already playing.
 **As built.** The handlers run as the Cloudflare Pages worker beside the
 site and the app: `service/functions/worker.mjs`, published by
 `deploy.sh` as `_worker.js`, answers `/api/…` and hands everything else
-to the static assets; `node --test service/functions` runs it against
-a stand-in upstream. Built so far: **turn-creds**, `POST /api/turn`
+to the static assets; `node --test service/functions/worker.test.mjs`
+runs it against a stand-in upstream. Built so far: **turn-creds**, `POST /api/turn`
 with the caller's table key, answering Cloudflare Realtime TURN
 credentials good for four hours, minted from a TURN key that lives in
 the project's secrets (`OH_TURN_KEY_ID`, `OH_TURN_API_TOKEN`) and never in
