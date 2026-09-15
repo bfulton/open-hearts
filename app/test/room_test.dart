@@ -263,47 +263,106 @@ void main() {
     });
   });
 
-  test('a start that seats me from someone not heard yet waits for their beat', () {
+  test('the fourth to arrive is seated by the table its own arrival made', () {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final a = FakeSigner('a');
+      final three = [for (final n in ['Ada', 'Bao', 'Cara']) Room(channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      async.elapse(const Duration(seconds: 3));
+      expect(three.every((r) => r.spec == null), isTrue, reason: 'three is not a table on its own');
+
+      // The fourth opens the link. Beats are not stored, so it has
+      // heard nobody yet, and its own first beat is what makes the
+      // room four — which starts the table at once, from a device
+      // whose beat has not come round again. Waiting for that beat is
+      // waiting for a room everyone else has just left.
+      final last = Room(channel: bus.attach(FakeSigner('Dee')), code: 'ROOM', myName: 'Dee', nowMs: now);
+      async.elapse(const Duration(seconds: 12));
+
+      expect(three.every((r) => r.seated), isTrue, reason: 'the three are at it');
+      expect(last.spec, isNotNull, reason: 'and so is the one that completed it');
+      expect(last.seated, isTrue);
+      expect(last.spec!.id, three.first.spec!.id, reason: 'the same table');
+      for (final r in [...three, last]) {
+        r.dispose();
+      }
+    });
+  });
+
+  test('a start is this room\'s when it seats me and the one who sent it, since I came in', () {
+    fakeAsync((async) {
+      int now() => async.elapsed.inMilliseconds;
+
+      // Seats me and its sender, made since I came in: the table I am
+      // at. The fourth to arrive gets exactly this, and gets it before
+      // any beat of the sender's has come round again.
+      final bus = Bus();
+      final ada = FakeSigner('a');
       final b = Room(channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 1));
-      // Ada saw four and started before her first beat reached Bao.
-      bus.publish(NostrEvent.sign(a, kind: 4244, content: jsonEncode({
+      bus.publish(NostrEvent.sign(ada, kind: 4244, content: jsonEncode({
         'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
         'seats': [
-          {'key': a.publicKey, 'name': 'Ada'}, {'key': b.me, 'name': 'Bao'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
+          {'key': ada.publicKey, 'name': 'Ada'}, {'key': b.me, 'name': 'Bao'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
       }), tags: const [['t', 'ROOM']]), ephemeral: false);
       async.elapse(const Duration(seconds: 1));
-      expect(b.spec, isNull, reason: 'held, not taken, until Ada is heard');
-      // Her beat arrives, as it does within two seconds.
-      bus.attach(a).announce({'kind': 'here', 'name': 'Ada', 'seed': 1, 'since': now() - 5000, 'policy': botPolicyVersion}, ephemeral: true);
-      async.elapse(const Duration(seconds: 1));
-      expect(b.spec, isNotNull, reason: 'taken once she is here');
+      expect(b.spec, isNotNull, reason: 'the sender is at it too, and it is newer than my way in');
       expect(b.seated, isTrue);
       b.dispose();
 
-      // And held only so long: a beat that never comes is nobody. A
-      // fresh bus, since the start above is on the relay and would be
-      // news to Cara — a table that filled without her.
+      // Seats me and not the one who sent it: somebody putting me at a
+      // table they are not at. Held for a beat that says they are at
+      // least here, and dropped when none comes.
       final bus2 = Bus();
-      final c = Room(channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       final ghost = FakeSigner('ghost');
+      final c = Room(channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
         'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
         'seats': [
-          {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': c.me, 'name': 'Cara'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
+          {'key': c.me, 'name': 'Cara'}, {'bot': 'Han'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
+        ],
+      }), tags: const [['t', 'ROOM']]), ephemeral: false);
+      async.elapse(const Duration(seconds: 1));
+      expect(c.spec, isNull, reason: 'held, not taken, until the sender is heard from');
+      bus2.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
+      async.elapse(const Duration(seconds: 1));
+      expect(c.spec, isNotNull, reason: 'taken once they are here');
+      c.dispose();
+
+      final bus3 = Bus();
+      final d = Room(channel: bus3.attach(FakeSigner('d')), code: 'ROOM', myName: 'Dee', nowMs: now);
+      async.elapse(const Duration(seconds: 1));
+      bus3.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
+        'seats': [
+          {'key': d.me, 'name': 'Dee'}, {'bot': 'Han'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
       }), tags: const [['t', 'ROOM']]), ephemeral: false);
       async.elapse(const Duration(seconds: 9));
-      bus2.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
+      bus3.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
       async.elapse(const Duration(seconds: 1));
-      expect(c.spec, isNull, reason: 'dropped after the stale window');
-      c.dispose();
+      expect(d.spec, isNull, reason: 'and held only so long: a beat that never comes is nobody');
+      d.dispose();
+
+      // Older than my way into the room, whoever it seats: a table
+      // that was played under this code and left, handed back by the
+      // relay, and not one to sit down at again.
+      final bus4 = Bus();
+      final before = now();
+      async.elapse(const Duration(seconds: 6));
+      final e = Room(channel: bus4.attach(FakeSigner('e')), code: 'ROOM', myName: 'Eve', nowMs: now);
+      async.elapse(const Duration(seconds: 1));
+      bus4.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': before,
+        'seats': [
+          {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': e.me, 'name': 'Eve'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
+        ],
+      }), tags: const [['t', 'ROOM']]), ephemeral: false);
+      async.elapse(const Duration(seconds: 12));
+      expect(e.spec, isNull, reason: 'it started before I was here');
+      e.dispose();
     });
   });
 

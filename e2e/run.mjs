@@ -34,6 +34,17 @@ import {
 // ---- the scenarios -------------------------------------------------------
 
 const names = ['Ada', 'Bao', 'Cara', 'Dee'];
+
+/// The app, driven, with the room told to wait for all four.
+///
+/// A room starts ten seconds after the last arrival, which is right
+/// for people and wrong for this: four whole apps opening on one
+/// machine can take longer than that between them, and the room then
+/// starts short while the last of them is still loading. Four in a
+/// room is a table at once whatever the wait, so a longer one costs
+/// nothing here and takes the machine's speed out of the question
+/// (app/lib/net/address.dart).
+const driven = 'e2e=1&roomWait=45';
 /// A seat badge that is not one of the four people: a bot took a seat.
 const roster = /^(?!Ada:|Bao:|Cara:|Dee:)[A-Z][\w ]+: \d+ in the game, \d+ this hand/;
 
@@ -56,7 +67,7 @@ async function main() {
         const verbose = /$^/;
         if (m.type() === 'error' || verbose.test(t) || /^duty: (?!.*emit )/.test(t) || /^table: .*(jury|juror|verdict|appeal|nobody online|summon)/.test(t)) log(`page ${names[i]}: ${t}`);
       });
-      await page.goto(`${app.url}/?e2e=1`);
+      await page.goto(`${app.url}/?${driven}`);
       contexts.push(ctx);
       pages.push(page);
     }
@@ -134,16 +145,16 @@ async function main() {
     // themselves, two of them lead, and the room comes apart into two
     // tables under one code — which the table id is there to keep
     // apart (docs/04-live-play.md) but which is not a table of four.
-    // Each arrival restarts the countdown, so arriving in turn is what
-    // keeps them together.
     //
-    // By the time the last is looked at the table may have started and
-    // the room it went through be gone, so either screen is arriving.
+    // They have as long as they need to get there: the room is waiting
+    // for a fourth rather than counting down (`driven`, above). By the
+    // time the last is looked at that fourth arrival may already have
+    // started the table, so either screen is arriving.
     for (let i = 1; i < 4; i++) {
-      await pages[i].goto(`${app.url}/?e2e=1&room=${code}`);
+      await pages[i].goto(`${app.url}/?${driven}&room=${code}`);
       await waitFor(pages[i], /^Share the link$|^\d of 4 here/, { what: `the room, by its link (${names[i]})`, timeout: 60000 });
     }
-    // Four in: whoever leads starts on its own.
+    // Four in a room is a table at once, whoever leads.
     for (const page of pages) await waitFor(page, /^4 of 4 here  ·  unrated$/, { what: 'the live table', timeout: 40000 });
     log('all four at the table');
 

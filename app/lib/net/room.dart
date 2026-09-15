@@ -112,15 +112,30 @@ class Room extends ChangeNotifier {
 
   /// Into the room under [code] on [relay], as [name], looking like
   /// [avatar], for a game to [target].
-  factory Room.enter(
-          {required RelayTransport relay,
-          required String code,
-          required String name,
-          Avatar avatar = Avatar.none,
-          int target = gameOverScore}) =>
-      Room(channel: RelayRoomChannel(relay), code: code, myName: name, myAvatar: avatar, target: target);
+  factory Room.enter({
+    required RelayTransport relay,
+    required String code,
+    required String name,
+    Avatar avatar = Avatar.none,
+    int target = gameOverScore,
+    Duration startAfter = Room.startAfter,
+  }) =>
+      Room(
+        channel: RelayRoomChannel(relay),
+        code: code,
+        myName: name,
+        myAvatar: avatar,
+        target: target,
+        startAfterMs: startAfter.inMilliseconds,
+      );
 
   static const startAfter = Duration(seconds: 10);
+
+  /// How far apart two devices' clocks are allowed to be before a
+  /// start made since this device arrived stops looking like one. Wider
+  /// than any two browsers on a table ever are, and a device further
+  /// out than this only falls back to waiting for a beat.
+  static const _skewMs = 5000;
 
   /// A code for a private table: eight characters, from the system's
   /// own source of randomness. It is the only thing between a stranger
@@ -317,13 +332,28 @@ class Room extends ChangeNotifier {
         // code long finished with gets reused.
         final at = c['at'] as int?;
         if (at == null || (now - at).abs() > 120000) return;
-        // One that seats this device has to come from someone here —
-        // heard within the stale window, as the leader was a moment
-        // ago — or it is a table this device was seated at earlier
-        // under this code and left, not one to sit down at again. One
-        // that does not is news: the table filled without you.
-        final seatsMe = (c['seats'] as List? ?? const []).any((raw) => raw is Map && raw['key'] == me);
-        if (seatsMe && !_present(e.pubkey)) {
+        // One that seats this device has to be one this device could
+        // be at: from someone here — heard within the stale window, as
+        // the leader was a moment ago — or else this is a table that
+        // was played under this code and left, not one to sit down at
+        // again. One that seats this device and nobody here is held
+        // for its sender's next beat, and dropped if none comes.
+        //
+        // Except when the start says so itself. The fourth to arrive
+        // is the reason a room of four becomes a table, and that
+        // happens at once: its own first beat goes out, the leader
+        // counts four and starts, and the start can be back before any
+        // beat of the leader's has come round. There is no beat to
+        // wait for either — everyone else is at the table now and has
+        // stopped saying they are in the room — so the fourth would
+        // hold a start naming its own seat until it went stale, and
+        // sit in a room the table had left. A start that seats the
+        // device that sent it, made since this device came into the
+        // room, is that table and not a leftover of an older one.
+        final seats = c['seats'] as List? ?? const [];
+        bool holds(PublicKey? key) => seats.any((raw) => raw is Map && raw['key'] == key);
+        final itsOwn = holds(e.pubkey) && at >= since - _skewMs;
+        if (holds(me) && !_present(e.pubkey) && !itsOwn) {
           _heldStart = (content: c, from: e.pubkey, heldAt: now);
           return;
         }

@@ -404,7 +404,16 @@ class _HomePageState extends State<HomePage> {
     final transport = await _connect(code, _Opening.friends);
     if (transport == null) return;
     try {
-      final room = Room.enter(relay: transport, code: code, name: _name, avatar: _avatar, target: _options.target);
+      final room = Room.enter(
+        relay: transport,
+        code: code,
+        name: _name,
+        avatar: _avatar,
+        target: _options.target,
+        // Ten seconds, unless the address asks for longer and is
+        // allowed to (net/address.dart).
+        startAfter: roomWait(Uri.base, standard: Room.startAfter),
+      );
       room.addListener(_onRoom);
       setState(() => _room = room);
       // The room is its link, and the link is in the address bar while
