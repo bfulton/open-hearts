@@ -120,9 +120,12 @@ async function main() {
     // Nobody types a code: the others arrive by the shared link — the
     // app's own address with the code — and, with a name already, land
     // straight in the room.
+    // The room starts ten seconds after the second arrival, so by the
+    // time the last of them is looked at, the table may already have
+    // started and the room it went through be gone: either is arriving.
     for (let i = 1; i < 4; i++) {
       await pages[i].goto(`${app.url}/?e2e=1&room=${code}`);
-      await waitFor(pages[i], new RegExp(`^Table ${code}$`), { what: 'the room, by its link', timeout: 60000 });
+      await waitFor(pages[i], new RegExp(`^Table ${code}$|^\\d of 4 here`), { what: 'the room, by its link', timeout: 60000 });
     }
     // Four in: whoever leads starts on its own.
     for (const page of pages) await waitFor(page, /^4 of 4 here  ·  unrated$/, { what: 'the live table', timeout: 40000 });
