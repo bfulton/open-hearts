@@ -16,7 +16,7 @@
 # look at, and sweep up after:
 #
 #   ./deploy.sh --prune [keep]   deletes the older previews, keeping the
-#                                newest [keep] (10) and anything live
+#                                newest [keep] (5) and anything live
 #   ./deploy.sh --prune -n       says what it would delete and stops
 #
 # Usage:  ./deploy.sh [branch-label]
@@ -44,7 +44,7 @@ branch_of_git() {
 # deployment of its branch, so deleting older previews takes nothing
 # down. Production deployments are left alone whatever their age.
 prune() {
-  local keep=${1:-10} dry=${2:-}
+  local keep=${1:-5} dry=${2:-}
   local api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments"
   local page=1 skip=$keep ids all=""
   # A page at a time, newest first, until a page comes back empty: the
@@ -86,7 +86,7 @@ $(echo "$ids" | tail -n +2)"
 if [ "${1:-}" = --prune ]; then
   shift
   DRY=
-  KEEP=10
+  KEEP=5
   for arg in "$@"; do
     case "$arg" in
       -n) DRY=1 ;;
