@@ -274,7 +274,11 @@ async function main() {
   const app = await serveApp();
   const browser = await chromium.launch();
   let failed = 0;
-  const contexts = [];
+  // A flow's devices are that flow's: they go when it does. Left open
+  // they stay online — announcing themselves, folding their hearts,
+  // holding sockets — and the next flow runs against a relay with a
+  // crowd on it and a machine with nothing left to give.
+  let contexts = [];
   // Only the lobby needs a relay, and it costs a couple of seconds and
   // two processes, so it is started when something asks for one.
   let relayOnce = null;
@@ -313,8 +317,9 @@ async function main() {
       failed++;
       log(`FAIL  ${name}: ${e.message}`);
     }
+    for (const ctx of contexts) await ctx.close();
+    contexts = [];
   }
-  for (const ctx of contexts) await ctx.close();
   await browser.close();
   app.stop();
   (await relayOnce)?.stop();

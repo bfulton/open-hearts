@@ -7,6 +7,8 @@
 /// the seating.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/game_options.dart';
@@ -41,6 +43,33 @@ Widget still(Widget home) => MaterialApp(
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test('a relay that answers late still counts; it is only said to be slow first', () async {
+    final relay = Completer<void>();
+    var said = 0;
+    final waiting = waitForRelay(relay.future,
+        slow: () => said++,
+        sayIt: const Duration(milliseconds: 60),
+        stopAt: const Duration(milliseconds: 2000));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(said, 1, reason: 'past the first deadline the screen says so');
+
+    relay.complete();
+    await waiting;
+    expect(said, 1, reason: 'and the late answer is an answer, not a failure');
+  });
+
+  test('a relay that never answers gives up at the far deadline', () async {
+    var said = 0;
+    await expectLater(
+      waitForRelay(Completer<void>().future,
+          slow: () => said++,
+          sayIt: const Duration(milliseconds: 40),
+          stopAt: const Duration(milliseconds: 160)),
+      throwsA(isA<TimeoutException>()),
+    );
+    expect(said, 1);
+  });
 
   testWidgets('one screen: the three ways in, and who you are in the corner', (tester) async {
     await pumpHome(tester);

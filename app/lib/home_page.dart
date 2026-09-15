@@ -95,6 +95,11 @@ class _HomePageState extends State<HomePage> {
   final List<Uri> _relays = appRelays();
   String? _error;
   bool _busy = false;
+
+  /// A relay is taking its time and the device is still waiting. Not an
+  /// error — there is nothing to do about it but wait — so it is said
+  /// quietly and it goes as soon as one answers.
+  bool _slow = false;
   Room? _room;
   WaitingRoom? _queue;
   RelayTransport? _transport;
@@ -243,16 +248,24 @@ class _HomePageState extends State<HomePage> {
     final relays = _relays;
     setState(() {
       _busy = true;
+      _slow = false;
       _error = null;
     });
+    RelayTransport? transport;
     try {
       final signer = _signer ??= await Identity.signer();
-      final transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
+      transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
       _refusalSub?.cancel();
       _refusalSub = transport.refusals.listen((r) {
         if (mounted) setState(() => _relayNote = r == null ? null : 'No relay will take this device\'s events: $r');
       });
-      await transport.ready.timeout(const Duration(seconds: 8));
+      await waitForRelay(transport.ready, slow: () {
+        if (mounted) setState(() => _slow = true);
+      });
+      if (!mounted) {
+        transport.close();
+        return null;
+      }
       // A relay answered: from here on this device is online to
       // everyone, and a juror when drawn.
       Duty.on(relays, signer, log: _debugging, crypto: dealCrypto);
@@ -262,25 +275,36 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _transport = transport;
         _busy = false;
+        _slow = false;
       });
       return transport;
     } on TimeoutException {
-      setState(() {
-        _busy = false;
-        _error = _noRelay;
-      });
+      _fell(transport, _noRelay);
     } catch (e) {
-      setState(() {
-        _busy = false;
-        _error = 'Could not connect: $e';
-      });
+      _fell(transport, 'Could not connect: $e');
     }
     return null;
+  }
+
+  /// The connection did not come off: the sockets go, and the screen
+  /// says why rather than sitting on a spinner.
+  void _fell(RelayTransport? transport, String why) {
+    _refusalSub?.cancel();
+    _refusalSub = null;
+    transport?.close();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _slow = false;
+      _error = why;
+    });
   }
 
   /// Nothing the player can change but the connection: the relays are
   /// the build's.
   static const _noRelay = 'No relay answered. Check the connection and try again.';
+
+
 
   /// Into the pool the options ask for, and wait to be seated — by
   /// whoever among the waiting has the lowest key, this device
@@ -565,6 +589,11 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 16),
         liveOpen ? _live() : const _LiveLocked(),
+        if (_slow) ...[
+          const SizedBox(height: 14),
+          const Text('Still looking for a relay…',
+              textAlign: TextAlign.center, style: TextStyle(color: Palette.chromeDim, fontSize: 13)),
+        ],
         if (_error != null) ...[
           const SizedBox(height: 14),
           Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
@@ -649,6 +678,33 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       );
+}
+
+/// When a slow relay is worth a word, and when there is nothing left
+/// to wait for.
+const sayItIsSlow = Duration(seconds: 8);
+const stopWaiting = Duration(seconds: 40);
+
+/// Waits for a relay to answer, and calls [slow] once if it is taking
+/// its time.
+///
+/// How long a relay takes is not the device's to decide — a cold
+/// network, a phone waking up, a crowd on one relay — so the first
+/// deadline only changes what the screen says. The sockets go on
+/// trying behind it and a relay that answers late still counts, which
+/// is the whole point: a device that gave up at eight seconds would sit
+/// on "no relay answered" with an open connection in its hand. The
+/// second deadline is the end of it, and throws [TimeoutException].
+Future<void> waitForRelay(
+  Future<void> ready, {
+  required void Function() slow,
+  Duration sayIt = sayItIsSlow,
+  Duration stopAt = stopWaiting,
+}) {
+  return ready.timeout(sayIt, onTimeout: () {
+    slow();
+    return ready.timeout(stopAt - sayIt);
+  });
 }
 
 /// Into a live game, with how many devices are online on the button
