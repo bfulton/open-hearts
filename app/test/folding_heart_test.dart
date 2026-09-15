@@ -16,6 +16,10 @@ import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/folding_heart.dart';
 
 const _side = 120.0;
+
+/// One frame at sixty a second, which is what a turn needs to be told
+/// it is over.
+const frame = Duration(milliseconds: 16);
 const _size = Size(_side, _side);
 
 /// What the heart covers at this point of the turn, in pixels.
@@ -38,7 +42,62 @@ Future<Rect> painted(double at) async {
   return right <= left ? Rect.zero : Rect.fromLTRB(left, top, right, bottom);
 }
 
+/// Where the heart on screen has got to in its turn.
+double turnAt(WidgetTester tester) => FoldingHeart.atOf(
+  tester.widget<CustomPaint>(find.descendant(of: find.byType(FoldingHeart), matching: find.byType(CustomPaint))).painter!,
+);
+
 void main() {
+  testWidgets('one turn, then a rest, and nothing asked for while it rests', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(child: FoldingHeart(size: 46, color: Palette.gold)),
+        ),
+      ),
+    );
+    expect(turnAt(tester), 0, reason: 'whole, to begin with');
+
+    await tester.pump(FoldingHeart.turn ~/ 2);
+    expect(turnAt(tester), closeTo(0.5, 0.02), reason: 'shut, half way through the turn');
+    expect(tester.binding.transientCallbackCount, 1, reason: 'ticking, because it is folding');
+    await tester.pump(FoldingHeart.turn ~/ 2);
+    expect(turnAt(tester), 1, reason: 'and whole again, the turn over');
+
+    // Resting. This is the part that is new: the heart is not folding,
+    // and nothing is being drawn for it either. One more frame is what
+    // tells the turn it is over — a run is done on the tick past its
+    // end, not on the tick that reaches it.
+    await tester.pump(frame);
+    expect(tester.binding.transientCallbackCount, 0, reason: 'nothing is ticking');
+    expect(tester.binding.hasScheduledFrame, isFalse, reason: 'and a heart at rest asks for no frames');
+
+    await tester.pump(FoldingHeart.every - FoldingHeart.turn - const Duration(seconds: 1));
+    expect(turnAt(tester), 1, reason: 'still whole, still still');
+    expect(tester.binding.hasScheduledFrame, isFalse);
+
+    // A period after it began, it goes again.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(FoldingHeart.turn ~/ 2);
+    expect(turnAt(tester), closeTo(0.5, 0.03), reason: 'round again, one period on');
+  });
+
+  testWidgets('a reader who asked for less movement gets a heart that never moves', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: Scaffold(
+            body: Center(child: FoldingHeart(size: 46, color: Palette.gold)),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(FoldingHeart.turn);
+    expect(turnAt(tester), 0);
+    expect(tester.binding.transientCallbackCount, 0, reason: 'and no frames are asked for on their behalf');
+  });
+
   test('each fold halves the paper, and the last one shuts it', () async {
     final whole = await painted(0);
     expect(whole.width, greaterThan(_side * 0.75));
@@ -50,13 +109,15 @@ void main() {
       final packet = FoldingHeart.packetAfter(fold, _size);
       // Inside the paper the folds have left, and filling it: the
       // flap has come over onto what it was folded from, not beside it.
-      expect(packet.inflate(1).contains(now.topLeft) && packet.inflate(1).contains(now.bottomRight), isTrue,
-          reason: 'after fold $fold the paper is $packet, and $now is drawn');
+      expect(
+        packet.inflate(1).contains(now.topLeft) && packet.inflate(1).contains(now.bottomRight),
+        isTrue,
+        reason: 'after fold $fold the paper is $packet, and $now is drawn',
+      );
       expect(now.width, greaterThan(packet.width * 0.7), reason: 'and it still fills it');
       // The axis this fold did not touch is untouched.
       final sideways = fold.isOdd; // vertical, horizontal, vertical
-      expect(sideways ? now.height : now.width, closeTo(sideways ? last.height : last.width, 2),
-          reason: 'fold $fold is on one axis');
+      expect(sideways ? now.height : now.width, closeTo(sideways ? last.height : last.width, 2), reason: 'fold $fold is on one axis');
       last = now;
     }
 

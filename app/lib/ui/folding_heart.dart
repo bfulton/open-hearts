@@ -1,4 +1,10 @@
-/// The heart at the front door, folded away and opened out again.
+/// The heart at the front door, folded away and opened out again every
+/// so often.
+///
+/// A flourish, not a fidget: it folds, comes back, and then is simply a
+/// heart until its next turn comes round. Between turns nothing is
+/// drawn and no frame is asked for, which matters on a door that may
+/// be left open in a tab all evening.
 ///
 /// A sheet of paper folded in half three times and then shut away,
 /// which is the trick: each fold leaves half of what it had, the
@@ -18,6 +24,7 @@
 /// straight on is where the door is looked at from.
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -26,13 +33,19 @@ import 'package:flutter/material.dart';
 enum _Crease { vertical, horizontal }
 
 class FoldingHeart extends StatefulWidget {
-  const FoldingHeart({super.key, required this.size, required this.color, this.period = const Duration(seconds: 9), this.at});
+  const FoldingHeart({super.key, required this.size, required this.color, this.period = every, this.at});
 
   final double size;
   final Color color;
 
-  /// One turn of folding away and opening out.
+  /// How often the heart folds away and opens out again, counted from
+  /// the start of one turn to the start of the next.
   final Duration period;
+
+  /// The cadence, and how long one turn of it takes. What is left of
+  /// the period after a turn is spent whole and still.
+  static const every = Duration(seconds: 20);
+  static const turn = Duration(seconds: 9);
 
   /// Held at this point of the turn rather than turning, for a still
   /// picture of it — a screenshot, or a test reading one frame.
@@ -54,37 +67,86 @@ class FoldingHeart extends StatefulWidget {
       _FoldedHeart._at(_FoldedHeart._still + folds * _FoldedHeart._foldFor + howFar * _FoldedHeart._shutFor);
 
   /// The painter for one point of the turn, for a test that would
-  /// rather read the pixels than the arithmetic.
+  /// rather read the pixels than the arithmetic, and where a painter
+  /// on the screen has got to.
   @visibleForTesting
   static CustomPainter painterAt(double at, Color color) => _FoldedHeart(at: at, color: color);
+
+  @visibleForTesting
+  static double atOf(CustomPainter painter) => (painter as _FoldedHeart).at;
 
   @override
   State<FoldingHeart> createState() => _FoldingHeartState();
 }
 
 class _FoldingHeartState extends State<FoldingHeart> with SingleTickerProviderStateMixin {
-  late final AnimationController _turn = AnimationController(vsync: this, duration: widget.period)..repeat();
+  late final AnimationController _folding = AnimationController(vsync: this, duration: _turn)
+    ..addStatusListener((status) {
+      if (status == AnimationStatus.completed) _rest();
+    });
+
+  /// The wait between one turn and the next. A timer rather than a
+  /// controller held at its end: a controller that is still running is
+  /// a frame every sixteen milliseconds to draw the same heart.
+  Timer? _resting;
+
+  /// One fold and unfold. Never longer than the period it has to
+  /// happen in, so a short period is a heart that folds without rest
+  /// rather than one that never finishes.
+  Duration get _turn => widget.period < FoldingHeart.turn ? widget.period : FoldingHeart.turn;
+
+  /// Whether something is holding the heart at a point of the turn: a
+  /// caller asking for one frame of it, or a reader who has asked for
+  /// less movement — there is nothing in the folding they are missing.
+  bool get _held => widget.at != null || MediaQuery.disableAnimationsOf(context);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_held) {
+      _resting?.cancel();
+      _resting = null;
+      _folding.stop();
+    } else if (!_folding.isAnimating && _resting == null) {
+      _folding.forward(from: 0);
+    }
+  }
+
+  void _rest() {
+    final rest = widget.period - _turn;
+    if (rest <= Duration.zero) {
+      _folding.forward(from: 0);
+      return;
+    }
+    _resting = Timer(rest, () {
+      _resting = null;
+      if (mounted && !_held) _folding.forward(from: 0);
+    });
+  }
 
   @override
   void dispose() {
-    _turn.dispose();
+    _resting?.cancel();
+    _folding.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // A reader who has asked for less movement gets the heart whole and
-    // still; there is nothing in the folding they would be missing.
     final held = widget.at ?? (MediaQuery.disableAnimationsOf(context) ? 0.0 : null);
     return SizedBox(
       width: widget.size,
       height: widget.size,
       child: RepaintBoundary(
         child: held != null
-            ? CustomPaint(painter: _FoldedHeart(at: held, color: widget.color))
+            ? CustomPaint(
+                painter: _FoldedHeart(at: held, color: widget.color),
+              )
             : AnimatedBuilder(
-                animation: _turn,
-                builder: (_, _) => CustomPaint(painter: _FoldedHeart(at: _turn.value, color: widget.color)),
+                animation: _folding,
+                builder: (_, _) => CustomPaint(
+                  painter: _FoldedHeart(at: _folding.value, color: widget.color),
+                ),
               ),
       ),
     );
@@ -193,8 +255,8 @@ class _FoldedHeart extends CustomPainter {
     final over = depth >= _folds.length || depth > made
         ? 0.0
         : depth < made
-            ? 1.0
-            : making;
+        ? 1.0
+        : making;
     if (over <= 0) return _heart(canvas, sheet, layers, whole);
 
     final down = _folds[depth] == _Crease.vertical;

@@ -182,6 +182,13 @@ Four movements, one rule each:
 - **The hand closes** over the gap a card leaves, and opens for one that
   arrives, rather than snapping to its new fan.
 
+The heart at the front door is the one thing that moves on its own,
+and it does not move for long: it folds away and opens out over nine
+seconds, and then is simply a heart until twenty seconds are up and
+its turn comes round again. Between turns it asks for no frames at
+all, which is the difference between a flourish and a fidget on a door
+somebody leaves open in a tab.
+
 None of it is long: a play is 240 ms, a pass 420, a trick swept 300, the
 fan settling 220. A movement anyone has to wait for is a movement that
 has stopped being information. And none of it is load-bearing — every
