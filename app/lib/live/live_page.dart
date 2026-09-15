@@ -274,6 +274,7 @@ class _LivePageState extends State<LivePage> {
                   seeds: _seeds,
                   avatars: _avatars,
                   mySeat: _c.mySeat,
+                  rating: _c.ratingChange,
                   action: 'Home',
                   onNewGame: () => Navigator.of(context).pop(),
                 ),

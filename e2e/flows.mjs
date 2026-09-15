@@ -170,6 +170,9 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
     await waitFor(page, new RegExp(`^Hand ${hand + 2}`), { what: `hand ${hand + 2}` });
   }
   await waitFor(page, /^New game$/, { what: 'the game-over sheet' });
+  // Nothing was at stake against bots, so the sheet says nothing about
+  // ratings.
+  if ((await texts(page)).some((t) => /^Rating /.test(t))) throw new Error('a game alone moved no rating, and should say so by saying nothing');
   await click(page, /^Copy record$/);
   await sleep(500);
   const record = await page.evaluate('navigator.clipboard.readText()');

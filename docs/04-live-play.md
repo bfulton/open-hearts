@@ -287,7 +287,12 @@ result stands when a majority of the humans who sat down published the
 same one; a stranger's word counts for nothing. Anyone can fold every
 standing result, oldest first, into every rating; the app does so when
 it reaches the relays, shows the player theirs in the live area of the
-front door, and states it when waiting to be seated. Lying there only
+front door, and states it when waiting to be seated. At the end of a
+rated game the score sheet says what the game did to it — "1500 → 1516"
+— which the device works out for itself by folding the result it has
+just published into the ledger it already holds, rather than waiting to
+hear its own result back off a relay; where that new rating is not
+known, the sheet says nothing about ratings at all. Lying there only
 changes who you sit with.
 
 **Backed by the deal.** Every live table is sealed ([doc

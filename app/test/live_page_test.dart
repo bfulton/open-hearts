@@ -25,9 +25,15 @@ import 'table_page_test.dart' show fanCards, tapCard;
 const _me = 2;
 
 class LiveHarness {
-  LiveHarness({DealCrypto? crypto, this.pictures, Map<int, Avatar> avatars = const {}}) {
+  LiveHarness({DealCrypto? crypto, this.pictures, Map<int, Avatar> avatars = const {}, int target = engine.gameOverScore, bool rated = false}) {
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
-    spec = TableSpec(id: 'widget', seed: 21, seats: [for (final s in signers) HumanSeat(s.publicKey)], sealed: crypto != null);
+    spec = TableSpec(
+        id: 'widget',
+        seed: 21,
+        seats: [for (final s in signers) HumanSeat(s.publicKey)],
+        sealed: crypto != null,
+        rated: rated,
+        target: target);
     for (var s = 0; s < engine.seatCount; s++) {
       if (s == _me) {
         controller = LiveController(
@@ -39,6 +45,11 @@ class LiveHarness {
           transport: net.attach(signers[s].publicKey),
           clock: clock,
           crypto: crypto,
+          // A rated table reads its ratings from this device's own
+          // ledger and folds the finished game into it, as the front
+          // door does off the relays (net/standing.dart).
+          ratingOf: rated ? ledger.of : null,
+          onResult: rated ? ledger.apply : null,
         );
       } else {
         final client =
@@ -53,6 +64,10 @@ class LiveHarness {
   /// What this device does with the others' pictures, where a test
   /// cares.
   final Pictures? pictures;
+
+  /// The ratings this device knows, at a rated table: empty, so
+  /// everyone starts fresh.
+  final ledger = Ledger();
 
   final clock = VirtualClock();
   late final SimNetwork net = SimNetwork(clock, seed: 3);
@@ -71,12 +86,13 @@ class LiveHarness {
   }
 }
 
-Future<LiveHarness> pumpLive(WidgetTester tester, {DealCrypto? crypto, Pictures? pictures, Map<int, Avatar> avatars = const {}}) async {
+Future<LiveHarness> pumpLive(WidgetTester tester,
+    {DealCrypto? crypto, Pictures? pictures, Map<int, Avatar> avatars = const {}, int target = engine.gameOverScore, bool rated = false}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  final live = LiveHarness(crypto: crypto, pictures: pictures, avatars: avatars);
+  final live = LiveHarness(crypto: crypto, pictures: pictures, avatars: avatars, target: target, rated: rated);
   await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: LivePage(controller: live.controller)));
   await tester.pumpAndSettle();
   return live;
@@ -124,6 +140,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('On with it'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a rated game ends by saying what it did to your rating', (tester) async {
+    // A game to a point is over at the end of the first hand, which is
+    // the whole of what the sheet needs.
+    final live = await pumpLive(tester, target: 1, rated: true);
+    for (var guard = 0; guard < 400 && !live.controller.gameOverDue; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(find.text('Home'), findsOneWidget, reason: 'the game is over and its sheet is up');
+    final change = live.controller.ratingChange!;
+    expect(change.before.shown, 1500, reason: 'nothing in this device\'s ledger before the game');
+    expect(change.after.shown, isNot(1500), reason: 'and the game moved it');
+    final moved = change.after.shown - change.before.shown;
+    expect(find.text('Rating 1500? → ${change.after.shown}?'), findsOneWidget);
+    expect(find.text(moved > 0 ? '+$moved' : '$moved'), findsOneWidget);
+  });
+
+  testWidgets('an unrated game says nothing about ratings', (tester) async {
+    final live = await pumpLive(tester, target: 1);
+    for (var guard = 0; guard < 400 && !live.controller.gameOverDue; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(find.text('Home'), findsOneWidget, reason: 'the game is over and its sheet is up');
+    expect(live.controller.ratingChange, isNull);
+    expect(find.textContaining('Rating'), findsNothing, reason: 'nothing was at stake, so there is nothing to report');
   });
 
   testWidgets('a person who leaves becomes a bot; a person who goes quiet on turn can be booted', (tester) async {

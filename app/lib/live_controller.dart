@@ -86,6 +86,13 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Where a finished game's result goes, once, when the game ends.
   final void Function(GameResult result)? onResult;
 
+  /// What the game did to this player's rating, at a rated table:
+  /// where it stood as the game ended, and where it stands with the
+  /// result folded in. Null at an unrated table, on a seat this device
+  /// does not hold, and while the new rating is not known — the game's
+  /// sheet says nothing rather than guess at it.
+  ({Rating before, Rating after})? ratingChange;
+
   /// What this device does with the others' pictures: hidden by the
   /// viewer, or kept off by its own check (pictures.dart). Null leaves
   /// every picture alone.
@@ -154,11 +161,31 @@ class LiveController extends ChangeNotifier implements TableModel {
   void _onChange() {
     if (client.done && !_reported) {
       _reported = true;
-      onResult?.call(GameResult.of(client.spec, client.holders, client.game.totals));
+      _report(GameResult.of(client.spec, client.holders, client.game.totals));
     }
     if (!client.awaitingMyPass) _selected.clear();
     unawaited(_pump());
     notifyListeners();
+  }
+
+  /// The finished game out to whoever publishes it, and what it did to
+  /// this player's rating on the way: the ratings are read either side
+  /// of the report, since folding a result into the ledger is
+  /// arithmetic this device does itself and nothing here may wait on a
+  /// relay. A rating that has not moved is one nobody has folded yet.
+  void _report(GameResult result) {
+    final rating = ratingOf;
+    final seat = client.mySeat;
+    final holder = seat == null ? null : client.spec.seats[seat];
+    final key = holder is HumanSeat ? holder.key : null;
+    if (rating == null || key == null) {
+      onResult?.call(result);
+      return;
+    }
+    final before = rating(key);
+    onResult?.call(result);
+    final after = rating(key);
+    if (after.mu != before.mu) ratingChange = (before: before, after: after);
   }
 
   /// Whether the shown decisions are still the record's first ones —

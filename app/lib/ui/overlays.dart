@@ -5,6 +5,8 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart';
+import 'package:table/table.dart' show Rating;
+
 import '../avatar.dart';
 import '../theme.dart';
 import 'player_icon.dart';
@@ -89,6 +91,10 @@ class HandOverSheet extends StatelessWidget {
   }
 }
 
+/// What a rated game did to the player's rating: where it stood before
+/// the result and where it stands with the result in it.
+typedef RatingChange = ({Rating before, Rating after});
+
 class GameOverSheet extends StatelessWidget {
   const GameOverSheet({
     super.key,
@@ -98,6 +104,7 @@ class GameOverSheet extends StatelessWidget {
     this.onCopyRecord,
     this.seeds,
     this.avatars,
+    this.rating,
     this.mySeat = humanSeat,
     this.action = 'New game',
   });
@@ -112,6 +119,13 @@ class GameOverSheet extends StatelessWidget {
   /// How each seat chose to look, seat order; nothing when null.
   final List<Avatar>? avatars;
   final VoidCallback onNewGame;
+
+  /// What the game moved this player's rating by, at a rated table.
+  /// Null where there is nothing to say: a game against bots, an
+  /// unrated table, or a new rating this device does not know yet —
+  /// which is worth less than silence.
+  final RatingChange? rating;
+
   final int mySeat;
   final String action;
 
@@ -144,6 +158,7 @@ class GameOverSheet extends StatelessWidget {
             you: seat == mySeat,
           ),
       ],
+      note: rating == null ? null : _RatingLine(change: rating!),
       action: action,
       onAction: onNewGame,
       secondary: onCopyRecord == null ? null : 'Copy record',
@@ -162,6 +177,7 @@ class _Sheet extends StatelessWidget {
     required this.action,
     required this.onAction,
     this.subtitle,
+    this.note,
     this.secondary,
     this.onSecondary,
   });
@@ -170,6 +186,11 @@ class _Sheet extends StatelessWidget {
   final String? subtitle;
   final Color accent;
   final List<_Row> rows;
+
+  /// A line under the score, where the sheet has something to say
+  /// about it.
+  final Widget? note;
+
   final String action;
   final VoidCallback onAction;
 
@@ -228,6 +249,10 @@ class _Sheet extends StatelessWidget {
                 ],
                 const SizedBox(height: 16),
                 for (final row in ranked) _ScoreRow(row: row),
+                if (note != null) ...[
+                  const SizedBox(height: 12),
+                  note!,
+                ],
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -258,6 +283,49 @@ class _Sheet extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// What the game did to your rating: where it was and where it is now,
+/// and the move itself beside it. A rating too new to be worth much
+/// carries the question mark it carries everywhere else.
+class _RatingLine extends StatelessWidget {
+  const _RatingLine({required this.change});
+
+  final RatingChange change;
+
+  static String _shown(Rating r) => '${r.shown}${r.provisional ? '?' : ''}';
+
+  @override
+  Widget build(BuildContext context) {
+    final moved = change.after.shown - change.before.shown;
+    // Rounding can swallow a small move, and "+0" would read as a
+    // number rather than as nothing happening.
+    if (moved == 0) {
+      return Text('Rating ${_shown(change.after)}',
+          textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim));
+    }
+    // A wrap rather than a row: the move drops under the numbers on a
+    // narrow screen instead of running off the side of the sheet.
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      children: [
+        Text(
+          'Rating ${_shown(change.before)} → ${_shown(change.after)}',
+          style: const TextStyle(fontSize: 13, color: Palette.chromeDim, fontFeatures: [FontFeature.tabularFigures()]),
+        ),
+        Text(
+          moved > 0 ? '+$moved' : '$moved',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            fontFeatures: const [FontFeature.tabularFigures()],
+            color: moved > 0 ? Palette.gold : Palette.danger,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -341,7 +341,15 @@ class _HomePageState extends State<HomePage> {
       presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto).presence,
       crypto: dealCrypto,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
-      onResult: (result) => Standing.publish(relays, signer, result),
+      onResult: (result) {
+        // The fold that turns results into ratings is arithmetic this
+        // device does itself, so the game's own sheet can say what it
+        // did to your rating without waiting to hear the result back
+        // off a relay — and the door behind the table has the new
+        // rating on it when you get there.
+        ledger.apply(result);
+        unawaited(Standing.publish(relays, signer, result));
+      },
       pictures: _pictures,
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
