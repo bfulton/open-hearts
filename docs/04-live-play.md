@@ -107,12 +107,14 @@ A bot's identity is its name and its rung: `Westley` at the top,
 ## The live table, as it stands
 
 What the app does today. There is one screen before a game, and
-everything that comes before one is on it: your name and your
+everything that comes before one is on it. Who you are is the icon in
+its top right and the profile behind that icon: your name, and your
 avatar — one of a set of icons on a colour, or a picture of your own,
-sixty-four pixels square, kept on the device with the name and
-carried to the others with it: the icon and colour in every beat, the
-picture once, as a stored event (what is done about a picture nobody
-asked for is below) — *Play bots*, and under it the live area, which
+sixty-four pixels square, both kept on the device and carried to the
+others together: the name, icon and colour in every beat, the picture
+once, as a stored event (what is done about a picture nobody asked
+for is below). A game that needs a name and finds none opens the
+profile for one. Then *Play bots*, and under it the live area, which
 carries the game being asked for on a line of its own: fifty points
 or a hundred, rated or unrated, changed in a small sheet and kept on
 the device beside the name. *Play live* is one button — the options

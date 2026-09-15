@@ -60,8 +60,9 @@ rigged. Roughly in order:
    fork or a deadlock ([doc 06](docs/06-service.md), `packages/table`).
    The local relay exists (`service/`, a NIP-01 subset), the same
    clients play a hand over it with real keys and real sockets, and
-   the app has live play: one screen before a game carries your name,
-   your avatar and the game you are asking for — fifty points or a
+   the app has live play: one screen before a game, your name and
+   avatar behind the icon in its corner and the game you are asking
+   for on it — fifty points or a
    hundred, rated or unrated — and **Play live** puts you in the pool
    with however many people are online, which the button says.
    Whoever is waiting on the relay seats each other four to a table
