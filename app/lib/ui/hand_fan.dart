@@ -362,7 +362,14 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
                 child: AnimatedBuilder(
                   animation: flight.controller,
                   builder: (context, card) {
-                    final t = Curves.easeIn.transform(flight.controller.value);
+                    // Out at speed, not up to speed: a card leaves on
+                    // the frame it is tapped, the way a thrown thing
+                    // leaves the hand at its fastest. Easing in instead
+                    // held it still for three frames, which is only
+                    // hidden while the rest of the fan is closing over
+                    // the gap — and the last card of a hand has no rest
+                    // of the fan.
+                    final t = Curves.easeOutCubic.transform(flight.controller.value);
                     return Transform.translate(
                       offset: Offset.lerp(flight.from, flight.travel, t)!,
                       child: Opacity(opacity: (1 - t * 1.3).clamp(0.0, 1.0), child: card),

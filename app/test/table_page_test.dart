@@ -352,6 +352,17 @@ void main() {
 
     expect(cardFinder(last), findsOneWidget, reason: 'still on its way');
     expect(tester.getTopLeft(cardFinder(last)).dy, lessThan(was.dy - 20), reason: 'rising towards the table');
+
+    // And it left on the frame it was tapped. With a hand behind it the
+    // fan closing over the gap is movement enough to cover a card that
+    // takes a few frames to get going; the last card has nothing behind
+    // it, so it is the one that shows a slow start.
+    await tester.pumpWidget(fan([last]));
+    await tester.pumpAndSettle();
+    final resting = tester.getTopLeft(cardFinder(last)).dy;
+    await tester.pumpWidget(fan(const []));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(tester.getTopLeft(cardFinder(last)).dy, lessThan(resting - 12), reason: 'a tapped card moves at once');
     await tester.pumpAndSettle();
     expect(cardFinder(last), findsNothing, reason: 'and then gone');
   });
