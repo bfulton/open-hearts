@@ -1,10 +1,16 @@
 /// The heart at the front door, folded away and opened out again.
 ///
-/// A sheet of paper folded in half three times and then not there at
-/// all, which is the trick: each fold leaves half of what it had, the
+/// A sheet of paper folded in half three times and then shut away,
+/// which is the trick: each fold leaves half of what it had, the
 /// folded flap lying over what it came from a shade darker, so the
 /// whole thing reads as paper rather than as a picture being squashed.
 /// Then it comes back out the way it went in.
+///
+/// The last step is a fold too, not a vanishing: the packet the three
+/// folds leave turns about its own last crease until it is edge-on and
+/// there is nothing to see — the way a book closes. Shrinking it about
+/// its middle instead, which is what this used to do, reads as the
+/// picture being taken away rather than the paper being folded.
 ///
 /// The fold itself is the old flat cheat — the flap keeps its far edge
 /// on the crease and loses its width as the cosine of how far over it
@@ -31,6 +37,26 @@ class FoldingHeart extends StatefulWidget {
   /// Held at this point of the turn rather than turning, for a still
   /// picture of it — a screenshot, or a test reading one frame.
   final double? at;
+
+  /// How many folds are made before the packet is shut away.
+  static int get folds => _FoldedHeart._folds.length;
+
+  /// The paper the first [n] folds leave: each one keeps the half its
+  /// crease is on, so the packet is the corner they lead to.
+  static Rect packetAfter(int n, Size size) => _FoldedHeart.packetIn(size, folds: n);
+
+  /// The point of the turn at which fold [n] is just made, and the one
+  /// at which the packet is [howFar] shut. Named rather than counted,
+  /// so what looks at one step of the turn does not carry a copy of
+  /// the timings around with it.
+  static double afterFold(int n) => _FoldedHeart._at(_FoldedHeart._still + n * _FoldedHeart._foldFor);
+  static double whileShutting(double howFar) =>
+      _FoldedHeart._at(_FoldedHeart._still + folds * _FoldedHeart._foldFor + howFar * _FoldedHeart._shutFor);
+
+  /// The painter for one point of the turn, for a test that would
+  /// rather read the pixels than the arithmetic.
+  @visibleForTesting
+  static CustomPainter painterAt(double at, Color color) => _FoldedHeart(at: at, color: color);
 
   @override
   State<FoldingHeart> createState() => _FoldingHeartState();
@@ -67,11 +93,13 @@ class _FoldingHeartState extends State<FoldingHeart> with SingleTickerProviderSt
 
 /// The heart, in the state the turn is at.
 ///
-/// The turn is: a beat whole, three folds, a beat gone, and the same
-/// read backwards. A fold keeps the flap's far edge on the crease and
-/// takes its width down as the cosine of how far over it has come,
-/// which is what a fold looks like from straight on — and straight on
-/// is where a front door is looked at from.
+/// The turn is: a beat whole, three folds, the packet shut about its
+/// last crease, and the same read backwards. A fold keeps the flap's
+/// far edge on the crease and takes its width down as the cosine of
+/// how far over it has come, which is what a fold looks like from
+/// straight on — and straight on is where a front door is looked at
+/// from. Shutting is the same cosine over a quarter turn, applied to
+/// everything at once.
 class _FoldedHeart extends CustomPainter {
   _FoldedHeart({required this.at, required this.color});
 
@@ -82,16 +110,23 @@ class _FoldedHeart extends CustomPainter {
   /// The three folds, in the order they are made.
   static const _folds = [_Crease.vertical, _Crease.horizontal, _Crease.vertical];
 
-  /// What the turn is spent on, in order: still, three folds, gone.
+  /// What the turn is spent on, in order: still, three folds, shut.
+  /// Shutting takes a fold's time, because that is what it is.
   static const _still = 0.14;
   static const _foldFor = 0.09;
-  static const _gone = 0.05;
+  static const _shutFor = 0.09;
+
+  /// How far through the half-turn everything is done.
+  static const _half = _still + 3 * _foldFor + _shutFor;
+
+  /// The point of the whole turn at which the half-turn is at [t].
+  static double _at(double t) => t / _half * 0.5;
 
   @override
   void paint(Canvas canvas, Size size) {
     // The same shape going in and coming out: the second half of the
     // turn is the first half backwards.
-    final half = _still + _folds.length * _foldFor + _gone;
+    const half = _half;
     final t = (at < 0.5 ? at : 1 - at) / 0.5 * half;
     var made = 0;
     var making = 0.0;
@@ -100,22 +135,61 @@ class _FoldedHeart extends CustomPainter {
       final into = t - _still;
       made = (into / _foldFor).floor().clamp(0, _folds.length);
       making = made < _folds.length ? (into - made * _foldFor) / _foldFor : 1;
-      if (made >= _folds.length) shut = ((into - _folds.length * _foldFor) / _gone).clamp(0.0, 1.0);
+      if (made >= _folds.length) shut = ((into - _folds.length * _foldFor) / _shutFor).clamp(0.0, 1.0);
     }
     canvas.save();
     if (shut > 0) {
-      // Gone: what is left closes about its own middle.
-      canvas.translate(size.width / 2, size.height / 2);
-      canvas.scale(1 - shut);
-      canvas.translate(-size.width / 2, -size.height / 2);
+      // Shut: the packet the folds have left turns about the last
+      // crease it was folded on until it is edge-on. One axis, pinned
+      // where the paper is thickest — a book closing, not a picture
+      // being scaled away.
+      final packet = packetIn(size);
+      final k = math.cos(shut * math.pi / 2);
+      if (_folds.last == _Crease.vertical) {
+        canvas.translate(packet.right, 0);
+        canvas.scale(k, 1);
+        canvas.translate(-packet.right, 0);
+      } else {
+        canvas.translate(0, packet.bottom);
+        canvas.scale(1, k);
+        canvas.translate(0, -packet.bottom);
+      }
     }
-    _sheet(canvas, Offset.zero & size, 0, 0, made, Curves.easeInOut.transform(making.clamp(0.0, 1.0)), size);
+    _sheet(canvas, Offset.zero & size, 0, 0, made, Curves.easeInOut.transform(making.clamp(0.0, 1.0)), size, false, false);
     canvas.restore();
   }
 
+  /// Where the paper has got to once every fold is made: each fold
+  /// keeps the half its crease is on, so the packet is the corner they
+  /// all lead to, and its last crease is the edge it shuts about.
+  static Rect packetIn(Size size, {int? folds}) {
+    var sheet = Offset.zero & size;
+    for (final crease in _folds.take(folds ?? _folds.length)) {
+      sheet = crease == _Crease.vertical
+          ? Rect.fromLTRB(sheet.left, sheet.top, sheet.center.dx, sheet.bottom)
+          : Rect.fromLTRB(sheet.left, sheet.top, sheet.right, sheet.center.dy);
+    }
+    return sheet;
+  }
+
+  /// The crease a fold is made on: the middle of whatever is being
+  /// folded, which is where the two halves meet whichever of them is
+  /// the one that moves.
+  static double _crease(Rect sheet, bool down) => down ? sheet.center.dx : sheet.center.dy;
+
   /// Draws the paper in [sheet]: what the folds from [depth] on have
   /// done to it, at [layers] thicknesses of paper deep.
-  void _sheet(Canvas canvas, Rect sheet, int depth, int layers, int made, double making, Size whole) {
+  ///
+  /// [flipX] and [flipY] say whether this piece of paper has been
+  /// turned over along each axis by the folds above it. It matters,
+  /// because a flap that has been folded once is a mirror of itself,
+  /// and the next fold is made on the packet, not on the flap: the
+  /// half that stays is the half that stays *in the packet*, which on
+  /// a mirrored flap is the other one. Without that, the third fold —
+  /// the second on an axis already folded — lays the two halves side
+  /// by side instead of one on the other, and the paper opens back out
+  /// rather than getting smaller.
+  void _sheet(Canvas canvas, Rect sheet, int depth, int layers, int made, double making, Size whole, bool flipX, bool flipY) {
     final over = depth >= _folds.length || depth > made
         ? 0.0
         : depth < made
@@ -123,31 +197,35 @@ class _FoldedHeart extends CustomPainter {
             : making;
     if (over <= 0) return _heart(canvas, sheet, layers, whole);
 
-    final crease = _folds[depth];
-    final down = crease == _Crease.vertical;
-    final stays = down
+    final down = _folds[depth] == _Crease.vertical;
+    final flipped = down ? flipX : flipY;
+    final near = down
         ? Rect.fromLTRB(sheet.left, sheet.top, sheet.center.dx, sheet.bottom)
         : Rect.fromLTRB(sheet.left, sheet.top, sheet.right, sheet.center.dy);
-    final goes = down
+    final far = down
         ? Rect.fromLTRB(sheet.center.dx, sheet.top, sheet.right, sheet.bottom)
         : Rect.fromLTRB(sheet.left, sheet.center.dy, sheet.right, sheet.bottom);
+    final stays = flipped ? far : near;
+    final goes = flipped ? near : far;
 
-    _sheet(canvas, stays, depth + 1, layers, made, making, whole);
+    _sheet(canvas, stays, depth + 1, layers, made, making, whole, flipX, flipY);
 
     // The flap, about the crease: a cosine of width, which is a mirror
-    // by the time it is all the way over.
+    // by the time it is all the way over — and being a mirror is what
+    // the flip below records for the folds after this one.
     final k = math.cos(over * math.pi);
+    final crease = _crease(sheet, down);
     canvas.save();
     if (down) {
-      canvas.translate(goes.left, 0);
+      canvas.translate(crease, 0);
       canvas.scale(k, 1);
-      canvas.translate(-goes.left, 0);
+      canvas.translate(-crease, 0);
     } else {
-      canvas.translate(0, goes.top);
+      canvas.translate(0, crease);
       canvas.scale(1, k);
-      canvas.translate(0, -goes.top);
+      canvas.translate(0, -crease);
     }
-    _sheet(canvas, goes, depth + 1, layers + 1, made, making, whole);
+    _sheet(canvas, goes, depth + 1, layers + 1, made, making, whole, down ? !flipX : flipX, down ? flipY : !flipY);
     canvas.restore();
   }
 
