@@ -34,6 +34,10 @@ const _suitGap = 11.0;
 /// How high a card rises when it is picked for the pass.
 const _lift = 13.0;
 
+/// One frame at sixty a second: what a card that has just been let go
+/// has already had, by the time anything can be drawn about it.
+const _aFrame = Duration(milliseconds: 16);
+
 class HandFan extends StatefulWidget {
   const HandFan({
     super.key,
@@ -198,7 +202,13 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
     });
     // No setState: this is a widget update, and the build is next.
     _flights.add(flight);
-    flight.controller.forward();
+    // A frame in, not from nothing. The tap happened during the frame
+    // that is about to be drawn, and a controller's first tick is the
+    // frame after that — so a flight started at zero spends its first
+    // drawn frame exactly where the card already was. That frame is
+    // the whole of what a hand still holding cards hides, and what the
+    // last card of a hand has nothing to hide it with.
+    flight.controller.forward(from: _aFrame.inMicroseconds / flight.controller.duration!.inMicroseconds);
   }
 
   /// The flight carrying [card] into the fan, if one is.

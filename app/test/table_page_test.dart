@@ -361,8 +361,12 @@ void main() {
     await tester.pumpAndSettle();
     final resting = tester.getTopLeft(cardFinder(last)).dy;
     await tester.pumpWidget(fan(const []));
-    await tester.pump(const Duration(milliseconds: 16));
-    expect(tester.getTopLeft(cardFinder(last)).dy, lessThan(resting - 12), reason: 'a tapped card moves at once');
+    // The first frame drawn after the tap, not the second: a flight
+    // that starts from nothing spends this frame where the card
+    // already was, and on the last card of a hand there is nothing
+    // else moving to cover it.
+    await tester.pump();
+    expect(tester.getTopLeft(cardFinder(last)).dy, lessThan(resting - 20), reason: 'a tapped card has already moved');
     await tester.pumpAndSettle();
     expect(cardFinder(last), findsNothing, reason: 'and then gone');
   });
@@ -475,11 +479,11 @@ void main() {
       home: Builder(
         builder: (context) => TextButton(
           onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TablePage(seed: 4, paced: false))),
-          child: const Text('Play bots'),
+          child: const Text('Play solo'),
         ),
       ),
     ));
-    await tester.tap(find.text('Play bots'));
+    await tester.tap(find.text('Play solo'));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget);
 
@@ -499,7 +503,7 @@ void main() {
     await tester.tap(find.text('Leave the table'));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsNothing);
-    expect(find.text('Play bots'), findsOneWidget);
+    expect(find.text('Play solo'), findsOneWidget);
   });
 
   testWidgets('everyone\'s standing: on their badges, yours among them, no card counts', (tester) async {

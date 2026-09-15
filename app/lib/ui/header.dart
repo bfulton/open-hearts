@@ -94,7 +94,11 @@ class MenuButton extends StatelessWidget {
       ),
       Offset.zero & overlay.size,
     );
-    final picked = await showMenu<MenuAction>(
+    // The entries act on their own tap rather than on what showMenu
+    // hands back, because what it hands back arrives only once the
+    // menu has finished closing — a third of a second of a screen that
+    // has been told what to do and is not doing it yet.
+    await showMenu<void>(
       context: context,
       position: position,
       color: Felt.mid,
@@ -104,8 +108,8 @@ class MenuButton extends StatelessWidget {
       ),
       items: [
         for (final action in menu)
-          PopupMenuItem<MenuAction>(
-            value: action,
+          PopupMenuItem<void>(
+            onTap: action.onSelected,
             child: Row(
               children: [
                 Icon(action.icon, size: 18, color: Palette.chromeDim),
@@ -116,7 +120,6 @@ class MenuButton extends StatelessWidget {
           ),
       ],
     );
-    picked?.onSelected();
   }
 
   @override

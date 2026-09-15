@@ -114,7 +114,7 @@ sixty-four pixels square, both kept on the device and carried to the
 others together: the name, icon and colour in every beat, the picture
 once, as a stored event (what is done about a picture nobody asked
 for is below). A game that needs a name and finds none opens the
-profile for one. Then *Play bots*, and under it the live area, which
+profile for one. Then *Play solo*, and under it the live area, which
 carries the game being asked for on a line of its own: fifty points
 or a hundred, rated or unrated, changed in a small sheet and kept on
 the device beside the name. *Play live* is one button — the options

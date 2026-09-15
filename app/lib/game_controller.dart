@@ -131,9 +131,11 @@ class GameController extends ChangeNotifier implements TableModel {
   Duration get _passBeat => paced ? const Duration(milliseconds: 900) : Duration.zero;
 
   /// After the last trick of a hand is swept, a beat of bare felt
-  /// before the sheet: long enough for the cards to fade out as every
-  /// trick's do, so the hand is seen to end rather than cut.
-  static const sweepBeat = Duration(milliseconds: 420);
+  /// before the sheet. Long enough to watch the last trick go to
+  /// whoever took it and to take the felt in after: a sheet that comes
+  /// down on the tail of the cards leaves the hand's last thing
+  /// unseen, and the score it is about unexplained.
+  static const sweepBeat = Duration(milliseconds: 1200);
   Duration get _sweepBeat => paced ? sweepBeat : Duration.zero;
 
   /// Whether the score sheet may show: the hand (or the game) is over

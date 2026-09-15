@@ -82,15 +82,41 @@ void main() {
     expect(tester.widget<FoldingHeart>(find.byType(FoldingHeart)).color, Palette.mark);
 
     // And gold is still doing its job, on the thing you press.
-    final play = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Play bots'));
+    final play = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Play solo'));
     expect(play.style!.backgroundColor!.resolve({}), Palette.gold);
+  });
+
+  testWidgets('the spinner belongs to the button that was pressed', (tester) async {
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
+    await pumpHome(tester);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    await tester.tap(find.text('Play friends'));
+    await tester.pump();
+    await tester.pump();
+    final spinners = find.byType(CircularProgressIndicator);
+    expect(spinners, findsOneWidget, reason: 'one way in is being opened, so one spinner');
+    expect(
+      find.descendant(of: find.widgetWithText(FilledButton, 'Play friends'), matching: spinners),
+      findsOneWidget,
+      reason: 'and it is on the button that was pressed',
+    );
+    expect(
+      find.descendant(of: find.widgetWithText(FilledButton, 'Play live'), matching: spinners),
+      findsNothing,
+      reason: 'not on the one that was not',
+    );
+
+    // Let the wait run out, so the relay it opened is closed behind it.
+    await tester.pump(stopWaiting + const Duration(seconds: 2));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('one screen: the three ways in, and who you are in the corner', (tester) async {
     await pumpHome(tester);
     expect(find.text('Open Hearts'), findsOneWidget);
     expect(find.byType(TextField), findsNothing, reason: 'nothing is typed on the door any more');
-    const buttons = ['Play bots', 'Play live', 'Play friends'];
+    const buttons = ['Play solo', 'Play live', 'Play friends'];
     for (final label in buttons) {
       expect(find.text(label), findsOneWidget, reason: '"$label" is on the front door');
     }
@@ -139,10 +165,10 @@ void main() {
     expect(kept.rated, isFalse);
   });
 
-  testWidgets('Play bots plays the game the options ask for', (tester) async {
+  testWidgets('Play solo plays the game the options ask for', (tester) async {
     SharedPreferences.setMockInitialValues({'game_target': 100});
     await pumpHome(tester);
-    await tester.tap(find.text('Play bots'));
+    await tester.tap(find.text('Play solo'));
     await tester.pumpAndSettle();
     expect(tester.widget<TablePage>(find.byType(TablePage)).target, 100);
     expect(find.text('Hand 1  ·  Pass left  ·  to 100'), findsOneWidget);
@@ -186,7 +212,7 @@ void main() {
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     await pumpHome(tester, openRoom: 'KP4T9MXR');
-    expect(find.text('Play bots'), findsOneWidget, reason: 'the bots are free, always');
+    expect(find.text('Play solo'), findsOneWidget, reason: 'playing alone is free, always');
     expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     expect(find.text('Not open yet'), findsOneWidget);
     expect(find.text('Play live'), findsNothing);

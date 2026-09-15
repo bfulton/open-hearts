@@ -138,7 +138,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// After the last trick of a hand is swept, a beat of bare felt
   /// before the sheet, as at the solo table: the cards fade out as
   /// every trick's do, and the hand is seen to end rather than cut.
-  static const sweepBeat = Duration(milliseconds: 420);
+  static const sweepBeat = Duration(milliseconds: 1200);
   Timer? _sweepTimer;
 
   /// The game is over as shown, and its last trick has been seen off
@@ -659,7 +659,15 @@ class LiveController extends ChangeNotifier implements TableModel {
     notifyListeners();
   }
 
+  /// How long the wire is kept open after a leave is announced. The
+  /// leaving is a message like any other and has to reach the relay
+  /// and the peers, and the wire it goes on is this one — so it is
+  /// closed a beat later rather than under its own message.
+  static const leaveBeat = Duration(milliseconds: 600);
+  bool _left = false;
+
   void leave() {
+    _left = true;
     client.leave();
     notifyListeners();
   }
@@ -700,7 +708,15 @@ class LiveController extends ChangeNotifier implements TableModel {
     _sub?.cancel();
     _refusals?.cancel();
     pictures?.removeListener(_pictured);
-    client.close();
+    // Nothing here reacts to the table any more, whichever way this
+    // goes; only the socket waits, and only for a leave that is still
+    // on its way out. Waiting before the page is gone would be the
+    // player standing at a table they have left.
+    if (_left) {
+      Timer(leaveBeat, client.close);
+    } else {
+      client.close();
+    }
     super.dispose();
   }
 }

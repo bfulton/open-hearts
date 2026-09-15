@@ -81,8 +81,8 @@ async function main() {
       // ?e2e turns the semantics tree on, which is what the clicks go
       // through (the suite does the same).
       await page.goto(`${app.url}/?e2e=1`);
-      if (!(await until(page, /^Play bots$/, 60000))) throw new Error(`${shape.name}: no app`);
-      await click(page, /^Play bots$/, true);
+      if (!(await until(page, /^Play solo$/, 60000))) throw new Error(`${shape.name}: no app`);
+      await click(page, /^Play solo$/, true);
       if (!(await until(page, /^Pass$/))) throw new Error(`${shape.name}: no table`);
       await sleep(700);
       await page.screenshot({ path: join(outDir, `${shape.name}-pass.png`) });

@@ -118,13 +118,12 @@ class _LivePageState extends State<LivePage> {
     await (chosen ? pictures.show(about.key) : pictures.hide(about.key));
   }
 
-  Future<void> _leave() async {
-    if (_c.amSeated && !_c.done) {
-      _c.leave();
-      // Let the leave reach the wire before the transport goes.
-      await Future<void>.delayed(const Duration(milliseconds: 600));
-    }
-    if (mounted) Navigator.of(context).pop();
+  void _leave() {
+    // Said, and gone. The beat the leaving needs to reach the wire is
+    // the socket's to wait out, not the screen's (live_controller.dart)
+    // — standing at a table you have left is the app arguing with you.
+    if (_c.amSeated && !_c.done) _c.leave();
+    Navigator.of(context).pop();
   }
 
   /// With `?e2e` in the address, the client's own account of the table

@@ -96,7 +96,12 @@ class _HomePageState extends State<HomePage> {
   Pictures? _pictures;
   final List<Uri> _relays = appRelays();
   String? _error;
-  bool _busy = false;
+
+  /// Which way in is being opened, while it is being opened. Both are
+  /// a relay connection away and both take a moment, and a spinner on
+  /// the button that was not pressed is the door looking confused.
+  _Opening? _opening;
+  bool get _busy => _opening != null;
 
   /// A relay is taking its time and the device is still waiting. Not an
   /// error — there is nothing to do about it but wait — so it is said
@@ -245,11 +250,11 @@ class _HomePageState extends State<HomePage> {
 
   /// Connects to the relays on [tag], or explains why not. Nothing
   /// goes near a relay without a name on it.
-  Future<RelayTransport?> _connect(String tag) async {
+  Future<RelayTransport?> _connect(String tag, _Opening opening) async {
     if (await _named() == null || !mounted) return null;
     final relays = _relays;
     setState(() {
-      _busy = true;
+      _opening = opening;
       _slow = false;
       _error = null;
     });
@@ -276,7 +281,7 @@ class _HomePageState extends State<HomePage> {
       if (_standing == null) await _loadStanding(relays, signer);
       setState(() {
         _transport = transport;
-        _busy = false;
+        _opening = null;
         _slow = false;
       });
       return transport;
@@ -296,7 +301,7 @@ class _HomePageState extends State<HomePage> {
     transport?.close();
     if (!mounted) return;
     setState(() {
-      _busy = false;
+      _opening = null;
       _slow = false;
       _error = why;
     });
@@ -314,7 +319,7 @@ class _HomePageState extends State<HomePage> {
   /// plays to is part of the pool's own name.
   Future<void> _play() async {
     final options = _options;
-    final transport = await _connect(poolTag(options.pool, target: options.target));
+    final transport = await _connect(poolTag(options.pool, target: options.target), _Opening.live);
     if (transport == null) return;
     final ledger = _standing?.ledger ?? Ledger();
     final queue = WaitingRoom(
@@ -396,7 +401,7 @@ class _HomePageState extends State<HomePage> {
   /// and the first to arrive is nobody special.
   Future<void> _enter() async {
     final code = widget.openRoom ?? Room.newCode();
-    final transport = await _connect(code);
+    final transport = await _connect(code, _Opening.friends);
     if (transport == null) return;
     try {
       final room = Room.enter(relay: transport, code: code, name: _name, avatar: _avatar, target: _options.target);
@@ -407,12 +412,12 @@ class _HomePageState extends State<HomePage> {
       showRoom(code);
     } on TimeoutException {
       setState(() {
-        _busy = false;
+        _opening = null;
         _error = _noRelay;
       });
     } catch (e) {
       setState(() {
-        _busy = false;
+        _opening = null;
         _error = 'Could not connect: $e';
       });
     }
@@ -604,11 +609,10 @@ class _HomePageState extends State<HomePage> {
         const Text('Open source, no ads. Play alone or live.',
             textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
         const SizedBox(height: 22),
-        FilledButton.icon(
+        FilledButton(
           onPressed: () => _go(TablePage(target: _options.target)),
           style: _primary(),
-          icon: const Icon(Icons.smart_toy_outlined, size: 20),
-          label: const Text('Play bots', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+          child: const Text('Play solo', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(height: 16),
         liveOpen ? _live() : const _LiveLocked(),
@@ -670,12 +674,14 @@ class _HomePageState extends State<HomePage> {
             style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
           ),
           const SizedBox(height: 12),
-          _PlayLive(online: _online, busy: _busy, onTap: _play),
+          _PlayLive(online: _online, busy: _opening == _Opening.live, disabled: _busy, onTap: _play),
           const SizedBox(height: 10),
-          OutlinedButton(
+          // The same gold as the rest: two ways into a live game, and
+          // neither is the lesser of them.
+          FilledButton(
             onPressed: _busy ? null : _enter,
-            style: _secondary(),
-            child: _Trying(busy: _busy, label: 'Play friends'),
+            style: _primary(),
+            child: _Trying(busy: _opening == _Opening.friends, label: 'Play friends', weight: FontWeight.w700, size: 15.5),
           ),
           const SizedBox(height: 6),
           const Text(
@@ -695,13 +701,10 @@ class _HomePageState extends State<HomePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       );
 
-  static ButtonStyle _secondary() => OutlinedButton.styleFrom(
-        foregroundColor: Palette.chrome,
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      );
 }
+
+/// The two ways into a live game, while one of them is being opened.
+enum _Opening { live, friends }
 
 /// When a slow relay is worth a word, and when there is nothing left
 /// to wait for.
@@ -734,13 +737,17 @@ Future<void> waitForRelay(
 /// itself: the count is the reason to press it now or to come back
 /// later, so it belongs where the pressing happens.
 class _PlayLive extends StatelessWidget {
-  const _PlayLive({required this.online, required this.busy, required this.onTap});
+  const _PlayLive({required this.online, required this.busy, required this.disabled, required this.onTap});
 
   /// Devices online, this one included; null before the relays have
   /// been heard from.
   final int? online;
 
+  /// Whether this is the one being opened, which is what the spinner
+  /// says; [disabled] is either of them being opened, which is what
+  /// stops a second press.
   final bool busy;
+  final bool disabled;
   final VoidCallback onTap;
 
   @override
@@ -751,7 +758,7 @@ class _PlayLive extends StatelessWidget {
     // thing the button says.
     final spoken = count == null ? 'Play live' : 'Play live, ${n! <= 1 ? 'nobody else online' : '$n online'}';
     return FilledButton(
-      onPressed: busy ? null : onTap,
+      onPressed: disabled ? null : onTap,
       style: _HomePageState._primary(),
       child: Semantics(
         label: spoken,

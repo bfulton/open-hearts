@@ -70,7 +70,7 @@ flow('the front door', async ({ open }) => {
     /^Open source, no ads\. Play alone or live\.$/,
     /^Menu$/,
     /^Your profile$/,
-    /^Play bots$/,
+    /^Play solo$/,
     /^50 points · rated$/,
     /^Game options$/,
     /^Play live/,
@@ -95,7 +95,7 @@ flow('the game options', async ({ open }) => {
   await waitFor(page, /^100 points · unrated$/, { what: 'the line, changed' });
   // The choice is a rule of the next game, not a label: the table
   // plays to it.
-  await click(page, /^Play bots$/);
+  await click(page, /^Play solo$/);
   await waitFor(page, /^Hand 1 .* to 100$/, { what: 'a game to a hundred' });
   await click(page, /^Menu$/);
   await waitFor(page, /^Leave the table$/, { what: 'the menu' });
@@ -107,7 +107,7 @@ flow('the game options', async ({ open }) => {
 
 flow('a hand alone', async ({ open }) => {
   const page = await open();
-  await click(page, /^Play bots$/);
+  await click(page, /^Play solo$/);
   await waitFor(page, /^Choose 3 more to pass$/, { what: 'the pass' });
   await playAlone(page, (p) => has(p, /^Next hand$/), 120000);
   await click(page, /^Next hand$/);
@@ -115,7 +115,7 @@ flow('a hand alone', async ({ open }) => {
   await click(page, /^Menu$/);
   await waitFor(page, /^Leave the table$/, { what: 'the menu' });
   await click(page, /^Leave the table$/);
-  await waitFor(page, /^Play bots$/, { what: 'the home screen again' });
+  await waitFor(page, /^Play solo$/, { what: 'the home screen again' });
 });
 
 flow('a thumb, not the tree', async ({ open }) => {
@@ -124,7 +124,7 @@ flow('a thumb, not the tree', async ({ open }) => {
   // test, so this is where a tap landing in the wrong place shows up.
   for (const [shape, viewport] of [['portrait', portrait], ['sideways', landscape]]) {
     const page = await open({ viewport, pointer: true });
-    await click(page, /^Play bots$/);
+    await click(page, /^Play solo$/);
     await waitFor(page, /^Choose 3 more to pass$/, { what: `the pass, ${shape}` });
     // Three named cards, each tapped where it is drawn: the count on
     // the line is how the app says the tap landed on that card and not
@@ -144,7 +144,7 @@ flow('a thumb, not the tree', async ({ open }) => {
 
 flow('turning the phone mid-hand', async ({ open }) => {
   const page = await open();
-  await click(page, /^Play bots$/);
+  await click(page, /^Play solo$/);
   await waitFor(page, /^Choose 3 more to pass$/, { what: 'the pass' });
   await playAlone(page, (p) => has(p, /^Your (turn|lead)$/), 60000);
   const hand = (await texts(page)).find((t) => /^Hand \d/.test(t));
@@ -161,7 +161,7 @@ flow('turning the phone mid-hand', async ({ open }) => {
 
 flow('a game alone, and the record it leaves', async ({ open, context }) => {
   const page = await open();
-  await click(page, /^Play bots$/);
+  await click(page, /^Play solo$/);
   // Hand after hand until somebody reaches fifty.
   for (let hand = 0; hand < 30; hand++) {
     await playAlone(page, (p) => has(p, /^Next hand$|^New game$/), 180000);
@@ -194,7 +194,7 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
   await click(page, /^Menu$/);
   await waitFor(page, /^Leave the table$/, { what: 'the menu' });
   await click(page, /^Leave the table$/);
-  await waitFor(page, /^Play bots$/, { what: 'the front door' });
+  await waitFor(page, /^Play solo$/, { what: 'the front door' });
   await click(page, /^Your profile$/);
   await waitFor(page, /^Alone$/, { what: 'the profile page', timeout: 40000 });
   const record0 = await texts(page);
@@ -212,7 +212,7 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
 
 flow('the about page', async ({ open }) => {
   const page = await open();
-  await click(page, /^Play bots$/);
+  await click(page, /^Play solo$/);
   await waitFor(page, /^Menu$/, { what: 'the table' });
   await click(page, /^Menu$/);
   await waitFor(page, /^About$/, { what: 'the menu' });
@@ -263,7 +263,7 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   // Leaving a room lands back on the front door, and takes the room
   // out of the address with it.
   await click(page, /^Leave$/);
-  await waitFor(page, /^Play bots$/, { what: 'the home screen after leaving' });
+  await waitFor(page, /^Play solo$/, { what: 'the home screen after leaving' });
   if (new URL(page.url()).searchParams.get('room')) throw new Error(`the room is still in the address: ${page.url()}`);
 });
 
@@ -326,7 +326,7 @@ async function main() {
     if (pointer) {
       await page.addStyleTag({ content: 'flt-semantics, flt-semantics * { pointer-events: none !important; }' });
     }
-    await waitFor(page, /^Open Hearts$|^Play bots$/, { what: 'the app', timeout: 60000 });
+    await waitFor(page, /^Open Hearts$|^Play solo$/, { what: 'the app', timeout: 60000 });
     return page;
   };
   for (const { name, run } of flows) {

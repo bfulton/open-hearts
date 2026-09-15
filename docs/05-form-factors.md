@@ -189,6 +189,18 @@ its turn comes round again. Between turns it asks for no frames at
 all, which is the difference between a flourish and a fidget on a door
 somebody leaves open in a tab.
 
+Two of these begin at the tap that asked for them, not at the frame
+after. A controller's first tick is the next frame, so a flight started
+from nothing spends its first drawn frame exactly where the card
+already was — a frame of nothing, which a hand still closing over the
+gap hides and the last card of a hand does not. Both start a frame in.
+
+At the end of a hand the sheet waits: the last trick sits while its
+winner is named, sweeps away, and then there is a beat of bare felt
+before the score comes down over it. A sheet that arrives on the tail
+of the cards leaves the hand's last thing unseen and the number it is
+about unexplained.
+
 None of it is long: a play is 240 ms, a pass 420, a trick swept 300, the
 fan settling 220. A movement anyone has to wait for is a movement that
 has stopped being information. And none of it is load-bearing — every
