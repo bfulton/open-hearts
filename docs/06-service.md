@@ -226,11 +226,100 @@ signature that takes 11 ms in the VM takes 100 ms compiled to
 JavaScript, and 0.6 ms as wasm
 ([measurements/sign](../measurements/README.md)).
 
+## An object per tag
+
+A relay is a meeting point, and a meeting point costs whatever it holds
+open. Ours is a **Cloudflare Durable Object per tag** (`service/do/`):
+`wss://relay.openhearts.game/<tag>`, the tag in the path because the
+object has to be named before the socket is opened, and everyone on
+that tag lands on that one object wherever they are — no fan-out
+between machines, no database in the middle. Presence is one tag,
+`online`, and one object. Tables and matchmaking have not moved.
+
+**It is preferred, and nothing depends on it.** The beats still go to
+every relay the device can write to, the public ones included: a device
+is online for whoever can hear it, and what another device can reach is
+not ours to assume — a build from before the object existed, a network
+that blocks the host, a deploy that is down. So a device on the object
+and a device on the public relays alone see each other, and the day the
+object is not there presence is exactly what it was before it existed
+(`service/test/presence_object_test.dart`).
+
+**Marked in the list, never assumed.** A relay that keeps one object
+per tag wears `{tag}` where the tag goes, and the client that has a tag
+puts it there (`tagMark`, `presence_relay.dart`). It cannot be
+inferred from a hostname in either direction: a public relay serves
+every tag at its root and would answer a path with a 404, and a
+sharded one cannot serve a client that gives it no tag. That is also
+why the marked relay is in the list presence takes
+(`presenceRelays`, `app/lib/net/relays.dart`) and not in the list
+tables and signalling take — a table has nowhere to put its tag until
+it moves here.
+
+**Hibernation, which is the difference between free and a monthly
+bill.** The object hands its sockets to the runtime
+(`state.acceptWebSocket`) instead of holding them itself
+(`server.accept`), so an open socket costs nothing while nothing is
+being said on it: the object is evicted and charged for none of that
+time, where accepting the socket itself would have held the object —
+and its duration charge — up for as long as anybody was connected, all
+night, on every tag. What an evicted object loses is its memory, so
+each socket carries its own subscriptions
+(`serializeAttachment`) and they come back with it; that ride has a
+size limit, so a socket is held to a few subscriptions and the oldest
+goes as a new one arrives — bounded as it is written, which is the
+rule for everything here.
+
+**Nothing is written down.** Presence is ephemeral by definition,
+forwarded to whoever is listening and forgotten, so the object has no
+storage to pay for, none to read on the way back from hibernation, and
+nothing that could ever need a scheduled sweep. A kind that is not
+ephemeral is refused with a reason rather than quietly dropped, and the
+client writes it to the relays that keep things.
+
+**One relay, two runtimes, one set of tests.** The core
+(`service/do/relay.mjs`) is the NIP-01 subset the Dart relay already
+speaks, written as plain functions over anything that can send a
+string: no Cloudflare imports and no node ones, signatures through the
+very wasm the app carries (`app/web/schnorr.wasm`, handed in compiled
+because a Worker may not compile one at runtime) rather than a third
+implementation of BIP-340. That is what lets it be tested properly.
+`service/do/host.mjs` hosts it on a plain node socket — the handshake
+and frames of RFC 6455 written out, since node ships a WebSocket
+client and no server — and `OH_RELAY=js` puts that host behind the
+`Relay` class the Dart tests already construct, so every suite in
+`service/` runs against either relay with nothing about the tests
+changed:
+
+```bash
+cd service && dart test                  # the Dart relay
+cd service && OH_RELAY=js dart test      # the relay the object runs
+node --test service/do/*.test.mjs        # the core, and the sockets under it
+```
+
+The local host takes the simulator's signatures as well as real ones,
+by their length, exactly as the Dart relay does and for the same
+reason (`signing.dart`); the deployed object knows BIP-340 and refuses
+everything else.
+
+**Deploying it.** `cd service/do && npx wrangler@4 deploy` — the
+binding (`TABLE`), the class and the SQLite migration are in
+`wrangler.toml`, and a first deploy answers on the worker's own
+`workers.dev` host. The name the app looks for is a Workers custom
+domain on `relay.openhearts.game`, which writes its own DNS record and
+needs the zone to be on the account; until it is, builds find the
+object down and presence rides the public relays, which is the same
+thing that has always been true of `nostr.openhearts.game`.
+
 ## Language and layout
 
 The juror runs the bot policy under MPC, and the bot is Dart. So the
 juror is Dart, and rather than carry a second language for two hundred
-lines of handlers, the whole service is Dart. Locally that is one
+lines of handlers, the whole service is Dart. The one exception is the
+object per tag, which is JavaScript because the runtime it hibernates
+on is: a few hundred lines of NIP-01 that the Dart suites hold to the
+Dart relay's own behaviour, rather than a runtime chosen to keep the
+language. Locally that is one
 `dart run`; in production it is a container, or Dart on a serverless
 runtime — a packaging decision, deferred.
 
