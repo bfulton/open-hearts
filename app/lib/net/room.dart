@@ -115,15 +115,23 @@ class Room extends ChangeNotifier {
 
   static const startAfter = Duration(seconds: 10);
 
-  /// A code people can read out: four letters, no lookalikes.
+  /// A code for a private table: eight characters, from the system's
+  /// own source of randomness. It is the only thing between a stranger
+  /// and the table, and a code that can be guessed in a few thousand
+  /// tries is no door at all. The alphabet leaves out the characters
+  /// that are read or typed as one another — O and zero, I and one and
+  /// a lowercase L — because a code still ends up read off one screen
+  /// and into another now and then.
   static String newCode([Random? random]) {
-    const letters = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+    const alphabet = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
     final rng = random ?? Random.secure();
-    return List.generate(4, (_) => letters[rng.nextInt(letters.length)]).join();
+    return List.generate(8, (_) => alphabet[rng.nextInt(alphabet.length)]).join();
   }
 
-  /// A code as typed or shared: four letters or digits.
-  static bool validCode(String s) => RegExp(r'^[A-Z0-9]{4}$').hasMatch(s);
+  /// A code as shared: eight letters or digits. Wider than the
+  /// alphabet a code is drawn from, since what arrives in a link is
+  /// somebody else's build's idea of one.
+  static bool validCode(String s) => RegExp(r'^[A-Z0-9]{8}$').hasMatch(s);
 
   final RoomChannel channel;
   final String code;

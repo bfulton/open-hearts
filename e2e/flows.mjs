@@ -220,15 +220,24 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   await waitFor(page, /^Play live, (nobody else online|\d+ online)$/, { what: 'the online count on the button', timeout: 40000 });
   await click(page, /^Play friends$/);
   await waitFor(page, /^Share the link$/, { what: 'the room', timeout: 60000 });
+  // The way in is the link, and the link is in the address bar: the
+  // room says who is here and nothing about its code.
+  const code = new URL(page.url()).searchParams.get('room');
+  if (!/^[A-Z0-9]{8}$/.test(code ?? '')) throw new Error(`no room in the address: ${page.url()}`);
   const seen = await texts(page);
-  const code = seen.find((t) => /^Table [A-Z0-9]{4}$/.test(t));
-  if (!code) throw new Error(`no table name in the room\nsaw: ${seen.join(' | ')}`);
-  if (seen.some((t) => /^[A-Z0-9]{4}$/.test(t))) throw new Error('the code is still shouted at the room');
+  if (seen.some((t) => t.includes(code))) throw new Error(`the code is on the screen\nsaw: ${seen.join(' | ')}`);
   if (!seen.some((t) => /^Ada \(you\)$/.test(t))) throw new Error('the room does not say which one is you');
   if (!seen.some((t) => /^rated \d+/.test(t))) throw new Error(`no rating beside a name\nsaw: ${seen.join(' | ')}`);
-  // Leaving a room lands back on the front door.
+  // A refresh is not a way out: the address is the room, so the device
+  // comes back to it.
+  await page.reload();
+  await waitFor(page, /^Share the link$/, { what: 'the room after a refresh', timeout: 60000 });
+  if (new URL(page.url()).searchParams.get('room') !== code) throw new Error(`the refresh landed elsewhere: ${page.url()}`);
+  // Leaving a room lands back on the front door, and takes the room
+  // out of the address with it.
   await click(page, /^Leave$/);
   await waitFor(page, /^Play bots$/, { what: 'the home screen after leaving' });
+  if (new URL(page.url()).searchParams.get('room')) throw new Error(`the room is still in the address: ${page.url()}`);
 });
 
 // ---- the runner ----------------------------------------------------------

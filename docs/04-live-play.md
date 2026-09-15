@@ -146,9 +146,14 @@ same way: it is in the signed start event, since four seats that
 disagree about when the game ends fork at the end of a hand, and it
 is part of the pool's tag on the relay, so everyone who meets in a
 pool wants the same game. Beside *Play live*, *Play friends* starts a
-table of its own at a code drawn at random. Nobody types a code — the
-room shows its code and a *Share the link* that carries it, and
-opening that link lands in the room.
+table of its own at a code drawn at random — eight characters from
+`Random.secure()`, out of an alphabet with no lookalikes in it, since
+the code is the whole of what keeps a stranger out of a private table.
+Nobody types a code, and no screen shows one: the room offers *Share
+the link*, the link carries the code, and opening it lands in the
+room. On the web the room's own link is in the address bar while the
+device is in it, so a refresh comes back and the address is there to
+copy.
 Nobody hosts a room: everyone at a code says so on the relay every two
 seconds, whoever has been heard lately is the table in the order they
 arrived, and the lowest key present leads — it starts the table ten

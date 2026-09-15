@@ -33,6 +33,7 @@ import 'live/profile_sheet.dart';
 import 'live/live_page.dart';
 import 'live/options_sheet.dart';
 import 'live_controller.dart';
+import 'net/address.dart';
 import 'net/duty.dart';
 import 'net/mesh_transport.dart';
 import 'net/relays.dart';
@@ -219,6 +220,9 @@ class _HomePageState extends State<HomePage> {
     room.removeListener(_onRoom);
     scheduleMicrotask(room.dispose);
     _room = null;
+    // Out of the room, so out of the address: a refresh from here is
+    // the front door, not a table that has started or emptied.
+    showRoom(null);
   }
 
   void _go(Widget page) {
@@ -357,6 +361,9 @@ class _HomePageState extends State<HomePage> {
       final room = Room.enter(relay: transport, code: code, name: _name, avatar: _avatar, target: _options.target);
       room.addListener(_onRoom);
       setState(() => _room = room);
+      // The room is its link, and the link is in the address bar while
+      // this device is in it (net/address.dart).
+      showRoom(code);
     } on TimeoutException {
       setState(() {
         _busy = false;
@@ -474,7 +481,7 @@ class _HomePageState extends State<HomePage> {
                                   ? _WaitingView(queue: queue, onCancel: () => setState(_closeLobby))
                                   : room == null
                                       ? _entry()
-                                      : _RoomView(
+                                      : RoomView(
                                           room: room,
                                           ledger: _standing?.ledger,
                                           onLeave: () => setState(_closeLobby),
@@ -753,11 +760,13 @@ class _WaitingView extends StatelessWidget {
   }
 }
 
-/// The room while it fills: the code, who is here, and the countdown.
-/// The same screen for everyone in it; the one who leads sees Start
-/// now, and that is the whole of the difference.
-class _RoomView extends StatelessWidget {
-  const _RoomView({required this.room, required this.ledger, required this.onLeave, required this.onShare});
+/// The room while it fills: who is here, and the countdown. The code
+/// is not on it — the link carries it, and a code on a screen is a code
+/// to be read over a shoulder. The same screen for everyone in it; the
+/// one who leads sees Start now, and that is the whole of the
+/// difference.
+class RoomView extends StatelessWidget {
+  const RoomView({super.key, required this.room, required this.ledger, required this.onLeave, required this.onShare});
 
   final Room room;
 
@@ -775,13 +784,6 @@ class _RoomView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // The code is nobody's to type any more — the link carries it
-        // — so it is a name for the table and not the point of the
-        // screen.
-        Text('Table ${room.code}',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: Palette.chromeDim, letterSpacing: 0.4)),
-        const SizedBox(height: 10),
         Text(
           seconds == null
               ? 'Send the link. The table starts ten seconds after someone joins.'

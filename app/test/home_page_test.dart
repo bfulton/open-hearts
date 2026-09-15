@@ -12,10 +12,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table/table.dart';
+
+import 'room_test.dart' show Bus;
 
 Future<void> pumpHome(WidgetTester tester, {String? openRoom}) async {
   tester.view
@@ -69,7 +73,7 @@ void main() {
   });
 
   testWidgets('a link to a room, on a device with no name, asks for one in the profile', (tester) async {
-    await pumpHome(tester, openRoom: 'ABCD');
+    await pumpHome(tester, openRoom: 'KP4T9MXR');
     expect(find.text('My initials'), findsOneWidget, reason: 'the profile itself, not a field on the page');
     expect(find.widgetWithText(TextField, 'Your name'), findsOneWidget,
         reason: 'the room needs a name, and the profile is where a name is given');
@@ -111,6 +115,22 @@ void main() {
     expect(find.text('Build'), findsOneWidget, reason: 'the about page');
   });
 
+  testWidgets('the room says who is here and how to bring the rest, and never says the code', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final room = Room(channel: Bus().attach(FakeSigner('a')), code: 'KP4T9MXR', myName: 'Ada');
+    await tester.pumpWidget(still(Scaffold(
+      body: RoomView(room: room, ledger: null, onLeave: () {}, onShare: () {}),
+    )));
+    await tester.pump();
+    expect(find.text('Ada (you)'), findsOneWidget);
+    expect(find.text('Share the link'), findsOneWidget);
+    expect(find.textContaining('KP4T9MXR'), findsNothing, reason: 'the link is the way in; the code is not for reading off a screen');
+    room.dispose();
+  });
+
   testWidgets('with live play locked there is a padlock and no way in, not even a link', (tester) async {
     liveOpen = false;
     addTearDown(() => liveOpen = true);
@@ -121,7 +141,7 @@ void main() {
       ..physicalSize = const Size(390, 844)
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await pumpHome(tester, openRoom: 'ABCD');
+    await pumpHome(tester, openRoom: 'KP4T9MXR');
     expect(find.text('Play bots'), findsOneWidget, reason: 'the bots are free, always');
     expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     expect(find.text('Not open yet'), findsOneWidget);

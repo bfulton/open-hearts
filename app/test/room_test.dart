@@ -54,16 +54,23 @@ class BusChannel implements RoomChannel {
 }
 
 void main() {
-  test('a code is four letters or digits', () {
-    expect(Room.validCode('ABCD'), isTrue);
-    expect(Room.validCode('A1B2'), isTrue);
-    expect(Room.validCode('abcd'), isFalse, reason: 'upper-cased before it gets here');
-    expect(Room.validCode('AB-D'), isFalse);
-    expect(Room.validCode('ABCDE'), isFalse);
+  test('a code is eight characters, none of them a lookalike, and no two alike', () {
+    expect(Room.validCode('ABCDEFGH'), isTrue);
+    expect(Room.validCode('A1B2C3D4'), isTrue, reason: 'what another build sends is still a code');
+    expect(Room.validCode('abcdefgh'), isFalse, reason: 'upper-cased before it gets here');
+    expect(Room.validCode('ABCDEF-H'), isFalse);
+    expect(Room.validCode('ABCD'), isFalse, reason: 'four of them was a door a stranger could walk through');
+    expect(Room.validCode('ABCDEFGHI'), isFalse);
     expect(Room.validCode(''), isFalse);
-    for (var i = 0; i < 50; i++) {
-      expect(Room.validCode(Room.newCode()), isTrue);
+    final drawn = <String>{};
+    for (var i = 0; i < 300; i++) {
+      final code = Room.newCode();
+      expect(Room.validCode(code), isTrue);
+      expect(code, matches(RegExp(r'^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$')),
+          reason: 'nothing in it is read or typed as something else');
+      drawn.add(code);
     }
+    expect(drawn.length, 300, reason: 'every table a code of its own');
   });
 
   test('two arrive, the lowest key leads, and the table starts ten seconds after the second', () {

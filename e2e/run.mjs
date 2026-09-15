@@ -115,12 +115,14 @@ async function main() {
     await click(pages[0], /^Rocket$/);
     await click(pages[0], /^Done$/);
     await waitFor(pages[0], /^Play friends$/);
-    // Ada goes in with no code, so a new one is drawn: the room names
-    // itself by it. Nobody hosts; whoever is at a code is the table.
+    // Ada goes in with no code, so a new one is drawn. Nobody hosts;
+    // whoever is at a code is the table. The code is on no screen —
+    // the room's link is in the address bar, which is where a person
+    // copies it from and where this reads it.
     await click(pages[0], /^Play friends$/);
     await waitFor(pages[0], /^Share the link$/, { what: 'the room' });
-    const code = (await texts(pages[0])).map((t) => /^Table ([A-Z0-9]{4})$/.exec(t)?.[1]).find(Boolean);
-    if (!code) throw new Error('no room code shown');
+    const code = new URL(pages[0].url()).searchParams.get('room');
+    if (!/^[A-Z0-9]{8}$/.test(code ?? '')) throw new Error(`no room in the address: ${pages[0].url()}`);
     log(`room ${code}`);
     // Nobody types a code: the others arrive by the shared link — the
     // app's own address with the code — and, with a name already, land
@@ -130,7 +132,7 @@ async function main() {
     // started and the room it went through be gone: either is arriving.
     for (let i = 1; i < 4; i++) {
       await pages[i].goto(`${app.url}/?e2e=1&room=${code}`);
-      await waitFor(pages[i], new RegExp(`^Table ${code}$|^\\d of 4 here`), { what: 'the room, by its link', timeout: 60000 });
+      await waitFor(pages[i], /^Share the link$|^\d of 4 here/, { what: 'the room, by its link', timeout: 60000 });
     }
     // Four in: whoever leads starts on its own.
     for (const page of pages) await waitFor(page, /^4 of 4 here  ·  unrated$/, { what: 'the live table', timeout: 40000 });
