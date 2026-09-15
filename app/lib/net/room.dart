@@ -94,6 +94,13 @@ class Room extends ChangeNotifier {
     for (final e in List.of(channel.lobbySoFar)) {
       _onLobby(e);
     }
+    // The start may already have been on the relay: a device that
+    // opens the link a moment after the table began finds its answer
+    // inside this constructor, before anyone can be listening for it,
+    // and every notification after that is guarded by `spec`. So the
+    // first tick says it once — otherwise the room is simply sat in,
+    // waiting for a table that has already gone.
+    _decidedInside = spec != null;
     _sub = channel.lobby.listen(_onLobby);
     _say();
     // The picture is heavy for a beat: once, stored under the code, so
@@ -176,6 +183,10 @@ class Room extends ChangeNotifier {
   int _lastSaid = -1 << 30;
   int _lastArrival = 0;
   bool _started = false;
+
+  /// Whether the table was decided before this room had a listener.
+  /// Cleared by the tick that says so.
+  bool _decidedInside = false;
   StreamSubscription<NostrEvent>? _sub;
   Timer? _timer;
 
@@ -238,7 +249,13 @@ class Room extends ChangeNotifier {
   bool _present(PublicKey key) => key == me || members.any((m) => m.key == key);
 
   void _tick() {
-    if (spec != null) return;
+    if (spec != null) {
+      if (_decidedInside) {
+        _decidedInside = false;
+        notifyListeners();
+      }
+      return;
+    }
     final now = _nowMs();
     if (now - _lastSaid >= heartbeatMs) _say();
     final held = _heldStart;

@@ -132,6 +132,32 @@ void main() {
     });
   });
 
+  test('a room that is already decided says so to whoever comes to listen', () {
+    fakeAsync((async) {
+      // The page enters the room and then listens, so a room that finds
+      // its answer inside its own constructor — the start was on the
+      // relay before this device asked for the code — has nobody to
+      // tell. Told late is the difference between being sent back to
+      // the front door and sitting in a room that will never fill.
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      async.elapse(const Duration(seconds: 3));
+      expect(rooms.every((r) => r.seated), isTrue);
+
+      final late = Room(channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
+      expect(late.spec, isNotNull, reason: 'decided in the constructor, before anyone listens');
+      var told = 0;
+      late.addListener(() => told++);
+      async.elapse(const Duration(seconds: 2));
+      expect(told, greaterThan(0), reason: 'and said to the listener that came after');
+      expect(late.seated, isFalse);
+      for (final r in [...rooms, late]) {
+        r.dispose();
+      }
+    });
+  });
+
   test('the leader\'s game is the table\'s: the score it runs to rides in the start event', () {
     fakeAsync((async) {
       final bus = Bus();

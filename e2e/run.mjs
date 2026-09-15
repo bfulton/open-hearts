@@ -127,13 +127,17 @@ async function main() {
     // Nobody types a code: the others arrive by the shared link — the
     // app's own address with the code — and, with a name already, land
     // straight in the room.
-    // The room starts ten seconds after the second arrival, so by the
-    // time the last of them is looked at, the table may already have
-    // started and the room it went through be gone: either is arriving.
-    for (let i = 1; i < 4; i++) {
+    //
+    // All three at once, because that is what three people sent a link
+    // do, and because the room starts ten seconds after the last
+    // arrival: opened one after another on a slow machine, the third
+    // can miss a table that has already begun without it. By the time
+    // the last is looked at the table may have started and the room it
+    // went through be gone, so either screen is arriving.
+    await Promise.all([1, 2, 3].map(async (i) => {
       await pages[i].goto(`${app.url}/?e2e=1&room=${code}`);
-      await waitFor(pages[i], /^Share the link$|^\d of 4 here/, { what: 'the room, by its link', timeout: 60000 });
-    }
+      await waitFor(pages[i], /^Share the link$|^\d of 4 here/, { what: `the room, by its link (${names[i]})`, timeout: 60000 });
+    }));
     // Four in: whoever leads starts on its own.
     for (const page of pages) await waitFor(page, /^4 of 4 here  ·  unrated$/, { what: 'the live table', timeout: 40000 });
     log('all four at the table');
