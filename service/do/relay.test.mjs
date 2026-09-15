@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { createRelay, maxSubscriptions, memoryStore, schnorrVerifier } from './relay.mjs';
+import { createRelay, maxSubscriptions, memoryStore, schnorrVerifier, tagOf } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
 
@@ -287,4 +287,30 @@ test('a burst from one socket is answered in the order it was sent', async () =>
   assert.deepEqual(a.of('OK').map((m) => m[1]), events.map((e) => e.id));
   // The REQ was sent last, so its history holds every event before it.
   assert.deepEqual(a.of('EVENT').map((m) => m[2].content), events.map((e) => e.content));
+});
+
+test('the tag in the path is what names an object, and only a tag does', () => {
+  // Everything this repo puts on a `t` tag: the one presence topic,
+  // the standings, a pool, a table id, a room code.
+  for (const tag of ['online', 'results', 'queue:unrated', 'queue:rated:50', 'half-deaf-table', 'AB12CD']) {
+    assert.equal(tagOf(`/${tag}`), tag);
+  }
+  // The root names no object: the worker turns that away, and the node
+  // host keeps a relay there for the suites that connect to it.
+  assert.equal(tagOf('/'), '');
+  assert.equal(tagOf(''), '');
+  // A name is one segment and nothing clever: no paths inside it, no
+  // way up out of it, nothing that has to be unescaped twice.
+  assert.equal(tagOf('/a/b'), null);
+  assert.equal(tagOf('/..'), null);
+  assert.equal(tagOf('/a%2Fb'), null);
+  assert.equal(tagOf('/%zz'), null);
+  assert.equal(tagOf(`/${'x'.repeat(129)}`), null);
+  // What is escaped is read before it is judged, so a client that
+  // writes a pool's colon out as an escape lands on the same object as
+  // one that does not.
+  assert.equal(tagOf('/queue%3Aunrated'), 'queue:unrated');
+  // And this is the mark the app's relay list carries while nobody has
+  // put a tag in it: it names no object, on purpose.
+  assert.equal(tagOf('/%7Btag%7D'), null);
 });

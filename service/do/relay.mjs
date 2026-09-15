@@ -42,8 +42,16 @@ const tagShape = /^[A-Za-z0-9._:@+-]{1,128}$/;
 /// the node host both ask this, so a client that reaches one reaches
 /// the other by the same URL.
 export function tagOf(pathname) {
-  const path = decodeURIComponent(pathname).replace(/^\/+/, '');
+  let path;
+  try {
+    path = decodeURIComponent(pathname).replace(/^\/+/, '');
+  } catch {
+    return null; // escapes that are not escapes
+  }
   if (path === '') return '';
+  // A name that reads as a step up a tree: object names have no tree
+  // to step up, but a URL that says otherwise is not answered.
+  if (path === '.' || path === '..') return null;
   return tagShape.test(path) ? path : null;
 }
 
