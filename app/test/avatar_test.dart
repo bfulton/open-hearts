@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:open_hearts/avatar.dart';
-import 'package:open_hearts/live/avatar_picker.dart';
+import 'package:open_hearts/live/profile_sheet.dart';
 import 'package:open_hearts/ui/player_icon.dart';
 
 void main() {
@@ -74,35 +74,39 @@ void main() {
     expect(icons[1].color, PlayerIcon.palette[2]);
   });
 
-  testWidgets('the picker: an icon, a colour, Done — and My initials clears it', (tester) async {
-    Avatar? picked;
+  testWidgets('the profile: a name, an icon, a colour, Done — and My initials clears it', (tester) async {
+    Profile? picked;
+    Profile current = (name: 'Ada', avatar: Avatar.none);
     await tester.pumpWidget(MaterialApp(
       home: Builder(
         builder: (context) => TextButton(
-          onPressed: () async => picked = await showAvatarPicker(context, current: Avatar.none, name: 'Ada', seed: 'k1'),
+          onPressed: () async => picked = await showProfile(context, current: current, seed: 'k1'),
           child: const Text('open'),
         ),
       ),
     ));
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.text('Your avatar'), findsOneWidget);
+    // The name is asked for here, and nowhere else.
+    expect(find.widgetWithText(TextField, 'Your name'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Your name'), 'Ada Lovelace');
+    await tester.pumpAndSettle();
+    expect(find.text('AL'), findsOneWidget, reason: 'the badge in the sheet wears what is typed');
     await tester.tap(find.bySemanticsLabel('Rocket'));
     await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel('Colour 4'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
-    expect(picked, const Avatar(icon: 'rocket', color: 3));
+    expect(picked, (name: 'Ada Lovelace', avatar: const Avatar(icon: 'rocket', color: 3)));
 
+    current = picked!;
     await tester.tap(find.text('open'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Rocket'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('My initials'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
-    expect(picked, Avatar.none);
+    expect(picked, (name: 'Ada Lovelace', avatar: Avatar.none), reason: 'the name it came in with, and no avatar');
   });
 }

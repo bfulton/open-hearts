@@ -2,12 +2,15 @@
 /// are, the game you are asking for, and the three ways in — bots,
 /// live, or friends at a link.
 ///
-/// One screen, because all of it is one decision. Your name and your
-/// avatar are here rather than behind a Play live, since the others
-/// see them the moment you sit down; the game's options are a line
-/// above the live buttons, where the choice they describe is about to
-/// be made. A table found or filled replaces the door with the waiting
-/// screen or the room, and leaving either brings it back.
+/// One screen, because all of it is one decision: the game's options
+/// are a line above the live buttons, where the choice they describe
+/// is about to be made. Who you are — your name and your avatar — is
+/// the icon in the top right, which is the whole of your profile
+/// (live/profile_sheet.dart); a game that needs a name and finds none
+/// asks for it there rather than holding a field open on the door for
+/// the many times it is not wanted. A table found or filled replaces
+/// the door with the waiting screen or the room, and leaving either
+/// brings it back.
 ///
 /// This is also where a device comes online: it says it is here and
 /// serves as a juror from the front door, not only from a table
@@ -26,7 +29,7 @@ import 'avatar.dart';
 import 'crypto/deal.dart';
 import 'game_options.dart';
 import 'identity.dart';
-import 'live/avatar_picker.dart';
+import 'live/profile_sheet.dart';
 import 'live/live_page.dart';
 import 'live/options_sheet.dart';
 import 'live_controller.dart';
@@ -74,10 +77,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _name = TextEditingController();
-
-  /// How you look to the others: read off the device with the name,
-  /// changed by tapping it.
+  /// Who this device is to everyone else: read off the device at the
+  /// start, changed in the profile behind the icon in the corner.
+  String _name = '';
   Avatar _avatar = Avatar.none;
 
   /// The game this device is asking for, off the device and back onto
@@ -141,11 +143,12 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _options = options;
       _avatar = avatar;
-      if (name != null) _name.text = name;
+      _name = name ?? '';
     });
-    // Here by a link, with a name already: straight into the room —
-    // unless live play is locked, which a link does not open.
-    if (liveOpen && widget.openRoom != null && (name ?? '').isNotEmpty) await _enter();
+    // Here by a link: straight into the room — unless live play is
+    // locked, which a link does not open. A device with no name yet is
+    // asked for one on the way in.
+    if (liveOpen && widget.openRoom != null) await _enter();
   }
 
   /// Online from the front door, not only from a table: this device is
@@ -189,7 +192,6 @@ class _HomePageState extends State<HomePage> {
     _closeLobby();
     _onlineClock?.cancel();
     _refusalSub?.cancel();
-    _name.dispose();
     super.dispose();
   }
 
@@ -223,20 +225,16 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
-  /// Connects to the relays on [tag], or explains why not.
+  /// Connects to the relays on [tag], or explains why not. Nothing
+  /// goes near a relay without a name on it.
   Future<RelayTransport?> _connect(String tag) async {
-    final name = _name.text.trim();
-    if (name.isEmpty) {
-      setState(() => _error = 'A name, so the others know who they are playing');
-      return null;
-    }
+    if (await _named() == null || !mounted) return null;
     final relays = _relays;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await Identity.setName(name);
       final signer = _signer ??= await Identity.signer();
       final transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
       _refusalSub?.cancel();
@@ -286,7 +284,7 @@ class _HomePageState extends State<HomePage> {
       relay: transport,
       pool: options.pool,
       target: options.target,
-      name: _name.text.trim(),
+      name: _name,
       rating: (_standing?.mine ?? Rating.fresh).shown,
       botRating: Standing.botPicker(ledger),
       sealed: dealCrypto != null,
@@ -356,8 +354,7 @@ class _HomePageState extends State<HomePage> {
     final transport = await _connect(code);
     if (transport == null) return;
     try {
-      final name = _name.text.trim();
-      final room = Room.enter(relay: transport, code: code, name: name, avatar: _avatar, target: _options.target);
+      final room = Room.enter(relay: transport, code: code, name: _name, avatar: _avatar, target: _options.target);
       room.addListener(_onRoom);
       setState(() => _room = room);
     } on TimeoutException {
@@ -373,11 +370,28 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _pickAvatar() async {
-    final chosen = await showAvatarPicker(context, current: _avatar, name: _name.text.isEmpty ? '?' : _name.text, seed: _signer?.publicKey ?? '');
+  /// Who you are here, in one sheet: the name the others see and the
+  /// face they see it on. Both are kept on the device as soon as the
+  /// sheet is done with.
+  Future<void> _editProfile() async {
+    final chosen = await showProfile(context, current: (name: _name, avatar: _avatar), seed: _signer?.publicKey ?? '');
     if (chosen == null || !mounted) return;
-    setState(() => _avatar = chosen);
-    await Identity.setAvatar(chosen);
+    setState(() {
+      _name = chosen.name;
+      _avatar = chosen.avatar;
+    });
+    await Identity.setName(chosen.name);
+    await Identity.setAvatar(chosen.avatar);
+  }
+
+  /// The name the others will see, asked for if this device has none:
+  /// nothing is played live without one, and the place to give it is
+  /// the profile. Null when the sheet comes back without a name, which
+  /// is the player saying not now.
+  Future<String?> _named() async {
+    if (_name.isNotEmpty) return _name;
+    await _editProfile();
+    return _name.isEmpty ? null : _name;
   }
 
   Future<void> _changeOptions() async {
@@ -488,13 +502,33 @@ class _HomePageState extends State<HomePage> {
 
   /// The line above everything: the menu on the left, the same control
   /// the table's line carries (ui/header.dart), holding what is not the
-  /// game.
+  /// game; and on the right how you look to the others, which is the
+  /// way into your profile.
   Widget _chrome() {
     return Row(
       children: [
         MenuButton(
           height: _chromeHeight,
           menu: [MenuAction('About', icon: Icons.info_outline, onSelected: () => _go(const AboutPage()))],
+        ),
+        const Spacer(),
+        Semantics(
+          button: true,
+          label: 'Your profile',
+          onTap: _editProfile,
+          child: InkWell(
+            onTap: _editProfile,
+            customBorder: const CircleBorder(),
+            child: ExcludeSemantics(
+              child: SizedBox(
+                width: 48,
+                height: _chromeHeight,
+                child: Center(
+                  child: PlayerIcon(name: _name.isEmpty ? '?' : _name, seed: _signer?.publicKey ?? '', avatar: _avatar, size: 32),
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -509,58 +543,6 @@ class _HomePageState extends State<HomePage> {
         const Text('Open source, no ads. Play alone or live.',
             textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
         const SizedBox(height: 22),
-        // How you will look at the table, big enough to see and plainly
-        // a button: tapping it opens the icons, the colours and a
-        // picture of your own (live/avatar_picker.dart).
-        Row(
-          children: [
-            Semantics(
-              button: true,
-              label: 'Your avatar',
-              onTap: _pickAvatar,
-              child: InkWell(
-                onTap: _pickAvatar,
-                customBorder: const CircleBorder(),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    PlayerIcon(name: _name.text.isEmpty ? '?' : _name.text, seed: _signer?.publicKey ?? '', avatar: _avatar, size: 56),
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: Felt.mid,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Palette.gold.withValues(alpha: 0.7)),
-                        ),
-                        child: const Icon(Icons.edit_outlined, size: 12, color: Palette.gold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: TextField(
-                controller: _name,
-                textCapitalization: TextCapitalization.words,
-                decoration: _field('Your name'),
-                // Kept on the device as it is typed, like the avatar:
-                // it is who you are here, not something a button
-                // collects on the way past.
-                onChanged: (name) {
-                  setState(() {});
-                  Identity.setName(name);
-                },
-                style: const TextStyle(color: Palette.chrome),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
         FilledButton.icon(
           onPressed: () => _go(TablePage(target: _options.target)),
           style: _primary(),
@@ -639,19 +621,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  static InputDecoration _field(String label) => InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Palette.chromeDim),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Palette.gold),
-        ),
-      );
 
   static ButtonStyle _primary() => FilledButton.styleFrom(
         backgroundColor: Palette.gold,

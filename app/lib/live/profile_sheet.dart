@@ -1,6 +1,11 @@
-/// Choosing how you look: one of the icons on one of the colours, a
-/// picture of your own, or your initials. Saved on the device with the
-/// name; the others see it on your badge (avatar.dart).
+/// Who you are here: the name the others see, and how you look to them
+/// — one of the icons on one of the colours, a picture of your own, or
+/// your initials. Both are kept on the device, and the others read
+/// them off your badge (avatar.dart).
+///
+/// One sheet rather than two, and no name on the front door, because a
+/// name and a face are one answer to the same question and are asked
+/// for in the same breath — when a game is about to need them.
 library;
 
 import 'dart:typed_data';
@@ -34,33 +39,42 @@ Uint8List? shrinkPicture(Uint8List bytes) {
   return null;
 }
 
-/// Opens the picker over [context]; resolves to the avatar chosen, or
-/// null if the sheet was dismissed without a change.
-Future<Avatar?> showAvatarPicker(BuildContext context, {required Avatar current, required String name, required String seed}) {
-  return showModalBottomSheet<Avatar>(
+/// Who this device is to everyone else.
+typedef Profile = ({String name, Avatar avatar});
+
+/// Opens the profile over [context]; resolves to what was chosen, or
+/// null if the sheet was dismissed rather than done with.
+Future<Profile?> showProfile(BuildContext context, {required Profile current, required String seed}) {
+  return showModalBottomSheet<Profile>(
     context: context,
     backgroundColor: Felt.mid,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (_) => _AvatarSheet(current: current, name: name, seed: seed),
+    builder: (_) => _ProfileSheet(current: current, seed: seed),
   );
 }
 
-class _AvatarSheet extends StatefulWidget {
-  const _AvatarSheet({required this.current, required this.name, required this.seed});
+class _ProfileSheet extends StatefulWidget {
+  const _ProfileSheet({required this.current, required this.seed});
 
-  final Avatar current;
-  final String name;
+  final Profile current;
   final String seed;
 
   @override
-  State<_AvatarSheet> createState() => _AvatarSheetState();
+  State<_ProfileSheet> createState() => _ProfileSheetState();
 }
 
-class _AvatarSheetState extends State<_AvatarSheet> {
-  late Avatar _avatar = widget.current;
+class _ProfileSheetState extends State<_ProfileSheet> {
+  late Avatar _avatar = widget.current.avatar;
+  late final _name = TextEditingController(text: widget.current.name);
   String? _note;
   bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickPhoto() async {
     setState(() {
@@ -90,20 +104,32 @@ class _AvatarSheetState extends State<_AvatarSheet> {
     final icons = AvatarIcons.all.keys.toList();
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+        // The keyboard comes up under the name: the sheet sits on top
+        // of it rather than behind it.
+        padding: EdgeInsets.fromLTRB(20, 14, 20, 16 + MediaQuery.viewInsetsOf(context).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                PlayerIcon(name: widget.name, seed: widget.seed, avatar: _avatar, size: 48),
+                PlayerIcon(name: _shownName, seed: widget.seed, avatar: _avatar, size: 48),
                 const SizedBox(width: 14),
-                const Expanded(
-                  child: Text('Your avatar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Palette.gold)),
+                Expanded(
+                  child: TextField(
+                    controller: _name,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _field('Your name'),
+                    // The badge beside it wears the initials of what is
+                    // being typed, so a name with no avatar behind it
+                    // is still a picture of something.
+                    onChanged: (_) => setState(() {}),
+                    style: const TextStyle(color: Palette.chrome),
+                  ),
                 ),
+                const SizedBox(width: 6),
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(_avatar),
+                  onPressed: _done,
                   style: TextButton.styleFrom(foregroundColor: Palette.gold),
                   child: const Text('Done', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
@@ -180,7 +206,26 @@ class _AvatarSheetState extends State<_AvatarSheet> {
     );
   }
 
+  void _done() => Navigator.of(context).pop((name: _name.text.trim(), avatar: _avatar));
+
+  /// What the badge in the sheet wears while there is nothing to go on.
+  String get _shownName => _name.text.trim().isEmpty ? '?' : _name.text.trim();
+
   int _derivedIndex() => PlayerIcon.palette.indexOf(PlayerIcon.colorOf(widget.seed));
+
+  static InputDecoration _field(String label) => InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Palette.chromeDim),
+        isDense: true,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Palette.gold),
+        ),
+      );
 }
 
 /// One thing to pick: a disc, ringed in gold when it is the choice.

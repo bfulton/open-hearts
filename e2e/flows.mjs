@@ -68,7 +68,8 @@ flow('the front door', async ({ open }) => {
   // game being asked for, and the three ways in.
   for (const want of [
     /^Open source, no ads\. Play alone or live\.$/,
-    /^Your avatar$/,
+    /^Menu$/,
+    /^Your profile$/,
     /^Play bots$/,
     /^50 points · rated$/,
     /^Game options$/,
@@ -77,6 +78,10 @@ flow('the front door', async ({ open }) => {
   ]) {
     if (!seen.some((t) => want.test(t))) throw new Error(`the home screen has nothing for ${want}\nsaw: ${seen.join(' | ')}`);
   }
+  // Who you are is behind the icon in the corner; nothing is typed on
+  // the door itself.
+  if (seen.some((t) => /^Your name$/.test(t))) throw new Error(`the door still asks for a name\nsaw: ${seen.join(' | ')}`);
+  if (seen.some((t) => /^About$/.test(t))) throw new Error('About is in the menu now, not on the door');
 });
 
 flow('the game options', async ({ open }) => {
@@ -202,10 +207,11 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   await relay();
   const page = await open();
   await waitFor(page, /^Play friends$/, { what: 'the home screen' });
+  // Your name and your avatar are one sheet, behind the icon in the
+  // corner.
+  await click(page, /^Your profile$/);
+  await waitFor(page, /^Rocket$/, { what: 'the profile' });
   await type(page, 'Your name', 'Ada');
-  // The avatar is chosen from the sheet behind your own icon.
-  await click(page, /^Your avatar$/);
-  await waitFor(page, /^Rocket$/, { what: 'the avatar picker' });
   await click(page, /^Rocket$/);
   await click(page, /^Done$/);
   await waitFor(page, /^Play friends$/, { what: 'the home screen again' });

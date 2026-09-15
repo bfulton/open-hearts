@@ -60,11 +60,16 @@ async function main() {
       contexts.push(ctx);
       pages.push(page);
     }
-    // Everyone names themselves on the front door, which is the whole
-    // of the lobby now.
+    // Everyone names themselves in their profile, behind the icon in
+    // the corner of the front door: the name and the avatar are one
+    // sheet, and the door carries neither.
     for (const [i, page] of pages.entries()) {
       await waitFor(page, /^Play friends$/, { what: 'the home screen' });
+      await click(page, /^Your profile$/);
+      await waitFor(page, /^Rocket$/, { what: 'the profile' });
       await type(page, 'Your name', names[i]);
+      await click(page, /^Done$/);
+      await waitFor(page, /^Play friends$/, { what: 'the home screen again' });
     }
     // Every device is online from the front door, and each one sees
     // the other three: presence over the relay, before anyone sits
@@ -103,10 +108,10 @@ async function main() {
       await waitFor(page, /^Play friends$/, { what: 'the home screen again' });
     }
 
-    // Ada picks an avatar first: the picker opens from her icon by the
-    // name, an icon is chosen, and Done keeps it.
-    await click(pages[0], /^Your avatar$/);
-    await waitFor(pages[0], /^Rocket$/, { what: 'the avatar picker' });
+    // Ada picks an avatar first: her profile opens from the icon in the
+    // corner, an icon is chosen, and Done keeps it.
+    await click(pages[0], /^Your profile$/);
+    await waitFor(pages[0], /^Rocket$/, { what: 'the profile' });
     await click(pages[0], /^Rocket$/);
     await click(pages[0], /^Done$/);
     await waitFor(pages[0], /^Play friends$/);

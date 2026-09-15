@@ -1,6 +1,6 @@
-/// The front door, driven the way a thumb drives it: your name and
-/// your avatar are on it, the three ways in are on it, and the game
-/// the live buttons are about to ask for is on it and kept.
+/// The front door, driven the way a thumb drives it: the three ways in
+/// are on it, the game the live buttons are about to ask for is on it
+/// and kept, and who you are is the icon in the corner.
 ///
 /// Nothing here reaches a relay — `online: false` keeps the device off
 /// them — so what is proved is the screen and what it remembers, not
@@ -38,22 +38,41 @@ Widget still(Widget home) => MaterialApp(
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('one screen: who you are, and the three ways in', (tester) async {
+  testWidgets('one screen: the three ways in, and who you are in the corner', (tester) async {
     await pumpHome(tester);
     expect(find.text('Open Hearts'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Your name'), findsOneWidget);
-    expect(find.bySemanticsLabel('Your avatar'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing, reason: 'nothing is typed on the door any more');
     const buttons = ['Play bots', 'Play live', 'Play friends'];
     for (final label in buttons) {
       expect(find.text(label), findsOneWidget, reason: '"$label" is on the front door');
     }
     final tops = [for (final label in buttons) tester.getTopLeft(find.text(label)).dy];
     expect(tops, orderedEquals(<double>[...tops]..sort()), reason: 'bots, live, friends, in that order down the screen');
-    // The name is yours from the moment it is typed, not something a
-    // button collects on the way past.
+
+    // Who you are is an icon in the top right, and the menu is in the
+    // top left.
+    final profile = tester.getCenter(find.bySemanticsLabel('Your profile'));
+    expect(profile.dx, greaterThan(195), reason: 'the right half of a 390-wide screen');
+    expect(profile.dy, lessThan(60), reason: 'up in the chrome, not in the body');
+    expect(tester.getCenter(find.bySemanticsLabel('Menu')).dx, lessThan(195));
+
+    // And the name is given in there, with the avatar, and kept on the
+    // device.
+    await tester.tap(find.bySemanticsLabel('Your profile'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'Your name'), 'Ada');
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
     expect(await Identity.name(), 'Ada');
+    expect(find.text('A'), findsOneWidget, reason: 'the icon in the corner wears her initial');
+  });
+
+  testWidgets('a link to a room, on a device with no name, asks for one in the profile', (tester) async {
+    await pumpHome(tester, openRoom: 'ABCD');
+    expect(find.text('My initials'), findsOneWidget, reason: 'the profile itself, not a field on the page');
+    expect(find.widgetWithText(TextField, 'Your name'), findsOneWidget,
+        reason: 'the room needs a name, and the profile is where a name is given');
   });
 
   testWidgets('the options line says what the next game is; the sheet changes it and the device keeps it', (tester) async {
