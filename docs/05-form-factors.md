@@ -158,6 +158,37 @@ full width.
 None of that is designed yet. What matters now is not baking in the
 assumption that it is a scaled phone.
 
+## What moves, and why
+
+Movement on a card table is information. A card that simply appears
+where it will sit says nothing about where it came from; a card that
+travels says whose it is, and says it in the time it takes to look up.
+So every card that changes hands travels, and it travels the way the
+table is laid out — the near player below, then west, north and east
+(`ui/table_view.dart`, `seatDirection`).
+
+Four movements, one rule each:
+
+- **A card played** rises out of the hand towards the table, and arrives
+  in its slot from the side of the screen its player sits on. Dragged up
+  and let go, it carries on from where the finger left it rather than
+  dropping back into the row first.
+- **The three passed** leave the hand off the side of the screen the
+  player they are passed to sits on, and **the three received** fly in
+  from the side the passer sits on. Nobody has to read the arrow to know
+  which way the hand went.
+- **The finished trick** goes to whoever took it, all four cards the one
+  way, shrinking as they go.
+- **The hand closes** over the gap a card leaves, and opens for one that
+  arrives, rather than snapping to its new fan.
+
+None of it is long: a play is 240 ms, a pass 420, a trick swept 300, the
+fan settling 220. A movement anyone has to wait for is a movement that
+has stopped being information. And none of it is load-bearing — every
+one is an ornament on a state the screen is already showing, so a device
+asking for no animation (`MediaQuery.disableAnimations`) gets the same
+table with nothing in flight.
+
 ## How the layout decides
 
 One rule, applied everywhere: **size from the constraints you are given,

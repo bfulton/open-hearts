@@ -251,6 +251,13 @@ class _LivePageState extends State<LivePage> {
                   dimUnplayable: _c.awaitingPlay,
                   forced: legal.length == 1 ? legal.first : null,
                   justReceived: game.tricksPlayed == 0 ? game.receivedBy(_c.mySeat).toSet() : const {},
+                  // Where a card the player gives up goes, and where
+                  // the ones they are given come from: the side of the
+                  // screen the other end of the pass sits on. Through
+                  // the play a card that leaves has been played, and
+                  // rises to the table instead (ui/hand_fan.dart).
+                  passTo: game.phase == Phase.passing ? passesTo(_c) : null,
+                  receivedFrom: passesFrom(_c),
                   spread: landscape ? 0.8 : 0.64,
                 ),
               ),

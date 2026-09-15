@@ -12,6 +12,12 @@
 /// it, and short of that it drops back. On a full hand a tap lands on
 /// a sliver and can land on the neighbour; a drag shows which card is
 /// coming before it is committed.
+///
+/// Cards leave and arrive on their own account, and the fan carries
+/// them: a played card rises towards the table, the three passed go
+/// off the side of the screen the player they are passed to sits on,
+/// and the three that come back fly in from the side the passer sits
+/// on. The rest of the hand closes the gap rather than snapping shut.
 library;
 
 import 'dart:math' as math;
@@ -38,6 +44,8 @@ class HandFan extends StatefulWidget {
     this.dimUnplayable = false,
     this.forced,
     this.justReceived = const {},
+    this.passTo,
+    this.receivedFrom,
     this.spread = 0.64,
   });
 
@@ -66,6 +74,16 @@ class HandFan extends StatefulWidget {
   /// three new cards are findable in a hand you have already read once.
   final Set<engine.Card> justReceived;
 
+  /// Which way off the screen a card that leaves the hand goes, while
+  /// there is a pass on: the direction the seat it is passed to lies
+  /// in (ui/table_view.dart). Null through the play, where a card that
+  /// leaves has been played and goes up to the table instead.
+  final Offset? passTo;
+
+  /// Which way the cards in [justReceived] came in from: the direction
+  /// the seat that passed them lies in. Null when nothing was passed.
+  final Offset? receivedFrom;
+
   /// How much of each card the fan shows at most, as a fraction of its
   /// width: the step between neighbours never exceeds this. A landscape
   /// hand has the width to show more of every card.
@@ -79,10 +97,53 @@ class HandFan extends StatefulWidget {
   State<HandFan> createState() => _HandFanState();
 }
 
-class _HandFanState extends State<HandFan> {
+/// A card the fan is carrying: one that has left the hand and is still
+/// on its way out, or one that has just arrived and is still on its way
+/// in. [travel] is the whole journey — a card on its way out starts at
+/// the fan and ends there, a card on its way in starts there and ends
+/// at the fan — and [places] is where each card's left edge sat in the
+/// fan, which is the end a flight has in common either way.
+class _Flight {
+  _Flight({required this.places, required this.from, required this.travel, required this.width, required this.out, required this.controller});
+
+  final Map<engine.Card, double> places;
+
+  /// Where the journey starts, off the fan's own place: nowhere,
+  /// unless the card was let go mid-drag, where it is where the finger
+  /// left it.
+  final Offset from;
+  final Offset travel;
+  final double width;
+  final bool out;
+  final AnimationController controller;
+}
+
+class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
   /// The card under the finger, and how far it has come from its place.
   engine.Card? _dragging;
   double _dragDy = 0;
+
+  /// Where the last build put each card — its left edge — and how wide
+  /// it drew them. A card that has left the hand has no place in the
+  /// fan any more, so this is where its flight starts.
+  final _places = <engine.Card, double>{};
+  double _placeWidth = 0;
+
+  /// What is in the air. Each drops itself when it lands.
+  final _flights = <_Flight>[];
+
+  /// The card the player dragged up and let go, and how far up it was
+  /// when they did: it leaves from there rather than snapping back to
+  /// its place first. Cleared by the flight that uses it.
+  (engine.Card, double)? _released;
+
+  @override
+  void dispose() {
+    for (final flight in _flights) {
+      flight.controller.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(HandFan old) {
@@ -91,17 +152,77 @@ class _HandFanState extends State<HandFan> {
       _dragging = null;
       _dragDy = 0;
     }
+    // Whoever asked for no animation gets none: the cards are simply
+    // where they now are.
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    final now = widget.hand.toSet();
+    final before = old.hand.toSet();
+    _launch(before.difference(now), out: true);
+    _launch(now.difference(before).intersection(widget.justReceived), out: false);
+  }
+
+  /// Sends [cards] on their way. A play is one card and a pass is
+  /// three; thirteen at once is a hand ending or a new one dealt, which
+  /// is not a movement anyone follows, so it is left to happen.
+  void _launch(Set<engine.Card> cards, {required bool out}) {
+    if (cards.isEmpty || cards.length > engine.passSize) return;
+    final size = MediaQuery.sizeOf(context);
+    // A pass leaves the screen on the side its player sits on; a play
+    // rises out of the hand towards the table, where the trick takes it
+    // up from the same side (ui/table_view.dart).
+    final side = out ? widget.passTo : widget.receivedFrom;
+    if (!out && side == null) return;
+    final travel = side == null
+        ? Offset(0, -cardHeightFor(_placeWidth) * 1.5)
+        : Offset(side.dx * size.width * 0.8, side.dy * size.height * 0.8);
+    final released = _released;
+    _released = null;
+    final flight = _Flight(
+      places: {for (final card in cards) card: _places[card] ?? 0},
+      from: out && cards.length == 1 && released?.$1 == cards.first ? Offset(0, released!.$2) : Offset.zero,
+      travel: travel,
+      width: _placeWidth,
+      out: out,
+      controller: AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: side == null ? 240 : 420),
+      ),
+    );
+    flight.controller.addStatusListener((status) {
+      if (status != AnimationStatus.completed) return;
+      // Off the list before it is disposed, so a teardown that lands in
+      // the same breath does not dispose it twice.
+      _flights.remove(flight);
+      flight.controller.dispose();
+      if (mounted) setState(() {});
+    });
+    // No setState: this is a widget update, and the build is next.
+    _flights.add(flight);
+    flight.controller.forward();
+  }
+
+  /// The flight carrying [card] into the fan, if one is.
+  _Flight? _arriving(engine.Card card) {
+    for (final flight in _flights) {
+      if (!flight.out && flight.places.containsKey(card)) return flight;
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     final hand = widget.hand;
-    if (hand.isEmpty) return const SizedBox.shrink();
+    // Nothing held and nothing in the air. The last card of a hand
+    // leaves an empty fan behind it, and it still has to be seen going.
+    if (hand.isEmpty && _flights.isEmpty) return const SizedBox.shrink();
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final n = hand.length;
         final gaps = _suitGaps(hand);
+        // An empty fan is a moment, not a layout: the cards still on
+        // screen are flights, drawn where the last full fan put them.
+        if (n == 0) return SizedBox(height: constraints.maxHeight, child: Stack(clipBehavior: Clip.none, children: _departing()));
         final available = constraints.maxWidth - gaps * _suitGap;
 
         // Cards are as large as the row allows, capped so a short hand
@@ -132,22 +253,30 @@ class _HandFanState extends State<HandFan> {
 
         var x = left0;
         final children = <Widget>[];
+        final places = <engine.Card, double>{};
         Widget? dragged;
         for (var i = 0; i < n; i++) {
           final card = hand[i];
           if (i > 0 && card.suit != hand[i - 1].suit) x += _suitGap;
+          places[card] = x;
           final isSelected = widget.selected.contains(card);
           final isPlayable = widget.playable.contains(card);
           final dragging = _dragging == card;
           final dy = dragging ? _dragDy : 0.0;
           final beyond = dragging && _pastThreshold(dy, isSelected, threshold);
-          final child = Positioned(
+          final arriving = _arriving(card);
+          final child = AnimatedPositioned(
             // Keyed, so the card under the finger can be drawn last —
             // over its neighbours — without losing its place or state.
             key: ValueKey(card),
+            // The hand closes over a card that has gone, and opens for
+            // one that has come, rather than snapping to the new fan.
+            // Under the finger there is nothing to catch up with.
+            duration: dragging ? Duration.zero : const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
             left: x,
             bottom: 0,
-            child: AnimatedContainer(
+            child: _carried(arriving, AnimatedContainer(
               // Under the finger the card follows it; let go, it settles
               // back or up over a few frames.
               duration: dragging ? Duration.zero : const Duration(milliseconds: 160),
@@ -190,7 +319,7 @@ class _HandFanState extends State<HandFan> {
                   ),
                 ),
               ),
-            ),
+            )),
           );
           if (dragging) {
             dragged = child;
@@ -201,11 +330,62 @@ class _HandFanState extends State<HandFan> {
         }
         if (dragged != null) children.add(dragged);
 
+        // Where this build put them, for the flight of whatever leaves
+        // next: a card that has gone has no place here to start from.
+        _places
+          ..clear()
+          ..addAll(places);
+        _placeWidth = width;
+
+        // On top of the fan, the cards that have left it: drawn where
+        // they sat and carried away, so the hand is seen to give them
+        // up rather than to have one fewer.
+        children.addAll(_departing());
+
         return SizedBox(
           height: height,
           child: Stack(clipBehavior: Clip.none, children: children),
         );
       },
+    );
+  }
+
+  /// The cards that have left the hand and are still on their way out,
+  /// each drawn where the fan last put it and carried from there.
+  List<Widget> _departing() => [
+        for (final flight in _flights)
+          if (flight.out)
+            for (final gone in flight.places.entries)
+              Positioned(
+                left: gone.value,
+                bottom: 0,
+                child: AnimatedBuilder(
+                  animation: flight.controller,
+                  builder: (context, card) {
+                    final t = Curves.easeIn.transform(flight.controller.value);
+                    return Transform.translate(
+                      offset: Offset.lerp(flight.from, flight.travel, t)!,
+                      child: Opacity(opacity: (1 - t * 1.3).clamp(0.0, 1.0), child: card),
+                    );
+                  },
+                  child: IgnorePointer(
+                    child: ExcludeSemantics(child: CardView(card: gone.key, width: flight.width)),
+                  ),
+                ),
+              ),
+      ];
+
+  /// A card on its way into the fan, drawn short of its place by
+  /// however much of the journey is left. Anything else is itself.
+  Widget _carried(_Flight? flight, Widget card) {
+    if (flight == null) return card;
+    return AnimatedBuilder(
+      animation: flight.controller,
+      builder: (context, child) => Transform.translate(
+        offset: flight.travel * (1 - Curves.easeOutCubic.transform(flight.controller.value)),
+        child: child,
+      ),
+      child: card,
     );
   }
 
@@ -217,7 +397,11 @@ class _HandFanState extends State<HandFan> {
   void _release(engine.Card card, bool isSelected, double threshold) {
     final dy = _dragDy;
     _settle();
-    if (_pastThreshold(dy, isSelected, threshold)) widget.onTap(card);
+    if (!_pastThreshold(dy, isSelected, threshold)) return;
+    // Dragged up and let go: if that plays it, its flight to the table
+    // carries on from here rather than starting over.
+    if (!isSelected) _released = (card, dy);
+    widget.onTap(card);
   }
 
   void _settle() => setState(() {

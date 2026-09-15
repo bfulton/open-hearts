@@ -226,8 +226,16 @@ void main() {
     expect(tester.getTopLeft(cardFinder(playable.card)).dy, closeTo(resting, 0.5), reason: 'let go where it started, it stays');
     expect(fanCards(tester).length, before.length);
 
-    // Past it: played, the same as a tap.
-    await dragCard(tester, playable.card, slop + threshold + 6);
+    // Past it: played, the same as a tap — and it carries on to the
+    // table from where the finger let it go, rather than dropping back
+    // into the row first.
+    final carried = slop + threshold + 6;
+    await tester.dragFrom(sliverOf(tester, playable.card), Offset(0, -carried));
+    await tester.pump();
+    expect(tester.getTopLeft(cardFinder(playable.card)).dy, lessThan(resting - threshold),
+        reason: 'the played card leaves from the finger, not from the row');
+
+    await tester.pumpAndSettle();
     expect(fanCards(tester).length, before.length - 1, reason: 'the card left the hand');
     expect(fanCards(tester).map((c) => c.card), isNot(contains(playable.card)));
   });
@@ -247,12 +255,23 @@ void main() {
     await pumpTable(tester, paced: true);
     final hand = fanCards(tester);
     final chosen = [for (var i = 0; i < 3; i++) hand[i].card];
+    final from = {for (final card in chosen) card: tester.getTopLeft(cardFinder(card))};
     for (final card in chosen) {
       await tapCard(tester, card);
     }
     await tester.tap(find.widgetWithText(FilledButton, 'Pass'));
     await tester.pump();
 
+    // They do not vanish: hand 1 passes left, so they go off the left
+    // of the screen, the side the seat they are going to sits on.
+    await tester.pump(const Duration(milliseconds: 250));
+    for (final card in chosen) {
+      final gone = tester.getTopLeft(cardFinder(card));
+      expect(gone.dx, lessThan(from[card]!.dx - 60), reason: 'a passed card leaves towards its seat');
+      expect(gone.dy, closeTo(from[card]!.dy, 1), reason: 'sideways, not up');
+    }
+
+    await tester.pumpAndSettle();
     expect(fanCards(tester).length, 10, reason: 'the three are gone from the hand');
     for (final card in chosen) {
       expect(cardFinder(card), findsNothing);
@@ -268,6 +287,108 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Passed to ${names[1]}'), findsNothing);
     expect(fanCards(tester).length, greaterThanOrEqualTo(12));
+  });
+
+  testWidgets('the cards passed to the player come in from the side the passer sits on', (tester) async {
+    // The fan on its own: the three arrive, and the hand they land in
+    // is the same hand either way, so the only thing to see is the
+    // journey. A pass to the left is received from the right.
+    final held = [for (final c in '2C.3C.4C.5C'.split('.')) engine.Card.parse(c)];
+    final given = [for (final c in 'AH.KH.QH'.split('.')) engine.Card.parse(c)];
+    Widget fan(List<engine.Card> hand, Set<engine.Card> arrived) => MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: TableLayout.portraitHandHeight,
+              child: HandFan(
+                hand: hand,
+                onTap: (_) {},
+                justReceived: arrived,
+                receivedFrom: const Offset(1, 0),
+              ),
+            ),
+          ),
+        );
+
+    tester.view
+      ..physicalSize = _phone
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(fan(held, const {}));
+    await tester.pumpWidget(fan([...held, ...given]..sort(), given.toSet()));
+    await tester.pump(const Duration(milliseconds: 60));
+
+    final flying = {for (final card in given) card: tester.getTopLeft(cardFinder(card)).dx};
+    await tester.pumpAndSettle();
+    for (final card in given) {
+      expect(flying[card]!, greaterThan(tester.getTopLeft(cardFinder(card)).dx + 60),
+          reason: 'an arriving card comes in from the passer\'s side');
+    }
+    for (final card in held) {
+      expect(cardFinder(card), findsOneWidget, reason: 'the hand it lands in is whole');
+    }
+  });
+
+  testWidgets('the last card of a hand is still seen leaving it', (tester) async {
+    // The fan the card leaves behind is empty, which is the one place
+    // the hand has nothing of its own left to draw.
+    final last = engine.Card.parse('2C');
+    Widget fan(List<engine.Card> hand) => MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: TableLayout.portraitHandHeight,
+              child: HandFan(hand: hand, onTap: (_) {}),
+            ),
+          ),
+        );
+
+    tester.view
+      ..physicalSize = _phone
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(fan([last]));
+    final was = tester.getTopLeft(cardFinder(last));
+    await tester.pumpWidget(fan(const []));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(cardFinder(last), findsOneWidget, reason: 'still on its way');
+    expect(tester.getTopLeft(cardFinder(last)).dy, lessThan(was.dy - 20), reason: 'rising towards the table');
+    await tester.pumpAndSettle();
+    expect(cardFinder(last), findsNothing, reason: 'and then gone');
+  });
+
+  testWidgets('the finished trick goes to whoever took it', (tester) async {
+    await pumpTable(tester, paced: true);
+    await _passAnything(tester);
+    final controller = tester.widget<TableView>(find.byType(TableView)).controller;
+
+    // Play into the first trick and let it fill.
+    for (var guard = 0; guard < 80 && controller.game.pendingTrick == null; guard++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      final playable = fanCards(tester).where((c) => !c.dimmed).toList();
+      if (controller.awaitingPlay && playable.isNotEmpty) await tapCard(tester, playable.first.card);
+    }
+    final trick = controller.game.pendingTrick!;
+    final slots = {for (final play in trick.plays) play.card: _feltCentre(tester, play.card)};
+
+    // Swept: the four are off their slots, all of them going the one
+    // way — towards the seat that took them.
+    for (var guard = 0; guard < 100 && controller.game.pendingTrick != null; guard++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await tester.pump(const Duration(milliseconds: 150));
+    final towards = seatDirection[controller.positionOf(trick.winner)]!;
+    for (final play in trick.plays) {
+      final moved = _feltCentre(tester, play.card) - slots[play.card]!;
+      expect(moved.dx * towards.dx + moved.dy * towards.dy, greaterThan(20),
+          reason: '${play.card} goes to the seat that took the trick');
+    }
+    expect(find.descendant(of: find.byType(TableView), matching: find.byType(CardGhost)), findsNWidgets(4),
+        reason: 'and the slots they left are already empty');
+
+    // Let the table run on to the player's turn, so the bots' clocks
+    // are spent rather than left ticking into the next test.
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('a whole hand plays out to the score sheet', (tester) async {
@@ -622,6 +743,12 @@ void main() {
 }
 
 /// The four slots of the trick, empty or not, as rectangles on screen.
+/// Where a card sits on the felt right now, wherever it is on its way
+/// to or from.
+Offset _feltCentre(WidgetTester tester, engine.Card card) => tester.getCenter(find.descendant(
+    of: find.byType(TableView),
+    matching: find.byWidgetPredicate((w) => w is CardView && w.card == card)));
+
 List<Rect> _trickSlots(WidgetTester tester) {
   final felt = find.byType(TableView);
   final ghosts = find.descendant(of: felt, matching: find.byType(CardGhost));

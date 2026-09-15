@@ -30,6 +30,32 @@ const _pillRow = 30.0;
 /// in units of the trick card's own size: a diamond where height is
 /// spare, flatter and wider where it is not (a landscape phone), so the
 /// four cards keep their size in the height the felt has.
+/// Which way each seat lies from the middle of the screen: the player
+/// below, then west, north and east. The table places a seat's card
+/// along it, a played card arrives along it, a swept trick leaves along
+/// the winner's, and the hand sends a pass off the screen along the
+/// receiver's (ui/hand_fan.dart).
+const seatDirection = <int, Offset>{
+  0: Offset(0, 1),
+  1: Offset(-1, 0),
+  2: Offset(0, -1),
+  3: Offset(1, 0),
+};
+
+/// Where the three cards a player passes go, and where the three they
+/// are passed come from: the seat at the other end of the pass, as a
+/// direction on screen. Null on the hand that holds.
+Offset? passesTo(TableModel controller) {
+  final direction = controller.game.passDirection;
+  if (direction == PassDirection.hold) return null;
+  return seatDirection[controller.positionOf((controller.mySeat + direction.seatOffset) % seatCount)];
+}
+
+Offset? passesFrom(TableModel controller) {
+  if (controller.game.passDirection == PassDirection.hold) return null;
+  return seatDirection[controller.positionOf(controller.game.passerTo(controller.mySeat))];
+}
+
 const _trickOffset = <int, Offset>{
   0: Offset(0, 0.78),
   1: Offset(-0.86, 0),
@@ -127,30 +153,24 @@ class TableView extends StatelessWidget {
 
         // The trick, as one centred block. Slots hold their place so
         // arriving cards never shove the layout around.
-        final trick = SizedBox.fromSize(
+        final trick = _Trick(
           size: trickBox,
-          child: Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              for (var position = 0; position < seatCount; position++)
-                Transform.translate(
-                  offset: Offset(
-                    offsets[position]!.dx * cardWidth * 1.15,
-                    offsets[position]!.dy * cardHeight * 1.02,
-                  ),
-                  child: _TrickSlot(
-                    card: _cardFrom(game, controller.seatAt(position)) ??
-                        (position == 0 ? controller.pendingPlay : null),
-                    name: controller.names[controller.seatAt(position)],
-                    order: _orderOf(game, controller.seatAt(position)) ??
-                        (position == 0 && controller.pendingPlay != null ? game.trick.length : null),
-                    width: cardWidth,
-                    winning: pending != null && pending.winner == controller.seatAt(position),
-                  ),
-                ),
-            ],
-          ),
+          offsets: offsets,
+          cardWidth: cardWidth,
+          cardHeight: cardHeight,
+          cards: [
+            for (var position = 0; position < seatCount; position++)
+              _cardFrom(game, controller.seatAt(position)) ?? (position == 0 ? controller.pendingPlay : null),
+          ],
+          orders: [
+            for (var position = 0; position < seatCount; position++)
+              _orderOf(game, controller.seatAt(position)) ??
+                  (position == 0 && controller.pendingPlay != null ? game.trick.length : null),
+          ],
+          names: [
+            for (var position = 0; position < seatCount; position++) controller.names[controller.seatAt(position)],
+          ],
+          winner: pending == null ? null : controller.positionOf(pending.winner),
         );
 
         // Under the trick, never across it: who took it, or whose turn
@@ -287,6 +307,129 @@ class TableView extends StatelessWidget {
   }
 }
 
+/// The middle of the felt: four slots that hold their place, whatever
+/// is in them. A card arrives from the side of the screen its player
+/// sits on, and the finished trick leaves towards whoever took it — so
+/// both movements say who, and neither needs a word.
+class _Trick extends StatefulWidget {
+  const _Trick({
+    required this.size,
+    required this.offsets,
+    required this.cardWidth,
+    required this.cardHeight,
+    required this.cards,
+    required this.orders,
+    required this.names,
+    required this.winner,
+  });
+
+  final Size size;
+  final Map<int, Offset> offsets;
+  final double cardWidth;
+  final double cardHeight;
+
+  /// By position, the near seat first: what is on the table, where in
+  /// the trick it was played, and whose it is.
+  final List<engine.Card?> cards;
+  final List<int?> orders;
+  final List<String> names;
+
+  /// The position that has taken the finished trick, while it is still
+  /// on the table; null at every other moment.
+  final int? winner;
+
+  @override
+  State<_Trick> createState() => _TrickState();
+}
+
+class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
+  late final AnimationController _sweep = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 300),
+  )..addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) setState(() => _taken = const []);
+    });
+
+  /// The finished trick on its way to whoever took it: each card and
+  /// the slot it is leaving from.
+  List<(engine.Card, int)> _taken = const [];
+  Offset _towards = Offset.zero;
+
+  @override
+  void dispose() {
+    _sweep.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_Trick old) {
+    super.didUpdateWidget(old);
+    final winner = old.winner;
+    if (winner == null) return;
+    final swept = [
+      for (var position = 0; position < seatCount; position++)
+        if (old.cards[position] != null && widget.cards[position] == null) (old.cards[position]!, position),
+    ];
+    // All four going at once is the trick being swept; anything less is
+    // the table catching up with itself.
+    if (swept.length < seatCount) return;
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    // No setState: this is a widget update, and the build is next.
+    _taken = swept;
+    _towards = seatDirection[winner]!;
+    _sweep.forward(from: 0);
+  }
+
+  /// Where a slot sits, out from the middle of the trick.
+  Offset _at(int position) => Offset(
+        widget.offsets[position]!.dx * widget.cardWidth * 1.15,
+        widget.offsets[position]!.dy * widget.cardHeight * 1.02,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final away = Offset(_towards.dx * widget.size.width * 0.9, _towards.dy * widget.size.height * 0.9);
+    return SizedBox.fromSize(
+      size: widget.size,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          for (var position = 0; position < seatCount; position++)
+            Transform.translate(
+              offset: _at(position),
+              child: _TrickSlot(
+                card: widget.cards[position],
+                name: widget.names[position],
+                order: widget.orders[position],
+                width: widget.cardWidth,
+                winning: widget.winner == position,
+                from: seatDirection[position]!,
+              ),
+            ),
+          for (final (card, position) in _taken)
+            AnimatedBuilder(
+              animation: _sweep,
+              builder: (context, child) {
+                final t = Curves.easeIn.transform(_sweep.value);
+                return Transform.translate(
+                  offset: _at(position) + away * t,
+                  child: Opacity(
+                    opacity: 1 - t,
+                    child: Transform.scale(scale: 1 - 0.3 * t, child: child),
+                  ),
+                );
+              },
+              child: IgnorePointer(
+                child: ExcludeSemantics(child: CardView(card: card, width: widget.cardWidth)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TrickSlot extends StatelessWidget {
   const _TrickSlot({
     required this.card,
@@ -294,6 +437,7 @@ class _TrickSlot extends StatelessWidget {
     required this.order,
     required this.width,
     required this.winning,
+    required this.from,
   });
 
   final engine.Card? card;
@@ -301,6 +445,10 @@ class _TrickSlot extends StatelessWidget {
   final int? order;
   final double width;
   final bool winning;
+
+  /// Which way the seat that plays into this slot lies, so its card
+  /// comes in from that side of the screen rather than out of the air.
+  final Offset from;
 
   @override
   Widget build(BuildContext context) {
@@ -313,11 +461,17 @@ class _TrickSlot extends StatelessWidget {
             ? '$name led the ${card!.spoken}'
             : '$name played the ${card!.spoken}';
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 190),
-      switchInCurve: Curves.easeOutBack,
+      duration: const Duration(milliseconds: 240),
+      // What leaves a slot is carried off by the sweep above, so there
+      // is nothing here to play backwards.
+      reverseDuration: Duration.zero,
+      switchInCurve: Curves.easeOutCubic,
       transitionBuilder: (child, animation) => FadeTransition(
         opacity: animation,
-        child: ScaleTransition(scale: Tween(begin: 0.82, end: 1.0).animate(animation), child: child),
+        child: SlideTransition(
+          position: Tween(begin: from * 1.7, end: Offset.zero).animate(animation),
+          child: child,
+        ),
       ),
       child: card == null
           ? CardGhost(key: const ValueKey('empty'), width: width)

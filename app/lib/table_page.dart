@@ -142,6 +142,13 @@ class _TablePageState extends State<TablePage> {
                   justReceived: game.tricksPlayed == 0
                       ? game.receivedBy(_controller.mySeat).toSet()
                       : const {},
+                  // Where a card the player gives up goes, and where
+                  // the ones they are given come from: the side of the
+                  // screen the other end of the pass sits on. Through
+                  // the play a card that leaves has been played, and
+                  // rises to the table instead (ui/hand_fan.dart).
+                  passTo: game.phase == Phase.passing ? passesTo(_controller) : null,
+                  receivedFrom: passesFrom(_controller),
                   spread: landscape ? 0.8 : 0.64,
                 ),
               ),
