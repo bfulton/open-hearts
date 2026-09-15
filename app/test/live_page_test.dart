@@ -14,6 +14,7 @@ import 'package:open_hearts/live/live_page.dart';
 import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/live_controller.dart';
 import 'package:open_hearts/pictures.dart';
+import 'package:open_hearts/table_model.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/table_view.dart' show ClockText, TableView;
 import 'package:table/src/sim/sim.dart';
@@ -83,6 +84,17 @@ class LiveHarness {
     clock.advance(ms);
     await tester.pump(Duration(milliseconds: ms));
     await tester.pumpAndSettle();
+  }
+
+  /// The table and the screen on one clock, in small steps. [advance]
+  /// settles the widgets with the table held still, which lets a screen
+  /// catch up on a table that has stopped to wait for it; here neither
+  /// waits for the other, as at a real table.
+  Future<void> tick(WidgetTester tester, int ms, {int step = 100}) async {
+    for (var t = 0; t < ms; t += step) {
+      clock.advance(step);
+      await tester.pump(Duration(milliseconds: step));
+    }
   }
 }
 
@@ -367,6 +379,30 @@ void main() {
     expect(live.controller.game.handNumber, 1, reason: 'the first hand finished');
     final v = live.controller.verification();
     expect(v.ok, isTrue, reason: v.reason);
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
+  testWidgets('a hand that ends while the others play on gives way to the next', (tester) async {
+    final live = await pumpLive(tester);
+    final c = live.controller;
+    // The last trick of a hand is swept and the screen holds a beat of
+    // bare felt before the sheet. The table does not hold with it: the
+    // next hand is dealt and passed while the beat runs, so for as long
+    // as the beat lasts the record is ahead of what is shown.
+    for (var guard = 0; guard < 900 && c.client.game.handNumber < 1; guard++) {
+      await act(tester, live);
+      await live.tick(tester, 200);
+    }
+    expect(c.client.game.handNumber, 1, reason: 'the table is into the second hand');
+
+    // And the screen follows it there. A hand that has ended is a place
+    // the shown game passes through, never one it can be left in.
+    for (var guard = 0; guard < 300 && c.game.handNumber < 1; guard++) {
+      await act(tester, live);
+      await live.tick(tester, 200);
+    }
+    expect(c.game.handNumber, 1, reason: 'the screen shows the new hand: ${c.behind}');
+    expect(c.handShown, isNotEmpty, reason: 'with cards to play: ${c.behind}');
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 5)));
 }

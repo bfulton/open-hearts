@@ -139,7 +139,6 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// before the sheet, as at the solo table: the cards fade out as
   /// every trick's do, and the hand is seen to end rather than cut.
   static const sweepBeat = Duration(milliseconds: 1200);
-  Timer? _sweepTimer;
 
   /// The game is over as shown, and its last trick has been seen off
   /// the table: the game's sheet may show.
@@ -197,6 +196,26 @@ class LiveController extends ChangeNotifier implements TableModel {
       if (!identical(record[i], _consumed[i])) return false;
     }
     return true;
+  }
+
+  /// The last hand whose sheet has been raised on this screen.
+  int _sheetsShownThrough = -1;
+
+  /// The hand shown out to its sheet, and the next one begun under it.
+  ///
+  /// A hand's sheet shows once: a rebuild replays hands the player has
+  /// already watched end, and a hand does not end twice. A rebuild that
+  /// lands on a hand whose end was never shown still shows it.
+  void _endOfHand() {
+    final hand = _shown.handNumber;
+    if (hand > _sheetsShownThrough) {
+      _sheetsShownThrough = hand;
+      handJustEnded = (hand: hand, scores: _shown.handScores, totals: _shown.totals, moonShooter: _shown.moonShooter);
+      _sheetTimer?.cancel();
+      _sheetTimer = Timer(const Duration(seconds: 6), dismissHandSheet);
+    }
+    _shown.nextHand();
+    _shownPlayed.clear();
   }
 
   /// Replays the whole record at once. A jump, for the rare case where
@@ -365,47 +384,24 @@ class LiveController extends ChangeNotifier implements TableModel {
         }
       );
     }
-    if (_shown.phase == Phase.gameOver) return null;
-    // Between the last trick's sweep and the sheet: nothing moves.
-    if (_shown.phase == Phase.handOver) return null;
-    if (_shown.pendingTrick != null) {
-      return (
-        delay: _trickHold,
-        act: () {
-          _shown.collectTrick();
-          if (_shown.phase == Phase.playing) return;
-          // The hand's last trick has gone: a beat, then the sheet — and
-          // the next hand as shown, under it.
-          final ended = (
-            hand: _shown.handNumber,
-            scores: _shown.handScores,
-            totals: _shown.totals,
-            moonShooter: _shown.moonShooter,
-          );
-          final over = _shown.phase == Phase.gameOver;
-          void raise() {
-            if (_disposed) return;
-            if (over) {
-              _gameOverDue = true;
-            } else {
-              handJustEnded = ended;
-              _sheetTimer?.cancel();
-              _sheetTimer = Timer(const Duration(seconds: 6), dismissHandSheet);
-              if (_shown.phase == Phase.handOver) _shown.nextHand();
-              _shownPlayed.clear();
-            }
-            notifyListeners();
-            unawaited(_pump());
-          }
-          _sweepTimer?.cancel();
-          if (!paced) {
-            raise();
-          } else {
-            _sweepTimer = Timer(sweepBeat, raise);
-          }
-        }
-      );
+    // The game is over as shown: the beat of bare felt that ends any
+    // hand, and then its sheet.
+    if (_shown.phase == Phase.gameOver) {
+      if (_gameOverDue) return null;
+      return (delay: sweepBeat, act: () => _gameOverDue = true);
     }
+    // The hand is over as shown: the same beat, then the sheet with the
+    // next hand dealt under it.
+    //
+    // A step of the pump, rather than a timer beside it. A rebuild
+    // replays the record through [_next], so anywhere _next will not
+    // step past is where a rebuild leaves the shown game for good — and
+    // a beat kept by a timer that the next rebuild cancels is a beat
+    // that never ends: the table deals and passes the next hand while
+    // this screen holds, and every decision it hears is another
+    // rebuild.
+    if (_shown.phase == Phase.handOver) return (delay: sweepBeat, act: _endOfHand);
+    if (_shown.pendingTrick != null) return (delay: _trickHold, act: _shown.collectTrick);
     final seat = _shown.currentSeat!;
     if (_shownHolders[seat] is BotSeat) {
       if (!_seesHand(seat)) return null; // a departed seat's hand, not open here yet
@@ -482,6 +478,12 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Whether the view has shown everything the table has settled, so
   /// the player is looking at the position they are asked to play.
   bool get _caughtUp => !_pumping && _consumed.length == client.record.length;
+
+  /// What the screen is waiting on, for the debug line a driven build
+  /// carries (live/live_page.dart). A table stuck from the outside is
+  /// often a screen that has not caught up with it.
+  String get behind => 'shown ${_shown.phase.name} h${_shown.handNumber}; consumed ${_consumed.length}/${client.record.length}; '
+      'pumping $_pumping; pending ${_pendingPlay?.code ?? '-'}/${_pendingPass.length}';
 
   /// A seat's name with its rating: "Roxane 1520". The rating is the
   /// seat's as dealt — a bot that took over a leaver's seat shows the
@@ -704,7 +706,6 @@ class LiveController extends ChangeNotifier implements TableModel {
     _disposed = true;
     _waitTimer?.cancel();
     _sheetTimer?.cancel();
-    _sweepTimer?.cancel();
     _sub?.cancel();
     _refusals?.cancel();
     pictures?.removeListener(_pictured);

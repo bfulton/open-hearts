@@ -137,9 +137,19 @@ class _LivePageState extends State<LivePage> {
       alwaysIncludeSemantics: true,
       child: SizedBox(
         height: 1,
-        child: Text('debug: ${_c.client.describe()}', overflow: TextOverflow.clip, maxLines: 1),
+        child: Text('debug: ${_c.client.describe()}${_screenState()}', overflow: TextOverflow.clip, maxLines: 1),
       ),
     );
+  }
+
+  /// What the screen itself thinks it can do, beside what the table
+  /// thinks. A table stuck from the outside is not always stuck in the
+  /// protocol: a hand the screen will not draw is a turn the player
+  /// cannot take, and the two look alike from off the device.
+  String _screenState() {
+    final game = _c.game;
+    return '  screen: hand ${game.knowsHand(_c.mySeat) ? '${_c.handShown.length} cards' : 'not open here'}; '
+        'my turn ${_c.client.awaitingMyPlay}; offered ${_c.awaitingPlay}; pass ${_c.awaitingPass}; ${_c.behind}\n';
   }
 
   /// The line under the felt: a pause and why, or a boot clock on the

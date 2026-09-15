@@ -201,6 +201,17 @@ before the score comes down over it. A sheet that arrives on the tail
 of the cards leaves the hand's last thing unseen and the number it is
 about unexplained.
 
+That beat is the one piece of pacing that is not an ornament, because at
+a live table the hand under it is still moving. A screen shows the
+record at its own speed, a step at a time; a beat kept by a timer beside
+that walk is a beat the table can interrupt, and at a live table it
+does — the next hand is dealt and passed while the screen holds, and
+each decision heard while it holds is another reason to start the walk
+again. So the beat is a step of the walk itself: the shown hand ends,
+the screen waits, and then the sheet comes down and the next hand is
+dealt under it. Nowhere the walk will not step past can the screen be
+left standing.
+
 None of it is long: a play is 240 ms, a pass 420, a trick swept 300, the
 fan settling 220. A movement anyone has to wait for is a movement that
 has stopped being information. And none of it is load-bearing — every
