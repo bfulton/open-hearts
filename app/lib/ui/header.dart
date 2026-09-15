@@ -1,6 +1,9 @@
 /// The line along the top of the table: the menu on the left, where the
 /// game stands in the middle, and on the right a heart — whole until
 /// hearts are broken, broken after.
+///
+/// The menu itself is the front door's too (home_page.dart): one
+/// control for the things that are not the game, wherever the app is.
 library;
 
 import 'package:flutter/material.dart';
@@ -37,7 +40,7 @@ class TableHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _MenuButton(menu: menu),
+          MenuButton(menu: menu),
           Expanded(
             child: Center(
               child: Text(
@@ -72,10 +75,14 @@ class TableHeader extends StatelessWidget {
 
 /// The menu: one semantics node, "Menu", a tap opening the entries
 /// under the button.
-class _MenuButton extends StatelessWidget {
-  const _MenuButton({required this.menu});
+class MenuButton extends StatelessWidget {
+  const MenuButton({super.key, required this.menu, this.height = TableHeader.height});
 
   final List<MenuAction> menu;
+
+  /// How tall the button is, so it fills the line it sits on — the
+  /// table's, or the front door's.
+  final double height;
 
   Future<void> _open(BuildContext context) async {
     final button = context.findRenderObject()! as RenderBox;
@@ -121,11 +128,11 @@ class _MenuButton extends StatelessWidget {
         onTap: () => _open(context),
         child: InkWell(
           onTap: () => _open(context),
-          child: const ExcludeSemantics(
+          child: ExcludeSemantics(
             child: SizedBox(
               width: 48,
-              height: TableHeader.height,
-              child: Icon(Icons.menu, size: 22, color: Palette.chromeDim),
+              height: height,
+              child: const Icon(Icons.menu, size: 22, color: Palette.chromeDim),
             ),
           ),
         ),

@@ -41,6 +41,7 @@ import 'pictures.dart';
 import 'table_page.dart';
 import 'theme.dart';
 import 'ui/folding_heart.dart';
+import 'ui/header.dart';
 import 'ui/player_icon.dart';
 import 'ui/update_pill.dart';
 
@@ -436,39 +437,46 @@ class _HomePageState extends State<HomePage> {
         child: SafeArea(
           child: Stack(
             children: [
-              Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(22),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 380),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const FoldingHeart(size: 46, color: Palette.gold),
-                        const SizedBox(height: 12),
-                        const Text('Open Hearts',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: Palette.gold)),
-                        const SizedBox(height: 18),
-                        queue != null
-                            ? _WaitingView(queue: queue, onCancel: () => setState(_closeLobby))
-                            : room == null
-                                ? _entry()
-                                : _RoomView(
-                                    room: room,
-                                    ledger: _standing?.ledger,
-                                    onLeave: () => setState(_closeLobby),
-                                    onShare: () => _share(room.code),
-                                  ),
-                        if (_relayNote != null && (queue != null || room != null)) ...[
-                          const SizedBox(height: 14),
-                          Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
-                        ],
-                      ],
+              Column(
+                children: [
+                  _chrome(),
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(22),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 380),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const FoldingHeart(size: 46, color: Palette.gold),
+                              const SizedBox(height: 12),
+                              const Text('Open Hearts',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: Palette.gold)),
+                              const SizedBox(height: 18),
+                              queue != null
+                                  ? _WaitingView(queue: queue, onCancel: () => setState(_closeLobby))
+                                  : room == null
+                                      ? _entry()
+                                      : _RoomView(
+                                          room: room,
+                                          ledger: _standing?.ledger,
+                                          onLeave: () => setState(_closeLobby),
+                                          onShare: () => _share(room.code),
+                                        ),
+                              if (_relayNote != null && (queue != null || room != null)) ...[
+                                const SizedBox(height: 14),
+                                Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
               const Positioned(right: 10, bottom: 8, child: UpdatePill()),
             ],
@@ -477,6 +485,22 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  /// The line above everything: the menu on the left, the same control
+  /// the table's line carries (ui/header.dart), holding what is not the
+  /// game.
+  Widget _chrome() {
+    return Row(
+      children: [
+        MenuButton(
+          height: _chromeHeight,
+          menu: [MenuAction('About', icon: Icons.info_outline, onSelected: () => _go(const AboutPage()))],
+        ),
+      ],
+    );
+  }
+
+  static const _chromeHeight = 44.0;
 
   Widget _entry() {
     return Column(
@@ -549,11 +573,6 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 14),
           Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
         ],
-        const SizedBox(height: 14),
-        TextButton(
-          onPressed: () => _go(const AboutPage()),
-          child: const Text('About', style: TextStyle(fontSize: 13, color: Palette.chromeDim)),
-        ),
       ],
     );
   }

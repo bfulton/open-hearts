@@ -14,6 +14,7 @@ import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/ui/header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> pumpHome(WidgetTester tester, {String? openRoom}) async {
@@ -78,6 +79,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<TablePage>(find.byType(TablePage)).target, 100);
     expect(find.text('Hand 1  ·  Pass left  ·  to 100'), findsOneWidget);
+  });
+
+  testWidgets('About is behind the menu, the same control the table carries', (tester) async {
+    await pumpHome(tester);
+    expect(find.text('About'), findsNothing, reason: 'no button of its own at the bottom of the door');
+    expect(find.byType(MenuButton), findsOneWidget, reason: 'the table\'s menu, not a lookalike of it');
+    await tester.tap(find.bySemanticsLabel('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('About'));
+    await tester.pumpAndSettle();
+    expect(find.text('Build'), findsOneWidget, reason: 'the about page');
   });
 
   testWidgets('with live play locked there is a padlock and no way in, not even a link', (tester) async {
