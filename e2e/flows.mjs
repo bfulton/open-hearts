@@ -186,6 +186,28 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
   log(`      the record replays: ${out.split('\n').length} lines`);
   await click(page, /^New game$/);
   await waitFor(page, /^Hand 1/, { what: 'a new game' });
+
+  // And the game that was just played is on the profile. The device
+  // counts its own games by playing them again from the record, so
+  // this is the whole way round: played by thumb, kept, replayed,
+  // counted.
+  await click(page, /^Menu$/);
+  await waitFor(page, /^Leave the table$/, { what: 'the menu' });
+  await click(page, /^Leave the table$/);
+  await waitFor(page, /^Play bots$/, { what: 'the front door' });
+  await click(page, /^Your profile$/);
+  await waitFor(page, /^Alone$/, { what: 'the profile page', timeout: 40000 });
+  const record0 = await texts(page);
+  for (const want of [/^Rating$/, /^Your games$/, /^Live$/, /^Alone$/, /^played$/, /^won$/, /^average$/, /^best$/]) {
+    if (!record0.some((t) => want.test(t))) throw new Error(`no ${want} on the profile\nsaw: ${record0.join(' | ')}`);
+  }
+  // Nothing rated has been played here, so there is no rating to show
+  // and the page says which rather than showing the number everyone
+  // starts at.
+  if (record0.some((t) => /^1500$/.test(t))) throw new Error('the profile shows the rating nobody earned');
+  if (!record0.some((t) => /Play a rated live game|No relay answered/.test(t))) {
+    throw new Error(`the profile says nothing about why there is no rating\nsaw: ${record0.join(' | ')}`);
+  }
 });
 
 flow('the about page', async ({ open }) => {

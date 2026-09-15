@@ -72,4 +72,52 @@ void main() {
     final l = Ledger.from([say(a, honest, 1), say(b, honest, 2), say(c, forged, 3), say(stranger, forged, 4)]);
     expect(l.of(a.publicKey).mu, greaterThan(1500));
   });
+
+  test('a tally is what a player\'s finished games come to', () {
+    final me = FakeSigner('me').publicKey;
+    final you = FakeSigner('you').publicKey;
+    GameResult game(String table, List<int> totals, {bool rated = true, bool iLeft = false}) => GameResult(
+          table: table,
+          rated: rated,
+          at: 0,
+          seats: [
+            SeatResult(human: true, key: me, total: totals[0], fromStart: true, left: iLeft),
+            SeatResult(human: true, key: you, total: totals[1], fromStart: true),
+            SeatResult(human: false, bot: 'Romeo', total: totals[2], fromStart: true),
+            SeatResult(human: false, bot: 'Juliet', total: totals[3], fromStart: true),
+          ],
+        );
+
+    final games = [
+      game('t1', [20, 50, 60, 70]), // won
+      game('t2', [80, 30, 40, 50]), // lost
+      game('t3', [45, 45, 60, 70]), // tied at the bottom, which the game does not break
+      game('t4', [10, 90, 90, 90], rated: false), // won, but not for the rating
+      game('t5', [99, 20, 30, 40], iLeft: true), // left
+    ];
+
+    final all = Tally.of(me, games);
+    expect(all.games, 5);
+    expect(all.won, 3, reason: 'the two outright and the tie');
+    expect(all.best, 10);
+    expect(all.average, closeTo((20 + 80 + 45 + 10 + 99) / 5, 0.001));
+
+    final rated = Tally.of(me, games, rated: true);
+    expect(rated.games, 4, reason: 'the unrated game is a game, but not a rated one');
+    expect(rated.won, 2);
+    expect(rated.best, 20);
+
+    // A seat its player left is played and not won, whatever the bot
+    // that finished it went on to score.
+    expect(Tally.of(me, [games.last]).won, 0);
+    // And the ledger keeps what it folded, which is where these come from.
+    final ledger = Ledger();
+    for (final g in games) {
+      ledger.apply(g);
+    }
+    expect(ledger.standing.length, 5, reason: 'unrated games are not rated, but they were still played');
+    // t2, t3's tie, and t5 — where the lowest of those still at the
+    // table was theirs, whatever the seat I left went on to score.
+    expect(Tally.of(you, ledger.standing).won, 3);
+  });
 }

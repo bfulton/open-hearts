@@ -135,6 +135,51 @@ class GameResult {
   Set<PublicKey> get humans => {for (final s in seats) if (s.key != null) s.key!};
 }
 
+/// What one player's finished games come to: enough to put on a
+/// profile, and no more than the results themselves say.
+///
+/// A game is won by the lowest total, which is Hearts; a tie at the
+/// bottom counts for everyone tied, because the game does not break
+/// them. A seat its player left counts as played and not won, since
+/// leaving is not a result to be proud of and the rating already says
+/// so.
+class Tally {
+  const Tally({this.games = 0, this.won = 0, this.points = 0, this.best});
+
+  final int games;
+  final int won;
+
+  /// Every final total added up, for the average.
+  final int points;
+
+  /// The lowest total in any of them.
+  final int? best;
+
+  double? get average => games == 0 ? null : points / games;
+
+  /// One player's line through [results].
+  static Tally of(String id, Iterable<GameResult> results, {bool? rated}) {
+    var games = 0, won = 0, points = 0;
+    int? best;
+    for (final r in results) {
+      if (rated != null && r.rated != rated) continue;
+      final mine = r.seats.where((s) => (s.key ?? s.bot) == id).toList();
+      if (mine.isEmpty) continue;
+      // A seat with two lines — a human who left and the bot that
+      // finished it — is one game for the human, at the total they
+      // left behind.
+      final seat = mine.first;
+      games++;
+      points += seat.total;
+      if (best == null || seat.total < best) best = seat.total;
+      if (seat.left) continue;
+      final lowest = r.seats.where((s) => !s.left).map((s) => s.total).fold<int?>(null, (a, b) => a == null || b < a ? b : a);
+      if (lowest != null && seat.total == lowest) won++;
+    }
+    return Tally(games: games, won: won, points: points, best: best);
+  }
+}
+
 /// Ratings from results: fold every result that stands, in order.
 class Ledger {
   Ledger({this.prior});
@@ -147,6 +192,12 @@ class Ledger {
   final Map<String, Rating> _ratings = {};
   final Map<String, int> _games = {};
 
+  /// Every result folded into this ledger, oldest first — the ones
+  /// that stood. Kept because a rating is not the only thing a
+  /// finished game says: what a seat scored, and where it came, are in
+  /// here too, and nothing else on the device has them.
+  final List<GameResult> standing = [];
+
   /// A person's key or a bot's `Persona.id`.
   Rating of(String id) => _ratings[id] ?? prior?.call(id) ?? Rating.fresh;
   int gamesOf(String id) => _games[id] ?? 0;
@@ -155,6 +206,7 @@ class Ledger {
   /// there from the deal — is rated against every other such seat by
   /// final total; a leaver's total counts as worse than everyone's.
   void apply(GameResult r) {
+    standing.add(r);
     if (!r.rated) return;
     final staked = r.seats.where((s) => s.human || s.fromStart).toList();
     String idOf(SeatResult s) => s.key ?? s.bot!;

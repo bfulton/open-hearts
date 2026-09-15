@@ -6,7 +6,7 @@
 /// are a line above the live buttons, where the choice they describe
 /// is about to be made. Who you are — your name and your avatar — is
 /// the icon in the top right, which is the whole of your profile
-/// (live/profile_sheet.dart); a game that needs a name and finds none
+/// (profile_page.dart); a game that needs a name and finds none
 /// asks for it there rather than holding a field open on the door for
 /// the many times it is not wanted. A table found or filled replaces
 /// the door with the waiting screen or the room, and leaving either
@@ -29,7 +29,9 @@ import 'avatar.dart';
 import 'crypto/deal.dart';
 import 'game_options.dart';
 import 'identity.dart';
-import 'live/profile_sheet.dart';
+import 'profile_page.dart';
+import 'record_store.dart';
+import 'stats.dart';
 import 'live/live_page.dart';
 import 'live/options_sheet.dart';
 import 'live_controller.dart';
@@ -416,11 +418,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Who you are here, in one sheet: the name the others see and the
-  /// face they see it on. Both are kept on the device as soon as the
-  /// sheet is done with.
+  /// Who you are here, and how you have done: the name the others see,
+  /// the face they see it on, and what the games say. The first two are
+  /// kept on the device as soon as the page is left.
   Future<void> _editProfile() async {
-    final chosen = await showProfile(context, current: (name: _name, avatar: _avatar), seed: _signer?.publicKey ?? '');
+    final chosen = await showProfile(
+      context,
+      current: (name: _name, avatar: _avatar),
+      seed: _signer?.publicKey ?? '',
+      stats: _statsOnThisDevice(),
+    );
     if (chosen == null || !mounted) return;
     setState(() {
       _name = chosen.name;
@@ -428,6 +435,22 @@ class _HomePageState extends State<HomePage> {
     });
     await Identity.setName(chosen.name);
     await Identity.setAvatar(chosen.avatar);
+  }
+
+  /// What the profile page shows about the games. The games played
+  /// alone are the device's own to count; the rating is the relays' to
+  /// say, and the standing this door already loaded when it connected
+  /// is the same answer, so it is handed over rather than asked for
+  /// again. A door told to stay off the relays asks them nothing here
+  /// either.
+  Stream<PlayerStats> _statsOnThisDevice() async* {
+    final signer = _signer ??= await Identity.signer();
+    yield* playerStats(
+      store: PrefsRecordStore(),
+      signer: signer,
+      standing: _standing,
+      relays: widget.online ? _relays : null,
+    );
   }
 
   /// The name the others will see, asked for if this device has none:

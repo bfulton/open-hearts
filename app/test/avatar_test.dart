@@ -8,8 +8,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:open_hearts/avatar.dart';
-import 'package:open_hearts/live/profile_sheet.dart';
+import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+
+/// Scrolls to something and presses it. A tap at a point off the
+/// screen lands on whatever is at that point, which is nothing, and
+/// the test then reads as though the press did not take.
+Future<void> reach(WidgetTester tester, Finder what) async {
+  await tester.ensureVisible(what);
+  await tester.pumpAndSettle();
+  await tester.tap(what);
+  await tester.pumpAndSettle();
+}
 
 void main() {
   test('to the wire and back: icon and colour in a beat, the picture too when asked', () {
@@ -75,6 +85,13 @@ void main() {
   });
 
   testWidgets('the profile: a name, an icon, a colour, Done — and My initials clears it', (tester) async {
+    // A phone, because the page is longer than a phone and what is
+    // below the fold has to be scrolled to, here as there.
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     Profile? picked;
     Profile current = (name: 'Ada', avatar: Avatar.none);
     await tester.pumpWidget(MaterialApp(
@@ -91,11 +108,9 @@ void main() {
     expect(find.widgetWithText(TextField, 'Your name'), findsOneWidget);
     await tester.enterText(find.widgetWithText(TextField, 'Your name'), 'Ada Lovelace');
     await tester.pumpAndSettle();
-    expect(find.text('AL'), findsOneWidget, reason: 'the badge in the sheet wears what is typed');
-    await tester.tap(find.bySemanticsLabel('Rocket'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Colour 4'));
-    await tester.pumpAndSettle();
+    expect(find.text('AL'), findsOneWidget, reason: 'the badge on the page wears what is typed');
+    await reach(tester, find.bySemanticsLabel('Rocket'));
+    await reach(tester, find.bySemanticsLabel('Colour 4'));
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
     expect(picked, (name: 'Ada Lovelace', avatar: const Avatar(icon: 'rocket', color: 3)));
@@ -103,8 +118,7 @@ void main() {
     current = picked!;
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('My initials'));
-    await tester.pumpAndSettle();
+    await reach(tester, find.text('My initials'));
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
     expect(picked, (name: 'Ada Lovelace', avatar: Avatar.none), reason: 'the name it came in with, and no avatar');
