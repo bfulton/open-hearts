@@ -119,7 +119,9 @@ class TableView extends StatelessWidget {
               // first. The side badges have a strip, so they stack.
               oneLine: wide || position.isEven,
               maxWidth: !wide && position.isEven ? facing : sideRoom,
-              height: line,
+              // A stacked badge takes the height of the row it is in,
+              // which is the taller of the pair's (below).
+              height: wide || position.isEven ? line : null,
               iconSize: wide || position.isEven ? SeatBadge.iconOn(line) : SeatBadge.iconIn(cardHeight),
             );
 
@@ -195,23 +197,24 @@ class TableView extends StatelessWidget {
               ),
             );
 
-        Widget seat(int position) => wide
-            ? SizedBox(
-                height: line,
-                child: Stack(
-                  children: [
-                    // The two ghosts make the box; the badge fills it.
-                    ghost(position),
-                    ghost((position + 2) % seatCount),
-                    Positioned.fill(child: badge(position)),
-                  ],
-                ),
-              )
-            : SizedBox(
-                width: position.isEven ? facing : sideRoom,
-                height: position.isEven ? null : cardHeight,
-                child: badge(position),
-              );
+        Widget seat(int position) {
+          if (wide) {
+            return SizedBox(
+              height: line,
+              child: Stack(
+                children: [
+                  // The two ghosts make the box; the badge fills it.
+                  ghost(position),
+                  ghost((position + 2) % seatCount),
+                  Positioned.fill(child: badge(position)),
+                ],
+              ),
+            );
+          }
+          return position.isEven
+              ? SizedBox(width: facing, height: line, child: badge(position))
+              : SizedBox(width: sideRoom, child: badge(position));
+        }
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: _badgeInset),
@@ -224,6 +227,7 @@ class TableView extends StatelessWidget {
                 height: trickBox.height,
                 child: Stack(
                   clipBehavior: Clip.none,
+                  alignment: Alignment.center,
                   children: [
                     Positioned(right: sideOut, top: 0, bottom: 0, child: Center(child: seat(1))),
                     Positioned(left: sideOut, top: 0, bottom: 0, child: Center(child: seat(3))),
@@ -348,7 +352,7 @@ class SeatBadge extends StatelessWidget {
     required this.avatar,
     this.clockMs,
     this.oneLine = false,
-    this.height = line,
+    this.height,
     this.onHold,
     required this.iconSize,
   });
@@ -382,9 +386,10 @@ class SeatBadge extends StatelessWidget {
   /// stacks instead.
   final bool oneLine;
 
-  /// How tall a one-line badge is, and how big its icon: the felt
-  /// chooses both, since it is the one that gives up the height.
-  final double height;
+  /// How tall the badge is, and how big its icon: the felt chooses
+  /// both, since it is the one that gives up the height. A null height
+  /// is the badge's own, which is what [stackedHeight] predicts.
+  final double? height;
   final double iconSize;
 
   /// The least a badge is given: a two-word name wrapped, or most of
@@ -407,6 +412,12 @@ class SeatBadge extends StatelessWidget {
   static double iconOn(double line) => line - 13;
   static double iconIn(double cardHeight) => (cardHeight * 0.38).clamp(22.0, 40.0);
 
+  /// Every name on the felt is this size, whoever it belongs to.
+  static const nameSize = 13.0;
+  static const _numberSize = 12.5;
+
+  static const _stacked = EdgeInsets.symmetric(horizontal: 11, vertical: 7);
+
   @override
   Widget build(BuildContext context) {
     final total = game.totals[seat];
@@ -420,9 +431,7 @@ class SeatBadge extends StatelessWidget {
           '${onTurn ? ', on turn' : ''}${clock == null ? '' : ', ${clockSeconds(clock)} s on the clock'}',
       onLongPress: onHold,
       child: ExcludeSemantics(
-        child: oneLine
-            ? SizedBox(height: height, child: _held(context, total, taken))
-            : _held(context, total, taken),
+        child: height == null ? _held(context, total, taken) : SizedBox(height: height, child: _held(context, total, taken)),
       ),
     );
   }
@@ -434,15 +443,17 @@ class SeatBadge extends StatelessWidget {
     return GestureDetector(behavior: HitTestBehavior.opaque, onLongPress: onHold, child: badge);
   }
 
-  EdgeInsets get _padding => oneLine ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : const EdgeInsets.symmetric(horizontal: 11, vertical: 7);
+  EdgeInsets get _padding => oneLine ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : _stacked;
 
-  /// The name, in the room it has: on one line when it fits, else — a
-  /// long name, Mumtaz Mahal in the east seat of a phone — wrapped at
-  /// its spaces where the badge is stacked, and scaled to the room
-  /// where it is one line or the name is one word.
+  /// The name, in the room it has, at one size wherever it is: every
+  /// player's name is the same size as every other's, so a long one is
+  /// not a smaller one. On one line when it fits; wrapped at its
+  /// spaces where the badge is stacked and the name has any — Mumtaz
+  /// Mahal in the east seat of a phone; and cut with an ellipsis when
+  /// even that will not go in.
   Widget _name(BuildContext context, double room) {
     final style = TextStyle(
-      fontSize: 13,
+      fontSize: nameSize,
       fontWeight: FontWeight.w600,
       color: onTurn ? Palette.gold : Palette.chrome,
     );
@@ -454,21 +465,42 @@ class SeatBadge extends StatelessWidget {
           maxLines: 1,
         )..layout())
         .width;
-    if (widthOf(name) <= room) return Text(name, style: style, maxLines: 1);
     final words = name.split(' ');
-    if (!oneLine && words.length > 1 && words.every((w) => widthOf(w) <= room)) {
-      return Text(
+    final wrapped = !oneLine && words.length > 1;
+    if (widthOf(name) <= room) {
+      final line = Text(name, style: style, maxLines: 1);
+      // A stacked badge keeps room for a second line whether this name
+      // needs one or not, so the pair at the sides are one size and a
+      // long name is not a smaller name.
+      return oneLine ? line : SizedBox(height: 2 * _lineHeight(context, style), child: Center(child: line));
+    }
+    // Bounded, so the line has something to cut against: the badge
+    // scales its contents into its box (below), and unbounded text
+    // would be scaled rather than cut.
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: room, minHeight: oneLine ? 0 : 2 * _lineHeight(context, style)),
+      child: Text(
         name,
         style: style,
         textAlign: TextAlign.center,
-        maxLines: words.length,
+        softWrap: wrapped,
+        maxLines: wrapped ? 2 : 1,
+        overflow: TextOverflow.ellipsis,
         // As wide as its longest line, not as the room: the badge hugs
         // the name.
         textWidthBasis: TextWidthBasis.longestLine,
-      );
-    }
-    return FittedBox(fit: BoxFit.scaleDown, child: Text(name, style: style, maxLines: 1));
+      ),
+    );
   }
+
+  /// One line of the name, as this reader's text size draws it.
+  static double _lineHeight(BuildContext context, TextStyle style) => (TextPainter(
+        text: TextSpan(text: 'M', style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: MediaQuery.textScalerOf(context),
+        maxLines: 1,
+      )..layout())
+      .height;
 
   Widget _badge(BuildContext context, int total, int taken) {
     // The icon sits beside the name where the badge has the width for
@@ -488,7 +520,7 @@ class SeatBadge extends StatelessWidget {
         children: [
           Text('$total',
               style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: _numberSize,
                   fontWeight: FontWeight.w600,
                   fontFeatures: const [FontFeature.tabularFigures()],
                   color: Palette.chrome.withValues(alpha: 0.85))),

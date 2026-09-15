@@ -53,6 +53,14 @@ List<CardView> fanCards(WidgetTester tester) => tester
     ))
     .toList();
 
+/// How much the badge's own scaling has shrunk a name on its way to
+/// the screen: 1 when it is drawn at the size it asks for.
+double _scaleOf(WidgetTester tester, Finder text) {
+  final box = tester.renderObject<RenderBox>(text);
+  final painted = tester.getRect(text);
+  return box.size.width == 0 ? 1 : painted.width / box.size.width;
+}
+
 Finder cardFinder(engine.Card card) => find.descendant(
     of: find.byType(HandFan),
     matching: find.byWidgetPredicate((w) => w is CardView && w.card == card));
@@ -380,12 +388,12 @@ void main() {
     expect(mine.bottom, lessThanOrEqualTo(hand.top));
   });
 
-  testWidgets('a long name wraps on its badge rather than running under the trick', (tester) async {
+  testWidgets('a long name wraps or is cut, and every name is the same size as every other', (tester) async {
     // The test font draws every glyph an em wide, so names here are
     // twice their width on a phone: "Mumtaz Mahal" is too wide even
-    // wrapped and is scaled to the room, while "Don Juan" wraps. Both
-    // in the east seat, where the room is narrowest — found by
-    // searching the seeds.
+    // wrapped and is cut, while "Don Juan" wraps. Both in the east
+    // seat, where the room is narrowest — found by searching the
+    // seeds.
     int? seedFor(String name) {
       for (var s = 0; s < 500; s++) {
         final c = GameController(seed: s, paced: false, store: MemoryRecordStore());
@@ -406,7 +414,20 @@ void main() {
       for (final slot in _trickSlots(tester)) {
         expect(east.overlaps(slot), isFalse, reason: '$name\'s badge stays clear of the trick');
       }
-      expect(find.text(name), findsOneWidget, reason: 'the whole name, on the badge');
+      expect(find.text(name), findsOneWidget, reason: 'the name, on the badge');
+      // One size for everyone: a name that does not fit is cut, not
+      // shrunk, so nobody's name is smaller than anybody else's.
+      final painted = <double>{
+        for (final seat in [name, names[1], names[2]])
+          tester.widget<Text>(find.text(seat)).style!.fontSize!
+      };
+      expect(painted, hasLength(1), reason: 'every badge sets the same size');
+      for (final seat in [name, names[1], names[2]]) {
+        final box = tester.renderObject<RenderBox>(find.text(seat));
+        final scale = _scaleOf(tester, find.text(seat));
+        expect(scale, closeTo(1.0, 0.001), reason: '$seat is drawn at the size it sets, not scaled to fit');
+        expect(box.size.height, greaterThan(0));
+      }
       if (name == 'Don Juan') {
         // Wrapped to two lines: taller than the north badge, which has
         // the whole width and stays on one.
