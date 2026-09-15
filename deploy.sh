@@ -10,8 +10,14 @@
 #   /measure/    benchmarks meant to be run on a phone (only the ones
 #                that have been built; see measurements/README.md)
 #
-# Every commit publishes, which is the whole point: the phone reading
-# https://dev.open-hearts.pages.dev/play is looking at the last push.
+# Publishing is for looking at, not for keeping: every upload is a
+# deployment Cloudflare keeps for ever, and a few dozen of them make
+# the project's own list useless. So publish when there is something to
+# look at, and sweep up after:
+#
+#   ./deploy.sh --prune [keep]   deletes the older previews, keeping the
+#                                newest [keep] (10) and anything live
+#   ./deploy.sh --prune -n       says what it would delete and stops
 #
 # Usage:  ./deploy.sh [branch-label]
 #
@@ -32,6 +38,64 @@ STAGE=build/publish
 branch_of_git() {
   git rev-parse --abbrev-ref HEAD 2>/dev/null || echo dev
 }
+
+# ---- sweeping up old deployments ---------------------------------------
+# The alias — dev.open-hearts.pages.dev — always points at the newest
+# deployment of its branch, so deleting older previews takes nothing
+# down. Production deployments are left alone whatever their age.
+prune() {
+  local keep=${1:-10} dry=${2:-}
+  local api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments"
+  local page=1 skip=$keep ids all=""
+  # A page at a time, newest first, until a page comes back empty: the
+  # newest [keep] are left alone and everything after them goes.
+  while :; do
+    ids=$(curl -sS "$api?per_page=25&page=$page" -H "Authorization: Bearer $CLOUDFLARE_TOKEN" |
+      python3 -c "
+import json, sys
+page = json.load(sys.stdin)
+if not page.get('success'):
+    sys.exit('cloudflare said no: ' + json.dumps(page.get('errors')))
+found = page['result']
+print('#', len(found))
+for d in [x for x in found if x['environment'] != 'production'][$skip:]:
+    print(d['id'], d['created_on'][:19], (d.get('deployment_trigger') or {}).get('metadata', {}).get('branch', '?'))
+")
+    [ "$(echo "$ids" | head -1 | cut -d' ' -f2)" = 0 ] && break
+    all="$all
+$(echo "$ids" | tail -n +2)"
+    page=$((page + 1))
+    skip=0
+    [ "$page" -gt 20 ] && break
+  done
+  all=$(echo "$all" | sed '/^$/d')
+  if [ -z "$all" ]; then
+    echo "nothing to sweep: $keep or fewer previews"
+    return
+  fi
+  echo "$all" | while read -r id made branch; do
+    if [ -n "$dry" ]; then
+      echo "would delete $id  $made  $branch"
+    else
+      curl -sS -X DELETE "$api/$id" -H "Authorization: Bearer $CLOUDFLARE_TOKEN" > /dev/null &&
+        echo "deleted $id  $made  $branch"
+    fi
+  done
+}
+
+if [ "${1:-}" = --prune ]; then
+  shift
+  DRY=
+  KEEP=10
+  for arg in "$@"; do
+    case "$arg" in
+      -n) DRY=1 ;;
+      *) KEEP=$arg ;;
+    esac
+  done
+  prune "$KEEP" "$DRY"
+  exit 0
+fi
 
 LABEL=${1:-}
 if [ -z "$LABEL" ]; then
