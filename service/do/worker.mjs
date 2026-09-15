@@ -36,18 +36,25 @@ export class TagRelay {
 
   /// The relay for this object, built on first use — which is the
   /// first message after every wake, since an evicted object comes
-  /// back empty. The sockets it already holds are handed back to it
-  /// with the subscriptions they were carrying.
-  async ready() {
-    if (this.relay) return this.relay;
-    this.relay = createRelay({
+  /// back empty. What is kept is the promise of it rather than the
+  /// relay, so a second message arriving while the first is still
+  /// waiting for the wasm gets the relay the first one built and not
+  /// one of its own.
+  ready() {
+    return (this.relay ??= this.build());
+  }
+
+  /// The sockets this object already holds are handed back to the new
+  /// relay with the subscriptions they were carrying.
+  async build() {
+    const relay = createRelay({
       verify: await schnorrVerifier(wasm),
       store: null,
       refuse: (event) =>
         ephemeral(event.kind) ? null : 'blocked: this relay carries ephemeral kinds; the stored ones live on the relays',
     });
-    for (const socket of this.state.getWebSockets()) this.relay.open(socket, socket.deserializeAttachment());
-    return this.relay;
+    for (const socket of this.state.getWebSockets()) relay.open(socket, socket.deserializeAttachment());
+    return relay;
   }
 
   async fetch(request) {
