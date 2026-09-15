@@ -9,6 +9,11 @@
 ///     cd service && dart run bin/service.dart            # relay on 7447
 ///     dart run bin/service.dart --port 0 --quiet         # any free port
 ///     dart run bin/service.dart --juror                  # and a juror
+///
+/// `OH_RELAY=js` runs the relay the Cloudflare object runs instead
+/// (service/do/, docs/06-service.md), on the same port and saying the
+/// same line, so anything that starts this process can be pointed at
+/// either relay without knowing which it got.
 library;
 
 // A server's output is its log.
