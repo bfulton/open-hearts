@@ -44,6 +44,7 @@ import 'net/turn.dart';
 import 'pictures.dart';
 import 'table_page.dart';
 import 'theme.dart';
+import 'ui/doorway.dart';
 import 'ui/folding_heart.dart';
 import 'ui/header.dart';
 import 'ui/player_icon.dart';
@@ -120,6 +121,12 @@ class _HomePageState extends State<HomePage> {
   Timer? _onlineClock;
 
   StreamSubscription<TableSpec>? _queueSub;
+
+  /// The heart at the top, held by a key of its own: the door, the
+  /// waiting screen and the room put it in different places, and it is
+  /// the same heart in all three — a fold part way through carries
+  /// across the change instead of starting over (ui/doorway.dart).
+  final _heart = GlobalKey();
 
   @override
   void initState() {
@@ -470,38 +477,30 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   _chrome(),
                   Expanded(
-                    child: Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(22),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 380),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const FoldingHeart(size: 46, color: Palette.gold),
-                              const SizedBox(height: 12),
-                              const Text('Open Hearts',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: Palette.gold)),
-                              const SizedBox(height: 18),
-                              queue != null
-                                  ? _WaitingView(queue: queue, onCancel: () => setState(_closeLobby))
-                                  : room == null
-                                      ? _entry()
-                                      : RoomView(
-                                          room: room,
-                                          ledger: _standing?.ledger,
-                                          onLeave: () => setState(_closeLobby),
-                                          onShare: () => _share(room.code),
-                                        ),
-                              if (_relayNote != null && (queue != null || room != null)) ...[
-                                const SizedBox(height: 14),
-                                Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
-                              ],
-                            ],
-                          ),
-                        ),
+                    child: Doorway(
+                      heart: FoldingHeart(key: _heart, size: 46, color: Palette.gold),
+                      // The app's name is the door's own: a screen with
+                      // one thing to say says that instead.
+                      title: queue == null && room == null,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          queue != null
+                              ? _WaitingView(queue: queue, onCancel: () => setState(_closeLobby))
+                              : room == null
+                                  ? _entry()
+                                  : RoomView(
+                                      room: room,
+                                      ledger: _standing?.ledger,
+                                      onLeave: () => setState(_closeLobby),
+                                      onShare: () => _share(room.code),
+                                    ),
+                          if (_relayNote != null && (queue != null || room != null)) ...[
+                            const SizedBox(height: 14),
+                            Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
+                          ],
+                        ],
                       ),
                     ),
                   ),

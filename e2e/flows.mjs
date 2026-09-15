@@ -229,6 +229,8 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   if (!/^[A-Z0-9]{8}$/.test(code ?? '')) throw new Error(`no room in the address: ${page.url()}`);
   const seen = await texts(page);
   if (seen.some((t) => t.includes(code))) throw new Error(`the code is on the screen\nsaw: ${seen.join(' | ')}`);
+  // A room has one thing to say and no need to say whose app it is.
+  if (seen.some((t) => /^Open Hearts$/.test(t))) throw new Error('the room still carries the name of the app over it');
   if (!seen.some((t) => /^Ada \(you\)$/.test(t))) throw new Error('the room does not say which one is you');
   if (!seen.some((t) => /^rated \d+/.test(t))) throw new Error(`no rating beside a name\nsaw: ${seen.join(' | ')}`);
   // A refresh is not a way out: the address is the room, so the device
