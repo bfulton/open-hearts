@@ -279,6 +279,51 @@ offer say so, and a build that cannot run the deal does not sit down.
   seal but needs the other's, and a release that goes out before a peer
   has seen the pass it covers carries nothing for it.
 
+  **The design those two findings give**, which is what the next
+  attempt builds. The first says the share escrow does not replace the
+  secret escrow; it sits beside it and covers a different window. Both
+  are made at the keys message: the secret in two pieces as now, and
+  the key in two shares, the people's and the jury's, wrapped to the
+  same table keys and costing the same 32 bytes each. The shares' keys
+  ride along in the open, and a keys message is refused unless they add
+  to the seat's own — which is what says the shares are shares of *that*
+  key, and it is checked by everyone, not only by a holder.
+
+  Then the window decides which escrow answers:
+
+  - **Before the deck is dealt**, a departed seat still owes a shuffle,
+    so the secret pieces are released and the secret rebuilt, exactly
+    as today. Nothing is gained by shares here and the shuffle cannot
+    be done without the secret.
+  - **In play**, nothing releases a share. A holder releases *share
+    tokens*: for each position still missing the seat's token, a
+    `shareToken` over that position, proved against that holder's share
+    key. Two such sets — a person's and a juror's — join the three
+    living seats' tokens, and unmasking over five keys opens the card.
+    The survivors learn the positions they open and nothing else, and
+    the departed key is never anywhere. This is the window the
+    confidentiality is for.
+  - **At the audit**, the hand is opened to everyone anyway, so the
+    secret pieces are released and the secret rebuilt. The audit, and
+    the verifier that replays it, are unchanged.
+
+  The second finding is why the release is of tokens and not of shares.
+  A share that crossed would hand the other side the power to open
+  every position, which is the whole thing being avoided; a token
+  crosses for one position and says nothing about the next. It also
+  answers the crossing problem directly, because a token is made
+  against a position both sides can already see in the dealt deck,
+  rather than against a pass one side may not have heard yet. A release
+  covers *every position the seat's token is missing from*, so a seat
+  that left before sending its tokens is covered by the same message as
+  one that left after.
+
+  The cost is a release of thirteen tokens where there was one 32-byte
+  piece — some 1.7 KB against the 49,143 bytes of payload a sealed
+  event carries ([the relay measurements](../measurements/relay/README.md))
+  — and at worst fifty-two, for a seat that left before its tokens went
+  out.
+
 - **The interim.** Until the bot plays inside the computation
   ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's
   hand is open to everyone at the table, and so is a departed person's
