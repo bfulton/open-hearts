@@ -104,6 +104,14 @@ they are almost exactly half of it.
 | CPU, native, both parties | 2.5–2.8 s (0.3 s with the check at hardware speed) |
 | CPU, wasm, both parties | 10.3–10.5 s (4.7–5.0 s without the check) |
 
+**That is the triples and nothing else**, which is the phase the design
+turns on but not the whole bill. A bot-held hand also sends the garbled
+circuit — two ciphertexts an AND gate, which KRRW18's Table 2 puts at
+34 bytes a gate for WRK17, so about 1.3 MB more — and an online phase
+that is only the input labels, a few KB. Both are small against the
+preprocessing, which is why the preprocessing is what was measured, and
+neither is counted in the figures here.
+
 Against [the channel](../channel/README.md), which affords 698 bytes a
 gate on 5 Mbit/s over a p50 hand of a minute and 1,396 over a p90 hand
 of two: **it does not fit in a minute and does fit in two.** 39.5 MB is
