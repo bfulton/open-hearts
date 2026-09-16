@@ -319,10 +319,11 @@ offer say so, and a build that cannot run the deal does not sit down.
   one that left after.
 
   The cost is a release of thirteen tokens where there was one 32-byte
-  piece — some 1.7 KB against the 49,143 bytes of payload a sealed
-  event carries ([the relay measurements](../measurements/relay/README.md))
-  — and at worst fifty-two, for a seat that left before its tokens went
-  out.
+  piece: 2,385 bytes of JSON, measured, against the 49,143 bytes of
+  payload a sealed event carries
+  ([the relay measurements](../measurements/relay/README.md)). A seat
+  that left before its tokens went out owes all fifty-two, about four
+  times that, and still one event.
 
 - **The interim.** Until the bot plays inside the computation
   ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's

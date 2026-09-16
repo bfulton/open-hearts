@@ -316,6 +316,61 @@ void main() {
     expect(all[0].acceptAudit(all[1].myAudit()!), isTrue, reason: 'the true one again is fine');
   });
 
+  test('a departed seat\'s hand opens from its key\'s two shares, and the key is never rebuilt', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final juror = make(seats, null, key: 'juror');
+    final all = dealOut(seats, custodians: ['juror', 'other-juror'], extra: [juror]);
+
+    // Seat 3 goes. Nobody releases a piece of its secret here: the
+    // people hold one share of its key and the jury the other, and
+    // what crosses is each share's tokens for the positions that are
+    // still shut (docs/03-fair-deal.md).
+    for (final x in [...all, juror]) {
+      x.seatLeft(3);
+    }
+    expect(all[0].awaitsSecret(3), isTrue, reason: 'one share opens nothing on its own');
+    expect(juror.awaitsSecret(3), isTrue);
+
+    final fromSeat = all[0].releaseShareTokens(3)!;
+    final fromJuror = juror.releaseShareTokens(3)!;
+    expect(fromSeat['share'], 0, reason: "a person holds the people's share");
+    expect(fromJuror['share'], 1, reason: "a juror holds the jury's");
+    expect(all[0].releaseShareTokens(2), isNull, reason: 'seat 2 is still here');
+    // Thirteen positions of its own, and no more: the seat published
+    // its tokens for the other seats' before it went.
+    expect((fromSeat['tokens'] as Map).length, 13);
+    expect((fromSeat['tokens'] as Map).keys.map((k) => int.parse(k as String) ~/ 13).toSet(), {3});
+
+    // A person already holds half, so the juror's half finishes it.
+    expect(all[1].acceptShareTokens(fromJuror), isTrue);
+    expect(all[1].handOf(3), all[3].handOf(3), reason: "its own share's tokens and the juror's");
+    expect(all[1].awaitsSecret(3), isFalse);
+    expect(all[1].knowsSecret(3), isFalse, reason: 'and the key was never put back together');
+
+    // A bystander holding no share of it needs both halves, and one
+    // alone tells it nothing.
+    final watcher = make(seats, null, key: 'watcher');
+    final byMessage = dealOut(seats, custodians: ['juror', 'other-juror'], extra: [watcher]);
+    final theirJuror = make(seats, null, key: 'juror');
+    for (final x in [...byMessage, theirJuror]) {
+      x.seatLeft(3);
+    }
+    expect(watcher.acceptShareTokens(byMessage[0].releaseShareTokens(3)!), isTrue);
+    expect(watcher.handOf(3), isNull, reason: "one share's tokens open nothing");
+    expect(watcher.awaitsSecret(3), isTrue);
+
+    // A share's token is proved against that share's key and no other,
+    // so the halves cannot be swapped or made up.
+    final swapped = Map<String, Object?>.from(byMessage[0].releaseShareTokens(3)!)..['share'] = 1;
+    expect(watcher.acceptShareTokens(swapped), isTrue, reason: 'taken in');
+    expect(watcher.handOf(3), isNull, reason: 'but not a token of that share, so nothing is kept');
+    expect(watcher.acceptShareTokens({'about': 3, 'holder': 'x', 'share': 9, 'tokens': const {}}), isFalse);
+    expect(watcher.acceptShareTokens({'about': 2, 'holder': 'x', 'share': 0, 'tokens': const {}}), isFalse,
+        reason: 'nothing is released for a seat still here');
+
+    expect(watcher.handOf(3), isNull, reason: 'still shut after all that');
+  });
+
   test('a verifier that saw every message ends with the whole deal, and refuses what does not verify', () {
     final seats = [const HumanDealSeat('a'), const HumanDealSeat('b'), const HumanDealSeat('c'), const BotDealSeat()];
     final verifier = make(seats, null, verifier: true);
