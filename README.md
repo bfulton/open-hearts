@@ -141,8 +141,10 @@ Ideas agreed on and not yet placed in the order above.
 - **The bot inside the computation**, so a bot's hand is open to
   nobody ([doc 04](docs/04-live-play.md), "Playing a seat nobody
   holds"); until then bots' hands are open to the table. What it would
-  take is written down there; the number that decides it has to be
-  measured before any of it is built.
+  take is written down there, and the budget it has to fit in is
+  measured: about seven hundred bytes a gate, on a channel of its own
+  ([measurements/channel](measurements/channel/README.md)). What a
+  triple costs to make is the next number.
 
 ## Developing
 

@@ -585,10 +585,22 @@ without either party seeing an input, and that is not a small thing.
   The cost that decides the design is not there but in the
   preprocessing: one authenticated triple per AND gate, made by
   oblivious transfer, which is where the traffic and the seconds go.
-  **That number is not measured, and until it is on a phone over the
-  open internet the design is not settled** — the same thing doc 03 said
-  about the shuffle before the shuffle was built, and the reason the
-  shuffle was benchmarked first.
+  **The budget for it is measured**
+  ([measurements/channel](../measurements/channel/README.md)): a hand is
+  p50 a minute, a seat on a phone should be assumed to have a few
+  megabits a second, and the two together give **about seven hundred
+  bytes a gate**. A construction that costs more than that needs a
+  smaller circuit, a longer hop, or a different protocol. What a triple
+  actually costs to make is still to be measured, and until it is on a
+  phone the design is not settled — the same thing doc 03 said about the
+  shuffle before the shuffle was built.
+- **What it must not share.** The same measurement says where the
+  material goes: not down the channel the table plays on. A seat that
+  hands a hand's worth of preprocessing to the stack and then has to
+  play a card waits behind its own upload — 8 MB of queue is 13 seconds
+  on a 5 Mbit/s link — and the table boots it for silence. A channel of
+  its own costs the table about 15 ms of added round trip while it runs,
+  which is affordable; the queue has to be paced as well as separated.
 - **Where it would live.** Beside the deal. `crypto/deal` is one Rust
   crate built twice, a cdylib for the VM and a wasm for the browser, and
   garbling and transfer belong in the same place for the same reason.

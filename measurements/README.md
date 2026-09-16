@@ -8,6 +8,7 @@ come from.
 |---|---|---|
 | [`shuffle/`](shuffle/README.md) | What does a verifiable 52-card shuffle cost, native and in wasm? | doc 03: fast enough to deal every hand |
 | [`sign/`](sign/README.md) | How long do BIP-340 signatures take in a browser? | 100 ms in Dart-to-JavaScript, 0.6 ms in wasm; the web app uses the wasm |
+| [`channel/`](channel/README.md) | What does a WebRTC data channel carry, and what does carrying it cost the table? | doc 04: the channel is not the constraint; a hand affords about 700 bytes a gate, and bulk must not share the table's channel |
 
 The bot policy as a boolean circuit is counted by
 `packages/engine/tool/circuit_count.dart` (doc 04); the bots' strength
