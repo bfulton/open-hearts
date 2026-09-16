@@ -137,6 +137,9 @@ export function storeOf(env) {
     async put(pk, sk, value) {
       await kv.put(at(pk, sk), JSON.stringify(value));
     },
+    async del(pk, sk) {
+      await kv.delete(at(pk, sk));
+    },
     /// The sort keys under [pk] that begin with [prefix]. The only
     /// call here that is not a point lookup, and it is bounded by what
     /// lives under one subscription: five devices (doc 06).
@@ -164,6 +167,9 @@ export function memoryStore(seed = {}) {
     },
     async put(pk, sk, value) {
       rows.set(at(pk, sk), JSON.stringify(value));
+    },
+    async del(pk, sk) {
+      rows.delete(at(pk, sk));
     },
     async under(pk, prefix) {
       return [...rows.keys()].filter((k) => k.startsWith(at(pk, prefix))).map((k) => k.slice(`${pk}|`.length));
@@ -439,6 +445,162 @@ export async function record(event, store, { now = Date.now() } = {}) {
   return null;
 }
 
+// ---- a subscription is a person's, not a device's ----------------------
+// Five devices to a subscription, and any of them can drop another.
+// Unbounded sharing is a subscription shared with the internet; five is
+// a household (doc 06).
+//
+// A second device is brought in by a code: the subscribed device shows
+// one, the new device arrives carrying it, and it is spent. The code is
+// a random sixteen bytes and nothing else. The design has it carry the
+// subscription and an expiry under a signature; what is built keeps
+// both here instead, for two reasons that only showed up against a
+// camera. A code that has to be spent needs a row whatever it carries,
+// so a signature saves no lookup — and a code three times longer is a
+// QR three times denser, read across a table by a phone that is not
+// quite still. Keeping it here also keeps the subscription off the
+// wire, which a photograph of a screen would otherwise carry away.
+
+const MOST_DEVICES = 5;
+
+/// How long a code is worth anything. Long enough to walk a phone over,
+/// short enough that a photograph of the screen is not a key.
+const TICKET_MINUTES = 10;
+
+const TICKET_BYTES = 16;
+
+const nonce = () => hex(crypto.getRandomValues(new Uint8Array(TICKET_BYTES)));
+
+/// The devices on a subscription, oldest binding first.
+export async function devicesOn(store, subscription) {
+  const found = [];
+  for (const sk of await store.under(`SUB#${subscription}`, 'DEVICE#')) {
+    const key = sk.slice('DEVICE#'.length);
+    const row = await store.get(`SUB#${subscription}`, sk);
+    found.push({ key, bound_at: row?.bound_at ?? null });
+  }
+  return found.sort((a, b) => String(a.bound_at).localeCompare(String(b.bound_at)) || a.key.localeCompare(b.key));
+}
+
+/// A code for a new device to arrive with: {status, body}.
+export async function ticketFor(key, store, { now = Date.now() } = {}) {
+  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  if (!held) return { status: 402, body: { error: 'no subscription' } };
+  const devices = await devicesOn(store, held.subscription);
+  if (devices.length >= MOST_DEVICES) {
+    return { status: 409, body: { error: 'five devices already', devices: devices.length, most: MOST_DEVICES } };
+  }
+  const code = nonce();
+  const expires_at = new Date(now + TICKET_MINUTES * 60000).toISOString();
+  await store.put(`TICKET#${code}`, 'META', { subscription: held.subscription, expires_at, used_at: null, made_by: key });
+  return { status: 200, body: { ticket: code, expires_at, devices: devices.length, most: MOST_DEVICES } };
+}
+
+/// A device arriving with a code. The code is spent whether or not the
+/// licence that follows can be signed: a code that could be tried twice
+/// is not a code that was spent once.
+export async function claimWith(key, code, store, { now = Date.now() } = {}) {
+  if (typeof code !== 'string' || !/^[0-9a-f]{2,64}$/.test(code)) return { status: 400, body: { error: 'not a code' } };
+  const ticket = await store.get(`TICKET#${code}`, 'META');
+  if (!ticket) return { status: 404, body: { error: 'no such code' } };
+  if (ticket.used_at) return { status: 409, body: { error: 'that code has been used' } };
+  if (Date.parse(ticket.expires_at) <= now) return { status: 410, body: { error: 'that code has run out' } };
+  const devices = await devicesOn(store, ticket.subscription);
+  const already = devices.some((d) => d.key === key);
+  if (!already && devices.length >= MOST_DEVICES) {
+    return { status: 409, body: { error: 'five devices already', devices: devices.length, most: MOST_DEVICES } };
+  }
+  const today = dayOf(now);
+  await store.put(`TICKET#${code}`, 'META', { ...ticket, used_at: today, used_by: key });
+  // A device that was on another subscription leaves it rather than
+  // counting against both.
+  const was = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  if (was && was.subscription !== ticket.subscription) await store.del(`SUB#${was.subscription}`, `DEVICE#${key}`);
+  const sub = await store.get(`SUB#${ticket.subscription}`, 'META');
+  if (!already) await store.put(`SUB#${ticket.subscription}`, `DEVICE#${key}`, { bound_at: today });
+  await store.put(`KEY#${key}`, 'ENTITLEMENT', {
+    subscription: ticket.subscription,
+    licensed_until: sub?.renews_at ?? null,
+    at: today,
+  });
+  return { status: 200, body: { subscription: ticket.subscription } };
+}
+
+/// Dropping a device: any device on the subscription can drop any
+/// other, its own self included — which is how a device is handed on.
+export async function dropDevice(key, device, store, { now = Date.now() } = {}) {
+  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  if (!held) return { status: 402, body: { error: 'no subscription' } };
+  const devices = await devicesOn(store, held.subscription);
+  if (!devices.some((d) => d.key === device)) return { status: 404, body: { error: 'not a device on this subscription' } };
+  await store.del(`SUB#${held.subscription}`, `DEVICE#${device}`);
+  // And the entitlement that device holds, which is gone rather than
+  // run out: a licence is one read, and a row saying it is paid up to
+  // next year would be that read. Its own copy of the date is not the
+  // only thing that would say so — a row dated today falls through to
+  // the subscription on the next ask, and the subscription is still
+  // paid up. It is the binding that ended, so the binding is what goes.
+  const theirs = await store.get(`KEY#${device}`, 'ENTITLEMENT');
+  if (theirs?.subscription === held.subscription) await store.del(`KEY#${device}`, 'ENTITLEMENT');
+  return { status: 200, body: { devices: (await devicesOn(store, held.subscription)).length, most: MOST_DEVICES } };
+}
+
+async function ticketRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const body = await bodyOf(request);
+  const key = keyOf(body);
+  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  const { status, body: out } = await ticketFor(key, store);
+  return json(request, status, out);
+}
+
+async function claimRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const body = await bodyOf(request);
+  const key = keyOf(body);
+  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  const claimed = await claimWith(key, body?.ticket, store);
+  if (claimed.status !== 200) return json(request, claimed.status, claimed.body);
+  // Straight back with the licence it was claimed for, so the device
+  // that scanned a code is playing rather than waiting to be told.
+  let signer;
+  try {
+    signer = await signerFor(request, env);
+  } catch {
+    return json(request, 503, { error: 'licensing not configured' });
+  }
+  const { status, body: out } = await licence(key, env, { signer });
+  return json(request, status, out);
+}
+
+async function devicesRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const body = await bodyOf(request);
+  const key = keyOf(body);
+  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  const drop = body?.drop;
+  if (typeof drop === 'string') {
+    if (!/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
+    const { status, body: out } = await dropDevice(key, drop, store);
+    if (status !== 200) return json(request, status, out);
+  }
+  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  if (!held) return json(request, 402, { error: 'no subscription' });
+  return json(request, 200, { devices: await devicesOn(store, held.subscription), most: MOST_DEVICES });
+}
+
 async function checkoutRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -534,6 +696,9 @@ export default {
     if (url.pathname === '/api/licence') return licenceRoute(request, env);
     if (url.pathname === '/api/checkout') return checkoutRoute(request, env);
     if (url.pathname === '/api/stripe') return stripeRoute(request, env);
+    if (url.pathname === '/api/ticket') return ticketRoute(request, env);
+    if (url.pathname === '/api/claim') return claimRoute(request, env);
+    if (url.pathname === '/api/devices') return devicesRoute(request, env);
     if (url.pathname.startsWith('/api/')) return json(request, 404, { error: 'no such handler' });
     return env.ASSETS.fetch(request);
   },

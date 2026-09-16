@@ -97,6 +97,10 @@ async function handlersFor(serve) {
         const [pk, sk] = at.split('|');
         await store.put(pk, sk, JSON.parse(raw));
       },
+      delete: async (at) => {
+        const [pk, sk] = at.split('|');
+        await store.del(pk, sk);
+      },
       list: async ({ prefix }) => ({ keys: [...store.rows.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
     },
     ASSETS: { fetch: serve },

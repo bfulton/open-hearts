@@ -137,15 +137,22 @@ class Licence {
   String toString() => 'Licence(${key.substring(0, 8)}… to ${dayOf(until)}, $plan)';
 }
 
-/// Where a licence comes from: the app's origin, which is the site the
-/// handlers run beside, over http or https alike — the browser suite
-/// serves the app and the handlers together on localhost (doc 06,
-/// local mode), and a build with no origin at all asks nobody.
-Uri? licenceEndpoint([Uri? base]) {
-  final at = base ?? Uri.base;
+/// Where the service's handlers are, by name: the origin this app was
+/// served by, which is the site the worker runs beside. Over http as
+/// well as https — the browser suite serves the app and the handlers
+/// together on localhost (doc 06, local mode) — and nowhere at all
+/// when there is no origin, which is a build asking nobody rather than
+/// asking anybody.
+///
+/// Settable, the way the signature verifier is (table's signing.dart):
+/// one seam for the tests to stand their own service in, rather than
+/// one per call.
+Uri? Function(String handler) handlerAt = (handler) => handlerFor(handler, Uri.base);
+
+Uri? handlerFor(String handler, Uri at) {
   if (at.host.isEmpty) return null;
   if (at.scheme != 'https' && at.scheme != 'http') return null;
-  return Uri(scheme: at.scheme, host: at.host, port: at.hasPort ? at.port : null, path: '/api/licence');
+  return Uri(scheme: at.scheme, host: at.host, port: at.hasPort ? at.port : null, path: '/api/$handler');
 }
 
 /// This device's licence as the service will give it: the current one,
@@ -158,7 +165,7 @@ Uri? licenceEndpoint([Uri? base]) {
 /// already has.
 Future<Licence?> fetchLicence(Signer signer,
     {Uri? endpoint, String service = serviceKey, Duration timeout = const Duration(seconds: 6)}) async {
-  final url = endpoint ?? licenceEndpoint();
+  final url = endpoint ?? handlerAt('licence');
   if (url == null) return null;
   try {
     final body = await http.postJson(url, jsonEncode({'key': signer.publicKey})).timeout(timeout);

@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/net/turn.dart';
+import 'package:open_hearts/net/turn_fetch_io.dart';
 import 'package:table/table.dart';
 
 void main() {
@@ -75,5 +76,22 @@ void main() {
     expect(parseIceServers('{"iceServers":{"urls":"x"}}'), isNull);
     expect(parseIceServers('[]'), isNull);
     expect(parseIceServers('nope'), isNull);
+  });
+
+  test('a refusal comes back whole: its status and what it said', () async {
+    // postJson keeps only what was taken, which is all the ICE servers
+    // need. The handlers a person is waiting on — a code, a claim —
+    // need the reason as well (net/household.dart), so the POST under
+    // both hands back the status and the body either way.
+    final h = await handler(409, '{"error":"that code has been used"}');
+    try {
+      final answer = await post(h.url, '{"key":"x"}');
+      expect(answer.status, 409);
+      expect(answer.body, '{"error":"that code has been used"}');
+      expect(await postJson(h.url, '{"key":"x"}'), isNull, reason: 'and what was refused was not taken');
+      expect(h.seen, hasLength(2));
+    } finally {
+      await h.stop();
+    }
   });
 }

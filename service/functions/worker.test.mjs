@@ -5,8 +5,11 @@ import { readFile } from 'node:fs/promises';
 import worker, {
   allowedOrigin,
   checkout,
+  claimWith,
   dayAfter,
   dayOf,
+  devicesOn,
+  dropDevice,
   entitlementOf,
   licence,
   licenceFor,
@@ -16,6 +19,7 @@ import worker, {
   sameSite,
   serversOf,
   signerOn,
+  ticketFor,
   webhookSigned,
 } from './worker.mjs';
 
@@ -169,6 +173,14 @@ const kvOf = (store) => ({
     const [pk, sk] = at.split('|');
     await store.put(pk, sk, JSON.parse(raw));
   },
+  delete: async (at) => {
+    const [pk, sk] = at.split('|');
+    await store.del(pk, sk);
+  },
+  list: async ({ prefix }) => ({
+    keys: [...store.rows.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })),
+    list_complete: true,
+  }),
 });
 
 test('days: an ISO date in UTC, and a month on from one', () => {
@@ -450,4 +462,158 @@ test('cancelling is not ending: the year paid for still runs, and dunning giving
   await record({ type: 'customer.subscription.updated', data: { object: { id: 'sub_9', status: 'unpaid', current_period_end: nextYear } } }, unpaid, { now });
   assert.equal((await unpaid.get(`KEY#${KEY}`, 'ENTITLEMENT')).licensed_until, '2026-09-16');
   assert.equal(await entitlementOf(unpaid, KEY, { now: Date.UTC(2026, 8, 17) }), null);
+});
+
+// ---- a subscription is a person's ---------------------------------------
+
+const OTHER = 'cd'.repeat(32);
+const THIRD = 'ef'.repeat(32);
+
+/// A store with KEY subscribed and its subscription running a year out.
+const household = async (now) => {
+  const store = memoryStore();
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store, { now });
+  await record({ type: 'customer.subscription.created', data: { object: { id: 'sub_9', current_period_end: Math.floor(Date.UTC(2027, 8, 16) / 1000) } } }, store, { now });
+  return store;
+};
+
+test('a code brings a second device in, and is spent doing it', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const made = await ticketFor(KEY, store, { now });
+  assert.equal(made.status, 200);
+  assert.match(made.body.ticket, /^[0-9a-f]{32}$/);
+  assert.deepEqual([made.body.devices, made.body.most], [1, 5]);
+  // Nothing about the subscription travels with it.
+  assert.equal(made.body.ticket.includes('sub_9'), false);
+
+  const claimed = await claimWith(OTHER, made.body.ticket, store, { now });
+  assert.equal(claimed.status, 200);
+  assert.equal((await entitlementOf(store, OTHER, { now })).licensed_until, '2027-09-16');
+  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY, OTHER]);
+
+  // Spent: a photograph of the screen a minute later is worth nothing.
+  const again = await claimWith(THIRD, made.body.ticket, store, { now });
+  assert.equal(again.status, 409);
+  assert.equal(await entitlementOf(store, THIRD, { now }), null);
+});
+
+test('a code runs out, and one nobody made was never a code', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const made = await ticketFor(KEY, store, { now });
+  const late = await claimWith(OTHER, made.body.ticket, store, { now: now + 11 * 60000 });
+  assert.equal(late.status, 410);
+  assert.equal(await entitlementOf(store, OTHER, { now }), null);
+  assert.equal((await claimWith(OTHER, 'ab'.repeat(16), store, { now })).status, 404);
+  assert.equal((await claimWith(OTHER, 'not a code', store, { now })).status, 400);
+});
+
+test('five devices is a household; a sixth is refused, and no code is made for one', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const keys = ['11', '22', '33', '44'].map((b) => b.repeat(32));
+  for (const key of keys) {
+    const made = await ticketFor(KEY, store, { now });
+    assert.equal(made.status, 200, `a code for ${key.slice(0, 4)}`);
+    assert.equal((await claimWith(key, made.body.ticket, store, { now })).status, 200);
+  }
+  assert.equal((await devicesOn(store, 'sub_9')).length, 5);
+  const sixth = await ticketFor(KEY, store, { now });
+  assert.equal(sixth.status, 409);
+  assert.deepEqual(sixth.body, { error: 'five devices already', devices: 5, most: 5 });
+});
+
+test('a code made before the fifth device cannot let a sixth in', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  // Made while there was room, spent after there was not.
+  const early = await ticketFor(KEY, store, { now });
+  for (const key of ['11', '22', '33', '44'].map((b) => b.repeat(32))) {
+    const made = await ticketFor(KEY, store, { now });
+    await claimWith(key, made.body.ticket, store, { now });
+  }
+  const late = await claimWith(OTHER, early.body.ticket, store, { now });
+  assert.equal(late.status, 409, 'the count is read where it is spent, not where it is made');
+  assert.equal((await devicesOn(store, 'sub_9')).length, 5);
+});
+
+test('any device can drop another, and the dropped one stops being licensed', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const made = await ticketFor(KEY, store, { now });
+  await claimWith(OTHER, made.body.ticket, store, { now });
+
+  // The one that arrived second drops the first, which is the case that
+  // matters: a phone dropping a laptop that was lost.
+  const dropped = await dropDevice(OTHER, KEY, store, { now });
+  assert.equal(dropped.status, 200);
+  assert.equal(dropped.body.devices, 1);
+  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [OTHER]);
+  assert.equal(await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 17) }), null);
+  assert.equal((await entitlementOf(store, OTHER, { now })).licensed_until, '2027-09-16');
+
+  // And nobody drops a device off somebody else's subscription.
+  assert.equal((await dropDevice(THIRD, OTHER, store, { now })).status, 402);
+  assert.equal((await dropDevice(OTHER, THIRD, store, { now })).status, 404);
+});
+
+test('a device moving to another subscription leaves the one it was on', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_2', metadata: { key: THIRD } } } }, store, { now });
+  await record({ type: 'customer.subscription.created', data: { object: { id: 'sub_2', current_period_end: Math.floor(Date.UTC(2027, 0, 1) / 1000) } } }, store, { now });
+
+  const made = await ticketFor(KEY, store, { now });
+  await claimWith(OTHER, made.body.ticket, store, { now });
+  const moving = await ticketFor(THIRD, store, { now });
+  await claimWith(OTHER, moving.body.ticket, store, { now });
+
+  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY], 'gone from the first');
+  // Bound the same day, so the tiebreak is the key: both are there,
+  // whichever way round they sort.
+  assert.deepEqual((await devicesOn(store, 'sub_2')).map((d) => d.key).sort(), [OTHER, THIRD].sort());
+  assert.equal((await entitlementOf(store, OTHER, { now })).subscription, 'sub_2');
+});
+
+test('the routes: a code, a claim that answers with the licence, and the devices list', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const held = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store) };
+  const at = (what) => `https://dev.open-hearts.pages.dev/api/${what}`;
+  const send = (what, body) => new Request(at(what), { method: 'POST', body: JSON.stringify(body) });
+
+  const made = await worker.fetch(send('ticket', { key: KEY }), held);
+  assert.equal(made.status, 200);
+  const { ticket } = await made.json();
+
+  const claimed = await worker.fetch(send('claim', { key: OTHER, ticket }), held);
+  assert.equal(claimed.status, 200);
+  const { licence: signed } = await claimed.json();
+  assert.equal(signed.key, OTHER, 'the device that scanned it is playing, not waiting to be told');
+
+  const listed = await worker.fetch(send('devices', { key: OTHER }), held);
+  const { devices, most } = await listed.json();
+  assert.deepEqual(devices.map((d) => d.key), [KEY, OTHER]);
+  assert.equal(most, 5);
+
+  const after = await worker.fetch(send('devices', { key: OTHER, drop: KEY }), held);
+  assert.deepEqual((await after.json()).devices.map((d) => d.key), [OTHER]);
+
+  const unknown = await worker.fetch(send('ticket', { key: THIRD }), held);
+  assert.equal(unknown.status, 402);
+});
+
+test('a dropped device does not come back on its next ask', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const made = await ticketFor(KEY, store, { now });
+  await claimWith(OTHER, made.body.ticket, store, { now });
+  await dropDevice(KEY, OTHER, store, { now });
+  // The subscription itself is still paid up to next year, so a row
+  // that merely ran out would be dated back from it on the next ask.
+  assert.equal((await store.get('SUB#sub_9', 'META')).renews_at, '2027-09-16');
+  for (const day of [Date.UTC(2026, 8, 16), Date.UTC(2026, 8, 17), Date.UTC(2027, 0, 1)]) {
+    assert.equal(await entitlementOf(store, OTHER, { now: day }), null, new Date(day).toISOString().slice(0, 10));
+  }
 });

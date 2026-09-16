@@ -24,6 +24,7 @@ import 'package:open_hearts/ui/header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
+import 'household_test.dart' show signedFor, standUp;
 import 'room_test.dart' show Bus;
 
 /// A service of this test's own: BIP-340's published pair, so the
@@ -48,13 +49,16 @@ Future<void> licenceThisDevice({int days = 30}) async {
   ));
 }
 
-Future<void> pumpHome(WidgetTester tester, {String? openRoom, bool live = true}) async {
+Future<void> pumpHome(WidgetTester tester, {String? openRoom, String? openClaim, bool live = true, bool online = false}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
+  // What main() does before the first frame: the device's standing is
+  // read off the device, licensed or not (entitlement.dart).
+  await Entitlement.current.load((await Identity.signer()).publicKey);
   if (live) await licenceThisDevice();
-  await tester.pumpWidget(still(HomePage(openRoom: openRoom, online: false)));
+  await tester.pumpWidget(still(HomePage(openRoom: openRoom, openClaim: openClaim, online: online)));
   await tester.pumpAndSettle();
 }
 
@@ -273,6 +277,30 @@ void main() {
     expect(find.text('Subscribe'), findsNothing);
   });
 
+  testWidgets('a device arriving with a code is licensed by it', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    stand.says('claim', {'licence': signedFor(me.publicKey)});
+    await pumpHome(tester, openClaim: 'ab12cd34', live: false);
+    await tester.pumpAndSettle();
+    expect(stand.seen.single, contains('"ticket":"ab12cd34"'));
+    expect(Entitlement.current.licence?.key, (await Identity.signer()).publicKey, reason: 'what came back');
+    expect(Entitlement.current.live, isTrue);
+    expect(find.text('Play live'), findsOneWidget, reason: 'the door is open on the device that scanned it');
+  });
+
+  testWidgets('a code already spent says so, and leaves the door where it was', (tester) async {
+    // The same link opened twice — a refresh, or a second phone shown
+    // the same photograph.
+    final stand = standUp();
+    stand.says('claim', {'error': 'that code has been used'}, status: 409);
+    await pumpHome(tester, openClaim: 'ab12cd34', live: false);
+    await tester.pumpAndSettle();
+    expect(Entitlement.current.live, isFalse);
+    expect(find.text('That code has been used.'), findsOneWidget);
+    expect(find.text('Subscribe'), findsOneWidget);
+  });
+
   testWidgets('with live play open the menu is where the date on the licence is', (tester) async {
     await pumpHome(tester);
     expect(find.text('Play live'), findsOneWidget);
@@ -281,7 +309,7 @@ void main() {
     await tester.tap(find.text('Live play'));
     await tester.pumpAndSettle();
     final until = Licence.dayOf(Entitlement.current.until!);
-    expect(find.text('Live play is open on this device, to $until.'), findsOneWidget);
+    expect(find.text('Open on this device, to $until'), findsOneWidget);
     expect(find.text('Subscribe'), findsNothing, reason: 'nothing to buy twice');
   });
 

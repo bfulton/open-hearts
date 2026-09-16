@@ -108,10 +108,11 @@ void main() {
     }
   });
 
-  test('where a licence comes from: the origin the app was served by, or nobody', () {
-    expect(licenceEndpoint(Uri.parse('https://open-hearts.pages.dev/play/')).toString(), 'https://open-hearts.pages.dev/api/licence');
-    expect(licenceEndpoint(Uri.parse('http://127.0.0.1:8123/index.html')).toString(), 'http://127.0.0.1:8123/api/licence');
-    expect(licenceEndpoint(Uri.parse('file:///tmp/index.html')), isNull);
-    expect(licenceEndpoint(Uri.parse('/play/')), isNull);
+  test('where the handlers are: the origin the app was served by, or nobody', () {
+    expect(handlerFor('licence', Uri.parse('https://open-hearts.pages.dev/play/')).toString(),
+        'https://open-hearts.pages.dev/api/licence');
+    expect(handlerFor('claim', Uri.parse('http://127.0.0.1:8123/index.html')).toString(), 'http://127.0.0.1:8123/api/claim');
+    expect(handlerFor('licence', Uri.parse('file:///tmp/index.html')), isNull);
+    expect(handlerFor('licence', Uri.parse('/play/')), isNull);
   });
 }

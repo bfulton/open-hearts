@@ -15,6 +15,9 @@ left is identity, entitlement, and a juror when the room is empty.
 | **checkout** | key, where to come back to | a Stripe Checkout to send the buyer to |
 | **entitle** | purchase webhook | entitlement recorded; signed licence available to the key |
 | **licence** | key | the licence that key is owed, or 402 |
+| **ticket** | key | a one-use code another device can arrive with |
+| **claim** | key, code | the code spent, the device bound, and its licence |
+| **devices** | key, a device to drop | the devices on this subscription |
 | **turn-creds** | attested key | short-lived TURN credentials |
 | **last-resort** | table id, hand | a juror comes online for that hand |
 
@@ -26,8 +29,8 @@ site and the app: `service/functions/worker.mjs`, published by
 `deploy.sh` as `_worker.js`, answers `/api/…` and hands everything else
 to the static assets; `node --test service/functions/worker.test.mjs`
 runs it against a stand-in upstream. Built so far: **turn-creds**,
-**checkout**, **entitle** and **licence**; **attest**, **supersede** and
-**last-resort** are not.
+**checkout**, **entitle**, **licence**, **ticket**, **claim** and
+**devices**; **attest**, **supersede** and **last-resort** are not.
 
 **licence**, `POST /api/licence` with the caller's key, answers the
 signed statement below or 402 when no subscription stands behind it.
@@ -83,6 +86,7 @@ KEY#<key>                  SUPERSEDES     predecessor, link, at
 SUB#<subscription>         META           source, txn_ref, renews_at, cancelled_at
 SUB#<subscription>         DEVICE#<key>   bound_at
 KEY#<key>                  ENTITLEMENT    subscription, licensed_until, at
+TICKET#<code>              META           subscription, expires_at, used_at
 COUNTER#<metric>#<day>     -              n
 ```
 
@@ -253,6 +257,32 @@ anything:
 A subscription carries **up to five devices**, and any of them can drop
 another. Unbounded sharing by QR is a subscription shared with the
 internet; five is a household.
+
+**As built**, the QR one, and with one change to it. The subscribed
+device asks for a code, shows it as a QR of a link back into the app,
+and the other device opens that link with its own camera — so there is
+no camera in this app and no permission to ask for, which is most of
+why this is the cheap way in. A device with no camera pointed at the
+screen gets the same link through the share sheet, as a room's link
+goes.
+
+The change: the code is sixteen random bytes and nothing else. The
+design has it carry the subscription and an expiry under a signature;
+what is built keeps both at the service instead, for two reasons that
+only showed up against a camera. A code that has to be spent needs a
+row whatever it carries, so a signature saves no lookup — and a code
+three times longer is a QR three times denser, read across a table by
+a phone that is not quite still. It also keeps the subscription id off
+the wire, which a photograph of somebody's screen would otherwise
+carry away.
+
+The count is read where a code is spent rather than where it is made,
+so a code made while there was room cannot let a sixth device in.
+Dropping a device takes away its binding **and** its entitlement row —
+not merely the date on it: the subscription is still paid up, so a row
+that had only run out would be dated forward again on that device's
+next ask. The one it holds runs out on its own within the month, which
+is what a licence with no revocation list can promise and all it can.
 
 TURN is Cloudflare's.
 

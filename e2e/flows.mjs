@@ -267,6 +267,49 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   if (new URL(page.url()).searchParams.get('room')) throw new Error(`the room is still in the address: ${page.url()}`);
 });
 
+flow('a second device, brought in by the code the first one shows', async ({ open }) => {
+  // A subscription is a person's, not a device's (docs/06-service.md).
+  // The first device shows a code; the second arrives carrying it, and
+  // ends up on the same subscription rather than one of its own — which
+  // is the thing worth proving here, since the rig's open house would
+  // licence any device that simply asked.
+  const first = await open();
+  await waitFor(first, /^Play live/, { what: 'live play open on the first device', timeout: 40000 });
+  await click(first, /^Menu$/);
+  await waitFor(first, /^Live play$/, { what: 'the menu' });
+  await click(first, /^Live play$/);
+  await waitFor(first, /^Add a device$/, { what: 'the subscription page' });
+  await waitFor(first, /^This device$/, { what: 'this device on the list' });
+  await click(first, /^Add a device$/);
+  await waitFor(first, /^A code to scan$/, { what: 'the code' });
+
+  // The link the code travels in, off the clipboard: no camera here,
+  // and none in the app either — the QR is for a phone's own.
+  await click(first, /^Send the link instead$/);
+  await sleep(500);
+  const link = await first.evaluate('navigator.clipboard.readText()');
+  if (!/[?&]claim=[0-9a-f]+/.test(link)) throw new Error(`no code in the link: ${link}`);
+
+  // A second device, opening it.
+  const second = await open({ url: link });
+  await waitFor(second, /^Play live/, { what: 'live play open on the second device', timeout: 40000 });
+  // The code is spent, so it leaves the address — after it has been
+  // spent, which is a moment later than the door opening: the rig's
+  // open house licenses any device that asks, so this screen was never
+  // waiting on the claim to be let in.
+  for (let guard = 0; guard < 40 && new URL(second.url()).searchParams.get('claim'); guard++) await sleep(250);
+  if (new URL(second.url()).searchParams.get('claim')) throw new Error(`the code is still in the address: ${second.url()}`);
+
+  // And the first device's subscription now carries both of them. The
+  // page reads the list when it opens, so it is opened again.
+  await first.reload();
+  await waitFor(first, /^Play live/, { what: 'the first device back at the door', timeout: 40000 });
+  await click(first, /^Menu$/);
+  await waitFor(first, /^Live play$/, { what: 'the menu' });
+  await click(first, /^Live play$/);
+  await waitFor(first, /^2 of 5$/, { what: 'both devices on the subscription', timeout: 20000 });
+});
+
 // ---- the runner ----------------------------------------------------------
 
 /// Plays for the thumb until [done], through the semantics tree —
@@ -305,7 +348,7 @@ async function main() {
   // two processes, so it is started when something asks for one.
   let relayOnce = null;
   const relay = () => (relayOnce ??= startRelay());
-  const open = async ({ viewport = portrait, pointer = false } = {}) => {
+  const open = async ({ viewport = portrait, pointer = false, url = null } = {}) => {
     const ctx = await browser.newContext({
       viewport,
       locale: 'en-US',
@@ -318,7 +361,7 @@ async function main() {
     contexts.push(ctx);
     const page = await ctx.newPage();
     page.on('pageerror', (e) => log(`page error: ${e.message}`));
-    await page.goto(`${app.url}/?e2e=1`);
+    await page.goto(url ?? `${app.url}/?e2e=1`);
     // For a flow that presses with the pointer, the nodes are read for
     // their labels and their geometry and take no clicks, so every
     // press goes through the app's own hit test. The rest keep them:

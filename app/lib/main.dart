@@ -8,6 +8,8 @@ import 'crypto/schnorr.dart';
 import 'entitlement.dart';
 import 'home_page.dart';
 import 'identity.dart';
+import 'net/buying.dart';
+import 'net/household.dart';
 import 'net/room.dart';
 import 'theme.dart';
 
@@ -34,14 +36,19 @@ class OpenHeartsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A shared link carries a room code: the front door opens onto
-    // that room.
+    // What the address is asking for, read here rather than by the page
+    // it is asking: a room shared by a link, a code another device
+    // showed, a checkout coming back.
     final room = Uri.base.queryParameters['room']?.trim().toUpperCase();
     return MaterialApp(
       title: 'Open Hearts',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: HomePage(openRoom: room != null && Room.validCode(room) ? room : null),
+      home: HomePage(
+        openRoom: room != null && Room.validCode(room) ? room : null,
+        openClaim: claimInAddress(),
+        justBought: boughtJustNow(),
+      ),
     );
   }
 }

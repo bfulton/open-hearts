@@ -4,18 +4,24 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-/// The response body of a POST of [body] as JSON to [url], or null when
-/// the answer is not 200.
-Future<String?> postJson(Uri url, String body) async {
+/// The answer to a POST of [body] as JSON to [url], whatever it says.
+/// A refusal carries its reason, which is often the thing worth
+/// showing.
+Future<({int status, String body})> post(Uri url, String body) async {
   final client = HttpClient();
   try {
     final request = await client.postUrl(url);
     request.headers.contentType = ContentType.json;
     request.write(body);
     final response = await request.close();
-    final text = await response.transform(utf8.decoder).join();
-    return response.statusCode == 200 ? text : null;
+    return (status: response.statusCode, body: await response.transform(utf8.decoder).join());
   } finally {
     client.close(force: true);
   }
+}
+
+/// The body of a POST that was taken, or null when it was not.
+Future<String?> postJson(Uri url, String body) async {
+  final answer = await post(url, body);
+  return answer.status == 200 ? answer.body : null;
 }

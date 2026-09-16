@@ -39,6 +39,7 @@ import 'live_controller.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
 import 'net/duty.dart';
+import 'net/household.dart';
 import 'net/mesh_transport.dart';
 import 'net/relays.dart';
 import 'net/room.dart';
@@ -70,10 +71,17 @@ void _relayLog(String line) => debugPrint('relay: $line');
 final _debugging = Uri.base.queryParameters.containsKey('e2e');
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.openRoom, this.online = true});
+  const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true});
 
   /// A room to open onto, from a shared link.
   final String? openRoom;
+
+  /// A code this device arrived carrying, from another device's screen
+  /// (net/household.dart).
+  final String? openClaim;
+
+  /// Whether this load is the one coming back from a checkout.
+  final bool justBought;
 
   /// False in widget tests: the device keeps off the relays, so no
   /// presence connection outlives the test. The app is always online.
@@ -157,7 +165,40 @@ class _HomePageState extends State<HomePage> {
     // A device that cannot play live has no business in the count of
     // who is here, or in a jury.
     if (widget.online && liveOpen) _goOnline();
-    if (widget.online && boughtJustNow()) unawaited(_justBought());
+    // Neither of these is the relays, which is what `online` is about:
+    // they are one call to the service each, and a test stands its own
+    // behind that (net/household.dart).
+    if (widget.justBought) unawaited(_justBought());
+    if (widget.openClaim != null) unawaited(_arriving());
+  }
+
+  /// Arrived by a code another device showed (docs/06-service.md): this
+  /// device joins that subscription and is given a licence of its own.
+  Future<void> _arriving() async {
+    final code = widget.openClaim;
+    if (code == null) return;
+    // Checked against the service this app is standing behind, which
+    // is the entitlement's to name and not a constant's: a test stands
+    // its own there, and so does the browser suite's rig.
+    final said = await claimCode(await Identity.signer(), code, service: Entitlement.current.service);
+    if (!mounted) return;
+    if (said.answer != null) {
+      await Entitlement.current.adopt(said.answer!);
+    } else {
+      setState(() => _error = said.refusal);
+    }
+    // The code is spent, so the address lets it go. Afterwards, not
+    // before: a refresh while it was still in the air should try again,
+    // and writing the address from initState is writing it before the
+    // engine's own history is there to be written over.
+    _forget('claim');
+  }
+
+  /// Takes [name] out of the address, once the screen has been drawn at
+  /// least once.
+  void _forget(String name) {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => forgetInAddress(name));
   }
 
   /// Live play opened, or shut, under this screen.
@@ -170,16 +211,15 @@ class _HomePageState extends State<HomePage> {
   /// Back from a checkout. The licence is behind a webhook Stripe sends
   /// us, which is usually there before the browser is — but not always,
   /// so this asks a few times before giving up and leaving the page
-  /// saying what it says to anyone else. The address loses the mark
-  /// either way: a refresh should not ask again.
+  /// saying what it says to anyone else.
   Future<void> _justBought() async {
-    forgetInAddress('bought');
     final signer = await Identity.signer();
     for (var tries = 0; tries < 8 && mounted && !liveOpen; tries++) {
       await Entitlement.current.refresh(signer);
       if (liveOpen) break;
       await Future<void>.delayed(const Duration(seconds: 2));
     }
+    _forget('bought');
   }
 
   /// Who this device is and what game it asks for, off the device. In

@@ -45,6 +45,10 @@ class Entitlement extends ChangeNotifier {
 
   /// The licence off the device, if there is one and it is still good.
   /// Called before the first frame: nothing here touches the network.
+  ///
+  /// Everything else waits on this. Until it has run there is no device
+  /// to hold a licence for, so nothing can be adopted and nothing is
+  /// open — which is the safe way for the order to go wrong.
   Future<void> load(PublicKey device) async {
     _device = device;
     final prefs = await SharedPreferences.getInstance();

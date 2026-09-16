@@ -112,9 +112,11 @@ rigged. Roughly in order:
    game. Tablet and the Duo are next.
 8. **Live play is a subscription** — $2.99 a year
    ([doc 06](docs/06-service.md)). The licence, the gate, and buying on
-   the web through Stripe are built; buying on a phone is the store's
-   own subscription and waits on the next item. Sharing a subscription
-   across your devices by QR, and provider sign-in, are next.
+   the web through Stripe are built, and so is sharing a subscription
+   across your devices: five to a household, brought in by a code one
+   of them shows and the next one's camera reads. Buying on a phone is
+   the store's own subscription and waits on the next item; provider
+   sign-in, so a lost phone is recovered by signing in, is next.
 9. **The stores.**
 
 ### Backlog

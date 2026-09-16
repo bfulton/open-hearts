@@ -16,6 +16,7 @@ import 'dart:convert';
 
 import 'package:table/table.dart';
 
+import 'licence.dart';
 import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 
@@ -46,13 +47,6 @@ String returnAddress(Uri at, {required bool bought}) {
 /// Whether this load is the one coming back from a checkout.
 bool boughtJustNow([Uri? at]) => (at ?? Uri.base).queryParameters.containsKey('bought');
 
-Uri? checkoutEndpoint([Uri? base]) {
-  final at = base ?? Uri.base;
-  if (at.host.isEmpty) return null;
-  if (at.scheme != 'https' && at.scheme != 'http') return null;
-  return Uri(scheme: at.scheme, host: at.host, port: at.hasPort ? at.port : null, path: '/api/checkout');
-}
-
 /// Why a checkout could not be opened, phrased for the screen; null
 /// when one was and the browser is on its way there.
 typedef Refusal = String?;
@@ -62,7 +56,7 @@ typedef Refusal = String?;
 /// there having apparently done nothing.
 Future<Refusal> buy(Signer signer, {Uri? endpoint, Uri? from, Duration timeout = const Duration(seconds: 12)}) async {
   if (!canBuyHere) return 'Buying is not open on this device yet.';
-  final url = endpoint ?? checkoutEndpoint();
+  final url = endpoint ?? handlerAt('checkout');
   if (url == null) return 'Buying is not open on this device yet.';
   final at = from ?? Uri.base;
   String? body;
