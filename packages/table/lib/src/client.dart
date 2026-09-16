@@ -77,12 +77,11 @@ import 'transport.dart';
 
 /// Why a table is not moving.
 /// How a modified client lies (docs/03-fair-deal.md), for the
-/// simulator. These are the two faults at a sealed table that the
-/// deal's own proofs cannot catch — a seat saying it holds the two of
-/// clubs nowhere has nothing to prove, and a token sealed to one pair
-/// of eyes is nothing anyone else can check. What the table does about
-/// each is worth a test, and there is no testing it without committing
-/// it.
+/// simulator. A seat saying it holds the two of clubs nowhere has
+/// nothing to prove, and nothing can be made to prove it; a token
+/// sealed to one pair of eyes is checked by an argument beside it.
+/// What the table does about each is worth a test, and there is no
+/// testing it without committing it.
 enum Lie {
   /// Says it holds the two of clubs nowhere and deals itself the hand
   /// all the same: it alone knows who leads, and it plays on while the
@@ -98,17 +97,10 @@ enum Lie {
   hide,
 
   /// Seals its pass to nothing: three cards of the right shape that the
-  /// receiver will never open, and that nobody else can tell from an
-  /// honest pass. Asked, it shows the three in the clear as an honest
-  /// passer would, and the hand plays on — with three of the receiver's
-  /// cards in the open, which is the most this fault can get and why it
-  /// is not worth committing.
+  /// seat it passed to could never open. It gets no further than its own
+  /// turn — every seat checks the argument beside a seal, and a pass
+  /// that fails it is not taken — and the clock has its seat there.
   seal,
-
-  /// The same pass, and no answer. The table takes its seat at whatever
-  /// turn of its own is open, and its hand opens from escrow, which
-  /// opens the three anyway.
-  sealNoAnswer,
 }
 
 enum Pause {
@@ -331,7 +323,6 @@ class TableClient {
     // (docs/03-fair-deal.md). It waits the clock a device answers by,
     // and no longer — a table that waited for ever on a passer that
     // will not answer would be the worse hole of the two.
-    if (_complaints.values.any((c) => c.to == seat && clock.nowMs - c.atMs < timeBank.fixedMs)) return false;
     final t = _openTurnOf(seat);
     if (t == null) return false;
     // A hand being opened to be given up has one thing left to settle,
@@ -605,7 +596,7 @@ class TableClient {
       final to = (mySeat! + game.passDirection.seatOffset) % seatCount;
       final m = d.passMessage(to, [for (final p in positions) p!]);
       if (m == null) return;
-      if ((lies == Lie.seal || lies == Lie.sealNoAnswer) && m['sealed'] != null) {
+      if (lies == Lie.seal && m['sealed'] != null) {
         // Sealed to nothing anybody holds: the shape of a pass, and
         // three cards the receiver will never open (docs/03).
         final rng = _random ?? Random();
@@ -1025,12 +1016,7 @@ class TableClient {
       // could not back it before, its presence not yet having seen
       // the jurors, looks again.
       if (event.kind == EventKind.jury) return _reconsiderJury(event);
-      if (event.kind != EventKind.leave &&
-          event.kind != EventKind.release &&
-          event.kind != EventKind.complain &&
-          event.kind != EventKind.show) {
-        _catchUp(event.turn);
-      }
+      if (event.kind != EventKind.leave && event.kind != EventKind.release) _catchUp(event.turn);
       return;
     }
     _accept(event);
@@ -1049,13 +1035,7 @@ class TableClient {
     if (event.kind == EventKind.heartbeat || event.kind == EventKind.serve) {
       return event.hand < game.handNumber || (event.hand == game.handNumber && event.step < step);
     }
-    // The events a hand carries beside its turns: a release of an
-    // escrow piece, and a pass that will not open being said and
-    // answered (docs/03-fair-deal.md). They are of the hand, not of a
-    // moment in it.
-    if (event.kind == EventKind.release || event.kind == EventKind.complain || event.kind == EventKind.show) {
-      return event.hand < game.handNumber;
-    }
+    if (event.kind == EventKind.release) return event.hand < game.handNumber;
     final t = event.turn;
     if (t.hand != game.handNumber) return t.hand < game.handNumber;
     return t.position < _herePosition;
@@ -1082,10 +1062,6 @@ class TableClient {
         _onAction(event);
       case EventKind.release:
         _onRelease(event);
-      case EventKind.complain:
-        _onComplain(event);
-      case EventKind.show:
-        _onShow(event);
       case EventKind.boot:
       case EventKind.absent:
         _onBoot(event);
@@ -1110,8 +1086,7 @@ class TableClient {
     if (!_futureIds.add(event.id)) return;
     _future.add(event);
     if (event.kind != EventKind.witness && event.kind != EventKind.release) {
-      final where = event.kind == EventKind.complain || event.kind == EventKind.show ? 'h${event.hand}' : '${event.turn}';
-      _trace('defer ${event.kind.name}@$where from ${event.author.substring(0, 4)}');
+      _trace('defer ${event.kind.name}@${event.turn} from ${event.author.substring(0, 4)}');
     }
   }
 
@@ -1340,14 +1315,6 @@ class TableClient {
 
   void _onAction(TableEvent event) {
     _relayIfAppealed(event);
-    // An audit of the hand this peer is still in the middle of: the
-    // table is opening the hand to give it up, and the seat that
-    // cannot go on for want of an answer goes with it. It cannot see
-    // the turn the table is waiting at — it never got past the pass —
-    // so it does not call the hand itself (docs/03-fair-deal.md).
-    if (event.kind == EventKind.deal && event.hand == game.handNumber && _waitingOnAPass && event.turn.isAudit) {
-      _openTheHand('the table is opening this hand');
-    }
     final turn = event.turn;
     final where = _compare(turn);
     if (where > 0) return _defer(event);
@@ -1370,14 +1337,8 @@ class TableClient {
     race.forAction.add(event.author);
     race.forAction.addAll(_earlyWitnesses.remove(event.id) ?? const {});
     race.witnessEvents.addAll(_earlyWitnessEvents.remove(event.id) ?? const []);
-    // Witness the action unless this peer already backed the boot — or
-    // the seat owes an answer for a pass that will not open, in which
-    // case no card of its carries until it gives one, and its own turn
-    // is where the table takes its seat (docs/03-fair-deal.md). Its
-    // steps of the deal still carry: the audit is the one thing a seat
-    // in that position can do that the table wants.
-    final held = turn.isPlay && _complaints.containsKey(seat);
-    if (amSeated && event.author != signer.publicKey && !_myWitness.containsKey(turn) && !held) {
+    // Witness the action unless this peer already backed the boot.
+    if (amSeated && event.author != signer.publicKey && !_myWitness.containsKey(turn)) {
       _witness(turn, event);
     }
     _settle(turn);
@@ -1728,10 +1689,6 @@ class TableClient {
     );
     _dealsByHand[game.handNumber] = _deal!;
     _stalled.clear();
-    _sentPass.clear();
-    _complaints.clear();
-    _complainedAt.clear();
-    _showedAt = -10000;
     for (var s = 0; s < seatCount; s++) {
       _openTurn(TurnId.deal(game.handNumber, 0, s), s);
     }
@@ -1852,11 +1809,7 @@ class TableClient {
     // would not open. Marked here and removed at the first turn of
     // theirs that opens ([_bootLiars]) — never at the turn they did it
     // at, which settled long before the cards said so.
-    final blamed = <int>{
-      if (d?.lied case final seat?) seat,
-      ...?d?.sealedShut.values,
-      ..._complaints.keys,
-    };
+    final blamed = <int>{if (d?.lied case final seat?) seat};
     for (final seat in blamed) {
       final holder = holders[seat];
       if (holder is HumanSeat) _liars.add(holder.key);
@@ -1972,19 +1925,6 @@ class TableClient {
     final b = Map<String, Object?>.from(e.body);
     if (!d.acceptPass(b, verified: true)) _trace('a pass settled that the deal would not take: $e');
     final positions = [for (final p in b['positions'] as List) p as int];
-    final to = (seat + game.passDirection.seatOffset) % seatCount;
-    _sentPass[seat] = (to: to, positions: positions);
-    _takePass(d, seat, to, positions);
-  }
-
-  /// Every settled pass of this hand, by the seat that made it: kept
-  /// because one may not open here yet, and a pass the engine could
-  /// not take has to be offered it again when it does ([_resumePasses]).
-  final Map<int, ({int to, List<int> positions})> _sentPass = {};
-
-  /// A settled pass offered to the engine, as far as this side can
-  /// open it.
-  void _takePass(DealSession d, int from, int to, List<int> positions) {
     final cards = <Card>[];
     for (final p in positions) {
       final c = d.openedCardAt(p);
@@ -1992,32 +1932,18 @@ class TableClient {
       cards.add(Card.deck[c]);
     }
     _declareLead();
+    final to = (seat + game.passDirection.seatOffset) % seatCount;
     if (cards.length != positions.length && game.knowsHand(to)) {
-      // Into a seat whose hand is seen here — this seat's own, or a
-      // departed seat's opened from escrow — a pass has to open too,
-      // and this one will not: sealed to a secret nobody holds, or to
-      // nothing at all (docs/03-fair-deal.md). The engine waits at the
-      // pass rather than take a hand it cannot fill, and where the seat
-      // is this one, this side says so rather than sit there looking
-      // idle.
-      _trace('a pass from seat $from into seat $to, whose hand is seen here, that will not open');
-      if (to == mySeat) _complain(from);
+      // Into a seat whose hand is seen here — a departed seat's, opened
+      // from escrow — a pass has to open too, and this one has not yet.
+      // A pass a seat could never open does not get this far: the
+      // argument beside each seal is checked before the pass is taken
+      // (docs/03-fair-deal.md). The engine waits rather than take a
+      // hand it cannot fill.
+      _trace('a pass into seat $to, whose hand is seen here, that will not open here yet: $e');
       return;
     }
-    game.setPass(from, cards.length == positions.length ? cards : null);
-  }
-
-  /// Every settled pass the engine has not taken, offered again: after
-  /// a showing, or after the passer's own hand opened from escrow.
-  void _resumePasses() {
-    final d = _deal;
-    if (d == null || game.phase != Phase.passing) return;
-    for (final e in _sentPass.entries) {
-      if (game.hasPassed(e.key)) continue;
-      _takePass(d, e.key, e.value.to, e.value.positions);
-    }
-    if (game.phase == Phase.playing) _openPlay();
-    _drainFuture();
+    game.setPass(seat, cards.length == positions.length ? cards : null);
   }
 
   /// A departed seat's turn that cannot move until its secret is
@@ -2060,165 +1986,6 @@ class TableClient {
     }
   }
 
-  // ---- a pass that will not open ----------------------------------------
-  //
-  // Doc 03: a passer seals the three tokens to the receiver, and
-  // nobody else can tell whether what it sealed is the right thing —
-  // that is the hole. A receiver left with three cards it cannot open
-  // cannot play them, and would sit there looking idle until the clock
-  // took its seat for a fault it did not commit. So it says so, and
-  // the passer answers by showing the three in the clear. An honest
-  // passer always can: the tokens are its own and it kept them. One
-  // that will not is removed at whatever turn of its own is open, and
-  // its hand opens from escrow, which opens the three anyway.
-  //
-  // The cost of answering is that the three cards become everyone's to
-  // see. That is why a receiver has no reason to ask falsely — the
-  // cards it would give away are the ones it just received — and why
-  // an honest passer is never asked at all.
-
-  /// Complaints heard this hand, by the seat that owes an answer.
-  final Map<int, ({int to, int atMs})> _complaints = {};
-
-  /// When this side last said a pass into its seat would not open, by
-  /// passer: said again every few seconds, since a complaint lost is a
-  /// seat that looks idle.
-  final Map<int, int> _complainedAt = {};
-
-  void _complain(int from) {
-    if (!amSeated || _left || done || mySeat == null) return;
-    if (clock.nowMs - (_complainedAt[from] ?? -10000) < 5000) return;
-    _complainedAt[from] = clock.nowMs;
-    _emit(EventKind.complain, {'hand': game.handNumber, 'about': from, 'seat': mySeat}, everywhere: true);
-  }
-
-  void _onComplain(TableEvent event) {
-    if (_deal == null) return;
-    if (event.hand > game.handNumber) return _defer(event);
-    if (event.hand < game.handNumber) return;
-    final from = event.about;
-    final to = event.seat;
-    if (from < 0 || from >= seatCount || to < 0 || to >= seatCount) return;
-    // Only the seat the pass was into, only about a pass that was made,
-    // and only about a person: a bot's pass is open to everyone, and a
-    // departed seat's opens from escrow.
-    final complainer = holders[to];
-    if (complainer is! HumanSeat || complainer.key != event.author || !_isParticipant(event.author)) return;
-    // A pass that settled here, from that seat into this one. Not
-    // "the engine took it": the one seat that cannot say the engine
-    // took it is the seat whose complaint this is.
-    if (game.passerTo(to) != from || _sentPass[from]?.to != to || holders[from] is! HumanSeat) return;
-    if (_complaints.containsKey(from)) return;
-    _complaints[from] = (to: to, atMs: clock.nowMs);
-    _trace('seat $to says the pass from seat $from will not open');
-    _complaintTick();
-    _notify();
-  }
-
-  void _onShow(TableEvent event) {
-    final d = _deal;
-    if (d == null) return;
-    if (event.hand > game.handNumber) return _defer(event);
-    if (event.hand < game.handNumber) return;
-    final seat = event.seat;
-    if (seat < 0 || seat >= seatCount) return;
-    final holder = holders[seat];
-    if (holder is! HumanSeat || holder.key != event.author) return;
-    if (!d.acceptShow(Map<String, Object?>.from(event.body))) {
-      _trace('a showing by seat $seat that does not open what it names');
-      return;
-    }
-    _trace('seat $seat showed in the clear what it passed');
-    _complaints.remove(seat);
-    _resumePasses();
-    _resumeStalled();
-    _witnessHeld(seat);
-    _notify();
-  }
-
-  /// Actions of [seat] this peer held its witness back from while the
-  /// seat owed an answer: witnessed now that it does not.
-  void _witnessHeld(int seat) {
-    if (!amSeated) return;
-    for (final e in List.of(_races.entries)) {
-      final action = e.value.action;
-      if (e.value.settled || action == null || _turnSeat[e.key] != seat) continue;
-      if (action.author == signer.publicKey || _myWitness.containsKey(e.key)) continue;
-      _witness(e.key, action);
-      _settle(e.key);
-    }
-  }
-
-  /// A second's worth of what a complaint comes to: this seat answers
-  /// one against it at once — there is nothing to think about, the
-  /// tokens are its own and it kept them — and says its own again
-  /// while it stands, since a complaint lost is a seat that looks idle.
-  void _complaintTick() {
-    if (!amSeated || _left || done) return;
-    final d = _deal;
-    final me = mySeat;
-    if (d == null || me == null) return;
-    // Owed by this seat: answered at once, and said again while the
-    // complaint stands, since an answer lost is a seat that looks like
-    // one refusing to give it.
-    final sent = _sentPass[me];
-    if (_complaints.containsKey(me) && sent != null && lies != Lie.sealNoAnswer) {
-      if (clock.nowMs - _showedAt >= 5000) {
-        final m = d.showMessage(sent.positions);
-        if (m != null) {
-          _showedAt = clock.nowMs;
-          _emit(EventKind.show, {'hand': game.handNumber, ...m}, everywhere: true);
-        }
-      }
-    }
-    // Owed to this seat: said again until it is answered.
-    if (game.phase == Phase.passing) {
-      final from = game.passerTo(me);
-      if (from != me && _sentPass.containsKey(from) && !game.hasPassed(from)) _complain(from);
-    }
-    if (_stuckOnAPass) _openTheHand('a pass sealed to nothing, unanswered, and the table waiting on the seat it was sent to');
-  }
-
-  /// Whether this seat is the one that cannot go on: it was sent a
-  /// pass that will not open and nobody has answered for it. It is
-  /// still at the pass while the table is somewhere in the hand, so it
-  /// is in no position to say the hand is past saving; it waits to be
-  /// told, by the audits turning up.
-  bool get _waitingOnAPass {
-    final me = mySeat;
-    if (me == null || _openingAudit || game.phase != Phase.passing) return false;
-    for (final e in _complaints.entries) {
-      if (e.value.to != me || clock.nowMs - e.value.atMs < timeBank.fixedMs) continue;
-      if (!game.hasPassed(e.key)) return true;
-    }
-    return false;
-  }
-
-  /// Whether the hand is past saving for want of an answer: a pass that
-  /// will not open, said so and not answered within the clock a device
-  /// answers by, with the table now waiting on the very seat that
-  /// cannot see its own cards.
-  ///
-  /// Only the passer could open those three, and it will not. The seat
-  /// waiting on them cannot play them, and removing it changes nothing
-  /// — a bot playing its hand cannot see them either. The wait is on a
-  /// turn that cannot come, which is the one thing a table must never
-  /// do, so the hand is opened and given up ([_openTheHand]).
-  ///
-  /// The moment is the same at every peer: the turn the table is
-  /// waiting at is the same turn everywhere, so the record every peer
-  /// gives up is the same record.
-  bool get _stuckOnAPass {
-    for (final e in _complaints.entries) {
-      if (clock.nowMs - e.value.atMs < timeBank.fixedMs) continue;
-      if (_openTurnOf(e.value.to) != null) return true;
-      if (_stalled.values.contains(e.value.to)) return true;
-    }
-    return false;
-  }
-
-  int _showedAt = -10000;
-
   void _onRelease(TableEvent event) {
     final d = _deal;
     if (d == null) return;
@@ -2236,7 +2003,6 @@ class TableClient {
     if (was && !d.awaitsSecret(about)) {
       _trace('seat $about\'s hand is open, from ${event.author.substring(0, 4)}\'s piece and another');
       _resumeStalled();
-      _resumePasses();
       // The hand may have been waiting on this very secret to know who
       // leads: a seat removed before it declared takes its word with it,
       // and the card is found in the hand the escrow just opened.
@@ -2277,9 +2043,6 @@ class TableClient {
       _removedAt[holder.key] = at;
       _removedHow[holder.key] = how;
       holders[seat] = BotSeat(spec.replacementFor(seat));
-      // Whatever it was asked to show, it will not be showing: what it
-      // sent opens from its escrow now, like the rest of its hand.
-      _complaints.remove(seat);
       // The seat's own open turn, if any, is settled by this removal.
       final open = _openTurnOf(seat);
       if (open != null) _removedAtTurn.add(open);
@@ -2420,7 +2183,6 @@ class TableClient {
         if (race.action != null || race.boots.isNotEmpty) _settle(e.key);
       }
       _juryTick();
-      _complaintTick();
       _bootLiars();
       _actOnDeal();
       _releaseTick();

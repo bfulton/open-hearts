@@ -99,11 +99,12 @@ rigged. Roughly in order:
    shuffles with a proof, each person's cards are theirs alone to see,
    a departed seat's hand is opened from escrow held by the others and
    the jury, every hand is audited, and the verifier replays it all.
-   The two faults no proof can catch — a seat that says it holds the
-   two of clubs nowhere, a pass sealed to something that will not open
-   — leave a hand nobody can finish, and a hand nobody can finish is
+   Every sealed token carries the argument that it is the right one, so
+   a pass nobody but its receiver can read is still checked by everyone.
+   The one fault no proof can catch — a seat that says it holds the two
+   of clubs nowhere — leaves a hand nobody can lead, and such a hand is
    opened where it stands and given up unscored, with the next dealt in
-   its place and the seat the open deal blames removed. Bots' hands are
+   its place and the seat the opened deal names removed. Bots' hands are
    open to the table until the bot plays inside the computation
    ([doc 04](docs/04-live-play.md)).
 6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
@@ -139,12 +140,9 @@ Ideas agreed on and not yet placed in the order above.
 
 - **The bot inside the computation**, so a bot's hand is open to
   nobody ([doc 04](docs/04-live-play.md), "Playing a seat nobody
-  holds"); until then bots' hands are open to the table.
-- **Two holes only a modified client can open** ([doc
-  03](docs/03-fair-deal.md), "As built"): a holder who declares the
-  2♣ nowhere — the remedy is an early audit and a redeal without the
-  liar — and a pass sealed with garbage — a verifiable encryption, or
-  a complaint the passer answers by opening the cards in public.
+  holds"); until then bots' hands are open to the table. What it would
+  take is written down there; the number that decides it has to be
+  measured before any of it is built.
 
 ## Developing
 

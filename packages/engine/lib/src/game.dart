@@ -460,17 +460,14 @@ class HeartsGame {
   }
 
   /// A hand given up, and the next one dealt in its place. Nothing is
-  /// scored: no hand happened, whatever was played of it.
+  /// scored: no hand happened.
   ///
-  /// The reasons for it are not rules of Hearts; they are what a sealed
-  /// table (docs/03-fair-deal.md) can be left with by a modified
-  /// client. A seat that holds the two of clubs can say it holds it
-  /// nowhere, and then nobody can lead. A seat can seal its pass to
-  /// nothing, and then the seat it passed to can never see three of its
-  /// own cards, nor play them. Neither hand can be finished by anybody,
-  /// so it is given up; what the table does about the seat is the
-  /// table's business (packages/table), and what the game does is deal
-  /// again.
+  /// There is one reason for it and it is not a rule of Hearts. At a
+  /// sealed table (docs/03-fair-deal.md) a seat that holds the two of
+  /// clubs can say it holds it nowhere: nothing can be made to prove
+  /// otherwise, and nobody can lead. No hand can be got out of that, so
+  /// it is given up; what the table does about the seat is the table's
+  /// business (packages/table), and what the game does is deal again.
   ///
   /// Not valid once a hand is over: a hand that reached its score is
   /// scored ([nextHand]).

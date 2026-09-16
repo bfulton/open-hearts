@@ -15,12 +15,12 @@
 //! returned. A deck is 52 masked cards, 3328 bytes.
 
 use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{to_bytes, PrimeField, UniformRand};
+use ark_ff::{to_bytes, Field, PrimeField, UniformRand};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{One, Zero};
 use barnett_smart_card_protocol::discrete_log_cards::{self, DLCards, Parameters};
 use barnett_smart_card_protocol::{BarnettSmartProtocol, Reveal};
-use proof_essentials::homomorphic_encryption::el_gamal::Plaintext;
+use proof_essentials::homomorphic_encryption::el_gamal::{self, Plaintext};
 use proof_essentials::utils::permutation::Permutation;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -53,6 +53,7 @@ pub const MASKED: usize = 64;
 pub const KEY_PROOF: usize = 64;
 pub const TOKEN: usize = POINT + 96;
 pub const SEALED: usize = 64;
+pub const SEAL_PROOF: usize = 3 * POINT + 2 * SCALAR;
 pub const DECK_BYTES: usize = DECK * MASKED;
 
 /// The Bayer–Groth argument sees the deck as an m × n matrix.
@@ -93,6 +94,19 @@ fn keys(secret: &[u8]) -> Option<(Affine, Scalar)> {
         return None;
     }
     Protocol::player_keygen(&mut rng_from(secret), &fixed().pp).ok()
+}
+
+/// The ElGamal generator the parameters were set up with. The
+/// protocol's own parameters keep it private and offer no way to ask
+/// for it, but a public key is sk·G, so one throwaway pair gives it
+/// back exactly: G = sk⁻¹·pk. Drawn once, and checked in the tests
+/// against a second pair.
+fn generator() -> Affine {
+    static G: OnceLock<Affine> = OnceLock::new();
+    *G.get_or_init(|| {
+        let (pk, sk) = keys(b"open-hearts generator probe v1  ").expect("probe keys");
+        pk.mul(sk.inverse().expect("a key's secret is not zero").into_repr()).into_affine()
+    })
 }
 
 fn write<T: CanonicalSerialize>(v: &T, out: &mut [u8]) -> Option<usize> {
@@ -270,16 +284,126 @@ pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8], check: bool) -> Option<u
 }
 
 /// A token for another seat's eyes only — a passed card — ElGamal
-/// encrypted to that seat's key: the protocol's own masking, under
-/// that key alone, with randomness from [seed].
-pub fn seal(pk: &[u8], token: &[u8], seed: &[u8], out: &mut [u8]) -> Option<usize> {
-    let f = fixed();
-    let pk = read::<Affine>(pk)?;
-    let token = read::<Token>(&token[..POINT])?;
+/// encrypted to that seat's key, with the argument that it is the right
+/// token. Writes [SEALED] bytes of ciphertext and then [SEAL_PROOF] of
+/// argument.
+///
+/// Sealing hides the token from everyone but the seat it is for, which
+/// is the point, and which used to mean that nobody else could tell an
+/// honest seal from a bad one: a passer could send three cards the
+/// receiver would never open, and no third party could say whose fault
+/// it was (docs/03-fair-deal.md). The argument says, to anybody, that
+/// what is inside the ciphertext is the share the owner's key owes for
+/// that card — without saying what the share is.
+///
+/// Knowledge of the two secrets (sk, r) behind
+///
+/// ```text
+///     pk = sk·G                    the owner's key
+///     c1 = r·G                     the seal's first half
+///     c2 = sk·C1 + r·pk_to         its second: the token sk·C1, blinded
+/// ```
+///
+/// where C1 is the masked card's first half, and sk·C1 is exactly the
+/// reveal token [reveal_token] would make. One Σ-protocol over two
+/// witnesses, made non-interactive the usual way: commit with random
+/// (a, b), take the challenge from a hash of the whole statement, and
+/// answer z1 = a + c·sk, z2 = b + c·r.
+pub fn seal(secret: &[u8], pk_to: &[u8], masked: &[u8], seed: &[u8], out: &mut [u8]) -> Option<usize> {
+    let g = generator();
+    let (pk, sk) = keys(secret)?;
+    let to = read::<Affine>(pk_to)?;
+    let m = read::<Masked>(masked)?;
+    if out.len() < SEALED + SEAL_PROOF {
+        return None;
+    }
     let mut rng = rng_from(seed);
     let r = Scalar::rand(&mut rng);
-    let (sealed, _) = Protocol::mask(&mut rng, &f.pp, &pk, &Plaintext::<Curve>(token.0), &r).ok()?;
-    write(&sealed, out)
+
+    let token = m.0.mul(sk.into_repr());
+    let c1 = g.mul(r.into_repr());
+    let c2 = token + to.mul(r.into_repr());
+    let sealed: Masked = el_gamal::Ciphertext(c1.into_affine(), c2.into_affine());
+
+    let a = Scalar::rand(&mut rng);
+    let b = Scalar::rand(&mut rng);
+    let a1 = g.mul(a.into_repr()).into_affine();
+    let a2 = g.mul(b.into_repr()).into_affine();
+    let a3 = (m.0.mul(a.into_repr()) + to.mul(b.into_repr())).into_affine();
+    let c = seal_challenge(&m, &pk, &to, &sealed, &a1, &a2, &a3)?;
+    let z1 = a + c * sk;
+    let z2 = b + c * r;
+
+    let n = write(&sealed, &mut out[..SEALED])?;
+    let p = &mut out[SEALED..SEALED + SEAL_PROOF];
+    write(&a1, &mut p[..POINT])?;
+    write(&a2, &mut p[POINT..2 * POINT])?;
+    write(&a3, &mut p[2 * POINT..3 * POINT])?;
+    write(&z1, &mut p[3 * POINT..3 * POINT + SCALAR])?;
+    write(&z2, &mut p[3 * POINT + SCALAR..])?;
+    Some(n + SEAL_PROOF)
+}
+
+/// Whether a sealed token is the one [pk_owner] owes for [masked],
+/// sealed to [pk_to]: the argument [seal] wrote, checked by anybody.
+/// [sealed] is the [SEALED] + [SEAL_PROOF] bytes seal returned.
+pub fn verify_seal(pk_owner: &[u8], pk_to: &[u8], masked: &[u8], sealed: &[u8]) -> bool {
+    let g = generator();
+    if sealed.len() < SEALED + SEAL_PROOF {
+        return false;
+    }
+    let p = &sealed[SEALED..SEALED + SEAL_PROOF];
+    let (Some(pk), Some(to), Some(m), Some(s), Some(a1), Some(a2), Some(a3), Some(z1), Some(z2)) = (
+        read::<Affine>(pk_owner),
+        read::<Affine>(pk_to),
+        read::<Masked>(masked),
+        read::<Masked>(&sealed[..SEALED]),
+        read::<Affine>(&p[..POINT]),
+        read::<Affine>(&p[POINT..2 * POINT]),
+        read::<Affine>(&p[2 * POINT..3 * POINT]),
+        read::<Scalar>(&p[3 * POINT..3 * POINT + SCALAR]),
+        read::<Scalar>(&p[3 * POINT + SCALAR..]),
+    ) else {
+        return false;
+    };
+    let Some(c) = seal_challenge(&m, &pk, &to, &s, &a1, &a2, &a3) else {
+        return false;
+    };
+    g.mul(z1.into_repr()) == a1.into_projective() + pk.mul(c.into_repr())
+        && g.mul(z2.into_repr()) == a2.into_projective() + s.0.mul(c.into_repr())
+        && m.0.mul(z1.into_repr()) + to.mul(z2.into_repr())
+            == a3.into_projective() + s.1.mul(c.into_repr())
+}
+
+/// The challenge a sealed token's argument answers: every public part
+/// of the statement and the three commitments, hashed under a tag of
+/// its own and taken into the scalar field. Sixty-four bytes go in, so
+/// what comes out is a scalar with nothing to choose between its
+/// values.
+fn seal_challenge(
+    masked: &Masked,
+    pk_owner: &Affine,
+    pk_to: &Affine,
+    sealed: &Masked,
+    a1: &Affine,
+    a2: &Affine,
+    a3: &Affine,
+) -> Option<Scalar> {
+    use blake2::{Blake2b, Digest};
+    let bytes = to_bytes![
+        b"open-hearts sealed token v1",
+        masked.0,
+        masked.1,
+        pk_owner,
+        pk_to,
+        sealed.0,
+        sealed.1,
+        a1,
+        a2,
+        a3
+    ]
+    .ok()?;
+    Some(Scalar::from_le_bytes_mod_order(&Blake2b::digest(&bytes)))
 }
 
 /// A secret two seats share and nobody else can compute: the hash of
@@ -402,8 +526,30 @@ pub unsafe extern "C" fn deal_unmask(pks: *const u8, tokens: *const u8, count: u
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn deal_seal(pk: *const u8, token: *const u8, seed: *const u8, out: *mut u8) -> i32 {
-    done(seal(input(pk, POINT), input(token, POINT), input(seed, 32), output(out, SEALED)))
+pub unsafe extern "C" fn deal_seal(
+    secret: *const u8,
+    pk_to: *const u8,
+    masked: *const u8,
+    seed: *const u8,
+    out: *mut u8,
+) -> i32 {
+    done(seal(
+        input(secret, SCALAR),
+        input(pk_to, POINT),
+        input(masked, MASKED),
+        input(seed, 32),
+        output(out, SEALED + SEAL_PROOF),
+    ))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_verify_seal(pk_owner: *const u8, pk_to: *const u8, masked: *const u8, sealed: *const u8) -> i32 {
+    i32::from(verify_seal(
+        input(pk_owner, POINT),
+        input(pk_to, POINT),
+        input(masked, MASKED),
+        input(sealed, SEALED + SEAL_PROOF),
+    ))
 }
 
 #[no_mangle]
@@ -476,18 +622,51 @@ mod tests {
         }
         assert!(seen.iter().all(|s| *s));
 
-        // A token sealed to seat 1 is opened by seat 1 alone.
+        // A token sealed to seat 1 is opened by seat 1 alone, and it is
+        // the token seat 0 owes for that card.
         let masked = &deck[..MASKED];
         let mut token = vec![0u8; TOKEN];
         reveal_token(&secrets[0], masked, &seed(50), &mut token).unwrap();
-        let mut sealed = vec![0u8; SEALED];
-        assert_eq!(seal(&pks[POINT..2 * POINT], &token, &seed(51), &mut sealed), Some(SEALED));
+        let mut sealed = vec![0u8; SEALED + SEAL_PROOF];
+        assert_eq!(
+            seal(&secrets[0], &pks[POINT..2 * POINT], masked, &seed(51), &mut sealed),
+            Some(SEALED + SEAL_PROOF)
+        );
         let mut opened = vec![0u8; POINT];
         assert_eq!(open(&secrets[1], &sealed, &mut opened), Some(POINT));
-        assert_eq!(opened, token[..POINT]);
+        assert_eq!(opened, token[..POINT], "what comes out is the reveal token itself");
         let mut wrong = vec![0u8; POINT];
         open(&secrets[2], &sealed, &mut wrong).unwrap();
         assert_ne!(wrong, token[..POINT]);
+
+        // And anybody can check that it is, without opening it. This
+        // is what closes the hole doc 03 left: a passer who sealed the
+        // receiver something else used to be indistinguishable from an
+        // honest one to every third party.
+        assert!(verify_seal(&pks[..POINT], &pks[POINT..2 * POINT], masked, &sealed));
+        assert!(!verify_seal(&pks[2 * POINT..3 * POINT], &pks[POINT..2 * POINT], masked, &sealed), "not another seat's token");
+        assert!(!verify_seal(&pks[..POINT], &pks[2 * POINT..3 * POINT], masked, &sealed), "not sealed to another seat");
+        assert!(!verify_seal(&pks[..POINT], &pks[POINT..2 * POINT], &deck[MASKED..2 * MASKED], &sealed), "not another card");
+        for i in [0usize, SEALED - 1, SEALED, SEALED + SEAL_PROOF - 1] {
+            let mut bent = sealed.clone();
+            bent[i] ^= 1;
+            assert!(!verify_seal(&pks[..POINT], &pks[POINT..2 * POINT], masked, &bent), "a bent byte at {i}");
+        }
+
+        // The fault itself: a passer that keeps the argument and sends
+        // a ciphertext of something else. The receiver gets a point
+        // that is not the token, and now everyone can say so.
+        let mut lie = sealed.clone();
+        {
+            let honest = read::<Masked>(&sealed[..SEALED]).unwrap();
+            let elsewhere = read::<Masked>(&deck[MASKED..2 * MASKED]).unwrap();
+            let c2 = (honest.1.into_projective() + elsewhere.1.into_projective()).into_affine();
+            write(&el_gamal::Ciphertext::<Curve>(honest.0, c2), &mut lie[..SEALED]).unwrap();
+        }
+        let mut got = vec![0u8; POINT];
+        open(&secrets[1], &lie, &mut got).unwrap();
+        assert_ne!(got, token[..POINT], "the receiver would be left with nothing that opens");
+        assert!(!verify_seal(&pks[..POINT], &pks[POINT..2 * POINT], masked, &lie), "and the table refuses it");
 
         // A shared secret is the same from either side and different
         // for a third.
@@ -497,6 +676,25 @@ mod tests {
         assert_eq!(shared_secret(&secrets[0], &pks[2 * POINT..3 * POINT], &mut ac), Some(32));
         assert_eq!(ab, ba);
         assert_ne!(ab, ac);
+    }
+}
+
+#[cfg(test)]
+mod seal_tests {
+    use super::*;
+    /// The parameters' generator is private, so it is taken back from
+    /// a throwaway pair (see [generator]). Any other pair proves it was
+    /// the right one: every public key is that same G times its secret.
+    #[test]
+    fn the_generator_taken_back_is_the_one_every_key_was_made_with() {
+        let g = generator();
+        for i in 1..5u8 {
+            let mut secret = [0u8; 32];
+            secret[0] = i;
+            secret[17] = 200 - i;
+            let (pk, sk) = keys(&secret).expect("a pair");
+            assert_eq!(g.mul(sk.into_repr()).into_affine(), pk, "pair {i}");
+        }
     }
 }
 

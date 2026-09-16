@@ -145,72 +145,33 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
-  /// A table where seat 0 seals its pass of the first hand to nothing:
-  /// three cards of the right shape that the receiver will never open,
-  /// and that nobody else can tell from an honest pass
-  /// (docs/03-fair-deal.md). [how] says whether it answers when it is
-  /// asked. Only the first hand: what the table does about it is the
-  /// point, not how long it can keep doing it.
-  SimTable sealersTable(Lie how, {int seed = 3}) {
-    final t = SimTable(humans: 4, seed: seed, crypto: crypto, jurors: 2);
+  test('a pass sealed to nothing gets no further than its own turn, and the clock has the seat', () {
+    final t = SimTable(humans: 4, seed: 3, crypto: crypto, jurors: 2);
     final sealer = t.clients.first;
-    sealer.lies = how;
+    sealer.lies = Lie.seal;
     sealer.changes.listen((_) {
       if (sealer.game.handNumber > 0) sealer.lies = null;
     });
-    return t;
-  }
-
-  test('a pass sealed to nothing: the receiver says so, the passer shows the three, and the hand goes on', () {
-    final t = sealersTable(Lie.seal);
-    final into = (0 + PassDirection.forHand(0).seatOffset) % seatCount;
-    final receiver = t.clients.firstWhere((c) => c.mySeat == into);
-    final said = <String>[];
-    receiver.log = said.add;
-    t.start();
-
-    // The receiver cannot open three of its own cards, so it cannot
-    // play them, and the table would take its seat for a fault it did
-    // not commit. It says so instead.
-    expect(t.clock.runUntil(() => said.any((l) => l.contains('will not open')), limitMs: 120000), isTrue,
-        reason: 'the receiver finds three cards it cannot open');
-    expect(t.clock.runUntil(() => said.any((l) => l.contains('showed in the clear')), limitMs: 120000), isTrue,
-        reason: 'and the passer answers by showing them');
-    expect(t.clock.runUntil(() => receiver.game.phase == Phase.playing, limitMs: 60000), isTrue,
-        reason: 'which puts the receiver back in the hand');
-
-    expect(t.run(), isTrue, reason: 'the game finishes');
-    expect(t.survivors, hasLength(4), reason: 'and nobody lost a seat over it');
-    agree(t);
-    t.stop();
-  }, timeout: const Timeout(Duration(minutes: 5)));
-
-  test('a pass sealed to nothing and no answer: the hand is given up, and the passer loses its seat', () {
-    final t = sealersTable(Lie.sealNoAnswer);
-    final sealer = t.clients.first;
     final into = (0 + PassDirection.forHand(0).seatOffset) % seatCount;
     final receiver = t.clients.firstWhere((c) => c.mySeat == into);
     t.start();
 
-    // Only the passer could open those three, and it will not. The
-    // receiver cannot play what it cannot see, removing it changes
-    // nothing — a bot playing its hand cannot see them either — and a
-    // table waiting on a turn that cannot come is the one thing that
-    // must not happen. So the hand is opened, given up, and dealt
-    // again without the seat that broke it.
-    expect(t.clock.runUntil(() => t.clients.every((c) => c.game.handNumber > 0), limitMs: 300000), isTrue,
-        reason: 'the hand is given up and the next one dealt');
-    for (final c in t.clients.where((c) => c.amSeated)) {
-      expect(c.lastHand, isNull, reason: 'a hand nobody could finish has no score sheet');
-      final hand0 = c.record.where((d) => d.turn.hand == 0).toList();
-      expect(hand0.where((d) => d.turn.isPlay), isEmpty, reason: 'and nothing of it was played');
-      expect(hand0.where((d) => d.turn.isAudit).length, 4, reason: 'every seat of it was opened, which is how anyone can tell');
-    }
-    expect(t.clock.runUntil(() => !sealer.amSeated, limitMs: 120000), isTrue, reason: 'the passer is out');
-    expect(receiver.amSeated, isTrue, reason: 'and the seat it did it to is not');
+    // Sealing three cards to nothing used to be nobody's business but
+    // the receiver's: only it could tell, and it had no way to say so
+    // that anyone could check. Every seat checks the argument beside a
+    // seal now (docs/03-fair-deal.md), so the pass is refused where it
+    // is made — the seat is left at its own turn with nothing settled,
+    // and the clock takes it there.
+    expect(t.clock.runUntil(() => t.clients.skip(1).every((c) => c.holders[0] is BotSeat), limitMs: 300000), isTrue,
+        reason: 'the pass never carries, and the seat goes at the turn it was made at');
+    expect(receiver.amSeated, isTrue, reason: 'and the seat it was aimed at is untouched');
+    expect(t.clock.runUntil(() => t.survivors.every((c) => c.game.handNumber > 0 || c.game.phase == Phase.playing), limitMs: 120000),
+        isTrue,
+        reason: 'the hand is played, not given up: the escrow opens what the seal did not');
 
-    expect(t.run(), isTrue, reason: 'the other three finish the game');
-    agree(t);
+    expect(t.clock.runUntil(() => t.survivors.every((c) => c.done), limitMs: 3 * 60 * 60 * 1000), isTrue,
+        reason: 'the other three finish the game');
+    agreeAmong(t, t.survivors);
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 

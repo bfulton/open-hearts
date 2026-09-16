@@ -55,10 +55,23 @@ void main() {
     }
     expect(seen.length, deckSize);
 
-    final token = d.revealToken(secrets[0], maskedAt(deck, 0), seed(50));
-    final sealed = d.seal(pks[1], token, seed(51));
+    // A token sealed to seat 1, with the argument that it is the token
+    // seat 0 owes for that card. Seat 1 alone opens it; anybody checks
+    // it (docs/03-fair-deal.md).
+    final masked0 = maskedAt(deck, 0);
+    final token = d.revealToken(secrets[0], masked0, seed(50));
+    final sealed = d.seal(secrets[0], pks[1], masked0, seed(51));
+    expect(sealed, hasLength(sealedBytes + sealProofBytes));
     expect(d.open(secrets[1], sealed), token.sublist(0, pointBytes));
     expect(d.open(secrets[2], sealed), isNot(token.sublist(0, pointBytes)));
+    expect(d.verifySeal(pks[0], pks[1], masked0, sealed), isTrue);
+    expect(d.verifySeal(pks[2], pks[1], masked0, sealed), isFalse, reason: 'not another seat\'s token');
+    expect(d.verifySeal(pks[0], pks[2], masked0, sealed), isFalse, reason: 'not sealed to another seat');
+    expect(d.verifySeal(pks[0], pks[1], maskedAt(deck, 1), sealed), isFalse, reason: 'not another card');
+    for (final i in [0, sealedBytes - 1, sealedBytes, sealed.length - 1]) {
+      final bent = Uint8List.fromList(sealed)..[i] ^= 1;
+      expect(d.verifySeal(pks[0], pks[1], masked0, bent), isFalse, reason: 'a bent byte at $i');
+    }
     expect(d.sharedSecret(secrets[0], pks[1]), d.sharedSecret(secrets[1], pks[0]));
     expect(d.sharedSecret(secrets[0], pks[2]), isNot(d.sharedSecret(secrets[0], pks[1])));
   });

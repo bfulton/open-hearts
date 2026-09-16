@@ -56,7 +56,9 @@ extension type _Exports._(JSObject _) implements JSObject {
   // ignore: non_constant_identifier_names
   external JSNumber deal_unmask(JSNumber pks, JSNumber tokens, JSNumber count, JSNumber masked, JSNumber check);
   // ignore: non_constant_identifier_names
-  external JSNumber deal_seal(JSNumber pk, JSNumber token, JSNumber seed, JSNumber out);
+  external JSNumber deal_seal(JSNumber secret, JSNumber pkTo, JSNumber masked, JSNumber seed, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_verify_seal(JSNumber pkOwner, JSNumber pkTo, JSNumber masked, JSNumber sealed);
   // ignore: non_constant_identifier_names
   external JSNumber deal_open(JSNumber secret, JSNumber sealed, JSNumber out);
   // ignore: non_constant_identifier_names
@@ -178,8 +180,15 @@ class _Wasm implements DealCrypto {
   }
 
   @override
-  Uint8List seal(Uint8List pk, Uint8List token, Uint8List seed) =>
-      _must(_call([pk, token, seed], sealedBytes, (i, o) => e.deal_seal(i[0].toJS, i[1].toJS, i[2].toJS, o.toJS).toDartInt), 'seal');
+  Uint8List seal(Uint8List secret, Uint8List pkTo, Uint8List masked, Uint8List seed) => _must(
+      _call([secret, pkTo, masked, seed], sealedBytes + sealProofBytes,
+          (i, o) => e.deal_seal(i[0].toJS, i[1].toJS, i[2].toJS, i[3].toJS, o.toJS).toDartInt),
+      'seal');
+
+  @override
+  bool verifySeal(Uint8List pkOwner, Uint8List pkTo, Uint8List masked, Uint8List sealed) => _call([pkOwner, pkTo, masked, sealed], 0,
+          (i, o) => e.deal_verify_seal(i[0].toJS, i[1].toJS, i[2].toJS, i[3].toJS).toDartInt == 1 ? 0 : -1) !=
+      null;
 
   @override
   Uint8List open(Uint8List secret, Uint8List sealed) =>

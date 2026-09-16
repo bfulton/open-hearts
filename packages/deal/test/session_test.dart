@@ -206,6 +206,29 @@ void main() {
     final passed = [for (final p in positions) all[0].openedCardAt(p)!];
     final pass = all[0].passMessage(1, positions)!;
     expect(pass['sealed'], isNotNull, reason: 'sealed to a person');
+
+    // A seal is for one seat's eyes, and every seat checks it all the
+    // same: the argument beside it says what is in there without
+    // opening it (docs/03-fair-deal.md). A passer that seals the
+    // receiver something else is refused here, by everybody, rather
+    // than leaving the receiver with three cards it cannot play and
+    // nobody else able to say whose fault that was.
+    final bent = {
+      ...pass,
+      'sealed': [
+        for (final (i, s) in (pass['sealed']! as List).indexed)
+          if (i == 1) base64.encode(List.filled(sealedBytes + sealProofBytes, 9)) else s as String,
+      ],
+    };
+    for (final x in all) {
+      expect(x.verifyPass(bent), isFalse, reason: 'a seal of nothing, refused by every side');
+      expect(x.acceptPass(bent), isFalse);
+    }
+    final elsewhere = {...pass, 'to': 2};
+    for (final x in all) {
+      expect(x.verifyPass(elsewhere), isFalse, reason: 'and a seal is bound to the seat it was for');
+    }
+
     broadcast(all, 0, (x) => x.acceptPass(pass));
     all[0].acceptPass(pass);
     expect(all[0].handOf(0)!.length, 10);
