@@ -16,6 +16,7 @@ import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
 import '../ui/hand_fan.dart';
+import '../ui/gone.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
 import '../ui/table_layout.dart';
@@ -231,6 +232,9 @@ class _LivePageState extends State<LivePage> {
           child: Stack(
             children: [
               TableLayout(
+                // Where there is room beside the table, what a phone
+                // has to hide goes in it (ui/gone.dart).
+                rail: (width) => Gone(played: _c.playedThisHand, width: width),
                 header: TableHeader(
                   game: game,
                   menu: [

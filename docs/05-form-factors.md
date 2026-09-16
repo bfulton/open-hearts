@@ -101,9 +101,7 @@ hand fitting, a whole hand played out, and a turn mid-hand that keeps
 the same controller, hand, trick and totals on both sides of it.
 `node e2e/shots.mjs` screenshots the built app at the shapes in the
 table above, the pass and the first trick each, for looking at a
-layout before a phone does. Desktop web gets the landscape composition
-with more room, as step 2 says; tablets and the Duo are not designed
-yet.
+layout before a phone does — the tablet and the Duo among them now.
 
 ## The foldable is easier than it looks
 
@@ -155,8 +153,43 @@ The hand should stay near the bottom edge and near the thumbs, which on a
 tablet in landscape means it does not want to be one wide fan across the
 full width.
 
-None of that is designed yet. What matters now is not baking in the
-assumption that it is a scaled phone.
+**As built.** Three things, all read off the constraints.
+
+*The table holds a width.* Past nine hundred points it stops spreading
+and is centred, because a fan any wider is a fan you reach across the
+device to touch. Whatever is left over is a rail, when there is enough
+of it to be one — two hundred and sixty points — and no more than four
+hundred and twenty, past which a rail is a column of air and the table
+would rather have the width back. A tablet in portrait has a hundred
+and twenty-four points left over, so it gets a wide table and no rail;
+in landscape it gets both.
+
+*The cards grow with the felt.* Seventy-six points was a phone's cap,
+and a phone's cap on a tablet is a phone's game with green around it.
+The cap is now the felt's own shortest side, between seventy-six and a
+hundred and eight: a phone lands exactly where it did, and a tablet's
+trick comes up to a size you can read from across a desk. The hand's
+own row grows a little too, since it is the part anybody touches.
+
+*The table sits low in a felt with height to spare.* A phone's felt is
+the size of its table and the slack is a few points either way, so it
+is centred, as before. A tablet's has height the cards will never grow
+into. There the room beyond the far seat reads as the far end of the
+table, and the room under your own badge is the gap between you and
+your own cards — so the first gets seven tenths of it and the second
+three.
+
+What the rail carries is the first of the two this section named, and
+the one a phone genuinely cannot show: **what has gone**. The
+fifty-two, with the played ones faded and struck through, and the line
+underneath that nobody does correctly in their head — how many hearts
+and whether the queen is still out. Nothing on it is a secret; every
+card on it was played face up in front of everybody. It is a memory
+aid, not a peek.
+
+`app/test/tablet_test.dart` holds the shapes, including the two this
+document asks for by name: unfolding mid-hand keeps the game, and Split
+View is the phone composition because nothing knows what a tablet is.
 
 ## What moves, and why
 

@@ -12,6 +12,12 @@ import 'card_view.dart';
 import 'pip.dart';
 import 'player_icon.dart';
 
+/// More height than a table is ever going to use, at which point where
+/// it sits in the felt stops being a rounding error and starts being a
+/// composition. Above a phone's own breathing room, so a phone's table
+/// is centred in its felt exactly as it was.
+const _roomToSpare = 240.0;
+
 /// The badges' inset from the felt's edge, and the gap every badge
 /// keeps from the card it labels.
 const _badgeInset = 6.0;
@@ -105,11 +111,18 @@ class TableView extends StatelessWidget {
         double cardsUnder(double line) =>
             (box.height - 2 * (line + _badgeGap) - (wide ? 0.0 : 2 * _pillRow)) / ((wide ? 2.3 : 2.7) / cardAspect);
         final line = cardsUnder(SeatBadge.line) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine;
+        // The biggest a card is allowed to be, from the felt's own
+        // size. A phone is held at arm's length and its felt is small,
+        // so seventy-six points is the whole of what fits; a tablet's
+        // felt is further away and has room, and cards that stayed a
+        // phone's size on it would be a phone's game with green around
+        // it (docs/05-form-factors.md).
+        final most = (box.shortestSide * 0.17).clamp(76.0, 108.0);
         var cardWidth = [
           box.width * (wide ? 0.16 : 0.21),
           cardsUnder(line),
-          76.0,
-        ].reduce((a, b) => a < b ? a : b).clamp(34.0, 76.0);
+          most,
+        ].reduce((a, b) => a < b ? a : b).clamp(34.0, most);
         // The side badges' room: from the felt's edge to the trick's
         // outer card, less a gap. A name has to fit it, wrapped if it
         // must; and on a felt too narrow for both, the trick gives way
@@ -236,11 +249,22 @@ class TableView extends StatelessWidget {
               : SizedBox(width: sideRoom, child: badge(position));
         }
 
+        // Where the table sits in the felt. A phone's felt is the size
+        // of its table and the slack is a few points either way, so it
+        // is centred and that is that. A tablet's has height the cards
+        // will never grow into, and there the table sits low: the room
+        // beyond the far seat reads as the far end of the table, while
+        // the room under your own badge is the gap between you and your
+        // own cards, and wants to be small.
+        final cluster = 2 * line + 2 * gap + trickBox.height + (wide ? 0.0 : 2 * _pillRow);
+        final slack = (box.height - cluster).clamp(0.0, double.infinity);
+        final above = slack > _roomToSpare ? slack * 0.7 : slack / 2;
+
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: _badgeInset),
           child: Column(
             children: [
-              const Spacer(),
+              SizedBox(height: above),
               seat(2),
               SizedBox(height: gap),
               SizedBox(

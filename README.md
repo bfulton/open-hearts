@@ -105,11 +105,15 @@ rigged. Roughly in order:
    matchmaking, seat handover, the jury: built, its deadlock role and
    its escrow of the deal.
 7. **Landscape**, then **tablet**, then **iPhone Duo**
-   ([doc 05](docs/05-form-factors.md)). Landscape is built: the phone
-   on its side gets the second composition, the hand shorter and
-   wider under the same slim header, chosen from the space the table
-   is given and never from the device; a turn mid-hand keeps the
-   game. Tablet and the Duo are next.
+   ([doc 05](docs/05-form-factors.md)) — built, all three, and all
+   three chosen from the space the table is given rather than from the
+   device. A phone on its side gets the second composition, the hand
+   shorter and wider under the same slim header. Past a width the
+   table wants it stops spreading and is centred, the cards grow with
+   the felt instead of staying a phone's size, the table sits low in a
+   felt with height to spare, and what is left over is a rail showing
+   what has gone — the fifty-two with the played ones struck through.
+   A turn mid-hand keeps the game, and so does a fold.
 8. **Live play is a subscription** — $2.99 a year
    ([doc 06](docs/06-service.md)). The licence, the gate, and buying on
    the web through Stripe are built, and so is sharing a subscription

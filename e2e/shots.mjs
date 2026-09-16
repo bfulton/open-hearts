@@ -34,6 +34,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shapes = [
   { name: 'phone-portrait', width: 390, height: 844 },
   { name: 'phone-landscape', width: 844, height: 390 },
+  { name: 'tablet-portrait', width: 1024, height: 1366 },
+  { name: 'tablet-landscape', width: 1366, height: 1024 },
+  // The Duo's inner display is the outer one's shape at a larger
+  // scale, so unfolding is a change of size and not of composition.
+  { name: 'duo-closed', width: 375, height: 812 },
+  { name: 'duo-open', width: 620, height: 1342 },
   { name: 'desktop', width: 1280, height: 800 },
   { name: 'narrow-split', width: 340, height: 720 },
 ];
