@@ -369,6 +369,15 @@ candidate carries an address and a public relay carries the event.
 The two ends' conversation key comes from their keys' shared point
 (`Signer.sharedXWith`), the same ECDH the deal's escrow rests on.
 
+What the path itself carries is measured
+([measurements/relay](../measurements/relay/README.md)): 366 bytes of
+envelope on an event, a third more again for anything that is not text,
+a signature to send one and a rehash and a signature to accept one at
+the relay and at every receiver — about 1,650 small events a second on
+a loopback, seven tenths of which is the relay checking them. That
+is the budget for a juror, which has no other path (doc 04, "The party
+that has no channel").
+
 `service/test/table_over_relay_test.dart` seats two people and two bots
 on the local relay with real keys, real sockets and the wall clock, and
 they play a hand: 28 decisions, every one signed twice and verified by

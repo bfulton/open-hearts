@@ -1,0 +1,10 @@
+name: relay_bench
+description: What sealing a relay event costs, in the Dart VM and compiled to JavaScript.
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  table:
+    path: ../../packages/table

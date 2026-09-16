@@ -609,6 +609,26 @@ without either party seeing an input, and that is not a small thing.
   the traffic, not its size**: a hand's preprocessing fits, and fits
   several times over, so long as it goes out paced and beside the table
   rather than in front of it.
+- **The party that has no channel.** A juror is not a peer. It is
+  summoned, it follows the table from the relay alone
+  (`juror_duty.dart`), and the app's transport offers a data channel to
+  the human seats and to nobody else (`mesh_transport.dart`). So the
+  foreman — which at one human is the second computing party — would
+  compute over a relay, and a relay is not a channel. Material that is
+  not text is base64 into the message, sealed to the foreman because a
+  relay is a stranger's machine, and base64 again: **1.79x on the
+  wire** against 1.0 down a channel, with one sealed event carrying
+  49,143 bytes because NIP-44 caps a plaintext at 65,535
+  ([measurements/relay](../measurements/relay/README.md)). The seconds
+  are affordable — a millisecond an event to sign and about as much to
+  check, at each end — and what the expansion costs is the budget:
+  **a minute of 5 Mbit/s is 390 bytes a gate over a relay where it was
+  700 over a channel**, and the relay is one queue for everything on
+  the tag, so bulk on a second socket still costs the table's own
+  messages ten times idle. A construction that fits in a few hundred
+  bytes a gate carries a foreman as things stand. One that does not
+  says to give a juror a channel — an offer, an answer and a candidate,
+  exactly as a peer gets — rather than to change the protocol.
 - **Where it would live.** Beside the deal. `crypto/deal` is one Rust
   crate built twice, a cdylib for the VM and a wasm for the browser, and
   garbling and transfer belong in the same place for the same reason.
@@ -793,7 +813,11 @@ On the wire:
   table says so and calls for a juror of last resort.
 - **The juror** follows the table like any peer behind — a summoned
   client is carried forward by the same heartbeats — and heartbeats
-  while it serves.
+  while it serves. On the relay alone: a juror is not seated, so
+  nothing offers it a data channel, and everything it hears and says
+  crosses two hops and a stranger's machine. What it does today is
+  small enough for that not to matter, and the computation above is
+  the first thing that would.
 - **The appeal.** A stuck turn — a race that split, or any open turn
   while the table is paused — is appealed every ten seconds.
 - **The rule.** A juror rules only when nobody who can still vote, as

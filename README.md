@@ -141,13 +141,19 @@ Ideas agreed on and not yet placed in the order above.
 - **The bot inside the computation**, so a bot's hand is open to
   nobody ([doc 04](docs/04-live-play.md), "Playing a seat nobody
   holds"); until then bots' hands are open to the table. What it would
-  take is written down there, and both halves of what decides it are
-  measured: the budget is about seven hundred bytes a gate on a channel
-  of its own ([channel](measurements/channel/README.md)), and an
-  oblivious transfer costs 16 bytes and a couple of microseconds
+  take is written down there, and what decides it is measured: the
+  budget is about seven hundred bytes a gate on a channel of its own
+  ([channel](measurements/channel/README.md)), and an oblivious
+  transfer costs 16 bytes and a couple of microseconds
   ([ot](measurements/ot/README.md)) — so a hand's preprocessing fits,
-  several times over, if it goes out paced and beside the table. What
-  the authentication on top of the transfers costs is the next number.
+  several times over, if it goes out paced and beside the table. The
+  third number is about the one party that has no channel: a juror is
+  not seated, so it follows a table from the relay alone, and over a
+  relay the same material is 1.79x on the wire and the budget halves to
+  390 bytes a gate ([relay](measurements/relay/README.md)). A foreman
+  fits in that; a construction that does not says to give a juror a
+  channel rather than to change the protocol. What the authentication
+  on top of the transfers costs is the next number.
 
 ## Developing
 
