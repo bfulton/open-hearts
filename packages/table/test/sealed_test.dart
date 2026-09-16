@@ -98,7 +98,11 @@ void main() {
     expect(t.clock.runUntil(() => t.clients.where((c) => c.pause == Pause.waitingForLead).length == 3, limitMs: 60000), isTrue,
         reason: 'nobody the table can hear claims the lead card');
     final liar = t.clients.firstWhere((c) => c.pause == null);
-    expect(liar.game.phase, Phase.passing, reason: 'the modified client alone got a hand out of it');
+    // Settling is not simultaneous: the three stop at the lead, and the
+    // liar is still finishing the deal it gave itself. Wait for it to
+    // get its hand rather than sample the instant the others stopped.
+    expect(t.clock.runUntil(() => liar.game.phase == Phase.passing, limitMs: 60000), isTrue,
+        reason: 'the modified client alone got a hand out of it');
     final honest = t.clients.where((c) => c != liar).toList();
 
     // It never answers the audit the others called, and its heartbeats
@@ -154,6 +158,11 @@ void main() {
     });
     final into = (0 + PassDirection.forHand(0).seatOffset) % seatCount;
     final receiver = t.clients.firstWhere((c) => c.mySeat == into);
+    // Not t.survivors: that is every client that still believes it is
+    // seated, and this one's record parts from the table's at the pass
+    // it spoiled, so whether it ever takes in its own removal is the
+    // deal's business. The three that did not lie are the table.
+    final honest = t.clients.where((c) => c != sealer).toList();
     t.start();
 
     // Sealing three cards to nothing used to be nobody's business but
@@ -165,13 +174,13 @@ void main() {
     expect(t.clock.runUntil(() => t.clients.skip(1).every((c) => c.holders[0] is BotSeat), limitMs: 300000), isTrue,
         reason: 'the pass never carries, and the seat goes at the turn it was made at');
     expect(receiver.amSeated, isTrue, reason: 'and the seat it was aimed at is untouched');
-    expect(t.clock.runUntil(() => t.survivors.every((c) => c.game.handNumber > 0 || c.game.phase == Phase.playing), limitMs: 120000),
+    expect(t.clock.runUntil(() => honest.every((c) => c.game.handNumber > 0 || c.game.phase == Phase.playing), limitMs: 120000),
         isTrue,
         reason: 'the hand is played, not given up: the escrow opens what the seal did not');
 
-    expect(t.clock.runUntil(() => t.survivors.every((c) => c.done), limitMs: 3 * 60 * 60 * 1000), isTrue,
+    expect(t.clock.runUntil(() => honest.every((c) => c.done), limitMs: 3 * 60 * 60 * 1000), isTrue,
         reason: 'the other three finish the game');
-    agreeAmong(t, t.survivors);
+    agreeAmong(t, honest);
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 

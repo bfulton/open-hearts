@@ -87,8 +87,12 @@ class SimTable {
   Iterable<TableClient> get clients => people.map((p) => p.client);
 
   /// Clients of people who have not left, crashed or gone quiet, and
-  /// have not been removed by the others — a removed client is out of
-  /// the table whatever it thinks.
+  /// still seat themselves. A client that applies the record sees its
+  /// own removal in it and drops out of here with the rest of the
+  /// table; a modified one whose record parted from the table's never
+  /// does, and stays a survivor to itself alone. A test with such a
+  /// client at the table names the honest set itself rather than ask
+  /// here — see the lie tests in sealed_test.dart.
   Iterable<TableClient> get survivors =>
       people.where((p) => !p.gone && p.client.amSeated).map((p) => p.client);
 
