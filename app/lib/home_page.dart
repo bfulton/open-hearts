@@ -45,6 +45,7 @@ import 'net/relays.dart';
 import 'net/room.dart';
 import 'net/share.dart';
 import 'net/standing.dart';
+import 'pace_store.dart';
 import 'net/turn.dart';
 import 'pictures.dart';
 import 'subscribe_page.dart';
@@ -96,6 +97,14 @@ class _HomePageState extends State<HomePage> {
   /// start, changed in the profile behind the icon in the corner.
   String _name = '';
   Avatar _avatar = Avatar.none;
+
+  /// How long this device takes over a card, as it has measured itself
+  /// (pace_store.dart). Nothing until it has played enough to know.
+  Pace _pace = Pace.fresh;
+
+  /// Whether the table now open has already had its cards folded into
+  /// the pace: a table says it is done more than once.
+  bool _paced = false;
 
   /// The game this device is asking for, off the device and back onto
   /// it when it changes (game_options.dart).
@@ -229,11 +238,13 @@ class _HomePageState extends State<HomePage> {
     final options = await GameOptions.load();
     final avatar = await Identity.avatar();
     final name = await Identity.name();
+    final pace = await PaceStore.load();
     if (!mounted) return;
     setState(() {
       _options = options;
       _avatar = avatar;
       _name = name ?? '';
+      _pace = pace;
     });
     // Here by a link: straight into the room — unless live play is
     // locked, which a link does not open. A device with no name yet is
@@ -399,6 +410,9 @@ class _HomePageState extends State<HomePage> {
       target: options.target,
       name: _name,
       rating: (_standing?.mine ?? Rating.fresh).shown,
+      // What this device has measured of its own play, so it is seated
+      // with people who play at about its speed (pace_store.dart).
+      pace: _pace.stated,
       botRating: Standing.botPicker(ledger),
       sealed: dealCrypto != null,
       avatar: _avatar.isDefault ? null : _avatar.toJson(withPicture: false),
@@ -462,6 +476,18 @@ class _HomePageState extends State<HomePage> {
       pictures: _pictures,
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
+    // What this device measured of its own play goes on the device and
+    // nowhere else (pace_store.dart). Folded when the table is done
+    // with, since a game left early is still cards this player took
+    // their own time over.
+    controller.addListener(() {
+      if (!controller.client.done || _paced) return;
+      _paced = true;
+      unawaited(PaceStore.fold(controller.client.myCardMs).then((pace) {
+        if (mounted) setState(() => _pace = pace);
+      }));
+    });
+    _paced = false;
     setState(_closeLobby);
     _go(LivePage(controller: controller));
   }

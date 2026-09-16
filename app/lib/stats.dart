@@ -15,11 +15,19 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 import 'net/standing.dart' as net;
+import 'pace_store.dart';
 import 'record_store.dart';
 
 /// Everything the profile puts on the screen.
 class PlayerStats {
-  const PlayerStats({this.rating, this.ratedGames = 0, this.live = const Tally(), this.alone = const Tally(), this.reached = false});
+  const PlayerStats({
+    this.rating,
+    this.ratedGames = 0,
+    this.live = const Tally(),
+    this.alone = const Tally(),
+    this.reached = false,
+    this.pace = Pace.fresh,
+  });
 
   /// This device's rating, or null when no relay has said yet.
   final Rating? rating;
@@ -38,10 +46,19 @@ class PlayerStats {
   /// does, and "no games" and "not asked" are different things to say.
   final bool reached;
 
-  PlayerStats withLive({required Rating rating, required int ratedGames, required Tally live}) =>
-      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: true);
+  /// How long this device takes over a card, as it has measured itself
+  /// (pace_store.dart). Never on a relay: nobody else can agree on it,
+  /// and nobody else is told.
+  final Pace pace;
 
-  PlayerStats withAlone(Tally alone) => PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached);
+  PlayerStats withLive({required Rating rating, required int ratedGames, required Tally live}) =>
+      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: true, pace: pace);
+
+  PlayerStats withAlone(Tally alone) =>
+      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached, pace: pace);
+
+  PlayerStats withPace(Pace pace) =>
+      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached, pace: pace);
 }
 
 /// The games on this device, played again for their scores.
@@ -78,7 +95,7 @@ PlayerStats fromStanding(PlayerStats onto, net.Standing standing, PublicKey me) 
 /// question. A null [relays] with no [standing] says not to ask at
 /// all, which is a door that is deliberately offline.
 Stream<PlayerStats> playerStats({required RecordStore store, required Signer signer, List<Uri>? relays, net.Standing? standing}) async* {
-  var stats = const PlayerStats();
+  var stats = const PlayerStats().withPace(await PaceStore.load());
   stats = stats.withAlone(soloTally(await store.load()));
   yield stats;
   if (standing != null) {

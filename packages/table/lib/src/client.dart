@@ -321,9 +321,21 @@ class TableClient {
     if (!timeBank.banks(turn) || holders[seat] is! HumanSeat) return;
     final opened = _openedAt[turn];
     if (opened == null) return;
-    final over = clock.nowMs - opened - timeBank.graceOf(turn);
+    final took = clock.nowMs - opened;
+    // What this device took over its own card, whole: its own account
+    // of itself, which is the only pace anybody can measure without
+    // dispute (pace.dart). The pass is one decision over thirteen
+    // cards and is not one of them.
+    if (seat == mySeat && turn.isPlay) myCardMs.add(took);
+    final over = took - timeBank.graceOf(turn);
     if (over > 0) _spentMs[(turn.hand, seat)] = (_spentMs[(turn.hand, seat)] ?? 0) + over;
   }
+
+  /// How long this device took over each of its own cards, in order:
+  /// the clock started when the turn opened here and stopped when the
+  /// play carried here. Nobody else's business and in no signed
+  /// record — see pace.dart for why it cannot be.
+  final List<int> myCardMs = [];
 
   /// Milliseconds [seat] has left before it can be booted, once the
   /// grace on its open turn is spent — the clock the badge shows — or

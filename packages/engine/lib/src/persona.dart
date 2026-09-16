@@ -39,12 +39,15 @@ enum PassStyle {
 
 /// How long a bot appears to think. Rhythm, not strategy: the engine
 /// decides instantly and the table waits this long before showing it.
-enum Pace {
+/// How long a bot pretends to think. A person's own pace is a
+/// different thing entirely and lives in packages/table (pace.dart):
+/// that one is measured, this one is manners.
+enum BotPace {
   quick(400, 700),
   measured(600, 1100),
   slow(900, 1600);
 
-  const Pace(this.minMs, this.maxMs);
+  const BotPace(this.minMs, this.maxMs);
 
   final int minMs;
   final int maxMs;
@@ -60,7 +63,7 @@ class Persona {
     this.flushMinSmallSpades = 1,
     this.moonDefenseTrigger = 4,
     this.passStyle = PassStyle.shedHeight,
-    this.pace = Pace.measured,
+    this.pace = BotPace.measured,
     this.shortSuitWeight = 20,
     this.shootLoserShare = 4,
     this.shootPassMaxLosers = 5,
@@ -171,7 +174,7 @@ class Persona {
 
   final PassStyle passStyle;
 
-  final Pace pace;
+  final BotPace pace;
 
   /// Runs at the moon when at most one card in this many is a loser
   /// (`Bot.strength`); zero never runs. Four is a shot most strong
@@ -266,21 +269,21 @@ class Persona {
     name: 'Buttercup',
     epithet: 'Ducks everything, and wins anyway.',
     moonDefenseTrigger: 3,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const romeo = Persona(
     name: 'Romeo',
     epithet: "Can't hold a queen, or a heart, or his breath.",
     passStyle: PassStyle.dumpQueen,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const juliet = Persona(
     name: 'Juliet',
     epithet: 'Waits for the moment. Then it is yours.',
     passStyle: PassStyle.keepQueen,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const cyrano = Persona(
@@ -307,14 +310,14 @@ class Persona {
     epithet: 'Wants all of them, or none.',
     shootLoserShare: 3,
     shootPassMaxLosers: 7,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const paolo = Persona(
     name: 'Paolo',
     epithet: 'Reads to the end of the page before he moves.',
     moonDefenseTrigger: 10,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const francesca = Persona(
@@ -328,7 +331,7 @@ class Persona {
     epithet: 'Charges when the odds are merely good.',
     shootLoserShare: 3,
     shootPassMaxLosers: 6,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const guinevere = Persona(
@@ -336,7 +339,7 @@ class Persona {
     epithet: 'Sends the queen away before anyone asks.',
     moonDefenseTrigger: 3,
     passStyle: PassStyle.dumpQueen,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const aragorn = Persona(
@@ -349,7 +352,7 @@ class Persona {
   static const arwen = Persona(
     name: 'Arwen',
     epithet: 'Gives up the queen slowly, and only once.',
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const orpheus = Persona(
@@ -363,7 +366,7 @@ class Persona {
     name: 'Eurydice',
     epithet: 'Gone before the second trick.',
     passStyle: PassStyle.dumpQueen,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const markAntony = Persona(
@@ -371,7 +374,7 @@ class Persona {
     epithet: 'Bets the empire on one hand.',
     shootLoserShare: 3,
     shootPassMaxLosers: 7,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const cleopatra = Persona(
@@ -379,14 +382,14 @@ class Persona {
     epithet: 'The queen stays until she chooses to go.',
     passStyle: PassStyle.keepQueen,
     moonDefenseTrigger: 6,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const shahJahan = Persona(
     name: 'Shah Jahan',
     epithet: 'Builds the long game one careful trick at a time.',
     moonDefenseTrigger: 10,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const mumtazMahal = Persona(
@@ -405,7 +408,7 @@ class Persona {
     name: 'Pierre Curie',
     epithet: 'Patient, exact, and rarely caught with the queen.',
     moonDefenseTrigger: 6,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const bonnie = Persona(
@@ -413,7 +416,7 @@ class Persona {
     epithet: 'Runs at the moon with the lights on.',
     shootLoserShare: 3,
     shootPassMaxLosers: 7,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const clyde = Persona(
@@ -422,14 +425,14 @@ class Persona {
     shootLoserShare: 3,
     shootPassMaxLosers: 6,
     moonDefenseTrigger: 8,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const diegoRivera = Persona(
     name: 'Diego Rivera',
     epithet: 'Works on a big wall, slowly.',
     moonDefenseTrigger: 10,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const fridaKahlo = Persona(
@@ -444,7 +447,7 @@ class Persona {
     passStyle: PassStyle.dumpQueen,
     shootLoserShare: 3,
     shootPassMaxLosers: 7,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const nancy = Persona(
@@ -452,14 +455,14 @@ class Persona {
     epithet: 'Wants the queen gone yesterday.',
     passStyle: PassStyle.dumpQueen,
     moonDefenseTrigger: 3,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const han = Persona(
     name: 'Han',
     epithet: 'Never tell him the odds.',
     shootPassMaxLosers: 7,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const leia = Persona(
@@ -480,7 +483,7 @@ class Persona {
     name: 'Catherine',
     epithet: 'Feels the moon coming in her bones.',
     moonDefenseTrigger: 3,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const darcy = Persona(
@@ -488,7 +491,7 @@ class Persona {
     epithet: 'Too proud to give up a queen.',
     passStyle: PassStyle.keepQueen,
     moonDefenseTrigger: 8,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const elizabeth = Persona(
@@ -502,14 +505,14 @@ class Persona {
     epithet: 'Aims high, and now and then hits.',
     shootPassMaxLosers: 7,
     moonDefenseTrigger: 4,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const psyche = Persona(
     name: 'Psyche',
     epithet: 'Trusts everyone until the lamp is lit.',
     moonDefenseTrigger: 10,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const dimitri = Persona(
@@ -517,7 +520,7 @@ class Persona {
     epithet: 'All in, on every hand that might be it.',
     shootLoserShare: 3,
     shootPassMaxLosers: 7,
-    pace: Pace.quick,
+    pace: BotPace.quick,
   );
 
   static const grushenka = Persona(
@@ -525,7 +528,7 @@ class Persona {
     epithet: 'Keeps the queen, and everyone guessing.',
     passStyle: PassStyle.keepQueen,
     moonDefenseTrigger: 3,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   static const pip = Persona(
@@ -540,7 +543,7 @@ class Persona {
     epithet: 'Cold to the run until it is nearly done.',
     passStyle: PassStyle.keepQueen,
     moonDefenseTrigger: 10,
-    pace: Pace.slow,
+    pace: BotPace.slow,
   );
 
   /// Everyone who might sit down. Order is not rank.

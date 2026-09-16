@@ -28,7 +28,7 @@ import 'theme.dart';
 import 'ui/photo_crop.dart';
 import 'ui/player_icon.dart';
 
-import 'package:table/table.dart' show Tally;
+import 'package:table/table.dart' show Pace, Tally;
 
 /// How big a picture is, or null when the bytes are not one.
 Size? sizeOfPicture(Uint8List bytes) {
@@ -372,6 +372,41 @@ class _Heading extends StatelessWidget {
   );
 }
 
+/// How long you take over a card, and what it does.
+///
+/// Measured by this device from its own turns and kept on it: it is the
+/// one number about a game no two peers can agree on, since the record
+/// carries no clock (packages/table, pace.dart). Worth saying out loud
+/// because it is stated in the pool and decides who you are seated
+/// with, and nobody should have that said about them without being
+/// told.
+class _PaceLine extends StatelessWidget {
+  const _PaceLine({required this.pace});
+
+  final Pace pace;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.speed_outlined, size: 15, color: Palette.chromeDim),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            pace.known
+                ? 'You play at a ${pace.word} pace — about ${pace.stated} second${pace.stated == 1 ? '' : 's'} a card, '
+                    'which is who you are seated with'
+                : 'Your pace is not yet known: play a live game or two and you will be seated with people who play at your speed',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, height: 1.4, color: Palette.chromeDim),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// What the games say: the rating over the two halves of the game.
 ///
 /// The rating is the live games' alone — they are the ones signed by
@@ -424,6 +459,8 @@ class _Record extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 10),
+        _PaceLine(pace: stats?.pace ?? Pace.fresh),
         const SizedBox(height: 18),
         const _Heading('Your games'),
         const SizedBox(height: 10),

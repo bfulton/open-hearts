@@ -120,24 +120,54 @@ or a hundred, rated or unrated, changed in a small sheet and kept on
 the device beside the name. *Play live* is one button — the options
 say which pool — and it carries how many devices are online, since
 that is the reason to press it now or to come back later. Pressing it
-is a waiting screen and nothing to do. (The live area has one switch
-in front of it, `liveOpen` in `app/lib/home_page.dart`, for the day
-live play is something bought rather than something given; it is open
-to everyone today, and there is nothing behind the switch but a
-padlock.) There is no matchmaker.
+is a waiting screen and nothing to do. (Live play is a subscription
+now — `liveOpen` in `app/lib/home_page.dart` asks whether this device
+holds a licence; see [doc 06](06-service.md).) There is no
+matchmaker.
 Players who want a game say so on the relay every couple of seconds,
-in the pool they chose, with their rating and how long they have
-waited; everyone waiting sees everyone else. Time is cut into rounds
+in the pool they chose, with their rating, their pace and how long
+they have waited; everyone waiting sees everyone else. Time is cut into rounds
 of five seconds, and in each round the lowest key present acts as
 host: it runs the seating rule (`packages/table/lib/src/matching.dart`)
 over everyone it has heard from and publishes one signed event per
 table naming the seats, the same start event a friends' room uses.
 The rule: whoever has waited through a round already is seated first,
 then the rest at random; a table is four ratings within a window that
-widens a hundred points for every round the first of them has waited;
-and once someone has waited ten seconds without a full table they get
+widens a hundred points for every round the first of them has waited,
+and four paces within a window that widens three seconds a round; and
+once someone has waited ten seconds without a full table they get
 one, with bots at their rating — the ladder above has every character
-at every strength — in the seats nobody came for. If the
+at every strength — in the seats nobody came for. A pace is how long somebody takes over a card, and it is
+there for a plain reason: three people playing a card a second with a
+fourth who reads the whole hand each turn is a bad evening for all
+four, whatever anybody is rated. It is the looser of the two windows,
+since a rating decides whether the game is any good and a pace only
+decides whether the evening is.
+
+A pace is also the one number about a game that **no two peers can
+agree on**, and that is worth being explicit about. Everything else a
+table settles is derived from the record, and the record carries no
+clock at all: an event is `(table, author, kind, body)` and nothing in
+it says when. The time bank works because each peer measures for
+itself and a majority has to agree, not because the number is shared
+— `bankLeftMs` is "by this peer's clock" and says so. Four peers asked
+how long a seat took would sign four different numbers, and a result
+needs a majority of identical ones to stand, so a pace can never go
+in one.
+
+What a device *can* measure without dispute is its own turns: the
+clock it started when the turn opened and stopped when it played. So
+a pace is a device's own account of itself, kept on the device
+(`app/lib/pace_store.dart`), stated in the pool exactly as a rating is
+stated there — and it decides who you sit with and nothing else.
+Nobody is ever told how long anybody took. A player who lies about it
+is seated with people who play at a speed they do not, which is its
+own punishment and costs nobody else a game. A turn longer than the
+table would ever wait — a card's grace plus the whole bank — was
+somebody who walked away rather than somebody thinking, and is
+dropped rather than counted.
+
+If the
 host says nothing for a round, the next key steps in — a host can only
 waste five seconds, and it cannot forge a play. Two hosts with
 different views may seat someone twice; they take the seating with the

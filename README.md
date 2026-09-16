@@ -103,7 +103,10 @@ rigged. Roughly in order:
    computation ([doc 04](docs/04-live-play.md)).
 6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
    matchmaking, seat handover, the jury: built, its deadlock role and
-   its escrow of the deal.
+   its escrow of the deal. Seating goes by pace as well as rating, so
+   slow players find each other; a pace is the one number about a game
+   no two peers can agree on, so each device measures its own and
+   states it the way it states a rating.
 7. **Landscape**, then **tablet**, then **iPhone Duo**
    ([doc 05](docs/05-form-factors.md)) — built, all three, and all
    three chosen from the space the table is given rather than from the
@@ -129,9 +132,6 @@ rigged. Roughly in order:
 
 Ideas agreed on and not yet placed in the order above.
 
-- **A pace history**, kept with the rating from the same signed
-  results, and **matchmaking by pace**, so slow players find each other.
-  The time bank's own accounting of each seat's turns is the material.
 - **The bot inside the computation**, so a bot's hand is open to
   nobody ([doc 04](docs/04-live-play.md), "Playing a seat nobody
   holds"); until then bots' hands are open to the table.

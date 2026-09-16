@@ -17,6 +17,7 @@ export 'src/model.dart';
 export 'src/nip44.dart';
 export 'src/nostr.dart';
 export 'src/presence_relay.dart';
+export 'src/pace.dart';
 export 'src/rating.dart';
 export 'src/record.dart';
 export 'src/results.dart';

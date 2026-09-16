@@ -25,13 +25,14 @@ import 'dart:math';
 import 'package:engine/engine.dart';
 
 import 'nostr.dart';
+import 'pace.dart';
 import 'relay_transport.dart';
 import 'signing.dart';
 import 'spec.dart';
 
 /// Someone waiting, as the others see them.
 class Waiter {
-  Waiter({required this.key, required this.name, required this.rating, required this.since, this.avatar});
+  Waiter({required this.key, required this.name, required this.rating, required this.since, this.avatar, this.pace = 0});
 
   final PublicKey key;
   final String name;
@@ -45,6 +46,13 @@ class Waiter {
   /// from the record by everyone.
   final int rating;
 
+  /// Seconds they take over a card, as they state it — their own
+  /// device's account of itself, since no two peers can agree on a
+  /// number the record does not carry (pace.dart). Like the rating it
+  /// decides who they sit with and nothing else. Zero is a player who
+  /// has not played enough to know, and sits with anybody.
+  final int pace;
+
   /// When they started waiting, ms since the epoch, by their own clock.
   final int since;
 
@@ -52,7 +60,7 @@ class Waiter {
   int lastSeen = 0;
 
   @override
-  String toString() => '${name.isEmpty ? key.substring(0, 6) : name}($rating)';
+  String toString() => '${name.isEmpty ? key.substring(0, 6) : name}($rating${pace == 0 ? '' : ', ${pace}s'})';
 }
 
 /// One round's decision.
@@ -81,6 +89,7 @@ Plan plan(
   required int botsAfterMs,
   required Random random,
   int windowPer = 100,
+  int paceWindowPer = 3,
 }) {
   final priority = waiting.where((w) => nowMs - w.since >= roundMs).toList()..shuffle(random);
   final rest = waiting.where((w) => nowMs - w.since < roundMs).toList()..shuffle(random);
@@ -91,9 +100,19 @@ Plan plan(
     final first = order.removeAt(0);
     final rounds = (nowMs - first.since) ~/ roundMs + 1;
     final window = windowPer * rounds;
-    // The nearest three by rating, within the window.
-    final near = order.where((w) => (w.rating - first.rating).abs() <= window).toList()
-      ..sort((a, b) => (a.rating - first.rating).abs().compareTo((b.rating - first.rating).abs()));
+    // Both windows widen with every round waited, so a player alone in
+    // a pool is never held out of a game by either of them. Pace is
+    // the second of the two and the looser: it is about whether an
+    // evening is pleasant, and a rating is about whether the game is.
+    final paceWindow = paceWindowPer * rounds;
+    // The nearest three by rating and then by pace, within both.
+    final near = order
+        .where((w) => (w.rating - first.rating).abs() <= window && paceApart(w.pace, first.pace) <= paceWindow)
+        .toList()
+      ..sort((a, b) {
+        final byPace = paceApart(a.pace, first.pace).compareTo(paceApart(b.pace, first.pace));
+        return byPace != 0 ? byPace : (a.rating - first.rating).abs().compareTo((b.rating - first.rating).abs());
+      });
     if (near.length >= seatCount - 1) {
       final table = [first, ...near.take(seatCount - 1)];
       for (final w in table.skip(1)) {
@@ -112,7 +131,12 @@ Plan plan(
     final rounds = (nowMs - first.since) ~/ roundMs + 1;
     final table = [first];
     for (final w in left) {
-      if (w != first && table.length < seatCount && (w.rating - first.rating).abs() <= windowPer * rounds) table.add(w);
+      if (w != first &&
+          table.length < seatCount &&
+          (w.rating - first.rating).abs() <= windowPer * rounds &&
+          paceApart(w.pace, first.pace) <= paceWindowPer * rounds) {
+        table.add(w);
+      }
     }
     for (final w in table) {
       left.remove(w);
@@ -135,6 +159,7 @@ class WaitingRoom {
     required this.pool,
     required this.name,
     required this.rating,
+    this.pace = 0,
     this.roundMs = 5000,
     this.botsAfterMs = 10000,
     this.heartbeatMs = 2000,
@@ -172,6 +197,10 @@ class WaitingRoom {
   /// seats are sealed, and it sits only at sealed ones.
   final bool sealed;
   final int rating;
+
+  /// Seconds this device takes over a card, as it measured itself
+  /// (pace.dart); zero until it has played enough to know.
+  final int pace;
 
   /// How this player looks, for the others: carried in every
   /// heartbeat and into the seating. Null for nothing chosen.
@@ -237,7 +266,9 @@ class WaitingRoom {
 
   void _say() {
     if (spec != null) return;
-    relay.announce({'kind': 'wait', 'name': name, 'rating': rating, 'since': since, if (avatar != null) 'avatar': avatar}, ephemeral: true);
+    relay.announce(
+        {'kind': 'wait', 'name': name, 'rating': rating, if (pace > 0) 'pace': pace, 'since': since, if (avatar != null) 'avatar': avatar},
+        ephemeral: true);
     _lastSaid = _now;
   }
 
@@ -319,6 +350,7 @@ class WaitingRoom {
             key: e.pubkey,
             name: (c['name'] as String?)?.trim() ?? '',
             rating: c['rating'] as int? ?? 1500,
+            pace: switch (c['pace']) { final int p when p > 0 && p <= 120 => p, _ => 0 },
             since: c['since'] as int? ?? _now,
             avatar: c['avatar'] is Map ? Map<String, Object?>.from(c['avatar'] as Map) : null,
           ),
