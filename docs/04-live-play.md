@@ -598,14 +598,24 @@ without either party seeing an input, and that is not a small thing.
   multiply. For a hand: **39.5 MB and ten seconds of a browser**, both
   parties' work. So it does not fit in a p50 hand on 5 Mbit/s — 66
   seconds of uplink for sixty of play — and fits in a p90 one with room.
-  Two things move it, and both are worth taking. **Preprocess a game's
-  worth rather than a hand's** and the bucket the protocol needs drops
-  from four to three past 280K triples, which is about six hands: 579
-  bytes a gate, 29.7 MB, 50 seconds, inside the minute. And **a
-  table-driven field multiplication for the extension's check** is more
-  than half the browser's time: without it a hand is 4.7 seconds rather
-  than 10.3. What the browser pays for otherwise is AES, thirteen to
-  forty times slower without the instruction a core has.
+  Several things move it, measured and ranked in that file. The
+  largest is not cryptography: **a triple is function-independent and
+  fungible, so only a hand with a bot-held seat spends any**, and most
+  hands have nobody leave. Preprocessing two plays at a time rather
+  than a hand a hop ahead holds **3.8 MB standing in place of 28 MB a
+  hand**, refills while the other three seats play, and costs only the
+  first play after a surprise departure — six seconds on 5 Mbit/s,
+  inside a decision's grace and well inside the seat's bank. It is
+  several bot seats at once that breaks it, because a bot plays
+  instantly and a hand of them runs at no human pace at all. Then:
+  **folding the table state into the circuit**, 29% off; **a game's
+  batch rather than a hand's**, which takes the bucket from four to
+  three and a further quarter off; the newer protocol of Katz,
+  Ranellucci, Rosulek and Wang, about 400 bytes a gate against 772;
+  and a newer transfer extension, which trades wire for the AES a
+  browser is worst at. Separately, **a table-driven field
+  multiplication for the extension's check** is more than half the
+  browser's time: without it a hand is 4.7 seconds rather than 10.3.
 - **What it must not share.** The same measurement says where the
   material goes: not down the channel the table plays on. A seat that
   hands a hand's worth of preprocessing to the stack and then has to
@@ -663,12 +673,12 @@ the bot rewritten without a branch on secret data, and its test proves
 it picks the same card as the bot on every decision of forty games.
 Counted, in AND gates — what a garbled circuit costs; XOR is free:
 
-| | AND gates |
-|---|---|
-| one play, legality included | 2,237 |
-| the same, hand in as thirteen dealt positions and position out | 3,316 |
-| one pass | 10,618 |
-| a bot seat for a whole hand: one pass and thirteen plays | 53,726 |
+| | built before the hand | built at its turn |
+|---|---|---|
+| one play, legality included | 2,237 | 1,220–1,616 |
+| the same, hand in as thirteen dealt positions and position out | 3,316 | 1,571–2,591 |
+| one pass | 10,618 | 10,618 |
+| a bot seat for a whole hand: one pass and thirteen plays | 53,726 | **38,136 on average, 44,301 at worst** |
 
 About half of a play is the run at the moon — knowing which cards are
 sure winners takes the whole played set as public input. At two
@@ -676,6 +686,20 @@ ciphertexts per gate a play is about 110 KB and a whole hand under 2 MB;
 malicious security multiplies that by a small constant. Small enough
 that the material for a hand travels while the previous one is played,
 and that the precomputation below is seconds of background work.
+
+**And the second column is a saving worth taking.** Everything the
+first column carries as a secret input — the trick, what has been
+played, whether hearts are broken, which of the thirteen dealt
+positions are still in hand — is public by the time the card is
+chosen, and a public input folded in is a constant that costs nothing.
+That is **29% off the average hand**, it gives up nothing (the
+preprocessing does not care what circuit its triples end up in, and a
+play that needs fewer than the worst case leaves the rest for the next
+one), and its test is already here: the oblivious bot folding the
+public inputs never changes the answer. What it asks is that the
+garbling happen at the turn rather than ahead of it. The pass does not
+move — at pass time there is no table state yet to fold — and it is
+then a quarter of the hand.
 
 **The parties are the humans at the table, and only them.** Adding the
 service as a third party would buy a cheaper protocol — honest-majority

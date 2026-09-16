@@ -19,6 +19,8 @@ void main() {
   int? fixedPlay, fixedPass, fixedLegal, fixedPositions;
   var fixedPlayPublic = 0;
   final folded = <int>[];
+  final foldedPositions = <int>[];
+  final foldedPass = <int>[];
   var plays = 0, passes = 0;
 
   for (var seed = 0; seed < 20; seed++) {
@@ -34,6 +36,10 @@ void main() {
             final ob = ObliviousBot(c);
             ob.choosePass(ob.secretHand(hand));
             fixedPass = _same(fixedPass, c.ands);
+            final fc = Circuit(foldPublic: true);
+            final fb = ObliviousBot(fc);
+            fb.choosePass(fb.secretHand(hand));
+            foldedPass.add(fc.ands);
             passes++;
             game.setPass(s, bot.choosePass(hand));
           }
@@ -83,6 +89,23 @@ void main() {
                 PublicPlay(pc, view),
               );
               fixedPositions = _same(fixedPositions, pc.ands);
+              // The same circuit with the table state folded in. What
+              // the trick holds, what has been played and whether
+              // hearts are broken are public when the card is chosen,
+              // and so is which of the thirteen dealt positions are
+              // still in hand — so a circuit built then is smaller
+              // than one built before the hand.
+              final fp = Circuit(foldPublic: true);
+              final fpb = ObliviousBot(fp);
+              fpb.chooseCardAt(
+                [
+                  for (final card in positions)
+                    [for (var k = 0; k < 6; k++) fp.secret((card.index >> k) & 1 == 1)],
+                ],
+                [for (final card in positions) fp.public(view.hand.contains(card))],
+                PublicPlay(fp, view),
+              );
+              foldedPositions.add(fp.ands);
             }
           }
           plays++;
@@ -101,7 +124,10 @@ void main() {
   }
 
   folded.sort();
+  foldedPositions.sort();
+  foldedPass.sort();
   final mean = folded.reduce((a, b) => a + b) / folded.length;
+  final positionsMean = foldedPositions.reduce((a, b) => a + b) / foldedPositions.length;
   print('AND gates, circuit built before the table state is known');
   print('  one play (policy + legality) : $fixedPlay   ($fixedLegal of them for legality)');
   print('  one play, hand as 13 dealt positions in, position out : $fixedPositions');
@@ -110,11 +136,20 @@ void main() {
   print('');
   print('AND gates, circuit built after the table state is known');
   print('  one play: min ${folded.first}  median ${folded[folded.length ~/ 2]}  mean ${mean.toStringAsFixed(0)}  max ${folded.last}');
+  print('  one play over positions: min ${foldedPositions.first}  median ${foldedPositions[foldedPositions.length ~/ 2]}'
+      '  mean ${positionsMean.toStringAsFixed(0)}  max ${foldedPositions.last}');
+  print('  one pass: ${foldedPass.first} to ${foldedPass.last}');
   print('');
   print('measured over $plays plays and $passes passes');
   print('');
   final handPlays = 13 * fixedPositions!;
   print('a bot-held seat for one hand: pass + 13 plays over positions = ${fixedPass! + handPlays} ANDs');
+  // What the same hand costs if each circuit is built when its turn
+  // comes, with the table state of that moment folded in. The
+  // preprocessing has to be sized for the worst case, so the total
+  // that matters is the largest each could be.
+  print('  the same, each circuit built at its turn: ${foldedPass.last + 13 * foldedPositions.last} ANDs at worst, '
+      '${(positionsMean * 13 + foldedPass.reduce((a, b) => a + b) / foldedPass.length).toStringAsFixed(0)} on average');
 }
 
 int _same(int? seen, int now) {

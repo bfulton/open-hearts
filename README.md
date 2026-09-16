@@ -147,13 +147,15 @@ Ideas agreed on and not yet placed in the order above.
   gate costs **772 bytes and 191 µs of wasm** a triple, built as the
   paper describes it and checked against its own equations
   ([ot](measurements/ot/README.md)) — 39.5 MB and ten seconds a hand,
-  which is a p90 hand and not a p50 one, until the bucket drops from
-  four to three on a game's batch and it is 29.7 MB and fifty seconds.
-  And the third is about the one party with no channel: a juror is not
-  seated, so it follows a table from the relay alone, where the same
-  material is 1.79x on the wire and the budget halves to 390 bytes a
-  gate ([relay](measurements/relay/README.md)) — a foreman at the pace
-  of a slow hand, and a reason to give a juror a channel.
+  which is a p90 hand and not a p50 one. That file ranks what would
+  move it, and the largest is not cryptography: a triple is fungible,
+  so only a hand where somebody leaves spends any, and making two
+  plays' worth at a time holds 3.8 MB standing in place of 28 MB a
+  hand. And the third number is about the one party with no channel: a
+  juror is not seated, so it follows a table from the relay alone,
+  where the same material is 1.79x on the wire and the budget halves to
+  390 bytes a gate ([relay](measurements/relay/README.md)) — a foreman
+  at the pace of a slow hand, and a reason to give a juror a channel.
 
 ## Developing
 
