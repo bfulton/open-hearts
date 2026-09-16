@@ -169,7 +169,10 @@ juror has, and doc 04 makes the foreman a computing party at one human
 
 ## What would move it
 
-Five things, in the order they are worth taking. The first two are
+The preprocessing is what there is to move — 86% of the wire and 94%
+of the time — so the figures here are of the triples, at 772 bytes a
+gate rather than the 938 a whole decision costs. Five things, in the
+order they are worth taking. The first two are
 measured here; the third is a scheduling decision; the last two are
 the literature, quoted from the papers.
 
