@@ -360,7 +360,8 @@ class _Record extends StatelessWidget {
             children: [
               Text(
                 rated ? '${rating.shown}' : '—',
-                style: TextStyle(fontSize: 38, fontWeight: FontWeight.w700, height: 1, color: rated ? Palette.gold : Palette.chromeDim),
+                // A rating is what you are, not something to press.
+                style: TextStyle(fontSize: 38, fontWeight: FontWeight.w700, height: 1, color: rated ? Palette.chrome : Palette.chromeDim),
               ),
               const SizedBox(height: 7),
               Text(

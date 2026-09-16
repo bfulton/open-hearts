@@ -304,10 +304,24 @@ class GameController extends ChangeNotifier implements TableModel {
     }
   }
 
+  Timer? _waitTimer;
+
   /// Sleeps, and reports whether the controller is still alive after —
   /// every await point is a place the widget can be torn down.
+  ///
+  /// A timer the controller can cancel, rather than a delayed future,
+  /// which nothing can: a beat this table is in the middle of is a beat
+  /// still running after the page has gone. Nothing came of it, since
+  /// every step checks whether it is still alive; but a timer outliving
+  /// its widget is the sort of thing that is true until one day it is
+  /// expensive, and the live table already does it the other way.
   Future<bool> _wait(Duration d) async {
-    if (d > Duration.zero) await Future<void>.delayed(d);
+    if (d > Duration.zero) {
+      final done = Completer<void>();
+      _waitTimer?.cancel();
+      _waitTimer = Timer(d, done.complete);
+      await done.future;
+    }
     return !_disposed;
   }
 
@@ -324,6 +338,7 @@ class GameController extends ChangeNotifier implements TableModel {
   @override
   void dispose() {
     _disposed = true;
+    _waitTimer?.cancel();
     super.dispose();
   }
 }

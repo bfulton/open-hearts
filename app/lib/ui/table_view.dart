@@ -707,7 +707,10 @@ class SeatBadge extends StatelessWidget {
           color: Colors.black.withValues(alpha: onTurn ? 0.42 : 0.24),
           borderRadius: BorderRadius.circular(13),
           border: Border.all(
-            color: onTurn || won ? Palette.gold : Colors.white.withValues(alpha: 0.10),
+            // Gold for the seat it is the turn of; white for the seat
+            // that just took the trick, which is the same news the pill
+            // carries and had better not disagree with it.
+            color: onTurn ? Palette.gold : (won ? Palette.chrome : Colors.white.withValues(alpha: 0.10)),
             width: onTurn || won ? 1.6 : 1,
           ),
         ),
@@ -744,7 +747,9 @@ class _TrickResult extends StatelessWidget {
     final who = you ? 'You take it' : '$name takes it';
     return _Pill(
       text: points == 0 ? who : '$who  ·  $points',
-      tone: points == 0 ? Palette.gold : Palette.danger,
+      // A trick that has been taken is news, not a turn to take: gold
+      // is kept for the seat it is the turn of (theme.dart).
+      tone: points == 0 ? Palette.chrome : Palette.danger,
     );
   }
 }

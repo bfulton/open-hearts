@@ -68,11 +68,7 @@ class HandOverSheet extends StatelessWidget {
           : shooter == mySeat
               ? 'You shot the moon'
               : '${names[shooter]} shot the moon',
-      accent: shooter == null
-          ? Palette.gold
-          : shooter == mySeat
-              ? Palette.gold
-              : Palette.danger,
+      tone: shooter == null || shooter == mySeat ? Palette.chrome : Palette.danger,
       subtitle: shooter == null ? null : 'All 26 — everyone else takes them',
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
@@ -145,7 +141,7 @@ class GameOverSheet extends StatelessWidget {
 
     return _Sheet(
       title: title,
-      accent: youWon ? Palette.gold : Palette.danger,
+      tone: youWon ? Palette.chrome : Palette.danger,
       subtitle: 'Lowest score after ${game.handNumber + 1} hands',
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
@@ -172,7 +168,7 @@ typedef _Row = ({String name, String seed, Avatar? avatar, int delta, int total,
 class _Sheet extends StatelessWidget {
   const _Sheet({
     required this.title,
-    required this.accent,
+    required this.tone,
     required this.rows,
     required this.action,
     required this.onAction,
@@ -184,7 +180,11 @@ class _Sheet extends StatelessWidget {
 
   final String title;
   final String? subtitle;
-  final Color accent;
+
+  /// What the sheet is *about*, which is never an action: white for a
+  /// hand that ended or a game you won, red for one that went against
+  /// you. The one gold thing on it is the button (theme.dart).
+  final Color tone;
   final List<_Row> rows;
 
   /// A line under the score, where the sheet has something to say
@@ -224,7 +224,7 @@ class _Sheet extends StatelessWidget {
             decoration: BoxDecoration(
               color: Felt.mid,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: accent.withValues(alpha: 0.45)),
+              border: Border.all(color: tone.withValues(alpha: 0.45)),
               boxShadow: [
                 BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 34),
               ],
@@ -238,7 +238,7 @@ class _Sheet extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.w700,
-                    color: accent,
+                    color: tone,
                   ),
                 ),
                 if (subtitle != null) ...[
@@ -259,7 +259,7 @@ class _Sheet extends StatelessWidget {
                   child: FilledButton(
                     onPressed: onAction,
                     style: FilledButton.styleFrom(
-                      backgroundColor: accent,
+                      backgroundColor: Palette.gold,
                       foregroundColor: Felt.dark,
                       padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(
@@ -322,7 +322,8 @@ class _RatingLine extends StatelessWidget {
             fontSize: 13,
             fontWeight: FontWeight.w700,
             fontFeatures: const [FontFeature.tabularFigures()],
-            color: moved > 0 ? Palette.gold : Palette.danger,
+            // What a game did to a rating is a number, not a button.
+            color: moved > 0 ? Palette.chrome : Palette.danger,
           ),
         ),
       ],
@@ -348,8 +349,10 @@ class _ScoreRow extends StatelessWidget {
               row.name,
               style: TextStyle(
                 fontSize: 14.5,
+                // Your own row is the weight, not the colour: which
+                // row is yours is a fact about the sheet.
                 fontWeight: row.you ? FontWeight.w700 : FontWeight.w500,
-                color: row.you ? Palette.gold : Palette.chrome,
+                color: Palette.chrome,
               ),
             ),
           ),

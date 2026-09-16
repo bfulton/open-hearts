@@ -219,6 +219,25 @@ one is an ornament on a state the screen is already showing, so a device
 asking for no animation (`MediaQuery.disableAnimations`) gets the same
 table with nothing in flight.
 
+## What the colours mean
+
+One meaning each, and the one that matters is **gold: what you can
+do**. A button, the card you may play, the seat it is the turn of, the
+thing that is waiting on you. Nothing else wears it — and "nothing
+else" is the whole rule, because gold on a name or a score or a rating
+teaches the eye that gold means nothing in particular, and then it
+means nothing when it is your turn.
+
+So the things a game tells you are white: which hand ended, the row
+that is yours, the rating you have, what a game did to it, the trick
+somebody just took. **Red is the game's own** — a heart, a suit,
+points against you, the game that went the other way. A score sheet
+ends up white over red with one gold button on it, which is exactly
+what it is: this is what happened, and here is the way on.
+
+`app/test/palette_test.dart` is where that is checked rather than
+believed.
+
 ## How the layout decides
 
 One rule, applied everywhere: **size from the constraints you are given,
