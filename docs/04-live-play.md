@@ -589,15 +589,23 @@ without either party seeing an input, and that is not a small thing.
   ([measurements/channel](../measurements/channel/README.md)): a hand is
   p50 a minute, a seat on a phone should be assumed to have a few
   megabits a second, and the two together give **about seven hundred
-  bytes a gate**. And the floor of what a triple costs is measured too
-  ([measurements/ot](../measurements/ot/README.md)): an extended
-  oblivious transfer is **16 bytes and 2 µs, or 7 µs in wasm** — 839 KB
-  and a third of a second a hand at one transfer a gate, which is
-  nowhere near the limit. Even at twenty transfers a gate it is 17 MB
-  and seconds, still inside both. What the browser pays for is AES,
-  thirteen to forty times slower without the instruction a core has; and
-  the authentication on top of the transfers is what a real
-  implementation would still have to be timed for.
+  bytes a gate**. And so is the triple
+  ([measurements/ot](../measurements/ot/README.md)), built as WRK17
+  describes it and checked against its own equations: **772 bytes and
+  191 µs in wasm**, which is 24 extended transfers and 144 block cipher
+  calls. Half that wire is the authenticated bits, which cost one
+  transfer each and nothing more, and half is the check that they
+  multiply. For a hand: **39.5 MB and ten seconds of a browser**, both
+  parties' work. So it does not fit in a p50 hand on 5 Mbit/s — 66
+  seconds of uplink for sixty of play — and fits in a p90 one with room.
+  Two things move it, and both are worth taking. **Preprocess a game's
+  worth rather than a hand's** and the bucket the protocol needs drops
+  from four to three past 280K triples, which is about six hands: 579
+  bytes a gate, 29.7 MB, 50 seconds, inside the minute. And **a
+  table-driven field multiplication for the extension's check** is more
+  than half the browser's time: without it a hand is 4.7 seconds rather
+  than 10.3. What the browser pays for otherwise is AES, thirteen to
+  forty times slower without the instruction a core has.
 - **What it must not share.** The same measurement says where the
   material goes: not down the channel the table plays on. A seat that
   hands a hand's worth of preprocessing to the stack and then has to
@@ -625,10 +633,14 @@ without either party seeing an input, and that is not a small thing.
   **a minute of 5 Mbit/s is 390 bytes a gate over a relay where it was
   700 over a channel**, and the relay is one queue for everything on
   the tag, so bulk on a second socket still costs the table's own
-  messages ten times idle. A construction that fits in a few hundred
-  bytes a gate carries a foreman as things stand. One that does not
-  says to give a juror a channel — an offer, an answer and a candidate,
-  exactly as a peer gets — rather than to change the protocol.
+  messages ten times idle. Measured against the triple above, that
+  settles it: 772 bytes a gate sealed at 1.79x is 74 MB and **119
+  seconds** for one seat's hand, a whole p90 hand and nothing like a
+  p50 one; at the smaller bucket a batch of a game's worth allows, 56
+  MB and 89 seconds. So a foreman on the relay works only at the pace
+  of a slow hand, and making it comfortable means giving a juror a
+  channel — an offer, an answer and a candidate, exactly as a peer gets
+  — rather than changing the protocol.
 - **Where it would live.** Beside the deal. `crypto/deal` is one Rust
   crate built twice, a cdylib for the VM and a wasm for the browser, and
   garbling and transfer belong in the same place for the same reason.

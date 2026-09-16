@@ -35,4 +35,37 @@ fn main() {
         per(all) * GATES as f64 / 1e6,
         per(lean) * GATES as f64 / 1e6,
         c.sent as f64 / m as f64 * GATES as f64 / 1024.0);
+
+    triples(
+        std::env::args().nth(2).and_then(|s| s.parse().ok()).unwrap_or(1 << 12),
+        std::env::args().nth(3).and_then(|s| s.parse().ok()).unwrap_or(ot_bench::triple::BUCKET),
+    );
+}
+
+/// The authentication on top, which is what a gate actually costs.
+fn triples(n: usize, bucket: usize) {
+    let start = Instant::now();
+    let now = || start.elapsed().as_secs_f64() * 1000.0;
+    let _ = ot_bench::triple::triples(256, bucket, 1, &now);
+    let c = ot_bench::triple::triples(n, bucket, 2, &now);
+    let all = c.abits + c.haand + c.check + c.bucket;
+    let per = |ms: f64| ms * 1e6 / n as f64; // nanoseconds
+    let bytes = c.bits as f64 / 8.0 / n as f64;
+
+    println!("\n{n} authenticated AND triples, bucket of {bucket}, one core\n");
+    println!("  the transfers under them {:8.1} ms  {:9.0} ns each", c.abits, per(c.abits));
+    println!("  the cross terms          {:8.1} ms  {:9.0} ns each", c.haand, per(c.haand));
+    println!("  the leaky check          {:8.1} ms  {:9.0} ns each", c.check, per(c.check));
+    println!("  bucketing                {:8.1} ms  {:9.0} ns each", c.bucket, per(c.bucket));
+    println!("  all of it                {:8.1} ms  {:9.0} ns each", all, per(all));
+    let lean = all - c.abits_check;
+    println!("  without the KOS check    {:8.1} ms  {:9.0} ns each", lean, per(lean));
+    println!("\n  on the wire {:9.0} bytes each — {:.0} the transfers, {:.0} the check — {} transfers and {} block cipher calls a triple",
+        bytes, c.abit_bits as f64 / 8.0 / n as f64, (c.bits - c.abit_bits) as f64 / 8.0 / n as f64, c.transfers / n, c.aes / n);
+    println!("\nfor a seat's {GATES} AND gates, one triple a gate:");
+    println!("  {:.1} s as measured, {:.1} s without the KOS check, {:.1} MB on the wire, {:.0} bytes a gate",
+        per(all) * GATES as f64 / 1e9,
+        per(lean) * GATES as f64 / 1e9,
+        bytes * GATES as f64 / 1048576.0,
+        bytes);
 }

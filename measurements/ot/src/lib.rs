@@ -30,6 +30,8 @@
 //!   consistent `r` rather than chosen;
 //! - and each row is hashed to the key the transfer hands over.
 
+pub mod triple;
+
 use aes::cipher::{BlockEncrypt, KeyInit};
 use aes::Aes128;
 use rand::{RngCore, SeedableRng};
@@ -51,7 +53,7 @@ pub struct Cost {
 /// AES-128 in counter mode as the generator: the standard choice, and
 /// the one a real implementation would make for the same reason — it is
 /// a block cipher call per sixteen bytes and nothing else.
-fn expand_into(seed: &[u8; BLOCK], out: &mut [u8]) {
+pub(crate) fn expand_into(seed: &[u8; BLOCK], out: &mut [u8]) {
     let cipher = Aes128::new(seed.into());
     let mut block = [0u8; BLOCK];
     for (counter, chunk) in out.chunks_mut(BLOCK).enumerate() {
@@ -118,14 +120,14 @@ fn gf_mul(a: u128, b: u128) -> u128 {
 
 /// The hash that turns a row into the key a transfer hands over:
 /// fixed-key AES, the construction every implementation of this uses.
-struct Mmo(Aes128);
+pub(crate) struct Mmo(Aes128);
 
 impl Mmo {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Mmo(Aes128::new(&[0x4f; BLOCK].into()))
     }
 
-    fn of(&self, row: &[u8], tweak: u64) -> [u8; BLOCK] {
+    pub(crate) fn of(&self, row: &[u8], tweak: u64) -> [u8; BLOCK] {
         let mut x = [0u8; BLOCK];
         x.copy_from_slice(row);
         for (b, t) in x[..8].iter_mut().zip(tweak.to_le_bytes()) {
@@ -141,18 +143,32 @@ impl Mmo {
     }
 }
 
-fn bit(bytes: &[u8], i: usize) -> bool {
+pub(crate) fn bit(bytes: &[u8], i: usize) -> bool {
     (bytes[i / 8] >> (i % 8)) & 1 == 1
 }
 
-/// `m` extended transfers, both sides, timed by phase. `now` is the
-/// host's clock in milliseconds.
-pub fn extend(m: usize, seed: u64, now: &dyn Fn() -> f64) -> Cost {
+/// What a batch of transfers leaves behind. `macs` and `keys` are m
+/// rows of κ bits, and row j of one is row j of the other xor `delta`
+/// exactly where `choices` has bit j set.
+///
+/// Which is an authenticated bit already: the receiver's choice is the
+/// bit, its row is the MAC, the sender's row is the key, and the
+/// sender's secret is the global key the MAC is under. Nothing else
+/// goes on the wire to authenticate a bit — the κ bits a transfer
+/// costs are the whole of it, and that is why the triple below counts
+/// its authenticated bits in transfers.
+pub(crate) struct Cot {
+    pub choices: Vec<u8>,
+    pub macs: Vec<u8>,
+    pub keys: Vec<u8>,
+    pub delta: [u8; KAPPA / 8],
+}
+
+/// `m` correlated transfers, both sides, adding to `cost` as it goes.
+pub(crate) fn cot(m: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn() -> f64) -> Cot {
     assert!(m % 8 == 0, "a whole number of bytes of choices");
-    let mut rng = ChaCha12Rng::seed_from_u64(seed);
     let stride = m / 8;
     let width = KAPPA / 8;
-    let mut cost = Cost::default();
 
     // What the base transfers would have left behind: the receiver
     // holds both seeds of every pair, the sender the one its secret
@@ -196,14 +212,14 @@ pub fn extend(m: usize, seed: u64, now: &dyn Fn() -> f64) -> Cost {
             }
         }
     }
-    cost.expand = now() - at;
+    cost.expand += now() - at;
 
     let at = now();
     let mut t_rows = vec![0u8; m * width];
     let mut q_rows = vec![0u8; m * width];
     transpose(&t_cols, &mut t_rows, m);
     transpose(&q_cols, &mut q_rows, m);
-    cost.transpose = now() - at;
+    cost.transpose += now() - at;
 
     // The check: a random combination of the receiver's rows and
     // choices, which the sender can only match if the rows were built
@@ -229,7 +245,18 @@ pub fn extend(m: usize, seed: u64, now: &dyn Fn() -> f64) -> Cost {
     }
     assert_eq!(q_acc, t_acc ^ gf_mul(x, s_word), "the check holds for an honest receiver");
     cost.sent += 3 * BLOCK;
-    cost.check = now() - at;
+    cost.check += now() - at;
+
+    Cot { choices, macs: t_rows, keys: q_rows, delta: s }
+}
+
+/// `m` extended transfers, both sides, timed by phase. `now` is the
+/// host's clock in milliseconds.
+pub fn extend(m: usize, seed: u64, now: &dyn Fn() -> f64) -> Cost {
+    let mut rng = ChaCha12Rng::seed_from_u64(seed);
+    let mut cost = Cost::default();
+    let Cot { choices: _, macs: t_rows, keys: q_rows, delta: s } = cot(m, &mut rng, &mut cost, now);
+    let width = KAPPA / 8;
 
     // And the keys themselves: the sender hashes both of a pair, the
     // receiver the one it chose.
@@ -380,5 +407,31 @@ pub extern "C" fn bench(m: u32, seed: u64) {
     let all = c.expand + c.transpose + c.check + c.hash;
     for (id, ms) in [(0, c.expand), (1, c.transpose), (2, c.check), (3, c.hash), (4, all), (5, c.sent as f64)] {
         unsafe { host::report(id, ms) };
+    }
+}
+
+/// And the authentication on top: [n] authenticated AND triples, by id
+/// — 6 the transfers under them, 7 the cross terms, 8 the leaky check,
+/// 9 bucketing, 10 the whole of it, 11 bits on the wire, 12 block
+/// cipher calls, 13 transfers consumed, 14 the KOS check inside 6, 15
+/// the bits inside 11 that were the transfers.
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn bench_triples(n: u32, bucket: u32, seed: u64) {
+    let c = triple::triples(n as usize, bucket as usize, seed, &|| unsafe { host::now() });
+    let all = c.abits + c.haand + c.check + c.bucket;
+    for (id, v) in [
+        (6, c.abits),
+        (7, c.haand),
+        (8, c.check),
+        (9, c.bucket),
+        (10, all),
+        (11, c.bits as f64),
+        (12, c.aes as f64),
+        (13, c.transfers as f64),
+        (14, c.abits_check),
+        (15, c.abit_bits as f64),
+    ] {
+        unsafe { host::report(id, v) };
     }
 }

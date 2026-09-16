@@ -126,36 +126,38 @@ the wire. **1.79x**, against 1.33x unsealed and 1.0 on a channel.
 
 ## What that gives doc 04
 
-One authenticated triple a gate, 53,726 gates, an extended transfer of
-16 bytes ([`ot/`](../ot/README.md)) — 839 KB of material a hand at one
-transfer a gate. Over the relay path, for the foreman:
+The triple is measured now too ([`ot/`](../ot/README.md)): one
+authenticated AND triple a gate, 53,726 gates, **772 bytes a triple**
+at the bucket a hand's batch needs and 579 at the smaller bucket a
+game's batch allows. Over the relay path, for the foreman:
 
-| | one transfer a gate | twenty |
+| | a hand's batch | a game's |
 |---|---|---|
-| payload | 839 KB | 16.4 MB |
-| sealed events | 18 | 350 |
-| on the wire | 1.5 MB | 29.3 MB |
-| to seal, on the web | 0.16 s | 3.1 s |
-| to open | 0.11 s | 2.1 s |
-| to sign, and to check at each end | 0.03 s, 0.02 s | 0.51 s, 0.36 s |
-| **on a 5 Mbit/s uplink** | **2.5 s** | **49 s** |
+| bucket | 4 | 3 |
+| payload | 39.6 MB | 29.7 MB |
+| sealed events | 844 | 633 |
+| on the wire | 70.7 MB | 53.0 MB |
+| to seal, on the web | 7.6 s | 5.7 s |
+| to open | 5.0 s | 3.7 s |
+| to sign, and to check at each end | 1.2 s, 0.9 s | 0.9 s, 0.7 s |
+| **on a 5 Mbit/s uplink** | **119 s** | **89 s** |
 
-A hand is p50 a minute. So at one transfer a gate the relay carries a
-foreman's share with room to spare, and at twenty it spends the whole
-hand doing it — on a link the table is also playing over, and a
-receiver whose downlink pays the same bytes again because the relay has
-to send them on.
+A hand is p50 a minute and p90 two. So **a foreman on the relay works
+only at the pace of a slow hand**, and only with the preprocessing a
+hop ahead — which the design already has it doing. At the batch size a
+whole game allows there is a little room; at a hand's, none.
 
 **The budget, in the channel bench's units.** 5 Mbit/s for a minute is
 37.5 MB of wire; at 1.79x that is 21 MB of payload, which is **390
 bytes a gate — against the channel's 700.** Sealing and the envelope
 leave the foreman a little over half of what a seated player has to
-spend; the seconds and the CPU are affordable either way.
+spend, and the triple costs 772.
 
-**Which is the finding.** The relay can carry a foreman at a
-construction that fits in a few hundred bytes a gate, and cannot carry
-one that does not. If the protocol lands above that, the answer is not
-a bigger relay: it is to give a juror a data channel, which is a
-change to `MeshTransport` — a juror is announced on presence, signalled
-like a peer and offered a channel like one — rather than to the
-protocol.
+**Which is the finding.** The relay carries a foreman, but with nothing
+to spare: the same preprocessing that takes 66 seconds of a seated
+player's uplink takes 119 of a juror's, because it crosses two links
+with a third more on it for base64 and a third again for the seal. If
+that is too tight — and at a p50 hand it is — the answer is not a
+bigger relay: it is to give a juror a data channel, which is a change
+to `MeshTransport` (a juror is announced on presence, signalled like a
+peer and offered a channel like one) rather than to the protocol.
