@@ -15,6 +15,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -24,14 +25,30 @@ import 'package:image_picker/image_picker.dart';
 import 'avatar.dart';
 import 'stats.dart';
 import 'theme.dart';
+import 'ui/photo_crop.dart';
 import 'ui/player_icon.dart';
 
 import 'package:table/table.dart' show Tally;
 
-/// A picture as chosen, made small: the middle square of it, scaled to
-/// [Avatar.side] and encoded as a JPEG a few kilobytes long. Null when
-/// the bytes are not a picture.
-Uint8List? shrinkPicture(Uint8List bytes) {
+/// How big a picture is, or null when the bytes are not one.
+Size? sizeOfPicture(Uint8List bytes) {
+  final img.Image? decoded;
+  try {
+    decoded = img.decodeImage(bytes);
+  } catch (_) {
+    return null;
+  }
+  return decoded == null ? null : Size(decoded.width.toDouble(), decoded.height.toDouble());
+}
+
+/// A picture as chosen, made small: the square [from] of it — the
+/// middle one when nobody has said otherwise — scaled to [Avatar.side]
+/// and encoded as a JPEG a few kilobytes long. Null when the bytes are
+/// not a picture.
+///
+/// [from] is in the picture's own pixels, which is what a crop window
+/// hands back (ui/photo_crop.dart).
+Uint8List? shrinkPicture(Uint8List bytes, {Rect? from}) {
   final img.Image? decoded;
   try {
     decoded = img.decodeImage(bytes);
@@ -39,7 +56,9 @@ Uint8List? shrinkPicture(Uint8List bytes) {
     return null; // a decoder that chokes on it is one more way of not being a picture
   }
   if (decoded == null) return null;
-  final square = img.copyResizeCropSquare(decoded, size: Avatar.side, interpolation: img.Interpolation.average);
+  final square = from == null
+      ? img.copyResizeCropSquare(decoded, size: Avatar.side, interpolation: img.Interpolation.average)
+      : _cut(decoded, from);
   // Quality down until it fits a relay, which it does at the first
   // step for any photograph this size.
   for (final quality in const [82, 70, 55, 40]) {
@@ -47,6 +66,17 @@ Uint8List? shrinkPicture(Uint8List bytes) {
     if (out.length <= Avatar.maxPictureBytes) return out;
   }
   return null;
+}
+
+/// The square [from] of [decoded], at [Avatar.side]. Held inside the
+/// picture whatever it is asked for: a window that ran off the edge
+/// would be a crash rather than a picture.
+img.Image _cut(img.Image decoded, Rect from) {
+  final side = from.width.round().clamp(1, min(decoded.width, decoded.height)).toInt();
+  final x = from.left.round().clamp(0, decoded.width - side).toInt();
+  final y = from.top.round().clamp(0, decoded.height - side).toInt();
+  final cut = img.copyCrop(decoded, x: x, y: y, width: side, height: side);
+  return img.copyResize(cut, width: Avatar.side, height: Avatar.side, interpolation: img.Interpolation.average);
 }
 
 /// Who this device is to everyone else.
@@ -133,11 +163,25 @@ class _ProfilePageState extends State<ProfilePage> {
       _note = null;
     });
     try {
-      // Small from the picker where it can be: a phone's photo is
-      // megabytes, and the shrink is in Dart.
-      final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 256, maxHeight: 256, imageQuality: 85);
+      // Smaller from the picker than a phone's photograph, which is
+      // megabytes, and bigger than the badge: what is asked for here is
+      // what a crop has left to work with when it is zoomed right in.
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 90);
       if (picked == null) return;
-      final small = shrinkPicture(await picked.readAsBytes());
+      final bytes = await picked.readAsBytes();
+      final size = sizeOfPicture(bytes);
+      if (size == null) {
+        setState(() => _note = 'That did not read as a picture.');
+        return;
+      }
+      if (!mounted) return;
+      // Which part of it is the picture is the player's to say, not the
+      // middle square's (ui/photo_crop.dart).
+      final area = await Navigator.of(context).push<Rect>(
+        MaterialPageRoute<Rect>(builder: (_) => PhotoCrop(bytes: bytes, picture: size)),
+      );
+      if (area == null || !mounted) return;
+      final small = shrinkPicture(bytes, from: area);
       if (small == null) {
         setState(() => _note = 'That did not read as a picture.');
         return;

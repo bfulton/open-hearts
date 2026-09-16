@@ -219,6 +219,26 @@ one is an ornament on a state the screen is already showing, so a device
 asking for no animation (`MediaQuery.disableAnimations`) gets the same
 table with nothing in flight.
 
+## The picture somebody chose
+
+A badge is sixty-four pixels across, so a photograph has to be cut down
+hard, and taking the middle square is what a computer would do and is
+wrong about half the time: people are not in the middle of their own
+photographs. A head cut off at the chin is then the whole of what
+anybody sees of them.
+
+So the square stays put and the photograph moves under it. Drag to move
+it, pinch to make it bigger, and what is in the circle is what is kept
+— the circle, because the badge is round and it is better to see the
+crop than to be told about it. The picture is asked of the phone at a
+thousand pixels rather than two hundred and fifty, which is what a crop
+zoomed right in has left to work with.
+
+The arithmetic is `Window` in `ui/photo_crop.dart`, and it is a value
+with no widget around it for one reason: it is the part that can be
+wrong in ways nobody notices until they are looking at their own chin.
+`app/test/photo_crop_test.dart` walks it before it walks the page.
+
 ## What the colours mean
 
 One meaning each, and the one that matters is **gold: what you can
