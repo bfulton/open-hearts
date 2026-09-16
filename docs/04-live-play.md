@@ -564,6 +564,48 @@ describes and the next step; the leaver's false hand is caught the
 same way either way, since the secret rebuilt is the secret the deal
 was made with.
 
+**What the next step costs**, since a design that is not built should
+say. The policy is done: the circuit below is written, checked against
+the bot, and counted. What is missing is the machine that runs it
+without either party seeing an input, and that is not a small thing.
+
+- **The protocol.** Two computing parties at most tables, three or four
+  where more people are seated. Authenticated garbling (Wang, Ranellucci
+  and Katz, [*Authenticated Garbling and Efficient Maliciously Secure
+  Two-Party Computation*](https://doi.org/10.1145/3133956.3134053), CCS
+  2017, and its multi-party companion) is the standard answer for two,
+  and the same construction generalises, at a cost that grows with the
+  parties, to more. Both are maliciously secure against any number of
+  corruptions, which is the only setting that counts here: every party
+  is a player with a stake in the hand, and a modified client is the
+  threat model the whole of doc 03 is written against.
+- **The size of a hand.** 53,726 AND gates for a bot-held seat over a
+  pass and thirteen plays, measured below. Online that is two ciphertexts
+  a gate, about 1.7 MB, which travels while the previous hand is played.
+  The cost that decides the design is not there but in the
+  preprocessing: one authenticated triple per AND gate, made by
+  oblivious transfer, which is where the traffic and the seconds go.
+  **That number is not measured, and until it is on a phone over the
+  open internet the design is not settled** — the same thing doc 03 said
+  about the shuffle before the shuffle was built, and the reason the
+  shuffle was benchmarked first.
+- **Where it would live.** Beside the deal. `crypto/deal` is one Rust
+  crate built twice, a cdylib for the VM and a wasm for the browser, and
+  garbling and transfer belong in the same place for the same reason.
+  Dart drives it as it drives the deal.
+- **What it moves at the table.** Each person would share the plaintext
+  of its thirteen positions and a share of its key at the deal, beside
+  the escrow it already shares; every departure would re-share among who
+  is left, one hop ahead so the table does not stall on it; the foreman
+  would become a computing party at one human; and a hand would gain a
+  state for waiting on material, of the kind the table already has for
+  waiting on escrow.
+- **What must not be built.** A semi-honest version. It would look like
+  this guarantee and would not be one: semi-honest security assumes
+  nobody has modified their client, which is exactly what is assumed
+  false everywhere else in these documents. Better the open hand above,
+  which at least says plainly what it does.
+
 **The policy as a circuit.** `packages/engine/lib/src/oblivious.dart` is
 the bot rewritten without a branch on secret data, and its test proves
 it picks the same card as the bot on every decision of forty games.

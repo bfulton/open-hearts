@@ -99,8 +99,13 @@ rigged. Roughly in order:
    shuffles with a proof, each person's cards are theirs alone to see,
    a departed seat's hand is opened from escrow held by the others and
    the jury, every hand is audited, and the verifier replays it all.
-   Bots' hands are open to the table until the bot plays inside the
-   computation ([doc 04](docs/04-live-play.md)).
+   The two faults no proof can catch — a seat that says it holds the
+   two of clubs nowhere, a pass sealed to something that will not open
+   — leave a hand nobody can finish, and a hand nobody can finish is
+   opened where it stands and given up unscored, with the next dealt in
+   its place and the seat the open deal blames removed. Bots' hands are
+   open to the table until the bot plays inside the computation
+   ([doc 04](docs/04-live-play.md)).
 6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
    matchmaking, seat handover, the jury: built, its deadlock role and
    its escrow of the deal. Seating goes by pace as well as rating, so
