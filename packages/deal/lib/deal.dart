@@ -19,6 +19,7 @@ export 'src/session.dart';
 
 const deckSize = 52;
 const pointBytes = 32;
+const scalarBytes = 32;
 const maskedBytes = 64;
 const deckBytes = deckSize * maskedBytes;
 const keyProofBytes = 64;
@@ -52,6 +53,25 @@ abstract class DealCrypto {
   /// This seat's share of opening [masked], with its proof.
   Uint8List revealToken(Uint8List secret, Uint8List masked, Uint8List seed);
   bool verifyToken(Uint8List pk, Uint8List masked, Uint8List token);
+
+  /// A seat's key split in two — [scalarBytes] each, the two together —
+  /// so that a departed seat's cards can be opened without anyone
+  /// putting the key back together (docs/04-live-play.md, "Playing a
+  /// seat nobody holds"). [shareKey] of each aggregates to the seat's
+  /// own public key, which is what says a split is a split of *that*
+  /// key.
+  Uint8List split(Uint8List secret, Uint8List seed);
+
+  /// One share's public key: what that share's token is checked
+  /// against, and one of the keys the seat's own is the sum of.
+  Uint8List shareKey(Uint8List share);
+
+  /// One share's part of opening [masked], proved against that share's
+  /// key exactly as a whole seat's token is proved against its own.
+  /// Nothing combines them: [unmask] adds every token it is given, so
+  /// a seat's shares go in as tokens beside the other seats' and the
+  /// card comes out.
+  Uint8List shareToken(Uint8List share, Uint8List masked, Uint8List seed);
 
   /// The card behind [masked] given every seat's token, each checked
   /// against its key unless [verified] — for tokens checked on arrival,

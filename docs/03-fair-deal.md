@@ -240,6 +240,21 @@ offer say so, and a build that cannot run the deal does not sit down.
   was drawn with crashed — a seat that leaves it can no longer be
   opened, and the table pauses for the rest of the hand and says so;
   the chaos walk reaches that state only by crashing four jurors.
+
+  **The pieces are of the bytes, and there is now a split of the key
+  itself.** Rebuilding the secret opens the departed seat's whole hand
+  to whoever rebuilt it, which is the thing
+  [doc 04](04-live-play.md)'s computation is written to avoid. `split`
+  divides the *key* in the field it lives in, `shareKey` gives each
+  share's public key — and the two aggregate to the seat's own, which
+  is what says a split is a split of that key — and `shareToken` is one
+  share's part of opening a card, proved against its own share key.
+  Nothing has to combine them: unmasking adds every token it is given,
+  so a seat's two shares go in as two tokens beside the other seats'
+  and the card comes out with the key never anywhere
+  (`crypto/deal`, and `a_split_key_opens_a_card_without_being_put_back_together`).
+  What still splits bytes is the escrow above; moving it over is the
+  change that makes the interim below end.
 - **The interim.** Until the bot plays inside the computation
   ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's
   hand is open to everyone at the table, and so is a departed person's

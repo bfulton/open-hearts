@@ -582,12 +582,16 @@ to nobody at a real table:
   app calls it; a departure still opens the hand through the escrow.
   A hand state for waiting on material, of the kind the table already
   has for waiting on escrow, is part of that.
-- **The sharing and the opening around it.** Each person sharing the
-  plaintext of its thirteen positions and a share of its key at the
-  deal, re-sharing one hop ahead on every departure, and the survivors
-  opening the chosen position in public by each contributing part of
-  the decryption — none of that exists. The deal's escrow rebuilds a
-  whole secret, which is the thing this section is written to avoid.
+- **The sharing at the deal.** Each person sharing the plaintext of
+  its thirteen positions, and re-sharing one hop ahead on every
+  departure, does not exist. The other half of it does: **the survivors
+  can open a chosen position without anyone rebuilding a key**, because
+  the deal now splits the key in the field it lives in and each share
+  makes its own part of a token, proved against its own share key
+  ([doc 03](03-fair-deal.md), "Escrow"). What is left is to move the
+  escrow itself from splitting the secret's bytes to splitting the key
+  — a change to a live protocol, its record and its verifier, not a
+  new piece of cryptography.
 - **Two parties only.** Three or four where more people are seated is
   the multi-party companion of the same paper, and costs more.
 - **Nothing is reviewed.** What is written is a benchmark whose parties
