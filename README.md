@@ -115,8 +115,10 @@ rigged. Roughly in order:
    the web through Stripe are built, and so is sharing a subscription
    across your devices: five to a household, brought in by a code one
    of them shows and the next one's camera reads. Buying on a phone is
-   the store's own subscription and waits on the next item; provider
-   sign-in, so a lost phone is recovered by signing in, is next.
+   the store's own subscription and waits on the next item. Provider
+   sign-in, so a lost phone is recovered by signing in, is built on the
+   service's side and waits on a Google client id and an Apple service
+   id for the app's.
 9. **The stores.**
 
 ### Backlog

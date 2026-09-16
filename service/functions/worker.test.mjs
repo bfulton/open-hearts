@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import worker, {
   allowedOrigin,
+  attest,
   checkout,
   claimWith,
   dayAfter,
@@ -11,16 +12,20 @@ import worker, {
   devicesOn,
   dropDevice,
   entitlementOf,
+  forgetProviderKeys,
   licence,
   licenceFor,
+  loginRow,
   memoryStore,
   mint,
   record,
   sameSite,
   serversOf,
   signerOn,
+  supersede,
   ticketFor,
   webhookSigned,
+  whoSignedIn,
 } from './worker.mjs';
 
 const KEY = 'ab'.repeat(32);
@@ -616,4 +621,178 @@ test('a dropped device does not come back on its next ask', async () => {
   for (const day of [Date.UTC(2026, 8, 16), Date.UTC(2026, 8, 17), Date.UTC(2027, 0, 1)]) {
     assert.equal(await entitlementOf(store, OTHER, { now: day }), null, new Date(day).toISOString().slice(0, 10));
   }
+});
+
+// ---- who this is, where a provider will say ------------------------------
+
+/// A provider of this test's own: a key pair, the key set it publishes,
+/// and tokens it signs. Nothing here is Apple's or Google's except the
+/// shape, which is the shape of every OpenID token.
+async function provider({ iss, aud, kid = 'k1' } = {}) {
+  const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const jwk = { ...(await crypto.subtle.exportKey('jwk', pair.publicKey)), kid, alg: 'RS256', use: 'sig' };
+  delete jwk.key_ops;
+  delete jwk.ext;
+  const b64 = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const part = (o) => b64(new TextEncoder().encode(JSON.stringify(o)));
+  return {
+    jwk,
+    fetch: async () => new Response(JSON.stringify({ keys: [jwk] }), { status: 200 }),
+    async token(claims, { alg = 'RS256', signer = pair.privateKey } = {}) {
+      const head = part({ alg, kid, typ: 'JWT' });
+      const body = part({ iss, aud, exp: Math.floor(Date.now() / 1000) + 600, iat: Math.floor(Date.now() / 1000), ...claims });
+      const sig = new Uint8Array(await crypto.subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, signer, new TextEncoder().encode(`${head}.${body}`)));
+      return `${head}.${body}.${b64(sig)}`;
+    },
+  };
+}
+
+/// The nonce a token has to carry: the hash of the device's own key.
+const nonceFor = async (key) =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`oh-signin/1\n${key}`)))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+const signedInAs = { OH_GOOGLE_AUDIENCE: 'oh.apps.googleusercontent.com', OH_ID_HMAC: 'pepper' };
+
+test('a sign-in token is read only when the provider signed it, for us, for this device, and not yet run out', async () => {
+  forgetProviderKeys();
+  const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const nonce = await nonceFor(KEY);
+  const good = await p.token({ sub: 'sub-1', nonce });
+  assert.deepEqual(await whoSignedIn('google', good, KEY, signedInAs, p.fetch), { provider: 'google', sub: 'sub-1' });
+
+  const cases = {
+    'another app\'s audience': await p.token({ sub: 'sub-1', nonce, aud: 'someone.else' }),
+    'another issuer': await p.token({ sub: 'sub-1', nonce, iss: 'https://evil.example' }),
+    'run out': await p.token({ sub: 'sub-1', nonce, exp: Math.floor(Date.now() / 1000) - 1 }),
+    'no subject': await p.token({ nonce }),
+    'minted for another device': await p.token({ sub: 'sub-1', nonce: await nonceFor(OTHER) }),
+    'no nonce at all': await p.token({ sub: 'sub-1' }),
+  };
+  for (const [why, token] of Object.entries(cases)) {
+    forgetProviderKeys();
+    assert.equal(await whoSignedIn('google', token, KEY, signedInAs, p.fetch), null, why);
+  }
+
+  // Signed by somebody else entirely, with the same key id.
+  forgetProviderKeys();
+  const impostor = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const forged = await impostor.token({ sub: 'sub-1', nonce });
+  assert.equal(await whoSignedIn('google', forged, KEY, signedInAs, p.fetch), null, 'a token the provider did not sign');
+
+  // And nothing at all without the audience configured, or for a
+  // provider nobody has heard of.
+  forgetProviderKeys();
+  assert.equal(await whoSignedIn('google', good, KEY, { OH_ID_HMAC: 'pepper' }, p.fetch), null);
+  assert.equal(await whoSignedIn('nobody', good, KEY, signedInAs, p.fetch), null);
+});
+
+test('the identifier is stored keyed, never raw, and only where there is a secret to key it with', async () => {
+  const who = { provider: 'google', sub: 'sub-1' };
+  const row = await loginRow(who, signedInAs);
+  assert.match(row, /^LOGIN#google#[0-9a-f]{64}$/);
+  assert.equal(row.includes('sub-1'), false, 'a leaked table joins to nothing');
+  // A different pepper is a different row: two leaks do not join either.
+  assert.notEqual(await loginRow(who, { OH_ID_HMAC: 'other' }), row);
+  // And the provider is part of what is keyed, so two providers that
+  // handed out the same subject are two accounts.
+  assert.notEqual(await loginRow({ provider: 'apple', sub: 'sub-1' }, signedInAs), row);
+  assert.equal(await loginRow(who, {}), null);
+});
+
+test('attest binds an account to one device, and says so when it is already on another', async () => {
+  const store = memoryStore();
+  const who = { provider: 'google', sub: 'sub-1' };
+  const now = Date.UTC(2026, 8, 16);
+  assert.deepEqual(await attest(who, KEY, store, signedInAs, { now }), { status: 200, body: { attested: '2026-09-16' } });
+  assert.deepEqual(await store.get(await loginRow(who, signedInAs), 'IDENTITY'), { key: KEY, created_at: '2026-09-16' });
+  // Nothing on the key's own side leads back to the provider's subject.
+  assert.deepEqual(await store.get(`KEY#${KEY}`, 'META'), { provider: 'google', attested_at: '2026-09-16' });
+
+  // The same device again is the same binding, not a second one.
+  assert.equal((await attest(who, KEY, store, signedInAs, { now })).status, 200);
+  // Another device is a refusal: moving is supersede's to say.
+  assert.equal((await attest(who, OTHER, store, signedInAs, { now })).status, 409);
+});
+
+test('supersede brings the subscription to the new device and takes the old one off it', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const who = { provider: 'google', sub: 'sub-1' };
+  await attest(who, KEY, store, signedInAs, { now });
+
+  const moved = await supersede(who, OTHER, store, signedInAs, { now: Date.UTC(2026, 9, 1) });
+  assert.deepEqual(moved.body, { superseded: KEY, at: '2026-10-01' });
+  assert.deepEqual(await store.get(`KEY#${OTHER}`, 'SUPERSEDES'), { predecessor: KEY, at: '2026-10-01' });
+  assert.equal((await entitlementOf(store, OTHER, { now })).subscription, 'sub_9');
+  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY, OTHER]);
+  // The login points at the new device from here, so the next sign-in
+  // on it is not a supersession of itself.
+  assert.deepEqual((await supersede(who, OTHER, store, signedInAs, { now })).body, { superseded: null, at: '2026-09-16' });
+});
+
+test('a full household superseded drops the device that was replaced, not somebody else\'s', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const keys = ['11', '22', '33', '44'].map((b) => b.repeat(32));
+  for (const key of keys) {
+    const made = await ticketFor(KEY, store, { now });
+    await claimWith(key, made.body.ticket, store, { now });
+  }
+  assert.equal((await devicesOn(store, 'sub_9')).length, 5);
+  const who = { provider: 'google', sub: 'sub-1' };
+  await attest(who, KEY, store, signedInAs, { now });
+  await supersede(who, OTHER, store, signedInAs, { now });
+  const after = (await devicesOn(store, 'sub_9')).map((d) => d.key);
+  assert.equal(after.length, 5);
+  assert.equal(after.includes(OTHER), true, 'the new device is on it');
+  assert.equal(after.includes(KEY), false, 'the one it replaced is not');
+  for (const key of keys) assert.equal(after.includes(key), true, 'and nobody else was moved for it');
+});
+
+test('supersede has nothing to move for an account nobody has signed in with', async () => {
+  const store = memoryStore();
+  assert.equal((await supersede({ provider: 'google', sub: 'nobody' }, KEY, store, signedInAs)).status, 404);
+});
+
+test('the sign-in route: a token that does not check out is 401, and one that does comes back with the licence', async () => {
+  forgetProviderKeys();
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = p.fetch;
+  try {
+    const held = { ...env, ...signedInAs, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store) };
+    const at = (what) => `https://dev.open-hearts.pages.dev/api/${what}`;
+    const send = (what, body) => new Request(at(what), { method: 'POST', body: JSON.stringify(body) });
+
+    const nonsense = await worker.fetch(send('attest', { key: KEY, provider: 'google', token: 'not.a.token' }), held);
+    assert.equal(nonsense.status, 401);
+
+    const token = await p.token({ sub: 'sub-1', nonce: await nonceFor(KEY) });
+    const ok = await worker.fetch(send('attest', { key: KEY, provider: 'google', token }), held);
+    assert.equal(ok.status, 200);
+    const said = await ok.json();
+    assert.equal(said.attested, dayOf(Date.now()));
+    assert.equal(said.licence.key, KEY, 'a device that has just proved who it is does not ask twice');
+
+    // The same account on a new phone: attest refuses, supersede moves.
+    const theirs = await p.token({ sub: 'sub-1', nonce: await nonceFor(OTHER) });
+    assert.equal((await worker.fetch(send('attest', { key: OTHER, provider: 'google', token: theirs }), held)).status, 409);
+    const moved = await worker.fetch(send('supersede', { key: OTHER, provider: 'google', token: theirs }), held);
+    assert.equal(moved.status, 200);
+    assert.equal((await moved.json()).licence.key, OTHER);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('local mode has a token of its own, and it is nothing anywhere else', async () => {
+  const local = { ...signedInAs, OH_OPEN_HOUSE: '1' };
+  assert.deepEqual(await whoSignedIn('google', 'local:sub-1', KEY, local), { provider: 'google', sub: 'sub-1' });
+  assert.equal(await whoSignedIn('google', 'local:sub-1', KEY, signedInAs), null, 'not in production');
+  assert.equal(await whoSignedIn('nobody', 'local:sub-1', KEY, local), null);
+  assert.equal(await whoSignedIn('google', 'local:', KEY, local), null);
 });

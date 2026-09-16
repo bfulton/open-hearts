@@ -601,6 +601,205 @@ async function devicesRoute(request, env) {
   return json(request, 200, { devices: await devicesOn(store, held.subscription), most: MOST_DEVICES });
 }
 
+// ---- who this is, where a provider will say ----------------------------
+// A subscription follows a person. A code (above) is how the person
+// brings their own second device in; a provider account is how they
+// come back to one they no longer have — a phone in a river is not a
+// phone that can show a code.
+//
+// What is stored of the provider is an HMAC of its subject identifier,
+// never the identifier: it is opaque but stable and joins to a real
+// account, so a leaked table has to join to nothing. And nothing on the
+// KEY# side leads back to the provider — the key is what public records
+// carry (doc 06).
+
+const PROVIDERS = {
+  apple: { iss: 'https://appleid.apple.com', jwks: 'https://appleid.apple.com/auth/keys', audience: 'OH_APPLE_AUDIENCE' },
+  google: { iss: 'https://accounts.google.com', jwks: 'https://www.googleapis.com/oauth2/v3/certs', audience: 'OH_GOOGLE_AUDIENCE' },
+};
+
+/// How long a fetched key set is kept. The providers rotate slowly and
+/// publish ahead of it; a miss re-fetches anyway.
+const JWKS_MINUTES = 60;
+
+const jwks = new Map();
+
+/// Forgets the cached key sets. For the tests, which stand up a
+/// provider of their own; nothing in production calls it.
+export const forgetProviderKeys = () => jwks.clear();
+
+/// A provider's signing keys, cached per isolate. [fetchImpl] is the
+/// seam the tests put their own provider behind.
+export async function keysOf(provider, fetchImpl = fetch, { now = Date.now() } = {}) {
+  const held = jwks.get(provider);
+  if (held && held.until > now) return held.keys;
+  const res = await fetchImpl(PROVIDERS[provider].jwks);
+  if (!res.ok) throw new Error(`${provider} keys ${res.status}`);
+  const { keys } = await res.json();
+  if (!Array.isArray(keys)) throw new Error(`${provider} keys are not a set`);
+  jwks.set(provider, { keys, until: now + JWKS_MINUTES * 60000 });
+  return keys;
+}
+
+const un64 = (s) => {
+  const padded = s.replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(padded + '='.repeat((4 - (padded.length % 4)) % 4)), (c) => c.charCodeAt(0));
+};
+
+const ALGS = {
+  RS256: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+  ES256: { name: 'ECDSA', namedCurve: 'P-256', hash: 'SHA-256' },
+};
+
+/// What a provider's sign-in token says, once it has been checked
+/// against that provider's own keys; null when it does not check out.
+///
+/// The token has to name the device it was minted for. Every provider
+/// carries a caller's nonce through, so the app puts the hash of its
+/// key there — without it, a token lifted from one app's traffic would
+/// bind somebody else's account to the lifter's key.
+export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, { now = Date.now() } = {}) {
+  // Local mode's own token: a subject and nothing else, taken only
+  // where the open house is (doc 06). One branch, never on in
+  // production, and the rest of the path below is the same path.
+  if (env.OH_OPEN_HOUSE && typeof token === 'string' && token.startsWith('local:')) {
+    const sub = token.slice('local:'.length);
+    return sub && PROVIDERS[provider] ? { provider, sub } : null;
+  }
+  const known = PROVIDERS[provider];
+  const audience = known && env[known.audience];
+  if (!known || !audience) return null;
+  const parts = String(token ?? '').split('.');
+  if (parts.length !== 3) return null;
+  let header;
+  let claims;
+  try {
+    header = JSON.parse(new TextDecoder().decode(un64(parts[0])));
+    claims = JSON.parse(new TextDecoder().decode(un64(parts[1])));
+  } catch {
+    return null;
+  }
+  const alg = ALGS[header?.alg];
+  if (!alg) return null;
+  let keys;
+  try {
+    keys = await keysOf(provider, fetchImpl, { now });
+  } catch {
+    return null;
+  }
+  // The kid names one; without one every key in the set is tried, which
+  // is at most a handful and is what a rotation looks like from here.
+  const candidates = keys.filter((k) => (header.kid ? k.kid === header.kid : true) && (k.alg ?? header.alg) === header.alg);
+  const signed = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+  const sig = un64(parts[2]);
+  let ok = false;
+  for (const jwk of candidates) {
+    try {
+      const imported = await crypto.subtle.importKey('jwk', { ...jwk, ext: true }, alg, false, ['verify']);
+      if (await crypto.subtle.verify(alg.name === 'ECDSA' ? { name: 'ECDSA', hash: 'SHA-256' } : alg, imported, sig, signed)) {
+        ok = true;
+        break;
+      }
+    } catch {
+      // A key that will not import is a key that did not sign this.
+    }
+  }
+  if (!ok) return null;
+  if (claims.iss !== known.iss) return null;
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!aud.includes(audience)) return null;
+  if (!(typeof claims.exp === 'number') || claims.exp * 1000 <= now) return null;
+  if (typeof claims.sub !== 'string' || !claims.sub) return null;
+  if (claims.nonce !== (await digestOf(`oh-signin/1\n${key}`))) return null;
+  return { provider, sub: claims.sub };
+}
+
+/// The identifier as it is stored: an HMAC, so a leaked table joins to
+/// nothing. Null when there is no secret to key it with, which is a
+/// service that must not be storing identifiers at all.
+export async function loginRow(who, env) {
+  const secret = env.OH_ID_HMAC;
+  if (!secret || !who) return null;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
+    'sign',
+  ]);
+  const mac = hex(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${who.provider}:${who.sub}`))));
+  return `LOGIN#${who.provider}#${mac}`;
+}
+
+/// Binds a sign-in to [key], once. A login already bound to another
+/// device is a refusal rather than a second binding: moving to a new
+/// device is [supersede], which says what it is replacing.
+export async function attest(who, key, store, env, { now = Date.now() } = {}) {
+  const login = await loginRow(who, env);
+  if (!login) return { status: 503, body: { error: 'sign-in is not configured' } };
+  const today = dayOf(now);
+  const held = await store.get(login, 'IDENTITY');
+  if (held && held.key !== key) return { status: 409, body: { error: 'that account is already on another device' } };
+  if (!held) await store.put(login, 'IDENTITY', { key, created_at: today });
+  // What the key's own row carries is that it was attested and when —
+  // never by whom. The key is what public records carry.
+  await store.put(`KEY#${key}`, 'META', { provider: who.provider, attested_at: today });
+  return { status: 200, body: { attested: today } };
+}
+
+/// The same account on a new device: the entitlement of the key the
+/// login was on comes forward to this one, so a licence stays one read,
+/// and the login points at the new key from here.
+export async function supersede(who, key, store, env, { now = Date.now() } = {}) {
+  const login = await loginRow(who, env);
+  if (!login) return { status: 503, body: { error: 'sign-in is not configured' } };
+  const held = await store.get(login, 'IDENTITY');
+  if (!held) return { status: 404, body: { error: 'that account is not on any device' } };
+  const today = dayOf(now);
+  if (held.key === key) return { status: 200, body: { superseded: null, at: today } };
+  const was = held.key;
+  await store.put(login, 'IDENTITY', { key, created_at: held.created_at, moved_at: today });
+  await store.put(`KEY#${key}`, 'META', { provider: who.provider, attested_at: today });
+  await store.put(`KEY#${key}`, 'SUPERSEDES', { predecessor: was, at: today });
+  // The subscription the old device was on takes this one in its place.
+  // A device the person still holds is not dropped by somebody else
+  // signing in on a new one — but the one that was superseded is, since
+  // it is the one that is gone.
+  const theirs = await store.get(`KEY#${was}`, 'ENTITLEMENT');
+  if (theirs) {
+    const devices = await devicesOn(store, theirs.subscription);
+    if (!devices.some((d) => d.key === key)) {
+      if (devices.length >= MOST_DEVICES) await store.del(`SUB#${theirs.subscription}`, `DEVICE#${was}`);
+      await store.put(`SUB#${theirs.subscription}`, `DEVICE#${key}`, { bound_at: today });
+    }
+    await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...theirs, at: today });
+  }
+  return { status: 200, body: { superseded: was, at: today } };
+}
+
+/// attest and supersede are one route: the same proof, and which of the
+/// two it is depends on whether the account has been somewhere before.
+async function signInRoute(request, env, move) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const body = await bodyOf(request);
+  const key = keyOf(body);
+  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  const who = await whoSignedIn(body?.provider, body?.token, key, env);
+  if (!who) return json(request, 401, { error: 'that sign-in does not check out' });
+  const { status, body: out } = await (move ? supersede : attest)(who, key, store, env);
+  if (status !== 200) return json(request, status, out);
+  // Straight back with the licence it is owed, if any: a device that
+  // has just proved who it is should not have to ask twice.
+  let signer;
+  try {
+    signer = await signerFor(request, env);
+  } catch {
+    return json(request, 200, out);
+  }
+  const licensed = await licence(key, env, { signer });
+  return json(request, 200, { ...out, ...(licensed.status === 200 ? licensed.body : {}) });
+}
+
 async function checkoutRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -699,6 +898,8 @@ export default {
     if (url.pathname === '/api/ticket') return ticketRoute(request, env);
     if (url.pathname === '/api/claim') return claimRoute(request, env);
     if (url.pathname === '/api/devices') return devicesRoute(request, env);
+    if (url.pathname === '/api/attest') return signInRoute(request, env, false);
+    if (url.pathname === '/api/supersede') return signInRoute(request, env, true);
     if (url.pathname.startsWith('/api/')) return json(request, 404, { error: 'no such handler' });
     return env.ASSETS.fetch(request);
   },

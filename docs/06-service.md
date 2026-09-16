@@ -29,8 +29,9 @@ site and the app: `service/functions/worker.mjs`, published by
 `deploy.sh` as `_worker.js`, answers `/api/…` and hands everything else
 to the static assets; `node --test service/functions/worker.test.mjs`
 runs it against a stand-in upstream. Built so far: **turn-creds**,
-**checkout**, **entitle**, **licence**, **ticket**, **claim** and
-**devices**; **attest**, **supersede** and **last-resort** are not.
+**checkout**, **entitle**, **licence**, **ticket**, **claim**,
+**devices**, **attest** and **supersede**; **last-resort** is not, and
+the last two are built on this side only — see below.
 
 **licence**, `POST /api/licence` with the caller's key, answers the
 signed statement below or 402 when no subscription stands behind it.
@@ -59,6 +60,28 @@ a replay is not a payment. `checkout.session.completed` binds the
 device; the subscription's own events carry the date. The two arrive in
 either order, so a device bound before its date is known is dated on
 its first ask after.
+
+**attest** and **supersede**, `POST /api/attest` and
+`/api/supersede`, are one proof with two endings. The proof is the
+provider's own sign-in token, checked against that provider's published
+keys — issuer, audience, expiry, and a nonce that has to be the hash of
+the device's key, so a token lifted from somewhere else cannot bind
+somebody's account to the lifter. What is stored of the account is an
+HMAC of the provider's subject identifier (`OH_ID_HMAC`), never the
+identifier; nothing on the `KEY#` side leads back to the provider.
+attest binds an account to one device and refuses a second; supersede
+is the move, and carries the subscription across — dropping the device
+it replaced, and nobody else's, where the household is already five.
+
+**Not built: the app's half of it.** Getting a token out of Google or
+Apple in a browser is a handshake with a client id in it, and there is
+no id to test against yet, so the flow the app would use — a redirect,
+or their button on the page — is a choice made better against a real
+one than guessed at. Local mode has a token of its own in the meantime
+(`local:<subject>`, taken only where the open house is), so the
+handler's own path runs end to end. What is needed to finish it: a
+Google OAuth client id and an Apple service id, as
+`OH_GOOGLE_AUDIENCE` and `OH_APPLE_AUDIENCE`.
 
 **turn-creds**, `POST /api/turn`
 with the caller's table key, answering Cloudflare Realtime TURN
@@ -294,7 +317,7 @@ code and different adapters:
 | | Production | Local |
 |---|---|---|
 | Storage | DynamoDB | in-memory, same shape |
-| Sign-in | Apple/Google public keys | a test token naming a `sub` |
+| Sign-in | Apple/Google published keys | `local:<subject>`, a token naming a `sub` |
 | Entitlement | store and Stripe webhooks | an open house: a key that asks is licensed for a month |
 | TURN | Cloudflare | none; localhost connects directly |
 | Signalling, waiting rooms, results | our own relay and a few public ones, listened on together; table events written to one relay everyone reads, ours preferred while up; lobby, signalling and whatever goes unanswered to all | a minimal NIP-01 relay in the repo |
