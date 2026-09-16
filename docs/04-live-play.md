@@ -589,11 +589,15 @@ without either party seeing an input, and that is not a small thing.
   ([measurements/channel](../measurements/channel/README.md)): a hand is
   p50 a minute, a seat on a phone should be assumed to have a few
   megabits a second, and the two together give **about seven hundred
-  bytes a gate**. A construction that costs more than that needs a
-  smaller circuit, a longer hop, or a different protocol. What a triple
-  actually costs to make is still to be measured, and until it is on a
-  phone the design is not settled — the same thing doc 03 said about the
-  shuffle before the shuffle was built.
+  bytes a gate**. And the floor of what a triple costs is measured too
+  ([measurements/ot](../measurements/ot/README.md)): an extended
+  oblivious transfer is **16 bytes and 2 µs, or 7 µs in wasm** — 839 KB
+  and a third of a second a hand at one transfer a gate, which is
+  nowhere near the limit. Even at twenty transfers a gate it is 17 MB
+  and seconds, still inside both. What the browser pays for is AES,
+  thirteen to forty times slower without the instruction a core has; and
+  the authentication on top of the transfers is what a real
+  implementation would still have to be timed for.
 - **What it must not share.** The same measurement says where the
   material goes: not down the channel the table plays on. A seat that
   hands a hand's worth of preprocessing to the stack and then has to
@@ -601,6 +605,10 @@ without either party seeing an input, and that is not a small thing.
   on a 5 Mbit/s link — and the table boots it for silence. A channel of
   its own costs the table about 15 ms of added round trip while it runs,
   which is affordable; the queue has to be paced as well as separated.
+  **Taken together the two numbers say the constraint is the shape of
+  the traffic, not its size**: a hand's preprocessing fits, and fits
+  several times over, so long as it goes out paced and beside the table
+  rather than in front of it.
 - **Where it would live.** Beside the deal. `crypto/deal` is one Rust
   crate built twice, a cdylib for the VM and a wasm for the browser, and
   garbling and transfer belong in the same place for the same reason.
