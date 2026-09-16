@@ -555,19 +555,48 @@ against a player who already took the rating loss for leaving. Until
 then the worst case is one bot playing the cheater's own seat a little
 wrong.
 
-**As built, for now.** The escrow is built — a piece of each person's
-deal secret with every other person and every juror, and any one of
-each rebuilds it (doc 03, "Escrow") — and what it opens is the whole
-hand, to every survivor, for the bot to play in the open. The
-computation over fragments that never meet is the design this section
-describes and the next step; the leaver's false hand is caught the
-same way either way, since the secret rebuilt is the secret the deal
-was made with.
+**As built.** At a live table the escrow is what runs — a piece of each
+person's deal secret with every other person and every juror, and any
+one of each rebuilds it (doc 03, "Escrow") — and what it opens is the
+whole hand, to every survivor, for the bot to play in the open. The
+leaver's false hand is caught the same way either way, since the
+secret rebuilt is the secret the deal was made with.
 
-**What the next step costs**, since a design that is not built should
-say. The policy is done: the circuit below is written, checked against
-the bot, and counted. What is missing is the machine that runs it
-without either party seeing an input, and that is not a small thing.
+**And the computation itself is built, and works**
+([measurements/ot](../measurements/ot/README.md)): Π_2pc over the
+policy below, on the triples below that, with the thirteen cards split
+between two parties so that neither holds one. Its test is the whole
+claim — *the garbled bot picks the card the bot picks* — and beside it,
+that one party's share alone says nothing, and that a garbler who
+tampers with a row is caught by the MAC the row carries rather than
+believed. One decision is 2,053 gates, 1.84 MB and 441 ms of wasm for
+both parties; a hand is 33.4 MB and eight seconds, which is 56 seconds
+of a 5 Mbit/s uplink against sixty of play. It fits, and only because
+the circuit is built at the turn rather than before the hand.
+
+**What is not built**, since a design that is not finished should say
+so plainly. Four things stand between that and a bot's hand being open
+to nobody at a real table:
+
+- **It is not wired to the table.** Nothing in `packages/table` or the
+  app calls it; a departure still opens the hand through the escrow.
+  A hand state for waiting on material, of the kind the table already
+  has for waiting on escrow, is part of that.
+- **The sharing and the opening around it.** Each person sharing the
+  plaintext of its thirteen positions and a share of its key at the
+  deal, re-sharing one hop ahead on every departure, and the survivors
+  opening the chosen position in public by each contributing part of
+  the decryption — none of that exists. The deal's escrow rebuilds a
+  whole secret, which is the thing this section is written to avoid.
+- **Two parties only.** Three or four where more people are seated is
+  the multi-party companion of the same paper, and costs more.
+- **Nothing is reviewed.** What is written is a benchmark whose parties
+  share a process: it computes what each side would hold and what each
+  would send, and it enforces nothing about who can read what. Cryptography
+  that guards a stranger's hand has to be read by people who do this,
+  and it has not been.
+
+**What it is made of**, since the shape of it decides the rest:
 
 - **The protocol.** Two computing parties at most tables, three or four
   where more people are seated. Authenticated garbling (Wang, Ranellucci

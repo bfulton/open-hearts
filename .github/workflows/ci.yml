@@ -27,12 +27,20 @@ jobs:
           workspaces: |
             crypto/deal
             crypto/schnorr
+            measurements/ot
       # The deal's cryptography (doc 03): the cdylib the VM tests load.
       # The browser's wasm is committed (app/web/deal.wasm).
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
         run: |
           cd crypto/deal && cargo build --release && cargo test --release
           cd ../schnorr && cargo build --release && cargo test --release
+      # The computation a bot-held seat is played by (doc 04). It is
+      # not shipped and nothing imports it, but its tests are what say
+      # the protocol is the protocol — that the garbled bot picks the
+      # card the bot picks, and that a tampered row is caught — so they
+      # run here rather than rot.
+      - name: The bot inside the computation (Rust — transfers, triples, garbling)
+        run: cd measurements/ot && cargo test --release
       - name: Engine (pure Dart — rules, bots, 200 seeded games)
         run: cd packages/engine && dart pub get && dart analyze && dart test
       - name: Deal (the primitives over FFI, and a hand's deal among four sessions)

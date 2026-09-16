@@ -40,10 +40,16 @@ enum Taint { constant, public, secret }
 
 /// One wire of a circuit, with its simulated value.
 class Bit {
-  const Bit._(this.value, this.taint);
+  const Bit._(this.value, this.taint, [this.wire = -1]);
 
   final bool value;
   final Taint taint;
+
+  /// Where this value sits in the netlist a recording circuit writes
+  /// down, or −1 when the circuit is only being simulated and counted.
+  /// Wires 0 and 1 are the constants, so a gate never has one as an
+  /// operand — constants fold before a gate is made.
+  final int wire;
 
   bool get isConstant => taint == Taint.constant;
   bool get isSecret => taint == Taint.secret;
@@ -58,9 +64,21 @@ class Bit {
 /// the cost of a circuit built *after* the table state is known, a lower
 /// bound the precomputed circuit cannot reach.
 class Circuit {
-  Circuit({this.foldPublic = false});
+  Circuit({this.foldPublic = false, this.record = false})
+      : assert(!record || foldPublic, 'a recorded circuit folds its public inputs: see [record]');
 
   final bool foldPublic;
+
+  /// Whether to write the circuit down as it is built, in [gates], so
+  /// that something else can evaluate it — which is what a garbled
+  /// circuit is (docs/04-live-play.md, "Playing a seat nobody holds").
+  ///
+  /// Recording requires [foldPublic]. A garbled circuit is built when
+  /// the decision is made, and by then the table state is public to
+  /// both parties, so a public input is a constant and there is no
+  /// third kind of wire left: everything is a constant or a secret.
+  /// That is also the smaller circuit (tool/circuit_count.dart).
+  final bool record;
 
   /// AND gates with at least one secret operand.
   int ands = 0;
@@ -68,20 +86,46 @@ class Circuit {
   int secretInputs = 0;
   int publicInputs = 0;
 
-  static const zero = Bit._(false, Taint.constant);
-  static const one = Bit._(true, Taint.constant);
+  static const opXor = 0;
+  static const opAnd = 1;
+  static const opInv = 2;
+
+  /// The gates in build order, four integers each: the operation, its
+  /// two operand wires (the second repeats the first for `not`), and
+  /// the wire it writes. Empty unless [record].
+  final List<int> gates = [];
+
+  /// Wires allocated so far. 0 and 1 are the constants.
+  int wires = 2;
+
+  /// The wires the secret inputs were given, in the order [secret] was
+  /// called — which is the order whoever feeds the circuit must use.
+  final List<int> inputs = [];
+
+  static const zero = Bit._(false, Taint.constant, 0);
+  static const one = Bit._(true, Taint.constant, 1);
 
   Bit constant(bool v) => v ? one : zero;
 
   Bit secret(bool v) {
     secretInputs++;
-    return Bit._(v, Taint.secret);
+    final w = _wire();
+    if (record) inputs.add(w);
+    return Bit._(v, Taint.secret, w);
   }
 
   Bit public(bool v) {
     if (foldPublic) return constant(v);
     publicInputs++;
     return Bit._(v, Taint.public);
+  }
+
+  int _wire() => record ? wires++ : -1;
+
+  Bit _gate(int op, Bit a, Bit b, bool value, Taint taint) {
+    final w = _wire();
+    if (record) gates.addAll([op, a.wire, b.wire, w]);
+    return Bit._(value, taint, w);
   }
 
   // ---- gates ----------------------------------------------------------
@@ -91,19 +135,19 @@ class Circuit {
     if (b.isConstant) return b.value ? a : zero;
     if (a.isSecret || b.isSecret) {
       ands++;
-      return Bit._(a.value && b.value, Taint.secret);
+      return _gate(opAnd, a, b, a.value && b.value, Taint.secret);
     }
-    return Bit._(a.value && b.value, Taint.public);
+    return _gate(opAnd, a, b, a.value && b.value, Taint.public);
   }
 
   Bit not(Bit a) =>
-      a.isConstant ? constant(!a.value) : Bit._(!a.value, a.taint);
+      a.isConstant ? constant(!a.value) : _gate(opInv, a, a, !a.value, a.taint);
 
   Bit xor(Bit a, Bit b) {
     if (a.isConstant) return a.value ? not(b) : b;
     if (b.isConstant) return b.value ? not(a) : a;
     final taint = a.isSecret || b.isSecret ? Taint.secret : Taint.public;
-    return Bit._(a.value ^ b.value, taint);
+    return _gate(opXor, a, b, a.value ^ b.value, taint);
   }
 
   Bit or(Bit a, Bit b) => not(and(not(a), not(b)));

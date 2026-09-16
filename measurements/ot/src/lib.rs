@@ -30,6 +30,7 @@
 //!   consistent `r` rather than chosen;
 //! - and each row is hashed to the key the transfer hands over.
 
+pub mod garble;
 pub mod triple;
 
 use aes::cipher::{BlockEncrypt, KeyInit};
@@ -161,11 +162,13 @@ pub(crate) struct Cot {
     pub choices: Vec<u8>,
     pub macs: Vec<u8>,
     pub keys: Vec<u8>,
-    pub delta: [u8; KAPPA / 8],
 }
 
 /// `m` correlated transfers, both sides, adding to `cost` as it goes.
-pub(crate) fn cot(m: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn() -> f64) -> Cot {
+/// The sender's secret is handed in rather than drawn, because every
+/// batch in one run has to be under the same global key for the MACs
+/// to add up across them.
+pub(crate) fn cot(m: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn() -> f64, s: [u8; KAPPA / 8]) -> Cot {
     assert!(m % 8 == 0, "a whole number of bytes of choices");
     let stride = m / 8;
     let width = KAPPA / 8;
@@ -178,8 +181,6 @@ pub(crate) fn cot(m: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn
         rng.fill_bytes(&mut p[0]);
         rng.fill_bytes(&mut p[1]);
     }
-    let mut s = [0u8; KAPPA / 8];
-    rng.fill_bytes(&mut s);
     let mut choices = vec![0u8; stride];
     rng.fill_bytes(&mut choices);
 
@@ -247,7 +248,7 @@ pub(crate) fn cot(m: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn
     cost.sent += 3 * BLOCK;
     cost.check += now() - at;
 
-    Cot { choices, macs: t_rows, keys: q_rows, delta: s }
+    Cot { choices, macs: t_rows, keys: q_rows }
 }
 
 /// `m` extended transfers, both sides, timed by phase. `now` is the
@@ -255,7 +256,9 @@ pub(crate) fn cot(m: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn
 pub fn extend(m: usize, seed: u64, now: &dyn Fn() -> f64) -> Cost {
     let mut rng = ChaCha12Rng::seed_from_u64(seed);
     let mut cost = Cost::default();
-    let Cot { choices: _, macs: t_rows, keys: q_rows, delta: s } = cot(m, &mut rng, &mut cost, now);
+    let mut s = [0u8; KAPPA / 8];
+    rng.fill_bytes(&mut s);
+    let Cot { choices: _, macs: t_rows, keys: q_rows } = cot(m, &mut rng, &mut cost, now, s);
     let width = KAPPA / 8;
 
     // And the keys themselves: the sender hashes both of a pair, the
@@ -431,6 +434,33 @@ pub extern "C" fn bench_triples(n: u32, bucket: u32, seed: u64) {
         (13, c.transfers as f64),
         (14, c.abits_check),
         (15, c.abit_bits as f64),
+    ] {
+        unsafe { host::report(id, v) };
+    }
+}
+
+/// And the whole of a bot's decision: the policy garbled over a hand
+/// neither party can see, by id — 16 the preprocessing, 17 garbling,
+/// 18 evaluating, 19 the whole of it, 20 bits on the wire, 21 the bits
+/// inside that which were the preprocessing, 22 block cipher calls, 23
+/// AND gates. The circuit is compiled in, since a wasm host has no
+/// files.
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn bench_decision(bucket: u32, seed: u64) {
+    let net = garble::Netlist::parse(include_str!("../bot.circuit"));
+    let (out, c) = garble::compute(&net, &net.values, bucket as usize, seed, &|| unsafe { host::now() });
+    assert!(out == net.expect, "the garbled policy picks what the bot picks");
+    let all = c.preprocess + c.garble + c.evaluate;
+    for (id, v) in [
+        (16, c.preprocess),
+        (17, c.garble),
+        (18, c.evaluate),
+        (19, all),
+        (20, c.bits as f64),
+        (21, c.preprocess_bits as f64),
+        (22, c.aes as f64),
+        (23, c.ands as f64),
     ] {
         unsafe { host::report(id, v) };
     }

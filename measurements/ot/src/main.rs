@@ -40,6 +40,10 @@ fn main() {
         std::env::args().nth(2).and_then(|s| s.parse().ok()).unwrap_or(1 << 12),
         std::env::args().nth(3).and_then(|s| s.parse().ok()).unwrap_or(ot_bench::triple::BUCKET),
     );
+    decision(
+        &std::env::args().nth(4).unwrap_or_else(|| "bot.circuit".into()),
+        std::env::args().nth(3).and_then(|s| s.parse().ok()).unwrap_or(ot_bench::triple::BUCKET),
+    );
 }
 
 /// The authentication on top, which is what a gate actually costs.
@@ -68,4 +72,40 @@ fn triples(n: usize, bucket: usize) {
         per(lean) * GATES as f64 / 1e9,
         bytes * GATES as f64 / 1048576.0,
         bytes);
+}
+
+/// And the whole of a bot's decision: the policy garbled, over a hand
+/// neither party can see.
+fn decision(path: &str, bucket: usize) {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => {
+            println!("\nno circuit at {path}: {e}");
+            println!("  cd packages/engine && dart run tool/circuit_dump.dart 1 20 > ../../measurements/ot/bot.circuit");
+            return;
+        }
+    };
+    let net = ot_bench::garble::Netlist::parse(&text);
+    let start = Instant::now();
+    let now = || start.elapsed().as_secs_f64() * 1000.0;
+    let (out, c) = ot_bench::garble::compute(&net, &net.values, bucket, 2, &now);
+    assert_eq!(out, net.expect, "the garbled policy picks what the bot picks");
+    let all = c.preprocess + c.garble + c.evaluate;
+    let bytes = c.bits as f64 / 8.0;
+
+    println!("\none decision of the bot, garbled, bucket of {bucket}, one core\n");
+    println!("  {} AND gates, {} wires, {} inputs, {} outputs", c.ands, net.wires, net.inputs.len(), net.outputs.len());
+    println!("  the triples and the bits {:8.1} ms", c.preprocess);
+    println!("  garbling                 {:8.1} ms", c.garble);
+    println!("  evaluating               {:8.1} ms", c.evaluate);
+    println!("  all of it                {:8.1} ms", all);
+    println!(
+        "\n  on the wire {:.2} MB — {:.2} the preprocessing, {:.2} the tables and the rest",
+        bytes / 1048576.0,
+        c.preprocess_bits as f64 / 8.0 / 1048576.0,
+        (c.bits - c.preprocess_bits) as f64 / 8.0 / 1048576.0,
+    );
+    println!("  {:.0} bytes a gate, {} block cipher calls", bytes / c.ands as f64, c.aes);
+    println!("\na hand is a pass and thirteen plays; at this play's size that is");
+    println!("  {:.1} MB and {:.1} s for thirteen of them, before the pass", 13.0 * bytes / 1048576.0, 13.0 * all / 1000.0);
 }

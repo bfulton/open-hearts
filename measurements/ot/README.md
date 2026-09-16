@@ -1,12 +1,13 @@
-# What a gate costs before it is computed
+# The bot inside the computation, and what it costs
 
-[Doc 04](../../docs/04-live-play.md)'s computation spends one
-**authenticated AND triple** per AND gate of the circuit a bot-held
-seat costs — **53,726 of them a hand**
-(`packages/engine/tool/circuit_count.dart`) — and every one of them is
-made before the hand it is for. This measures the whole of that: the
-oblivious transfers underneath, and the authentication on top that
-turns them into a triple.
+[Doc 04](../../docs/04-live-play.md) plays a seat nobody holds by
+putting its thirteen cards in as fragments that are never reassembled,
+running the bot policy over them, and taking out one position — which
+was going face up anyway. **That computation is here and it works**:
+the bot's own policy, garbled, over a hand split between two parties
+neither of whom can see a card, picking the card the bot picks. What it
+costs is measured from the transfers at the bottom to the answer at the
+top.
 
 ```bash
 cd measurements/ot
@@ -14,6 +15,10 @@ cargo test --release                                    # it is the protocol it 
 cargo run --release [transfers] [triples] [bucket]      # native, one core
 cargo build --release --target wasm32-unknown-unknown
 node bench.mjs [transfers] [triples] [bucket]           # the same code as wasm
+
+# and the circuit it runs, out of the bot itself
+cd ../../packages/engine
+dart run tool/circuit_dump.dart 1 20 > ../../measurements/ot/bot.circuit
 ```
 
 **This is a benchmark, not a protocol.** Both parties run in one
@@ -25,9 +30,18 @@ times below are both parties' work; one party does about half.**
 
 The protocol is Wang, Ranellucci and Katz, [*Authenticated Garbling and
 Efficient Maliciously Secure Two-Party Computation*](https://eprint.iacr.org/2017/030)
-(CCS 2017): Π_HaAND for the cross terms of a product, Π_LaAND for a
-triple that is right but leaks a little, Π_aAND to bucket B leaky
-triples into one that does not.
+(CCS 2017), end to end: Π_HaAND for the cross terms of a product,
+Π_LaAND for a triple that is right but leaks a little, Π_aAND to bucket
+B leaky triples into one that does not, and Π_2pc (Figure 2) to garble
+a circuit with them and evaluate it.
+
+**Maliciously secure, which is the only setting that counts here.**
+Every party is a player with a stake in the hand, and a modified client
+is the threat model the whole of [doc 03](../../docs/03-fair-deal.md) is
+written against. Each garbled row carries its own MAC, so a garbler
+that tampers with one is caught rather than believed — `a_tampered_row_is_caught`
+is that, as a test. The semi-honest version doc 04 says must not be
+built would look the same and would not be this.
 
 ## The transfers
 
@@ -94,9 +108,47 @@ bytes of transfers, 388 bytes of check — which is the answer to the
 question this file was left open on. The transfers are the floor and
 they are almost exactly half of it.
 
-## What it comes to for a hand
+## The whole of a decision
 
-53,726 triples, one a gate, at a bucket of four:
+One play of the bot: the policy as 2,053 AND gates with the table state
+folded in, 156 input wires — thirteen cards, six bits each, two shares
+a bit — and thirteen output wires, one per position, of which exactly
+one comes out set.
+
+| | native | wasm |
+|---|---|---|
+| the triples and the authenticated bits | 101.7 ms | 416.2 ms |
+| garbling | 0.8 ms | 20.3 ms |
+| evaluating | 0.2 ms | 4.1 ms |
+| **all of it** | **102.6–103.6 ms** | **440.6 ms** |
+| on the wire | **1.84 MB** — 1.58 the preprocessing, 0.26 the tables | |
+| | 938 bytes a gate, 336,692 block cipher calls | |
+
+**The preprocessing is 86% of the wire and 94% of the time.** Garbling
+and evaluating are almost free beside it, which is the whole shape of
+authenticated garbling: the expensive part is making the material, and
+it can be made before the hand it is for.
+
+For a hand — a pass of 10,618 gates, which has no table state to fold,
+and thirteen plays of this size:
+
+| | |
+|---|---|
+| on the wire | **33.4 MB** |
+| CPU, wasm, both parties | **8.0 s** (about four each) |
+| on a 5 Mbit/s uplink | 56 s |
+
+A hand is p50 a minute. So **the whole computation fits, and it fits
+because of the folding** — the circuit built at the turn rather than
+before the hand is what brings 53,726 gates down to 38,136. It has
+nothing to spare, and everything under "What would move it" below is
+still worth taking.
+
+## What the preprocessing costs on its own
+
+The triples are most of the above, and they are what a protocol change
+would change, so they are worth having separately. 53,726 triples, one
+a gate, at a bucket of four:
 
 | | |
 |---|---|
@@ -104,18 +156,11 @@ they are almost exactly half of it.
 | CPU, native, both parties | 2.5–2.8 s (0.3 s with the check at hardware speed) |
 | CPU, wasm, both parties | 10.3–10.5 s (4.7–5.0 s without the check) |
 
-**That is the triples and nothing else**, which is the phase the design
-turns on but not the whole bill. A bot-held hand also sends the garbled
-circuit — two ciphertexts an AND gate, which KRRW18's Table 2 puts at
-34 bytes a gate for WRK17, so about 1.3 MB more — and an online phase
-that is only the input labels, a few KB. Both are small against the
-preprocessing, which is why the preprocessing is what was measured, and
-neither is counted in the figures here.
-
 Against [the channel](../channel/README.md), which affords 698 bytes a
 gate on 5 Mbit/s over a p50 hand of a minute and 1,396 over a p90 hand
-of two: **it does not fit in a minute and does fit in two.** 39.5 MB is
-66 seconds of a 5 Mbit/s uplink, and 13 seconds of a 25 Mbit/s one.
+of two: **the triples alone do not fit in a minute at the unfolded gate
+count and do fit in two.** 39.5 MB is 66 seconds of a 5 Mbit/s uplink,
+and 13 seconds of a 25 Mbit/s one.
 
 Against [the relay](../relay/README.md) — which is the only path a
 juror has, and doc 04 makes the foreman a computing party at one human

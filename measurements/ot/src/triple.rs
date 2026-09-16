@@ -77,13 +77,13 @@ pub struct TripleCost {
 /// one process. The owner has `v` and `mac`; the other party has `key`;
 /// and `mac = key ⊕ v·Δ` for the *other* party's global key Δ.
 #[derive(Clone, Copy, Default)]
-struct Auth {
-    v: bool,
-    mac: Block,
-    key: Block,
+pub struct Auth {
+    pub v: bool,
+    pub mac: Block,
+    pub key: Block,
 }
 
-fn xor(a: Block, b: Block) -> Block {
+pub fn xor(a: Block, b: Block) -> Block {
     let mut out = [0u8; BLOCK];
     for i in 0..BLOCK {
         out[i] = a[i] ^ b[i];
@@ -92,7 +92,7 @@ fn xor(a: Block, b: Block) -> Block {
 }
 
 /// Δ where the bit is set, nothing where it is not.
-fn times(d: Block, b: bool) -> Block {
+pub fn times(d: Block, b: bool) -> Block {
     if b {
         d
     } else {
@@ -103,19 +103,19 @@ fn times(d: Block, b: bool) -> Block {
 impl Auth {
     /// Two bits of the same owner, added: the shares, the MACs and the
     /// keys all add, because the MAC relation is linear.
-    fn add(self, o: Auth) -> Auth {
+    pub fn add(self, o: Auth) -> Auth {
         Auth { v: self.v ^ o.v, mac: xor(self.mac, o.mac), key: xor(self.key, o.key) }
     }
 
     /// A public bit added in. The owner flips its share and keeps its
     /// MAC; the key holder folds `d·Δ` into the key, which is the same
     /// relation again.
-    fn add_public(self, d: bool, delta: Block) -> Auth {
+    pub fn add_public(self, d: bool, delta: Block) -> Auth {
         Auth { v: self.v ^ d, mac: self.mac, key: xor(self.key, times(delta, d)) }
     }
 
     /// Multiplied by a public bit: itself, or the authenticated zero.
-    fn times_public(self, d: bool) -> Auth {
+    pub fn times_public(self, d: bool) -> Auth {
         if d {
             self
         } else {
@@ -145,9 +145,9 @@ fn lsb(b: Block) -> bool {
 /// `n` authenticated bits owned by one party under the other's global
 /// key, and that key. One correlated transfer each: the rows the
 /// transfer leaves are the MAC and the key already.
-fn a_bits(n: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn() -> f64) -> (Vec<Auth>, Block) {
+pub fn a_bits(n: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn() -> f64, delta: Block) -> Vec<Auth> {
     let m = n.div_ceil(8) * 8;
-    let c = cot(m, rng, cost, now);
+    let c = cot(m, rng, cost, now, delta);
     let width = KAPPA / 8;
     let mut out = Vec::with_capacity(n);
     for j in 0..n {
@@ -157,19 +157,21 @@ fn a_bits(n: usize, rng: &mut ChaCha12Rng, cost: &mut Cost, now: &dyn Fn() -> f6
         key.copy_from_slice(&c.keys[j * width..(j + 1) * width]);
         out.push(Auth { v: bit(&c.choices, j), mac, key });
     }
-    (out, c.delta)
+    out
 }
 
-/// A triple that is right but leaks: z1 ⊕ z2 = (x1 ⊕ x2) ∧ (y1 ⊕ y2),
-/// with a selective-failure attack still open on one input.
+/// A triple: z1 ⊕ z2 = (x1 ⊕ x2) ∧ (y1 ⊕ y2), each of the six an
+/// authenticated bit. Out of [`la_and`] it is *leaky* — a
+/// selective-failure attack is still open on one input — and out of
+/// [`make`], which buckets, it is not.
 #[derive(Clone, Copy)]
-struct Leaky {
-    x1: Auth,
-    y1: Auth,
-    z1: Auth,
-    x2: Auth,
-    y2: Auth,
-    z2: Auth,
+pub struct Triple {
+    pub x1: Auth,
+    pub y1: Auth,
+    pub z1: Auth,
+    pub x2: Auth,
+    pub y2: Auth,
+    pub z2: Auth,
 }
 
 /// Π_LaAND's check, one half of it: the party holding the MACs on
@@ -248,7 +250,7 @@ fn la_and(
     x2: Auth,
     y2: Auth,
     r: Auth,
-) -> Leaky {
+) -> Triple {
     // Π_HaAND: shares of the two cross terms, x2·y1 and x1·y2, from
     // the authenticated bits themselves — the MAC relation is a
     // one-out-of-two transfer already, so this is two bits each way.
@@ -273,11 +275,11 @@ fn la_and(
     let z2 = r.add_public(d, delta_a);
     cost.bits += 2;
 
-    Leaky { x1, y1, z1, x2, y2, z2 }
+    Triple { x1, y1, z1, x2, y2, z2 }
 }
 
 /// Both halves of Π_LaAND's check on one triple.
-fn la_check(mmo: &Mmo, tweak: u64, cost: &mut TripleCost, rng: &mut ChaCha12Rng, delta_a: Block, delta_b: Block, t: &Leaky) -> bool {
+fn la_check(mmo: &Mmo, tweak: u64, cost: &mut TripleCost, rng: &mut ChaCha12Rng, delta_a: Block, delta_b: Block, t: &Triple) -> bool {
     let bits = &mut cost.bits;
     let ok_b = half_check(mmo, tweak + 2, &mut cost.aes, bits, rng, delta_b, delta_a, t.x1, t.y1, t.z1, t.x2, t.y2.v, t.z2.v);
     let ok_a = half_check(mmo, tweak + 4, &mut cost.aes, bits, rng, delta_a, delta_b, t.x2, t.y2, t.z2, t.x1, t.y1.v, t.z1.v);
@@ -288,10 +290,10 @@ fn la_check(mmo: &Mmo, tweak: u64, cost: &mut TripleCost, rng: &mut ChaCha12Rng,
 /// what a selective failure could have learned. The y's are made equal
 /// by opening their difference — two authenticated bits, whose MACs go
 /// into the batch checked at the end — and the z's are corrected by it.
-fn combine(a: Leaky, b: Leaky, bits: &mut usize) -> Leaky {
+fn combine(a: Triple, b: Triple, bits: &mut usize) -> Triple {
     let d = (a.y1.v ^ b.y1.v) ^ (a.y2.v ^ b.y2.v);
     *bits += 2;
-    Leaky {
+    Triple {
         x1: a.x1.add(b.x1),
         y1: a.y1,
         z1: a.z1.add(b.z1).add(b.x1.times_public(d)),
@@ -306,6 +308,26 @@ fn combine(a: Leaky, b: Leaky, bits: &mut usize) -> Leaky {
 pub fn triples(n: usize, bucket: usize, seed: u64, now: &dyn Fn() -> f64) -> TripleCost {
     let mut rng = ChaCha12Rng::seed_from_u64(seed);
     let mut cost = TripleCost { triples: n, ..Default::default() };
+    let mut delta_a = [0u8; BLOCK];
+    let mut delta_b = [0u8; BLOCK];
+    rng.fill_bytes(&mut delta_a);
+    rng.fill_bytes(&mut delta_b);
+    make(n, bucket, &mut rng, &mut cost, now, delta_a, delta_b);
+    cost
+}
+
+/// The same, for a caller that wants the triples rather than the
+/// timing: `n` of them under global keys it already holds.
+#[allow(clippy::too_many_arguments)]
+pub fn make(
+    n: usize,
+    bucket: usize,
+    rng: &mut ChaCha12Rng,
+    cost: &mut TripleCost,
+    now: &dyn Fn() -> f64,
+    delta_a: Block,
+    delta_b: Block,
+) -> Vec<Triple> {
     let leaky = n * bucket;
 
     // Six authenticated bits a leaky triple: x, y and z on one side,
@@ -313,8 +335,8 @@ pub fn triples(n: usize, bucket: usize, seed: u64, now: &dyn Fn() -> f64) -> Tri
     // KOS check amortises the way it would in a real run.
     let at = now();
     let mut transfers = Cost::default();
-    let (a_pool, delta_b) = a_bits(3 * leaky, &mut rng, &mut transfers, now);
-    let (b_pool, delta_a) = a_bits(3 * leaky, &mut rng, &mut transfers, now);
+    let a_pool = a_bits(3 * leaky, rng, &mut transfers, now, delta_b);
+    let b_pool = a_bits(3 * leaky, rng, &mut transfers, now, delta_a);
     cost.abits = now() - at;
     cost.abits_check = transfers.check;
     cost.transfers = 6 * leaky;
@@ -328,8 +350,8 @@ pub fn triples(n: usize, bucket: usize, seed: u64, now: &dyn Fn() -> f64) -> Tri
         objects.push(la_and(
             &mmo,
             (i as u64) << 3,
-            &mut cost,
-            &mut rng,
+            cost,
+            rng,
             delta_a,
             delta_b,
             a_pool[3 * i],
@@ -345,7 +367,7 @@ pub fn triples(n: usize, bucket: usize, seed: u64, now: &dyn Fn() -> f64) -> Tri
     let at = now();
     for (i, t) in objects.iter().enumerate() {
         assert!(
-            la_check(&mmo, (i as u64) << 3, &mut cost, &mut rng, delta_a, delta_b, t),
+            la_check(&mmo, (i as u64) << 3, cost, rng, delta_a, delta_b, t),
             "the leaky check holds for honest parties"
         );
     }
@@ -380,7 +402,16 @@ pub fn triples(n: usize, bucket: usize, seed: u64, now: &dyn Fn() -> f64) -> Tri
         let y = t.y1.v ^ t.y2.v;
         assert_eq!(t.z1.v ^ t.z2.v, x & y, "every triple that comes out is an AND");
     }
-    cost
+    out
+}
+
+/// A global key each, which everything in one run has to share.
+pub fn two_keys(rng: &mut ChaCha12Rng) -> (Block, Block) {
+    let mut a = [0u8; BLOCK];
+    let mut b = [0u8; BLOCK];
+    rng.fill_bytes(&mut a);
+    rng.fill_bytes(&mut b);
+    (a, b)
 }
 
 #[cfg(test)]
@@ -393,7 +424,9 @@ mod tests {
     fn the_transfers_leave_authenticated_bits() {
         let mut rng = ChaCha12Rng::seed_from_u64(1);
         let mut cost = Cost::default();
-        let (pool, delta) = a_bits(512, &mut rng, &mut cost, &|| 0.0);
+        let mut delta = [0u8; BLOCK];
+        rng.fill_bytes(&mut delta);
+        let pool = a_bits(512, &mut rng, &mut cost, &|| 0.0, delta);
         for (i, b) in pool.iter().enumerate() {
             assert_eq!(b.mac, xor(b.key, times(delta, b.v)), "bit {i}");
         }
@@ -407,8 +440,9 @@ mod tests {
         let mmo = Mmo::new();
         let mut rng = ChaCha12Rng::seed_from_u64(2);
         let mut cost = Cost::default();
-        let (a, delta_b) = a_bits(3 * 400, &mut rng, &mut cost, &|| 0.0);
-        let (b, delta_a) = a_bits(3 * 400, &mut rng, &mut cost, &|| 0.0);
+        let (delta_a, delta_b) = two_keys(&mut rng);
+        let a = a_bits(3 * 400, &mut rng, &mut cost, &|| 0.0, delta_b);
+        let b = a_bits(3 * 400, &mut rng, &mut cost, &|| 0.0, delta_a);
         let mut tcost = TripleCost::default();
         let mut seen = [0; 4];
         for i in 0..400 {
@@ -433,8 +467,9 @@ mod tests {
         let mmo = Mmo::new();
         let mut rng = ChaCha12Rng::seed_from_u64(3);
         let mut cost = Cost::default();
-        let (a, delta_b) = a_bits(3 * 200, &mut rng, &mut cost, &|| 0.0);
-        let (b, delta_a) = a_bits(3 * 200, &mut rng, &mut cost, &|| 0.0);
+        let (delta_a, delta_b) = two_keys(&mut rng);
+        let a = a_bits(3 * 200, &mut rng, &mut cost, &|| 0.0, delta_b);
+        let b = a_bits(3 * 200, &mut rng, &mut cost, &|| 0.0, delta_a);
         let mut tcost = TripleCost::default();
         let mut caught = 0;
         for i in 0..200 {

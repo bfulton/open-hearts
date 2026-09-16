@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 
-const FIELDS = ['expand', 'transpose', 'check', 'hash', 'all', 'sent', 'abits', 'haand', 'laand', 'bucket', 'triples', 'bits', 'aes', 'transfers', 'abitCheck', 'abitBits'];
+const FIELDS = ['expand', 'transpose', 'check', 'hash', 'all', 'sent', 'abits', 'haand', 'laand', 'bucket', 'triples', 'bits', 'aes', 'transfers', 'abitCheck', 'abitBits', 'pre', 'garble', 'eval', 'decision', 'dbits', 'dpre', 'daes', 'dands'];
 /// One bot-held seat for one hand (packages/engine/tool/circuit_count.dart).
 const GATES = 53726;
 
@@ -67,3 +67,27 @@ console.log(
     `${((each(leanTriple) * GATES) / 1e9).toFixed(1)} s without the KOS check, ` +
     `${((bytes * GATES) / 1048576).toFixed(1)} MB on the wire, ${bytes.toFixed(0)} bytes a gate`,
 );
+
+// And the whole of a bot's decision: the policy garbled over a hand
+// neither party can see. The circuit is compiled into the wasm.
+instance.exports.bench_decision(bucket, 5n);
+
+const dAll = out.decision;
+const dBytes = out.dbits / 8;
+console.log(`\none decision of the bot, garbled, bucket of ${bucket}, the same wasm\n`);
+console.log(`  ${out.dands} AND gates`);
+for (const [f, label] of [
+  ['pre', 'the triples and the bits'],
+  ['garble', 'garbling'],
+  ['eval', 'evaluating'],
+  ['decision', 'all of it'],
+]) {
+  console.log(`  ${label.padEnd(24)} ${out[f].toFixed(1).padStart(8)} ms`);
+}
+console.log(
+  `\n  on the wire ${(dBytes / 1048576).toFixed(2)} MB — ${(out.dpre / 8 / 1048576).toFixed(2)} the preprocessing, ` +
+    `${((out.dbits - out.dpre) / 8 / 1048576).toFixed(2)} the tables and the rest`,
+);
+console.log(`  ${(dBytes / out.dands).toFixed(0)} bytes a gate, ${out.daes} block cipher calls`);
+console.log(`\na hand is a pass and thirteen plays; at this play's size that is`);
+console.log(`  ${((13 * dBytes) / 1048576).toFixed(1)} MB and ${((13 * dAll) / 1000).toFixed(1)} s for thirteen of them, before the pass`);

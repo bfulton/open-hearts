@@ -140,22 +140,19 @@ Ideas agreed on and not yet placed in the order above.
 
 - **The bot inside the computation**, so a bot's hand is open to
   nobody ([doc 04](docs/04-live-play.md), "Playing a seat nobody
-  holds"); until then bots' hands are open to the table. What it would
-  take is written down there, and all three numbers that decide it are
-  now measured. The budget is about seven hundred bytes a gate on a
-  channel of its own ([channel](measurements/channel/README.md)). A
-  gate costs **772 bytes and 191 µs of wasm** a triple, built as the
-  paper describes it and checked against its own equations
-  ([ot](measurements/ot/README.md)) — 39.5 MB and ten seconds a hand,
-  which is a p90 hand and not a p50 one. That file ranks what would
-  move it, and the largest is not cryptography: a triple is fungible,
-  so only a hand where somebody leaves spends any, and making two
-  plays' worth at a time holds 3.8 MB standing in place of 28 MB a
-  hand. And the third number is about the one party with no channel: a
-  juror is not seated, so it follows a table from the relay alone,
-  where the same material is 1.79x on the wire and the budget halves to
-  390 bytes a gate ([relay](measurements/relay/README.md)) — a foreman
-  at the pace of a slow hand, and a reason to give a juror a channel.
+  holds"); at a live table bots' hands are still open to the players.
+  **The computation itself is built and works**
+  ([ot](measurements/ot/README.md)): the bot's own policy, garbled,
+  over a hand split between two parties neither of whom can see a
+  card, picking the card the bot picks — with a garbler who tampers
+  with a row caught by the MAC the row carries. One decision is 1.84
+  MB and 441 ms of wasm for both parties; a hand is 33.4 MB and eight
+  seconds, which is 56 seconds of a 5 Mbit/s uplink against sixty of
+  play. It fits, and only because the circuit is built at the turn
+  rather than before the hand. What stands between that and a real
+  table is in doc 04: it is not wired to the table, the sharing at the
+  deal and the opening of a position are not built, it is two parties
+  only, and none of it has been reviewed.
 
 ## Developing
 
