@@ -523,6 +523,33 @@ mod tests {
         assert_eq!(cost.ands, 2053, "the AND gates the circuit says it has");
     }
 
+    /// The same circuit over inputs it was not dumped with, against
+    /// the same circuit in the clear: the garbling is faithful to the
+    /// netlist and not to one lucky path through it.
+    #[test]
+    fn the_garbled_circuit_agrees_with_the_clear_one_on_whatever_it_is_given() {
+        let net = Netlist::parse(include_str!("../bot.circuit"));
+        let mut rng = ChaCha12Rng::seed_from_u64(31);
+        for round in 0..8u64 {
+            let values: Vec<bool> = (0..net.inputs.len()).map(|_| rng.next_u32() & 1 == 1).collect();
+            let (got, _) = compute(&net, &values, 4, 300 + round, &|| 0.0);
+            assert_eq!(got, net.evaluate(&values), "round {round}");
+        }
+    }
+
+    /// And the answer does not depend on the masks: the same inputs
+    /// through preprocessing drawn differently come out the same,
+    /// which is what says the masks cancel the way they are supposed
+    /// to rather than happening to.
+    #[test]
+    fn the_masks_cancel_whatever_they_are() {
+        let net = Netlist::parse(include_str!("../bot.circuit"));
+        for seed in [11u64, 12, 13] {
+            let (got, _) = compute(&net, &net.values, 4, seed, &|| 0.0);
+            assert_eq!(got, net.expect, "seed {seed}");
+        }
+    }
+
     /// Neither share is the hand. Flip one bit of the garbler's share
     /// and the answer moves — which is what says the computation is
     /// over both of them and not over one.

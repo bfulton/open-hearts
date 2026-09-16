@@ -284,8 +284,25 @@ The numbers mean nothing if the protocol is not the protocol, so:
   cases were transcribed the right way round: a check that always
   passed would satisfy every other test here;
 - a bucket of leaky triples is still a triple;
-- and the wire is exactly what the protocol puts on it, counted step by
-  step against the figures above.
+- the wire is exactly what the protocol puts on it, counted step by
+  step against the figures above;
+
+and for the garbling on top of them:
+
+- a garbled AND is an AND, over every combination of the two parties'
+  bits, and the free gates are free and right;
+- **the garbled bot picks the card the bot picks** — the whole claim,
+  over the policy `packages/engine/tool/circuit_dump.dart` writes,
+  which refuses to write a circuit that disagrees with the bot;
+- the garbled circuit agrees with the same circuit in the clear on
+  eight input vectors it was never dumped with, so the garbling is
+  faithful to the netlist and not to one path through it;
+- the masks cancel whatever they are: the same inputs through
+  preprocessing drawn from three different seeds come out the same;
+- one party's share alone says nothing — flip the garbler's half of
+  every card and the answer moves;
+- and **a tampered row is caught** by the MAC it carries, rather than
+  believed.
 
 ### One correction to the paper
 
