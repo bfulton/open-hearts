@@ -70,17 +70,80 @@ const types = {
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.frag': 'application/octet-stream', '.symbols': 'text/plain',
 };
 
+/// The service's handlers in local mode (docs/06-service.md): the same
+/// worker the site runs, over a Map instead of a key-value store, with
+/// the open house on — a device that asks is licensed for a month, so
+/// the suite plays live without a shop to buy from. The service's own
+/// key is BIP-340's published pair, and the app is built to expect it.
+export const localService = {
+  key: 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659',
+  secret: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef',
+};
+
+async function handlersFor(serve) {
+  const { default: handler, memoryStore } = await import(new URL('../service/functions/worker.mjs', import.meta.url));
+  const store = memoryStore();
+  const env = {
+    OH_SERVICE_SECRET: localService.secret,
+    OH_SERVICE_KEY: localService.key,
+    OH_OPEN_HOUSE: '1',
+    OH_STORE: {
+      get: async (at, kind) => {
+        const [pk, sk] = at.split('|');
+        const row = await store.get(pk, sk);
+        return kind === 'json' ? row : row === null ? null : JSON.stringify(row);
+      },
+      put: async (at, raw) => {
+        const [pk, sk] = at.split('|');
+        await store.put(pk, sk, JSON.parse(raw));
+      },
+      list: async ({ prefix }) => ({ keys: [...store.rows.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
+    },
+    ASSETS: { fetch: serve },
+  };
+  return (request) => handler.fetch(request, env);
+}
+
 export async function serveApp() {
-  const server = createServer(async (req, res) => {
-    const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-    const file = join(appDir, path === '/' ? 'index.html' : path);
+  // Static files as a fetch, which is what the worker's own ASSETS
+  // binding is: the handlers reach the app's wasm through it exactly
+  // as they do on the site.
+  const asset = async (request) => {
+    const path = decodeURIComponent(new URL(request.url ?? request).pathname);
+    // The app is served at the root here and at /play/ on the site;
+    // the worker asks for its wasm by the site's path.
+    const file = join(appDir, (path.startsWith('/play/') ? path.slice(5) : path) === '/' ? 'index.html' : path.startsWith('/play/') ? path.slice(5) : path);
     try {
       const body = await readFile(file);
-      res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
-      res.end(body);
+      return new Response(body, { status: 200, headers: { 'content-type': types[extname(file)] ?? 'application/octet-stream' } });
     } catch {
-      res.writeHead(404).end();
+      return new Response(null, { status: 404 });
     }
+  };
+  const handlers = await handlersFor(asset);
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
+    if (url.pathname.startsWith('/api/')) {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const answer = await handlers(
+        new Request(url, {
+          method: req.method,
+          headers: req.headers,
+          ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
+        }),
+      );
+      res.writeHead(answer.status, Object.fromEntries(answer.headers));
+      res.end(Buffer.from(await answer.arrayBuffer()));
+      return;
+    }
+    const answer = await asset(url);
+    if (!answer.ok) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200, { 'content-type': answer.headers.get('content-type'), 'cache-control': 'no-store' });
+    res.end(Buffer.from(await answer.arrayBuffer()));
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   return { url: `http://127.0.0.1:${server.address().port}`, stop: () => server.close() };

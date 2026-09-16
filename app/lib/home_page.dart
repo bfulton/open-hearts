@@ -27,6 +27,7 @@ import 'package:table/table.dart';
 import 'about_page.dart';
 import 'avatar.dart';
 import 'crypto/deal.dart';
+import 'entitlement.dart';
 import 'game_options.dart';
 import 'identity.dart';
 import 'profile_page.dart';
@@ -36,6 +37,7 @@ import 'live/live_page.dart';
 import 'live/options_sheet.dart';
 import 'live_controller.dart';
 import 'net/address.dart';
+import 'net/buying.dart';
 import 'net/duty.dart';
 import 'net/mesh_transport.dart';
 import 'net/relays.dart';
@@ -44,6 +46,7 @@ import 'net/share.dart';
 import 'net/standing.dart';
 import 'net/turn.dart';
 import 'pictures.dart';
+import 'subscribe_page.dart';
 import 'table_page.dart';
 import 'theme.dart';
 import 'ui/doorway.dart';
@@ -52,10 +55,10 @@ import 'ui/header.dart';
 import 'ui/player_icon.dart';
 import 'ui/update_pill.dart';
 
-/// Whether live play is open on this device. It is meant to become
-/// something bought one day, and this is the one place that will
-/// answer that question when it does; until then everybody has it.
-bool liveOpen = true;
+/// Whether live play is open on this device: whether it holds a
+/// licence the service signed and the date on it has not passed
+/// (entitlement.dart, docs/06-service.md). Solo play never asks.
+bool get liveOpen => Entitlement.current.live;
 
 /// What the relays say back — a refusal, a notice, a drop — goes to
 /// the console, where a person debugging a table can read it. Which
@@ -147,9 +150,36 @@ class _HomePageState extends State<HomePage> {
     Pictures.load().then((p) {
       if (mounted) _pictures = p;
     });
+    // Live play can open under this screen — a subscription bought on
+    // the way back from a checkout, a licence the service was slow to
+    // answer for — and when it does the door opens with it.
+    Entitlement.current.addListener(_licensed);
     // A device that cannot play live has no business in the count of
     // who is here, or in a jury.
     if (widget.online && liveOpen) _goOnline();
+    if (widget.online && boughtJustNow()) unawaited(_justBought());
+  }
+
+  /// Live play opened, or shut, under this screen.
+  void _licensed() {
+    if (!mounted) return;
+    setState(() {});
+    if (widget.online && liveOpen && Duty.current == null) _goOnline();
+  }
+
+  /// Back from a checkout. The licence is behind a webhook Stripe sends
+  /// us, which is usually there before the browser is — but not always,
+  /// so this asks a few times before giving up and leaving the page
+  /// saying what it says to anyone else. The address loses the mark
+  /// either way: a refresh should not ask again.
+  Future<void> _justBought() async {
+    forgetInAddress('bought');
+    final signer = await Identity.signer();
+    for (var tries = 0; tries < 8 && mounted && !liveOpen; tries++) {
+      await Entitlement.current.refresh(signer);
+      if (liveOpen) break;
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
   }
 
   /// Who this device is and what game it asks for, off the device. In
@@ -209,6 +239,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    Entitlement.current.removeListener(_licensed);
     _closeLobby();
     _onlineClock?.cancel();
     _refusalSub?.cancel();
@@ -584,7 +615,13 @@ class _HomePageState extends State<HomePage> {
       children: [
         MenuButton(
           height: _chromeHeight,
-          menu: [MenuAction('About', icon: Icons.info_outline, onSelected: () => _go(const AboutPage()))],
+          menu: [
+            // Reachable whether live play is open here or not: shut, the
+            // door itself says what it costs; open, this is where the
+            // date on the licence is.
+            MenuAction('Live play', icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
+            MenuAction('About', icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
+          ],
         ),
         const Spacer(),
         Semantics(
@@ -624,7 +661,7 @@ class _HomePageState extends State<HomePage> {
           child: const Text('Play solo', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(height: 16),
-        liveOpen ? _live() : const _LiveLocked(),
+        liveOpen ? _live() : _LiveLocked(onTap: () => showSubscribe(context)),
         if (_slow) ...[
           const SizedBox(height: 14),
           const Text('Still looking for a relay…',
@@ -796,31 +833,51 @@ class _PlayLive extends StatelessWidget {
 /// Live play before it is opened: what is behind the lock, and that it
 /// is not open yet. Nothing here asks for money — that is for the day
 /// [liveOpen] answers something other than yes.
+/// Live play, not open here. The padlock is not the point: what live
+/// play is and what it costs is, and the way to it is one gold button
+/// like every other way into a game.
 class _LiveLocked extends StatelessWidget {
-  const _LiveLocked();
+  const _LiveLocked({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.lock_outline, size: 20, color: Palette.chromeDim),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Live play', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chromeDim)),
-                const SizedBox(height: 3),
-                Text('Not open yet', style: TextStyle(fontSize: 12.5, color: Palette.chromeDim.withValues(alpha: 0.7))),
-              ],
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Live play',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+              ),
+              const Text(price, style: TextStyle(fontSize: 13, color: Palette.chrome, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Four seats, filled with whoever is waiting — or a link you send to three friends.',
+            style: TextStyle(fontSize: 12, color: Palette.chromeDim),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: onTap,
+            style: _HomePageState._primary(),
+            child: const Text('Subscribe', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Playing alone is free, and always will be.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11.5, color: Palette.chromeDim),
           ),
         ],
       ),

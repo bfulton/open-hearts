@@ -7,6 +7,9 @@ environment:
   sdk: ^3.13.2
 
 dependencies:
+  # For minting the service's signing pair (bin/service_key.dart): the
+  # only place here that needs a public key derived from a secret.
+  bip340: ^0.3.1
   shelf: ^1.4.2
   shelf_web_socket: ^3.0.0
   web_socket_channel: ^3.0.3

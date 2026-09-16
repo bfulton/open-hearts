@@ -7,7 +7,7 @@ stalled on its turn and booted, one that leaves — with the local relay
 and the built web app served from this machine.
 
 ```bash
-cd app && flutter build web -o build/e2e --base-href / --no-web-resources-cdn
+./e2e/build.sh
 cd .. && node e2e/run.mjs
 ```
 

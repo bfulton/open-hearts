@@ -12,7 +12,9 @@ left is identity, entitlement, and a juror when the room is empty.
 |---|---|---|
 | **attest** | Apple/Google sign-in token, device public key | signed attestation, or refusal because the account is already bound |
 | **supersede** | sign-in token, old and new public keys | signed supersession link |
+| **checkout** | key, where to come back to | a Stripe Checkout to send the buyer to |
 | **entitle** | purchase webhook | entitlement recorded; signed licence available to the key |
+| **licence** | key | the licence that key is owed, or 402 |
 | **turn-creds** | attested key | short-lived TURN credentials |
 | **last-resort** | table id, hand | a juror comes online for that hand |
 
@@ -23,7 +25,39 @@ and none is needed by a table already playing.
 site and the app: `service/functions/worker.mjs`, published by
 `deploy.sh` as `_worker.js`, answers `/api/…` and hands everything else
 to the static assets; `node --test service/functions/worker.test.mjs`
-runs it against a stand-in upstream. Built so far: **turn-creds**, `POST /api/turn`
+runs it against a stand-in upstream. Built so far: **turn-creds**,
+**checkout**, **entitle** and **licence**; **attest**, **supersede** and
+**last-resort** are not.
+
+**licence**, `POST /api/licence` with the caller's key, answers the
+signed statement below or 402 when no subscription stands behind it.
+The signing is the app's own BIP-340 wasm — one curve in this project
+and one implementation of it — which the worker fetches from the static
+assets it is already serving and keeps for the life of its isolate. It
+signs with `OH_SERVICE_SECRET` and then checks its own signature
+against `OH_SERVICE_KEY`, the public half every build is compiled to
+expect: a pair that does not match is a 503 saying so, rather than
+licences no device will take. `dart run bin/service_key.dart` in
+`service/` mints a pair; `deploy.sh` passes the public half into the
+build.
+
+**checkout**, `POST /api/checkout`, opens a Stripe Checkout session in
+subscription mode with the device's key in three places — the session's
+metadata, its client reference, and the subscription's metadata, which
+is what a renewal a year from now will carry. Where the buyer is sent
+back to comes in from the app and is checked against this site's own
+origin first: a payment does not land wherever the caller says.
+
+**entitle**, `POST /api/stripe`, is Stripe's webhook. Nothing is read
+out of a body until the `Stripe-Signature` header checks out against
+`OH_STRIPE_WEBHOOK_SECRET` — HMAC-SHA256 over the timestamp and the
+body, and a signature from last week is refused whatever it says, since
+a replay is not a payment. `checkout.session.completed` binds the
+device; the subscription's own events carry the date. The two arrive in
+either order, so a device bound before its date is known is dated on
+its first ask after.
+
+**turn-creds**, `POST /api/turn`
 with the caller's table key, answering Cloudflare Realtime TURN
 credentials good for four hours, minted from a TURN key that lives in
 the project's secrets (`OH_TURN_KEY_ID`, `OH_TURN_API_TOKEN`) and never in
@@ -78,6 +112,23 @@ Secrets — the service signing key, the TURN secret, the purchase webhook
 secret, the HMAC key — live in the platform's secret store, never in
 the table.
 
+**As built.** The shape above, flattened to one key per row —
+`PK|SK` — behind four calls: `get`, `put`, `under` (the sort keys under
+one partition key, for the devices on a subscription) and nothing else.
+Cloudflare KV bound as `OH_STORE` on the site; a `Map` behind the same
+four in the browser suite and in the tests, which is all local mode
+needs (`memoryStore`). `under` is the only call that is not a point
+lookup, and what it ranges over is five devices.
+
+One thing the shape does not survive on its own: the copy of the date a
+device keeps so that a licence is one read. Stale is harmless when a
+renewal has moved the date *out* — the device catches up on its first
+ask after its copy runs out. It is not harmless when a subscription
+*ends*: a refund would otherwise leave every device on it licensed for
+up to a year. So an ending — deleted, unpaid, expired — writes the
+devices down as well as the subscription. Five rows, once, and never on
+the renewal path.
+
 The design is written against DynamoDB's single-table shape and ports to
 any key-value store almost literally; the platform choice is deferred to
 deployment. A bucket is reserved for archiving public game records,
@@ -123,6 +174,24 @@ revocation list to distribute and check: a cancelled subscription simply
 stops being renewed, and the last licence runs out. A year's
 subscription is twelve or thirteen renewals, each a single point read.
 
+**As built** (`app/lib/net/licence.dart`, `app/lib/entitlement.dart`).
+The statement is four lines — a tag, the key, the day, the plan — hashed
+and signed BIP-340, and the date is the last day it is good for, running
+to the end of it in UTC. A licence signed by anything but the key this
+build names is not a licence; neither is one for another device, and
+neither is a licence whose day has passed. It is read off the device
+before the first frame and asked of the service behind it, in that
+order and never the other way: the front door has to be able to answer
+before it is drawn, and a device on a train has to be able to answer at
+all.
+
+Two things it does *not* do. It does not go through the general
+signature check the rest of the protocol uses, which also takes a
+simulated table's fake signature — a hash of the signer's **public**
+key, and the service's is printed in every build. And a build that
+names no service does not fall open: every device is unlicensed, rather
+than every device licensed by whoever answers first.
+
 ### Where the money comes in
 
 | | Buying | Renewing | Telling us |
@@ -134,6 +203,26 @@ Both land at **entitle**, keyed by the public key the buyer had when
 they bought — the key rides in the checkout session's metadata, or in
 the purchase's application username. A renewal is the same handler with
 a later date. Neither path asks the player to make an account.
+
+**As built.** The web half: Checkout, the webhook, and the app's side of
+both (`app/lib/net/buying.dart`). Pressing Subscribe asks the service
+for a session and leaves for it — and only for Stripe's own host,
+checked here, since what a device is sent to is not a place a bad
+answer gets to choose. Coming back, the address carries a mark the app
+reads once and then takes out: the webhook is usually there before the
+browser is, and when it is not the app asks again for a few seconds
+rather than telling the buyer nothing happened.
+
+The store half is not built, and cannot be until the app is in a store
+(README, roadmap 8). Until then `canBuyHere` is false off the web and
+says so rather than opening a checkout a phone should not be using.
+
+Three things have to be set on the project for any of it to work:
+`OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` (a yearly recurring price) and
+`OH_STRIPE_WEBHOOK_SECRET`, with the webhook pointed at `/api/stripe`
+for `checkout.session.completed` and `customer.subscription.*`. Without
+them the shop says it is not open yet, which is what a deployment with
+no keys should say.
 
 ### A subscription is a person's, not a device's
 
@@ -176,12 +265,22 @@ code and different adapters:
 |---|---|---|
 | Storage | DynamoDB | in-memory, same shape |
 | Sign-in | Apple/Google public keys | a test token naming a `sub` |
-| Entitlement | store and Stripe webhooks | a test endpoint that licences a key for a month |
+| Entitlement | store and Stripe webhooks | an open house: a key that asks is licensed for a month |
 | TURN | Cloudflare | none; localhost connects directly |
 | Signalling, waiting rooms, results | our own relay and a few public ones, listened on together; table events written to one relay everyone reads, ours preferred while up; lobby, signalling and whatever goes unanswered to all | a minimal NIP-01 relay in the repo |
 | Last-resort juror | woken on demand | always available |
 
 One process, one flag.
+
+**As built.** The browser suites run the site's own worker in-process
+over a `Map`, with `OH_OPEN_HOUSE` set: a key nobody has heard of is
+written a subscription and a device binding like any other and licensed
+for a month, which is one branch inside `entitlementOf` and is never on
+in production. The rig signs with BIP-340's published pair and
+`e2e/build.sh` compiles the app to expect it — a key that licenses one
+machine's rig and nothing else. So the suites exercise the real handler,
+the real signature and the real gate, rather than a door propped open
+for them.
 
 ## The relay, and the table over it
 

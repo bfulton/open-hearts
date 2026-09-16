@@ -1,6 +1,6 @@
 // Every flow one device can drive, in a real browser.
 //
-//   cd app && flutter build web -o build/e2e --base-href / --no-web-resources-cdn
+//   ./e2e/build.sh
 //   node e2e/flows.mjs                 # from the repo root
 //   node e2e/flows.mjs --only "a hand alone"
 //
@@ -287,7 +287,7 @@ async function playAlone(page, done, timeout = 120000) {
 async function checkFresh() {
   const built = statSync(join(appDir, 'main.dart.js'), { throwIfNoEntry: false })?.mtimeMs ?? 0;
   const newest = execFileSync('bash', ['-c', `find ${join(root, 'app', 'lib')} ${join(root, 'app', 'web')} -newermt @${Math.round(built / 1000)} -type f | head -3`], { encoding: 'utf8' }).trim();
-  if (newest) log(`the build is older than ${newest.split('\n').join(', ')} — flutter build web -o build/e2e first`);
+  if (newest) log(`the build is older than ${newest.split('\n').join(', ')} — ./e2e/build.sh first`);
 }
 
 async function main() {

@@ -39,6 +39,20 @@ Duration roomWait(Uri at, {required Duration standard, Duration most = const Dur
 /// of it when [code] is null.
 void showRoom(String? code) => platform.showAddress(roomAddress(code, Uri.base));
 
+/// Takes [name] out of the address and leaves the rest of it alone:
+/// for a mark a round trip put there — the `bought` a checkout comes
+/// back with — which a refresh should not act on twice.
+void forgetInAddress(String name) => platform.showAddress(addressWithout(name, Uri.base));
+
+String addressWithout(String name, Uri at) {
+  final params = Map<String, String>.from(at.queryParameters)..remove(name);
+  return Uri(
+    path: at.path.isEmpty ? '/' : at.path,
+    queryParameters: params.isEmpty ? null : params,
+    fragment: at.fragment.isEmpty ? null : at.fragment,
+  ).toString();
+}
+
 /// What the address becomes: [at] with the room set or dropped, and
 /// the rest of it left alone — a build driven with `?e2e` stays driven
 /// with it across a refresh.

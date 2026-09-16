@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import 'crypto/deal.dart';
 import 'crypto/schnorr.dart';
+import 'entitlement.dart';
 import 'home_page.dart';
+import 'identity.dart';
 import 'net/room.dart';
 import 'theme.dart';
 
@@ -16,6 +20,12 @@ Future<void> main() async {
   }
   await installFastSchnorr();
   await loadDeal();
+  // What this device may do, before the front door is drawn: read off
+  // the device, so a device that cannot reach us answers anyway, and
+  // asked of the service behind the first frame (docs/06-service.md).
+  final signer = await Identity.signer();
+  await Entitlement.current.load(signer.publicKey);
+  unawaited(Entitlement.current.refresh(signer));
   runApp(const OpenHeartsApp());
 }
 

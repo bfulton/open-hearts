@@ -1,6 +1,6 @@
 // Four real browsers at one table.
 //
-//   cd app && flutter build web -o build/e2e --base-href / --no-web-resources-cdn
+//   ./e2e/build.sh
 //   node e2e/run.mjs            # from the repo root; needs the global Playwright
 //
 // The app's relays are the build's, never typed in (app/lib/net/

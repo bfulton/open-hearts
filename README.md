@@ -110,7 +110,12 @@ rigged. Roughly in order:
    wider under the same slim header, chosen from the space the table
    is given and never from the device; a turn mid-hand keeps the
    game. Tablet and the Duo are next.
-8. **The stores.**
+8. **Live play is a subscription** — $2.99 a year
+   ([doc 06](docs/06-service.md)). The licence, the gate, and buying on
+   the web through Stripe are built; buying on a phone is the store's
+   own subscription and waits on the next item. Sharing a subscription
+   across your devices by QR, and provider sign-in, are next.
+9. **The stores.**
 
 ### Backlog
 
@@ -139,10 +144,11 @@ cd packages/table && dart test      # the protocol on a simulated network, seale
 cd service && dart test             # the local relay, and a hand played over it with real signatures
 cd service && OH_RELAY=js dart test # the same suite, against the object's relay
 node --test service/do/*.test.mjs   # that relay's own tests, and the sockets under it
+node --test service/functions/*.test.mjs  # the site's handlers: TURN, licences, the shop
 cd app && flutter test              # the widgets
 cd app && flutter run -d chrome
 
-cd app && flutter build web -o build/e2e --base-href / --no-web-resources-cdn
+./e2e/build.sh                      # the app as the suites drive it
 node e2e/flows.mjs                  # every flow one device can drive, in a browser
 node e2e/run.mjs                    # four browsers at one table, over the local relay
 ```
@@ -165,6 +171,18 @@ Publish the current commit to the dev branch page:
 ```bash
 ./deploy.sh         # needs CLOUDFLARE_TOKEN and CLOUDFLARE_ACCOUNT_ID
 ```
+
+Live play is a subscription ([doc 06](docs/06-service.md)), and a build
+only takes a licence from the service it was compiled to expect. Mint
+the pair once with `cd service && dart run bin/service_key.dart`: the
+public half goes in `OH_SERVICE_KEY` where `deploy.sh` can read it, the
+secret half into the project's secrets as `OH_SERVICE_SECRET` and
+nowhere else. The store is Cloudflare KV bound as `OH_STORE`, and the
+shop is `OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` and
+`OH_STRIPE_WEBHOOK_SECRET`. A build published without them has live
+play shut and says what it costs — which is the right way round for a
+missing key, and is what the browser suites prove by supplying their
+own (`e2e/build.sh`).
 
 ### The engine is the point
 

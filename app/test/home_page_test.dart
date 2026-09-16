@@ -11,9 +11,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
@@ -24,11 +26,34 @@ import 'package:table/table.dart';
 
 import 'room_test.dart' show Bus;
 
-Future<void> pumpHome(WidgetTester tester, {String? openRoom}) async {
+/// A service of this test's own: BIP-340's published pair, so the
+/// licences here are signed the way the real one signs them and checked
+/// the way the app checks that one.
+const _serviceSecret = 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef';
+const _service = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
+
+/// Live play open on this device, the only way it is ever open: a
+/// licence with a date on it, signed by the service this build names.
+Future<void> licenceThisDevice({int days = 30}) async {
+  final device = (await Identity.signer()).publicKey;
+  final day = DateTime.now().toUtc().add(Duration(days: days));
+  final until = DateTime.utc(day.year, day.month, day.day);
+  final unsigned = Licence(key: device, until: until, plan: 'year', signature: '');
+  await Entitlement.current.load(device);
+  await Entitlement.current.adopt(Licence(
+    key: device,
+    until: until,
+    plan: 'year',
+    signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest),
+  ));
+}
+
+Future<void> pumpHome(WidgetTester tester, {String? openRoom, bool live = true}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
+  if (live) await licenceThisDevice();
   await tester.pumpWidget(still(HomePage(openRoom: openRoom, online: false)));
   await tester.pumpAndSettle();
 }
@@ -43,7 +68,14 @@ Widget still(Widget home) => MaterialApp(
     );
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    // Every test stands up a service of its own, and takes it down
+    // again: the standing of this device is a global, like its
+    // identity (entitlement.dart).
+    Entitlement.current = Entitlement(service: _service);
+  });
+  tearDown(() => Entitlement.current = Entitlement());
 
   test('a relay that answers late still counts; it is only said to be slow first', () async {
     final relay = Completer<void>();
@@ -201,22 +233,64 @@ void main() {
     room.dispose();
   });
 
-  testWidgets('with live play locked there is a padlock and no way in, not even a link', (tester) async {
-    liveOpen = false;
-    addTearDown(() => liveOpen = true);
+  testWidgets('unlicensed there is no way into a live game, not even a link — and a price instead', (tester) async {
     // A name on the device and a room link in the address: the way
     // into a room that asks for no button at all.
     SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
-    tester.view
-      ..physicalSize = const Size(390, 844)
-      ..devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-    await pumpHome(tester, openRoom: 'KP4T9MXR');
+    await pumpHome(tester, openRoom: 'KP4T9MXR', live: false);
     expect(find.text('Play solo'), findsOneWidget, reason: 'playing alone is free, always');
-    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
-    expect(find.text('Not open yet'), findsOneWidget);
     expect(find.text('Play live'), findsNothing);
     expect(find.text('Play friends'), findsNothing);
     expect(find.text('Share the link'), findsNothing, reason: 'the link did not open a room either');
+    expect(find.text(r'$2.99 a year'), findsOneWidget, reason: 'what it costs, said on the door');
+    expect(find.text('Subscribe'), findsOneWidget);
+  });
+
+  testWidgets('a licence run out is no licence, and one for another device is none either', (tester) async {
+    await licenceThisDevice(days: -1);
+    expect(Entitlement.current.live, isFalse, reason: 'yesterday is not a date you can play on');
+
+    // Signed for somebody else's device, by the right service.
+    final other = SchnorrSigner.generate().publicKey;
+    final until = DateTime.now().toUtc().add(const Duration(days: 30));
+    final day = DateTime.utc(until.year, until.month, until.day);
+    final unsigned = Licence(key: other, until: day, plan: 'year', signature: '');
+    final signed = Licence(
+        key: other, until: day, plan: 'year', signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest));
+    expect(await Entitlement.current.adopt(signed), isFalse);
+    expect(Entitlement.current.live, isFalse);
+
+    await pumpHome(tester, live: false);
+    expect(find.text('Subscribe'), findsOneWidget);
+  });
+
+  testWidgets('a licence that arrives under the screen opens the door', (tester) async {
+    await pumpHome(tester, live: false);
+    expect(find.text('Play live'), findsNothing);
+    await licenceThisDevice();
+    await tester.pumpAndSettle();
+    expect(find.text('Play live'), findsOneWidget, reason: 'the door opens when the licence lands');
+    expect(find.text('Subscribe'), findsNothing);
+  });
+
+  testWidgets('with live play open the menu is where the date on the licence is', (tester) async {
+    await pumpHome(tester);
+    expect(find.text('Play live'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Live play'));
+    await tester.pumpAndSettle();
+    final until = Licence.dayOf(Entitlement.current.until!);
+    expect(find.text('Live play is open on this device, to $until.'), findsOneWidget);
+    expect(find.text('Subscribe'), findsNothing, reason: 'nothing to buy twice');
+  });
+
+  testWidgets('the page behind the price says what the money is for, and it is not the game', (tester) async {
+    await pumpHome(tester, live: false);
+    await tester.tap(find.text('Subscribe'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Playing alone is free'), findsOneWidget);
+    expect(find.textContaining('No server sees a hand'), findsOneWidget);
+    expect(find.text(r'$2.99 a year'), findsOneWidget);
   });
 }

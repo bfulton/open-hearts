@@ -2,7 +2,7 @@
 // from the built app in a headless browser — for looking at a layout
 // before a phone does.
 //
-//   cd app && flutter build web -o build/e2e --base-href / --no-web-resources-cdn
+//   ./e2e/build.sh
 //   node e2e/shots.mjs            # writes app/build/shots/*.png
 //
 // Each shape gets the pass (thirteen cards, the Pass button), then the

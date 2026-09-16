@@ -46,12 +46,18 @@ abstract class Signer {
   Uint8List sharedXWith(PublicKey other);
 }
 
+/// Whether a fake signature counts as a signature here. False until
+/// this process makes a [FakeSigner], which only a simulation or a test
+/// ever does — see [FakeSigner] for why it must be off everywhere else.
+bool fakeSignaturesPass = false;
+
 /// Checks [signatureHex] over [digestHex] by [key]. Recognises both real
 /// and fake signatures, by their length, so a simulated table and a real
-/// one share every line of protocol code.
+/// one share every line of protocol code — but a fake one only where
+/// fake signers exist.
 bool verify(PublicKey key, String digestHex, String signatureHex) {
   if (signatureHex.length == FakeSigner.length) {
-    return FakeSigner.check(key, digestHex, signatureHex);
+    return fakeSignaturesPass && FakeSigner.check(key, digestHex, signatureHex);
   }
   try {
     return schnorrVerifier(key, digestHex, signatureHex);
@@ -128,9 +134,18 @@ class SchnorrSigner implements Signer {
 List<int> _unhex(String hex) => [for (var i = 0; i < hex.length; i += 2) int.parse(hex.substring(i, i + 2), radix: 16)];
 
 /// A stand-in for tests: the "signature" is a hash of key and digest.
-/// Anyone could forge it; nobody in a simulation tries to.
+///
+/// Anyone could forge it, and that is not a detail: what it hashes is
+/// the signer's *public* key, which everyone at a table has. A peer
+/// could sign as any other seat simply by making the hash. So [verify]
+/// takes one only where fake signers are in use, and making one is what
+/// says so — a simulation and a test make them, and nothing a person
+/// runs ever does. Arming it here rather than at each entry point is
+/// the point: an entry point can be forgotten.
 class FakeSigner implements Signer {
-  FakeSigner(String name) : publicKey = sha256Hex(utf8.encode('fake:$name'));
+  FakeSigner(String name) : publicKey = sha256Hex(utf8.encode('fake:$name')) {
+    fakeSignaturesPass = true;
+  }
 
   static const length = 32; // half a real signature, so never mistaken
 

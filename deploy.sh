@@ -139,11 +139,20 @@ cp service/functions/worker.mjs "$STAGE/_worker.js"
 # (app/lib/net/relays.dart); the local rig is the only thing that sets
 # it, to its bridges. The build's identity comes from the generated
 # file above, not a flag.
+#
+# OH_SERVICE_KEY names the service this build will take a licence from,
+# and no other (docs/06-service.md, app/lib/net/licence.dart): the
+# public half of the pair `dart run bin/service_key.dart` mints, whose
+# secret is set on the Pages project as OH_SERVICE_SECRET and lives
+# nowhere else. A build published without it has live play shut, which
+# is the safe way round: the alternative is a build that would take a
+# licence from whoever answered first.
 ( cd app && "$FLUTTER" build web \
     --release \
     --no-web-resources-cdn \
     --base-href /play/ \
-    --dart-define=OH_RELAYS="${OH_RELAYS:-}" )
+    --dart-define=OH_RELAYS="${OH_RELAYS:-}" \
+    --dart-define=OH_SERVICE_KEY="${OH_SERVICE_KEY:-}" )
 
 mkdir -p "$STAGE/play"
 cp -r app/build/web/. "$STAGE/play"/
