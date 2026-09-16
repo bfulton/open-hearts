@@ -297,6 +297,38 @@ class DealSession {
     return p == null ? null : _holderOf[p];
   }
 
+  /// Whether every seat that gave its word on the lead card said it
+  /// holds the card nowhere.
+  ///
+  /// On its own this is not a stalled hand: a bot's hand is open to
+  /// everyone and a departed seat's opens from escrow, and either may
+  /// hold the card, in which case every person saying "not me" is four
+  /// true words and a hand that leads itself. It is a stalled hand
+  /// together with [leader] being null, which says nothing open holds
+  /// the card either — and then somebody lied, since one of the four
+  /// thirteens has it.
+  ///
+  /// Only words go into it, so it is the same answer at every side of
+  /// the table and stays the same answer afterwards: a seat removed
+  /// later does not take its word back.
+  bool get leadDisclaimed => _declared.isNotEmpty && _declared.values.every((p) => p < 0);
+
+  /// Whether any departed seat's secret is still owed here: a hand
+  /// this side cannot see yet, which may be the one holding the lead
+  /// card. Nothing about the lead is settled while this is true.
+  bool get awaitsAnySecret => _gone.any(awaitsSecret);
+
+  /// The seat whose word on the lead card was false: it was dealt the
+  /// card and said it holds it nowhere. Null until the deal is open
+  /// enough to see the card — which, where every seat disclaimed it,
+  /// takes the audit.
+  int? get lied {
+    final p = leadPosition;
+    if (p == null) return null;
+    final seat = dealtTo(p);
+    return _declared[seat] == -1 ? seat : null;
+  }
+
   // ---- keys ------------------------------------------------------------
 
   /// This seat's keys, for everyone, with its escrow: null when this
@@ -603,9 +635,25 @@ class DealSession {
       for (final s in e.value.entries) {
         final p = s.key;
         final owner = p ~/ _handSize;
-        final point = crypto.open(secret, Uint8List.sublistView(s.value, 0, sealedBytes));
-        final token = Uint8List.fromList([...point, ...Uint8List.sublistView(s.value, sealedBytes)]);
-        if (crypto.verifyToken(_pks[owner]!, _masked(p), token)) _tokens.putIfAbsent(owner, () => {})[p] = token;
+        // Sealed to nothing leaves no token to be had
+        // (docs/03-fair-deal.md): either the opening is arithmetic on a
+        // point that is not one, which the primitives refuse, or what
+        // comes out is not the token for the card. Either way it is
+        // this position only, and it is written down rather than
+        // thrown — an unopenable seal thrown from here used to take
+        // the whole session with it, so that nothing else opened
+        // either.
+        try {
+          final point = crypto.open(secret, Uint8List.sublistView(s.value, 0, sealedBytes));
+          final token = Uint8List.fromList([...point, ...Uint8List.sublistView(s.value, sealedBytes)]);
+          if (crypto.verifyToken(_pks[owner]!, _masked(p), token)) {
+            _tokens.putIfAbsent(owner, () => {})[p] = token;
+          } else {
+            _sealedShut[p] = owner;
+          }
+        } catch (_) {
+          _sealedShut[p] = owner;
+        }
       }
       _sealedTo.remove(e.key);
     }
@@ -859,6 +907,93 @@ class DealSession {
     }
   }
 
+  /// The tokens for [positions] in the clear, from the seat that was
+  /// dealt them: a passer's answer to a receiver that says the pass it
+  /// was sent will not open (docs/03-fair-deal.md).
+  ///
+  /// Nobody can tell from the outside whether a sealed token is the
+  /// right one — that is the whole of the hole — so the answer is to
+  /// stop sealing it. The three cards become everyone's to see, which
+  /// is what being asked costs, and is why an honest passer is never
+  /// asked twice and a receiver has no reason to ask falsely: the cards
+  /// it gives away are the ones it just received.
+  Map<String, Object?>? showMessage(List<int> positions) {
+    final me = mySeat;
+    if (me == null || deck == null || positions.isEmpty) return null;
+    final tokens = <Uint8List>[];
+    for (final p in positions) {
+      if (p ~/ _handSize != me) return null;
+      final t = _tokens[me]?[p];
+      if (t == null) return null;
+      tokens.add(t);
+    }
+    return {'seat': me, 'positions': positions, 'tokens': [for (final t in tokens) _b64(t)]};
+  }
+
+  /// Whether a showing holds: positions dealt to the seat that shows
+  /// them, and a token for each that opens what it names. Changes
+  /// nothing.
+  bool verifyShow(Map<String, Object?> m) {
+    try {
+      final seat = m['seat'] as int;
+      if (!_human(seat) || deck == null || !_pks.containsKey(seat)) return false;
+      final positions = [for (final p in m['positions'] as List) p as int];
+      final tokens = [for (final t in m['tokens'] as List) _unb64(t)];
+      if (positions.isEmpty || tokens.length != positions.length) return false;
+      if (positions.toSet().length != positions.length) return false;
+      for (var i = 0; i < positions.length; i++) {
+        final p = positions[i];
+        if (p < 0 || p >= deckSize || p ~/ _handSize != seat) return false;
+        if (!crypto.verifyToken(_pks[seat]!, _masked(p), tokens[i])) return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// A showing taken: the tokens are kept, and what they complete
+  /// opens for everyone.
+  bool acceptShow(Map<String, Object?> m, {bool verified = false}) {
+    try {
+      if (!verified && !verifyShow(m)) return false;
+      final seat = m['seat'] as int;
+      final positions = [for (final p in m['positions'] as List) p as int];
+      final tokens = [for (final t in m['tokens'] as List) _unb64(t)];
+      if (tokens.length != positions.length) return false;
+      for (var i = 0; i < positions.length; i++) {
+        _tokens.putIfAbsent(seat, () => {})[positions[i]] = tokens[i];
+      }
+      _openWhatCan();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Positions whose sealed token would not open with the secret it
+  /// was sealed to, by the seat that sealed them: a passer sent the
+  /// receiver something that is not the token for the card
+  /// (docs/03-fair-deal.md). Only a side holding the receiver's secret
+  /// can tell, which is the receiver, and every side once the hand is
+  /// audited — so this is how a verifier knows a hand given up for it
+  /// was given up truthfully.
+  ///
+  /// A position here may open later all the same, by the owner showing
+  /// its token in the clear or by its secret becoming everyone's; that
+  /// the seal was bad does not stop being true.
+  final Map<int, int> _sealedShut = {};
+
+  Map<int, int> get sealedShut => Map.unmodifiable(_sealedShut);
+
+  /// The positions [from] passed to [to] that will not open here: the
+  /// three cards a receiver cannot see, or none. Empty where there is
+  /// no such pass, or it opened.
+  List<int> unopenedPass(int from, int to) => [
+        for (var p = from * _handSize; p < (from + 1) * _handSize; p++)
+          if (_holderOf[p] == to && !_cards.containsKey(p)) p,
+      ];
+
   /// A pass from a seat whose secret this side holds — a bot's, or
   /// its own once it has left and a bot plays its seat — needs no
   /// message: the positions move, and everyone can open them.
@@ -973,7 +1108,16 @@ class DealSession {
       if (known is Map) {
         for (final e in known.entries) {
           final s = int.parse(e.key as String);
-          if (!_human(s) || !_pks.containsKey(s)) return false;
+          // A secret offered for a seat this side plays as a bot is
+          // nothing to this side: a bot's secret is public work, and the
+          // value offered cannot open a card differently. The side that
+          // signed the audit may have held the seat as a person who left
+          // — a seat removed at the first turn of a hand is a person to
+          // the table and a bot to a verifier that reads the removal
+          // before the deal — and either way this is what
+          // [acceptAudit] passes over, so it is what this passes over.
+          if (!_human(s)) continue;
+          if (!_pks.containsKey(s)) return false;
           final other = _unb64(e.value);
           if (other.length != 32 || !_same(crypto.keygen(other), _pks[s]!)) return false;
         }

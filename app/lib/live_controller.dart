@@ -199,6 +199,28 @@ class LiveController extends ChangeNotifier implements TableModel {
   }
 
   /// The last hand whose sheet has been raised on this screen.
+  /// Whether the record has left behind the hand the view is still
+  /// showing: nothing of it remains, and what comes next is a later
+  /// hand's. That is a hand the table gave up where it stood
+  /// (docs/03-fair-deal.md) — nobody could lead it, or a pass into a
+  /// seat would never open — and there is nothing more of it to show.
+  ///
+  /// Asked only where the view has run out of things to do of its own:
+  /// a bot's move is not in the record, so a hand that ends on three of
+  /// them has nothing left in the record either, and is not given up.
+  bool _givenUp(List<Decision> record) =>
+      _consumed.length < record.length && record[_consumed.length].turn.hand > _shown.handNumber;
+
+  /// A hand given up, as the view shows it: the beat of bare felt that
+  /// ends any hand, and then the next one dealt. No sheet — nothing was
+  /// scored, because no hand happened.
+  void _giveUpShownHand() {
+    _shown.abandonHand();
+    _shownPlayed.clear();
+    _pendingPlay = null;
+    _pendingPass = const {};
+  }
+
   int _sheetsShownThrough = -1;
 
   /// The hand shown out to its sheet, and the next one begun under it.
@@ -370,6 +392,7 @@ class LiveController extends ChangeNotifier implements TableModel {
           return (delay: Duration.zero, act: () => _botActs(s, passing: true));
         }
       }
+      if (_givenUp(record)) return (delay: sweepBeat, act: _giveUpShownHand);
       if (_consumed.length >= record.length) return null; // a person's pass is owed
       final d = record[_consumed.length];
       if (d.event.kind != EventKind.pass) return null; // not what the replay expects: leave it to a rebuild
@@ -407,6 +430,7 @@ class LiveController extends ChangeNotifier implements TableModel {
       if (!_seesHand(seat)) return null; // a departed seat's hand, not open here yet
       return (delay: _botThink(seat), act: () => _botActs(seat, passing: false));
     }
+    if (_givenUp(record)) return (delay: sweepBeat, act: _giveUpShownHand);
     if (_consumed.length >= record.length) return null; // a person's play is owed
     final d = record[_consumed.length];
     if (d.event.kind != EventKind.play || d.event.seat != seat) return null;

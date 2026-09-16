@@ -372,7 +372,9 @@ Verification verifyRecord(
       if (!carried(dec.witnesses, dec.turn, dec.among) && !byVerdict(dec)) {
         return fail('an audit at ${dec.turn} by seat $seat without a majority behind it (${dec.witnesses.length} of ${dec.among.length})');
       }
-      if (!d.acceptAudit(Map<String, Object?>.from(e.body))) return fail('an audit by seat $seat that is not the secret behind its key');
+      if (!d.acceptAudit(Map<String, Object?>.from(e.body))) {
+        return fail('hand ${game.handNumber}: an audit by seat $seat that is not the secret behind its key');
+      }
       final why = takeRemovals();
       if (why != null) return fail(why);
     }
@@ -388,6 +390,34 @@ Verification verifyRecord(
   }
 
   var incomplete = false;
+  var gaveUp = false;
+
+  /// A hand that stopped where it stood and was given up: its audits
+  /// where its cards should be (docs/03-fair-deal.md, and _giveUpHand
+  /// in client.dart). Null unless the record does that here; [gaveUp]
+  /// says whether it did.
+  ///
+  /// Two things leave a hand nobody can finish, and the opened deal
+  /// shows both: a seat dealt the two of clubs that said it held it
+  /// nowhere, so that nobody could lead; and a pass sealed to something
+  /// that is not the token for the card, so that the seat it was sent
+  /// to could never see three of its own. Neither is a thing a majority
+  /// can arrange: only the seat that did it could have.
+  Verification? takeGiveUp() {
+    gaveUp = false;
+    if (!nextIsAudit()) return null;
+    final d = deal;
+    if (d == null) return fail('hand ${game.handNumber}: given up at a table with no deal');
+    final v = takeAudits();
+    if (v != null) return v;
+    if (d.lied == null && d.sealedShut.isEmpty) {
+      return fail('hand ${game.handNumber}: given up, though the open deal shows nothing that could not be finished');
+    }
+    game.abandonHand();
+    deal = null;
+    gaveUp = true;
+    return null;
+  }
 
   while (game.phase != Phase.gameOver) {
     final why = takeRemovals();
@@ -405,7 +435,30 @@ Verification verifyRecord(
           if (allowPartial && index >= record.length) return partial();
           return fail('hand ${game.handNumber}: the deal is not complete (${d.phase.name})');
         }
+        // A hand whose audits follow its deal with nothing in between
+        // never began: nobody could lead it, so the table opened it to
+        // find out why and gave it up (docs/03-fair-deal.md, and
+        // _giveUpHand in client.dart). Two things make that legitimate,
+        // and both are in the record: every seat's own signed word put
+        // the lead card nowhere, and the deal those audits open shows
+        // one of them holding it. What the record must not then contain
+        // is the hand played on with every card in the open, and it
+        // cannot: the audits are where the hand ends.
+        final givenUp = nextIsAudit();
         feedSecrets(d, all: true);
+        if (givenUp) {
+          if (!d.leadDisclaimed) {
+            return fail('hand ${game.handNumber}: opened before it began, though a seat said where the lead card was');
+          }
+          final v = takeAudits();
+          if (v != null) return v;
+          if (d.lied == null) {
+            return fail('hand ${game.handNumber}: given up, though the open deal shows a seat that could have led it');
+          }
+          game.abandonHand();
+          deal = null;
+          continue;
+        }
         final leader = d.leader;
         if (leader == null) return fail('hand ${game.handNumber}: nobody declared the lead card');
         final hands = <List<Card>?>[];
@@ -456,6 +509,13 @@ Verification verifyRecord(
         }
       }
       if (game.phase != Phase.passing) continue;
+      // A hand's audits where its cards should be: the hand was given
+      // up where it stood. Asked here, where the replay is waiting on
+      // the record — a bot's move is not in the record, it is computed,
+      // and the audits may sit behind several of them.
+      final gone = takeGiveUp();
+      if (gone != null) return gone;
+      if (gaveUp) continue;
       if (index >= record.length) return allowPartial ? partial() : fail('the record ends mid-pass');
       final d = record[index++];
       final e = d.event;
@@ -514,6 +574,9 @@ Verification verifyRecord(
       sweep();
       continue;
     }
+    final gone = takeGiveUp();
+    if (gone != null) return gone;
+    if (gaveUp) continue;
     if (index >= record.length) return allowPartial ? partial() : fail('the record ends with seat $seat to play');
     final d = record[index++];
     final e = d.event;

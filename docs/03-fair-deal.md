@@ -265,16 +265,61 @@ offer say so, and a build that cannot run the deal does not sit down.
   wasm built for the VM, two hundred times faster, and an event seen
   before is taken by its id without a second check.
 
-Two things it does not do yet. Both take a modified client, both stall
-one table and nothing more, and both the audit would expose:
+**Two faults no proof can catch**, and what the table does about them.
+Both take a modified client, and in each the arithmetic has nothing to
+work on: a seat saying it holds the two of clubs nowhere has nothing to
+prove, and a token sealed to one pair of eyes is nothing anyone else can
+check. But each leaves a hand nobody can finish, and a table waiting on
+a turn that cannot come is the one thing that must never happen. So the
+hand is opened where it stands — its audit called at the top of it, or
+in the middle, instead of at the end — and then given up: nothing
+scored, nothing played counted, and the next hand dealt in its place,
+without the seat the open deal shows broke it. A hand given up is the
+redeal, in everything but its number: a hand's turns live under its own
+number, so the fresh deal is the next hand rather than the same one
+again.
 
-- A holder who declares the 2♣ nowhere stalls the hand before it
-  starts; the rail says nobody claims it. The remedy is an early audit
-  and a redeal without the liar.
-- A passer who seals garbage to the receiver leaves it three cards it
-  cannot open until the audit; a third party cannot tell whose fault
-  that is. The remedy is a verifiable encryption of the token, or a
-  complaint the passer must answer by opening the three in public.
+- **A holder who declares the 2♣ nowhere.** Every seat says it holds the
+  card nowhere, and one of the four thirteens has it, so nobody can lead
+  and no seat's word will say which lied. The audit is called there and
+  then; the opened deal names the seat that was dealt the card it
+  disclaimed, and it is removed at the first turn of its own that opens
+  in the hand after — never at the turn it lied at, which settled long
+  before the cards said so. A client that will not answer that audit is
+  booted at the turn it will not answer; one that plays on by itself,
+  alone in knowing who leads, is a client whose heartbeats stop moving,
+  and a peer that has not moved for longer than a decision may take is
+  not catching up.
+- **A passer who seals the receiver something that will not open.** The
+  receiver says so, and an honest passer answers by showing the three
+  tokens in the clear. That opens the three cards to everybody and puts
+  the receiver back in the hand, and there it ends: no seat is lost, and
+  the hand is played out. While an answer is owed, no card of the
+  passer's carries and the receiver is not late — the table stops on the
+  passer, whose own next turn is where the clock takes its seat. Where
+  the table is left waiting on the receiver instead, nothing can come:
+  it cannot play what it cannot see, and removing it changes nothing,
+  since a bot playing its hand cannot see those three either. So the
+  hand is opened and given up, and the passer is out at the first turn
+  of the next one.
+- **A verifier sees both for itself**, which is why the hand is opened
+  before it is given up: with every secret in, a hand given up must show
+  either a seat dealt the lead card that disclaimed it, or a seal that
+  does not open to the token for its card. Neither is a thing a majority
+  can arrange — only the seat that did it could have — so a table cannot
+  throw away a hand it merely dislikes.
+
+**What the answer costs, and what is left.** Showing the three puts
+three of the receiver's cards in the open for the rest of that hand, and
+a modified passer can make that happen without losing its seat: nobody
+outside the pair can tell its seal from an honest one, so nothing
+follows at the table from having sent it. The record keeps it all the
+same — a verifier holding every secret can say which seal would not open
+and which seat sent it. Closing it at the table is the other remedy
+named above: a verifiable encryption of the token, a proof carried with
+the pass that what is sealed is the token for the card. That is a
+Σ-protocol on the curve the deal already uses, of the same shape as the
+token proofs, and it is not built.
 
 **Tests.** `packages/deal`: every primitive round trips, and four
 sessions in one process deal, pass, play, lose a seat and rebuild it,
@@ -282,7 +327,11 @@ and audit, with a verifier that saw only the messages.
 `packages/table/test/sealed_test.dart`: whole sealed games at one, two
 and four people that verify to the end; a person leaving mid-hand and
 during the deal; a table of two surviving a crash on turn by the
-jury's verdict and a juror's piece. The jury over real sockets
+jury's verdict and a juror's piece; and the two faults above committed
+for real — every seat disclaiming the two of clubs, by a client that
+deals itself the hand anyway and by one that waits with the rest, and a
+pass sealed to nothing by a client that answers for it and by one that
+will not — each played out to a game that finishes and verifies. The jury over real sockets
 (`service/test`) runs sealed as well as seeded; the app's widget test
 plays a sealed hand from seat 2; and the browser suite's four headless
 browsers deal every hand this way.
@@ -323,5 +372,7 @@ revealing the permutation.
    core** (above); the phone's number is a tap away on the dev site.
 4. If the number holds, implement Barnett–Smart and make the fair deal
    the default for tables with strangers. **Built** ("As built",
-   above), for every live table. What remains is the bot inside the
-   computation ([doc 04](04-live-play.md)), and the two gaps above.
+   above), for every live table, and the two faults above are answered
+   — a hand no modified client can leave unfinished. What remains is the
+   bot inside the computation ([doc 04](04-live-play.md)), and the
+   verifiable encryption of the passed token.

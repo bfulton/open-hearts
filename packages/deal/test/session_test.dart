@@ -94,6 +94,87 @@ void main() {
     return all;
   }
 
+  test('a seat that says it holds the lead card nowhere: the deal says so, and the audit says which', () {
+    // Four people, every one of whom declares the lead card nowhere.
+    // Three of them are telling the truth.
+    final seats = [for (var s = 0; s < 4; s++) HumanDealSeat('p$s')];
+    final all = [for (var s = 0; s < 4; s++) make(seats, s)];
+    for (var s = 0; s < 4; s++) {
+      broadcast(all, s, (x) => x.acceptKeys(all[s].myKeys()!));
+    }
+    for (var s = 0; s < 4; s++) {
+      final m = all[s].myShuffle()!;
+      broadcast(all, s, (x) => x.acceptShuffle(m));
+    }
+    for (var s = 0; s < 4; s++) {
+      final m = all[s].myTokens()!;
+      broadcast(all, s, (x) => x.acceptTokens(m));
+    }
+    // Which seat was dealt the card, for the test to check against
+    // afterwards; nobody at the table can see this yet.
+    final dealt = [for (var s = 0; s < 4; s++) s].firstWhere((s) => all[s].handOf(s)!.contains(leadCard));
+    for (var s = 0; s < 4; s++) {
+      final honest = all[s].myDeclaration()!;
+      expect(honest['position'] == -1, s != dealt, reason: 'only the seat holding it has anything to declare');
+      broadcast(all, s, (x) => x.acceptDeclaration({'seat': s, 'position': -1}));
+      expect(all[s].acceptDeclaration({'seat': s, 'position': -1}), isTrue, reason: 'and it takes its own word too');
+    }
+
+    for (var s = 0; s < 4; s++) {
+      expect(all[s].leadDisclaimed, isTrue, reason: 'nobody claims the card');
+      expect(all[s].awaitsAnySecret, isFalse, reason: 'and nobody is owed a hand from escrow');
+      // Only the seat that lied can see the card, in its own hand. To
+      // everyone else the hand is simply unleadable.
+      expect(all[s].leader, s == dealt ? dealt : isNull);
+      expect(all[s].lied, s == dealt ? dealt : isNull);
+    }
+
+    // The audit opens every hand, and then the deal names the seat: it
+    // was dealt the card and said it held it nowhere.
+    for (var s = 0; s < 4; s++) {
+      final m = all[s].myAudit()!;
+      broadcast(all, s, (x) => x.acceptAudit(m));
+    }
+    for (var s = 0; s < 4; s++) {
+      expect(all[s].fullDeal, isNotNull, reason: 'every card is open');
+      expect(all[s].lied, dealt);
+      expect(all[s].leader, dealt, reason: 'and it could have led all along');
+    }
+  });
+
+  test('four true words and a hand that leads itself: a bot holding the card is not a lie', () {
+    // Two people and two bots, dealt until somebody leads. Where the
+    // card fell to a bot, both people say "not me" and mean it: every
+    // word on the lead card is a disclaimer and the hand leads anyway,
+    // off a hand that is open to everybody.
+    for (var seed = 1; seed <= 6; seed++) {
+      final seats = [const HumanDealSeat('a'), const HumanDealSeat('b'), const BotDealSeat(), const BotDealSeat()];
+      final all = [for (var s = 0; s < 4; s++) make(seats, seats[s] is HumanDealSeat ? s : null, seed: seed)];
+      for (final h in [0, 1]) {
+        broadcast(all, h, (x) => x.acceptKeys(all[h].myKeys()!));
+      }
+      for (final h in [0, 1]) {
+        final m = all[h].myShuffle()!;
+        broadcast(all, h, (x) => x.acceptShuffle(m));
+      }
+      for (final h in [0, 1]) {
+        final m = all[h].myTokens()!;
+        broadcast(all, h, (x) => x.acceptTokens(m));
+      }
+      for (final h in [0, 1]) {
+        final m = all[h].myDeclaration()!;
+        broadcast(all, h, (x) => x.acceptDeclaration(m));
+        expect(all[h].acceptDeclaration(m), isTrue);
+      }
+      for (final x in all) {
+        expect(x.leader, isNotNull, reason: 'somebody leads, whoever was dealt it');
+        expect(x.lied, isNull, reason: 'and nobody said otherwise');
+        expect(x.leadDisclaimed, x.leader! >= 2,
+            reason: 'both people disclaim it exactly when a bot holds it, and are right to');
+      }
+    }
+  });
+
   test('two people and two bots: each person sees its own hand and the bots\', not the other person\'s', () {
     final seats = [const HumanDealSeat('a'), const HumanDealSeat('b'), const BotDealSeat(), const BotDealSeat()];
     final all = dealOut(seats);
