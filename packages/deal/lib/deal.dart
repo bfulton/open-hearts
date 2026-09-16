@@ -54,17 +54,23 @@ abstract class DealCrypto {
   Uint8List revealToken(Uint8List secret, Uint8List masked, Uint8List seed);
   bool verifyToken(Uint8List pk, Uint8List masked, Uint8List token);
 
-  /// A seat's key split in two — [scalarBytes] each, the two together —
+  /// A seat's key split into [shares] pieces of [scalarBytes] each,
   /// so that a departed seat's cards can be opened without anyone
-  /// putting the key back together (docs/04-live-play.md, "Playing a
-  /// seat nobody holds"). [shareKey] of each aggregates to the seat's
-  /// own public key, which is what says a split is a split of *that*
-  /// key.
-  Uint8List split(Uint8List secret, Uint8List seed);
+  /// putting the key back together (docs/03-fair-deal.md, "Escrow").
+  /// [shareKey] of each aggregates to the seat's own public key, which
+  /// is what says a split is a split of *that* key, and no smaller set
+  /// of them is anything.
+  Uint8List split(Uint8List secret, Uint8List seed, {int shares = 2});
 
   /// One share's public key: what that share's token is checked
   /// against, and one of the keys the seat's own is the sum of.
   Uint8List shareKey(Uint8List share);
+
+  /// The token behind a seal, from the parts the shares of the
+  /// recipient's key made of it. A seal is a ciphertext of a card's
+  /// shape, so a share's part is [shareToken] over the seal itself and
+  /// [verifyToken] checks it; this adds them up and takes them off.
+  Uint8List openShared(Uint8List sealed, List<Uint8List> parts);
 
   /// One share's part of opening [masked], proved against that share's
   /// key exactly as a whole seat's token is proved against its own.

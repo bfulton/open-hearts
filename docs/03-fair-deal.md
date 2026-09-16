@@ -241,20 +241,44 @@ offer say so, and a build that cannot run the deal does not sit down.
   opened, and the table pauses for the rest of the hand and says so;
   the chaos walk reaches that state only by crashing four jurors.
 
-  **The pieces are of the bytes, and there is now a split of the key
-  itself.** Rebuilding the secret opens the departed seat's whole hand
-  to whoever rebuilt it, which is the thing
-  [doc 04](04-live-play.md)'s computation is written to avoid. `split`
-  divides the *key* in the field it lives in, `shareKey` gives each
-  share's public key — and the two aggregate to the seat's own, which
-  is what says a split is a split of that key — and `shareToken` is one
-  share's part of opening a card, proved against its own share key.
-  Nothing has to combine them: unmasking adds every token it is given,
-  so a seat's two shares go in as two tokens beside the other seats'
-  and the card comes out with the key never anywhere
-  (`crypto/deal`, and `a_split_key_opens_a_card_without_being_put_back_together`).
-  What still splits bytes is the escrow above; moving it over is the
-  change that makes the interim below end.
+  **The pieces are of the secret, and rebuilding it opens the whole
+  hand** to whoever rebuilt it — which is the thing
+  [doc 04](04-live-play.md)'s computation is written to avoid. The
+  cryptography for the other way is built and tested in `crypto/deal`,
+  and the escrow has yet to move onto it:
+
+  - `split` divides the **key**, in the field it lives in, into as many
+    shares as a table needs; `shareKey` gives each share's public key,
+    and they add to the seat's own, which is what says a split is a
+    split of *that* key.
+  - `shareToken` is one share's part of opening a card, proved against
+    its own share key. Nothing combines them: unmasking adds every
+    token it is given, so a seat's shares go in as tokens beside the
+    other seats' and the card comes out with the key never anywhere.
+  - `openShared` does the same for a **seal**. A pass to a seat that
+    then leaves is a ciphertext only that seat's key opens, and a seal
+    is a ciphertext of a card's shape, so a share's part of opening one
+    is a token made over the seal itself.
+
+  What that would buy is that a holder releases what a position needs
+  rather than the key that opens everything — so when the bot plays
+  inside the computation it is one position a turn, and the rest of the
+  hand stays shut until the audit opens every hand anyway. Against a
+  colluding person and juror it changes nothing, and the bound above
+  already says so; what it changes is that honest survivors no longer
+  learn a departed hand in order to play it.
+
+  **Two things a first attempt at moving the escrow over turned up**,
+  written down so the next one starts with them. A seat that leaves
+  *before the deck is dealt* still owes a shuffle, and a shuffle is a
+  computation with the secret rather than a decryption with the key, so
+  the secret's pieces cannot simply be replaced — the two escrows have
+  different lifetimes and both are needed. And the shares have to reach
+  the peers that do not hold them: a person holds the people's share
+  and a juror the jury's, so each can make its own part of opening a
+  seal but needs the other's, and a release that goes out before a peer
+  has seen the pass it covers carries nothing for it.
+
 - **The interim.** Until the bot plays inside the computation
   ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's
   hand is open to everyone at the table, and so is a departed person's

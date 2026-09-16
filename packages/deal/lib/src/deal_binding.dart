@@ -17,8 +17,9 @@ typedef _InitialDeck = Int32 Function(Pointer<Uint8>, Pointer<Uint8>);
 typedef _Shuffle = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Size);
 typedef _VerifyShuffle = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Size);
 typedef _RevealToken = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
-typedef _Split = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
+typedef _Split = Int32 Function(Pointer<Uint8>, IntPtr, Pointer<Uint8>, Pointer<Uint8>);
 typedef _ShareKey = Int32 Function(Pointer<Uint8>, Pointer<Uint8>);
+typedef _OpenShared = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, IntPtr, Pointer<Uint8>);
 typedef _VerifyToken = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _VerifySeal = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _Unmask = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size, Pointer<Uint8>, Uint8);
@@ -58,8 +59,9 @@ class _Ffi implements DealCrypto {
         _verifyShuffle = lib.lookupFunction<_VerifyShuffle, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, int)>('deal_verify_shuffle'),
         _revealToken = lib.lookupFunction<_RevealToken, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_reveal_token'),
         _verifyToken = lib.lookupFunction<_VerifyToken, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_verify_token'),
-        _split = lib.lookupFunction<_Split, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_split'),
+        _split = lib.lookupFunction<_Split, int Function(Pointer<Uint8>, int, Pointer<Uint8>, Pointer<Uint8>)>('deal_split'),
         _shareKey = lib.lookupFunction<_ShareKey, int Function(Pointer<Uint8>, Pointer<Uint8>)>('deal_share_key'),
+        _openShared = lib.lookupFunction<_OpenShared, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>)>('deal_open_shared'),
         _shareToken = lib.lookupFunction<_RevealToken, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_share_token'),
         _unmask = lib.lookupFunction<_Unmask, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>, int)>('deal_unmask'),
         _seal = lib.lookupFunction<_Seal, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_seal'),
@@ -79,8 +81,9 @@ class _Ffi implements DealCrypto {
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, int) _verifyShuffle;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _revealToken;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _verifyToken;
-  final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _split;
+  final int Function(Pointer<Uint8>, int, Pointer<Uint8>, Pointer<Uint8>) _split;
   final int Function(Pointer<Uint8>, Pointer<Uint8>) _shareKey;
+  final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>) _openShared;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _shareToken;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>, int) _unmask;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _seal;
@@ -158,8 +161,14 @@ class _Ffi implements DealCrypto {
       _call([pk, masked, token], 0, (i, o) => _verifyToken(i[0], i[1], i[2]) == 1 ? 0 : -1) != null;
 
   @override
-  Uint8List split(Uint8List secret, Uint8List seed) =>
-      _must(_call([secret, seed], 2 * scalarBytes, (i, o) => _split(i[0], i[1], o)), 'split');
+  Uint8List split(Uint8List secret, Uint8List seed, {int shares = 2}) =>
+      _must(_call([secret, seed], shares * scalarBytes, (i, o) => _split(i[0], shares, i[1], o)), 'split');
+
+  @override
+  Uint8List openShared(Uint8List sealed, List<Uint8List> parts) {
+    final all = Uint8List.fromList([for (final p in parts) ...Uint8List.sublistView(p, 0, pointBytes)]);
+    return _must(_call([sealed, all], pointBytes, (i, o) => _openShared(i[0], i[1], parts.length, o)), 'open shared');
+  }
 
   @override
   Uint8List shareKey(Uint8List share) => _must(_call([share], pointBytes, (i, o) => _shareKey(i[0], o)), 'share key');

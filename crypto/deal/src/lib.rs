@@ -264,16 +264,22 @@ pub fn verify_token(pk: &[u8], masked: &[u8], token: &[u8]) -> bool {
 /// key itself, in the field it lives in, and that is the difference
 /// between a departed seat's hand being opened to whoever rebuilds it
 /// and being opened to nobody.
-pub fn split(secret: &[u8], seed: &[u8], out: &mut [u8]) -> Option<usize> {
-    if out.len() < 2 * SCALAR {
+pub fn split(secret: &[u8], shares: usize, seed: &[u8], out: &mut [u8]) -> Option<usize> {
+    if shares < 2 || out.len() < shares * SCALAR {
         return None;
     }
     let (_, sk) = keys(secret)?;
     let mut rng = rng_from(seed);
-    let a = Scalar::rand(&mut rng);
-    let n = write(&a, &mut out[..SCALAR])?;
-    let m = write(&(sk - a), &mut out[SCALAR..2 * SCALAR])?;
-    Some(n + m)
+    // Every share but the last is drawn; the last is what is left, so
+    // they add to the key and no smaller set of them is anything.
+    let mut rest = sk;
+    for i in 0..shares - 1 {
+        let a = Scalar::rand(&mut rng);
+        rest -= a;
+        write(&a, &mut out[i * SCALAR..(i + 1) * SCALAR])?;
+    }
+    write(&rest, &mut out[(shares - 1) * SCALAR..shares * SCALAR])?;
+    Some(shares * SCALAR)
 }
 
 /// One share's public key: what that share's token is checked
@@ -488,6 +494,24 @@ pub fn open(secret: &[u8], sealed: &[u8], out: &mut [u8]) -> Option<usize> {
     write(&Plaintext::<Curve>(m), out)
 }
 
+/// The token behind a seal, from the parts the shares of the
+/// recipient's key made of it: the same arithmetic [`open`] does, with
+/// a key nobody holds.
+///
+/// A seal is a ciphertext of the same shape as a masked card, so a
+/// share's part of opening one is a reveal token made with that share
+/// over the seal itself — [`share_token`] makes it and [`verify_token`]
+/// checks it, and this adds them up and takes them off.
+pub fn open_shared(sealed: &[u8], parts: &[u8], out: &mut [u8]) -> Option<usize> {
+    let c = read::<Masked>(sealed)?;
+    let mut sum = Curve::zero();
+    for chunk in parts.chunks(POINT) {
+        sum += read::<Affine>(chunk)?.into_projective();
+    }
+    let m = c.1 + (-sum.into_affine());
+    write(&Plaintext::<Curve>(m), out)
+}
+
 // ---- the flat interface -----------------------------------------------------
 //
 // Every function takes pointers and lengths into memory the caller
@@ -570,8 +594,8 @@ pub unsafe extern "C" fn deal_reveal_token(secret: *const u8, masked: *const u8,
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn deal_split(secret: *const u8, seed: *const u8, out: *mut u8) -> i32 {
-    done(split(input(secret, SCALAR), input(seed, 32), output(out, 2 * SCALAR)))
+pub unsafe extern "C" fn deal_split(secret: *const u8, shares: usize, seed: *const u8, out: *mut u8) -> i32 {
+    done(split(input(secret, SCALAR), shares, input(seed, 32), output(out, shares * SCALAR)))
 }
 
 #[no_mangle]
@@ -582,6 +606,11 @@ pub unsafe extern "C" fn deal_share_key(share: *const u8, out: *mut u8) -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn deal_share_token(share: *const u8, masked: *const u8, seed: *const u8, out: *mut u8) -> i32 {
     done(share_token(input(share, SCALAR), input(masked, MASKED), input(seed, 32), output(out, TOKEN)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_open_shared(sealed: *const u8, parts: *const u8, count: usize, out: *mut u8) -> i32 {
+    done(open_shared(input(sealed, SEALED), input(parts, count * POINT), output(out, POINT)))
 }
 
 #[no_mangle]
@@ -746,6 +775,81 @@ mod tests {
         assert_eq!(ab, ba);
         assert_ne!(ab, ac);
     }
+    /// A token sealed to a seat opens from the shares of that seat's
+    /// key too — which it has to, since a pass to a seat that then
+    /// leaves is a ciphertext only that seat's key could open, and the
+    /// key is nobody's.
+    #[test]
+    fn a_seal_opens_from_the_shares_of_the_key_it_was_sealed_to() {
+        let secrets: Vec<[u8; 32]> = (1..=2).map(seed).collect();
+        let mut pks = vec![0u8; 2 * POINT];
+        for (i, s) in secrets.iter().enumerate() {
+            keygen(s, &mut pks[i * POINT..(i + 1) * POINT]).unwrap();
+        }
+        let mut joint = vec![0u8; POINT];
+        aggregate(&pks, &mut joint).unwrap();
+        let mut deck = vec![0u8; DECK_BYTES];
+        initial_deck(&joint, &mut deck).unwrap();
+        let masked = &deck[3 * MASKED..4 * MASKED];
+
+        // Seat 0 seals its token for that card to seat 1, then seat 1
+        // leaves and its key is split.
+        let mut sealed = vec![0u8; SEALED + SEAL_PROOF];
+        seal(&secrets[0], &pks[POINT..], masked, &seed(30), &mut sealed).unwrap();
+        let mut whole = vec![0u8; POINT];
+        open(&secrets[1], &sealed, &mut whole).unwrap();
+
+        let mut shares = vec![0u8; 2 * SCALAR];
+        split(&secrets[1], 2, &seed(31), &mut shares).unwrap();
+        let mut parts = vec![0u8; 2 * POINT];
+        for i in 0..2 {
+            let share = &shares[i * SCALAR..(i + 1) * SCALAR];
+            let mut part = vec![0u8; TOKEN];
+            // A seal is a ciphertext of a card's shape, so a share's
+            // part of opening it is a token over the seal itself.
+            assert_eq!(share_token(share, &sealed[..SEALED], &seed(32 + i as u8), &mut part), Some(TOKEN));
+            let mut share_pk = vec![0u8; POINT];
+            share_key(share, &mut share_pk).unwrap();
+            assert!(verify_token(&share_pk, &sealed[..SEALED], &part), "the part proves against its share's key");
+            parts[i * POINT..(i + 1) * POINT].copy_from_slice(&part[..POINT]);
+        }
+        let mut got = vec![0u8; POINT];
+        assert_eq!(open_shared(&sealed[..SEALED], &parts, &mut got), Some(POINT));
+        assert_eq!(got, whole, "the same token the key itself would have opened");
+        assert_ne!(
+            open_shared(&sealed[..SEALED], &parts[..POINT], &mut got.clone()).map(|_| got.clone()),
+            None,
+            "one part alone gives something"
+        );
+    }
+
+    /// And into more than two, for a table with no jury to escrow to,
+    /// where every other person holds a share and all of them are
+    /// needed: the shares' keys still add to the seat's, and every
+    /// share's token is needed to open a card.
+    #[test]
+    fn a_key_splits_into_as_many_shares_as_a_table_needs() {
+        let secret = seed(3);
+        let mut pk = vec![0u8; POINT];
+        keygen(&secret, &mut pk).unwrap();
+        for shares in 2..=4usize {
+            let mut out = vec![0u8; shares * SCALAR];
+            assert_eq!(split(&secret, shares, &seed(80 + shares as u8), &mut out), Some(shares * SCALAR));
+            let mut pks = vec![0u8; shares * POINT];
+            for i in 0..shares {
+                share_key(&out[i * SCALAR..(i + 1) * SCALAR], &mut pks[i * POINT..(i + 1) * POINT]).unwrap();
+            }
+            let mut sum = vec![0u8; POINT];
+            aggregate(&pks, &mut sum).unwrap();
+            assert_eq!(sum, pk, "{shares} shares add to the key");
+            // And no smaller set does.
+            let mut short = vec![0u8; POINT];
+            aggregate(&pks[..(shares - 1) * POINT], &mut short).unwrap();
+            assert_ne!(short, pk, "{} of {shares} is not the key", shares - 1);
+        }
+        assert_eq!(split(&secret, 1, &seed(90), &mut vec![0u8; SCALAR]), None, "a split is into two or more");
+    }
+
     /// A departed seat's card, opened by the holders of its key's two
     /// shares — without either of them, or anybody, ever holding the
     /// key. This is what lets doc 04's computation mean anything: if
@@ -766,7 +870,7 @@ mod tests {
 
         // Seat 0 is gone, and its key was split in two at the deal.
         let mut shares = vec![0u8; 2 * SCALAR];
-        assert_eq!(split(&secrets[0], &seed(60), &mut shares), Some(2 * SCALAR));
+        assert_eq!(split(&secrets[0], 2, &seed(60), &mut shares), Some(2 * SCALAR));
         let (a, b) = (&shares[..SCALAR], &shares[SCALAR..]);
         assert_ne!(a, b);
         let mut share_pks = vec![0u8; 2 * POINT];

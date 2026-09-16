@@ -54,9 +54,11 @@ extension type _Exports._(JSObject _) implements JSObject {
   // ignore: non_constant_identifier_names
   external JSNumber deal_verify_token(JSNumber pk, JSNumber masked, JSNumber token);
   // ignore: non_constant_identifier_names
-  external JSNumber deal_split(JSNumber secret, JSNumber seed, JSNumber out);
+  external JSNumber deal_split(JSNumber secret, JSNumber shares, JSNumber seed, JSNumber out);
   // ignore: non_constant_identifier_names
   external JSNumber deal_share_key(JSNumber share, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_open_shared(JSNumber sealed, JSNumber parts, JSNumber count, JSNumber out);
   // ignore: non_constant_identifier_names
   external JSNumber deal_share_token(JSNumber share, JSNumber masked, JSNumber seed, JSNumber out);
   // ignore: non_constant_identifier_names
@@ -173,8 +175,17 @@ class _Wasm implements DealCrypto {
       _call([pk, masked, token], 0, (i, o) => e.deal_verify_token(i[0].toJS, i[1].toJS, i[2].toJS).toDartInt == 1 ? 0 : -1) != null;
 
   @override
-  Uint8List split(Uint8List secret, Uint8List seed) =>
-      _must(_call([secret, seed], 2 * scalarBytes, (i, o) => e.deal_split(i[0].toJS, i[1].toJS, o.toJS).toDartInt), 'split');
+  Uint8List split(Uint8List secret, Uint8List seed, {int shares = 2}) => _must(
+      _call([secret, seed], shares * scalarBytes, (i, o) => e.deal_split(i[0].toJS, shares.toJS, i[1].toJS, o.toJS).toDartInt),
+      'split');
+
+  @override
+  Uint8List openShared(Uint8List sealed, List<Uint8List> parts) {
+    final all = Uint8List.fromList([for (final p in parts) ...Uint8List.sublistView(p, 0, pointBytes)]);
+    return _must(
+        _call([sealed, all], pointBytes, (i, o) => e.deal_open_shared(i[0].toJS, i[1].toJS, parts.length.toJS, o.toJS).toDartInt),
+        'open shared');
+  }
 
   @override
   Uint8List shareKey(Uint8List share) =>
