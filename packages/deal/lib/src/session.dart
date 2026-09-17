@@ -86,10 +86,13 @@ class DealSession {
     Random? random,
   })  : _random = random ?? Random.secure() {
     if (seats.length != _seats) throw ArgumentError('four seats');
-    if (mySeat != null && seats[mySeat!] is! HumanDealSeat) throw ArgumentError('a person\'s seat');
+    if (mySeat != null && !_keyed(mySeat!)) throw ArgumentError('a seat with a key of its own');
     if (mySeat != null && wrap == null) throw ArgumentError('a seat wraps its escrow');
     for (var s = 0; s < _seats; s++) {
-      if (seats[s] is BotDealSeat) {
+      // A bot seat with no key is the solo game's, and everyone
+      // computes it from what everyone knows. One a juror holds has a
+      // secret of its own, and only its holder has it.
+      if (!_keyed(s)) {
         _secrets[s] = botSecret(tableId, tableSeed, hand, s);
       } else if (s == mySeat) {
         _secrets[s] = mySecret ?? _draw();
@@ -447,21 +450,29 @@ class DealSession {
     if (cached != null) return cached;
     final secret = _secrets[me]!;
     final proof = _keyProofs[me] ??= crypto.keyProof(secret, _name(me), _draw());
-    final others = [for (var s = 0; s < _seats; s++) if (s != me && _human(s)) s];
+    // Nobody at the table holds a piece of a bot seat: its escrow is
+    // the jury's alone, both sides of it (docs/04-live-play.md). A
+    // person's seat gives one to each of the other people.
+    final others = _human(me) ? [for (var s = 0; s < _seats; s++) if (s != me && _human(s)) s] : const <int>[];
     final pieces = <String, String>{};
     final custody = <String>[];
     final shares = <String, String>{};
     final shareCustody = <String>[];
     final shareKeys = <String>[];
     if (custodians.isNotEmpty) {
-      // One piece to every person, one to every juror.
-      final toSeats = _draw();
-      final toJury = _xor(secret, toSeats);
+      // One piece to each of the two sides the seat escrows across:
+      // the other people and the jury for a person's seat, the jury
+      // split in two for a bot seat a juror holds.
+      final (sideA, sideB) = _escrowSides(me, custodians);
+      final first = _draw();
+      final second = _xor(secret, first);
       for (final s in others) {
-        pieces['$s'] = _b64(_wrapFor(_keyOf(s), toSeats, me));
+        pieces['$s'] = _b64(_wrapFor(_keyOf(s), first, me));
       }
       for (final j in custodians) {
-        custody.add(_b64(_wrapFor(j, toJury, me)));
+        // Every juror gets its own entry at its own index, whichever
+        // side it is on, so opening one is the same either way.
+        custody.add(_b64(_wrapFor(j, sideA.contains(j) ? first : second, me)));
       }
       // And the key itself in two shares, to the same holders. The
       // secret's pieces answer before the deck is dealt, where a
@@ -505,6 +516,26 @@ class DealSession {
   Map<String, Object?>? _myKeysMessage;
 
   Uint8List _xor(Uint8List a, Uint8List b) => Uint8List.fromList([for (var i = 0; i < a.length; i++) a[i] ^ b[i]]);
+
+  /// The two sides a seat's secret is escrowed across, one piece each,
+  /// so that one holder from each rebuilds it and neither side alone
+  /// is anything.
+  ///
+  /// A person's seat splits across the other people and the jury. A
+  /// bot seat splits the jury in two and gives the people nothing:
+  /// a player with one juror's help is exactly what a bot's hand is
+  /// hidden from, so handing players a piece would undo the whole of
+  /// it (docs/04-live-play.md). The price is that a bot seat wants two
+  /// live jurors where a person's wants one of each; with a jury of
+  /// one the second side is empty and the seat cannot be opened at
+  /// all, which is the table's business to avoid, not the deal's.
+  (List<String>, List<String>) _escrowSides(int seat, List<String> jury) {
+    if (_human(seat)) {
+      return ([for (var s = 0; s < _seats; s++) if (s != seat && _human(s)) _keyOf(s)], jury);
+    }
+    final half = (jury.length + 1) ~/ 2;
+    return (jury.take(half).toList(), jury.skip(half).toList());
+  }
 
   /// A piece for the holder of [key], hidden under the secret this
   /// side shares with it and the piece's place.
@@ -1162,8 +1193,8 @@ class DealSession {
       final piece = _unb64(m['share']);
       if (!_keyed(about) || !_gone.contains(about) || piece.length != 32) return false;
       final custodianKeys = _custodiansOf[about] ?? const <String>[];
-      final seatKeys = {for (var s = 0; s < _seats; s++) if (s != about && _human(s)) _keyOf(s)};
-      if (!seatKeys.contains(holder) && !custodianKeys.contains(holder)) return false;
+      final (sideA, sideB) = _escrowSides(about, custodianKeys);
+      if (!sideA.contains(holder) && !sideB.contains(holder)) return false;
       if (_secrets.containsKey(about)) return true;
       final got = _released.putIfAbsent(about, () => {});
       got[holder] = piece;
@@ -1173,16 +1204,19 @@ class DealSession {
       if (own != null && k != null) got[k] = own;
       final pk = _pks[about]!;
       if (custodianKeys.isEmpty) {
-        if (!seatKeys.every(got.containsKey)) return true;
+        if (!sideA.every(got.containsKey)) return true;
         var secret = Uint8List(32);
-        for (final k in seatKeys) {
+        for (final k in sideA) {
           secret = _xor(secret, got[k]!);
         }
         if (_same(crypto.keygen(secret), pk)) _learnSecret(about, secret);
         return true;
       }
-      for (final s in seatKeys) {
-        for (final j in custodianKeys) {
+      // One holder from each side, whoever they are: two people at a
+      // table with no jury, a person and a juror at a person's seat, or
+      // two jurors at a bot seat.
+      for (final s in sideA) {
+        for (final j in sideB) {
           final a = got[s];
           final b = got[j];
           if (a == null || b == null) continue;

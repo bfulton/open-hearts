@@ -411,6 +411,51 @@ void main() {
     expect((again['seals'] as Map), isNotEmpty);
   });
 
+  test('a bot seat a juror holds escrows to the jury alone: two jurors open it, a player and a juror cannot', () {
+    // Three people and a bot seat held by the first juror. Its key is
+    // drawn like a person's rather than hashed from what everyone
+    // knows, so the table cannot compute its hand (docs/04-live-play.md).
+    final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
+    final seats = [
+      const HumanDealSeat('a'),
+      const HumanDealSeat('b'),
+      const HumanDealSeat('c'),
+      BotDealSeat(key: jury.first),
+    ];
+    final holder = make(seats, 3, key: jury.first, custodians: jury);
+    final keys = holder.myKeys()!;
+
+    // Not a piece of it goes to anybody at the table.
+    expect(keys['pieces'], isEmpty, reason: 'no player holds a piece of a bot seat');
+    expect((keys['custody'] as List).length, jury.length, reason: 'one to every juror');
+
+    // Every juror opens its own piece; the two sides of the jury hold
+    // different halves, and a side on its own is noise.
+    final jurors = [for (final k in jury) make(seats, null, key: k, custodians: jury)];
+    for (final j in jurors) {
+      expect(j.acceptKeys(keys), isTrue);
+      j.seatLeft(3);
+    }
+    final players = [for (var s = 0; s < 3; s++) make(seats, s, custodians: jury)];
+    for (final p in players) {
+      expect(p.acceptKeys(keys), isTrue);
+      p.seatLeft(3);
+      expect(p.releaseShare(3), isNull, reason: 'a player has nothing of it to release');
+    }
+
+    // A player with one juror's help gets nowhere: the pair the bot's
+    // hand is hidden from is exactly the pair that cannot open it.
+    final fromJuror0 = jurors[0].releaseShare(3)!;
+    expect(players[0].acceptRelease(fromJuror0), isTrue);
+    expect(players[0].knowsSecret(3), isFalse, reason: 'a juror and a player are not two sides');
+    expect(players[0].acceptRelease(jurors[1].releaseShare(3)!), isTrue);
+    expect(players[0].knowsSecret(3), isFalse, reason: 'nor are two jurors of the same side');
+
+    // Two jurors from opposite sides do.
+    expect(players[0].acceptRelease(jurors[2].releaseShare(3)!), isTrue);
+    expect(players[0].knowsSecret(3), isTrue, reason: 'one juror from each side rebuilds it');
+  });
+
   test('a verifier that saw every message ends with the whole deal, and refuses what does not verify', () {
     final seats = [const HumanDealSeat('a'), const HumanDealSeat('b'), const HumanDealSeat('c'), const BotDealSeat()];
     final verifier = make(seats, null, verifier: true);
