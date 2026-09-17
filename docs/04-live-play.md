@@ -562,6 +562,20 @@ across three jurors each holds thirteen and none can subtract.
 
 **What it costs**, stated plainly because it is not free:
 
+- **A bot's move becomes a signed event, and stops being checkable
+  live.** Today a bot's move is in no event at all: its hand is public,
+  the policy is deterministic, and every peer — the verifier included —
+  recomputes the same card rather than being told it. Once one juror
+  alone can compute it, the move has to be said rather than derived,
+  and nobody else can check it until the audit publishes the seat's
+  secret. A juror could play a bot badly for a colluding player and be
+  caught at the end of the hand rather than at the turn. That is the
+  same after-the-fact catch a leaver who shared a false hand already
+  gets, applied now to every bot seat in every hand; and it is the real
+  price of the hand being hidden, larger than the events themselves.
+  At a table of one person and three bots the record grows by about
+  fifty-four signed events a hand, where today it grows by none.
+
 - **The jury becomes load-bearing for play.** Today a table with no
   jury still plays and the jury matters only when somebody leaves.
   A bot seat cannot move without its juror, so a hand with a bot needs

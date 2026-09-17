@@ -1669,20 +1669,27 @@ class TableClient {
 
   void _startDeal() {
     final c = crypto!;
+    final held = botHolders(game.handNumber);
     _deal = DealSession(
       c,
       tableId: spec.id,
       tableSeed: spec.seed,
       hand: game.handNumber,
       seats: [
-        for (final h in holders)
-          switch (h) {
+        for (var s = 0; s < seatCount; s++)
+          switch (holders[s]) {
             HumanSeat(:final key) => HumanDealSeat(key),
-            BotSeat() => const BotDealSeat(),
+            // A bot seat a juror holds carries that juror's key and is
+            // a seat that acts for itself; one nobody holds carries
+            // none and stays everyone's to compute.
+            BotSeat() => BotDealSeat(key: held[s]),
           },
       ],
       leadCard: twoOfClubs.index,
-      mySeat: amSeated ? mySeat : null,
+      // The deal's notion of this side's seat is not the table's: a
+      // juror sits at no seat here and still acts for the bot seat it
+      // holds.
+      mySeat: amSeated ? mySeat : _seatHeldHere(held),
       myKey: signer.publicKey,
       wrap: signer.sharedSecretWith,
       random: _random,
@@ -1694,6 +1701,32 @@ class TableClient {
     }
     _bootLiars();
     _actOnDeal();
+  }
+
+  /// Whether a bot seat's hand is a juror's to hold rather than
+  /// everyone's to compute (docs/04-live-play.md, "Playing a seat
+  /// nobody holds"). Off while the path is being built; it goes with
+  /// the change that makes it the only way.
+  bool botsToJury = false;
+
+  /// Which juror holds which bot seat at [hand]. Empty when the table
+  /// does not hold bots with the jury, or when there is no jury to
+  /// hold them — in which case a bot seat stays public work, which is
+  /// what a table with nobody online to draw from falls back to.
+  Map<int, PublicKey> botHolders(int hand) {
+    if (!botsToJury) return const {};
+    return assignBots(
+      _jurorsOf(hand).toList(),
+      [for (var s = 0; s < seatCount; s++) if (holders[s] is BotSeat) s],
+    );
+  }
+
+  /// The bot seat this side holds at that assignment, if any.
+  int? _seatHeldHere(Map<int, PublicKey> held) {
+    for (final e in held.entries) {
+      if (e.value == signer.publicKey) return e.key;
+    }
+    return null;
   }
 
   bool _roundDone(int round) =>
