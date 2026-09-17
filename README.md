@@ -138,9 +138,14 @@ rigged. Roughly in order:
 
 Ideas agreed on and not yet placed in the order above.
 
-- **The bot inside the computation**, so a bot's hand is open to
-  nobody ([doc 04](docs/04-live-play.md), "Playing a seat nobody
-  holds"); at a live table bots' hands are still open to the players.
+- **A juror holds each bot seat**, so a bot's hand is open to no player
+  ([doc 04](docs/04-live-play.md), "Playing a seat nobody holds"); at a
+  live table bots' hands are still open to everyone, and below four
+  humans that gives away the other player's hand by subtraction. A bot
+  seat becomes a seat whose device is the jury: its key drawn like a
+  person's instead of hashed from public values, one juror per seat so
+  that nobody holds enough to subtract, and the audit publishing it so
+  the verifier still checks every bot move was the policy's.
   **The computation itself is built and works**
   ([ot](measurements/ot/README.md)): the bot's own policy, garbled,
   over a hand split between two parties neither of whom can see a
@@ -149,10 +154,15 @@ Ideas agreed on and not yet placed in the order above.
   MB and 441 ms of wasm for both parties; a hand is 33.4 MB and eight
   seconds, which is 56 seconds of a 5 Mbit/s uplink against sixty of
   play. It fits, and only because the circuit is built at the turn
-  rather than before the hand. What stands between that and a real
-  table is in doc 04: it is not wired to the table, the sharing at the
-  deal and the opening of a position are not built, it is two parties
-  only, and none of it has been reviewed.
+  rather than before the hand. What it does not fit is a seat that is a
+  bot from the deal: 28 MiB a hand, 47 seconds of a 5 Mbit/s uplink
+  against a hand of sixty, and 141 at three bot seats. The standing
+  buffer that looks like the answer buys latency rather than total — it
+  spends only on plays a bot really makes, which saves nothing when a
+  bot plays every trick. So the jury plays bot seats and this stays a
+  measurement: the one that priced the alternative well enough to
+  choose against it. If a protocol lands several times smaller, the
+  ledger changes.
 
 ## Developing
 

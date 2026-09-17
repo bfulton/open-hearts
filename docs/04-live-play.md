@@ -520,9 +520,49 @@ faults checking that no two survivors ever disagree.
 ## Playing a seat nobody holds
 
 A bot seat holds thirteen secret cards. Somebody must be able to open
-them or the bot cannot play — and nobody may learn them.
+them or the bot cannot play — and no player may learn them.
 
-Both are satisfied by **secure multi-party computation**, and the
+**The jury plays them.** A bot seat is a seat whose device is the jury:
+one juror per bot seat, drawn with the rest of the jury and named by
+the same verifiable draw. That juror draws the seat's deal key like any
+person's — a real secret, not today's hash of public values — takes the
+seat's turns in the deal, plays its cards, and publishes the secret at
+the audit, where every seat's is published anyway. From the table's
+side nothing is special about it: the shuffle carries its argument, the
+tokens carry their proofs, the declaration is checked like anyone's,
+and the verifier replays the hand afterwards and checks that every card
+the bot played was the card the policy plays on the hand it turns out
+to have held. Determinism stays checkable; it stops being checkable
+*live*, which is the whole of what is given up.
+
+**One juror per bot seat, and this is not a detail.** A single juror
+playing three bots at a one-human table would hold thirty-nine of
+fifty-two cards, and the remaining thirteen are the human's by
+elimination — the leak this removes, put back one seat over. Split
+across three jurors each holds thirteen and none can subtract.
+
+**What it costs**, stated plainly because it is not free:
+
+- **The jury becomes load-bearing for play.** Today a table with no
+  jury still plays and the jury matters only when somebody leaves.
+  A bot seat cannot move without its juror, so a hand with a bot needs
+  a live jury for its whole length. Exposure goes from the 8% of hands
+  where somebody departs to every hand with a bot, which at two and
+  three humans is every hand, and the sizing has to answer for that.
+- **On a quiet night the juror of last resort is ours.** It would hold
+  cards and choose plays, where today it carries only "a table needs a
+  juror". That is the one place the promise above bends, and it bends
+  exactly when there is nobody else online to ask.
+- **A stranger sees a bot's hand for one hand.** Bounded by the draw:
+  jurors come from other tables, the table's own humans are excluded,
+  and the draw is the deal's own randomness, so nobody chooses to be
+  the juror at the table they want to watch. It is the trust boundary
+  the escrow already sits on — one person's piece and one juror's open
+  a departed hand today — rather than a new one.
+
+**Why not the computation**, which is what this section used to say and
+what `measurements/ot` was built to answer. Secure multi-party
+computation satisfies both halves outright, and the
 distinction that makes it work is that computing on a secret is not the
 same as reconstructing one. The hand goes in as fragments that are never
 reassembled; the computation runs the bot policy over them and outputs
@@ -574,8 +614,26 @@ both parties; a hand is 33.4 MB and eight seconds, which is 56 seconds
 of a 5 Mbit/s uplink against sixty of play. It fits, and only because
 the circuit is built at the turn rather than before the hand.
 
-**What is not built**, since a design that is not finished should say
-so plainly. Four things stand between that and a bot's hand being open
+**And it is still too much, which is the number the decision turned
+on.** The levers below are real, but the one that looks decisive —
+holding 3.8 MB standing instead of 28 MB a hand — buys latency, not
+total: it spends 1.9 MB only on plays a bot actually makes, which is a
+saving when a bot rarely plays and none at all when a bot seat plays
+every trick of every hand. Seated bots do exactly that. At bucket four
+and folded at the turn, one bot seat is 28 MiB a hand, or 47 seconds of
+a 5 Mbit/s uplink against a hand of sixty; two seats are 94 seconds and
+three are 141. KRRW18 halves it to 15 MiB and 25 seconds, which does
+not close a gap that size either. A departed seat played out for the
+rest of a hand is the case the buffer was built for and the case this
+would still suit; a seat that is a bot from the deal is not.
+
+So the jury plays bot seats, and this stays a measurement rather than a
+mechanism — the one that priced the alternative honestly enough to
+choose against it. If a protocol arrives that is several times smaller
+again, the ledger changes and so should this.
+
+**What was not built**, since a design that is not finished should say
+so plainly. Four things stood between that and a bot's hand being open
 to nobody at a real table:
 
 - **It is not wired to the table.** Nothing in `packages/table` or the
@@ -810,6 +868,46 @@ a node. Random draw from purchase-backed identities offers no lever; a
 juror with a bad connection is simply disqualified and redrawn. Random
 selection across unrelated networks also keeps juror failures
 independent, which the sizing below depends on.
+
+**The sizing.** Two roles with very different exposure. As *escrow* the
+jury answers only when somebody leaves — a departure in about 8% of
+hands at 2% a seat — and the bad event is that every juror is gone at
+the moment one does. As the *player of a bot seat* it answers every
+hand that has one, which below four humans is every hand. Writing p for
+the chance a given juror is lost within a hand and asking for five
+nines across an eight-hand game:
+
+| p | jurors, escrow only | jurors, playing bot seats |
+|---|---|---|
+| 5% | 4 | 5 |
+| 10% | 5 | 6 |
+| 20% | 7 | 9 |
+
+Two things matter more than the table. The draw is **repaired, not
+static**: a redraw goes out whenever fewer than two jurors are live and
+every ten seconds after, so the question is not whether four die over a
+hand but whether the live count reaches zero in the seconds before it
+is needed — which makes p^J pessimistic for a healthy pool. And beneath
+that sits the **juror of last resort**, so the floor is not zero jurors
+but our uptime. Between them, J matters less than either, and past
+about six it stops mattering at all, because what takes every juror at
+once is a relay outage — common-mode, which no amount of jurors
+divides.
+
+`jurySize` is four (`packages/table/lib/src/jury.dart`). Escrow alone
+justifies it; a jury that plays bot seats wants **six**, and the honest
+reason to stop there is that the seventh buys less than relay diversity
+would.
+
+**When quorum is lost anyway.** A hand whose bot seat has no juror
+cannot go on, and neither can one whose departed seat cannot be opened.
+That hand is given up unscored and the next is dealt, the way a hand
+nobody can lead already is — with the difference that this one cannot
+be opened to say why, so it ends without an audit and the verifier has
+to accept an abandoned hand as a terminal state rather than an
+incomplete one. Killing the whole table is the other option and costs
+three innocent players their game, so it is the answer only if a table
+cannot get a jury at all, hand after hand.
 
 **Per hand, not per game.** The deck is resealed every hand, so shares
 are per-hand and a juror's whole obligation is one hand — p50 a minute,

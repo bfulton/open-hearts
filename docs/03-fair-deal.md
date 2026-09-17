@@ -211,9 +211,12 @@ offer say so, and a build that cannot run the deal does not sit down.
   that opens it for everyone — and four audit turns after the last
   trick, each person's deal secret for all, so the hand replays. Each
   is a race like any other turn: the seat wins it by acting, checked
-  by everyone on arrival, or loses it by removal. A bot's step is
-  public work everyone computes, from a secret that is a hash of what
-  everyone knows.
+  by everyone on arrival, or loses it by removal. A bot's step is taken
+  by the juror that holds that seat ([doc 04](04-live-play.md),
+  "Playing a seat nobody holds"), from a secret drawn like a person's
+  and published at the audit with everyone else's — so its shuffle
+  carries an argument and its tokens carry proofs, and the table checks
+  them without being able to see the hand behind them.
 - **A pass** moves positions, for all to see, with the tokens that
   open them sealed to the receiver (ElGamal under its deal key, the
   reveal proof in the clear beside it) — or in the clear outright when
@@ -367,12 +370,19 @@ offer say so, and a build that cannot run the deal does not sit down.
   about three times as long with the share path on, 15 minutes against
   5, which is the tokens being made and checked a position at a time.
 
-- **The interim.** Until the bot plays inside the computation
+- **The interim.** Until a juror holds each bot seat
   ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's
   hand is open to everyone at the table, and so is a departed person's
-  once the escrow opens it. So at a table of two people and two bots,
-  each person sees their own cards and the bots', never the other
-  person's; at four, nobody sees anyone's. The shuffle's guarantee
+  once the escrow opens it. At four people nobody sees anyone's. Below
+  that it is worse than it sounds, and the reason is subtraction: at a
+  table of two people and two bots each person sees their own thirteen
+  and the bots' twenty-six, which is thirty-nine of fifty-two, and the
+  other person's hand is the thirteen left over. Saying they never see
+  the other person's cards is true and means nothing — there is no
+  hidden information between them at all. At three people and one bot,
+  twenty-six are known and the rest is split two ways, which leaks but
+  does not solve. **The seat count where the game works today is
+  four**, and that is the reason to finish the jury's half of it. The shuffle's guarantee
   holds regardless: one honest shuffler is enough.
 - **The verifier** replays a sealed record through the deal: every
   key's proof, every shuffle's argument against the deck before it,
