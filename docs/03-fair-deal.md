@@ -325,6 +325,48 @@ offer say so, and a build that cannot run the deal does not sit down.
   that left before its tokens went out owes all fifty-two, about four
   times that, and still one event.
 
+  **The session does this and the table does not yet.** `DealSession`
+  splits the key beside the secret, refuses a keys message whose share
+  keys do not add to the seat's own, releases a share's tokens for the
+  positions a departed seat owes, opens a seal made out to it from a
+  token over the seal itself, and unmasks over five keys where there
+  were four. A departed seat's hand comes out and `knowsSecret` stays
+  false throughout — the key is never anywhere. Two tests hold it: one
+  for the hand, one for a pass sealed to a seat that then leaves.
+
+  **What wiring the table to it ran into**, written down like the two
+  above. With the share path on, three of the sealed tests fail, and
+  all three are a seat that goes *during the pass*; with it off and
+  every session change still in, twelve of the thirteen pass. So the
+  session's part is sound and the table's is not.
+
+  The mechanism, as far as it was traced. A departed seat's hand opens
+  when the escrow covers it, and a pass *into* that seat may be heard
+  afterwards — its seal is a ciphertext to the departed key, and the
+  parts that open it come with a later release. The table drops such a
+  pass rather than keeping it, and offering it to the deal again is
+  refused, because a pass is taken into the deal once and only once.
+  Keeping it and telling the engine when it does open restores
+  agreement — every peer then holds the same record, the same hand and
+  the same flags for who has passed, which was checked — and the table
+  still does not finish: the peer that was behind reaches playing with
+  no play turn open, and the others' plays sit deferred for ever.
+
+  Four things were tried past that point and none of them moved it:
+  declaring the lead on the late pass, draining what was deferred,
+  opening the play turn, and holding every card of a departed seat shut
+  until all of it can open at once. They are symptom patches on one
+  mismatch — the table settles a pass once, and the escrow may open it
+  later — and the next attempt should change where a pass is *settled*
+  rather than what happens afterwards. The deal has to take the pass
+  the moment it arrives, since the deal is what knows the seal and the
+  parts cannot be checked without it; what can wait is the turn, which
+  could stay open until the engine can be told. That was not tried.
+
+  One more measurement for whoever picks it up: the sealed tests take
+  about three times as long with the share path on, 15 minutes against
+  5, which is the tokens being made and checked a position at a time.
+
 - **The interim.** Until the bot plays inside the computation
   ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's
   hand is open to everyone at the table, and so is a departed person's

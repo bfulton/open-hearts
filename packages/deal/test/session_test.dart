@@ -371,6 +371,46 @@ void main() {
     expect(watcher.handOf(3), isNull, reason: 'still shut after all that');
   });
 
+  test('a pass sealed to a seat that then leaves opens from that seat\'s two shares', () {
+    final seats = [for (final k in ['a', 'b', 'c', 'd']) HumanDealSeat(k)];
+    final juror = make(seats, null, key: 'juror');
+    final all = dealOut(seats, custodians: ['juror', 'other-juror'], extra: [juror]);
+
+    // Seat 0 passes three cards to seat 1, sealed to seat 1's key.
+    final positions = [0, 5, 12];
+    final passed = [for (final p in positions) all[0].openedCardAt(p)!];
+    final pass = all[0].passMessage(1, positions)!;
+    broadcast(all, 0, (x) => x.acceptPass(pass));
+    all[0].acceptPass(pass);
+
+    // Then seat 1 goes. That seal is a ciphertext only its key opens,
+    // and its key is nobody's, so the parts come from the two shares —
+    // a token over the seal itself (docs/03-fair-deal.md).
+    for (final x in [...all, juror]) {
+      x.seatLeft(1);
+    }
+    expect(all[2].awaitsSecret(1), isTrue);
+    expect(all[2].handOf(1), isNull);
+
+    final fromJuror = juror.releaseShareTokens(1)!;
+    expect([for (final k in (fromJuror['seals'] as Map).keys) int.parse(k as String)]..sort(), positions,
+        reason: 'a part for each seal made out to the seat');
+    expect(all[2].acceptShareTokens(fromJuror), isTrue);
+
+    expect(all[2].handOf(1), isNotNull, reason: "its own share's parts and the juror's open the seal");
+    expect(all[2].awaitsSecret(1), isFalse);
+    expect(all[2].knowsSecret(1), isFalse, reason: 'and the key was never put back together');
+    for (final c in passed) {
+      expect(all[2].handOf(1), contains(c), reason: 'the passed cards are in the hand it left behind');
+    }
+    expect(all[2].handOf(1)!.length, 16);
+
+    // A holder that has served itself can still serve a peer behind
+    // it: the seal is not thrown away with the opening.
+    final again = all[2].releaseShareTokens(1)!;
+    expect((again['seals'] as Map), isNotEmpty);
+  });
+
   test('a verifier that saw every message ends with the whole deal, and refuses what does not verify', () {
     final seats = [const HumanDealSeat('a'), const HumanDealSeat('b'), const HumanDealSeat('c'), const BotDealSeat()];
     final verifier = make(seats, null, verifier: true);
