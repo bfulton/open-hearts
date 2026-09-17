@@ -535,6 +535,25 @@ the bot played was the card the policy plays on the hand it turns out
 to have held. Determinism stays checkable; it stops being checkable
 *live*, which is the whole of what is given up.
 
+**To the deal it is an ordinary seat.** Nothing about it is a new kind
+of party: it has a key, it shuffles with an argument, it owes tokens
+for the other seats' positions, it declares the lead or says it holds
+it nowhere, it passes and plays, and it is audited. What changes is
+only who acts for it — a juror rather than a person, and the policy
+rather than a pair of hands. The deal's existing split is between a
+seat whose steps everyone computes and a seat whose steps its holder
+takes, and this moves bot seats from the first to the second.
+
+**Its escrow goes to jurors, not to players.** A person's deal secret
+is split so that any one person and any one juror rebuild it. A bot
+seat's is split among the jurors alone, so that any two of them do and
+no player ever holds a piece. The reason is that the player-plus-juror
+pair is exactly the pair we are hiding the hand from: escrow it the
+usual way and any player with one juror's help opens the bot's hand,
+which is the thing this whole change is for. The cost is that a bot
+seat needs two live jurors to survive its own juror leaving, where a
+person's seat needs one of each — another reason the jury wants six.
+
 **One juror per bot seat, and this is not a detail.** A single juror
 playing three bots at a one-human table would hold thirty-nine of
 fifty-two cards, and the remaining thirteen are the human's by

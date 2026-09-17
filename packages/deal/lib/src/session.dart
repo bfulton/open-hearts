@@ -56,7 +56,12 @@ class HumanDealSeat extends DealSeat {
 }
 
 class BotDealSeat extends DealSeat {
-  const BotDealSeat();
+  const BotDealSeat({this.key});
+
+  /// The table key of the juror holding this seat, hex, at a live
+  /// table; null in a solo game, where a bot's steps are public work
+  /// everyone computes.
+  final String? key;
 }
 
 const _seats = 4;
@@ -199,8 +204,21 @@ class DealSession {
 
   Uint8List _name(int seat) => Uint8List.fromList(utf8.encode('$tableId|$hand|$seat'));
 
+  /// A person's seat, as against a bot's however the bot is held: what
+  /// escrow routing turns on, since a bot seat's pieces go to jurors
+  /// alone (docs/04-live-play.md).
   bool _human(int seat) => seats[seat] is HumanDealSeat;
-  String _keyOf(int seat) => (seats[seat] as HumanDealSeat).key;
+
+  /// A seat that holds a key of its own and so acts for itself: a
+  /// person's, or a bot seat a juror holds. A bot seat without a key
+  /// is the solo game's, and its steps are everyone's to compute.
+  bool _keyed(int seat) => _keyOrNull(seat) != null;
+
+  String? _keyOrNull(int seat) => switch (seats[seat]) {
+        HumanDealSeat(:final key) => key,
+        BotDealSeat(:final key) => key,
+      };
+  String _keyOf(int seat) => _keyOrNull(seat)!;
 
   // ---- where things stand ---------------------------------------------
 
@@ -499,7 +517,7 @@ class DealSession {
   bool verifyKeys(Map<String, Object?> m) {
     try {
       final seat = m['seat'] as int;
-      if (seat < 0 || seat >= _seats || !_human(seat)) return false;
+      if (seat < 0 || seat >= _seats || !_keyed(seat)) return false;
       final pk = _unb64(m['pk']);
       final proof = _unb64(m['proof']);
       final custodianKeys = [for (final k in m['custodians'] as List) k as String];
@@ -539,7 +557,7 @@ class DealSession {
   bool acceptKeys(Map<String, Object?> m, {bool verified = false}) {
     try {
       final seat = m['seat'] as int;
-      if (seat < 0 || seat >= _seats || !_human(seat)) return false;
+      if (seat < 0 || seat >= _seats || !_keyed(seat)) return false;
       if (_pks.containsKey(seat)) {
         _afterKeys(); // the same seat again — or this side's own, whose keys were here from the start
         return true;
@@ -590,7 +608,7 @@ class DealSession {
   /// bot from here, secret and all; with them, its secret is awaited
   /// from the pieces the others hold.
   void seatLeft(int seat) {
-    if (!_human(seat) || _gone.contains(seat)) return;
+    if (!_keyed(seat) || _gone.contains(seat)) return;
     _gone.add(seat);
     if (!_pks.containsKey(seat)) {
       _secrets[seat] = botSecret(tableId, tableSeed, hand, seat);
@@ -610,7 +628,7 @@ class DealSession {
   /// departed person's once its secret is rebuilt. A person still at
   /// the table makes its own, even to a side that has come to know
   /// its secret — the verifier, reading the audit ahead.
-  bool _public(int seat) => seat != mySeat && (!_human(seat) || _gone.contains(seat)) && _secrets.containsKey(seat);
+  bool _public(int seat) => seat != mySeat && (!_keyed(seat) || _gone.contains(seat)) && _secrets.containsKey(seat);
 
   /// Every step of a seat whose secret is public here is public work:
   /// shuffles as far as they are next; and with the deck done, tokens
@@ -632,7 +650,7 @@ class DealSession {
   /// A seat's secret from elsewhere — an audit read ahead — kept when
   /// it is the one behind the seat's key.
   bool provideSecret(int seat, Uint8List secret) {
-    if (!_human(seat) || !_pks.containsKey(seat)) return false;
+    if (!_keyed(seat) || !_pks.containsKey(seat)) return false;
     if (_secrets.containsKey(seat)) return true;
     if (secret.length != 32 || !_same(crypto.keygen(secret), _pks[seat]!)) return false;
     _learnSecret(seat, secret);
@@ -661,7 +679,7 @@ class DealSession {
   bool verifyShuffle(Map<String, Object?> m) {
     try {
       final seat = m['seat'] as int;
-      if (nextShuffler != seat || !_human(seat) || _public(seat)) return false;
+      if (nextShuffler != seat || !_keyed(seat) || _public(seat)) return false;
       final next = _unb64(m['deck']);
       final proof = _unb64(m['proof']);
       return next.length == deckBytes && crypto.verifyShuffle(_joint!, _decks.last, next, proof);
@@ -676,7 +694,7 @@ class DealSession {
     try {
       final seat = m['seat'] as int;
       if (_shuffleProofs.containsKey(seat)) return true;
-      if (nextShuffler != seat || !_human(seat) || _public(seat)) return false;
+      if (nextShuffler != seat || !_keyed(seat) || _public(seat)) return false;
       if (!verified && !verifyShuffle(m)) return false;
       final next = _unb64(m['deck']);
       final proof = _unb64(m['proof']);
@@ -725,7 +743,7 @@ class DealSession {
   Map<int, Uint8List>? _checkTokens(Map<String, Object?> m) {
     try {
       final seat = m['seat'] as int;
-      if (!_human(seat) || deck == null || _public(seat)) return null;
+      if (!_keyed(seat) || deck == null || _public(seat)) return null;
       final pk = _pks[seat]!;
       final given = Map<String, Object?>.from(m['tokens'] as Map);
       final checked = <int, Uint8List>{};
@@ -746,7 +764,7 @@ class DealSession {
   bool acceptTokens(Map<String, Object?> m, {bool verified = false}) {
     try {
       final seat = m['seat'] as int;
-      if (!_human(seat) || deck == null || _public(seat)) return false;
+      if (!_keyed(seat) || deck == null || _public(seat)) return false;
       if (hasTokens(seat)) return true;
       final Map<int, Uint8List> checked;
       if (verified) {
@@ -867,7 +885,7 @@ class DealSession {
   bool verifyDeclaration(Map<String, Object?> m) {
     try {
       final seat = m['seat'] as int;
-      if (!_human(seat) || deck == null) return false;
+      if (!_keyed(seat) || deck == null) return false;
       final p = m['position'] as int;
       if (p < 0) return true;
       if (p ~/ _handSize != seat) return false;
@@ -914,7 +932,7 @@ class DealSession {
   bool acceptDeclaration(Map<String, Object?> m, {bool verified = false}) {
     try {
       final seat = m['seat'] as int;
-      if (!_human(seat) || deck == null) return false;
+      if (!_keyed(seat) || deck == null) return false;
       if (_declared.containsKey(seat)) return true;
       if (!verified && !verifyDeclaration(m)) return false;
       final p = m['position'] as int;
@@ -1142,7 +1160,7 @@ class DealSession {
       final about = m['about'] as int;
       final holder = m['holder'] as String;
       final piece = _unb64(m['share']);
-      if (!_human(about) || !_gone.contains(about) || piece.length != 32) return false;
+      if (!_keyed(about) || !_gone.contains(about) || piece.length != 32) return false;
       final custodianKeys = _custodiansOf[about] ?? const <String>[];
       final seatKeys = {for (var s = 0; s < _seats; s++) if (s != about && _human(s)) _keyOf(s)};
       if (!seatKeys.contains(holder) && !custodianKeys.contains(holder)) return false;
@@ -1283,7 +1301,7 @@ class DealSession {
   bool acceptShareTokens(Map<String, Object?> m) {
     try {
       final about = m['about'] as int;
-      if (!_human(about) || !_gone.contains(about) || deck == null) return false;
+      if (!_keyed(about) || !_gone.contains(about) || deck == null) return false;
       final keys = _shareKeysOf[about];
       if (keys == null) return false;
       final at = m['share'] as int;
@@ -1362,7 +1380,7 @@ class DealSession {
   bool verifyAudit(Map<String, Object?> m) {
     try {
       final seat = m['seat'] as int;
-      if (!_human(seat) || !_pks.containsKey(seat)) return false;
+      if (!_keyed(seat) || !_pks.containsKey(seat)) return false;
       final secret = _unb64(m['secret']);
       if (secret.length != 32 || !_same(crypto.keygen(secret), _pks[seat]!)) return false;
       final known = m['known'];
@@ -1377,7 +1395,7 @@ class DealSession {
           // the table and a bot to a verifier that reads the removal
           // before the deal — and either way this is what
           // [acceptAudit] passes over, so it is what this passes over.
-          if (!_human(s)) continue;
+          if (!_keyed(s)) continue;
           if (!_pks.containsKey(s)) return false;
           final other = _unb64(e.value);
           if (other.length != 32 || !_same(crypto.keygen(other), _pks[s]!)) return false;
@@ -1395,7 +1413,7 @@ class DealSession {
   bool acceptAudit(Map<String, Object?> m, {bool verified = false}) {
     try {
       final seat = m['seat'] as int;
-      if (!_human(seat)) return false;
+      if (!_keyed(seat)) return false;
       if (!verified && !verifyAudit(m)) return false;
       final secret = _unb64(m['secret']);
       if (!_secrets.containsKey(seat)) {
@@ -1405,7 +1423,7 @@ class DealSession {
       if (known is Map) {
         for (final e in known.entries) {
           final s = int.parse(e.key as String);
-          if (_secrets.containsKey(s) || !_human(s)) continue;
+          if (_secrets.containsKey(s) || !_keyed(s)) continue;
           _learnSecret(s, _unb64(e.value));
         }
       }
