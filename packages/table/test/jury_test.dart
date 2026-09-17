@@ -187,4 +187,22 @@ void main() {
       t.stop();
     });
   });
+
+  test('a bot seat to a juror each, the foreman left free', () {
+    final jury = ['j0', 'j1', 'j2', 'j3'];
+    expect(assignBots(jury, [1, 3]), {1: 'j1', 3: 'j2'}, reason: 'in seat order, past the foreman');
+    expect(assignBots(jury, [3, 1]), {1: 'j1', 3: 'j2'}, reason: 'the seats are a set, not an order');
+    expect(assignBots(jury, const []), isEmpty);
+
+    // One seat each: a juror holding two of them at a table of one
+    // person holds twenty-six cards and subtracts the rest.
+    final three = assignBots(jury, [1, 2, 3]);
+    expect(three.values.toSet().length, 3, reason: 'no juror holds two');
+    expect(three.containsValue('j0'), isFalse, reason: 'and not the foreman');
+
+    // Not enough jurors to go round: the last seats go unheld, which
+    // is the table's cue to wait rather than seat a bot nobody holds.
+    expect(assignBots(['j0', 'j1'], [1, 2, 3]), {1: 'j1'});
+    expect(assignBots(['j0'], [1]), isEmpty, reason: 'a jury of one is a foreman and nobody else');
+  });
 }

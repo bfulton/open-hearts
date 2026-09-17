@@ -12,8 +12,14 @@ import 'dart:math';
 
 import 'signing.dart';
 
-/// How many jurors a hand draws. Doc 04 sizes it: the jury is lost
-/// only when every juror goes inside one replacement window.
+/// How many jurors a hand draws. Doc 04 sizes it ("The sizing"): four
+/// answers the escrow, whose exposure is the 8% of hands where
+/// somebody leaves. Holding bot seats is the other role and wants six
+/// — its exposure is every hand with a bot, and the count has to cover
+/// the foreman standing aside and one seat per bot besides, which at
+/// three bots leaves four with no spare at all. It stays four until a
+/// juror really holds a seat, since a wider jury before then is escrow
+/// pieces and connections bought for nothing.
 const jurySize = 4;
 
 /// The draw, deterministic in [seed], [hand] and the [snapshot] of
@@ -29,6 +35,30 @@ List<PublicKey> drawJury(int seed, int hand, Iterable<PublicKey> snapshot, {int 
   }
   pool.shuffle(Random(h));
   return pool.take(size).toList();
+}
+
+/// Which juror holds which bot seat, one seat each
+/// (docs/04-live-play.md, "Playing a seat nobody holds"). Deterministic
+/// in the jury and the seats, so every peer computes the same
+/// assignment from the same proposal and the verifier recomputes it
+/// afterwards.
+///
+/// One seat each, because a juror holding two bot seats at a table of
+/// one person holds twenty-six of the fifty-two cards and takes the
+/// person's hand by subtraction — the leak this exists to close, one
+/// seat over. The foreman is skipped: it decides whether somebody has
+/// gone, and a seat of its own in the hand it is judging is a
+/// conflict worth the one spare juror it costs.
+///
+/// Fewer jurors than bot seats leaves the last seats unassigned, and
+/// that is the table's cue to wait for a bigger jury rather than to
+/// seat a bot nobody holds.
+Map<int, PublicKey> assignBots(List<PublicKey> jury, Iterable<int> botSeats) {
+  final seats = botSeats.toList()..sort();
+  final holders = jury.skip(1).toList();
+  return {
+    for (var i = 0; i < seats.length && i < holders.length; i++) seats[i]: holders[i],
+  };
 }
 
 /// Who is online, and how to reach a juror before it follows a table.
