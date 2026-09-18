@@ -56,7 +56,38 @@ void main() async {
     final v = byLabel[l]!..sort();
     print('${l.padRight(16)} n=${v.length.toString().padLeft(3)}  each=${v.first}..${v.last}  total=${v.fold(0, (a, b) => a + b)}');
   }
-  print('the hand: $whole bytes, $wholeGz gzipped (${(100 * wholeGz / whole).round()}%)');
+  print('the hand: $whole bytes, $wholeGz gzipped an event at a time (${(100 * wholeGz / whole).round()}%)');
+
+  // An event at a time is the worst a compressor can do: every
+  // message starts from nothing. A websocket that keeps its window
+  // between messages (permessage-deflate with context takeover) is
+  // nearer the stream, so measure that too — and measure what is left
+  // once the base64 of curve points, which no compressor can touch, is
+  // taken out of the count.
+  final stream = <int>[];
+  var payload = 0;
+  for (final d in c.record) {
+    final e = d.event;
+    if (e.body['hand'] != 0) continue;
+    final json = jsonEncode(e.toJson());
+    stream.addAll(utf8.encode(json));
+    for (final v in e.body.values) {
+      final one = v is List ? v : [v];
+      for (final x in one) {
+        if (x is String && x.length > 64 && RegExp(r'^[A-Za-z0-9+/=]+$').hasMatch(x)) {
+          payload += x.length;
+        }
+      }
+    }
+  }
+  final structure = whole - payload;
+  final streamGz = gzip.encode(stream).length;
+  print('as one stream: $streamGz (${(100 * streamGz / whole).round()}%), '
+      'so a window kept between messages is worth ${whole - streamGz} bytes');
+  print('of the hand, $payload is base64 payload and $structure is structure');
+  final bare = String.fromCharCodes(stream).replaceAll(RegExp(r'[A-Za-z0-9+/=]{64,}'), '');
+  final withoutPayload = gzip.encode(utf8.encode(bare)).length;
+  print('the structure alone, gzipped as a stream: $withoutPayload of $structure');
 
   print('\n--- the fields that carry it ---');
   final top = fields.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
