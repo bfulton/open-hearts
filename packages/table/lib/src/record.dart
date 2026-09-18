@@ -132,16 +132,62 @@ Verification verifyRecord(
   /// seat's steps would be computed rather than checked.
   final pending = <int, Uint8List>{};
 
+  /// The jury in its drawn order, per hand, filled in as the juries
+  /// are checked below. A bot seat's holder comes out of this, and a
+  /// set's iteration order would hand the same seat to different
+  /// jurors here than at the table (docs/04-live-play.md).
+  final juryOrder = <int, List<PublicKey>>{};
+
+  /// The jury drawn for [hand] itself, in the draw's order — not the
+  /// one in force, which falls back to an earlier hand's. A bot seat's
+  /// holder is named by its own hand's draw, so that the table and
+  /// this agree on it.
+  List<PublicKey> juryOrderAt(int hand) => juryOrder[hand] ?? const [];
+
+  /// Bot seats that somebody spoke for, by hand: a seat whose steps
+  /// are in the record was held, and one whose are not was everyone's
+  /// to compute. Read from the record rather than from any setting,
+  /// because the record is all a verifier has — it cannot be told how
+  /// the table was configured, only shown what the table did.
+  final spokenFor = <int, Set<int>>{};
+  for (final d in record) {
+    try {
+      final s = d.event.seat;
+      if (s < 0 || s >= seatCount || holders[s] is! BotSeat) continue;
+      spokenFor.putIfAbsent(d.turn.hand, () => {}).add(s);
+    } catch (_) {}
+  }
+
+  /// Which juror holds which bot seat at [hand] — the same assignment
+  /// the table computed, from the same jury, and only for the seats
+  /// the record shows were spoken for.
+  Map<int, PublicKey> heldAt(int hand) {
+    final spoken = spokenFor[hand] ?? const <int>{};
+    if (spoken.isEmpty) return const {};
+    final all = assignBots(juryOrderAt(hand), [for (var s = 0; s < seatCount; s++) if (holders[s] is BotSeat) s]);
+    return {for (final e in all.entries) if (spoken.contains(e.key)) e.key: e.value};
+  }
+
+  /// Whether [who] may act for [seat] at [hand]: the person sitting
+  /// there, or the juror holding it when it is a bot seat the jury
+  /// holds. A bot seat nobody holds is acted for by nobody, and its
+  /// steps are recomputed rather than read.
+  bool mayAct(int seat, PublicKey who, int hand) {
+    final holder = holders[seat];
+    if (holder is HumanSeat) return holder.key == who;
+    return heldAt(hand)[seat] == who;
+  }
+
   DealSession startDeal() => deal = DealSession(
     crypto!,
     tableId: spec.id,
     tableSeed: spec.seed,
     hand: game.handNumber,
     seats: [
-      for (final h in holders)
-        switch (h) {
+      for (var s = 0; s < seatCount; s++)
+        switch (holders[s]) {
           HumanSeat(:final key) => HumanDealSeat(key),
-          BotSeat() => const BotDealSeat(),
+          BotSeat() => BotDealSeat(key: heldAt(game.handNumber)[s]),
         },
     ],
     leadCard: twoOfClubs.index,
@@ -231,6 +277,17 @@ Verification verifyRecord(
       return fail('a jury for hand ${e.hand} without a majority behind it (${d.witnesses.length} of ${d.among.length})');
     }
     jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
+  }
+
+  // The jury in its drawn order, across several juries by their event
+  // ids: a bot seat's holder comes out of this, and a set's iteration
+  // order would hand the same seat to different jurors here than at
+  // the table (docs/04-live-play.md).
+  // The first jury drawn for each hand, by event id: a bot seat's
+  // holder is named by the draw the hand opened with, and a redraw
+  // later in the hand moves the jury without moving the seat.
+  for (final d in juries.toList()..sort((a, b) => a.event.id.compareTo(b.event.id))) {
+    juryOrder.putIfAbsent(d.event.hand, () => d.event.jurors);
   }
 
   /// The jurors in force at [hand]: its own, or until it has any, the
@@ -342,8 +399,7 @@ Verification verifyRecord(
     final d = record[index++];
     final e = d.event;
     if (e.kind != kind) return (null, 'expected a ${kind.name}, saw ${e.kind.name}');
-    final holder = holders[seat];
-    if (holder is! HumanSeat || holder.key != e.author || e.seat != seat) {
+    if (!mayAct(seat, e.author, d.turn.hand) || e.seat != seat) {
       return (null, 'a ${kind.name} by a key that did not hold seat $seat');
     }
     if (d.turn != turn) return (null, 'a ${kind.name} recorded at $turn as ${d.turn}');
@@ -366,9 +422,8 @@ Verification verifyRecord(
       final dec = record[index++];
       final e = dec.event;
       final seat = dec.turn.auditSeat;
-      final holder = holders[seat];
       if (e.kind != EventKind.deal || e.round != 4 || e.seat != seat) return fail('expected an audit by seat $seat, saw ${e.kind.name}');
-      if (holder is! HumanSeat || holder.key != e.author) return fail('an audit by a key that did not hold seat $seat');
+      if (!mayAct(seat, e.author, dec.turn.hand)) return fail('an audit by a key that did not hold seat $seat');
       if (!carried(dec.witnesses, dec.turn, dec.among) && !byVerdict(dec)) {
         return fail('an audit at ${dec.turn} by seat $seat without a majority behind it (${dec.witnesses.length} of ${dec.among.length})');
       }
@@ -475,7 +530,9 @@ Verification verifyRecord(
     }
     if (game.phase == Phase.passing) {
       for (var s = 0; s < seatCount; s++) {
-        if (holders[s] is BotSeat && !game.hasPassed(s)) {
+        // A bot seat a juror holds said its pass in the record, like a
+        // person's; only one nobody holds is recomputed here.
+        if (holders[s] is BotSeat && heldAt(game.handNumber)[s] == null && !game.hasPassed(s)) {
           final whyNot = botActs(s, passing: true);
           if (whyNot != null) return allowPartial ? partial() : fail(whyNot);
         }
@@ -485,8 +542,7 @@ Verification verifyRecord(
       final d = record[index++];
       final e = d.event;
       if (e.kind != EventKind.pass) return fail('expected a pass, saw ${e.kind.name}');
-      final holder = holders[e.seat];
-      if (holder is! HumanSeat || holder.key != e.author) return fail('a pass by a key that did not hold seat ${e.seat}');
+      if (!mayAct(e.seat, e.author, d.turn.hand)) return fail('a pass by a key that did not hold seat ${e.seat}');
       if (!carried(d.witnesses, d.turn, d.among) && !byVerdict(d)) {
         return fail(
           'a pass at ${d.turn} by seat ${e.seat} without a majority behind it '
@@ -508,6 +564,14 @@ Verification verifyRecord(
         }
         final leader = dl.leader;
         if (leader != null) game.declareLeader(leader);
+        // As with a play: a bot seat a juror holds said this pass, so
+        // the policy on its opened hand has to give the same three.
+        if (heldAt(game.handNumber)[e.seat] != null && cards.length == passSize && game.knowsHand(e.seat)) {
+          final want = Bot(persona: (holders[e.seat] as BotSeat).persona).choosePass(game.handOf(e.seat));
+          if (want.toSet().length != cards.toSet().length || !want.every(cards.contains)) {
+            return fail('a pass by seat ${e.seat} that the policy does not pass');
+          }
+        }
         try {
           game.setPass(e.seat, cards.length == passSize ? cards : null);
         } catch (_) {
@@ -533,7 +597,7 @@ Verification verifyRecord(
       continue;
     }
     final seat = game.currentSeat!;
-    if (holders[seat] is BotSeat) {
+    if (holders[seat] is BotSeat && heldAt(game.handNumber)[seat] == null) {
       final whyNot = botActs(seat, passing: false);
       if (whyNot != null) return allowPartial ? partial() : fail(whyNot);
       sweep();
@@ -543,8 +607,7 @@ Verification verifyRecord(
     final d = record[index++];
     final e = d.event;
     if (e.kind != EventKind.play) return fail('expected a play, saw ${e.kind.name}');
-    final holder = holders[seat];
-    if (holder is! HumanSeat || holder.key != e.author || e.seat != seat) {
+    if (!mayAct(seat, e.author, d.turn.hand) || e.seat != seat) {
       return fail('a play by a key that did not hold seat $seat');
     }
     final turn = TurnId.play(game.handNumber, playIndex());
@@ -568,6 +631,27 @@ Verification verifyRecord(
       }
     } else if (!game.legalPlaysFor(seat).contains(card)) {
       return fail('an illegal play by seat $seat: $card');
+    }
+    // A bot seat a juror holds said this card rather than everyone
+    // working it out, so this is where it is checked: on the hand the
+    // audit opened, the policy has to give the same card. A juror
+    // playing a bot badly for somebody at the table is caught here,
+    // at the end of the hand rather than at the turn — which is the
+    // price of the hand being hidden (docs/04-live-play.md).
+    if (heldAt(game.handNumber)[seat] != null && game.knowsHand(seat)) {
+      final want = Bot(persona: (holders[seat] as BotSeat).persona).chooseCard(
+        BotView(
+          seat: seat,
+          hand: game.handOf(seat),
+          trick: game.trick,
+          played: played,
+          heartsBroken: game.heartsBroken,
+          isFirstTrick: game.isFirstTrick,
+          taken: game.taken,
+        ),
+        game.legalPlaysFor(seat),
+      );
+      if (want != card) return fail('a play at $turn by seat $seat that the policy does not play: $card, not $want');
     }
     game.play(seat, card);
     played.add(card);

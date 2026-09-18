@@ -84,11 +84,7 @@ void main() {
     expect(holders.values.toSet().length, 2, reason: 'and not the same juror twice');
 
     expect(t.run(), isTrue, reason: 'the game plays out');
-    // Not agree() yet: the verifier recomputes a bot's moves rather
-    // than checking the ones in the record, which it cannot do once a
-    // seat's hand is a juror's. Checking them against the policy from
-    // the secret the audit publishes is the next piece
-    // (docs/04-live-play.md, "Playing a seat nobody holds").
+    agree(t);
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 

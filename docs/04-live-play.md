@@ -554,6 +554,19 @@ which is the thing this whole change is for. The cost is that a bot
 seat needs two live jurors to survive its own juror leaving, where a
 person's seat needs one of each — another reason the jury wants six.
 
+**A seat whose juror goes is taken over by another**, and this is the
+piece that decides whether any of it works at a real table rather than
+a quiet one. A person's seat survives its person leaving because the
+table plays it as a bot; a bot seat played by a juror has nowhere to
+fall back to, so when its juror goes quiet another has to pick it up
+from the escrow — two jurors' pieces, as above — and go on playing it.
+Without that, one juror going quiet strands its seat for the rest of
+the hand, and the table waits for a card that is never coming. Turning
+the path on before it existed failed thirty-six of the chaos walk's
+tests and seven of the sealed ones, which is the chaos walk doing
+exactly its job: it kills jurors, and a jury that cannot lose one is
+not a jury.
+
 **One juror per bot seat, and this is not a detail.** A single juror
 playing three bots at a one-human table would hold thirty-nine of
 fifty-two cards, and the remaining thirteen are the human's by

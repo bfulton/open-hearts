@@ -1779,8 +1779,10 @@ class TableClient {
 
   /// Whether a bot seat's hand is a juror's to hold rather than
   /// everyone's to compute (docs/04-live-play.md, "Playing a seat
-  /// nobody holds"). Off while the path is being built; it goes with
-  /// the change that makes it the only way.
+  /// nobody holds"). Off until a bot seat whose juror goes can be
+  /// taken over by another — without that, one juror going quiet
+  /// strands its seat for the rest of the hand, which is most of what
+  /// the chaos walk does to a jury.
   bool botsToJury = false;
 
   /// Which juror holds which bot seat at [hand]. Empty when the table
@@ -1803,13 +1805,19 @@ class TableClient {
     // peer's own history, and two peers that saw the same juries in a
     // different order would hand the same seat to different jurors —
     // each then rejecting what the other said for it.
-    final drawn = _juriesFor(hand).toList()..sort((a, b) => a.event.id.compareTo(b.event.id));
-    final jury = <PublicKey>[];
-    for (final d in drawn) {
-      for (final k in d.event.jurors) {
-        if (!jury.contains(k)) jury.add(k);
-      }
-    }
+    // The first jury drawn for the hand, by event id — not the union
+    // of every jury in force at it. A redraw mid-hand moves the jury
+    // for escrow and appeals, and must not move a seat out from under
+    // the deal it is already in; and the verifier, which sees every
+    // jury at once, has to land on the same one this did.
+    // The jury drawn for this hand, and no other. _juriesFor falls back
+    // to the last hand that had one, which is right for escrow and
+    // appeals and wrong here: the deal would be built against the jury
+    // of the hand before, and the verifier — reading this hand's own —
+    // would name a different juror for the seat.
+    final drawn = _juriesFor(hand).where((d) => d.event.hand == hand).toList()
+      ..sort((a, b) => a.event.id.compareTo(b.event.id));
+    final jury = drawn.isEmpty ? const <PublicKey>[] : drawn.first.event.jurors;
     return assignBots(jury, [for (var s = 0; s < seatCount; s++) if (holders[s] is BotSeat) s]);
   }
 
