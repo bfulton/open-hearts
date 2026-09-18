@@ -965,3 +965,44 @@ mod transcript_tests {
         assert!(Protocol::verify_key_ownership(&f.pp, &pk2, &name, &proof2).is_ok(), "through bytes");
     }
 }
+
+#[cfg(test)]
+mod wire {
+    use super::*;
+    use std::time::Instant;
+
+    fn seed(i: u8) -> [u8; 32] {
+        let mut s = [0u8; 32];
+        s[0] = i;
+        s[31] = 7;
+        s
+    }
+
+    /// What the deck's m x n factorisation costs on the wire and in
+    /// the browser: the argument's bytes, and the time to make and
+    /// check one. Run with --nocapture, changing M and N above.
+    #[test]
+    fn shuffle_argument_size() {
+        let secrets: Vec<[u8; 32]> = (1..=4).map(seed).collect();
+        let mut pks = vec![0u8; 4 * POINT];
+        for (i, s) in secrets.iter().enumerate() {
+            keygen(s, &mut pks[i * POINT..(i + 1) * POINT]).unwrap();
+        }
+        let mut joint = vec![0u8; POINT];
+        aggregate(&pks, &mut joint).unwrap();
+        let mut deck = vec![0u8; DECK_BYTES];
+        initial_deck(&joint, &mut deck).unwrap();
+        let mut next = vec![0u8; DECK_BYTES];
+        let mut proof = vec![0u8; 262144];
+        let t0 = Instant::now();
+        let n = shuffle(&joint, &deck, &seed(3), &mut next, &mut proof).expect("shuffle");
+        let made = t0.elapsed();
+        let t1 = Instant::now();
+        assert!(verify_shuffle(&joint, &deck, &next, &proof[..n]));
+        let checked = t1.elapsed();
+        println!(
+            "m={} n={}: argument {} bytes ({} x 32), deck {} bytes; make {:?}, check {:?}",
+            M, N, n, n / 32, DECK_BYTES, made, checked
+        );
+    }
+}
