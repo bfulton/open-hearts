@@ -2439,14 +2439,48 @@ class TableClient {
 
   int _repeatTick = 0;
 
+  /// How long to wait before saying an unsettled turn again, in
+  /// seconds, by how many times it has been said already.
+  static int _repeatGap(int repeats) => repeats >= 4 ? 30 : 2 << repeats;
+
+  /// Whether [turn] is old enough for a peer to say somebody *else's*
+  /// action again.
+  ///
+  /// A seat says its own action again after two seconds, because a
+  /// dropped message is the ordinary reason a turn has not settled.
+  /// Everyone else carrying it at two seconds as well is what made the
+  /// wire what it is: at a sealed table, six parties each repeating a
+  /// twelve-kilobyte shuffle argument, and the relay handing every
+  /// copy to all six — the largest single item on the wire, and all of
+  /// it for a case that had not happened yet
+  /// (service/tool/wire_over_socket.dart).
+  ///
+  /// Carrying is for the case it was built for: a table cut in two, or
+  /// a relay that takes one peer's events and not another's, where the
+  /// only way the far side hears an action is from somebody who is not
+  /// its author (matrix_test.dart, "a seat that only one peer hears
+  /// directly is carried, not booted"). What makes that case urgent is
+  /// the boot clock, so the boot clock is what the wait is measured
+  /// against: halfway to the turn's own allowance, which leaves as long
+  /// again for the carried copy to arrive and be witnessed before
+  /// anybody can call the seat silent. Three seconds for a play whose
+  /// bank is spent, seven and a half for a deal turn, more for a pass
+  /// or a seat with time in hand.
+  bool _carryDue(TurnId turn) {
+    final opened = _openedAt[turn];
+    final seat = _turnSeat[turn];
+    if (opened == null || seat == null) return true;
+    return clock.nowMs - opened >= _allowanceMs(turn, seat) ~/ 2;
+  }
+
   void _repeat() {
     if (++_repeatTick % 2 != 0) return;
-    // What stays unsettled is said again every two seconds, by the
-    // usual path; the second time, and every tenth second after, by
-    // every path. An action settles in a moment when everyone heard
-    // it, so one still open after four seconds may have gone to a
-    // relay someone at the table cannot read, and the only way to
-    // find out is to say it where they can hear.
+    // What stays unsettled is said again — the first time after two
+    // seconds, by the usual path; the second time, and every tenth
+    // second after, by every path. An action settles in a moment when
+    // everyone heard it, so one still open after four seconds may
+    // have gone to a relay someone at the table cannot read, and the
+    // only way to find out is to say it where they can hear.
     final insist = _repeatTick % 10 == 0;
     for (final e in List.of(_races.entries)) {
       final race = e.value;
@@ -2458,10 +2492,24 @@ class TableClient {
       // split.
       if (race.split && _repeatTick % 30 != 0) continue;
       if (race.action == null && race.boots.isEmpty) continue; // nothing to say yet
+      // And the rest widen as they go ([_Race.nextRepeatTick]).
+      if (_repeatTick < race.nextRepeatTick) continue;
+      // What this peer has to say again: its own, always; anybody
+      // else's once the turn has been open long enough for carrying
+      // to be the point ([_carryAfterMs]).
+      final carry = _carryDue(e.key);
+      final action = race.action;
+      final sayAction = action != null && (carry || action.author == signer.publicKey);
+      final sayBoots = [
+        for (final b in race.boots)
+          if (carry || b.author == signer.publicKey) b,
+      ];
+      if (!sayAction && sayBoots.isEmpty) continue;
+      race.nextRepeatTick = _repeatTick + _repeatGap(race.repeats);
       race.repeats++;
       final everywhere = race.repeats == 2 || insist;
-      if (race.action != null) transport.broadcast(race.action!.toJson(), everywhere: everywhere);
-      for (final b in race.boots) {
+      if (sayAction) transport.broadcast(action.toJson(), everywhere: everywhere);
+      for (final b in sayBoots) {
         transport.broadcast(b.toJson(), everywhere: everywhere);
       }
     }
@@ -2911,8 +2959,17 @@ class _Race {
   TableEvent? action;
   final List<TableEvent> boots = [];
 
-  /// How many times this peer has said the race's evidence again.
+  /// How many times this peer has said the race's evidence again, and
+  /// the tick it may be said at next. A turn is repeated so that a
+  /// peer who missed it gets it; a peer who has it wants none of them,
+  /// and at a sealed table a repeated deal turn is twelve kilobytes of
+  /// shuffle argument every time (service/tool/wire_over_socket.dart).
+  /// So the gap widens: two seconds, four, eight, sixteen, then every
+  /// half minute for as long as it stays open. What a seat really
+  /// stuck needs is not the fifth repeat but the boot path, which says
+  /// the action again where the booter can hear it.
   int repeats = 0;
+  int nextRepeatTick = 0;
 
   /// Every witness received, so the whole decision can be handed to a
   /// peer that missed some of it.

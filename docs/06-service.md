@@ -378,6 +378,33 @@ a loopback, seven tenths of which is the relay checking them. That
 is the budget for a juror, which has no other path (doc 04, "The party
 that has no channel").
 
+**And what a hand costs it, end to end**
+(`service/tool/wire_over_socket.dart`: a counting proxy in front of
+the relay, a sealed hand with two people and two bot seats the bench
+holds). Five to seven megabytes across the sockets uncompressed; about
+1.5 with **permessage-deflate**, which is 74% off and now agreed to —
+the clients were always offering it and the relay was refusing,
+because `shelf_web_socket` does not do the extension. The upgrade is
+dart:io's own now. Half of what a table sends is base64 of curve
+points, which no compressor touches, and half is JSON keys, hex ids,
+keys and signatures, which go thirteen to one; duplication is what
+makes the ratio as good as it is.
+
+The duplication is worth its own line. Of a megabyte published in a
+hand, the largest single item was deal turns being said again by
+somebody who did not author them: a turn that has not settled is
+repeated, and a repeated shuffle argument is twelve kilobytes every
+time. A seat now says its own turn again after two seconds, and
+everyone else waits ten before carrying it — long enough that
+carrying means what it was built to mean, a table cut in two rather
+than a message dropped once. Measured in the simulator, where the
+count is exact: 21% off everything said and handed over at a jury of
+four, 17% at six.
+
+Nothing negotiates compression in the rig that drives the suites
+(`service/do/ws.mjs` says so in its own header), so every number
+measured there is the uncompressed one.
+
 `service/test/table_over_relay_test.dart` seats two people and two bots
 on the local relay with real keys, real sockets and the wall clock, and
 they play a hand: 28 decisions, every one signed twice and verified by

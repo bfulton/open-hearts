@@ -26,6 +26,30 @@ class SimNetwork {
   /// Fraction of messages lost on a healthy link, 0 to 1.
   double lossRate = 0;
 
+  /// What has crossed the simulated wire: bytes said, and bytes
+  /// handed over — one copy per peer that gets one. The clock here is
+  /// virtual and the network deterministic, so the same seed gives the
+  /// same counts to the byte, which is what makes a protocol change
+  /// measurable at all (tool/wire_in_sim.dart). A real socket's totals
+  /// swing a quarter either way between runs.
+  int said = 0;
+  int handed = 0;
+
+  /// The same, by what was said and whether the sayer is the one who
+  /// made it: a table says again what has not settled, and carries
+  /// forward what a peer behind has missed.
+  final Map<String, int> byKind = {};
+
+  void _tally(PublicKey from, Map<String, Object?> message, String wire, int copies) {
+    said += wire.length;
+    handed += wire.length * copies;
+    final kind = message['kind'];
+    if (kind is! String) return;
+    final own = message['author'] == from ? 'own' : 'carried';
+    final key = '$kind $own';
+    byKind[key] = (byKind[key] ?? 0) + wire.length * copies;
+  }
+
   /// How long the transport takes to notice a peer is gone.
   final int detectDisconnectMs;
 
@@ -132,6 +156,7 @@ class SimNetwork {
   /// The classic bus: to every reachable peer, no relay in the way.
   void _broadcastAll(PublicKey from, Map<String, Object?> message) {
     final wire = jsonEncode(message);
+    var copies = 0;
     for (final to in _peers.keys) {
       if (to == from) continue;
       if (!_reachable(from, to)) {
@@ -142,6 +167,7 @@ class SimNetwork {
         dropped++;
         continue;
       }
+      copies++;
       clock.schedule(_latency(), () {
         if (!_reachable(from, to)) {
           dropped++;
@@ -151,6 +177,7 @@ class SimNetwork {
         _peers[to]!._incoming.add((from: from, message: jsonDecode(wire) as Map<String, Object?>));
       });
     }
+    _tally(from, message, wire, copies);
   }
 
   /// The relay bus: written to [targets], and reaching a peer only if
@@ -171,6 +198,7 @@ class SimNetwork {
       return;
     }
     final wire = jsonEncode(message);
+    var copies = 0;
     for (final to in _peers.keys) {
       if (to == from) continue;
       if (!reachOf(to).any(live.contains)) {
@@ -185,6 +213,7 @@ class SimNetwork {
         dropped++;
         continue;
       }
+      copies++;
       clock.schedule(_latency(), () {
         if (!_reachable(from, to)) {
           dropped++;
@@ -194,6 +223,7 @@ class SimNetwork {
         _peers[to]!._incoming.add((from: from, message: jsonDecode(wire) as Map<String, Object?>));
       });
     }
+    _tally(from, message, wire, copies);
   }
 }
 

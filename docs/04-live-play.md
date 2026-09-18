@@ -597,6 +597,20 @@ across three jurors each holds thirteen and none can subtract.
   a thousandth of the wire, which is the whole of why this is what got
   built.
 
+  **What a hand really costs is not those events but their copies.**
+  Counted where the count is exact — a virtual clock and a
+  deterministic network, so the same seed gives the same bytes
+  (`packages/table/tool/wire_in_sim.dart`) — two people and two
+  jury-held bot seats say 308,608 bytes in a hand and are handed
+  1,532,996, five copies for five listeners. The jury is most of that
+  multiplier: at six jurors the same hand says 483,455 and is handed
+  3,365,579, **seven times**. Over a real socket
+  (`service/tool/wire_over_socket.dart`) a hand is five to seven
+  megabytes uncompressed and about 1.5 compressed, and a player who
+  drops out for half a minute costs five times a whole hand to carry
+  forward. Jury size is a wire cost as well as a reliability one, and
+  that had not been priced when `jurySize` went from four to six.
+
 - **The jury becomes load-bearing for play.** Today a table with no
   jury still plays and the jury matters only when somebody leaves.
   A bot seat cannot move without its juror, so a hand with a bot needs
