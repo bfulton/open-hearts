@@ -586,8 +586,16 @@ across three jurors each holds thirteen and none can subtract.
   same after-the-fact catch a leaver who shared a false hand already
   gets, applied now to every bot seat in every hand; and it is the real
   price of the hand being hidden, larger than the events themselves.
-  At a table of one person and three bots the record grows by about
-  fifty-four signed events a hand, where today it grows by none.
+  The events are small, measured
+  (`packages/table/tool/juror_wire.dart`, the deal's real proofs and a
+  real signature's length): **about 30 KB a bot seat a hand** — 61,657
+  bytes of juror-authored events at two people and two bots, 92,392 at
+  one and three. At one person that is 57 events where today there are
+  none: 15 deal steps, 3 passes and 39 plays. A play is 565 bytes, a
+  pass 1,717, and the largest single event is a shuffle argument at
+  12,155. Against the computation's 28 MiB a bot seat a hand, that is
+  a thousandth of the wire, which is the whole of why this is what got
+  built.
 
 - **The jury becomes load-bearing for play.** Today a table with no
   jury still plays and the jury matters only when somebody leaves.
@@ -595,10 +603,23 @@ across three jurors each holds thirteen and none can subtract.
   a live jury for its whole length. Exposure goes from the 8% of hands
   where somebody departs to every hand with a bot, which at two and
   three humans is every hand, and the sizing has to answer for that.
-- **On a quiet night the juror of last resort is ours.** It would hold
-  cards and choose plays, where today it carries only "a table needs a
-  juror". That is the one place the promise above bends, and it bends
-  exactly when there is nobody else online to ask.
+- **On a quiet night the juror of last resort is ours.** It holds
+  cards and chooses plays, where before it carried only "a table needs
+  a juror". That is the one place the promise above bends, and it
+  bends exactly when there is nobody else online to ask.
+- **And under four jurors nothing is held at all**, which is the hole
+  this leaves open. A jury that small cannot get a seat back from its
+  own escrow, so `assignBots` holds none and every bot seat is public
+  work again — and at two people and two bots, public bot hands are
+  the other person's hand by subtraction. It is not a rare case
+  either: a table has bot seats exactly when matchmaking could not
+  find four people, which is exactly when there are few people to draw
+  a jury from. The answer is not to make the table wait for strangers
+  but to have the **juror of last resort fill the jury up to four** —
+  it is ours, it is already what a table with nobody online calls for,
+  and the bend above is the one we have already accepted. Until that
+  is built, a sealed table with bot seats and a jury under four plays
+  those seats in the open.
 - **A stranger sees a bot's hand for one hand.** Bounded by the draw:
   jurors come from other tables, the table's own humans are excluded,
   and the draw is the deal's own randomness, so nobody chooses to be
@@ -898,8 +919,9 @@ bot and the commitment of the deal make one unnecessary.
 Two of the cases above cannot be settled by the players alone. At **two
 humans**, a silent player leaves the other with one vote of two — no
 majority, and from the inside a rage quit and a partition look the same.
-At **one human**, there is nobody to be the second MPC party. Both need
-one thing: a party with no stake in the table.
+Wherever a **seat is a bot**, thirteen secret cards need a device to
+hold and play them, and it cannot be one of the players. Both need one
+thing: a party with no stake in the table.
 
 So every hand seats a **jury**: a small number of players drawn at random
 from whoever is online at other tables. Each juror holds a share of the
@@ -940,10 +962,17 @@ about six it stops mattering at all, because what takes every juror at
 once is a relay outage — common-mode, which no amount of jurors
 divides.
 
-`jurySize` is four (`packages/table/lib/src/jury.dart`). Escrow alone
-justifies it; a jury that plays bot seats wants **six**, and the honest
-reason to stop there is that the seventh buys less than relay diversity
-would.
+`jurySize` is **six** (`packages/table/lib/src/jury.dart`). Escrow
+alone would justify four; a jury that plays bot seats wants six, and
+the honest reason to stop there is that the seventh buys less than
+relay diversity would. Below four (`juryToHoldBots`) no seat is held
+at all: a bot seat's escrow has two sides and its holder sits in one
+of them, so losing the holder from a jury of two empties that side and
+the seat can never be opened again — four is the least that leaves
+each side a member after its holder goes. The number to make small is
+not J but the **replacement window** — the ten seconds or so to notice
+a drop, redraw and hand the seat over — because it enters as (λT)ᴶ.
+Halving it is worth more than a seventh juror.
 
 **When quorum is lost anyway.** A hand whose bot seat has no juror
 cannot go on, and neither can one whose departed seat cannot be opened.
@@ -969,19 +998,13 @@ survivor continues. Only a partition that also splits the jury can
 produce two answers, and that degrades to a detectable fork rather than a
 silent one.
 
-**The second party.** At one human, the foreman steps into the MPC in
-the departed player's place. Survivor and foreman compute each bot move
-together, for the rest of the hand, and neither sees a card. If the
-foreman drops, the next juror in order already holds the share and takes
-over at the next move.
-
-**Size.** The jury fails only if every juror leaves inside one
-replacement window — the ten seconds or so it takes to notice a drop,
-redraw, and distribute a share. With sessions of one game and a p90
-two-minute hand, four jurors put that around 10⁻⁵ per hand; with
-players staying for two or three games it is nearer 10⁻⁶. **k = 4**,
-and the number to make small is the replacement window, which enters
-as (λT)ᵏ. Halving it is worth more than a fifth juror.
+**The seats nobody holds are the jury's.** At one human the other
+three seats are bots, and each is held and played by a juror of its own
+("Playing a seat nobody holds" above) — not computed with the survivor,
+who would then be a party to a hand they must not learn. One juror per
+seat, so no juror can subtract its own thirteen from the deck and read
+the human's by elimination. If a holder drops, another juror rebuilds
+the seat from the escrow and plays on.
 
 **If the jury is lost anyway**, the table pauses, says so, and resumes
 when one is rebuilt. Nobody at the table controls whether strangers
@@ -1014,7 +1037,7 @@ On the wire:
   relays a juror does not listen to has no jurors from that pool.
 - **The draw.** At each hand the lowest key among the participants
   heard lately proposes: a snapshot of who is online (nobody at this
-  table), and the draw — four, foreman first — as a deterministic
+  table), and the draw — six, foreman first — as a deterministic
   function of the seed, the hand and the snapshot. The others witness
   it when the draw is what the snapshot gives and the jurors are people
   they too have seen; a majority carries it, beside the record rather
@@ -1028,9 +1051,11 @@ On the wire:
   client is carried forward by the same heartbeats — and heartbeats
   while it serves. On the relay alone: a juror is not seated, so
   nothing offers it a data channel, and everything it hears and says
-  crosses two hops and a stranger's machine. What it does today is
-  small enough for that not to matter, and the computation above is
-  the first thing that would.
+  crosses two hops and a stranger's machine. Holding a bot seat is the
+  most it has ever put through that path and it is still small — about
+  30 KB a seat a hand, a 12 KB shuffle argument its largest single
+  event (`packages/table/tool/juror_wire.dart`) — where the
+  computation above would have been a thousand times that.
 - **The appeal.** A stuck turn — a race that split, or any open turn
   while the table is paused — is appealed every ten seconds.
 - **The rule.** A juror rules only when nobody who can still vote, as
@@ -1057,6 +1082,22 @@ On the wire:
   person's deal secret ([doc 03](03-fair-deal.md), "Escrow"), given
   with the person's keys, and releases it when the table removes the
   seat — with a person's piece, the seat's hand opens for its bot.
+  A **bot seat's** secret is escrowed among the jurors alone, in two
+  sides, so that any two of them rebuild it and no player holds a
+  piece of one.
+- **The seats the jury plays.** At a sealed table with a jury of four
+  or more (`juryToHoldBots`), `assignBots` gives each bot seat a juror
+  of its own in the drawn order, foreman skipped. That juror draws the
+  seat's key, takes its turns in the deal, says its pass and its
+  plays, and publishes its secret at the audit with everyone else's.
+  The assignment is frozen at the hand's first jury (`botHolders`), so
+  a jury redrawn mid-hand moves permission — which juror may act for
+  the seat — without moving the seat itself. When a holder is no
+  longer among the live jurors, another rebuilds the seat from the
+  escrow and plays on. The verifier recomputes the assignment from the
+  record, checks the author of every move for a held seat against the
+  hand's jury, and checks the move itself against the policy once the
+  audit opens the hand.
 
 The simulator's jury rows (`packages/table/test/jury_test.dart`): a
 table of two with one gone quiet off turn and on it; four cut two and

@@ -61,7 +61,7 @@ void main() {
   }
 
   test('a bot seat a juror holds is played by that juror, and no player sees its hand', () {
-    final t = SimTable(humans: 2, seed: 7, crypto: crypto, jurors: 4, botsToJury: true);
+    final t = SimTable(humans: 2, seed: 7, crypto: crypto, jurors: 4);
     t.start();
     expect(t.clock.runUntil(() => t.clients.every((c) => c.game.phase == Phase.passing), limitMs: 120000), isTrue,
         reason: 'the deal completes with two seats held by jurors');
@@ -82,6 +82,15 @@ void main() {
     final holders = t.clients.first.botHolders(0);
     expect(holders.length, 2, reason: 'a juror to each bot seat');
     expect(holders.values.toSet().length, 2, reason: 'and not the same juror twice');
+    for (final held in holders.entries) {
+      final d = t.jurors.firstWhere((j) => j.signer.publicKey == held.value).client!.deal!;
+      expect(d.knowsSecret(held.key), isTrue, reason: 'the juror holding seat ${held.key} drew its key');
+      for (final other in holders.keys) {
+        if (other != held.key) {
+          expect(d.knowsSecret(other), isFalse, reason: 'and holds no more of the deck than its own seat');
+        }
+      }
+    }
 
     expect(t.run(), isTrue, reason: 'the game plays out');
     agree(t);
@@ -217,12 +226,24 @@ void main() {
     t.people[2].exitAt = Moment.offTurn;
     t.people[2].exit = Exit.leave;
     t.start();
+    // The hand they left is in play still, and this deal was built
+    // with their seat a person's: nobody holds it, so the escrow
+    // opens it to the table and the bot finishes the hand in the
+    // open. That opening is the one hand's only.
+    int? leftAt;
+    expect(t.clock.runUntil(() {
+      if (!t.survivors.every((c) => c.seatStateOf(2) == SeatState.left)) return false;
+      leftAt ??= t.survivors.first.game.handNumber;
+      return t.survivors.every((c) => c.game.handNumber == leftAt && c.game.knowsHand(2));
+    }, limitMs: 300000), isTrue, reason: 'the escrow opens the hand they left, in the hand they left it');
     expect(t.run(), isTrue);
     expect(t.people[2].gone, isTrue);
     expect(t.survivors.length, 3);
     for (final c in t.survivors) {
       expect(c.seatStateOf(2), SeatState.left);
-      expect(c.game.knowsHand(2), isTrue, reason: 'the leaver\'s seat is a bot whose hand everyone sees');
+      // From the next deal on the seat is a bot a juror holds, and a
+      // bot seat is nobody at the table's to see (docs/04-live-play.md).
+      expect(c.game.knowsHand(2), isFalse, reason: 'a jury-held bot seat is not the players\' to see');
     }
     agree(t);
     t.stop();
@@ -273,10 +294,19 @@ void main() {
       });
       t.people[1].exit = exit;
       t.start();
+      // The pass was sealed to a seat whose secret the escrow rebuilds:
+      // the hand it lands in opens to the table, pass included, and the
+      // bot plays it out there.
+      int? leftAt;
+      expect(t.clock.runUntil(() {
+        if (!t.survivors.every((c) => c.seatStateOf(1) != SeatState.human)) return false;
+        leftAt ??= t.survivors.first.game.handNumber;
+        return t.survivors.every((c) => c.game.handNumber == leftAt && c.game.knowsHand(1));
+      }, limitMs: 300000), isTrue, reason: 'the pass into the seat is opened with the hand it was sealed to');
       expect(t.run(), isTrue);
       expect(t.people[1].gone, isTrue, reason: 'the moment came');
       for (final c in t.survivors) {
-        expect(c.game.knowsHand(1), isTrue);
+        expect(c.game.knowsHand(1), isFalse, reason: 'the seat is a bot the jury holds by the end');
         expect(c.pause, isNull);
       }
       agree(t);

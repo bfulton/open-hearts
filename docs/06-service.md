@@ -474,9 +474,10 @@ thing that has always been true of `nostr.openhearts.game`.
 
 ## Language and layout
 
-The juror runs the bot policy under MPC, and the bot is Dart. So the
-juror is Dart, and rather than carry a second language for two hundred
-lines of handlers, the whole service is Dart. The one exception is the
+The juror runs the bot policy — it plays the bot seats it holds
+([doc 04](04-live-play.md), "Playing a seat nobody holds") — and the
+bot is Dart. So the juror is Dart, and rather than carry a second
+language for two hundred lines of handlers, the whole service is Dart. The one exception is the
 object per tag, which is JavaScript because the runtime it hibernates
 on is: a few hundred lines of NIP-01 that the Dart suites hold to the
 Dart relay's own behaviour, rather than a runtime chosen to keep the

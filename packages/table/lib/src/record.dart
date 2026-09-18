@@ -132,6 +132,22 @@ Verification verifyRecord(
   /// seat's steps would be computed rather than checked.
   final pending = <int, Uint8List>{};
 
+  /// Every juror the hand ever had, across redraws, filled in as the
+  /// juries are checked below. Who *may* act for a bot seat, as
+  /// against [juryOrder], which says who goes first.
+  final jurors = <int, Set<PublicKey>>{};
+
+  /// The jurors in force at [hand]: its own, or until it has any, the
+  /// latest earlier hand's — the client's rule, a juror serves until
+  /// relieved.
+  Set<PublicKey> jurorsAt(int hand) {
+    var latest = -1;
+    for (final h in jurors.keys) {
+      if (h <= hand && h > latest) latest = h;
+    }
+    return latest < 0 ? const {} : jurors[latest]!;
+  }
+
   /// The jury in its drawn order, per hand, filled in as the juries
   /// are checked below. A bot seat's holder comes out of this, and a
   /// set's iteration order would hand the same seat to different
@@ -152,8 +168,20 @@ Verification verifyRecord(
   final spokenFor = <int, Set<int>>{};
   for (final d in record) {
     try {
+      // Only the kinds that act *for* a seat. A juror ruling on a seat
+      // carries that seat too, and counting a verdict here would mark
+      // the seat juror-held and then refuse the person's own plays
+      // for it.
+      final k = d.event.kind;
+      if (k != EventKind.deal && k != EventKind.pass && k != EventKind.play) continue;
       final s = d.event.seat;
-      if (s < 0 || s >= seatCount || holders[s] is! BotSeat) continue;
+      if (s < 0 || s >= seatCount) continue;
+      // By somebody who is not at the table: a juror. Not filtered on
+      // the seat being a bot's, because holders here is where the
+      // seats started — a seat that becomes a bot in a later hand
+      // would never be counted, and its juror's steps would then be
+      // refused for coming from a juror.
+      if (humans.contains(d.event.author)) continue;
       spokenFor.putIfAbsent(d.turn.hand, () => {}).add(s);
     } catch (_) {}
   }
@@ -175,7 +203,13 @@ Verification verifyRecord(
   bool mayAct(int seat, PublicKey who, int hand) {
     final holder = holders[seat];
     if (holder is HumanSeat) return holder.key == who;
-    return heldAt(hand)[seat] == who;
+    // Any juror the hand had, redraws included — as at the table. The
+    // assignment says who goes first; the seat's key, which only its
+    // holder drew and only the jury's own escrow passes on, says who
+    // can go at all. So a seat taken over after its juror went quiet
+    // is spoken for by whichever juror came by the key, and that juror
+    // may be from a draw the first one did not name.
+    return heldAt(hand).containsKey(seat) && jurorsAt(hand).contains(who);
   }
 
   DealSession startDeal() => deal = DealSession(
@@ -255,7 +289,6 @@ Verification verifyRecord(
     return witnesses.intersection(among).length >= among.length ~/ 2 + 1;
   }
 
-  final jurors = <int, Set<PublicKey>>{};
   for (final d in juries) {
     final e = d.event;
     if (!d.jury || e.kind != EventKind.jury) return fail('a jury that is not a jury proposal');
@@ -288,17 +321,6 @@ Verification verifyRecord(
   // later in the hand moves the jury without moving the seat.
   for (final d in juries.toList()..sort((a, b) => a.event.id.compareTo(b.event.id))) {
     juryOrder.putIfAbsent(d.event.hand, () => d.event.jurors);
-  }
-
-  /// The jurors in force at [hand]: its own, or until it has any, the
-  /// latest earlier hand's — the client's rule, a juror serves until
-  /// relieved.
-  Set<PublicKey> jurorsAt(int hand) {
-    var latest = -1;
-    for (final h in jurors.keys) {
-      if (h <= hand && h > latest) latest = h;
-    }
-    return latest < 0 ? const {} : jurors[latest]!;
   }
 
   /// Whether [d] is carried by a verdict: a juror of the hand ruled

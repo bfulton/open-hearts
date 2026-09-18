@@ -26,7 +26,6 @@ class SimTable {
     int jurors = 0,
     bool lastResort = false,
     bool withPresence = false,
-    this.botsToJury = false,
     this.crypto,
   })  : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
@@ -34,12 +33,12 @@ class SimTable {
     if (jurors > 0 || lastResort || withPresence) {
       final p = presence = SimPresence(net, clock);
       for (var j = 0; j < jurors; j++) {
-        final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock, crypto: crypto, botsToJury: botsToJury);
+        final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock, crypto: crypto);
         this.jurors.add(juror);
         p.register(juror);
       }
       if (lastResort) {
-        final juror = SimJuror(FakeSigner('last-resort-$seed'), net, clock, crypto: crypto, botsToJury: botsToJury);
+        final juror = SimJuror(FakeSigner('last-resort-$seed'), net, clock, crypto: crypto);
         this.jurors.add(juror);
         p.register(juror);
         p.lastResort = juror;
@@ -63,16 +62,11 @@ class SimTable {
           presence: presence,
           crypto: crypto,
           random: Random(seed * 1000 + i));
-      client.botsToJury = botsToJury;
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }
   }
 
   final int humans;
-
-  /// Whether each bot seat is held by a juror rather than computed by
-  /// everyone (docs/04-live-play.md, "Playing a seat nobody holds").
-  final bool botsToJury;
 
   /// The deal's primitives, at a sealed table.
   final DealCrypto? crypto;

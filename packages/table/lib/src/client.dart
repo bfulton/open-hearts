@@ -835,7 +835,12 @@ class TableClient {
     // it has no hand to work from, and every way in here has to be
     // stopped, not only the turn being opened.
     final holder = botHolders(turn.hand)[seat];
-    final heldHere = holder == signer.publicKey;
+    // Held here if this side was named for it, or if it is a juror
+    // that has since come by the seat's key through the escrow — a
+    // takeover after the named holder went quiet.
+    final heldHere = holder != null &&
+        (holder == signer.publicKey ||
+            (mySeat == null && _jurorsOf(turn.hand).contains(signer.publicKey) && (d?.knowsSecret(seat) ?? false)));
     if (holder != null && !heldHere) return;
     if (d != null) {
       if (d.awaitsSecret(seat)) return _stall(turn, seat);
@@ -1714,21 +1719,18 @@ class TableClient {
     // after the first.
     if (!spec.sealed || done) return;
     if (_deal != null && _deal!.hand == game.handNumber) return;
-    if (botsToJury && _hasBotSeats && clock.nowMs - _handOpenedAt < 10000) {
-      final held = botHolders(game.handNumber);
-      if (!_everyBotHeld(held)) return;
+    // Wait for the hand's jury to be drawn, not for it to be big
+    // enough to hold the seats: a jury too small holds none of them,
+    // and waiting on that is waiting for something that will not
+    // happen — ten seconds of every hand, spent to arrive where the
+    // first look already was.
+    if (_hasBotSeats && clock.nowMs - _handOpenedAt < 10000) {
+      if (!_juriesFor(game.handNumber).any((d) => d.event.hand == game.handNumber)) return;
     }
     _startDeal();
   }
 
   bool get _hasBotSeats => holders.any((h) => h is BotSeat);
-
-  bool _everyBotHeld(Map<int, PublicKey> held) {
-    for (var s = 0; s < seatCount; s++) {
-      if (holders[s] is BotSeat && !held.containsKey(s)) return false;
-    }
-    return true;
-  }
 
   void _startDeal() {
     final c = crypto!;
@@ -1774,21 +1776,20 @@ class TableClient {
   bool _mayAct(int seat, PublicKey who, int hand) {
     final holder = holders[seat];
     if (holder is HumanSeat) return holder.key == who;
-    return botHolders(hand)[seat] == who;
+    // Any juror of the hand, not only the one the assignment named.
+    // What actually stops a juror acting for a seat is not having its
+    // key: only the holder drew it, and only the jury's own escrow
+    // gives it to anybody else. So the assignment says who goes first,
+    // and this says who may go at all — which is what lets another
+    // juror take a seat over when its holder goes quiet, with no peer
+    // having to agree about who is live.
+    return botHolders(hand).containsKey(seat) && _jurorsOf(hand).contains(who);
   }
 
-  /// Whether a bot seat's hand is a juror's to hold rather than
-  /// everyone's to compute (docs/04-live-play.md, "Playing a seat
-  /// nobody holds"). Off until a bot seat whose juror goes can be
-  /// taken over by another — without that, one juror going quiet
-  /// strands its seat for the rest of the hand, which is most of what
-  /// the chaos walk does to a jury.
-  bool botsToJury = false;
-
   /// Which juror holds which bot seat at [hand]. Empty when the table
-  /// does not hold bots with the jury, or when there is no jury to
-  /// hold them — in which case a bot seat stays public work, which is
-  /// what a table with nobody online to draw from falls back to.
+  /// is unsealed, or when there is no jury to hold them — in which
+  /// case a bot seat stays public work, which is what a table with
+  /// nobody online to draw from falls back to.
   /// Fixed once the hand's deal is built: a bot seat's holder is in
   /// that deal, and a jury redrawn mid-hand would otherwise move the
   /// seat out from under it — the juror still saying its steps while
@@ -1796,7 +1797,11 @@ class TableClient {
   final Map<int, Map<int, PublicKey>> _heldByHand = {};
 
   Map<int, PublicKey> botHolders(int hand) {
-    if (!botsToJury) return const {};
+    // Only at a sealed table. An unsealed one has no hidden hands to
+    // keep from anybody, so a juror holding a bot seat there would
+    // protect nothing and only take the seat away from the peers that
+    // work its moves out between them.
+    if (!spec.sealed) return const {};
     final fixed = _heldByHand[hand];
     if (fixed != null) return fixed;
     // In the jury's own drawn order, and across several juries by
@@ -2115,10 +2120,35 @@ class TableClient {
     _emit(EventKind.release, {'hand': game.handNumber, 'about': seat, 'share': m['share']});
   }
 
+  /// A bot seat whose juror has gone quiet is a seat nobody is
+  /// playing, so it is given up to the escrow like a departed
+  /// person's: the jury's own pieces open it, two of them, and
+  /// whichever juror comes by the key goes on playing the seat
+  /// (docs/04-live-play.md). A player never holds a piece of one, so
+  /// this opens the hand to the jury and to nobody at the table.
+  ///
+  /// Judged here rather than agreed, as a juror's silence always is;
+  /// peers that judge it late simply take longer to accept whoever
+  /// picks the seat up, and the record shows who did.
+  void _handOverQuietSeats() {
+    final d = _deal;
+    if (d == null) return;
+    final hand = game.handNumber;
+    final held = botHolders(hand);
+    if (held.isEmpty) return;
+    final live = _liveJurors(hand);
+    for (final e in held.entries) {
+      if (live.contains(e.value) || d.gone.contains(e.key)) continue;
+      _trace('bot seat ${e.key}: its juror ${e.value.substring(0, 4)} has gone quiet; to the escrow');
+      d.seatLeft(e.key);
+    }
+  }
+
   /// Every few seconds while any departed seat's secret is awaited
   /// here: say this side's pieces again, since a release lost is a
   /// table stalled.
   void _releaseTick() {
+    _handOverQuietSeats();
     final d = _deal;
     if (d == null || clock.nowMs - _lastReleaseAt < 5000) return;
     for (final s in d.gone) {
@@ -2292,6 +2322,11 @@ class TableClient {
   /// or a reconnect is recovered by whoever still holds it.
   void _tick() {
     if (_closed) return;
+    // Before either branch: a hand's deal can be deferred waiting on
+    // its jury, and the peer that has to come back to it is not always
+    // a seated one or a serving one — a client that has left the table
+    // still follows the hands out, and is in neither branch below.
+    _startDealWhenReady();
     _timers.add(clock.schedule(1000, _tick));
     if (amSeated && !_left && !done) {
       _repeat();

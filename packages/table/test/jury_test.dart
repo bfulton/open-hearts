@@ -39,13 +39,15 @@ void checkFinishedByJury(SimTable t, {required Set<int> departedSeats, bool expe
 
 void main() {
   test('the draw is a function of the seed, the hand and the snapshot', () {
-    final pool = ['k3', 'k1', 'k5', 'k2', 'k4', 'k6'];
+    // More online than the jury takes, so the draw is a selection and
+    // not just an ordering of everybody there is.
+    final pool = ['k3', 'k1', 'k5', 'k2', 'k4', 'k6', 'k7', 'k8'];
     final a = drawJury(7, 2, pool);
     expect(a.length, jurySize);
     expect(drawJury(7, 2, pool.reversed), a, reason: 'the snapshot is a set');
     expect(drawJury(7, 3, pool), isNot(a), reason: 'every hand draws afresh');
     expect(drawJury(8, 2, pool), isNot(a));
-    expect(drawJury(7, 2, ['k1', 'k2']).toSet(), {'k1', 'k2'}, reason: 'fewer than four online is the jury there is');
+    expect(drawJury(7, 2, ['k1', 'k2']).toSet(), {'k1', 'k2'}, reason: 'fewer online than the draw asks for is the jury there is');
   });
 
   group('a table of two', () {
@@ -134,7 +136,9 @@ void main() {
     });
 
     test('the whole jury goes quiet: another is drawn from whoever is left', () {
-      final t = SimTable(humans: 3, seed: 66, jurors: 6);
+      // Two more online than a jury takes, so there is somebody left
+      // to draw the second one from.
+      final t = SimTable(humans: 3, seed: 66, jurors: 8);
       t.people[2]
         ..exit = Exit.idle
         ..exitAt = Moment('off turn, hand 2', Moment.offTurn.holds, fromHand: 2);
@@ -200,9 +204,16 @@ void main() {
     expect(three.values.toSet().length, 3, reason: 'no juror holds two');
     expect(three.containsValue('j0'), isFalse, reason: 'and not the foreman');
 
-    // Not enough jurors to go round: the last seats go unheld, which
-    // is the table's cue to wait rather than seat a bot nobody holds.
-    expect(assignBots(['j0', 'j1'], [1, 2, 3]), {1: 'j1'});
+    // Every seat held, at more seats than a table can really have:
+    // the holders run out only past three bots, and a fourth bot seat
+    // would be a table with nobody at it.
+    expect(assignBots([...jury, 'j4'], [1, 2, 3, 0]), {0: 'j1', 1: 'j2', 2: 'j3', 3: 'j4'});
+
+    // And under four, nothing is held at all: a bot seat's escrow is
+    // the jury's own in two sides with the holder in one of them, so a
+    // jury this small cannot open the seat again once its holder goes.
+    expect(assignBots(['j0', 'j1'], [1, 2, 3]), isEmpty);
+    expect(assignBots(['j0', 'j1', 'j2'], [1]), isEmpty, reason: 'three is still too few');
     expect(assignBots(['j0'], [1]), isEmpty, reason: 'a jury of one is a foreman and nobody else');
   });
 }

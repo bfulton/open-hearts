@@ -370,20 +370,21 @@ offer say so, and a build that cannot run the deal does not sit down.
   about three times as long with the share path on, 15 minutes against
   5, which is the tokens being made and checked a position at a time.
 
-- **The interim.** Until a juror holds each bot seat
-  ([doc 04](04-live-play.md), "Playing a seat nobody holds"), a bot's
-  hand is open to everyone at the table, and so is a departed person's
-  once the escrow opens it. At four people nobody sees anyone's. Below
-  that it is worse than it sounds, and the reason is subtraction: at a
-  table of two people and two bots each person sees their own thirteen
-  and the bots' twenty-six, which is thirty-nine of fifty-two, and the
-  other person's hand is the thirteen left over. Saying they never see
-  the other person's cards is true and means nothing — there is no
-  hidden information between them at all. At three people and one bot,
-  twenty-six are known and the rest is split two ways, which leaks but
-  does not solve. **The seat count where the game works today is
-  four**, and that is the reason to finish the jury's half of it. The shuffle's guarantee
-  holds regardless: one honest shuffler is enough.
+- **The seats nobody holds.** A bot seat's hand is held by a juror and
+  by nobody at the table ([doc 04](04-live-play.md), "Playing a seat
+  nobody holds"), which is what makes the guarantee above hold at every
+  seat count rather than only at four people. The reason it has to is
+  subtraction: with bots' hands open, a table of two people and two
+  bots shows each person their own thirteen and the bots' twenty-six —
+  thirty-nine of fifty-two, and the other person's hand is the thirteen
+  left over. Saying they never see the other person's cards would be
+  true and would mean nothing. One juror per bot seat, for the same
+  reason one seat over: a juror holding two of them at a table of one
+  person holds twenty-six and takes the person's hand the same way.
+  What stays open is a **departed person's** hand, opened from escrow
+  for the rest of the hand they left — the seat is a bot the jury holds
+  only from the next deal. The shuffle's guarantee holds throughout:
+  one honest shuffler is enough.
 - **The verifier** replays a sealed record through the deal: every
   key's proof, every shuffle's argument against the deck before it,
   every token, the lead card's declaration; then the audit's secrets

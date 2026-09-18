@@ -104,15 +104,26 @@ rigged. Roughly in order:
    The one fault no proof can catch — a seat that says it holds the two
    of clubs nowhere — leaves a hand nobody can lead, and such a hand is
    opened where it stands and given up unscored, with the next dealt in
-   its place and the seat the opened deal names removed. Bots' hands are
-   open to the table until the bot plays inside the computation
-   ([doc 04](docs/04-live-play.md)).
+   its place and the seat the opened deal names removed. A bot's hand
+   is nobody at the table's to see either: a juror holds each bot seat
+   and plays it ([doc 04](docs/04-live-play.md), "Playing a seat
+   nobody holds").
 6. **Live play** ([doc 04](docs/04-live-play.md)) — presence,
-   matchmaking, seat handover, the jury: built, its deadlock role and
-   its escrow of the deal. Seating goes by pace as well as rating, so
-   slow players find each other; a pace is the one number about a game
-   no two peers can agree on, so each device measures its own and
-   states it the way it states a rating.
+   matchmaking, seat handover, the jury: built, all three of its roles
+   — breaking a deadlock, holding the escrow of the deal, and playing
+   the seats nobody holds. A bot seat is a seat whose device is a
+   juror: its key drawn like a person's instead of hashed from public
+   values, one juror per seat so that nobody holds enough to take the
+   last hand by subtraction, its escrow among jurors alone so no
+   player holds a piece, another juror taking it over when its holder
+   goes, and the audit publishing its secret so the verifier still
+   checks every bot move was the policy's. It costs about 30 KB a seat
+   a hand on the relay and it costs the live check: a bot's move is a
+   signed event now, and true only at the audit rather than at the
+   turn. Seating goes by pace as well as rating, so slow players find
+   each other; a pace is the one number about a game no two peers can
+   agree on, so each device measures its own and states it the way it
+   states a rating.
 7. **Landscape**, then **tablet**, then **iPhone Duo**
    ([doc 05](docs/05-form-factors.md)) — built, all three, and all
    three chosen from the space the table is given rather than from the
@@ -138,15 +149,10 @@ rigged. Roughly in order:
 
 Ideas agreed on and not yet placed in the order above.
 
-- **A juror holds each bot seat**, so a bot's hand is open to no player
-  ([doc 04](docs/04-live-play.md), "Playing a seat nobody holds"); at a
-  live table bots' hands are still open to everyone, and below four
-  humans that gives away the other player's hand by subtraction. A bot
-  seat becomes a seat whose device is the jury: its key drawn like a
-  person's instead of hashed from public values, one juror per seat so
-  that nobody holds enough to subtract, and the audit publishing it so
-  the verifier still checks every bot move was the policy's.
-  **The computation itself is built and works**
+- **The bot inside the computation**, which would give back the live
+  check a juror-held seat gives up — a bot's move derived by everyone
+  again rather than taken on a stranger's signature until the audit.
+  **The computation is built and works**
   ([ot](measurements/ot/README.md)): the bot's own policy, garbled,
   over a hand split between two parties neither of whom can see a
   card, picking the card the bot picks — with a garbler who tampers
