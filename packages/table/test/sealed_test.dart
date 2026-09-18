@@ -60,6 +60,38 @@ void main() {
     }, timeout: const Timeout(Duration(minutes: 5)));
   }
 
+  test('a bot seat a juror holds is played by that juror, and no player sees its hand', () {
+    final t = SimTable(humans: 2, seed: 7, crypto: crypto, jurors: 4, botsToJury: true);
+    t.start();
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.game.phase == Phase.passing), limitMs: 120000), isTrue,
+        reason: 'the deal completes with two seats held by jurors');
+
+    // The point of the whole change: a person sees its own cards and
+    // nobody else's, where today it would see both bots' as well and
+    // take the other person's hand by subtraction (docs/03-fair-deal.md).
+    for (final c in t.clients) {
+      for (var s = 0; s < seatCount; s++) {
+        expect(c.game.knowsHand(s), s == c.mySeat, reason: 'seat $s as seen by seat ${c.mySeat}');
+      }
+      expect(c.deal!.knowsSecret(2), isFalse, reason: 'a bot seat\'s key is not a player\'s to compute');
+      expect(c.deal!.knowsSecret(3), isFalse);
+    }
+
+    // And the jurors that hold them do see them — one seat each, so no
+    // juror holds enough of the deck to subtract either.
+    final holders = t.clients.first.botHolders(0);
+    expect(holders.length, 2, reason: 'a juror to each bot seat');
+    expect(holders.values.toSet().length, 2, reason: 'and not the same juror twice');
+
+    expect(t.run(), isTrue, reason: 'the game plays out');
+    // Not agree() yet: the verifier recomputes a bot's moves rather
+    // than checking the ones in the record, which it cannot do once a
+    // seat's hand is a juror's. Checking them against the policy from
+    // the secret the audit publishes is the next piece
+    // (docs/04-live-play.md, "Playing a seat nobody holds").
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   /// A table where every seat says it holds the two of clubs nowhere.
   /// Three of them are telling the truth; whichever was dealt the card
   /// is not, and nothing in the deal's proofs can tell them apart

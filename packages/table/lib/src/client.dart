@@ -584,19 +584,27 @@ class TableClient {
 
   void pass(List<Card> cards) {
     if (!awaitingMyPass) return;
-    final turn = TurnId.pass(game.handNumber, mySeat!);
+    sayPass(mySeat!, cards);
+  }
+
+  /// A pass for [seat], said rather than worked out by everyone: a
+  /// player's own, or a bot seat's by the juror that holds it
+  /// (docs/04-live-play.md). A bot seat nobody holds needs no event —
+  /// every peer computes the same pass from a hand it can all see.
+  void sayPass(int seat, List<Card> cards) {
+    final turn = TurnId.pass(game.handNumber, seat);
     if (!_races.containsKey(turn) || _races[turn]!.settled) return;
-    final body = <String, Object?>{'hand': game.handNumber, 'turn': turn.index, 'seat': mySeat};
+    final body = <String, Object?>{'hand': game.handNumber, 'turn': turn.index, 'seat': seat};
     if (spec.sealed) {
       // The cards stay hidden: the positions move, and the tokens that
       // open them go to the receiver alone.
       final d = _deal!;
-      final positions = [for (final c in cards) d.positionOf(mySeat!, c.index)];
+      final positions = [for (final c in cards) d.positionOf(seat, c.index)];
       if (positions.any((p) => p == null)) return;
-      final to = (mySeat! + game.passDirection.seatOffset) % seatCount;
+      final to = (seat + game.passDirection.seatOffset) % seatCount;
       final m = d.passMessage(to, [for (final p in positions) p!]);
       if (m == null) return;
-      if (lies == Lie.seal && m['sealed'] != null) {
+      if (seat == mySeat && lies == Lie.seal && m['sealed'] != null) {
         // Sealed to nothing anybody holds: the shape of a pass, and
         // three cards the receiver will never open (docs/03).
         final rng = _random ?? Random();
@@ -612,11 +620,17 @@ class TableClient {
   void play(Card card) {
     if (!awaitingMyPlay) return;
     if (!game.legalPlaysFor(mySeat!).contains(card)) return;
+    sayPlay(mySeat!, card);
+  }
+
+  /// A play for [seat], said rather than worked out by everyone: as
+  /// [sayPass], and for the same reason.
+  void sayPlay(int seat, Card card) {
     final turn = TurnId.play(game.handNumber, _playIndex);
-    final body = <String, Object?>{'hand': game.handNumber, 'turn': turn.index, 'seat': mySeat, 'card': card.code};
+    final body = <String, Object?>{'hand': game.handNumber, 'turn': turn.index, 'seat': seat, 'card': card.code};
     if (spec.sealed) {
       final d = _deal!;
-      final p = d.positionOf(mySeat!, card.index);
+      final p = d.positionOf(seat, card.index);
       if (p == null) return;
       final m = d.playToken(p);
       if (m == null) return;
@@ -740,7 +754,8 @@ class TableClient {
     step = 0;
     _proposeJury();
     if (spec.sealed) {
-      _startDeal();
+      _handOpenedAt = clock.nowMs;
+      _startDealWhenReady();
       return;
     }
     _openPlay();
@@ -776,7 +791,11 @@ class TableClient {
     _turnSeat[turn] = seat;
     _trace('open $turn for seat $seat (${holders[seat]})');
     if (botActs && holders[seat] is BotSeat) {
-      _botTurn(turn, seat);
+      // A bot seat nobody holds is everyone's to compute. One a juror
+      // holds is that juror's alone: every other peer waits to be told
+      // (docs/04-live-play.md).
+      final holder = botHolders(turn.hand)[seat];
+      if (holder == null || holder == signer.publicKey) _botTurn(turn, seat);
     }
   }
 
@@ -810,9 +829,21 @@ class TableClient {
   /// escrow — the turn stalls, settled or not, until the pieces come.
   void _botActs(TurnId turn, int seat) {
     final d = _deal;
+    // A seat this side holds for the jury: its move is nobody else's
+    // to work out, so it is said and settles as a person's does. A
+    // seat somebody else holds is not this side's business at all —
+    // it has no hand to work from, and every way in here has to be
+    // stopped, not only the turn being opened.
+    final holder = botHolders(turn.hand)[seat];
+    final heldHere = holder == signer.publicKey;
+    if (holder != null && !heldHere) return;
     if (d != null) {
       if (d.awaitsSecret(seat)) return _stall(turn, seat);
       if (turn.isDeal || turn.isAudit) {
+        // A bot seat nobody holds has deal steps everyone computes, so
+        // the turn settles here with nothing said. A held seat's are
+        // its juror's to say, in _actOnDeal, like a person's.
+        if (heldHere) return;
         _races[turn]!.settled = true;
         _closeTurn(turn);
         return;
@@ -843,6 +874,7 @@ class TableClient {
     final bot = Bot(persona: (holders[seat] as BotSeat).persona);
     if (turn.isPass) {
       final cards = bot.choosePass(game.handOf(seat));
+      if (heldHere) return sayPass(seat, cards);
       if (d != null) {
         final to = (seat + game.passDirection.seatOffset) % seatCount;
         d.passOpen(seat, to, [for (final c in cards) d.positionOf(seat, c.index)!]);
@@ -860,6 +892,7 @@ class TableClient {
         taken: game.taken,
       );
       final card = bot.chooseCard(view, game.legalPlaysFor(seat));
+      if (heldHere) return sayPlay(seat, card);
       if (d != null) d.playOpen(seat, d.positionOf(seat, card.index)!);
       game.play(seat, card);
       played.add(card);
@@ -1323,8 +1356,7 @@ class TableClient {
     if (race == null) return _defer(event); // current, and not open yet
     if (race.settled) return _catchUp(turn);
     final seat = _turnSeat[turn]!;
-    final holder = holders[seat];
-    if (holder is! HumanSeat || holder.key != event.author) return;
+    if (!_mayAct(seat, event.author, turn.hand)) return;
     if (!_valid(event, seat)) {
       // Not valid here now — which for a deal step can mean this peer
       // has yet to see what it is checked against; let a re-send be
@@ -1667,9 +1699,41 @@ class TableClient {
   DealSession? dealOf(int hand) => _dealsByHand[hand];
   final Map<int, DealSession> _dealsByHand = {};
 
+  /// When the hand's deal was opened, for the wait below.
+  int _handOpenedAt = 0;
+
+  /// The deal is built once, and a bot seat's holder is fixed in it,
+  /// so a table that holds bots with the jury waits for the jury
+  /// before building it. The jury is proposed as the hand opens and
+  /// settles a moment later; ten seconds without one means there is
+  /// nobody online to draw from, and the hand goes ahead with its bot
+  /// seats public, which is what a deserted table falls back to.
+  void _startDealWhenReady() {
+    // A deal for *this* hand: _deal still holds the last one until the
+    // new one replaces it, and testing it for null strands every hand
+    // after the first.
+    if (!spec.sealed || done) return;
+    if (_deal != null && _deal!.hand == game.handNumber) return;
+    if (botsToJury && _hasBotSeats && clock.nowMs - _handOpenedAt < 10000) {
+      final held = botHolders(game.handNumber);
+      if (!_everyBotHeld(held)) return;
+    }
+    _startDeal();
+  }
+
+  bool get _hasBotSeats => holders.any((h) => h is BotSeat);
+
+  bool _everyBotHeld(Map<int, PublicKey> held) {
+    for (var s = 0; s < seatCount; s++) {
+      if (holders[s] is BotSeat && !held.containsKey(s)) return false;
+    }
+    return true;
+  }
+
   void _startDeal() {
     final c = crypto!;
     final held = botHolders(game.handNumber);
+    _heldByHand[game.handNumber] = held;
     _deal = DealSession(
       c,
       tableId: spec.id,
@@ -1703,6 +1767,16 @@ class TableClient {
     _actOnDeal();
   }
 
+  /// Whether [who] may act for [seat]: the person sitting there, or
+  /// the juror holding it when it is a bot seat the jury holds. A bot
+  /// seat nobody holds is acted for by nobody — every peer works its
+  /// move out and no event is made.
+  bool _mayAct(int seat, PublicKey who, int hand) {
+    final holder = holders[seat];
+    if (holder is HumanSeat) return holder.key == who;
+    return botHolders(hand)[seat] == who;
+  }
+
   /// Whether a bot seat's hand is a juror's to hold rather than
   /// everyone's to compute (docs/04-live-play.md, "Playing a seat
   /// nobody holds"). Off while the path is being built; it goes with
@@ -1713,12 +1787,30 @@ class TableClient {
   /// does not hold bots with the jury, or when there is no jury to
   /// hold them — in which case a bot seat stays public work, which is
   /// what a table with nobody online to draw from falls back to.
+  /// Fixed once the hand's deal is built: a bot seat's holder is in
+  /// that deal, and a jury redrawn mid-hand would otherwise move the
+  /// seat out from under it — the juror still saying its steps while
+  /// everyone, itself included, had stopped accepting them for it.
+  final Map<int, Map<int, PublicKey>> _heldByHand = {};
+
   Map<int, PublicKey> botHolders(int hand) {
     if (!botsToJury) return const {};
-    return assignBots(
-      _jurorsOf(hand).toList(),
-      [for (var s = 0; s < seatCount; s++) if (holders[s] is BotSeat) s],
-    );
+    final fixed = _heldByHand[hand];
+    if (fixed != null) return fixed;
+    // In the jury's own drawn order, and across several juries by
+    // their event ids rather than by the order they happened to settle
+    // here. _jurorsOf is a set whose iteration order follows this
+    // peer's own history, and two peers that saw the same juries in a
+    // different order would hand the same seat to different jurors —
+    // each then rejecting what the other said for it.
+    final drawn = _juriesFor(hand).toList()..sort((a, b) => a.event.id.compareTo(b.event.id));
+    final jury = <PublicKey>[];
+    for (final d in drawn) {
+      for (final k in d.event.jurors) {
+        if (!jury.contains(k)) jury.add(k);
+      }
+    }
+    return assignBots(jury, [for (var s = 0; s < seatCount; s++) if (holders[s] is BotSeat) s]);
   }
 
   /// The bot seat this side holds at that assignment, if any.
@@ -1896,8 +1988,12 @@ class TableClient {
   /// when the hand is over.
   void _actOnDeal() {
     final d = _deal;
-    if (d == null || !amSeated || _left || done) return;
-    final me = mySeat!;
+    if (d == null || _left || done) return;
+    // The seat this side acts for in the deal: its own if it is a
+    // player, or the bot seat it holds if it is a juror. A player that
+    // has been removed acts for nothing.
+    final me = d.mySeat;
+    if (me == null || (mySeat != null && !amSeated)) return;
     final h = game.handNumber;
     TurnId? open(TurnId t) {
       final r = _races[t];
@@ -1910,21 +2006,21 @@ class TableClient {
       final waited = clock.nowMs - _openedAt[keys]!;
       if (jurors.isNotEmpty || presence == null || needsJuror || waited >= 10000) {
         d.custodians = jurors.toList()..sort();
-        _emitDeal(keys, 0, d.myKeys()!);
+        _emitDeal(keys, 0, me, d.myKeys()!);
       }
     }
     final shuffle = open(TurnId.deal(h, 1, me));
-    if (shuffle != null && d.nextShuffler == me) _emitDeal(shuffle, 1, d.myShuffle()!);
+    if (shuffle != null && d.nextShuffler == me) _emitDeal(shuffle, 1, me, d.myShuffle()!);
     final tokens = open(TurnId.deal(h, 2, me));
-    if (tokens != null && d.deck != null) _emitDeal(tokens, 2, d.myTokens()!);
+    if (tokens != null && d.deck != null) _emitDeal(tokens, 2, me, d.myTokens()!);
     final declare = open(TurnId.deal(h, 3, me));
     if (declare != null) {
       final m = d.myDeclaration();
-      if (m != null) _emitDeal(declare, 3, lies == null ? m : {'seat': m['seat'], 'position': -1});
+      if (m != null) _emitDeal(declare, 3, me, lies == null ? m : {'seat': m['seat'], 'position': -1});
     }
     final audit = open(TurnId.audit(h, me));
     if (audit != null && (game.phase == Phase.handOver || game.phase == Phase.gameOver || _openingAudit)) {
-      _emitDeal(audit, 4, d.myAudit()!);
+      _emitDeal(audit, 4, me, d.myAudit()!);
     }
   }
 
@@ -1932,8 +2028,11 @@ class TableClient {
   /// client but a simulated one. See [Lie].
   Lie? lies;
 
-  void _emitDeal(TurnId turn, int round, Map<String, Object?> m) =>
-      _emit(EventKind.deal, {'hand': turn.hand, 'turn': turn.index, 'seat': mySeat, 'round': round, ...m});
+  /// A deal step for the seat it is taken for — this side's own, or
+  /// the bot seat a juror holds, which is not the same as its seat at
+  /// the table because a juror has none.
+  void _emitDeal(TurnId turn, int round, int seat, Map<String, Object?> m) =>
+      _emit(EventKind.deal, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'round': round, ...m});
 
   /// A settled deal step, applied. Verified on arrival; this side's
   /// own were made here.
@@ -2221,6 +2320,14 @@ class TableClient {
       _releaseTick();
     } else if (mySeat == null && _serving.isNotEmpty && !done) {
       _judgeAppeals();
+      // A juror holding a bot seat owes that seat's deal steps, and
+      // owes them again whenever the last look found it too early to
+      // take one (docs/04-live-play.md). The hand's deal may have been
+      // too early to build as well — the jury that holds its bot seats
+      // settles a moment after the hand opens — and nothing else here
+      // would ever come back to it.
+      _startDealWhenReady();
+      _actOnDeal();
       _releaseTick();
     }
     _notify();
@@ -2456,6 +2563,8 @@ class TableClient {
         p.summon(j, {'table': spec.toJson(), 'hand': e.hand, 'jurors': e.jurors, 'jury': e.id});
       }
     }
+    // A deal waiting on a jury to hold its bot seats can be built now.
+    _startDealWhenReady();
     _notify();
   }
 
@@ -2466,6 +2575,7 @@ class TableClient {
   /// and has nothing to split; it asks.
   void _juryTick() {
     _proposeJury();
+    _startDealWhenReady();
     for (final e in List.of(_races.entries)) {
       final race = e.value;
       if (race.settled || !(race.split || _pause != null)) continue;

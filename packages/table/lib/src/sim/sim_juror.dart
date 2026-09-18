@@ -15,7 +15,10 @@ import 'sim_network.dart';
 import 'virtual_clock.dart';
 
 class SimJuror {
-  SimJuror(this.signer, this.net, this.clock, {this.crypto});
+  SimJuror(this.signer, this.net, this.clock, {this.crypto, this.botsToJury = false});
+
+  /// Whether this juror holds bot seats as well as answering appeals.
+  final bool botsToJury;
 
   final FakeSigner signer;
   final SimNetwork net;
@@ -42,6 +45,7 @@ class SimJuror {
       c = TableClient(
           spec: spec, signer: signer, transport: net.attach(signer.publicKey), clock: clock, crypto: crypto, random: Random(signer.publicKey.hashCode));
       client = c;
+      c.botsToJury = botsToJury;
       c.start();
       c.changes.listen((_) => verdicts = c!.record.where((d) => d.verdict?.author == signer.publicKey).length);
     }
