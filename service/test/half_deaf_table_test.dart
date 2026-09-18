@@ -12,7 +12,6 @@ import 'package:service/service.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
 
-import 'table_over_relay_test.dart' show Player;
 
 void main() {
   setUpAll(() => installNativeSchnorr());
