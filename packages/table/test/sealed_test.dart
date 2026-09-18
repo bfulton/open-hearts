@@ -97,6 +97,33 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  test('nobody online to draw from: the jurors of last resort come up and hold the bot seats', () {
+    // The quiet night, which is when a table has bot seats at all:
+    // matchmaking gives you bots exactly when it cannot find four
+    // people, and that is exactly when there is nobody to draw a jury
+    // from. The call brings up the bench, the bench holds the seats,
+    // and the bots' hands stay hidden (docs/04-live-play.md).
+    final t = SimTable(humans: 2, seed: 21, crypto: crypto, lastResort: true);
+    t.start();
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.game.phase == Phase.passing), limitMs: 300000), isTrue,
+        reason: 'the deal waits for the bench and then completes');
+    expect(t.presence!.calls, greaterThan(0), reason: 'the table called for jurors');
+
+    final holders = t.clients.first.botHolders(0);
+    expect(holders.length, 2, reason: 'a juror to each bot seat');
+    final bench = {for (final j in t.presence!.lastResorts) j.signer.publicKey};
+    expect(holders.values.every(bench.contains), isTrue, reason: 'and they are the bench, since nobody else was online');
+    for (final c in t.clients) {
+      for (var s = 0; s < seatCount; s++) {
+        expect(c.game.knowsHand(s), s == c.mySeat, reason: 'seat $s as seen by seat ${c.mySeat}');
+      }
+    }
+
+    expect(t.run(), isTrue, reason: 'the game plays out');
+    agree(t);
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   /// A table where every seat says it holds the two of clubs nowhere.
   /// Three of them are telling the truth; whichever was dealt the card
   /// is not, and nothing in the deal's proofs can tell them apart

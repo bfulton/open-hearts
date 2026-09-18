@@ -26,16 +26,40 @@ import 'table_page_test.dart' show fanCards, tapCard;
 const _me = 2;
 
 class LiveHarness {
-  LiveHarness({DealCrypto? crypto, this.pictures, Map<int, Avatar> avatars = const {}, int target = engine.gameOverScore, bool rated = false}) {
+  LiveHarness({
+    DealCrypto? crypto,
+    this.pictures,
+    Map<int, Avatar> avatars = const {},
+    int target = engine.gameOverScore,
+    bool rated = false,
+    Set<int> botSeats = const {},
+    int jurors = 0,
+  }) {
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
     spec = TableSpec(
         id: 'widget',
         seed: 21,
-        seats: [for (final s in signers) HumanSeat(s.publicKey)],
+        seats: [
+          for (var s = 0; s < engine.seatCount; s++)
+            if (botSeats.contains(s)) BotSeat(engine.Persona.roster[s % engine.Persona.roster.length]) else HumanSeat(signers[s].publicKey),
+        ],
         sealed: crypto != null,
         rated: rated,
         target: target);
+    // Jurors to draw from, for the seats a bot sits in: at a sealed
+    // table those are a juror's to hold and play, and their hands are
+    // not this screen's to see (docs/04-live-play.md).
+    if (jurors > 0) {
+      final p = presence = SimPresence(net, clock);
+      for (var j = 0; j < jurors; j++) {
+        final juror = SimJuror(FakeSigner('juror$j'), net, clock, crypto: crypto);
+        this.jurors.add(juror);
+        p.register(juror);
+      }
+      p.start();
+    }
     for (var s = 0; s < engine.seatCount; s++) {
+      if (botSeats.contains(s)) continue;
       if (s == _me) {
         controller = LiveController(
           spec: spec,
@@ -46,6 +70,7 @@ class LiveHarness {
           transport: net.attach(signers[s].publicKey),
           clock: clock,
           crypto: crypto,
+          presence: presence,
           // A rated table reads its ratings from this device's own
           // ledger and folds the finished game into it, as the front
           // door does off the relays (net/standing.dart).
@@ -53,8 +78,13 @@ class LiveHarness {
           onResult: rated ? ledger.apply : null,
         );
       } else {
-        final client =
-            TableClient(spec: spec, signer: signers[s], transport: net.attach(signers[s].publicKey), clock: clock, crypto: crypto);
+        final client = TableClient(
+            spec: spec,
+            signer: signers[s],
+            transport: net.attach(signers[s].publicKey),
+            clock: clock,
+            crypto: crypto,
+            presence: presence);
         final person = ScriptedHuman(client, net, clock, persona: engine.Persona.westley, thinkMs: 300);
         people[s] = person;
         person.start();
@@ -72,6 +102,10 @@ class LiveHarness {
 
   final clock = VirtualClock();
   late final SimNetwork net = SimNetwork(clock, seed: 3);
+
+  /// Who is online to be drawn as a juror, and the jurors themselves.
+  SimPresence? presence;
+  final List<SimJuror> jurors = [];
   late final TableSpec spec;
   late final LiveController controller;
   final Map<int, ScriptedHuman> people = {};
@@ -99,12 +133,19 @@ class LiveHarness {
 }
 
 Future<LiveHarness> pumpLive(WidgetTester tester,
-    {DealCrypto? crypto, Pictures? pictures, Map<int, Avatar> avatars = const {}, int target = engine.gameOverScore, bool rated = false}) async {
+    {DealCrypto? crypto,
+    Pictures? pictures,
+    Map<int, Avatar> avatars = const {},
+    int target = engine.gameOverScore,
+    bool rated = false,
+    Set<int> botSeats = const {},
+    int jurors = 0}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  final live = LiveHarness(crypto: crypto, pictures: pictures, avatars: avatars, target: target, rated: rated);
+  final live =
+      LiveHarness(crypto: crypto, pictures: pictures, avatars: avatars, target: target, rated: rated, botSeats: botSeats, jurors: jurors);
   await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: LivePage(controller: live.controller)));
   await tester.pumpAndSettle();
   return live;
@@ -336,6 +377,40 @@ void main() {
     await live.advance(tester, 7000);
     expect(live.controller.clockMs(_me), isNotNull);
     expect(find.bySemanticsLabel(RegExp(r'^You: .*, \d+ s on the clock$')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a bot seat a juror holds plays from the record, and its hand is no more open than a person\'s', (tester) async {
+    // The screen works a bot's moves out for itself, which it can only
+    // do with the bot's hand in front of it. A seat a juror holds has
+    // no hand to show it (docs/04-live-play.md), so its moves have to
+    // come off the record like a person's — and a screen that waited
+    // for the hand instead would stop at the pass and never play.
+    final crypto = await DealCrypto.load();
+    final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: 4);
+    for (var guard = 0; guard < 200 && live.controller.game.phase == engine.Phase.dealing; guard++) {
+      await live.advance(tester, 500);
+    }
+    expect(live.controller.game.phase, engine.Phase.passing, reason: 'the deal completed with two seats held by jurors');
+    final held = live.controller.client.botHolders(0);
+    expect(held.keys.toSet(), {1, 3}, reason: 'a juror to each bot seat');
+    for (var s = 0; s < engine.seatCount; s++) {
+      expect(live.controller.game.knowsHand(s), s == _me, reason: 'seat $s\'s cards, as this screen has them');
+    }
+
+    // Past the pass and into the play: the bots' passes and plays are
+    // the jurors' to say, and the screen takes them as they land.
+    await act(tester, live);
+    for (var guard = 0; guard < 200 && live.controller.game.phase != engine.Phase.playing; guard++) {
+      await live.advance(tester, 500);
+    }
+    expect(live.controller.game.phase, engine.Phase.playing, reason: 'the screen moved past the pass');
+    for (var guard = 0; guard < 200 && live.controller.game.tricksPlayed < 2; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(live.controller.game.tricksPlayed, greaterThanOrEqualTo(2), reason: 'tricks are played on the screen');
+    expect(live.controller.game.knowsHand(1), isFalse, reason: 'and the bot\'s hand was never opened to do it');
     expect(tester.takeException(), isNull);
   });
 

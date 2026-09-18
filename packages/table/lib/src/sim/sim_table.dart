@@ -7,6 +7,7 @@ import 'dart:math';
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import '../client.dart';
+import '../jury.dart';
 import '../signing.dart';
 import '../spec.dart';
 import 'scripted_human.dart';
@@ -25,23 +26,28 @@ class SimTable {
     int netSeed = 1,
     int jurors = 0,
     bool lastResort = false,
+    int? lastResorts,
     bool withPresence = false,
     this.crypto,
   })  : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
-    if (jurors > 0 || lastResort || withPresence) {
+    if (jurors > 0 || lastResort || (lastResorts ?? 0) > 0 || withPresence) {
       final p = presence = SimPresence(net, clock);
       for (var j = 0; j < jurors; j++) {
         final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock, crypto: crypto);
         this.jurors.add(juror);
         p.register(juror);
       }
-      if (lastResort) {
-        final juror = SimJuror(FakeSigner('last-resort-$seed'), net, clock, crypto: crypto);
+      // A bench, not one: a table that needs its bot seats held needs
+      // [juryToHoldBots] of them, and when it calls there is nobody
+      // else to make that up (docs/04-live-play.md).
+      final bench = lastResorts ?? (lastResort ? juryToHoldBots : 0);
+      for (var b = 0; b < bench; b++) {
+        final juror = SimJuror(FakeSigner('last-resort$b-$seed'), net, clock, crypto: crypto);
         this.jurors.add(juror);
         p.register(juror);
-        p.lastResort = juror;
+        p.lastResorts.add(juror);
       }
     }
     spec = TableSpec(

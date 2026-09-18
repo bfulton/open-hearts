@@ -117,10 +117,13 @@ rigged. Roughly in order:
    last hand by subtraction, its escrow among jurors alone so no
    player holds a piece, another juror taking it over when its holder
    goes, and the audit publishing its secret so the verifier still
-   checks every bot move was the policy's. It costs about 30 KB a seat
-   a hand on the relay and it costs the live check: a bot's move is a
-   signed event now, and true only at the audit rather than at the
-   turn. Seating goes by pace as well as rating, so slow players find
+   checks every bot move was the policy's. A table short of jurors to
+   hold its bot seats calls for them and waits rather than dealing a
+   hand everyone can see, and what answers on an empty night is a
+   bench of jurors of last resort rather than one, since one cannot
+   make the four a held seat needs. It costs about 30 KB a seat a hand
+   on the relay and it costs the live check: a bot's move is a signed
+   event now, and true only at the audit rather than at the turn. Seating goes by pace as well as rating, so slow players find
    each other; a pace is the one number about a game no two peers can
    agree on, so each device measures its own and states it the way it
    states a rating.

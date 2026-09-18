@@ -112,6 +112,49 @@ class JurorDuty {
   }
 }
 
+/// A bench of them. A table whose bot seats are the jury's to hold
+/// needs [juryToHoldBots] jurors before it can hold any (jury.dart),
+/// and the call for a last resort comes exactly when there is nobody
+/// else to make that number up — so what answers is a bench rather
+/// than a juror, and a quiet night keeps the bots' hands hidden
+/// instead of handing them back to the table.
+///
+/// Each seat on the bench is its own identity, its own presence and
+/// its own duty, so the draw takes them as it takes anyone: one bot
+/// seat each, and none of them holding enough of the deck to subtract
+/// the rest. They are all ours, which is the bend doc 04 names — ours
+/// rather than another player's, and only when the room is empty.
+class LastResortBench {
+  LastResortBench({
+    required List<Signer> signers,
+    required List<Uri> relays,
+    void Function(String line)? log,
+    int idleMs = 10 * 60 * 1000,
+    int silenceAfterMs = 120000,
+    DealCrypto? crypto,
+  }) : jurors = [
+          for (final s in signers)
+            LastResortJuror(relays: relays, signer: s, log: log, idleMs: idleMs, silenceAfterMs: silenceAfterMs, crypto: crypto),
+        ];
+
+  final List<LastResortJuror> jurors;
+
+  /// Whether any of the bench is up.
+  bool get online => jurors.any((j) => j.online);
+
+  void start() {
+    for (final j in jurors) {
+      j.start();
+    }
+  }
+
+  void close() {
+    for (final j in jurors) {
+      j.close();
+    }
+  }
+}
+
 /// The juror of last resort (docs/04-live-play.md): quiet until a
 /// table says it has nobody to draw from, then online — the same code
 /// every other juror runs — and quiet again once it has been idle for

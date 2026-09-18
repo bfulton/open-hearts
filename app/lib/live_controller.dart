@@ -254,6 +254,16 @@ class LiveController extends ChangeNotifier implements TableModel {
     }
   }
 
+  /// Whether this view has to work a seat's move out for itself. A bot
+  /// seat is everyone's to compute — unless a juror holds it, and then
+  /// its move arrives as a signed event like a person's and its hand
+  /// is not ours to see at all (docs/04-live-play.md, "Playing a seat
+  /// nobody holds"). Asked of the hand being shown, which runs behind
+  /// the table's: a seat can be a person's in the hand on screen and a
+  /// bot the jury holds in the one the table is already dealing.
+  bool _worksOutMove(int seat) =>
+      _shownHolders[seat] is BotSeat && !client.botHolders(_shown.handNumber).containsKey(seat);
+
   /// A bot seat's hand, for the shown game to compute its move: dealt
   /// open, or a departed person's opened from escrow since. False
   /// while it is still closed.
@@ -387,7 +397,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     }
     if (_shown.phase == Phase.passing) {
       for (var s = 0; s < seatCount; s++) {
-        if (_shownHolders[s] is BotSeat && !_shown.hasPassed(s)) {
+        if (_worksOutMove(s) && !_shown.hasPassed(s)) {
           if (!_seesHand(s)) return null; // a departed seat's hand, not open here yet
           return (delay: Duration.zero, act: () => _botActs(s, passing: true));
         }
@@ -426,7 +436,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     if (_shown.phase == Phase.handOver) return (delay: sweepBeat, act: _endOfHand);
     if (_shown.pendingTrick != null) return (delay: _trickHold, act: _shown.collectTrick);
     final seat = _shown.currentSeat!;
-    if (_shownHolders[seat] is BotSeat) {
+    if (_worksOutMove(seat)) {
       if (!_seesHand(seat)) return null; // a departed seat's hand, not open here yet
       return (delay: _botThink(seat), act: () => _botActs(seat, passing: false));
     }
@@ -711,6 +721,10 @@ class LiveController extends ChangeNotifier implements TableModel {
   String? get dealNote {
     if (client.game.phase != Phase.dealing) return null;
     final d = client.deal;
+    // Before there is a deal at all: a hand with bot seats waits for
+    // jurors enough to hold them, because a bot seat nobody holds is
+    // a hand everyone can see (docs/04-live-play.md).
+    if (d == null && client.shortOfJurors) return 'Waiting for jurors to hold the bots\' hands';
     if (d == null) return 'Dealing';
     return switch (d.phase) {
       DealPhase.keys => 'Dealing — keys',

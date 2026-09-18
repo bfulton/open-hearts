@@ -4,7 +4,7 @@ What runs on our side, which is deliberately little. The game is peer to
 peer ([doc 02](02-multiplayer.md)), the deal is verifiable
 ([doc 03](03-fair-deal.md)), presence rides relays and bot seats are
 played by the players and the jury ([doc 04](04-live-play.md)). What is
-left is identity, entitlement, and a juror when the room is empty.
+left is identity, entitlement, and jurors when the room is empty.
 
 ## Handlers
 
@@ -19,7 +19,7 @@ left is identity, entitlement, and a juror when the room is empty.
 | **claim** | key, code | the code spent, the device bound, and its licence |
 | **devices** | key, a device to drop | the devices on this subscription |
 | **turn-creds** | attested key | short-lived TURN credentials |
-| **last-resort** | table id, hand | a juror comes online for that hand |
+| **last-resort** | table id, hand | the bench comes online for that hand |
 
 Each is a point lookup and a signature. None is in a game's latency path
 and none is needed by a table already playing.
@@ -129,7 +129,7 @@ Three rules baked in:
 
 Not stored: cards, plays, game state, ratings, emails, device sessions.
 Ratings are computed from public records by anyone. TURN credentials are
-minted from a secret, not kept. The last-resort juror keeps nothing.
+minted from a secret, not kept. The last-resort jurors keep nothing.
 
 Counters are the instrumentation the design asks for — how often tables
 drain to one human, how often a jury cannot be drawn — as atomic
@@ -169,7 +169,7 @@ Live play is a subscription: **$2.99 a year**. Everything else is free
 and stays free — the bots, the records, the verifiable deal, the engine
 itself. What the money is for is the part that costs us money to run:
 relaying people to each other, TURN when a direct path will not form,
-and a juror when a table is left alone.
+and jurors when a table is left alone.
 
 A year rather than a month, for an unglamorous reason. At three dollars
 a month the fixed part of a card fee — thirty cents on Stripe — is ten
@@ -321,7 +321,7 @@ code and different adapters:
 | Entitlement | store and Stripe webhooks | an open house: a key that asks is licensed for a month |
 | TURN | Cloudflare | none; localhost connects directly |
 | Signalling, waiting rooms, results | our own relay and a few public ones, listened on together; table events written to one relay everyone reads, ours preferred while up; lobby, signalling and whatever goes unanswered to all | a minimal NIP-01 relay in the repo |
-| Last-resort juror | woken on demand | always available |
+| Last-resort jurors | woken on demand | always available |
 
 One process, one flag.
 

@@ -603,23 +603,40 @@ across three jurors each holds thirteen and none can subtract.
   a live jury for its whole length. Exposure goes from the 8% of hands
   where somebody departs to every hand with a bot, which at two and
   three humans is every hand, and the sizing has to answer for that.
-- **On a quiet night the juror of last resort is ours.** It holds
-  cards and chooses plays, where before it carried only "a table needs
+- **On a quiet night the jurors of last resort are ours.** They hold
+  cards and choose plays, where before one carried only "a table needs
   a juror". That is the one place the promise above bends, and it
   bends exactly when there is nobody else online to ask.
-- **And under four jurors nothing is held at all**, which is the hole
-  this leaves open. A jury that small cannot get a seat back from its
-  own escrow, so `assignBots` holds none and every bot seat is public
-  work again — and at two people and two bots, public bot hands are
-  the other person's hand by subtraction. It is not a rare case
-  either: a table has bot seats exactly when matchmaking could not
-  find four people, which is exactly when there are few people to draw
-  a jury from. The answer is not to make the table wait for strangers
-  but to have the **juror of last resort fill the jury up to four** —
-  it is ours, it is already what a table with nobody online calls for,
-  and the bend above is the one we have already accepted. Until that
-  is built, a sealed table with bot seats and a jury under four plays
-  those seats in the open.
+
+**Under four jurors nothing is held at all**, and that is not a rare
+corner: a table has bot seats exactly when matchmaking could not find
+four people, which is exactly when there are few people to draw a jury
+from. A jury that small cannot get a seat back from its own escrow, so
+`assignBots` holds none, every bot seat is public work, and at two
+people and two bots public bot hands are the other person's hand by
+subtraction. So the table does not deal such a hand. It **calls for
+jurors whenever the pool is short of what holding the seats needs**,
+not only when the pool is empty, and holds the hand's draw and its
+deal back while a called-for juror could still arrive — saying, on the
+table, that it is waiting for jurors to hold the bots' hands. What
+answers is a **bench** of jurors of last resort rather than one
+(`LastResortBench`), since one cannot make four. They are all ours,
+which is the bend above and not a new one; what they are not is
+another player.
+
+The wait is bounded (`_jurorsWaitMs`, forty seconds). Past the point
+where nobody is coming, a table frozen for good is worse than one
+whose bots are public, so the hand goes ahead in the open — which now
+means nobody else online *and* our own bench unreachable, rather than
+merely a quiet night.
+
+Holding the *draw* back, rather than drawing a small jury now and a
+bigger one after, is deliberate: a hand has one jury and the
+assignment comes from it, so a second draw would not move the seats
+anyway — it would only pin them to a jury that can hold none. The cost
+is that a deadlock in those forty seconds has no jury to break it. It
+is bounded by the same forty seconds, it only arises at a table whose
+bot seats need holding, and the table says what it is waiting for.
 - **A stranger sees a bot's hand for one hand.** Bounded by the draw:
   jurors come from other tables, the table's own humans are excluded,
   and the draw is the deal's own randomness, so nobody chooses to be
@@ -1010,10 +1027,15 @@ the seat from the escrow and plays on.
 when one is rebuilt. Nobody at the table controls whether strangers
 elsewhere go offline, so the pause is not a lever.
 
-**Juror of last resort.** When a table cannot draw a jury — because too
-few people are online — it says so, and a client we manage comes online
-to serve. It is the same code every other juror runs, holds the same
-kind of share, does the same one hand, and knows nothing else. Its cost
+**Jurors of last resort.** When a table cannot draw a jury — because
+too few people are online — it says so, and clients we manage come
+online to serve. A bench rather than one, because a table with bot
+seats needs four jurors before it can hold any (`juryToHoldBots`) and
+the call comes exactly when there is nobody else to make that number
+up; each is its own identity, so the draw takes them as it takes
+anyone and none of them holds more than its own seat. It is the same
+code every other juror runs, holds the same kind of share, does the
+same one hand, and knows nothing else. Its cost
 scales inversely with the player base: it runs when the room is empty
 and never otherwise. This is the only place a gameplay event reaches
 anything of ours, and what it carries is "a table needs a juror."
@@ -1045,8 +1067,10 @@ On the wire:
   authority. Everyone summons the jurors. A jury stays in force until a
   later one carries: a table of two with one gone quiet cannot carry a
   new one, and that is when it needs the old. A jury gone quiet is
-  redrawn from whoever is left; with nobody online to draw from the
-  table says so and calls for a juror of last resort.
+  redrawn from whoever is left; with nobody online to draw from — or
+  with too few to hold the table's bot seats — it says so and calls
+  for the jurors of last resort, holding the hand's draw back while
+  they could still arrive.
 - **The juror** follows the table like any peer behind — a summoned
   client is carried forward by the same heartbeats — and heartbeats
   while it serves. On the relay alone: a juror is not seated, so
@@ -1087,7 +1111,10 @@ On the wire:
   piece of one.
 - **The seats the jury plays.** At a sealed table with a jury of four
   or more (`juryToHoldBots`), `assignBots` gives each bot seat a juror
-  of its own in the drawn order, foreman skipped. That juror draws the
+  of its own in the drawn order, foreman skipped. A table with bot
+  seats and too few jurors to hold them holds its draw and its deal
+  back for up to forty seconds while the bench it called for comes
+  online, and says on the table that it is waiting. That juror draws the
   seat's key, takes its turns in the deal, says its pass and its
   plays, and publishes its secret at the audit with everyone else's.
   The assignment is frozen at the hand's first jury (`botHolders`), so

@@ -528,6 +528,15 @@ class TableClient {
   /// has said so.
   bool needsJuror = false;
 
+  /// True while a hand is held back for want of a jury big enough to
+  /// hold its bot seats: there are jurors, but not enough of them for
+  /// a seat to survive its holder going (jury.dart, [juryToHoldBots]).
+  /// The table says so rather than dealing a hand whose bots everyone
+  /// can see.
+  bool _shortOfJurors = false;
+
+  bool get shortOfJurors => _shortOfJurors;
+
   // As a juror: the hands this client serves, each with the jury it was
   // summoned into, foreman first; the appeals heard; the verdicts given.
   final Map<int, List<PublicKey>> _serving = {};
@@ -1710,24 +1719,76 @@ class TableClient {
   /// The deal is built once, and a bot seat's holder is fixed in it,
   /// so a table that holds bots with the jury waits for the jury
   /// before building it. The jury is proposed as the hand opens and
-  /// settles a moment later; ten seconds without one means there is
-  /// nobody online to draw from, and the hand goes ahead with its bot
-  /// seats public, which is what a deserted table falls back to.
+  /// settles a moment later, and a table with bot seats waits past
+  /// that for a jury big enough to hold them — the call for a juror
+  /// of last resort is what answers on a quiet night, and a bench of
+  /// them is what makes the wait worth having (docs/04-live-play.md).
+  /// The wait is bounded: nothing can be gained by waiting past the
+  /// point where nobody is coming, and a table frozen for good is
+  /// worse than one whose bots are public. So at [_jurorsWaitMs] the
+  /// hand goes ahead with its bot seats in the open, which is what a
+  /// deserted table with no service behind it falls back to.
   void _startDealWhenReady() {
     // A deal for *this* hand: _deal still holds the last one until the
     // new one replaces it, and testing it for null strands every hand
     // after the first.
     if (!spec.sealed || done) return;
     if (_deal != null && _deal!.hand == game.handNumber) return;
-    // Wait for the hand's jury to be drawn, not for it to be big
-    // enough to hold the seats: a jury too small holds none of them,
-    // and waiting on that is waiting for something that will not
-    // happen — ten seconds of every hand, spent to arrive where the
-    // first look already was.
-    if (_hasBotSeats && clock.nowMs - _handOpenedAt < 10000) {
-      if (!_juriesFor(game.handNumber).any((d) => d.event.hand == game.handNumber)) return;
+    if (_hasBotSeats) {
+      // A jury that holds every bot seat — which covers waiting for a
+      // jury at all, since a hand with no jury holds nothing. Short of
+      // it a bot's hand is the table's to see, and at two people and
+      // two bots that is the other person's hand by subtraction:
+      // worth waiting on, and worth saying so while it is waited on.
+      final held = botHolders(game.handNumber);
+      if (clock.nowMs - _handOpenedAt < _jurorsWait && !_everyBotHeld(held)) {
+        if (!_shortOfJurors) {
+          _shortOfJurors = true;
+          _trace('hand ${game.handNumber}: waiting for a jury that can hold the bot seats');
+          _notify();
+        }
+        return;
+      }
+      if (!_everyBotHeld(held)) _fellBackOpen = true;
+      if (_shortOfJurors) {
+        _shortOfJurors = false;
+        _notify();
+      }
     }
     _startDeal();
+  }
+
+  /// Whether a hand at this table has already gone ahead with its bot
+  /// seats in the open for want of jurors. The next hand still asks,
+  /// and still takes a jury that can hold them if one has arrived,
+  /// but it no longer waits out the whole window to find out: forty
+  /// seconds is what it costs to learn that nobody is coming, and
+  /// paying it once a hand at a table whose service is down would be
+  /// most of the table's life.
+  bool _fellBackOpen = false;
+
+  /// How long a hand waits for a jury that can hold its bot seats.
+  /// Long enough for a called-for juror to come online and be drawn
+  /// into a redraw or two, short enough that a table behind a service
+  /// that is down still plays.
+  static const _jurorsWaitMs = 40000;
+
+  /// The window as this hand has it.
+  int get _jurorsWait => _fellBackOpen ? 10000 : _jurorsWaitMs;
+
+  /// And how long the hand's *draw* is held back for the same reason,
+  /// which is ten seconds less: a jury proposed at the end of its
+  /// window still has to carry, and a deal that gave up on the jury a
+  /// moment before it landed would deal with no jury at all — bot
+  /// seats in the open and nobody holding the escrow either, which is
+  /// worse than either alone.
+  int get _juryDrawWait => _jurorsWait - 10000;
+
+  bool _everyBotHeld(Map<int, PublicKey> held) {
+    for (var s = 0; s < seatCount; s++) {
+      if (holders[s] is BotSeat && !held.containsKey(s)) return false;
+    }
+    return true;
   }
 
   bool get _hasBotSeats => holders.any((h) => h is BotSeat);
@@ -2468,6 +2529,15 @@ class TableClient {
     for (final d in _juriesFor(hand)) {
       final drawn = _juryAt[d.event.id] ?? 0;
       for (final j in d.event.jurors) {
+        // This side is live to itself. Heard-from is how a juror
+        // knows about the others, and a client never hears its own
+        // heartbeats — so a serving juror left out of here would read
+        // as quiet to itself, and hand the seat it is holding back to
+        // the escrow half a minute into every hand.
+        if (j == signer.publicKey && _serving.containsKey(hand)) {
+          live.add(j);
+          continue;
+        }
         final heard = _jurorHeard[j];
         if ((heard != null && clock.nowMs - heard < 30000) || clock.nowMs - drawn < 30000) live.add(j);
       }
@@ -2501,14 +2571,37 @@ class TableClient {
     if (own && _liveJurors(hand).length >= 2) return;
     final quiet = _jurorsOf(hand).difference(_liveJurors(hand));
     final candidates = p.online(withinMs: 15000).difference(_humans).difference(quiet);
-    if (candidates.isEmpty) {
-      if (!needsJuror) _trace('nobody online to draw a jury from');
-      needsJuror = true;
+    // What this table needs a jury for. Escrow needs somebody; bot
+    // seats need enough jurors that a seat survives its holder going
+    // (jury.dart, [juryToHoldBots]), and short of that the seats are
+    // held by nobody and their hands are the table's to see.
+    final wanted = spec.sealed && _hasBotSeats ? juryToHoldBots : 1;
+    if (candidates.length < wanted) {
       if (clock.nowMs - _lastCalledAt >= 10000) {
         _lastCalledAt = clock.nowMs;
         p.callForJuror(spec.id);
       }
-      return;
+      if (candidates.isEmpty) {
+        if (!needsJuror) _trace('nobody online to draw a jury from');
+        needsJuror = true;
+        return;
+      }
+      // Somebody is there, whatever they add up to.
+      needsJuror = false;
+      // Somebody, but not enough to hold the bot seats. A hand has one
+      // jury and the assignment comes from it, so a second draw later
+      // does not move the seats — which makes it worth holding the
+      // first draw back while a called-for juror could still arrive,
+      // rather than drawing a jury now that can hold nothing. Only up
+      // to [_jurorsWaitMs], after which the jury is whoever is there.
+      if (!own && clock.nowMs - _handOpenedAt < _juryDrawWait) {
+        if (!_shortOfJurors) {
+          _shortOfJurors = true;
+          _trace('${candidates.length} online to draw from, $wanted wanted to hold the bot seats; called');
+          _notify();
+        }
+        return;
+      }
     }
     needsJuror = false;
     // A jury already drawn is kept unless a redraw would seat someone

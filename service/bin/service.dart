@@ -48,8 +48,16 @@ Future<void> main(List<String> args) async {
     } catch (e) {
       print('juror: no deal cryptography ($e); sealed tables cannot be served');
     }
-    final j = LastResortJuror(relays: [relay.url], signer: SchnorrSigner.generate(), log: print, crypto: crypto);
-    j.start();
-    print('juror of last resort ${j.presence.signer.publicKey.substring(0, 8)} listening');
+    // A bench of them, because a table with bot seats needs
+    // juryToHoldBots online before a juror can hold one at all, and
+    // this is what answers when there is nobody else (doc 04).
+    final bench = LastResortBench(
+      signers: [for (var i = 0; i < juryToHoldBots; i++) SchnorrSigner.generate()],
+      relays: [relay.url],
+      log: print,
+      crypto: crypto,
+    );
+    bench.start();
+    print('jurors of last resort ${[for (final j in bench.jurors) j.presence.signer.publicKey.substring(0, 8)].join(' ')} listening');
   }
 }
