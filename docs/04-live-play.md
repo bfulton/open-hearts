@@ -994,42 +994,57 @@ juror with a bad connection is simply disqualified and redrawn. Random
 selection across unrelated networks also keeps juror failures
 independent, which the sizing below depends on.
 
-**The sizing.** Two roles with very different exposure. As *escrow* the
-jury answers only when somebody leaves — a departure in about 8% of
-hands at 2% a seat — and the bad event is that every juror is gone at
-the moment one does. As the *player of a bot seat* it answers every
-hand that has one, which below four humans is every hand. Writing p for
-the chance a given juror is lost within a hand and asking for five
-nines across an eight-hand game:
+**The sizing**, computed rather than argued
+(`packages/table/tool/jury_size.dart`). An earlier version of this
+section sized the jury on "every juror is gone at the moment one is
+needed", which is p^J and put the answer at five or six. That is the
+right model for a *person's* seat, whose escrow splits across the
+other people and the jury, so any one live juror answers it. It is the
+wrong model for a **bot seat**, which is the case that binds, and the
+code says why: a bot seat's key is split across two halves of the jury
+and the split is additive — *every* share of a side is needed
+(`crypto/deal/src/lib.rs`, `split`; `session.dart`, `_escrowSides`).
+So the bad event is not that all J are gone but that **either half is
+empty**, which is about p^(J/2), and a jury of six behaves like a jury
+of three.
 
-| p | jurors, escrow only | jurors, playing bot seats |
+Writing f for the chance a juror drawn at the start of a hand cannot be
+reached when its piece is wanted, a minute or two later, and asking for
+five nines of hands that can go on:
+
+| f | least jury, the escrow as built | at the six we ship |
 |---|---|---|
-| 5% | 4 | 5 |
-| 10% | 5 | 6 |
-| 20% | 7 | 9 |
+| 1% | 6 | 3.0e-6 ✓ |
+| 2% | 8 | 2.4e-5 |
+| 5% | 10 | 3.9e-4 |
+| 10% | 12 | 3.3e-3 |
 
-Two things matter more than the table. The draw is **repaired, not
-static**: a redraw goes out whenever fewer than two jurors are live and
-every ten seconds after, so the question is not whether four die over a
-hand but whether the live count reaches zero in the seconds before it
-is needed — which makes p^J pessimistic for a healthy pool. And beneath
-that sits the **juror of last resort**, so the floor is not zero jurors
-but our uptime. Between them, J matters less than either, and past
-about six it stops mattering at all, because what takes every juror at
-once is a relay outage — common-mode, which no amount of jurors
-divides.
+Two mitigations this section used to lean on do not apply here. A
+**redraw** repairs who rules and who holds a seat, but not the escrow:
+the custodians are fixed in the deal's first round and a jury drawn
+later holds nothing. And the **juror of last resort** raises the floor
+on who is *available to draw*, not on a hand already dealt to a jury
+that has since gone. What does still hold is the common-mode caveat: a
+relay outage takes every juror at once and no jury size divides it, so
+these numbers are a ceiling and relay diversity is what moves the
+floor.
 
-`jurySize` is **six** (`packages/table/lib/src/jury.dart`). Escrow
-alone would justify four; a jury that plays bot seats wants six, and
-the honest reason to stop there is that the seventh buys less than
-relay diversity would. Below four (`juryToHoldBots`) no seat is held
-at all: a bot seat's escrow has two sides and its holder sits in one
-of them, so losing the holder from a jury of two empties that side and
-the seat can never be opened again — four is the least that leaves
-each side a member after its holder goes. The number to make small is
-not J but the **replacement window** — the ten seconds or so to notice
-a drop, redraw and hand the seat over — because it enters as (λT)ᴶ.
-Halving it is worth more than a seventh juror.
+`jurySize` stays at **six** (`packages/table/lib/src/jury.dart`), which
+is five nines at f = 1% and about four and a half at 2%. Ten would buy
+five nines at 5% and cost roughly double the bytes a hand hands over
+(1.87 MB against 3.55, `tool/wire_in_sim.dart`). **The cheaper fix is
+the escrow, not the jury**: with any two of the whole jury enough
+instead of both halves, six covers f = 5% with room (4.5e-6) and four
+covers 1%. That wants Shamir shares over the same scalar field rather
+than an additive split — a share's token scales by its public Lagrange
+coefficient and still adds, so the key stays nowhere, which is the
+property the additive split was chosen for. It is a change to the
+deal's cryptography and is not built.
+
+Below four (`juryToHoldBots`) no seat is held at all: losing the holder
+from a jury of two empties its side and the seat can never be opened —
+four is the least that leaves each side a member after its holder
+goes.
 
 **When quorum is lost anyway.** A hand whose bot seat has no juror
 cannot go on, and neither can one whose departed seat cannot be opened.
@@ -1149,6 +1164,21 @@ On the wire:
   whole, so it settles the same turn the same way wherever it lands,
   and a turn settled by verdict travels with its verdict when a peer
   behind is carried forward.
+- **Carrying the gap, not the record.** A peer whose heartbeat puts it
+  behind is sent what it is missing, a window of twelve turns at a
+  time, budgeted at a few events a second. Each of those turns used to
+  send every departure in the record, every jury and every one of the
+  jury's witnesses — the same events twelve times over, and again on
+  the next heartbeat, because a carry is a *broadcast* and the sender
+  was not tracking that it had just said them. That was most of what a
+  hand said. An event now goes at most once every eight seconds
+  whoever is asking, which is the knee of the curve
+  (`tool/wire_in_sim.dart`): a hand at a jury of six went from 483,455
+  bytes said and 3.4 MB handed over to **269,961 and 1.87 MB, 44% off
+  both**. What it costs is the wait after a carry that goes missing,
+  and that is affordable — the peer is behind by definition, the window
+  moves on to turns it has not seen either way, and the silence it is
+  judged by is two minutes.
 - **Carrying.** From the first appeal of a hand to its end, the first
   juror in the draw still heard from says again at once everything it
   hears for a turn not yet settled: a table cut in two has its votes on

@@ -34,7 +34,13 @@ Future<void> main(List<String> args) async {
   // data channel's, which is what it takes for a peer to still be
   // behind when the jury's turn to answer comes round.
   final slow = args.contains('--slow');
-  for (final jurors in [4, 6]) {
+  // Jury sizes to measure: the default sweep, or whatever is asked
+  // for — `--jury 4,6,8,10` — since what a jury costs is half of
+  // choosing how big it should be (tool/jury_size.dart is the other
+  // half).
+  final asked = args.indexOf('--jury');
+  final sizes = asked >= 0 && asked + 1 < args.length ? [for (final n in args[asked + 1].split(',')) int.parse(n)] : const [4, 6];
+  for (final jurors in sizes) {
     final t = SimTable(humans: 2, seed: 7, crypto: crypto, jurors: jurors);
     if (slow) {
       t.net.minLatencyMs = 200;

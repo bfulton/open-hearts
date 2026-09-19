@@ -1299,12 +1299,51 @@ class TableClient {
     }
   }
 
-  /// One catch-up event, if the budget has it.
+  /// One catch-up event, if the budget has it and it has not just
+  /// been said.
+  ///
+  /// A carry is a broadcast: it goes to everyone, so saying the same
+  /// event again a moment later carries nobody any further forward and
+  /// costs the table a copy per peer. That was most of what a hand
+  /// said. A window is twelve turns and each of them sent every
+  /// departure in the record, every jury and every one of the jury's
+  /// witnesses — the same events twelve times over, and again on the
+  /// next heartbeat. Now an event goes at most once per
+  /// [carryRepeatMs], whoever is asking and however many turns want
+  /// it; a peer that missed it asks again and gets it after that, and
+  /// the budget it no longer spends goes on turns the asker has not
+  /// seen at all.
   void _send(Map<String, Object?> json) {
+    final id = json['id'];
+    if (id is String && clock.nowMs - (_saidAgainAt[id] ?? -carryRepeatMs) < carryRepeatMs) return;
     _refillCatchUp();
     if (_catchUpTokens < 1) return;
     _catchUpTokens -= 1;
+    if (id is String) _saidAgainAt[id] = clock.nowMs;
     transport.broadcast(json);
+  }
+
+  /// When each event was last said again for somebody behind.
+  final Map<String, int> _saidAgainAt = {};
+
+  /// How long an event stays said. Measured rather than picked: at a
+  /// jury of six a hand says 349,305 bytes at five seconds and 269,961
+  /// at eight, and eight is the knee — twelve buys nothing more
+  /// (`tool/wire_in_sim.dart`). It has to be longer than the two
+  /// seconds a turn waits between carries, so a window's worth of
+  /// turns asking for the same jury gets one copy of it, and what it
+  /// costs is the wait after a carry that goes missing. That wait is
+  /// affordable: a peer being carried is behind by definition, the
+  /// window moves on to turns it has not seen either way, and the
+  /// silence it is judged by is two minutes.
+  static const carryRepeatMs = 8000;
+
+  /// Forgets what has gone stale, so the memory is the last few
+  /// seconds and not the table's whole history.
+  void _forgetSaidAgain() {
+    if (_saidAgainAt.length < 256) return;
+    final now = clock.nowMs;
+    _saidAgainAt.removeWhere((_, at) => now - at >= carryRepeatMs);
   }
 
   /// Catch-up events in hand, refilled at [catchUpPerSecond] up to
@@ -2409,6 +2448,7 @@ class TableClient {
     // a seated one or a serving one — a client that has left the table
     // still follows the hands out, and is in neither branch below.
     _startDealWhenReady();
+    _forgetSaidAgain();
     _timers.add(clock.schedule(1000, _tick));
     if (amSeated && !_left && !done) {
       _repeat();
