@@ -37,8 +37,12 @@ class SimNetwork {
 
   /// The same, by what was said and whether the sayer is the one who
   /// made it: a table says again what has not settled, and carries
-  /// forward what a peer behind has missed.
+  /// forward what a peer behind has missed. [byKind] counts what was
+  /// handed over — bytes times listeners — and [saidByKind] what was
+  /// said once, which is the one to compare against what a hand is
+  /// actually made of.
   final Map<String, int> byKind = {};
+  final Map<String, int> saidByKind = {};
 
   void _tally(PublicKey from, Map<String, Object?> message, String wire, int copies) {
     said += wire.length;
@@ -48,6 +52,7 @@ class SimNetwork {
     final own = message['author'] == from ? 'own' : 'carried';
     final key = '$kind $own';
     byKind[key] = (byKind[key] ?? 0) + wire.length * copies;
+    saidByKind[key] = (saidByKind[key] ?? 0) + wire.length;
   }
 
   /// How long the transport takes to notice a peer is gone.

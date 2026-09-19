@@ -52,9 +52,9 @@ Future<void> main(List<String> args) async {
     final net = t.net;
     print('--- 2 people, 2 bot seats, a jury of $jurors (hand reached: $ok) ---');
     print('said ${net.said} bytes, handed over ${net.handed} (${(net.handed / net.said).toStringAsFixed(1)}x)');
-    final by = net.byKind.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    for (final e in by.take(8)) {
-      print('  ${e.key.padRight(18)} ${e.value}');
+    final by = net.saidByKind.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    for (final e in by.take(10)) {
+      print('  said ${e.key.padRight(18)} ${e.value}');
     }
     t.stop();
   }
