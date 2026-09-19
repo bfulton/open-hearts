@@ -16,6 +16,8 @@ import 'clock.dart';
 import 'presence_relay.dart';
 import 'relay_transport.dart';
 import 'signing.dart';
+import 'spec.dart';
+import 'transport.dart';
 
 class JurorDuty {
   JurorDuty(
@@ -26,6 +28,7 @@ class JurorDuty {
       Clock? clock,
       this.silenceAfterMs = 120000,
       this.pinned = 0,
+      this.dial,
       this.crypto})
       : clock = clock ?? WallClock();
 
@@ -47,7 +50,19 @@ class JurorDuty {
   /// Relays at the front of [relays] kept primary — ours to run.
   final int pinned;
 
-  final Map<String, ({TableClient client, RelayTransport transport})> _tables = {};
+  /// How a juror talks to the table it is summoned to. The default is
+  /// the relay it was summoned over, which is all a juror had for a
+  /// long time — and the reason the table copied every event there
+  /// (docs/02-multiplayer.md gives the relay signalling and a fallback
+  /// lane, not the play). An app hands over a mesh instead: the relay
+  /// under it for signalling, and a data channel to each seat, so a
+  /// juror is dialled like anybody else at the table.
+  ///
+  /// The service's own jurors keep the relay, having no WebRTC in the
+  /// VM to dial with — which is what the fallback lane is for.
+  final Transport Function(TableSpec spec, RelayTransport relay)? dial;
+
+  final Map<String, ({TableClient client, Transport transport})> _tables = {};
   StreamSubscription<Summons>? _sub;
   Timer? _sweep;
 
@@ -68,7 +83,8 @@ class JurorDuty {
   void _onSummons(Summons s) {
     var t = _tables[s.spec.id];
     if (t == null) {
-      final transport = RelayTransport(relays: relays, signer: signer, table: s.spec.id, log: log, pinned: pinned);
+      final lane = RelayTransport(relays: relays, signer: signer, table: s.spec.id, log: log, pinned: pinned);
+      final transport = dial?.call(s.spec, lane) ?? lane;
       if (s.spec.sealed && crypto == null) {
         log?.call('duty: summoned to a sealed table without the deal\'s cryptography; cannot serve');
         return;

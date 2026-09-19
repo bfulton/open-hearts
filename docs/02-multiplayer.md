@@ -41,6 +41,18 @@ entirely and every card played travels directly between players.
 Four players is a 6-edge mesh — three connections each. There is no
 scaling problem to solve here at all.
 
+The mesh turned out to have one more class of member than this document
+imagined. A hand draws a jury of strangers ([doc 04](04-live-play.md)),
+and those jurors have to hear the table's events to rule on them. They
+are introduced the same way everyone else is — over the relay, by a
+summons instead of a room code — and then dialled the same way too, so
+a jury of six makes a mesh of ten rather than four. Only the
+introduction changed; the conclusion did not. For a while the jurors
+were the exception, spoken to over the relay for a whole hand because
+nothing offered them a channel, and that quietly made the relay a
+primary path for every event at the table — the thing the last section
+of this page says not to do. It is a fallback again.
+
 ## Latency, honestly
 
 | Hop | Typical | Worst realistic |

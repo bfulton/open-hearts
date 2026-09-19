@@ -12,6 +12,7 @@ import 'package:deal/deal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:table/table.dart';
 
+import 'mesh_transport.dart';
 import 'relays.dart';
 
 class Duty {
@@ -22,6 +23,13 @@ class Duty {
   final JurorDuty juror;
 
   static Duty? _current;
+
+  /// The ICE servers a juror's own channels are made with, set once
+  /// the app has fetched them (net/turn.dart). Read when a channel is
+  /// made rather than when the duty starts, because the duty starts at
+  /// the front door and the credentials arrive after; a channel made
+  /// before them has STUN alone, which is most tables.
+  static List<Map<String, Object?>> ice = const [];
 
   /// The duty on [relays], started if need be; a new list replaces it.
   /// With [crypto] the juror can serve sealed tables, holding a piece
@@ -35,7 +43,26 @@ class Duty {
     // the relays when it does not answer (net/relays.dart). Only
     // presence: a table's events go to the relays proper.
     final presence = RelayPresence(relays: presenceRelays(relays), signer: signer, log: logger);
-    final juror = JurorDuty(relays: relays, signer: signer, presence: presence, log: logger, crypto: crypto, pinned: pinnedRelays(relays))..start();
+    final juror = JurorDuty(
+      relays: relays,
+      signer: signer,
+      presence: presence,
+      log: logger,
+      crypto: crypto,
+      pinned: pinnedRelays(relays),
+      // A juror here is a device like any other: it takes the table's
+      // seats as peers and is dialled by them, so the play reaches it
+      // on a data channel rather than through the relay
+      // (docs/02-multiplayer.md). The relay under the mesh is what
+      // signals the channels into being, and the lane for whatever has
+      // no channel yet.
+      dial: (spec, lane) => MeshTransport(
+        relay: lane,
+        peers: [for (final s in spec.seats) if (s is HumanSeat) s.key],
+        iceServers: Duty.ice,
+        log: logger == null ? null : (l) => logger('mesh: $l'),
+      ),
+    )..start();
     return _current = Duty._(relays, presence, juror);
   }
 

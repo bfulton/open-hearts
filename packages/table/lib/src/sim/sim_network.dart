@@ -290,6 +290,11 @@ class SimTransport implements Transport {
   Stream<PublicKey> get disconnected => _disconnected.stream;
 
   @override
+  void reach(Set<PublicKey> peers) {
+    // The simulated bus reaches every peer on it.
+  }
+
+  @override
   void close() {
     _incoming.close();
     _disconnected.close();

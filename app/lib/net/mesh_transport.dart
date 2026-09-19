@@ -1,17 +1,30 @@
-/// The app's transport: a WebRTC data channel to every other human at
-/// the table, set up through the relay, and the relay itself beside
-/// them — the path to a peer whose channel is not open, and the only
-/// path to a juror, which follows the table from the relay alone.
+/// The app's transport: a WebRTC data channel to everyone this device
+/// has to reach at a table — the other humans seated, and the hand's
+/// jurors — set up through the relay, with the relay itself behind
+/// them as the lane for whoever has no channel open.
 ///
-/// Every message goes over every open channel and, once, through the
-/// relay envelope; the table's own dedup by event id absorbs what
-/// arrives twice. Sending to the relay only while a channel was down
-/// left a juror deaf at a table whose four channels were all up — and
-/// at a table of one person, who has no channels at all. What arrives
-/// on a channel is from the peer at its far end; what arrives from the
-/// relay is from the envelope's signer. A channel closing or failing is
-/// reported as a disconnect, which the protocol treats as most of the
-/// silence allowance already spent.
+/// Who that is grows: the seats are known when the table starts, and
+/// the jurors as each jury carries, so the client says again who to
+/// reach and the mesh dials whatever is new ([reach]). It only ever
+/// adds. A client's view of the table lags — a juror that has not yet
+/// seen a seat sit down leaves it out — and dropping a channel on that
+/// would report a disconnect for somebody who never went anywhere.
+/// Channels end by failing or by the transport closing with the table.
+///
+/// Every message goes over every open channel, and through the relay
+/// envelope as well while anyone to be reached is without one; the
+/// table's own dedup by event id absorbs what arrives twice. That
+/// condition used to be permanently true, because a juror was never
+/// dialled, so every event went to a relay for the whole hand and the
+/// relay was the table's primary path in all but name — the thing
+/// docs/02-multiplayer.md says not to depend on. With every channel up
+/// the lane says nothing at all, which is the point: a table at full
+/// strength costs the relays its presence and its signalling.
+///
+/// What arrives on a channel is from the peer at its far end; what
+/// arrives from the relay is from the envelope's signer. A channel
+/// closing or failing is reported as a disconnect, which the protocol
+/// treats as most of the silence allowance already spent.
 ///
 /// Who offers: of any two peers, the one with the lower key. ICE runs
 /// without servers here — peers on one network, or a dev machine — and
@@ -27,21 +40,45 @@ import 'package:table/table.dart';
 class MeshTransport implements Transport {
   MeshTransport({
     required this.relay,
-    required this.peers,
+    required Iterable<PublicKey> peers,
     this.iceServers = const [],
     this.log,
-  }) {
+  }) : peers = peers.toSet() {
     _sub = relay.signals.listen(_onSignal);
     _relaySub = relay.incoming.listen(_incoming.add);
-    for (final p in peers) {
-      if (p != relay.signer.publicKey && p.compareTo(relay.signer.publicKey) > 0) _offerTo(p);
+    for (final p in this.peers) {
+      _dial(p);
+    }
+  }
+
+  /// Of any two peers, the one with the lower key offers; the other
+  /// waits to be offered to.
+  void _dial(PublicKey peer) {
+    if (peer == relay.signer.publicKey || _links.containsKey(peer)) return;
+    if (peer.compareTo(relay.signer.publicKey) > 0) _offerTo(peer);
+  }
+
+  /// Only ever adds, for the reason at the top of this file.
+  @override
+  void reach(Set<PublicKey> who) {
+    if (_closed) return;
+    for (final p in who) {
+      if (peers.add(p)) {
+        log?.call('reaching ${p.substring(0, 6)}');
+        _dial(p);
+      }
     }
   }
 
   final RelayTransport relay;
 
-  /// Every human at the table, this peer included.
-  final List<PublicKey> peers;
+  /// Everyone this device dials: the seats at the start, and the
+  /// hand's jurors as [reach] names them. A juror used to be the one
+  /// party with no channel, which is why every message went to the
+  /// relay as well as to the channels; it has one now, and the relay
+  /// is back to what doc 02 gave it — signalling, and the lane for a
+  /// peer whose channel is not up.
+  final Set<PublicKey> peers;
   final List<Map<String, Object?>> iceServers;
   final void Function(String line)? log;
 
@@ -69,9 +106,13 @@ class MeshTransport implements Transport {
       final link = _links[p];
       if (link != null && link.open) link.channel!.send(RTCDataChannelMessage(wire));
     }
-    // One envelope reaches everyone on the relay path: a peer whose
-    // channel is down, and every juror following.
-    relay.broadcast(message, everywhere: everywhere);
+    // And the relay lane for whoever has no channel up — doc 02's
+    // fallback, not a second primary path. With every peer connected
+    // this says nothing at all, which is the point: a table at full
+    // strength costs the relays a heartbeat and its signalling.
+    if (peers.any((p) => p != relay.signer.publicKey && !(_links[p]?.open ?? false))) {
+      relay.broadcast(message, everywhere: everywhere);
+    }
   }
 
   @override

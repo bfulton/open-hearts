@@ -375,8 +375,14 @@ envelope on an event, a third more again for anything that is not text,
 a signature to send one and a rehash and a signature to accept one at
 the relay and at every receiver — about 1,650 small events a second on
 a loopback, seven tenths of which is the relay checking them. That
-is the budget for a juror, which has no other path (doc 04, "The party
-that has no channel").
+was the budget for a juror, which had no other path — the case doc 04
+calls "the party that had no channel". A juror drawn from somebody's
+app has one now: the summons introduces it and the seats dial it, so
+its play crosses a data channel and the relay carries its signalling
+(`Transport.reach`, `JurorDuty.dial`). The figures above are still the
+budget for the jurors of last resort here, which run in a Dart VM with
+no peer connection in it and so stay on the lane doc 02 keeps for
+exactly that.
 
 **And what a hand costs it, end to end**
 (`service/tool/wire_over_socket.dart`: a counting proxy in front of

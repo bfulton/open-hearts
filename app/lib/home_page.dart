@@ -359,7 +359,12 @@ class _HomePageState extends State<HomePage> {
       // everyone, and a juror when drawn.
       Duty.on(relays, signer, log: _debugging, crypto: dealCrypto);
       _iceServers ??= const [];
-      iceServersFor(signer).then((servers) => _iceServers = servers);
+      iceServersFor(signer).then((servers) {
+        _iceServers = servers;
+        // The same credentials serve this device's juror duty, whose
+        // channels are made when a table summons it (net/duty.dart).
+        Duty.ice = servers;
+      });
       if (_standing == null) await _loadStanding(relays, signer);
       setState(() {
         _transport = transport;

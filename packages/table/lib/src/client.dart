@@ -761,6 +761,10 @@ class TableClient {
   void _openHand() {
     played.clear();
     step = 0;
+    // The hand's jurors are the hand's to reach: a jury carried for an
+    // earlier hand still serves until relieved, and a new one changes
+    // who there is to dial.
+    _reachOut();
     _proposeJury();
     if (spec.sealed) {
       _handOpenedAt = clock.nowMs;
@@ -1847,6 +1851,16 @@ class TableClient {
     return botHolders(hand).containsKey(seat) && _jurorsOf(hand).contains(who);
   }
 
+  /// Who this table has to reach directly: the people at it, and the
+  /// jurors of the hand in play. A transport that dials its peers —
+  /// the app's mesh — opens a channel to each; a relay transport
+  /// ignores it. Said again whenever a jury carries or a hand opens,
+  /// since a redrawn jury is a different set of strangers.
+  void _reachOut() => transport.reach({
+        ...participants,
+        ..._jurorsOf(game.handNumber),
+      });
+
   /// Which juror holds which bot seat at [hand]. Empty when the table
   /// is unsealed, or when there is no jury to hold them — in which
   /// case a bot seat stays public work, which is what a table with
@@ -2740,6 +2754,7 @@ class TableClient {
     juries.add(Decision(turn: e.turn, event: e, witnesses: Set.of(race.forAction), among: of, jury: true));
     _juryAt[e.id] = clock.nowMs;
     needsJuror = false;
+    _reachOut();
     _trace('jury for hand ${e.hand}: ${e.jurors.map((k) => k.substring(0, 4))} by ${race.forAction.length}');
     final p = presence;
     if (p != null && amSeated) {

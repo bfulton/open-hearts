@@ -39,5 +39,17 @@ abstract class Transport {
   /// Peers whose connection the transport has seen close.
   Stream<PublicKey> get disconnected;
 
+  /// Who is at the table to be reached directly, as the protocol comes
+  /// to know them: the seats at the start, and the hand's jurors as
+  /// each jury carries and is redrawn.
+  ///
+  /// A transport that dials peers — the app's mesh — opens a channel
+  /// to each and drops the ones that leave; one that writes to a relay
+  /// has nothing to do with it and ignores it. This is how a juror
+  /// stops being the party with no path of its own
+  /// (docs/04-live-play.md): it is summoned over the relay and then
+  /// spoken to directly, like anybody else at the table.
+  void reach(Set<PublicKey> peers) {}
+
   void close();
 }

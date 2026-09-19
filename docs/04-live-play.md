@@ -193,10 +193,18 @@ seconds after the last arrival, at once at four, or on *Start now*, by
 the same kind of start event, and a leader who leaves is simply no
 longer present (`Room`). A start counts only from someone present and
 only if recent, since the relay keeps them and a code gets reused. The transport is a WebRTC data channel to every
-other person, set up over the relays' signalling and carrying the
-table's events directly, and through a relay as well — the path to a
-peer whose channel is not open, and the only path to a juror, which
-follows from the relays alone (`MeshTransport`). Relays, plural: a
+other person *and to the hand's jurors*, set up over the relays'
+signalling and carrying the table's events directly; a relay is the
+lane behind it, taken only while somebody the table has to reach has
+no channel open (`MeshTransport`). A juror used to be that somebody
+permanently — summoned over the relay and then spoken to over it for
+the whole hand, which is why every event went to a relay as well as
+down the channels. It is dialled now: the client says who it has to
+reach as it learns them (`Transport.reach` — the seats when a hand
+opens, the jurors as each jury carries), the mesh offers a channel to
+each, and the relay is back to what doc 02 gave it, signalling and a
+fallback. A table whose channels are all up costs the relays its
+presence and its signalling and nothing else. Relays, plural: a
 client holds a short list — the build's, not a setting anyone types
 (`app/lib/net/relays.dart`) — keeps a subscription on every one of
 them and writes each table event to the first that has not refused it
@@ -816,30 +824,38 @@ to nobody at a real table:
   the traffic, not its size**: a hand's preprocessing fits, and fits
   several times over, so long as it goes out paced and beside the table
   rather than in front of it.
-- **The party that has no channel.** A juror is not a peer. It is
-  summoned, it follows the table from the relay alone
-  (`juror_duty.dart`), and the app's transport offers a data channel to
-  the human seats and to nobody else (`mesh_transport.dart`). So the
-  foreman — which at one human is the second computing party — would
-  compute over a relay, and a relay is not a channel. Material that is
-  not text is base64 into the message, sealed to the foreman because a
-  relay is a stranger's machine, and base64 again: **1.79x on the
-  wire** against 1.0 down a channel, with one sealed event carrying
-  49,143 bytes because NIP-44 caps a plaintext at 65,535
+- **The party that had no channel — and now has one.** This was the
+  hard constraint on the whole idea, and it has been taken away since
+  it was written, so what follows is kept as the arithmetic that
+  forced the change. A juror was not a peer: summoned, it followed the
+  table from the relay alone, and the app's transport offered a data
+  channel to the human seats and to nobody else. So the foreman —
+  which at one human is the second computing party — would have
+  computed over a relay, and a relay is not a channel. Material that
+  is not text is base64 into the message, sealed to the foreman
+  because a relay is a stranger's machine, and base64 again: **1.79x
+  on the wire** against 1.0 down a channel, with one sealed event
+  carrying 49,143 bytes because NIP-44 caps a plaintext at 65,535
   ([measurements/relay](../measurements/relay/README.md)). The seconds
   are affordable — a millisecond an event to sign and about as much to
-  check, at each end — and what the expansion costs is the budget:
+  check, at each end — and what the expansion cost was the budget:
   **a minute of 5 Mbit/s is 390 bytes a gate over a relay where it was
   700 over a channel**, and the relay is one queue for everything on
   the tag, so bulk on a second socket still costs the table's own
   messages ten times idle. Measured against the triple above, that
-  settles it: 772 bytes a gate sealed at 1.79x is 74 MB and **119
+  settled it: 772 bytes a gate sealed at 1.79x is 74 MB and **119
   seconds** for one seat's hand, a whole p90 hand and nothing like a
   p50 one; at the smaller bucket a batch of a game's worth allows, 56
-  MB and 89 seconds. So a foreman on the relay works only at the pace
-  of a slow hand, and making it comfortable means giving a juror a
-  channel — an offer, an answer and a candidate, exactly as a peer gets
-  — rather than changing the protocol.
+  MB and 89 seconds. A foreman on the relay would have worked only at
+  the pace of a slow hand, and the conclusion drawn here was that
+  making it comfortable meant giving a juror a channel — an offer, an
+  answer and a candidate, exactly as a peer gets — rather than
+  changing the protocol. That is what `Transport.reach` and
+  `JurorDuty.dial` now do, for the ordinary traffic first; the budget
+  above is the 1.0 column when the foreman is an app. A juror of last
+  resort in the service still has no WebRTC, so the 1.79x column is
+  what it would compute at, which is one more reason the bench is the
+  empty-room fallback and not the common case.
 - **Where it would live.** Beside the deal. `crypto/deal` is one Rust
   crate built twice, a cdylib for the VM and a wasm for the browser, and
   garbling and transfer belong in the same place for the same reason.
@@ -1087,13 +1103,18 @@ On the wire:
   they could still arrive.
 - **The juror** follows the table like any peer behind — a summoned
   client is carried forward by the same heartbeats — and heartbeats
-  while it serves. On the relay alone: a juror is not seated, so
-  nothing offers it a data channel, and everything it hears and says
-  crosses two hops and a stranger's machine. Holding a bot seat is the
-  most it has ever put through that path and it is still small — about
-  30 KB a seat a hand, a 12 KB shuffle argument its largest single
-  event (`packages/table/tool/juror_wire.dart`) — where the
-  computation above would have been a thousand times that.
+  while it serves. Over channels, like any peer: the summons is the
+  introduction and the seats dial it from there, so what it hears and
+  says goes the direct way rather than across two hops and a
+  stranger's machine (`Transport.reach`, `JurorDuty.dial`). The relay
+  is still the lane until the channel is up, and it is the whole path
+  for a juror that has no WebRTC to be dialled with — the service's
+  own jurors of last resort, in a VM with no peer connection in it,
+  which is exactly the case doc 02's fallback exists for. Holding a
+  bot seat is the most a juror has ever put through either path and it
+  is still small — about 30 KB a seat a hand, a 12 KB shuffle argument
+  its largest single event (`packages/table/tool/juror_wire.dart`) —
+  where the computation above would have been a thousand times that.
 - **The appeal.** A stuck turn — a race that split, or any open turn
   while the table is paused — is appealed every ten seconds.
 - **The rule.** A juror rules only when nobody who can still vote, as

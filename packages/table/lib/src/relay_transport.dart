@@ -196,6 +196,11 @@ class RelayTransport implements Transport {
   }
 
   @override
+  void reach(Set<PublicKey> peers) {
+    // A relay reaches whoever reads it; there is nobody to dial.
+  }
+
+  @override
   void close() {
     _group.close();
     _incoming.close();
