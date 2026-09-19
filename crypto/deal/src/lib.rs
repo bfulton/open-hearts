@@ -54,11 +54,35 @@ pub const KEY_PROOF: usize = 64;
 pub const TOKEN: usize = POINT + 96;
 pub const SEALED: usize = 64;
 pub const SEAL_PROOF: usize = 3 * POINT + 2 * SCALAR;
+
+/// One argument for a whole batch of reveal tokens, however many.
+pub const BATCH_PROOF: usize = 2 * POINT + SCALAR;
+
+/// How long [reveal_tokens] writes for [n] cards: the tokens, and one
+/// argument for the lot.
+pub const fn tokens_len(n: usize) -> usize {
+    n * POINT + BATCH_PROOF
+}
 pub const DECK_BYTES: usize = DECK * MASKED;
 
-/// The Bayer–Groth argument sees the deck as an m × n matrix.
-const M: usize = 2;
-const N: usize = 26;
+/// The Bayer–Groth argument sees the deck as an m × n matrix, and its
+/// size depends on which way the fifty-two are folded. Measured, all
+/// four factorisations, by `wire::shuffle_argument_size`:
+///
+/// | m × n | argument | made | checked |
+/// |---|---|---|---|
+/// | 2 × 26 | 5,496 B | 105 ms | 103 ms |
+/// | **4 × 13** | **4,120 B** | 142 ms | 116 ms |
+/// | 13 × 4 | 5,848 B | 290 ms | 158 ms |
+/// | 26 × 2 | 10,104 B | 493 ms | 225 ms |
+///
+/// Four by thirteen is a quarter off the argument — 6% off everything
+/// a hand's events carry — for a third more time to make one and a
+/// tenth more to check one. A hand makes four and checks four, inside
+/// a deal turn that allows fifteen seconds, so the milliseconds are
+/// affordable where the bytes cross a phone's link four times over.
+const M: usize = 4;
+const N: usize = 13;
 
 /// Public parameters and the 52 cards, the same for every table, from
 /// fixed seeds: nothing in them is secret, and everyone must agree on
@@ -249,6 +273,124 @@ pub fn verify_token(pk: &[u8], masked: &[u8], token: &[u8]) -> bool {
     Protocol::verify_reveal(&f.pp, &pk, &t, &masked, &proof).is_ok()
 }
 
+/// Tokens for many cards at once, with one argument for the lot.
+///
+/// A token is 32 bytes and the proof beside it is 96, so a seat
+/// opening the other seats' thirty-nine positions at the deal sent
+/// three quarters proof — and every one of those proofs said the same
+/// thing about the same key. This says it once.
+///
+/// The standard batch: take public coefficients ρ_i that the prover
+/// cannot choose, from a hash of the whole statement, and argue about
+/// the combination instead of the parts —
+///
+/// ```text
+///     H = Σ ρ_i·C1_i        B = Σ ρ_i·T_i
+///     pk = sk·G             B = sk·H
+/// ```
+///
+/// A seat that gets one token wrong moves B off sk·H, and can only
+/// put it back by knowing the ρ_i before it commits, which the hash
+/// denies it: a bad batch passes with probability about 1/|F|. The
+/// argument itself is the same Σ-protocol as [seal] over one witness —
+/// commit with a random a, challenge from a hash of the statement,
+/// answer z = a + c·sk.
+///
+/// Writes [tokens_len] bytes: the tokens in the order the cards came
+/// in, then the argument. [unmask] takes the tokens alone.
+pub fn reveal_tokens(secret: &[u8], masked_many: &[u8], seed: &[u8], out: &mut [u8]) -> Option<usize> {
+    let g = generator();
+    let (pk, sk) = keys(secret)?;
+    let n = masked_many.len() / MASKED;
+    if n == 0 || masked_many.len() % MASKED != 0 || out.len() < tokens_len(n) {
+        return None;
+    }
+    let mut cards = Vec::with_capacity(n);
+    for i in 0..n {
+        cards.push(read::<Masked>(&masked_many[i * MASKED..(i + 1) * MASKED])?);
+    }
+    for (i, m) in cards.iter().enumerate() {
+        let token: Token = el_gamal::Plaintext(m.0.mul(sk.into_repr()).into_affine());
+        write(&token, &mut out[i * POINT..(i + 1) * POINT])?;
+    }
+    let (h, b) = batch_points(&pk, &cards, &out[..n * POINT])?;
+
+    let mut rng = rng_from(seed);
+    let a = Scalar::rand(&mut rng);
+    let a1 = g.mul(a.into_repr()).into_affine();
+    let a2 = h.mul(a.into_repr()).into_affine();
+    let c = batch_challenge(&pk, &h, &b, &a1, &a2)?;
+    let z = a + c * sk;
+
+    let p = &mut out[n * POINT..tokens_len(n)];
+    write(&a1, &mut p[..POINT])?;
+    write(&a2, &mut p[POINT..2 * POINT])?;
+    write(&z, &mut p[2 * POINT..])?;
+    Some(tokens_len(n))
+}
+
+/// Whether a batch of tokens is the one [pk] owes for those cards, in
+/// that order: what [reveal_tokens] wrote, checked by anybody.
+pub fn verify_tokens(pk: &[u8], masked_many: &[u8], tokens: &[u8]) -> bool {
+    let g = generator();
+    let n = masked_many.len() / MASKED;
+    if n == 0 || masked_many.len() % MASKED != 0 || tokens.len() < tokens_len(n) {
+        return false;
+    }
+    let Some(pk) = read::<Affine>(pk) else { return false };
+    let mut cards = Vec::with_capacity(n);
+    for i in 0..n {
+        let Some(m) = read::<Masked>(&masked_many[i * MASKED..(i + 1) * MASKED]) else {
+            return false;
+        };
+        cards.push(m);
+    }
+    let Some((h, b)) = batch_points(&pk, &cards, &tokens[..n * POINT]) else { return false };
+    let p = &tokens[n * POINT..tokens_len(n)];
+    let (Some(a1), Some(a2), Some(z)) = (
+        read::<Affine>(&p[..POINT]),
+        read::<Affine>(&p[POINT..2 * POINT]),
+        read::<Scalar>(&p[2 * POINT..]),
+    ) else {
+        return false;
+    };
+    let Some(c) = batch_challenge(&pk, &h, &b, &a1, &a2) else { return false };
+    g.mul(z.into_repr()) == a1.into_projective() + pk.mul(c.into_repr())
+        && h.mul(z.into_repr()) == a2.into_projective() + b.mul(c.into_repr())
+}
+
+/// The two points a batch argues about: H, the cards' first halves
+/// weighted by coefficients nobody chose, and B, the tokens weighted
+/// the same. The coefficients come from a hash of the key, the cards
+/// and the tokens together, so a seat cannot know one before it has
+/// committed to all of them.
+fn batch_points(pk: &Affine, cards: &[Masked], tokens: &[u8]) -> Option<(Affine, Affine)> {
+    use blake2::{Blake2b, Digest};
+    let mut bytes = b"open-hearts batch tokens v1".to_vec();
+    bytes.extend(to_bytes![pk].ok()?);
+    for m in cards {
+        bytes.extend(to_bytes![m.0, m.1].ok()?);
+    }
+    bytes.extend(tokens);
+    let mut rng = ChaCha20Rng::from_seed(<[u8; 32]>::try_from(&Blake2b::digest(&bytes)[..32]).ok()?);
+    let mut h = Curve::zero();
+    let mut b = Curve::zero();
+    for (i, m) in cards.iter().enumerate() {
+        let rho = Scalar::rand(&mut rng);
+        let t = read::<Token>(&tokens[i * POINT..(i + 1) * POINT])?;
+        h += m.0.mul(rho.into_repr());
+        b += t.0.mul(rho.into_repr());
+    }
+    Some((h.into_affine(), b.into_affine()))
+}
+
+fn batch_challenge(pk: &Affine, h: &Affine, b: &Affine, a1: &Affine, a2: &Affine) -> Option<Scalar> {
+    use blake2::{Blake2b, Digest};
+    let mut bytes = b"open-hearts batch challenge v1".to_vec();
+    bytes.extend(to_bytes![pk, h, b, a1, a2].ok()?);
+    Some(Scalar::from_le_bytes_mod_order(&Blake2b::digest(&bytes)))
+}
+
 /// Opens a masked card with every seat's token (each checked against
 /// its key): the card's index, 0 to 51, or none if a token is bad or
 /// the result is no card.
@@ -316,30 +458,23 @@ pub fn share_token(share: &[u8], masked: &[u8], seed: &[u8], out: &mut [u8]) -> 
 /// each token's proof is verified against its key first; without, the
 /// tokens are combined as given — for a caller that verified each on
 /// arrival, since a proof checked twice is most of the cost of a card.
-pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8], check: bool) -> Option<usize> {
+/// [tokens] are the bare 32-byte tokens, one per key in [pks], with no
+/// proofs among them: a token is checked when it arrives — against its
+/// key, singly or in a batch ([verify_tokens]) — and what is kept
+/// afterwards is the token alone. Opening is addition, and addition
+/// has nothing to check.
+pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8]) -> Option<usize> {
     let f = fixed();
     let masked = read::<Masked>(masked)?;
     let n = pks.len() / POINT;
-    if tokens.len() < n * TOKEN {
+    if tokens.len() < n * POINT {
         return None;
     }
-    let mut key = Vec::with_capacity(n);
+    let mut aggregate = Token::zero();
     for i in 0..n {
-        let pk = read::<Affine>(&pks[i * POINT..(i + 1) * POINT])?;
-        let t = &tokens[i * TOKEN..(i + 1) * TOKEN];
-        let token = read::<Token>(&t[..POINT])?;
-        let proof = read::<RevealProof>(&t[POINT..])?;
-        key.push((token, proof, pk));
+        aggregate = aggregate + read::<Token>(&tokens[i * POINT..(i + 1) * POINT])?;
     }
-    let card = if check {
-        Protocol::unmask(&f.pp, &key, &masked).ok()?
-    } else {
-        let mut aggregate = Token::zero();
-        for (token, _, _) in &key {
-            aggregate = aggregate + *token;
-        }
-        aggregate.reveal(&masked).ok()?
-    };
+    let card = aggregate.reveal(&masked).ok()?;
     f.cards.iter().position(|c| *c == card)
 }
 
@@ -619,8 +754,23 @@ pub unsafe extern "C" fn deal_verify_token(pk: *const u8, masked: *const u8, tok
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn deal_unmask(pks: *const u8, tokens: *const u8, count: usize, masked: *const u8, check: u8) -> i32 {
-    done(unmask(input(pks, count * POINT), input(tokens, count * TOKEN), input(masked, MASKED), check != 0))
+pub unsafe extern "C" fn deal_unmask(pks: *const u8, tokens: *const u8, count: usize, masked: *const u8) -> i32 {
+    done(unmask(input(pks, count * POINT), input(tokens, count * POINT), input(masked, MASKED)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_reveal_tokens(secret: *const u8, masked: *const u8, count: usize, seed: *const u8, out: *mut u8) -> i32 {
+    done(reveal_tokens(
+        input(secret, SCALAR),
+        input(masked, count * MASKED),
+        input(seed, 32),
+        output(out, tokens_len(count)),
+    ))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_verify_tokens(pk: *const u8, masked: *const u8, count: usize, tokens: *const u8) -> i32 {
+    verify_tokens(input(pk, POINT), input(masked, count * MASKED), input(tokens, tokens_len(count))) as i32
 }
 
 #[no_mangle]
@@ -703,22 +853,44 @@ mod tests {
         eprintln!("shuffle proof: {proof_len} bytes");
 
         // Everyone opens every card: the deck is a permutation of 0..52.
+        // A seat makes its tokens for the whole deck in one batch, with
+        // one argument for the lot, which is how a hand does it.
+        let mut batched = Vec::new();
+        for (i, s) in secrets.iter().enumerate() {
+            let mut out = vec![0u8; tokens_len(DECK)];
+            assert_eq!(reveal_tokens(s, &deck, &seed(40 + i as u8), &mut out), Some(tokens_len(DECK)));
+            assert!(verify_tokens(&pks[i * POINT..(i + 1) * POINT], &deck, &out), "the batch checks");
+            batched.push(out);
+        }
         let mut seen = vec![false; DECK];
         for c in 0..DECK {
             let masked = &deck[c * MASKED..(c + 1) * MASKED];
-            let mut tokens = vec![0u8; 4 * TOKEN];
+            let mut tokens = vec![0u8; 4 * POINT];
             for (i, s) in secrets.iter().enumerate() {
-                assert_eq!(reveal_token(s, masked, &seed(40 + i as u8), &mut tokens[i * TOKEN..(i + 1) * TOKEN]), Some(TOKEN));
-                assert!(verify_token(&pks[i * POINT..(i + 1) * POINT], masked, &tokens[i * TOKEN..(i + 1) * TOKEN]));
+                // The single-token call and the batch agree, card for card.
+                let mut one = vec![0u8; TOKEN];
+                assert_eq!(reveal_token(s, masked, &seed(40 + i as u8), &mut one), Some(TOKEN));
+                assert!(verify_token(&pks[i * POINT..(i + 1) * POINT], masked, &one));
+                let from_batch = &batched[i][c * POINT..(c + 1) * POINT];
+                assert_eq!(&one[..POINT], from_batch, "seat {i}, card {c}: one token, two ways");
+                tokens[i * POINT..(i + 1) * POINT].copy_from_slice(from_batch);
             }
-            let card = unmask(&pks, &tokens, masked, true).expect("a card");
-            assert_eq!(unmask(&pks, &tokens, masked, false), Some(card), "unchecked, the same card");
+            let card = unmask(&pks, &tokens, masked).expect("a card");
             assert!(!seen[card], "card {card} dealt twice");
             seen[card] = true;
             // Without one token the card stays closed.
-            assert_eq!(unmask(&pks[..3 * POINT], &tokens[..3 * TOKEN], masked, true), None);
+            assert_eq!(unmask(&pks[..3 * POINT], &tokens[..3 * POINT], masked), None);
         }
         assert!(seen.iter().all(|s| *s));
+
+        // A batch with one token bent is refused, and the bend is the
+        // only thing that changed.
+        let mut bent = batched[0].clone();
+        bent[7 * POINT] ^= 1;
+        assert!(!verify_tokens(&pks[..POINT], &deck, &bent), "a bent token fails the batch");
+        // As is a batch offered for a different deck, or by another key.
+        assert!(!verify_tokens(&pks[POINT..2 * POINT], &deck, &batched[0]), "not that seat's batch");
+        assert!(!verify_tokens(&pks[..POINT], &deck[..(DECK - 1) * MASKED], &batched[0]), "not those cards");
 
         // A token sealed to seat 1 is opened by seat 1 alone, and it is
         // the token seat 0 owes for that card.
@@ -898,7 +1070,16 @@ mod tests {
         assert!(!verify_token(&pks[..POINT], masked, &tokens[..TOKEN]), "not against the seat's whole key");
         assert!(!verify_token(&share_pks[POINT..], masked, &tokens[..TOKEN]), "nor the other share's");
 
-        let card = unmask(&all_pks, &tokens, masked, true).expect("a card");
+        // Opening takes the tokens alone: a proof is checked when the
+        // token arrives, as just above, and what is kept is the token.
+        let bare = |t: &[u8]| -> Vec<u8> {
+            let mut out = Vec::new();
+            for i in 0..t.len() / TOKEN {
+                out.extend_from_slice(&t[i * TOKEN..i * TOKEN + POINT]);
+            }
+            out
+        };
+        let card = unmask(&all_pks, &bare(&tokens), masked).expect("a card");
         assert_eq!(card, 7, "the initial deck is masked by one, so this is card seven");
 
         // And it is the card the whole key would have opened.
@@ -906,14 +1087,14 @@ mod tests {
         for (i, s) in secrets.iter().enumerate() {
             reveal_token(s, masked, &seed(70 + i as u8), &mut whole[i * TOKEN..(i + 1) * TOKEN]).unwrap();
         }
-        assert_eq!(unmask(&pks, &whole, masked, true), Some(card), "the same card, by a key nobody held");
+        assert_eq!(unmask(&pks, &bare(&whole), masked), Some(card), "the same card, by a key nobody held");
 
         // One share is not the key: without the other, no card.
         let mut short = tokens[..TOKEN].to_vec();
         short.extend_from_slice(&tokens[2 * TOKEN..]);
         let mut short_pks = share_pks[..POINT].to_vec();
         short_pks.extend_from_slice(&pks[POINT..]);
-        assert_eq!(unmask(&short_pks, &short, masked, true), None, "one share opens nothing");
+        assert_eq!(unmask(&short_pks, &bare(&short), masked), None, "one share opens nothing");
     }
 
 }

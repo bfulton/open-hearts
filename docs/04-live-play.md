@@ -1137,8 +1137,8 @@ On the wire:
   own jurors of last resort, in a VM with no peer connection in it,
   which is exactly the case doc 02's fallback exists for. Holding a
   bot seat is the most a juror has ever put through either path and it
-  is still small — 30,829 bytes a seat a hand as JSON on a relay,
-  19,879 as frames on a channel, a 12 KB shuffle argument its largest
+  is still small — 23,780 bytes a seat a hand as JSON on a relay,
+  14,632 as frames on a channel, a 10 KB shuffle argument its largest
   single event (`packages/table/tool/juror_wire.dart`) — where the
   computation above would have been a thousand times that.
   Two rules keep the dialling from costing more than it saves, both of

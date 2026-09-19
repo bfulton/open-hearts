@@ -62,7 +62,11 @@ extension type _Exports._(JSObject _) implements JSObject {
   // ignore: non_constant_identifier_names
   external JSNumber deal_share_token(JSNumber share, JSNumber masked, JSNumber seed, JSNumber out);
   // ignore: non_constant_identifier_names
-  external JSNumber deal_unmask(JSNumber pks, JSNumber tokens, JSNumber count, JSNumber masked, JSNumber check);
+  external JSNumber deal_unmask(JSNumber pks, JSNumber tokens, JSNumber count, JSNumber masked);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_reveal_tokens(JSNumber secret, JSNumber masked, JSNumber count, JSNumber seed, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_verify_tokens(JSNumber pk, JSNumber masked, JSNumber count, JSNumber tokens);
   // ignore: non_constant_identifier_names
   external JSNumber deal_seal(JSNumber secret, JSNumber pkTo, JSNumber masked, JSNumber seed, JSNumber out);
   // ignore: non_constant_identifier_names
@@ -196,12 +200,26 @@ class _Wasm implements DealCrypto {
       _must(_call([share, masked, seed], tokenBytes, (i, o) => e.deal_share_token(i[0].toJS, i[1].toJS, i[2].toJS, o.toJS).toDartInt), 'share token');
 
   @override
-  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked, {bool verified = false}) {
+  Uint8List revealTokens(Uint8List secret, Uint8List cards, Uint8List seed) {
+    final n = cards.length ~/ maskedBytes;
+    return _must(
+        _call([secret, cards, seed], tokensBytes(n), (i, o) => e.deal_reveal_tokens(i[0].toJS, i[1].toJS, n.toJS, i[2].toJS, o.toJS).toDartInt),
+        'reveal tokens');
+  }
+
+  @override
+  bool verifyTokens(Uint8List pk, Uint8List cards, Uint8List tokens) {
+    final n = cards.length ~/ maskedBytes;
+    return _call([pk, cards, tokens], 0, (i, o) => e.deal_verify_tokens(i[0].toJS, i[1].toJS, n.toJS, i[2].toJS).toDartInt == 1 ? 0 : -1) != null;
+  }
+
+  @override
+  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked) {
     final allPks = Uint8List.fromList([for (final p in pks) ...p]);
     final allTokens = Uint8List.fromList([for (final t in tokens) ...t]);
     int? card;
     _call([allPks, allTokens, masked], 0, (i, o) {
-      final r = e.deal_unmask(i[0].toJS, i[1].toJS, pks.length.toJS, i[2].toJS, (verified ? 0 : 1).toJS).toDartInt;
+      final r = e.deal_unmask(i[0].toJS, i[1].toJS, pks.length.toJS, i[2].toJS).toDartInt;
       card = r < 0 ? null : r;
       return 0;
     });

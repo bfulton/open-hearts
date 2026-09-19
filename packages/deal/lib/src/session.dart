@@ -742,29 +742,57 @@ class DealSession {
 
   /// Tokens by [seat] — whose secret this side holds — for every
   /// position, or for the other seats' alone.
+  ///
+  /// Kept bare: a token is 32 bytes, its proof 96, and the proof is
+  /// spent the moment it is checked ([acceptTokens]). What opens a
+  /// card is the sum of tokens, and a sum has nothing to check.
   void _tokensBy(int seat, {required bool everyPosition}) {
     final t = _tokens.putIfAbsent(seat, () => {});
-    for (var p = 0; p < deckSize; p++) {
-      if (!everyPosition && p ~/ _handSize == seat) continue;
-      t[p] ??= crypto.revealToken(_secrets[seat]!, _masked(p), _seed('token $p', seat));
+    final want = [
+      for (var p = 0; p < deckSize; p++)
+        if ((everyPosition || p ~/ _handSize != seat) && t[p] == null) p,
+    ];
+    if (want.isEmpty) return;
+    _spread(t, want, crypto.revealTokens(_secrets[seat]!, _cardsAt(want), _seed('tokens ${want.length}', seat)));
+  }
+
+  /// The bare tokens out of a batch, position by position.
+  void _spread(Map<int, Uint8List> into, List<int> positions, Uint8List batch) {
+    for (var i = 0; i < positions.length; i++) {
+      into[positions[i]] = Uint8List.fromList(Uint8List.sublistView(batch, i * pointBytes, (i + 1) * pointBytes));
     }
   }
 
   Uint8List _masked(int p) => maskedAt(deck!, p);
 
+  /// The masked cards at [positions], end to end, as a batch takes them.
+  Uint8List _cardsAt(List<int> positions) => Uint8List.fromList([for (final p in positions) ..._masked(p)]);
+
+  /// The positions a seat owes everyone a token for: every one but the
+  /// thirteen it was dealt.
+  List<int> _owed(int seat) => [for (var p = 0; p < deckSize; p++) if (p ~/ _handSize != seat) p];
+
   /// This seat's tokens for the other seats' positions; null before
   /// the deck is dealt or without a seat.
+  ///
+  /// One batch with one argument, not thirty-nine tokens each carrying
+  /// a proof three times its own size: the proofs all said the same
+  /// thing about the same key, and a batch says it once
+  /// ([DealCrypto.revealTokens]).
   Map<String, Object?>? myTokens() {
     final me = mySeat;
     if (me == null || deck == null) return null;
+    final owed = _owed(me);
+    final batch = _myTokens ??= crypto.revealTokens(_secrets[me]!, _cardsAt(owed), _seed('tokens ${owed.length}', me));
+    _spread(_tokens.putIfAbsent(me, () => {}), owed, batch);
+    // And its own thirteen, which it needs to open its own cards and
+    // nobody else ever sees.
     _tokensBy(me, everyPosition: true);
-    final t = _tokens[me]!;
     _openWhatCan();
-    return {
-      'seat': me,
-      'tokens': {for (var p = 0; p < deckSize; p++) if (p ~/ _handSize != me) '$p': _b64(t[p]!)},
-    };
+    return {'seat': me, 'tokens': _b64(batch)};
   }
+
+  Uint8List? _myTokens;
 
   /// Whether a seat's tokens are one for every position not its own,
   /// each verifying against its key and the dealt deck. Changes
@@ -775,15 +803,14 @@ class DealSession {
     try {
       final seat = m['seat'] as int;
       if (!_keyed(seat) || deck == null || _public(seat)) return null;
-      final pk = _pks[seat]!;
-      final given = Map<String, Object?>.from(m['tokens'] as Map);
+      final owed = _owed(seat);
+      final batch = _unb64(m['tokens']);
+      if (batch.length != tokensBytes(owed.length)) return null;
+      // One check for the lot, against the seat's key and the dealt
+      // deck: a seat that gets any one token wrong fails it.
+      if (!crypto.verifyTokens(_pks[seat]!, _cardsAt(owed), batch)) return null;
       final checked = <int, Uint8List>{};
-      for (var p = 0; p < deckSize; p++) {
-        if (p ~/ _handSize == seat) continue;
-        final t = _unb64(given['$p']);
-        if (!crypto.verifyToken(pk, _masked(p), t)) return null;
-        checked[p] = t;
-      }
+      _spread(checked, owed, batch);
       return checked;
     } catch (_) {
       return null;
@@ -799,8 +826,11 @@ class DealSession {
       if (hasTokens(seat)) return true;
       final Map<int, Uint8List> checked;
       if (verified) {
-        final given = Map<String, Object?>.from(m['tokens'] as Map);
-        checked = {for (var p = 0; p < deckSize; p++) if (p ~/ _handSize != seat) p: _unb64(given['$p'])};
+        final owed = _owed(seat);
+        final batch = _unb64(m['tokens']);
+        if (batch.length != tokensBytes(owed.length)) return false;
+        checked = {};
+        _spread(checked, owed, batch);
       } else {
         final c = _checkTokens(m);
         if (c == null) return false;
@@ -854,7 +884,10 @@ class DealSession {
             point = crypto.openShared(sealed, [a, b]);
           }
           final token = Uint8List.fromList([...point, ...Uint8List.sublistView(s.value, sealedBytes + sealProofBytes)]);
-          if (crypto.verifyToken(_pks[owner]!, _masked(p), token)) _tokens.putIfAbsent(owner, () => {})[p] = token;
+          if (crypto.verifyToken(_pks[owner]!, _masked(p), token)) {
+            _tokens.putIfAbsent(owner, () => {})[p] = DealCrypto.tokenOf(token);
+            _passed.putIfAbsent(owner, () => {})[p] = token;
+          }
         } catch (_) {}
       }
       // A seal whose parts have not arrived is kept: the release that
@@ -888,11 +921,11 @@ class DealSession {
           whole = false;
           break;
         }
-        tokens.addAll([a, b]);
+        tokens.addAll([DealCrypto.tokenOf(a), DealCrypto.tokenOf(b)]);
         pks.addAll([keys[0], keys[1]]);
       }
       if (!whole) continue;
-      final c = crypto.unmask(pks, tokens, maskedAt(d, p), verified: true);
+      final c = crypto.unmask(pks, tokens, maskedAt(d, p));
       if (c != null) _cards[p] = c;
     }
   }
@@ -907,7 +940,9 @@ class DealSession {
     if (me == null || handOf(me) == null) return null;
     final p = positionOf(me, leadCard);
     if (p == null) return {'seat': me, 'position': -1};
-    return {'seat': me, 'position': p, 'token': _b64(_tokens[me]![p]!)};
+    // With its proof, since it travels alone and nothing else here
+    // vouches for it; what this side keeps is still the bare token.
+    return {'seat': me, 'position': p, 'token': _b64(crypto.revealToken(_secrets[me]!, _masked(p), _seed('declare $p', me)))};
   }
 
   /// Whether a seat's word on the lead card holds: nowhere, or a
@@ -937,12 +972,12 @@ class DealSession {
     final tokens = <Uint8List>[];
     final pks = <Uint8List>[];
     for (var s = 0; s < _seats; s++) {
-      final t = s == owner ? token : _tokens[s]?[p];
+      final t = s == owner ? DealCrypto.tokenOf(token) : _tokens[s]?[p];
       if (t == null) return null;
       tokens.add(t);
       pks.add(_pks[s]!);
     }
-    final card = crypto.unmask(pks, tokens, _masked(p), verified: true);
+    final card = crypto.unmask(pks, tokens, _masked(p));
     if (card != null) _checked[p] = (token: token, card: card);
     return card;
   }
@@ -953,7 +988,11 @@ class DealSession {
   /// Keeps a token that was checked to open [p]: the card without
   /// unmasking again.
   void _keepChecked(int owner, int p, Uint8List token) {
-    _tokens.putIfAbsent(owner, () => {})[p] = token;
+    // Bare in the store, proved beside it: the token that came in with
+    // a play is the one this side would have to carry on if the
+    // position moved again ([_proved]).
+    _tokens.putIfAbsent(owner, () => {})[p] = DealCrypto.tokenOf(token);
+    _passed.putIfAbsent(owner, () => {})[p] = token;
     final seen = _checked[p];
     if (seen != null && _same(seen.token, token)) _cards[p] ??= seen.card;
   }
@@ -987,10 +1026,27 @@ class DealSession {
   /// it is that seat or was passed the card.
   Map<String, Object?>? playToken(int position) {
     final owner = position ~/ _handSize;
-    final t = _tokens[owner]?[position];
-    if (t == null) return null;
-    return {'position': position, 'token': _b64(t)};
+    if (_tokens[owner]?[position] == null) return null;
+    final proved = _proved(owner, position);
+    if (proved == null) return null;
+    return {'position': position, 'token': _b64(proved)};
   }
+
+  /// The owner's token for [p] with its proof beside it. The store
+  /// keeps tokens bare — a proof is spent when it is checked, and
+  /// opening is addition — but a token that travels alone needs one,
+  /// since nothing else vouches for it. Made here when this side holds
+  /// the owner's secret; otherwise the one that came with the pass
+  /// that handed the card over, which is the only other way to be
+  /// holding somebody else's token at all.
+  Uint8List? _proved(int owner, int p) {
+    final secret = _secrets[owner];
+    if (secret != null && deck != null) return crypto.revealToken(secret, _masked(p), _seed('play token $p', owner));
+    return _passed[owner]?[p];
+  }
+
+  /// Tokens that arrived with a proof, kept whole for [_proved].
+  final Map<int, Map<int, Uint8List>> _passed = {};
 
   /// The card a play would open — the position's missing token,
   /// checked against the key of the seat that held the position at
@@ -1060,9 +1116,12 @@ class DealSession {
     final tokens = <Uint8List>[];
     for (final p in positions) {
       if (_holderOf[p] != me || p ~/ _handSize != me) return null;
-      final t = _tokens[me]?[p];
-      if (t == null) return null;
-      tokens.add(t);
+      if (_tokens[me]?[p] == null) return null;
+      // Made here rather than taken from the store, which keeps the
+      // token alone: a pass needs the proof beside it, in the clear or
+      // as the half that travels with a seal. Deterministic, so it is
+      // the same token either way.
+      tokens.add(crypto.revealToken(secret, _masked(p), _seed('pass token $p', me)));
     }
     if (_public(to)) {
       return {'from': me, 'to': to, 'positions': positions, 'tokens': [for (final t in tokens) _b64(t)]};
@@ -1133,7 +1192,12 @@ class DealSession {
         final tokens = [for (final t in clear as List) _unb64(t)];
         if (tokens.length != positions.length) return false;
         for (var i = 0; i < positions.length; i++) {
-          _tokens.putIfAbsent(positions[i] ~/ _handSize, () => {})[positions[i]] = tokens[i];
+          final owner = positions[i] ~/ _handSize;
+          // Checked just above; the store keeps the token alone, and
+          // the proved one is kept beside it for the play that will
+          // have to carry it on ([_proved]).
+          _tokens.putIfAbsent(owner, () => {})[positions[i]] = DealCrypto.tokenOf(tokens[i]);
+          _passed.putIfAbsent(owner, () => {})[positions[i]] = tokens[i];
         }
       } else {
         final sealed = [for (final s in m['sealed'] as List) _unb64(s)];

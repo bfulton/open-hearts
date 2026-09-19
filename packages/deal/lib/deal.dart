@@ -27,6 +27,13 @@ const tokenBytes = 128;
 const sealedBytes = 64;
 const sealProofBytes = 160;
 
+/// One argument for a batch of reveal tokens, however many
+/// ([DealCrypto.revealTokens]).
+const batchProofBytes = 96;
+
+/// How long a batch of [n] tokens is on the wire.
+int tokensBytes(int n) => n * pointBytes + batchProofBytes;
+
 abstract class DealCrypto {
   /// The platform's binding, once it is ready: the wasm fetched on the
   /// web, the cdylib opened on the VM.
@@ -50,9 +57,24 @@ abstract class DealCrypto {
   ({Uint8List deck, Uint8List proof}) shuffle(Uint8List joint, Uint8List deck, Uint8List seed);
   bool verifyShuffle(Uint8List joint, Uint8List before, Uint8List after, Uint8List proof);
 
-  /// This seat's share of opening [masked], with its proof.
+  /// This seat's share of opening [masked], with its proof — the
+  /// token in the first [pointBytes], the proof after it. What is kept
+  /// afterwards is the token alone: [unmask] adds tokens and addition
+  /// has nothing to check.
   Uint8List revealToken(Uint8List secret, Uint8List masked, Uint8List seed);
   bool verifyToken(Uint8List pk, Uint8List masked, Uint8List token);
+
+  /// The same for a run of cards at once, with one argument for the
+  /// lot: [cards] masked cards end to end, answered with that many
+  /// bare tokens in the same order and then [batchProofBytes].
+  ///
+  /// A proof is three times a token, and the proofs beside a seat's
+  /// thirty-nine tokens at the deal all said the same thing about the
+  /// same key. One batch says it once — the tokens weighted by
+  /// coefficients nobody chose, argued about together — and a seat
+  /// that gets any one of them wrong fails the batch.
+  Uint8List revealTokens(Uint8List secret, Uint8List cards, Uint8List seed);
+  bool verifyTokens(Uint8List pk, Uint8List cards, Uint8List tokens);
 
   /// A seat's key split into [shares] pieces of [scalarBytes] each,
   /// so that a departed seat's cards can be opened without anyone
@@ -79,11 +101,15 @@ abstract class DealCrypto {
   /// card comes out.
   Uint8List shareToken(Uint8List share, Uint8List masked, Uint8List seed);
 
-  /// The card behind [masked] given every seat's token, each checked
-  /// against its key unless [verified] — for tokens checked on arrival,
-  /// since checking a proof twice is most of the cost of a card; null
-  /// if a token is bad or the result is no card.
-  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked, {bool verified = false});
+  /// The card behind [masked] given every seat's token: the bare
+  /// [pointBytes] tokens, with no proofs among them. A token is
+  /// checked when it arrives — against its key, singly or in a batch —
+  /// and opening is addition, which has nothing to check. [pks] says
+  /// how many to expect and nothing else. Null if the sum is no card.
+  int? unmask(List<Uint8List> pks, List<Uint8List> tokens, Uint8List masked);
+
+  /// The token in what [revealToken] or [shareToken] wrote.
+  static Uint8List tokenOf(Uint8List proved) => Uint8List.sublistView(proved, 0, pointBytes);
 
   /// A token for one seat's eyes: the share [secret]'s key owes for
   /// [masked], encrypted to [pkTo] — and after it, the argument that

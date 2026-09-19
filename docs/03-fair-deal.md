@@ -194,7 +194,7 @@ offer say so, and a build that cannot run the deal does not sit down.
   Barnett–Smart with the Bayer–Groth argument on the Starknet curve,
   m = 2 and n = 26 — wrapped as flat functions over bytes: keys and
   their proof of ownership, the joint key, the initial deck, a shuffle
-  with its argument, reveal tokens with their proofs, unmasking, and
+  with its argument, reveal tokens singly and in batches, unmasking, and
   sealing a token to one key. One Rust crate builds twice: a cdylib
   the Dart VM loads over FFI (the tests, the verifier, the service's
   juror) and a 400 KB wasm the browser loads bare, no glue. Every
@@ -204,11 +204,29 @@ offer say so, and a build that cannot run the deal does not sit down.
   into a proof's transcript is normalised first, because a proof made
   from Jacobian coordinates and verified from its bytes hashed two
   different things, and every proof here crosses a wire.
+- **A batch, not thirty-nine arguments.** A reveal token is 32 bytes
+  and the Chaum–Pedersen proof beside it is 96, so the tokens round
+  was three quarters proof — and every one of those proofs said the
+  same thing about the same key. The standard batch says it once:
+  public coefficients ρ_i that the prover cannot choose, taken from a
+  hash of the key, the cards and the tokens together, and one argument
+  about the combination, log_G(pk) = log_H(B) for H = Σ ρ_i·C1_i and
+  B = Σ ρ_i·T_i. A seat that gets any one token wrong moves B off
+  sk·H and can only put it back by knowing the ρ_i before it commits,
+  which the hash denies it. The round went from 7,386 bytes a seat to
+  **2,169** (`crypto/deal/src/lib.rs`, `reveal_tokens`;
+  `packages/table/tool/wire_breakdown.dart`). A token that travels
+  alone — a declaration, a play, a pass — still carries its own proof,
+  a batch of one being the same size as a proof.
+- **What is kept is the token, not the proof.** A proof is spent the
+  moment it is checked: opening a card is the sum of the seats'
+  tokens, and a sum has nothing to check. So a token is verified on
+  arrival and stored bare, and `unmask` takes bare tokens.
 - **A hand's deal is turns of the table** ([doc 04](04-live-play.md)).
   Four rounds of one turn per seat before the pass — keys, a shuffle
   in seat order, reveal tokens for the other seats' thirty-nine
-  positions, and the lead card declared by its holder with the token
-  that opens it for everyone — and four audit turns after the last
+  positions **in one batch under one argument**, and the lead card
+  declared by its holder with the token that opens it for everyone — and four audit turns after the last
   trick, each person's deal secret for all, so the hand replays. Each
   is a race like any other turn: the seat wins it by acting, checked
   by everyone on arrival, or loses it by removal. A bot's step is taken

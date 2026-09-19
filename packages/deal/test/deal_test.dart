@@ -36,14 +36,16 @@ void main() {
     ];
     expect(d.verifyToken(sharePks[0], masked, tokens[0]), isTrue);
     expect(d.verifyToken(pks[0], masked, tokens[0]), isFalse, reason: "not against the seat's whole key");
-    final card = d.unmask([...sharePks, ...pks.skip(1)], tokens, masked);
+    // Checked on arrival; what opens the card is the tokens alone.
+    final bare = [for (final t in tokens) DealCrypto.tokenOf(t)];
+    final card = d.unmask([...sharePks, ...pks.skip(1)], bare, masked);
     expect(card, 7);
 
     // The same card the whole key would have opened, and one share on
     // its own opens nothing.
-    final whole = [for (var i = 0; i < 4; i++) d.revealToken(secrets[i], masked, seed(70 + i))];
+    final whole = [for (var i = 0; i < 4; i++) DealCrypto.tokenOf(d.revealToken(secrets[i], masked, seed(70 + i)))];
     expect(d.unmask(pks, whole, masked), card, reason: 'by a key nobody held');
-    expect(d.unmask([sharePks[0], ...pks.skip(1)], [tokens[0], ...tokens.skip(2)], masked), isNull);
+    expect(d.unmask([sharePks[0], ...pks.skip(1)], [bare[0], ...bare.skip(2)], masked), isNull);
   });
 
   test('four seats deal fifty-two cards, each opened once, none without every token', () {
@@ -65,25 +67,39 @@ void main() {
       expect(d.verifyShuffle(joint, r.deck, deck, r.proof), isFalse);
       deck = r.deck;
     }
+    // Each seat's tokens for the whole deck in one batch, with one
+    // argument for the lot — which is how a hand does it — and the
+    // batch's tokens are the ones the single call makes.
+    final batches = [for (var i = 0; i < 4; i++) d.revealTokens(secrets[i], deck, seed(40 + i))];
+    for (var i = 0; i < 4; i++) {
+      expect(d.verifyTokens(pks[i], deck, batches[i]), isTrue, reason: 'seat $i\'s batch checks');
+      expect(batches[i].length, tokensBytes(deckSize));
+    }
+    final bent = Uint8List.fromList(batches[0])..[7 * pointBytes] ^= 1;
+    expect(d.verifyTokens(pks[0], deck, bent), isFalse, reason: 'a bent token fails the batch');
+    expect(d.verifyTokens(pks[1], deck, batches[0]), isFalse, reason: 'not that seat\'s batch');
+
     final seen = <int>{};
     for (var c = 0; c < deckSize; c++) {
       final masked = maskedAt(deck, c);
-      final tokens = [for (var i = 0; i < 4; i++) d.revealToken(secrets[i], masked, seed(40 + i))];
+      final proved = [for (var i = 0; i < 4; i++) d.revealToken(secrets[i], masked, seed(40 + i))];
+      final tokens = <Uint8List>[];
       for (var i = 0; i < 4; i++) {
-        expect(d.verifyToken(pks[i], masked, tokens[i]), isTrue);
+        expect(d.verifyToken(pks[i], masked, proved[i]), isTrue);
+        final fromBatch = Uint8List.sublistView(batches[i], c * pointBytes, (c + 1) * pointBytes);
+        expect(DealCrypto.tokenOf(proved[i]), fromBatch, reason: 'seat $i, card $c: one token, two ways');
+        tokens.add(fromBatch);
       }
       final card = d.unmask(pks, tokens, masked);
       expect(card, isNotNull);
       expect(seen.add(card!), isTrue, reason: 'card $card dealt twice');
-      expect(d.unmask(pks, tokens, masked, verified: true), card, reason: 'unchecked, the same card');
       expect(d.unmask(pks.sublist(0, 3), tokens.sublist(0, 3), masked), isNull, reason: 'three tokens open nothing');
       if (c == 0) {
-        // A token for another position: caught when checked; combined
-        // blindly it opens nothing, or the wrong thing, which is why
-        // unchecked is only for tokens checked on arrival.
-        final wrong = [...tokens.sublist(0, 3), d.revealToken(secrets[3], maskedAt(deck, 1), seed(41))];
-        expect(d.unmask(pks, wrong, masked), isNull);
-        expect(d.unmask(pks, wrong, masked, verified: true), isNot(card));
+        // A token for another position opens nothing, or the wrong
+        // thing: opening is addition, so what guards it is the check
+        // the token passed on arrival.
+        final wrong = [...tokens.sublist(0, 3), Uint8List.sublistView(batches[3], pointBytes, 2 * pointBytes)];
+        expect(d.unmask(pks, wrong, masked), isNot(card));
       }
     }
     expect(seen.length, deckSize);
