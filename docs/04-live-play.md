@@ -1019,6 +1019,41 @@ five nines of hands that can go on:
 | 5% | 10 | 3.9e-4 |
 | 10% | 12 | 3.3e-3 |
 
+**And f is not small.** The assumption to design against is a juror
+lasting about a minute at p50 — a stranger's app, in a lobby or at
+another table, with no stake in this hand. Taken as memoryless, which
+is the conservative reading, that is f = 50% over a hand of a minute
+and 75% over one of two. At those rates the shape does not work at any
+size worth having:
+
+| hand | f | halves as built | any 2 of n | any 3 of n |
+|---|---|---|---|---|
+| p50, 1 min | 50% | 38 | 23 | 27 |
+| p90, 2 min | 75% | >40 | >40 | >40 |
+
+A jury of six delivers **0.43** at that rate — two hands in five with a
+bot seat could not go on — and the cost of a jury is linear in its
+size, a jury of twelve already handing over 7.7 MB a hand. So the size
+is the wrong knob. Two things move it instead, and neither is built:
+
+- **Refresh the escrow to whoever is live**, instead of sealing it to
+  the draw for the whole hand. Then what has to survive is one refresh
+  window rather than a hand. Any two of six, refreshed every two
+  seconds, is 2.7e-6 — five nines with room; every five seconds is
+  9.6e-5. This is proactive resharing, and it is the change that
+  actually answers the question.
+- **Draw jurors who have a reason to stay.** The draw takes whoever is
+  online, which mixes somebody seated at a live table — there for the
+  rest of their game — with somebody glancing at the lobby. Presence
+  already carries a status (`presence_relay.dart`); preferring seated
+  jurors changes the population rather than the protocol, and f with
+  it.
+
+Both leave the last resort where it is: a hand that cannot open a bot
+seat mid-hand has no graceful degradation. Falling back to open bot
+seats happens only before the deal, because after it the seat's cards
+are masked and the holder's token is the only way in.
+
 Two mitigations this section used to lean on do not apply here. A
 **redraw** repairs who rules and who holds a seat, but not the escrow:
 the custodians are fixed in the deal's first round and a jury drawn

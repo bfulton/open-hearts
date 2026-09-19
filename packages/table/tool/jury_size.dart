@@ -33,6 +33,8 @@ library;
 
 import 'dart:math';
 
+const ln2 = 0.6931471805599453;
+
 /// Doc 04: a person leaves in about 8% of hands.
 const personLeaves = 0.08;
 
@@ -98,6 +100,58 @@ int? least(double f, double target, {int? t}) {
   return null;
 }
 
+/// [f] from a lifetime, which is how the assumption actually comes:
+/// "expect the p50 juror to last about a minute".
+///
+/// A juror's presence is taken as memoryless — a constant chance of
+/// going per second. That is the conservative reading: real session
+/// lengths are heavier in the tail, and a juror is drawn from people
+/// who are *already* online, so a real draw is of survivors and does
+/// better than this. Exponential assumes that evidence away.
+double rateFromHalfLife(double seconds) => ln2 / seconds;
+
+/// The chance one juror is gone by the time a hand of [seconds] is out.
+double goneOver(double rate, double seconds) => 1 - exp(-rate * seconds);
+
+/// A hand is p50 a minute and p90 two (doc 04, "Per hand, not per game").
+const handP50 = 60.0;
+const handP90 = 120.0;
+
+/// What a juror's half-life means for the jury, structure by structure.
+void lifetimes(double target, double halfLifeSeconds) {
+  final rate = rateFromHalfLife(halfLifeSeconds);
+  print('\n--- a juror lasting ${halfLifeSeconds.toStringAsFixed(0)}s at p50, hands of a minute and two ---');
+  print('   hand          f     halves as built   any 2 of n   any 3 of n');
+  for (final t in [(name: 'p50, 1 min', s: handP50), (name: 'p90, 2 min', s: handP90)]) {
+    final f = goneOver(rate, t.s);
+    String col(int? n) => (n == null ? '>40' : n.toString()).padLeft(13);
+    print('  ${t.name.padRight(14)}${(100 * f).toStringAsFixed(1).padLeft(5)}%'
+        '${col(least(f, target))}${col(least(f, target, t: 2))}${col(least(f, target, t: 3))}');
+  }
+
+  // And what a jury of six actually delivers at that rate, which is
+  // the number that says whether the shape works at all.
+  print('\n   at the six we ship, hands of a minute:');
+  final f = goneOver(rate, handP50);
+  print('     halves as built   ${handFails(6, f).toStringAsExponential(1)}');
+  print('     any 2 of six      ${handFails(6, f, t: 2).toStringAsExponential(1)}');
+  print('     any 3 of six      ${handFails(6, f, t: 3).toStringAsExponential(1)}');
+
+  // The escrow moved to whoever is live, every so often, instead of
+  // being sealed to the draw for the whole hand. Then a share is only
+  // ever as old as the last refresh, and what has to survive is that
+  // window rather than the hand.
+  print('\n--- if the escrow were refreshed to live jurors every so often (any 2 of six) ---');
+  print('   every        f over it    a hand of a minute');
+  for (final every in [30.0, 10.0, 5.0, 2.0, 1.0]) {
+    final fw = goneOver(rate, every);
+    final perWindow = handFails(6, fw, t: 2);
+    final perHand = 1 - pow(1 - perWindow, handP50 / every);
+    print('  ${every.toStringAsFixed(0).padLeft(4)}s  ${(100 * fw).toStringAsFixed(1).padLeft(10)}%'
+        '${perHand.toStringAsExponential(1).padLeft(22)}');
+  }
+}
+
 void main(List<String> args) {
   final at = args.indexOf('--target');
   final target = at >= 0 && at + 1 < args.length ? double.parse(args[at + 1]) : 0.00001;
@@ -129,6 +183,9 @@ void main(List<String> args) {
           '${six.toStringAsExponential(1).padLeft(29)}');
     }
   }
+
+  final hl = args.indexOf('--juror-p50');
+  lifetimes(target, hl >= 0 && hl + 1 < args.length ? double.parse(args[hl + 1]) : 60);
 
   print('\n--- what each size costs, for the trade (tool/wire_in_sim.dart) ---');
   print('a jury of  4: 1.21 MB handed over a hand');
