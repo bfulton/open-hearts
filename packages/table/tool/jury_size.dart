@@ -193,6 +193,61 @@ void lifetimes(double target, double halfLifeSeconds) {
   }
 }
 
+/// Where seven comes from, one assumption at a time.
+///
+/// The chain is: a bot seat's holder goes; the seat's cards are masked
+/// and only its token opens them; so the escrow has to answer; so two
+/// live custodians have to be there when it does. Each link has a
+/// number under it, and the size falls straight out of the product.
+/// This varies one at a time, so it is clear which one is load-bearing.
+void whySeven(double target) {
+  const baseSeats = mostBotSeats;
+  const baseHalfLife = 60.0;
+  const baseWindow = 5.0;
+  const baseAnnounced = 0.0;
+
+  int? size({int seats = baseSeats, double halfLife = baseHalfLife, double window = baseWindow, double announced = baseAnnounced}) {
+    // A departure that is announced needs no waiting to be noticed, so
+    // what is left to wait out is the share that is not.
+    final w = window * (1 - announced);
+    final f = goneOver(rateFromHalfLife(halfLife), w);
+    final windows = w <= 0 ? 1.0 : handP50 / w;
+    for (var n = 2; n <= 24; n++) {
+      final perHand = 1 - pow(1 - handFails(n, f, t: 2, botSeats: seats), windows);
+      if (perHand <= target) return n;
+    }
+    return null;
+  }
+
+  void row(String what, int? n) => print('  ${what.padRight(46)}${(n?.toString() ?? '>24').padLeft(6)}');
+
+  print('\n--- where seven comes from, one assumption at a time ---');
+  print('  base: 3 bot seats, a juror lasting 60s at p50, a dead one');
+  print('  replaced within 5s, any two of the jury opening a seat\n');
+  row('the base', size());
+  print('');
+  row('2 bot seats (two people at the table)', size(seats: 2));
+  row('1 bot seat (three people)', size(seats: 1));
+  print('');
+  row('a juror lasting 2 min at p50', size(halfLife: 120));
+  row('a juror lasting 5 min at p50', size(halfLife: 300));
+  print('');
+  row('replaced within 10s (two heartbeats)', size(window: 10));
+  row('replaced within 2s', size(window: 2));
+  print('');
+  row('half of departures announced, not waited out', size(announced: 0.5));
+  row('nine in ten announced', size(announced: 0.9));
+  print('');
+  row('announced 9/10, and drawn from seated players', size(announced: 0.9, halfLife: 300));
+  row('the same at two bot seats', size(announced: 0.9, halfLife: 300, seats: 2));
+  print('');
+  // Unload events are not reliable — a backgrounded phone, a crash or
+  // a dropped link fires nothing — so half announced is the sober
+  // version of it, and the pair is what to design against.
+  row('half announced, drawn from seated players', size(announced: 0.5, halfLife: 300));
+  row('half announced, a juror lasting 2 min', size(announced: 0.5, halfLife: 120));
+}
+
 void main(List<String> args) {
   final at = args.indexOf('--target');
   final target = at >= 0 && at + 1 < args.length ? double.parse(args[at + 1]) : 0.00001;
@@ -226,6 +281,7 @@ void main(List<String> args) {
   }
 
   final hl = args.indexOf('--juror-p50');
+  whySeven(target);
   lifetimes(target, hl >= 0 && hl + 1 < args.length ? double.parse(args[hl + 1]) : 60);
 
   print('\n--- what each size costs, for the trade (tool/wire_in_sim.dart) ---');
