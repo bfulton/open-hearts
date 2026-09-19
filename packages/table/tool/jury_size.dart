@@ -161,16 +161,19 @@ void lifetimes(double target, double halfLifeSeconds) {
 
   // And the same with a threshold instead of two fixed sides, where
   // any [t] of the live jurors answer rather than one of each side.
+  // The window is how long a dead juror goes unreplaced, which is a
+  // question of heartbeats — they are five seconds apart — and not of
+  // bandwidth: a top-up is one small event, and only when somebody
+  // actually drops.
   print('\n--- topped up, and any 2 of the jury rather than one of each side ---');
-  print('   every    jury size    a hand of a minute');
-  for (final every in [30.0, 10.0, 5.0, 2.0]) {
+  print('  replaced within        jury of 5   jury of 6   jury of 7   jury of 8');
+  for (final every in [10.0, 5.0, 3.0, 2.0]) {
     final fw = goneOver(rate, every);
     final windows = handP50 / every;
-    final line = StringBuffer('  ${every.toStringAsFixed(0).padLeft(4)}s  ');
-    for (final n in [4, 6, 8]) {
-      final perWindow = handFails(n, fw, t: 2);
-      final perHand = 1 - pow(1 - perWindow, windows);
-      line.write('$n:${perHand.toStringAsExponential(0).padLeft(8)}  ');
+    final line = StringBuffer('  ${every.toStringAsFixed(0).padLeft(13)}s   ');
+    for (final n in [5, 6, 7, 8]) {
+      final perHand = 1 - pow(1 - handFails(n, fw, t: 2), windows);
+      line.write('${perHand.toStringAsExponential(1).padLeft(9)}   ');
     }
     print(line);
   }
