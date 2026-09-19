@@ -137,6 +137,44 @@ void lifetimes(double target, double halfLifeSeconds) {
   print('     any 2 of six      ${handFails(6, f, t: 2).toStringAsExponential(1)}');
   print('     any 3 of six      ${handFails(6, f, t: 3).toStringAsExponential(1)}');
 
+  // The jury topped up: new jurors brought on as old ones go, and a
+  // live custodian handing its own piece to each newcomer — the same
+  // wrapping the deal already does (session.dart, `_wrapFor`), so no
+  // new cryptography. A side is then lost only if every holder of it
+  // dies inside one top-up window, before anybody can pass the piece
+  // on; the window after that, the side is back to strength.
+  print('\n--- the jury topped up, each side\'s piece passed on (no new crypto) ---');
+  print('   every    live holders a side    a hand of a minute');
+  for (final every in [30.0, 10.0, 5.0, 2.0]) {
+    final fw = goneOver(rate, every);
+    final windows = handP50 / every;
+    final line = StringBuffer('  ${every.toStringAsFixed(0).padLeft(4)}s  ');
+    for (final k in [2, 3, 4, 5, 7]) {
+      // Both sides must keep somebody, every window, for every seat.
+      final sideLost = pow(fw, k) as double;
+      final perWindow = 1 - pow(1 - (2 * sideLost - sideLost * sideLost), mostBotSeats);
+      final perHand = 1 - pow(1 - perWindow, windows);
+      line.write('$k:${perHand.toStringAsExponential(0).padLeft(8)}  ');
+    }
+    print(line);
+  }
+
+  // And the same with a threshold instead of two fixed sides, where
+  // any [t] of the live jurors answer rather than one of each side.
+  print('\n--- topped up, and any 2 of the jury rather than one of each side ---');
+  print('   every    jury size    a hand of a minute');
+  for (final every in [30.0, 10.0, 5.0, 2.0]) {
+    final fw = goneOver(rate, every);
+    final windows = handP50 / every;
+    final line = StringBuffer('  ${every.toStringAsFixed(0).padLeft(4)}s  ');
+    for (final n in [4, 6, 8]) {
+      final perWindow = handFails(n, fw, t: 2);
+      final perHand = 1 - pow(1 - perWindow, windows);
+      line.write('$n:${perHand.toStringAsExponential(0).padLeft(8)}  ');
+    }
+    print(line);
+  }
+
   // The escrow moved to whoever is live, every so often, instead of
   // being sealed to the draw for the whole hand. Then a share is only
   // ever as old as the last refresh, and what has to survive is that
