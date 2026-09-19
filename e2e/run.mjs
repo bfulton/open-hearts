@@ -63,9 +63,12 @@ async function main() {
       page.on('pageerror', (e) => log(`page ${names[i]} error: ${e.message}\n${(e.stack || '').slice(0, 600)}`));
       page.on('console', (m) => {
         const t = m.text();
-        // Errors, and the table's and the duty's own traces about the jury.
+        // Errors, the table's and the duty's own traces about the
+        // jury, and the mesh: who this device dials and whether the
+        // channel came up, which is how a table that has fallen back
+        // to the relay lane shows itself.
         const verbose = /$^/;
-        if (m.type() === 'error' || verbose.test(t) || /^duty: (?!.*emit )/.test(t) || /^table: .*(jury|juror|verdict|appeal|nobody online|summon)/.test(t)) log(`page ${names[i]}: ${t}`);
+        if (m.type() === 'error' || verbose.test(t) || /^mesh: /.test(t) || /^duty: (?!.*emit )/.test(t) || /^table: .*(jury|juror|verdict|appeal|nobody online|summon)/.test(t)) log(`page ${names[i]}: ${t}`);
       });
       await page.goto(`${app.url}/?${driven}`);
       contexts.push(ctx);

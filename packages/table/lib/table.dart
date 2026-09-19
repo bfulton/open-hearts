@@ -10,6 +10,7 @@ library;
 export 'src/client.dart';
 export 'src/clock.dart';
 export 'src/events.dart';
+export 'src/frame.dart';
 export 'src/jury.dart';
 export 'src/juror_duty.dart';
 export 'src/matching.dart';

@@ -370,7 +370,11 @@ The two ends' conversation key comes from their keys' shared point
 (`Signer.sharedXWith`), the same ECDH the deal's escrow rests on.
 
 What the path itself carries is measured
-([measurements/relay](../measurements/relay/README.md)): 366 bytes of
+([measurements/relay](../measurements/relay/README.md)) — and it is the
+relay path only: a data channel carries the event as bytes instead,
+which is 36% less again (`packages/table/lib/src/frame.dart`), because
+a channel has our own code at both ends where a relay has to read and
+store what it is given. On the relay, then: 366 bytes of
 envelope on an event, a third more again for anything that is not text,
 a signature to send one and a rehash and a signature to accept one at
 the relay and at every receiver — about 1,650 small events a second on

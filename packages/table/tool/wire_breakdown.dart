@@ -14,6 +14,10 @@ import 'package:table/table.dart';
 /// simulator's stand-in is 32.
 const sigGap = 128 - FakeSigner.length;
 
+/// The same gap in a frame, where a signature is the 64 bytes it is
+/// rather than the hex of them (frame.dart).
+const sigGapFramed = 64 - FakeSigner.length ~/ 2;
+
 String shape(Object? v) {
   if (v is! String) return v.runtimeType.toString();
   if (RegExp(r'^[0-9a-f]+$').hasMatch(v) && v.length > 16) return 'hex(${v.length})';
@@ -31,6 +35,7 @@ void main() async {
 
   var whole = 0;
   var wholeGz = 0;
+  var framed = 0;
   final byLabel = <String, List<int>>{};
   final fields = <String, int>{};
   final biggest = <(int, String, Map<String, Object?>)>[];
@@ -41,6 +46,7 @@ void main() async {
     final n = json.length + sigGap;
     whole += n;
     wholeGz += gzip.encode(utf8.encode(json)).length + sigGap;
+    framed += encodeFrame(e.toJson(), table: e.table)!.length + sigGapFramed;
     final who = jurors.contains(e.author) ? 'juror' : 'player';
     final round = e.kind == EventKind.deal ? '.${e.body['round']}' : '';
     byLabel.putIfAbsent('${e.kind.name}$round $who', () => []).add(n);
@@ -88,6 +94,12 @@ void main() async {
   final bare = String.fromCharCodes(stream).replaceAll(RegExp(r'[A-Za-z0-9+/=]{64,}'), '');
   final withoutPayload = gzip.encode(utf8.encode(bare)).length;
   print('the structure alone, gzipped as a stream: $withoutPayload of $structure');
+
+  // And the same hand as frames: what a data channel carries, where
+  // nothing in the middle has to read it (frame.dart). No compressor,
+  // no window, no CPU — the expansions are simply not made.
+  print('as frames on a channel: $framed (${(100 * framed / whole).round()}%), '
+      'so the channel framing is worth ${whole - framed} bytes a hand');
 
   print('\n--- the fields that carry it ---');
   final top = fields.entries.toList()..sort((a, b) => b.value.compareTo(a.value));

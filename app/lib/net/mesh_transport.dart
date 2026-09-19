@@ -11,9 +11,13 @@
 /// would report a disconnect for somebody who never went anywhere.
 /// Channels end by failing or by the transport closing with the table.
 ///
-/// Every message goes over every open channel, and through the relay
-/// envelope as well while anyone to be reached is without one; the
-/// table's own dedup by event id absorbs what arrives twice. That
+/// Every message goes over every open channel as bytes — a table event
+/// framed, not JSON, because nothing between two channel ends has to
+/// read it (`frame.dart`, 36% off a hand and no compressor) — and
+/// through the relay envelope as JSON while anyone to be reached is
+/// without a channel, because a relay does have to read what it
+/// carries. The table's own dedup by event id absorbs what arrives
+/// twice, and an event's id is the same whichever way it came. That
 /// condition used to be permanently true, because a juror was never
 /// dialled, so every event went to a relay for the whole hand and the
 /// relay was the table's primary path in all but name — the thing
@@ -100,11 +104,18 @@ class MeshTransport implements Transport {
 
   @override
   void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
-    final wire = jsonEncode(message);
+    // Bytes down the channel, JSON to the relay: the relay is a
+    // stranger's machine that has to read and store what it carries,
+    // and the channel is not (`frame.dart`). Anything the framing
+    // does not recognise goes down the channel as the JSON it is.
+    final frame = encodeFrame(message, table: relay.table);
+    final wire = frame == null
+        ? RTCDataChannelMessage(jsonEncode(message))
+        : RTCDataChannelMessage.fromBinary(frame);
     for (final p in peers) {
       if (p == relay.signer.publicKey) continue;
       final link = _links[p];
-      if (link != null && link.open) link.channel!.send(RTCDataChannelMessage(wire));
+      if (link != null && link.open) link.channel!.send(wire);
     }
     // And the relay lane for whoever has no channel up — doc 02's
     // fallback, not a second primary path. With every peer connected
@@ -145,14 +156,52 @@ class MeshTransport implements Transport {
 
   Future<void> _offerTo(PublicKey peer) async {
     if (_closed) return;
-    final link = _links[peer] = _Link();
+    final tries = (_links[peer]?.tries ?? 0) + 1;
+    final link = _links[peer] = _Link()..tries = tries;
+    // An offer that is never answered is not free: it holds a peer
+    // connection open, and its candidates are sealed and published one
+    // by one. Some peers never answer — a juror of last resort runs in
+    // the service's VM with no WebRTC in it at all — so a dial that has
+    // not come up in [_answerMs] is let go of, and the relay lane
+    // carries that peer, which is what the lane is for.
+    link.giveUp = Timer(const Duration(milliseconds: _answerMs), () => _unanswered(peer));
     final pc = await _connection(peer);
+    if (_closed || _links[peer] != link) {
+      await pc.close();
+      return;
+    }
     link.pc = pc;
     final ch = await pc.createDataChannel('table', RTCDataChannelInit()..ordered = true);
     _attach(peer, ch);
     final offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     relay.signal(peer, Signal(from: '', type: 'offer', payload: {'sdp': offer.sdp}));
+  }
+
+  /// How long to wait for an answer before letting a dial go.
+  static const _answerMs = 20000;
+
+  /// A dial that never came up. The connection goes, the peer stays
+  /// in [peers] so the relay lane keeps carrying it, and the next
+  /// attempt waits longer than the last — a minute, then two, then
+  /// four, to a quarter of an hour. Nothing is reported as a
+  /// disconnect: a channel that never opened says nothing about
+  /// whether anybody is there, and the protocol would read it as most
+  /// of the silence allowance already spent.
+  void _unanswered(PublicKey peer) {
+    final link = _links[peer];
+    if (link == null || link.open || _closed) return;
+    log?.call('${peer.substring(0, 6)} did not answer; the relay carries them');
+    link.giveUp = null;
+    link.pc?.close();
+    link.pc = null;
+    link.channel = null;
+    final steps = link.tries > 4 ? 4 : link.tries - 1;
+    Future<void>.delayed(Duration(minutes: 1 << steps), () {
+      if (_closed || !peers.contains(peer)) return;
+      if (_links[peer]?.open ?? false) return;
+      _offerTo(peer);
+    });
   }
 
   Future<void> _onSignal(Signal s) async {
@@ -199,23 +248,43 @@ class MeshTransport implements Transport {
     final link = _links[peer] ?? (_links[peer] = _Link());
     link.channel = ch;
     ch.onMessage = (m) {
-      if (!m.isBinary) {
-        try {
-          _incoming.add((from: peer, message: Map<String, Object?>.from(jsonDecode(m.text) as Map)));
-        } catch (_) {}
+      try {
+        final message = m.isBinary ? decodeFrame(m.binary, table: relay.table) : Map<String, Object?>.from(jsonDecode(m.text) as Map);
+        if (message != null) _incoming.add((from: peer, message: message));
+      } catch (_) {
+        // A message this build cannot read is one peer's problem, not
+        // the table's: the protocol says everything again.
       }
     };
     ch.onDataChannelState = (s) {
       link.open = s == RTCDataChannelState.RTCDataChannelOpen;
+      if (link.open) _answered(link);
       log?.call('${peer.substring(0, 6)} channel $s');
       if (s == RTCDataChannelState.RTCDataChannelClosed) _dropped(peer);
     };
-    if (ch.state == RTCDataChannelState.RTCDataChannelOpen) link.open = true;
+    if (ch.state == RTCDataChannelState.RTCDataChannelOpen) {
+      link.open = true;
+      _answered(link);
+    }
+  }
+
+  void _answered(_Link link) {
+    link.everOpen = true;
+    link.tries = 0;
+    link.giveUp?.cancel();
+    link.giveUp = null;
   }
 
   void _dropped(PublicKey peer) {
     final link = _links[peer];
     if (link == null || !link.open && link.pc == null) return;
+    // A connection that failed on its way up is a dial that was never
+    // answered, not a peer that went away: it goes through
+    // [_unanswered], which says nothing and waits longer each time.
+    if (!link.everOpen) {
+      _unanswered(peer);
+      return;
+    }
     link.open = false;
     link.pc?.close();
     link.pc = null;
@@ -234,6 +303,7 @@ class MeshTransport implements Transport {
     _sub?.cancel();
     _relaySub?.cancel();
     for (final l in _links.values) {
+      l.giveUp?.cancel();
       l.channel?.close();
       l.pc?.close();
     }
@@ -248,5 +318,15 @@ class _Link {
   RTCPeerConnection? pc;
   RTCDataChannel? channel;
   bool open = false;
+
+  /// Whether this peer's channel has ever been up. A channel that has
+  /// been open and closes is a disconnect; one that never opened is a
+  /// dial nobody answered, which is a different thing.
+  bool everOpen = false;
+
+  /// Dials that went unanswered in a row, which is what the wait
+  /// before the next one is made of.
+  int tries = 0;
+  Timer? giveUp;
   final List<RTCIceCandidate> pending = [];
 }

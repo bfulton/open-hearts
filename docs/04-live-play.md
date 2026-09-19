@@ -204,7 +204,17 @@ reach as it learns them (`Transport.reach` — the seats when a hand
 opens, the jurors as each jury carries), the mesh offers a channel to
 each, and the relay is back to what doc 02 gave it, signalling and a
 fallback. A table whose channels are all up costs the relays its
-presence and its signalling and nothing else. Relays, plural: a
+presence and its signalling and nothing else. And what goes down a
+channel is not what goes to a relay: a relay is a stranger's machine
+that has to read and store what it carries, so it gets NIP-01 JSON,
+where a channel has our own code at both ends and gets the event as
+bytes — no base64 around the deal's cryptography, no hex around a key
+or a signature, no table id (a channel is one table's) and no event id
+(it is the hash of the rest, so it is recomputed). **36% less than the
+same hand as JSON**, with no compressor and no CPU in the path
+(`frame.dart`, `packages/table/tool/wire_breakdown.dart`). What is
+signed does not change: the canonical bytes underneath are the same
+bytes, and an event has the same id whichever way it arrived. Relays, plural: a
 client holds a short list — the build's, not a setting anyone types
 (`app/lib/net/relays.dart`) — keeps a subscription on every one of
 them and writes each table event to the first that has not refused it
@@ -1112,9 +1122,19 @@ On the wire:
   own jurors of last resort, in a VM with no peer connection in it,
   which is exactly the case doc 02's fallback exists for. Holding a
   bot seat is the most a juror has ever put through either path and it
-  is still small — about 30 KB a seat a hand, a 12 KB shuffle argument
-  its largest single event (`packages/table/tool/juror_wire.dart`) —
-  where the computation above would have been a thousand times that.
+  is still small — 30,829 bytes a seat a hand as JSON on a relay,
+  19,879 as frames on a channel, a 12 KB shuffle argument its largest
+  single event (`packages/table/tool/juror_wire.dart`) — where the
+  computation above would have been a thousand times that.
+  Two rules keep the dialling from costing more than it saves, both of
+  them measured ([measurements/channel](../measurements/channel/README.md)):
+  a juror dials the seats and not its fellow jurors, since what passes
+  between jurors is a handful of small events a hand and a jury of six
+  dialling itself is fifteen more connections; and a dial that is not
+  answered in twenty seconds is let go of, the lane carrying that peer,
+  with the next attempt a minute later and each one after that twice as
+  far off. A channel that never opened is not reported as a
+  disconnect — it says nothing about whether anybody is there.
 - **The appeal.** A stuck turn — a race that split, or any open turn
   while the table is paused — is appealed every ten seconds.
 - **The rule.** A juror rules only when nobody who can still vote, as

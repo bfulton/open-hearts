@@ -1851,14 +1851,21 @@ class TableClient {
     return botHolders(hand).containsKey(seat) && _jurorsOf(hand).contains(who);
   }
 
-  /// Who this table has to reach directly: the people at it, and the
-  /// jurors of the hand in play. A transport that dials its peers —
-  /// the app's mesh — opens a channel to each; a relay transport
-  /// ignores it. Said again whenever a jury carries or a hand opens,
-  /// since a redrawn jury is a different set of strangers.
+  /// Who this table has to reach directly: the people at it, and —
+  /// from a seat — the jurors of the hand in play. A transport that
+  /// dials its peers — the app's mesh — opens a channel to each; a
+  /// relay transport ignores it. Said again whenever a jury carries or
+  /// a hand opens, since a redrawn jury is a different set of
+  /// strangers.
+  ///
+  /// A juror does not dial its fellow jurors. What a juror must hear
+  /// is the table, and the seats dial it for that; a jury of six
+  /// dialling itself as well would be fifteen more connections for
+  /// the appeals and verdicts that pass between jurors, which are a
+  /// handful of small events a hand and can take the relay.
   void _reachOut() => transport.reach({
         ...participants,
-        ..._jurorsOf(game.handNumber),
+        if (amSeated) ..._jurorsOf(game.handNumber),
       });
 
   /// Which juror holds which bot seat at [hand]. Empty when the table

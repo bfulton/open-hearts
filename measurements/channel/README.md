@@ -76,3 +76,47 @@ construction costs more than that, the design needs a smaller circuit,
 a longer hop, or a different protocol. That is the number the next step
 has to be measured against, and it did not need the protocol built to
 find.
+
+## What dialling a jury costs, and the two rules that came out of it
+
+A juror is dialled now like anybody else at the table
+([doc 04](../../docs/04-live-play.md), `Transport.reach`), which is a
+change in how many connections a table makes: a jury of six at a table
+of four is twenty-four seat-to-juror pairs on top of the table's own
+six. This was measured with the browser suite as the load — four
+headless Chromium at one table, each of them also serving as a juror
+for the suite's other tables, which is the crowded case — and the meter
+is the suite's own cell: the time from "matched" to the matched hand
+being finished on all four screens, against its three-minute budget.
+Three runs an arm on a dev box whose timings swing by a third:
+
+| | the matched hand, seconds | runs finished in three minutes |
+|---|---|---|
+| jurors on the relay, not dialled | 121, 107, 106 | 3 of 3 |
+| jurors dialled | 167, —, — | 1 of 3 |
+| the same, with the channel framed (`frame.dart`) | 112, 131, 159 | 3 of 5 |
+| the same, with the two rules below | 84, 108, 182, 112 | 4 of 4 |
+
+(A dash is a run that did not finish the hand inside the budget.)
+
+**Framing is not the cost**; the arm with it is faster than the arm
+without, which is what fewer bytes should do. Dialling is the cost, and
+two rules pay it back:
+
+- **A juror does not dial its fellow jurors.** What a juror needs to
+  hear is the table, and the seats dial it for that. A jury of six
+  dialling itself as well is fifteen more connections per table, for
+  the appeals and verdicts that pass between jurors — a handful of
+  small events a hand, which the relay carries perfectly well. In the
+  suite this was every one of the extra connections: four browsers
+  each serving two other tables, dialling each other on both.
+- **A dial that is not answered is let go of.** Some peers never
+  answer at all: a juror of last resort runs in the service's VM with
+  no WebRTC in it, and a peer behind a symmetric NAT with no TURN
+  cannot be reached either. An offer that has not come up in twenty
+  seconds is dropped, the relay lane carries that peer — which is what
+  the lane is for — and the next attempt waits a minute, then two,
+  then four, to a quarter of an hour. Nothing is reported as a
+  disconnect: a channel that never opened says nothing about whether
+  anybody is there, where the protocol would read it as most of the
+  silence allowance already spent.

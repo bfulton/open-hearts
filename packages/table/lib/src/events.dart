@@ -140,6 +140,12 @@ class TableEvent {
   Map<String, Object?> toJson() =>
       {'id': id, 'table': table, 'author': author, 'kind': kind.name, 'body': body, 'sig': sig};
 
+  /// The id an event with this content has, wherever it came from.
+  /// A frame leaves the id out and this puts it back (`frame.dart`);
+  /// the parser then checks it, as it checks one that travelled.
+  static String idFor({required String table, required PublicKey author, required EventKind kind, required Map<String, Object?> body}) =>
+      digestOf(_canonical(table, author, kind, body));
+
   static Uint8List _canonical(String table, PublicKey author, EventKind kind, Map<String, Object?> body) {
     final sortedBody = Map.fromEntries(body.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
     return Uint8List.fromList(utf8.encode(jsonEncode([table, author, kind.name, sortedBody])));

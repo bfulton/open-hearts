@@ -1,19 +1,33 @@
-# What the relay path carries, and the one party that has only it
+# What the relay path carries, and who is left on it
 
-A table has two paths. Every human at it gets a WebRTC data channel,
-measured in [`channel/`](../channel/README.md); the relay runs beside
-them, carrying the same messages once more so that a peer whose
-channel is down is still reached (`app/lib/net/mesh_transport.dart`).
+A table has two paths. Everyone at it gets a WebRTC data channel,
+measured in [`channel/`](../channel/README.md); the relay runs behind
+them as the lane for whoever has none open
+(`app/lib/net/mesh_transport.dart`).
 
-A juror has only the second. It is not a peer: it is summoned, it
-follows the table on its own relay list
-(`packages/table/lib/src/juror_duty.dart`), and the transport the app
-builds offers channels to the human seats and to nobody else
-(`app/lib/home_page.dart`, `peers`). That is fine for what a juror does
-today — appeals, verdicts and a share of the escrow, all of them small
-— and it is the thing to know before [doc 04](../../docs/04-live-play.md)'s
-computation, which at one human makes the **foreman a computing
-party**. Whatever the foreman computes, it computes over a relay.
+"Everyone" used to mean the human seats. A juror was not a peer — it
+was summoned, it followed the table on its own relay list, and nothing
+offered it a channel — so the relay carried a copy of every event for
+the whole of every hand, and the numbers below were what a juror's
+whole path cost. A juror is dialled now
+(`Transport.reach`, `JurorDuty.dial`), which matters most for
+[doc 04](../../docs/04-live-play.md)'s computation: at one human the
+**foreman is a computing party**, and it now computes down a channel
+rather than through a stranger's machine.
+
+Two readers are still on the relay and always will be. One is a peer
+whose channel has not come up or has failed, which is what the lane is
+for. The other is a **juror of last resort**, which runs in the
+service's Dart VM with no peer connection in it to be dialled at: the
+1.79x column below is what that one computes at, and the reason the
+bench is the empty-room fallback rather than the common case.
+
+What goes down a channel is not this. A relay is a stranger's machine
+that has to read and store what it carries, so it gets NIP-01 JSON and
+base64; a channel has two ends that share our own code, so it gets the
+event as bytes (`packages/table/lib/src/frame.dart`) — **36% less than
+the same hand as JSON**, with no compressor in the path
+(`packages/table/tool/wire_breakdown.dart`).
 
 ```bash
 node measurements/relay/bench.mjs      # the envelope, the per-event work, the wire
