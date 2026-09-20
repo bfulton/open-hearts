@@ -241,7 +241,19 @@ offer say so, and a build that cannot run the deal does not sit down.
   playing had too. A person's seat is the other way about — its hand
   has to be played out where everyone can see it — and its pieces go
   in the clear. Once the hand is over a bot seat's go in the clear as
-  well, with the audit that publishes every secret. The same coefficient evaluated at another index gives a juror
+  well, with the audit that publishes every secret.
+
+  A held bot seat's secret is also never **guessed**. A seat that goes
+  before its keys are read turns into a bot from there, and a bot's
+  secret is the one anybody can compute — but only where there was
+  nobody to have drawn one. A bot seat a juror holds has a key of its
+  own, drawn precisely so the table cannot work its hand out, and the
+  public secret opens nothing of it. A side that took it anyway would
+  be worse off than one that knew nothing: believing it held the hand,
+  it would stop awaiting the escrow and never say the piece it does
+  hold, and the jurors that could have opened the seat between them
+  would wait on a release that was never coming. That is what it did,
+  and it cost a browser run every release in a hand. The same coefficient evaluated at another index gives a juror
   arriving later a share of its own, made by two holders out of theirs,
   with the secret never rebuilt anywhere in the making of it. That is
   `topUpPart`: each holder sends what its share is worth towards the

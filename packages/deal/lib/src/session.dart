@@ -664,12 +664,31 @@ class DealSession {
   void seatLeft(int seat) {
     if (!_keyed(seat) || _gone.contains(seat)) return;
     _gone.add(seat);
-    if (!_pks.containsKey(seat)) {
+    // A seat that goes before its keys are read is a bot from there,
+    // and a bot's secret is the one anybody can compute.
+    //
+    // Only where there was nobody to have drawn one. A bot seat a
+    // juror holds has a key of its own, drawn exactly so that the
+    // table cannot work its hand out, and the public secret opens
+    // nothing of it. Taking it anyway is worse than knowing nothing:
+    // this side would believe it held the seat's hand, so it would
+    // stop awaiting the escrow and never say the piece it holds — and
+    // the jurors that could have opened the seat between them would
+    // wait on a release that never came. A held seat's keys are read
+    // or the seat is awaited; they are never guessed.
+    if (!_pks.containsKey(seat) && !_heldBot(seat)) {
       _secrets[seat] = botSecret(tableId, tableSeed, hand, seat);
       _pks[seat] = crypto.keygen(_secrets[seat]!);
       _afterKeys();
     }
   }
+
+  /// A bot seat a juror holds: it carries that juror's table key,
+  /// where one nobody holds carries none.
+  bool _heldBot(int seat) => switch (seats[seat]) {
+        BotDealSeat(:final key) => key != null,
+        HumanDealSeat() => false,
+      };
 
   void _afterKeys() {
     if (_pks.length < _seats || _joint != null) return;

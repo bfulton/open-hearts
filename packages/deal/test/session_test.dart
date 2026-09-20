@@ -473,6 +473,39 @@ void main() {
     }
   });
 
+  test('a bot seat a juror holds is awaited when its keys have not been read, never guessed', () {
+    // The case a juror summoned mid-hand is in: it has been told the
+    // seat is given up before it has been carried the keys that say
+    // whose it was. A bot seat nobody holds has a secret anyone can
+    // compute, and a person who goes before keying turns into one —
+    // but a seat a juror holds drew a key of its own, exactly so that
+    // the table cannot work its hand out, and computing the public
+    // one would open nothing.
+    //
+    // Guessing it is worse than knowing nothing: this side would stop
+    // awaiting the escrow and would never say the piece it holds, and
+    // the jurors that could have opened the seat between them would
+    // wait for a release that was never coming. It cost the browser
+    // run every release in a hand.
+    final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
+    final seats = [
+      const HumanDealSeat('a'),
+      const HumanDealSeat('b'),
+      const HumanDealSeat('c'),
+      BotDealSeat(key: jury.first),
+    ];
+    final side = make(seats, null, key: jury[1], custodians: jury);
+    side.seatLeft(3);
+    expect(side.knowsSecret(3), isFalse, reason: 'a held seat\'s key is drawn, so there is nothing to compute');
+    expect(side.awaitsSecret(3), isTrue, reason: 'so the seat is awaited from the escrow, and this side says its piece');
+
+    // A bot seat nobody holds is the other way about, and stays so:
+    // there is no key to have drawn and the hand is everyone's.
+    final open = [...seats.take(3), const BotDealSeat()];
+    final other = make(open, null, key: jury[1], custodians: jury)..seatLeft(3);
+    expect(other.awaitsSecret(3), isFalse, reason: 'an unheld bot seat was never anybody\'s to give up');
+  });
+
   test('a verifier that saw every message ends with the whole deal, and refuses what does not verify', () {
     final seats = [const HumanDealSeat('a'), const HumanDealSeat('b'), const HumanDealSeat('c'), const BotDealSeat()];
     final verifier = make(seats, null, verifier: true);

@@ -1142,6 +1142,16 @@ there anyone may check the hand. A person's seat is unchanged and
 still opens to everyone, which is what a departed player's hand has to
 do.
 
+It also made one latent thing load-bearing. A seat given up before
+its keys have been read used to have its secret *computed* — right for
+a person who left before keying, wrong for a bot seat a juror holds,
+whose key was drawn so that nobody could compute it. A juror in that
+state believed it held the hand, so it stopped awaiting the escrow and
+never said the piece it was holding. While the pieces went out in the
+clear it hardly showed, since some other side always had the secret;
+with them sealed to the jury it was every release in a hand
+(`packages/deal`, `seatLeft`, and doc 03).
+
 That changes who can act, and the rest follows from it. Only a juror
 can open a given-up seat, so a juror says its moves rather than every
 side working them out — **one** juror, the first of the hand's
