@@ -84,6 +84,38 @@ abstract class DealCrypto {
   /// of them is anything.
   Uint8List split(Uint8List secret, Uint8List seed, {int shares = 2});
 
+  /// A seat's key in [n] Shamir shares, any [t] of which rebuild it —
+  /// where [split] makes shares that are all needed at once. Written
+  /// in index order, [scalarBytes] each; a share's index is its place
+  /// in the list counted from one, which is what [lagrange] takes.
+  ///
+  /// What it buys is availability. "Every share of a side" is the
+  /// worst shape an escrow can have, and a hand's rests on the jurors
+  /// it was sealed to still being reachable when a bot seat has to be
+  /// opened (docs/04-live-play.md, "The sizing"). Any two of the jury
+  /// is the same secrecy — one holder alone is nothing — with room to
+  /// lose people. The key is still never anywhere: a share's token is
+  /// scaled by its public coefficient and the scaled tokens add.
+  Uint8List splitThreshold(Uint8List secret, {required int n, required int t, required Uint8List seed});
+
+  /// What the share at [index] is worth among the shares [have] holds,
+  /// evaluated [at] an index: zero for the key itself, or another
+  /// index to make *that* share — which is how a juror arriving later
+  /// is given one without anybody rebuilding the key.
+  Uint8List lagrange(List<int> have, int index, {int at = 0});
+
+  /// Two scalars multiplied: a share by its coefficient, which is
+  /// what a holder sends rather than the share.
+  Uint8List scalarMul(Uint8List a, Uint8List b);
+
+  /// Scalars added: the parts a newcomer is sent, summed into the
+  /// share it holds from then on.
+  Uint8List scalarSum(List<Uint8List> parts);
+
+  /// A point scaled by a scalar: a share's key by its coefficient, so
+  /// anybody can check the scaled token against it.
+  Uint8List pointScale(Uint8List point, Uint8List scalar);
+
   /// One share's public key: what that share's token is checked
   /// against, and one of the keys the seat's own is the sum of.
   Uint8List shareKey(Uint8List share);

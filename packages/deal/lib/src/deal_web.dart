@@ -58,6 +58,16 @@ extension type _Exports._(JSObject _) implements JSObject {
   // ignore: non_constant_identifier_names
   external JSNumber deal_share_key(JSNumber share, JSNumber out);
   // ignore: non_constant_identifier_names
+  external JSNumber deal_split_threshold(JSNumber secret, JSNumber n, JSNumber t, JSNumber seed, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_lagrange(JSNumber have, JSNumber count, JSNumber index, JSNumber at, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_scalar_mul(JSNumber a, JSNumber b, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_scalar_sum(JSNumber parts, JSNumber count, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_point_scale(JSNumber point, JSNumber scalar, JSNumber out);
+  // ignore: non_constant_identifier_names
   external JSNumber deal_open_shared(JSNumber sealed, JSNumber parts, JSNumber count, JSNumber out);
   // ignore: non_constant_identifier_names
   external JSNumber deal_share_token(JSNumber share, JSNumber masked, JSNumber seed, JSNumber out);
@@ -190,6 +200,31 @@ class _Wasm implements DealCrypto {
         _call([sealed, all], pointBytes, (i, o) => e.deal_open_shared(i[0].toJS, i[1].toJS, parts.length.toJS, o.toJS).toDartInt),
         'open shared');
   }
+
+  @override
+  Uint8List splitThreshold(Uint8List secret, {required int n, required int t, required Uint8List seed}) => _must(
+      _call([secret, seed], n * scalarBytes, (i, o) => e.deal_split_threshold(i[0].toJS, n.toJS, t.toJS, i[1].toJS, o.toJS).toDartInt),
+      'split threshold');
+
+  @override
+  Uint8List lagrange(List<int> have, int index, {int at = 0}) => _must(
+      _call([Uint8List.fromList(have)], scalarBytes,
+          (i, o) => e.deal_lagrange(i[0].toJS, have.length.toJS, index.toJS, at.toJS, o.toJS).toDartInt),
+      'lagrange');
+
+  @override
+  Uint8List scalarMul(Uint8List a, Uint8List b) =>
+      _must(_call([a, b], scalarBytes, (i, o) => e.deal_scalar_mul(i[0].toJS, i[1].toJS, o.toJS).toDartInt), 'scalar mul');
+
+  @override
+  Uint8List scalarSum(List<Uint8List> parts) => _must(
+      _call([Uint8List.fromList([for (final p in parts) ...p])], scalarBytes,
+          (i, o) => e.deal_scalar_sum(i[0].toJS, parts.length.toJS, o.toJS).toDartInt),
+      'scalar sum');
+
+  @override
+  Uint8List pointScale(Uint8List point, Uint8List scalar) =>
+      _must(_call([point, scalar], pointBytes, (i, o) => e.deal_point_scale(i[0].toJS, i[1].toJS, o.toJS).toDartInt), 'point scale');
 
   @override
   Uint8List shareKey(Uint8List share) =>

@@ -424,6 +424,109 @@ pub fn split(secret: &[u8], shares: usize, seed: &[u8], out: &mut [u8]) -> Optio
     Some(shares * SCALAR)
 }
 
+/// A seat's key in [n] Shamir shares over the same scalar field, any
+/// [t] of which rebuild it — where [split] makes shares that are all
+/// needed at once.
+///
+/// Why a threshold at all: a hand's escrow rests on the jurors it was
+/// sealed to still being reachable when a bot seat has to be opened,
+/// and "every share of a side" is the worst shape availability can
+/// have (docs/04-live-play.md, "The sizing"). "Any two of the jury"
+/// is the same secrecy — one holder alone is nothing — with room to
+/// lose people.
+///
+/// The shares are f(1)..f(n) of a polynomial of degree t−1 whose
+/// constant term is the key, drawn from [seed]. Written in index
+/// order, [SCALAR] each; the index of a share is its place in the
+/// list, counted from one, and is what [lagrange] needs.
+///
+/// Nothing here ever puts the key back together. A share's token is
+/// scaled by its (public) Lagrange coefficient and the scaled tokens
+/// *add*, exactly as the two halves of [split] add — which is the
+/// property the additive split was chosen for, and it survives.
+pub fn split_threshold(secret: &[u8], n: usize, t: usize, seed: &[u8], out: &mut [u8]) -> Option<usize> {
+    if t < 2 || n < t || n > 255 || out.len() < n * SCALAR {
+        return None;
+    }
+    let (_, sk) = keys(secret)?;
+    let mut rng = rng_from(seed);
+    // f(x) = sk + a1·x + … + a(t−1)·x^(t−1)
+    let coefficients: Vec<Scalar> = (1..t).map(|_| Scalar::rand(&mut rng)).collect();
+    for i in 1..=n {
+        let x = Scalar::from(i as u64);
+        let mut y = sk;
+        let mut power = x;
+        for a in &coefficients {
+            y += *a * power;
+            power *= x;
+        }
+        write(&y, &mut out[(i - 1) * SCALAR..i * SCALAR])?;
+    }
+    Some(n * SCALAR)
+}
+
+/// The Lagrange coefficient for the share at [index], among the set
+/// of shares [have] holds, evaluated at [at].
+///
+/// At zero it is what that share's part is worth towards the key
+/// itself: Σ over the set of coefficient·share is the key, so Σ of
+/// coefficient·(share·C1) is the seat's own token, and the card comes
+/// out. At another index it is what the share is worth towards *that*
+/// index's share — which is how a newcomer to the jury is given one
+/// without anybody rebuilding the key (docs/04-live-play.md).
+///
+/// [have] is one byte per index, each 1..=255 and distinct; [index]
+/// must be among them.
+pub fn lagrange(have: &[u8], index: u8, at: u8, out: &mut [u8]) -> Option<usize> {
+    if have.is_empty() || !have.contains(&index) || index == 0 {
+        return None;
+    }
+    let mut seen = have.to_vec();
+    seen.sort_unstable();
+    seen.dedup();
+    if seen.len() != have.len() || seen.first() == Some(&0) {
+        return None;
+    }
+    let xi = Scalar::from(index as u64);
+    let x = Scalar::from(at as u64);
+    let mut c = Scalar::one();
+    for k in have {
+        if *k == index {
+            continue;
+        }
+        let xk = Scalar::from(*k as u64);
+        c *= (x - xk) * (xi - xk).inverse()?;
+    }
+    write(&c, out)
+}
+
+/// Two scalars multiplied: a share by its coefficient, which is what
+/// a holder sends rather than the share itself.
+pub fn scalar_mul(a: &[u8], b: &[u8], out: &mut [u8]) -> Option<usize> {
+    write(&(read::<Scalar>(a)? * read::<Scalar>(b)?), out)
+}
+
+/// Scalars added: the parts a newcomer is sent, summed into the share
+/// it now holds.
+pub fn scalar_sum(parts: &[u8], out: &mut [u8]) -> Option<usize> {
+    if parts.is_empty() || parts.len() % SCALAR != 0 {
+        return None;
+    }
+    let mut sum = Scalar::zero();
+    for i in 0..parts.len() / SCALAR {
+        sum += read::<Scalar>(&parts[i * SCALAR..(i + 1) * SCALAR])?;
+    }
+    write(&sum, out)
+}
+
+/// A point scaled by a scalar: a share's key by its coefficient, so
+/// that anybody can check the scaled token against it.
+pub fn point_scale(point: &[u8], scalar: &[u8], out: &mut [u8]) -> Option<usize> {
+    let p = read::<Affine>(point)?;
+    let s = read::<Scalar>(scalar)?;
+    write(&p.mul(s.into_repr()).into_affine(), out)
+}
+
 /// One share's public key: what that share's token is checked
 /// against, and one of the keys the seat's own is the sum of.
 pub fn share_key(share: &[u8], out: &mut [u8]) -> Option<usize> {
@@ -731,6 +834,31 @@ pub unsafe extern "C" fn deal_reveal_token(secret: *const u8, masked: *const u8,
 #[no_mangle]
 pub unsafe extern "C" fn deal_split(secret: *const u8, shares: usize, seed: *const u8, out: *mut u8) -> i32 {
     done(split(input(secret, SCALAR), shares, input(seed, 32), output(out, shares * SCALAR)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_split_threshold(secret: *const u8, n: usize, t: usize, seed: *const u8, out: *mut u8) -> i32 {
+    done(split_threshold(input(secret, SCALAR), n, t, input(seed, 32), output(out, n * SCALAR)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_lagrange(have: *const u8, count: usize, index: u8, at: u8, out: *mut u8) -> i32 {
+    done(lagrange(input(have, count), index, at, output(out, SCALAR)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_scalar_mul(a: *const u8, b: *const u8, out: *mut u8) -> i32 {
+    done(scalar_mul(input(a, SCALAR), input(b, SCALAR), output(out, SCALAR)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_scalar_sum(parts: *const u8, count: usize, out: *mut u8) -> i32 {
+    done(scalar_sum(input(parts, count * SCALAR), output(out, SCALAR)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_point_scale(point: *const u8, scalar: *const u8, out: *mut u8) -> i32 {
+    done(point_scale(input(point, POINT), input(scalar, SCALAR), output(out, POINT)))
 }
 
 #[no_mangle]
@@ -1162,6 +1290,133 @@ mod wire {
     /// What the deck's m x n factorisation costs on the wire and in
     /// the browser: the argument's bytes, and the time to make and
     /// check one. Run with --nocapture, changing M and N above.
+    /// Any t of n open a card, t-1 do not, and a juror who arrives
+    /// later is given a share of its own without the key ever being
+    /// put back together.
+    #[test]
+    fn a_threshold_of_shares_opens_a_card_and_a_newcomer_is_given_one() {
+        let secrets: Vec<[u8; 32]> = (1..=4).map(seed).collect();
+        let mut pks = vec![0u8; 4 * POINT];
+        for (i, s) in secrets.iter().enumerate() {
+            keygen(s, &mut pks[i * POINT..(i + 1) * POINT]).unwrap();
+        }
+        let mut joint = vec![0u8; POINT];
+        aggregate(&pks, &mut joint).unwrap();
+        let mut deck = vec![0u8; DECK_BYTES];
+        initial_deck(&joint, &mut deck).unwrap();
+        let masked = &deck[7 * MASKED..8 * MASKED];
+
+        // Seat 0's key in six shares, any two of which answer.
+        const N: usize = 6;
+        const T: usize = 2;
+        let mut shares = vec![0u8; N * SCALAR];
+        assert_eq!(split_threshold(&secrets[0], N, T, &seed(80), &mut shares), Some(N * SCALAR));
+        let share = |i: usize| &shares[(i - 1) * SCALAR..i * SCALAR];
+        let mut share_keys = vec![0u8; N * POINT];
+        for i in 1..=N {
+            share_key(share(i), &mut share_keys[(i - 1) * POINT..i * POINT]).unwrap();
+        }
+
+        // The card, opened by the jurors at `have` plus the three
+        // seats still here — with every scaled token checked by
+        // anybody, against a key anybody can work out.
+        let open = |have: &[u8], shares: &[u8], share_keys: &[u8]| -> Option<usize> {
+            let mut tokens = Vec::new();
+            let mut keys = Vec::new();
+            for &i in have {
+                let mut coefficient = vec![0u8; SCALAR];
+                lagrange(have, i, 0, &mut coefficient).unwrap();
+                // What the holder sends: its share, times what that
+                // share is worth in this set.
+                let mut scaled = vec![0u8; SCALAR];
+                scalar_mul(&shares[(i as usize - 1) * SCALAR..i as usize * SCALAR], &coefficient, &mut scaled).unwrap();
+                let mut token = vec![0u8; TOKEN];
+                share_token(&scaled, masked, &seed(90 + i), &mut token).unwrap();
+                // What anybody checks it against: the share's own
+                // published key, scaled by the same public coefficient.
+                let mut against = vec![0u8; POINT];
+                point_scale(&share_keys[(i as usize - 1) * POINT..i as usize * POINT], &coefficient, &mut against).unwrap();
+                assert!(verify_token(&against, masked, &token), "juror {i}'s scaled token checks");
+                assert!(!verify_token(&share_keys[..POINT], masked, &token) || i == 1, "and against nothing else");
+                tokens.extend_from_slice(&token[..POINT]);
+                keys.extend_from_slice(&against);
+            }
+            tokens.reserve(3 * POINT);
+            for (i, s) in secrets.iter().enumerate().skip(1) {
+                let mut whole = vec![0u8; TOKEN];
+                reveal_token(s, masked, &seed(70 + i as u8), &mut whole).unwrap();
+                tokens.extend_from_slice(&whole[..POINT]);
+                keys.extend_from_slice(&pks[i * POINT..(i + 1) * POINT]);
+            }
+            unmask(&keys, &tokens, masked)
+        };
+
+        // The card the whole key would have opened.
+        let mut whole = vec![0u8; 4 * POINT];
+        for (i, s) in secrets.iter().enumerate() {
+            let mut t = vec![0u8; TOKEN];
+            reveal_token(s, masked, &seed(60 + i as u8), &mut t).unwrap();
+            whole[i * POINT..(i + 1) * POINT].copy_from_slice(&t[..POINT]);
+        }
+        let card = unmask(&pks, &whole, masked).expect("a card");
+
+        // Any two of the six, whichever two.
+        for pair in [[1u8, 2], [2, 5], [3, 6], [1, 6]] {
+            assert_eq!(open(&pair, &shares, &share_keys), Some(card), "shares {pair:?} open it");
+        }
+        // And more than two is the same card, not a different one.
+        assert_eq!(open(&[1, 3, 5], &shares, &share_keys), Some(card));
+        // One is nothing: its part alone is not the seat's token.
+        assert_ne!(open(&[4], &shares, &share_keys), Some(card), "one share opens nothing");
+
+        // A juror arriving later is given share seven, made by two
+        // holders out of their own and sent sealed. Neither of them
+        // ever holds the key, and what each sends is worth nothing by
+        // itself.
+        let have: [u8; 2] = [2, 5];
+        let mut parts = vec![0u8; have.len() * SCALAR];
+        for (n, &i) in have.iter().enumerate() {
+            let mut coefficient = vec![0u8; SCALAR];
+            lagrange(&have, i, 7, &mut coefficient).unwrap();
+            scalar_mul(
+                &shares[(i as usize - 1) * SCALAR..i as usize * SCALAR],
+                &coefficient,
+                &mut parts[n * SCALAR..(n + 1) * SCALAR],
+            )
+            .unwrap();
+        }
+        let mut seventh = vec![0u8; SCALAR];
+        assert_eq!(scalar_sum(&parts, &mut seventh), Some(SCALAR));
+
+        // It is a share like any other: it opens the card beside one
+        // of the originals, and its key is the one anybody checks it
+        // against.
+        let mut wider = shares.clone();
+        wider.extend_from_slice(&seventh);
+        let mut wider_keys = share_keys.clone();
+        wider_keys.resize((N + 1) * POINT, 0);
+        share_key(&seventh, &mut wider_keys[N * POINT..]).unwrap();
+        for pair in [[7u8, 1], [7, 4], [3, 7]] {
+            assert_eq!(open(&pair, &wider, &wider_keys), Some(card), "the newcomer's share {pair:?} answers");
+        }
+
+        // A coefficient is for the set it was made for: used in
+        // another set it is the wrong weight and opens nothing.
+        let mut wrong = vec![0u8; SCALAR];
+        lagrange(&[1, 2], 1, 0, &mut wrong).unwrap();
+        let mut right = vec![0u8; SCALAR];
+        lagrange(&[1, 3], 1, 0, &mut right).unwrap();
+        assert_ne!(wrong, right, "the weight depends on who else is answering");
+
+        // And the guards: an index outside the set, a repeat, a zero.
+        let mut out = vec![0u8; SCALAR];
+        assert_eq!(lagrange(&[1, 2], 3, 0, &mut out), None);
+        assert_eq!(lagrange(&[1, 1], 1, 0, &mut out), None);
+        assert_eq!(lagrange(&[0, 1], 0, 0, &mut out), None);
+        assert_eq!(split_threshold(&secrets[0], 3, 1, &seed(81), &mut shares), None, "a threshold of one is no threshold");
+        assert_eq!(split_threshold(&secrets[0], 2, 3, &seed(81), &mut shares), None, "nor more than there are shares");
+    }
+
     #[test]
     fn shuffle_argument_size() {
         let secrets: Vec<[u8; 32]> = (1..=4).map(seed).collect();

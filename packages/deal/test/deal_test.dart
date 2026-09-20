@@ -124,4 +124,70 @@ void main() {
     expect(d.sharedSecret(secrets[0], pks[1]), d.sharedSecret(secrets[1], pks[0]));
     expect(d.sharedSecret(secrets[0], pks[2]), isNot(d.sharedSecret(secrets[0], pks[1])));
   });
+
+  test('any two of a jury open a card, and a juror arriving later is given a share', () async {
+    final d = await DealCrypto.load();
+    final secrets = [for (var i = 0; i < 4; i++) seed(i)];
+    final pks = [for (final s in secrets) d.keygen(s)];
+    final deck = d.initialDeck(d.aggregate(pks));
+    final masked = maskedAt(deck, 7);
+
+    // The card the whole key would open, for comparison.
+    final whole = [for (var i = 0; i < 4; i++) DealCrypto.tokenOf(d.revealToken(secrets[i], masked, seed(60 + i)))];
+    final card = d.unmask(pks, whole, masked);
+    expect(card, isNotNull);
+
+    // Seat 0's key in six shares, any two of which answer.
+    const n = 6;
+    final shares = d.splitThreshold(secrets[0], n: n, t: 2, seed: seed(80));
+    expect(shares.length, n * scalarBytes);
+    Uint8List share(int i) => Uint8List.sublistView(shares, (i - 1) * scalarBytes, i * scalarBytes);
+    final shareKeys = {for (var i = 1; i <= n; i++) i: d.shareKey(share(i))};
+
+    /// The card as the jurors at [have] open it, with each scaled
+    /// token checked against a key anybody can work out.
+    int? open(List<int> have, Uint8List Function(int) shareOf, Map<int, Uint8List> keys) {
+      final tokens = <Uint8List>[];
+      final against = <Uint8List>[];
+      for (final i in have) {
+        final coefficient = d.lagrange(have, i);
+        final scaled = d.scalarMul(shareOf(i), coefficient);
+        final token = d.shareToken(scaled, masked, seed(90 + i));
+        final key = d.pointScale(keys[i]!, coefficient);
+        expect(d.verifyToken(key, masked, token), isTrue, reason: 'juror $i\'s scaled token checks');
+        tokens.add(DealCrypto.tokenOf(token));
+        against.add(key);
+      }
+      for (var i = 1; i < 4; i++) {
+        tokens.add(DealCrypto.tokenOf(d.revealToken(secrets[i], masked, seed(70 + i))));
+        against.add(pks[i]);
+      }
+      return d.unmask(against, tokens, masked);
+    }
+
+    for (final pair in [
+      [1, 2],
+      [2, 5],
+      [3, 6],
+    ]) {
+      expect(open(pair, share, shareKeys), card, reason: 'shares $pair open it');
+    }
+    expect(open([1, 3, 5], share, shareKeys), card, reason: 'more than two is the same card');
+    expect(open([4], share, shareKeys), isNot(card), reason: 'one share opens nothing');
+
+    // A juror arriving later is given share seven, made by two
+    // holders out of their own: each sends what its share is worth
+    // towards seven, and the newcomer adds them up. Neither of them
+    // ever holds the key.
+    final from = [2, 5];
+    final seventh = d.scalarSum([for (final i in from) d.scalarMul(share(i), d.lagrange(from, i, at: 7))]);
+    Uint8List wider(int i) => i == 7 ? seventh : share(i);
+    final widerKeys = {...shareKeys, 7: d.shareKey(seventh)};
+    for (final pair in [
+      [7, 1],
+      [3, 7],
+    ]) {
+      expect(open(pair, wider, widerKeys), card, reason: "the newcomer's share answers beside $pair");
+    }
+  });
 }

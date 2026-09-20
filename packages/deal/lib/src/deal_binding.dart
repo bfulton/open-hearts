@@ -23,6 +23,10 @@ typedef _OpenShared = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, IntPtr, Poi
 typedef _VerifyToken = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _VerifySeal = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _Unmask = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size, Pointer<Uint8>);
+typedef _SplitThreshold = Int32 Function(Pointer<Uint8>, Size, Size, Pointer<Uint8>, Pointer<Uint8>);
+typedef _Lagrange = Int32 Function(Pointer<Uint8>, Size, Uint8, Uint8, Pointer<Uint8>);
+typedef _TwoScalars = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
+typedef _ScalarSum = Int32 Function(Pointer<Uint8>, Size, Pointer<Uint8>);
 typedef _RevealTokens = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size, Pointer<Uint8>, Pointer<Uint8>);
 typedef _VerifyTokens = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size, Pointer<Uint8>);
 typedef _Seal = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
@@ -66,6 +70,12 @@ class _Ffi implements DealCrypto {
         _openShared = lib.lookupFunction<_OpenShared, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>)>('deal_open_shared'),
         _shareToken = lib.lookupFunction<_RevealToken, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_share_token'),
         _unmask = lib.lookupFunction<_Unmask, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>)>('deal_unmask'),
+        _splitThreshold =
+            lib.lookupFunction<_SplitThreshold, int Function(Pointer<Uint8>, int, int, Pointer<Uint8>, Pointer<Uint8>)>('deal_split_threshold'),
+        _lagrange = lib.lookupFunction<_Lagrange, int Function(Pointer<Uint8>, int, int, int, Pointer<Uint8>)>('deal_lagrange'),
+        _scalarMul = lib.lookupFunction<_TwoScalars, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_scalar_mul'),
+        _scalarSum = lib.lookupFunction<_ScalarSum, int Function(Pointer<Uint8>, int, Pointer<Uint8>)>('deal_scalar_sum'),
+        _pointScale = lib.lookupFunction<_TwoScalars, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_point_scale'),
         _revealTokens =
             lib.lookupFunction<_RevealTokens, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>, Pointer<Uint8>)>('deal_reveal_tokens'),
         _verifyTokens = lib.lookupFunction<_VerifyTokens, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>)>('deal_verify_tokens'),
@@ -91,6 +101,11 @@ class _Ffi implements DealCrypto {
   final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>) _openShared;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _shareToken;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>) _unmask;
+  final int Function(Pointer<Uint8>, int, int, Pointer<Uint8>, Pointer<Uint8>) _splitThreshold;
+  final int Function(Pointer<Uint8>, int, int, int, Pointer<Uint8>) _lagrange;
+  final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _scalarMul;
+  final int Function(Pointer<Uint8>, int, Pointer<Uint8>) _scalarSum;
+  final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _pointScale;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>, Pointer<Uint8>) _revealTokens;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>) _verifyTokens;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _seal;
@@ -176,6 +191,25 @@ class _Ffi implements DealCrypto {
     final all = Uint8List.fromList([for (final p in parts) ...Uint8List.sublistView(p, 0, pointBytes)]);
     return _must(_call([sealed, all], pointBytes, (i, o) => _openShared(i[0], i[1], parts.length, o)), 'open shared');
   }
+
+  @override
+  Uint8List splitThreshold(Uint8List secret, {required int n, required int t, required Uint8List seed}) =>
+      _must(_call([secret, seed], n * scalarBytes, (i, o) => _splitThreshold(i[0], n, t, i[1], o)), 'split threshold');
+
+  @override
+  Uint8List lagrange(List<int> have, int index, {int at = 0}) => _must(
+      _call([Uint8List.fromList(have)], scalarBytes, (i, o) => _lagrange(i[0], have.length, index, at, o)), 'lagrange');
+
+  @override
+  Uint8List scalarMul(Uint8List a, Uint8List b) => _must(_call([a, b], scalarBytes, (i, o) => _scalarMul(i[0], i[1], o)), 'scalar mul');
+
+  @override
+  Uint8List scalarSum(List<Uint8List> parts) => _must(
+      _call([Uint8List.fromList([for (final p in parts) ...p])], scalarBytes, (i, o) => _scalarSum(i[0], parts.length, o)), 'scalar sum');
+
+  @override
+  Uint8List pointScale(Uint8List point, Uint8List scalar) =>
+      _must(_call([point, scalar], pointBytes, (i, o) => _pointScale(i[0], i[1], o)), 'point scale');
 
   @override
   Uint8List shareKey(Uint8List share) => _must(_call([share], pointBytes, (i, o) => _shareKey(i[0], o)), 'share key');
