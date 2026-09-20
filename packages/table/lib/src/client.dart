@@ -830,13 +830,16 @@ class TableClient {
       if (live.contains(order[i])) out.add(i + 1);
     }
     // And filled out from the order itself where too few are known to
-    // be live. A juror hears the table, not its fellow jurors — it
-    // dials the seats and they dial it, and the jury never dials
-    // itself ([_reachOut]) — so its reading of which of them are about
-    // can be empty even while they all are. Sealed to a custodian that
-    // has gone is a few bytes wasted; sealed to nobody, as this was in
-    // the browser, is a release that never goes out at all and a seat
-    // the hand stops at.
+    // be live, so that the count is always met. A juror hears the
+    // table rather than its fellow jurors — it dials the seats and
+    // they dial it, and the jury never dials itself ([_reachOut]) — so
+    // its reading of which of them are about runs behind theirs. In
+    // the simulator that reading comes up short of the three about one
+    // time in fourteen, at a mean of 2.86, which is often enough that
+    // the fill is what the count rests on rather than a safeguard
+    // against something rare. Sealed to a custodian that has gone is a
+    // few bytes wasted; sealed to too few is a seat the hand stops
+    // at.
     for (var i = 0; i < order.length && out.length < want; i++) {
       out.add(i + 1);
     }
@@ -857,6 +860,20 @@ class TableClient {
     return at != null && clock.nowMs - at >= _juryFirmMs;
   }
 
+  /// And it is free, which is why it is this rather than nothing.
+  /// Over twenty seeded hands (`tool/time_to_deal.dart`), a sealed
+  /// deal takes the same time at zero, one, two, three and four
+  /// seconds: 6.55 s where nothing goes missing and 15.41 s where
+  /// something does, six hands of twenty being the first. Nothing in
+  /// that spread is this wait — it is a juror a step behind waiting
+  /// out [carryRepeatMs] to be carried, and with that window at two
+  /// seconds instead of eight the slow hands are 8.51 s.
+  ///
+  /// Past four seconds the shape does change: at six and eight every
+  /// hand deals in 12.68 s, the spread gone and the middle worse. Not
+  /// a reason to take it — the wait is here so that a late draw can
+  /// still be read, not to keep the jury in step — but worth knowing
+  /// that it is not monotonic.
   static const _juryFirmMs = 2000;
 
   /// Whether this side is the one to say a given-up seat's moves: the
@@ -1481,10 +1498,25 @@ class TableClient {
   /// (`tool/wire_in_sim.dart`). It has to be longer than the two
   /// seconds a turn waits between carries, so a window's worth of
   /// turns asking for the same jury gets one copy of it, and what it
-  /// costs is the wait after a carry that goes missing. That wait is
-  /// affordable: a peer being carried is behind by definition, the
-  /// window moves on to turns it has not seen either way, and the
-  /// silence it is judged by is two minutes.
+  /// costs is the wait after a carry that goes missing.
+  ///
+  /// That wait has since been measured, and it is the largest thing
+  /// in a sealed deal (`tool/time_to_deal.dart`). With a jury of ten,
+  /// fourteen hands in twenty have a juror a step behind — it settled
+  /// its own seat's keys and is missing the other bot seat's — and it
+  /// waits this window out to be sent them, because the copy that
+  /// went to another juror a moment earlier counts as having been
+  /// said. A hand deals in 6.55 s where that does not happen and
+  /// 15.41 s where it does; at two seconds here the slow hands are
+  /// 8.51 s, which is this window and nothing else.
+  ///
+  /// It stays at eight because the other side of it is measured too:
+  /// a hand says 349,305 bytes at five seconds and 269,961 at eight,
+  /// and the knee is here. Six seconds of the deal against eighty
+  /// kilobytes a hand is a trade worth making deliberately rather
+  /// than by lowering a constant — and the better answer is probably
+  /// neither, since a peer that asks again from the same step is
+  /// saying the copy did not reach it.
   static const carryRepeatMs = 8000;
 
   /// Forgets what has gone stale, so the memory is the last few

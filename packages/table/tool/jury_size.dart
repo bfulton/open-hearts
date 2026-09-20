@@ -90,6 +90,17 @@ double binomial(int n, int k) {
 double handFails(int n, double f, {int? t, int botSeats = mostBotSeats}) {
   final perSeat = t == null ? splitInHalves(n, f) : threshold(n, f, t);
   var ok = pow(1 - perSeat, botSeats) as double;
+  // A given-up seat is also *said* by a juror rather than worked out
+  // by every side. Its pieces are sealed to the jury, so no player can
+  // open it and none can compute its moves (doc 04): the seat wants
+  // one custodian still reachable to play it on. That is the holder
+  // gone and every other juror with it, f^n, which is smaller than the
+  // threshold term above by a wide margin at any f worth shipping —
+  // the dependency is real but it is not what decides the number.
+  // What it costs in practice is a wait rather than a hand: when the
+  // juror saying the moves goes, the next in the escrow's order takes
+  // over once it has judged the first one quiet.
+  ok *= pow(1 - pow(f, n), botSeats) as double;
   // A person's seat wants one live juror of any; a deadlock wants the
   // same. Both are the whole jury gone, which is small either way.
   ok *= 1 - personLeaves * pow(f, n);
