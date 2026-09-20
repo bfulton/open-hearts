@@ -112,6 +112,23 @@ class RelayPresence implements Presence {
 
   late final RelayGroup _group;
   final Map<PublicKey, int> _seen = {};
+
+  /// When each key's current run of being here began, and what it
+  /// last said it was doing — the two things [settled] reads.
+  final Map<PublicKey, int> _since = {};
+  final Map<PublicKey, String> _doing = {};
+
+  /// Keys that have said they are going. A device that closes says so
+  /// rather than leaving everyone to notice a missed heartbeat, which
+  /// is five seconds of the table believing somebody is there who is
+  /// not. Only the key itself can say it, since the event is signed
+  /// by it, and a later `here` undoes it.
+  final Set<PublicKey> _went = {};
+
+  /// A run shorter than this is a fresh arrival rather than a return:
+  /// long enough to ride out one missed announcement, short enough
+  /// that somebody back from a real absence starts their run again.
+  static const _gapMs = 15000;
   final _summonses = StreamController<Summons>.broadcast();
   final _calls = StreamController<String>.broadcast();
   Timer? _beat;
@@ -140,7 +157,41 @@ class RelayPresence implements Presence {
   @override
   Set<PublicKey> online({required int withinMs}) {
     final now = _nowMs;
-    return {for (final e in _seen.entries) if (now - e.value < withinMs) e.key, if (!_silent) signer.publicKey};
+    return {
+      for (final e in _seen.entries)
+        if (now - e.value < withinMs && !_went.contains(e.key)) e.key,
+      if (!_silent) signer.publicKey,
+    };
+  }
+
+  @override
+  Set<PublicKey> settled({required int withinMs, required int forMs}) {
+    final now = _nowMs;
+    return {
+      for (final k in online(withinMs: withinMs))
+        if (k == signer.publicKey || _doing[k] == seated || now - (_since[k] ?? now) >= forMs) k,
+    };
+  }
+
+  /// What a client says of itself while it is at a table, as against
+  /// the lobby: somebody mid-game has a reason to still be here in a
+  /// minute.
+  static const seated = 'seated';
+
+  /// Says this device is going, so that nobody waits out a heartbeat
+  /// to find out. Best effort by its nature — a backgrounded phone, a
+  /// crash or a dead link says nothing at all — which is why the
+  /// table still times out anyone silent.
+  void leaving() {
+    if (_closed || _silent) return;
+    _group.publish(
+        NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'gone'}), tags: [
+          ['t', topic],
+        ]),
+        everywhere: true);
+    // And stop saying it is here, or the next beat would undo this.
+    // Announcing resumes when something sets [silent] back.
+    _silent = true;
   }
 
   @override
@@ -176,7 +227,14 @@ class RelayPresence implements Presence {
     }
     switch (c['kind']) {
       case 'here':
-        _seen[e.pubkey] = _nowMs;
+        final now = _nowMs;
+        if (now - (_seen[e.pubkey] ?? -_gapMs * 2) > _gapMs) _since[e.pubkey] = now;
+        _seen[e.pubkey] = now;
+        _doing[e.pubkey] = c['status'] is String ? c['status'] as String : 'online';
+        _went.remove(e.pubkey);
+      case 'gone':
+        _went.add(e.pubkey);
+        _since.remove(e.pubkey);
       case 'summons':
         if (e.tag('p') != signer.publicKey) return true;
         final s = Summons.parse(e.pubkey, c);

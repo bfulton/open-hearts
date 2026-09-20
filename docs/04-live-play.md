@@ -1049,10 +1049,32 @@ is the wrong knob. Two things move it instead, and neither is built:
   jurors changes the population rather than the protocol, and f with
   it.
 
-Both leave the last resort where it is: a hand that cannot open a bot
-seat mid-hand has no graceful degradation. Falling back to open bot
-seats happens only before the deal, because after it the seat's cards
-are masked and the holder's token is the only way in.
+The last two are **built** (`presence_relay.dart`, `client.dart`).
+
+- A device says it is going — on its way out of the app, into the
+  background or off the page — rather than leaving everyone to notice
+  a missed heartbeat, which is five seconds of a table believing
+  somebody is there who is not. Only the key itself can say it, the
+  event being signed by it, and a later beat undoes it. Best effort by
+  its nature: a crash, a killed tab or a dead link says nothing at
+  all, which is why silence is still timed out, and why half of
+  departures announced is the sober figure rather than nine in ten.
+- The draw prefers the **settled**: keys that have been announcing for
+  at least a minute (`TableClient.jurySettledMs`), or that say they
+  are seated at a table and so have a game to finish. Where too few of
+  those are about, the draw is from everyone — a jury of whoever is
+  there beats none. This needs no agreement and cannot deadlock: a
+  proposer may narrow its own candidates as it likes, since what the
+  table checks of a proposal is that each juror is somebody *it* has
+  seen within five minutes. What it rests on is that presence is not
+  memoryless — that somebody here five minutes will likely be here in
+  one — which is how session lengths generally behave and is an
+  assumption until there is a population to measure.
+
+What is not built is the escrow itself. A hand that cannot open a bot
+seat mid-hand still has no graceful degradation: falling back to open
+bot seats happens only before the deal, because after it the seat's
+cards are masked and the holder's token is the only way in.
 
 Two mitigations this section used to lean on do not apply here. A
 **redraw** repairs who rules and who holds a seat, but not the escrow:

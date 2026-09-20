@@ -18,6 +18,10 @@ class SimPresence implements Presence {
   final Map<PublicKey, SimJuror> _jurors = {};
   final Map<PublicKey, int> _lastUp = {};
 
+  /// When each key was first heard from in its current run of being
+  /// up — what [settled] measures.
+  final Map<PublicKey, int> _firstUp = {};
+
   /// The jurors that come online only when a table calls for one —
   /// the bench of last resort a service would bring up. Several, not
   /// one: a table with bot seats needs [juryToHoldBots] before a
@@ -42,7 +46,13 @@ class SimPresence implements Presence {
 
   void _tick() {
     for (final j in _jurors.values) {
-      if (!j.gone && net.isUp(j.signer.publicKey) && (!lastResorts.contains(j) || j.called)) _lastUp[j.signer.publicKey] = clock.nowMs;
+      final k = j.signer.publicKey;
+      if (!j.gone && net.isUp(k) && (!lastResorts.contains(j) || j.called)) {
+        // A gap longer than the heartbeat starts the run again: a
+        // juror that went and came back is newly here, not settled.
+        if (clock.nowMs - (_lastUp[k] ?? -60000) > 15000) _firstUp[k] = clock.nowMs;
+        _lastUp[k] = clock.nowMs;
+      }
     }
     clock.schedule(5000, _tick);
   }
@@ -50,6 +60,10 @@ class SimPresence implements Presence {
   @override
   Set<PublicKey> online({required int withinMs}) =>
       {for (final e in _lastUp.entries) if (clock.nowMs - e.value < withinMs) e.key};
+
+  @override
+  Set<PublicKey> settled({required int withinMs, required int forMs}) =>
+      {for (final k in online(withinMs: withinMs)) if (clock.nowMs - (_firstUp[k] ?? clock.nowMs) >= forMs) k};
 
   @override
   void summon(PublicKey juror, Map<String, Object?> summons) {
@@ -69,6 +83,7 @@ class SimPresence implements Presence {
     for (final j in lastResorts) {
       if (j.called) continue;
       j.called = true;
+      _firstUp[j.signer.publicKey] = clock.nowMs;
       _lastUp[j.signer.publicKey] = clock.nowMs;
     }
   }

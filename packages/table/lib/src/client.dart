@@ -1365,6 +1365,13 @@ class TableClient {
     _catchUpRefilledAt = now;
   }
 
+  /// How long somebody has to have been announcing to count as
+  /// settled for the draw. A minute: long enough that it is evidence
+  /// of anything, short enough that a table forming in a quiet room
+  /// does not wait on it — and where nobody clears it, the draw falls
+  /// back to whoever is there.
+  static const jurySettledMs = 60000;
+
   /// The claims and witnesses this peer holds for [turn].
   void _sendEvidence(TurnId turn) {
     final race = _races[turn];
@@ -2679,12 +2686,28 @@ class TableClient {
     final own = juries.any((d) => d.event.hand == hand);
     if (own && _liveJurors(hand).length >= 2) return;
     final quiet = _jurorsOf(hand).difference(_liveJurors(hand));
-    final candidates = p.online(withinMs: 15000).difference(_humans).difference(quiet);
+    final here = p.online(withinMs: 15000).difference(_humans).difference(quiet);
     // What this table needs a jury for. Escrow needs somebody; bot
     // seats need enough jurors that a seat survives its holder going
     // (jury.dart, [juryToHoldBots]), and short of that the seats are
     // held by nobody and their hands are the table's to see.
     final wanted = spec.sealed && _hasBotSeats ? juryToHoldBots : 1;
+    // Drawn from the settled ones where there are enough of them.
+    // What a hand's escrow rests on is the jurors it draws still
+    // being there when a bot seat has to be opened, and the size of
+    // the jury is a poor lever on that where the draw is a good one
+    // (docs/04-live-play.md, "The sizing"): somebody mid-game has a
+    // reason to still be here in a minute, somebody glancing at the
+    // lobby has none.
+    //
+    // A proposer may narrow its own candidates as it likes, because
+    // what the table checks of a proposal is that each juror is
+    // somebody *it* has seen lately, over a far wider window
+    // ([_acceptableJury]). So this needs no agreement and cannot
+    // deadlock — and where the settled are too few, the draw is from
+    // everyone, since a jury of whoever is there beats none.
+    final steady = p.settled(withinMs: 15000, forMs: jurySettledMs).difference(_humans).difference(quiet);
+    final candidates = steady.length >= wanted ? steady : here;
     if (candidates.length < wanted) {
       if (clock.nowMs - _lastCalledAt >= 10000) {
         _lastCalledAt = clock.nowMs;

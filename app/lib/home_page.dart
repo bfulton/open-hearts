@@ -326,9 +326,7 @@ class _HomePageState extends State<HomePage> {
     showRoom(null);
   }
 
-  void _go(Widget page) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
-  }
+  Future<void> _go(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
   /// Connects to the relays on [tag], or explains why not. Nothing
   /// goes near a relay without a name on it.
@@ -494,7 +492,12 @@ class _HomePageState extends State<HomePage> {
     });
     _paced = false;
     setState(_closeLobby);
-    _go(LivePage(controller: controller));
+    // Online *and* at a table, which another table's draw prefers:
+    // somebody mid-game has a reason to still be here in a minute
+    // (docs/04-live-play.md, "The sizing"). Cleared on the way back
+    // to the front door, however the table ended.
+    Duty.seated = true;
+    unawaited(_go(LivePage(controller: controller)).whenComplete(() => Duty.seated = false));
   }
 
   /// Into the room this device arrived at by a link, or a new one of

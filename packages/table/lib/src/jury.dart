@@ -84,6 +84,25 @@ abstract class Presence {
   /// device's included.
   Set<PublicKey> online({required int withinMs});
 
+  /// Of those, the ones likely to still be there in a minute: keys
+  /// that have been announcing for at least [forMs], or that say they
+  /// are seated at a table and so have a game to finish.
+  ///
+  /// The draw takes whoever is online, which mixes somebody in the
+  /// middle of a game with somebody glancing at the lobby, and a
+  /// hand's escrow rests on the ones it draws still being there when
+  /// a bot seat has to be opened (docs/04-live-play.md, "The
+  /// sizing"). Preferring the settled ones costs nothing and needs no
+  /// agreement: a proposer may narrow its own candidates as it likes,
+  /// since what the table checks is that each juror is somebody *it*
+  /// has seen lately, over a much wider window.
+  ///
+  /// What this rests on is that presence is not memoryless — that
+  /// somebody who has been here five minutes will likely be here in
+  /// one. Session lengths generally are heavy-tailed that way; it is
+  /// an assumption until there is a population to measure.
+  Set<PublicKey> settled({required int withinMs, required int forMs});
+
   /// Asks [juror] to follow a table: the summons carries the table's
   /// spec and the hand.
   void summon(PublicKey juror, Map<String, Object?> summons);

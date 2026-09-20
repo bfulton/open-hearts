@@ -68,7 +68,32 @@ class Duty {
 
   static Duty? get current => _current;
 
+  /// Says whether this device is at a table, which presence carries so
+  /// that another table's draw can prefer it: somebody mid-game has a
+  /// reason to still be here in a minute where somebody in the lobby
+  /// has none (docs/04-live-play.md, "The sizing").
+  static set seated(bool v) {
+    final p = _current?.presence;
+    if (p != null) p.status = v ? RelayPresence.seated : 'online';
+  }
+
+  /// Says this device is going, so that nobody waits out a missed
+  /// heartbeat to find out. Best effort by its nature: a backgrounded
+  /// phone, a crash or a dead link says nothing at all, which is why
+  /// the table still times out whoever is silent.
+  static void leaving() => _current?.presence.leaving();
+
+  /// And back: the app returning to the foreground says it is here
+  /// again, and the next beat clears the going everywhere.
+  static void back() {
+    final p = _current?.presence;
+    if (p != null) p.silent = false;
+  }
+
   void close() {
+    // One last word before the sockets go, so that no table waits out
+    // a heartbeat to learn this device is not a juror any more.
+    presence.leaving();
     juror.close();
     presence.close();
     if (_current == this) _current = null;
