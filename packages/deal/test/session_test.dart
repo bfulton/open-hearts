@@ -444,33 +444,32 @@ void main() {
       expect(p.releaseShare(3), isNull, reason: 'a player has nothing of it to release');
     }
 
-    // A player with one juror's help gets nowhere: the pair the bot's
-    // hand is hidden from is exactly the pair that cannot open it.
-    final fromJuror0 = jurors[0].releaseShare(3)!;
-    expect(players[0].acceptRelease(fromJuror0), isTrue);
-    expect(players[0].knowsSecret(3), isFalse, reason: 'a player holds nothing, so one juror is one piece');
+    // A player hears every one of them and is no wiser. Holding a
+    // piece was never what it took to rebuild a secret — hearing
+    // [escrowThreshold] of them is — so a piece said in the clear
+    // would be a piece the players had too. A bot seat's go sealed to
+    // the custodians, and the side the hand is hidden from cannot so
+    // much as take one in.
+    for (final j in jurors) {
+      expect(players[0].acceptRelease(j.releaseShare(3)!), isFalse, reason: 'sealed to the jury, and a player is not on it');
+    }
+    expect(players[0].knowsSecret(3), isFalse, reason: 'every juror released and the table learned nothing');
 
-    // Any second juror does, whichever it is — where the escrow used
-    // to want one from each of two fixed halves, and losing a half
-    // took the seat with it (docs/04-live-play.md, "The sizing").
-    expect(players[0].acceptRelease(jurors[1].releaseShare(3)!), isTrue);
-    expect(players[0].knowsSecret(3), isTrue, reason: 'any two of the jury rebuild it');
-
-    // And it is any two, not that two: every other pair as well, each
-    // to a side that has heard nothing yet.
-    for (final pair in [
-      [1, 2],
-      [2, 3],
-      [0, 3],
-      [1, 3],
-    ]) {
-      final fresh = make(seats, 0, custodians: jury);
-      expect(fresh.acceptKeys(keys), isTrue);
-      fresh.seatLeft(3);
-      expect(fresh.acceptRelease(jurors[pair[0]].releaseShare(3)!), isTrue);
-      expect(fresh.knowsSecret(3), isFalse, reason: 'one of ${pair[0]} is still one');
-      expect(fresh.acceptRelease(jurors[pair[1]].releaseShare(3)!), isTrue);
-      expect(fresh.knowsSecret(3), isTrue, reason: 'jurors $pair open it');
+    // Among the jury it is any two, not two fixed halves — where the
+    // escrow used to want one from each half, and losing a half took
+    // the seat with it (docs/04-live-play.md, "The sizing"). Each
+    // juror holds one piece of its own, so one more opens the seat,
+    // whichever juror it comes from.
+    for (var mine = 0; mine < jury.length; mine++) {
+      for (var other = 0; other < jury.length; other++) {
+        if (other == mine) continue;
+        final side = make(seats, null, key: jury[mine], custodians: jury);
+        expect(side.acceptKeys(keys), isTrue);
+        side.seatLeft(3);
+        expect(side.knowsSecret(3), isFalse, reason: 'juror $mine alone holds one piece, which is nothing');
+        expect(side.acceptRelease(jurors[other].releaseShare(3)!), isTrue);
+        expect(side.knowsSecret(3), isTrue, reason: 'jurors $mine and $other open it');
+      }
     }
   });
 
@@ -638,15 +637,18 @@ void main() {
     // And it is a share like any other: with any one of the
     // originals it opens the seat, and on its own it does not.
     for (final other in [0, 1, 2, 3]) {
-      final side = make(seats, 0, custodians: jury);
+      // From a juror's seat, since a bot seat's pieces are sealed to
+      // the custodians and nobody else can read one. The juror holds
+      // one piece of its own, which is nothing on its own; the share
+      // the newcomer was given answers beside it like any original.
+      final side = make(seats, null, key: jury[other], custodians: jury);
       expect(side.acceptKeys(keys), isTrue);
       side.extendCustodians(3, [newcomer]);
       for (final x in [...all, side]) {
         x.seatLeft(3);
       }
+      expect(side.knowsSecret(3), isFalse, reason: 'juror $other alone is one piece');
       expect(side.acceptRelease(fresh.releaseShare(3)!), isTrue);
-      expect(side.knowsSecret(3), isFalse, reason: 'the newcomer alone is one piece');
-      expect(side.acceptRelease(jurors[other].releaseShare(3)!), isTrue);
       expect(side.knowsSecret(3), isTrue, reason: 'the newcomer answers beside juror $other');
     }
 

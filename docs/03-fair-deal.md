@@ -234,7 +234,14 @@ offer say so, and a build that cannot run the deal does not sit down.
   rebuild it. One juror alone is still nothing, which is the whole
   point — a player with one juror's help is exactly what a bot's hand
   is hidden from — and losing a juror no longer takes the seat with
-  it. The same coefficient evaluated at another index gives a juror
+  it. The pieces of a bot seat are **sealed to the custodians**, each
+  to one of them, for as long as the hand is played: what rebuilds a
+  secret is hearing `escrowThreshold` pieces rather than being given
+  one, so a piece said in the clear would be a piece the people
+  playing had too. A person's seat is the other way about — its hand
+  has to be played out where everyone can see it — and its pieces go
+  in the clear. Once the hand is over a bot seat's go in the clear as
+  well, with the audit that publishes every secret. The same coefficient evaluated at another index gives a juror
   arriving later a share of its own, made by two holders out of theirs,
   with the secret never rebuilt anywhere in the making of it. That is
   `topUpPart`: each holder sends what its share is worth towards the

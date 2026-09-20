@@ -1132,8 +1132,10 @@ class DealSession {
   /// A seat passes cards it was dealt, so every position here is its
   /// own at the deal: that is what the argument is about, and a pass of
   /// anything else is refused.
-  Map<String, Object?>? passMessage(int to, List<int> positions) {
-    final me = mySeat;
+  /// [from] for a juror that has come by a given-up seat's key and is
+  /// making its pass: the seat acting is not this side's own.
+  Map<String, Object?>? passMessage(int to, List<int> positions, {int? from}) {
+    final me = from ?? mySeat;
     final secret = _secrets[me];
     if (me == null || secret == null || deck == null) return null;
     final tokens = <Uint8List>[];
@@ -1261,11 +1263,72 @@ class DealSession {
   /// This side's piece of a departed seat's secret, in the clear, for
   /// everyone: as a person or as a juror. Null when it holds none, or
   /// the seat is still here.
-  Map<String, Object?>? releaseShare(int seat) {
+  /// A person's seat opens to the table: its hand has to be played
+  /// out where everyone can see it, and every side needs the key to
+  /// work its moves out and check them. So that piece goes in the
+  /// clear.
+  ///
+  /// A bot seat's opens to the jury and to nobody else — a piece to
+  /// each custodian, sealed to it — because the whole reason a juror
+  /// holds the seat is that nobody at the table may see its hand
+  /// (docs/04-live-play.md). Holding a piece was never what it took
+  /// to rebuild the secret: hearing [escrowThreshold] of them is, and
+  /// a piece said in the clear is heard by the people playing.
+  ///
+  /// [inTheOpen] once the hand is over. The audit publishes every
+  /// secret then, so there is nothing left to seal, and a piece the
+  /// players could not read would leave a hand only the jury could
+  /// check.
+  /// [only] narrows who it is sealed to, by custodian index. Every
+  /// custodian already holds a piece of its own, so one more opens the
+  /// seat: a piece needs to reach the custodian that will play the
+  /// seat out, not all of them. The caller names the few it judges
+  /// live, and says it again as that judgement changes — a piece
+  /// sealed to a custodian that has itself gone is bytes nobody reads,
+  /// and at a jury topped up to ten there were eight of them in every
+  /// release.
+  Map<String, Object?>? releaseShare(int seat, {bool inTheOpen = false, Set<int>? only}) {
     final piece = _myPieceOf[seat];
     final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
     if (piece == null || k == null || !_gone.contains(seat)) return null;
-    return {'about': seat, 'holder': k, 'share': _b64(piece)};
+    if (_human(seat) || inTheOpen) return {'about': seat, 'holder': k, 'share': _b64(piece)};
+    final to = _custodiansOf[seat];
+    final w = wrap;
+    if (to == null || w == null) return null;
+    final sealed = {
+      for (var i = 0; i < to.length; i++)
+        if (to[i] != k && (only == null || only.contains(i + 1))) '${i + 1}': _b64(_sealRelease(to[i], piece, seat)),
+    };
+    return sealed.isEmpty ? null : {'about': seat, 'holder': k, 'sealed': sealed};
+  }
+
+  /// A piece sealed to one custodian, with the secret the two table
+  /// keys share. A label of its own, not [_wrapFor]'s: the same two
+  /// keys wrap the seat's first share and every top-up part under
+  /// that one, and a pad used twice over different plaintexts gives
+  /// both of them away.
+  Uint8List _sealRelease(String to, Uint8List piece, int seat) => _xor(piece, _pad(wrap!(to), 'release|$tableId|$hand|$seat'));
+
+  /// The piece a release carries, as this side can read it: in the
+  /// clear, or unsealed from the entry made out to this side. Null
+  /// when it is sealed to the jury and this side is not on it — which
+  /// is every player, and is the point of sealing it.
+  Uint8List? _pieceReleased(Map<String, Object?> m, int about, String holder) {
+    final bare = m['share'];
+    if (bare is String) {
+      final piece = _unb64(bare);
+      return piece.length == 32 ? piece : null;
+    }
+    final sealed = m['sealed'];
+    final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
+    final w = wrap;
+    if (sealed is! Map || k == null || w == null) return null;
+    final at = custodianIndexOf(about);
+    final mine = at < 1 ? null : sealed['$at'];
+    if (mine is! String) return null;
+    final got = _unb64(mine);
+    if (got.length != 32) return null;
+    return _xor(got, _pad(w(holder), 'release|$tableId|$hand|$about'));
   }
 
   // ---- topping the jury up ----------------------------------------------
@@ -1391,8 +1454,9 @@ class DealSession {
     try {
       final about = m['about'] as int;
       final holder = m['holder'] as String;
-      final piece = _unb64(m['share']);
-      if (!_keyed(about) || !_gone.contains(about) || piece.length != 32) return false;
+      if (!_keyed(about) || !_gone.contains(about)) return false;
+      final piece = _pieceReleased(m, about, holder);
+      if (piece == null) return false;
       final custodianKeys = _custodiansOf[about] ?? const <String>[];
       final threshold = _thresholdEscrow(about, custodianKeys);
       final (sideA, sideB) = threshold ? (custodianKeys, custodianKeys) : _escrowSides(about, custodianKeys);

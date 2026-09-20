@@ -1113,10 +1113,8 @@ Three things had to be true for that, and none of them was:
 - A bot seat **given up to the escrow was played by nobody**. The
   assignment names one juror, every other peer waits to be told, and
   the juror is gone — so the hand stopped at that seat's turn with the
-  cards on the table. A given-up seat goes back to being everyone's to
-  work out, as an unheld bot seat always was: the escrow has opened it
-  to every side that will ever open it, and the turn it was on, opened
-  while a juror still held it, is offered to the bot again
+  cards on the table. The turn it was on, opened while a juror still
+  held it, is offered to the bot again when the seat changes hands
   (`packages/table/test/quiet_holder_test.dart`).
 
 The assignment itself had to become a fact of the **record** rather
@@ -1132,12 +1130,54 @@ and an assignment fixed before the hand's first jury arrived is fixed
 again — the deal rebuilt with it — while nothing has yet been sealed
 to that deal.
 
+**And the escrow opens the seat to the jury, not to the table.** What
+it takes to rebuild a secret is hearing `escrowThreshold` pieces, not
+being given one — so a piece said in the clear is a piece the people
+playing have too, and for a while that is what a given-up bot seat
+cost: its hand went open to the table, which is the one thing a juror
+holds it to prevent. A bot seat's pieces are now sealed to the
+custodians, each to one of them, for as long as the hand is played;
+once it is over they go out in the open with the audit, because from
+there anyone may check the hand. A person's seat is unchanged and
+still opens to everyone, which is what a departed player's hand has to
+do.
+
+That changes who can act, and the rest follows from it. Only a juror
+can open a given-up seat, so a juror says its moves rather than every
+side working them out — **one** juror, the first of the hand's
+custodians still being heard from, since they all hold the same key
+and would all say the same card. Its audit is the exception: by then
+the secret is in the open and every side settles it for itself.
+
+A seat's **holder is a fact of the record**: whoever's keys settled
+that seat's first deal round. The draw only says who goes first. Two
+peers reading the draw could disagree — a juror summoned into a redraw
+hears the redraw before it is carried the draw that came first — and
+one that read itself into somebody else's seat watched the wrong juror
+for silence and gave up a seat nobody had lost. One keys message
+settles a seat's round, so every side and the verifier read the same
+holder from it.
+
 What is still missing is **graceful degradation** for a hand that
 cannot open a bot seat mid-hand: falling back to open bot seats
 happens only before the deal, because after it the seat's cards are
 masked and the holder's token is the only way in. A hand that loses
 more than `jurySize - escrowThreshold` of its custodians before the
 top-up reaches the newcomers stops at that seat's turn and says so.
+That is the trade, taken deliberately: a hand that stops is a defect
+to fix, a hand played out with a bot's cards face up is not a game.
+
+**What it costs on the wire**, measured at a jury of six with
+`tool/wire_in_sim.dart --quiet`, which takes a bot seat's own juror
+offline once the play has begun: an ordinary hand says 179,648 bytes
+and gives nothing up, so it pays none of this. The hand that loses a
+holder says 400,230, of which the pieces are 33,247. Sealing them made
+the wire smaller rather than larger — 448,558 for the same hand
+before — because a piece is keyed by its custodian's index rather than
+by a key of sixty-four characters, and goes only to the few custodians
+that can use one: every custodian holds a piece of its own, so one
+more opens the seat, and what the piece has to reach is the juror that
+will play the seat out.
 
 A **redraw** used not to apply here at all: it repaired who rules and
 who holds a seat, but not the escrow, whose custodians are fixed in

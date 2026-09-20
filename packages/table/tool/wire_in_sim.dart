@@ -34,6 +34,12 @@ Future<void> main(List<String> args) async {
   // data channel's, which is what it takes for a peer to still be
   // behind when the jury's turn to answer comes round.
   final slow = args.contains('--slow');
+  // And `--quiet` takes a bot seat's own juror offline once the play
+  // has begun, which is the case sealing the escrow to the jury put a
+  // price on: the seat is given up, every custodian says its piece
+  // sealed to the others, and one of them plays the seat out. An
+  // ordinary hand gives nothing up and pays none of it.
+  final quiet = args.contains('--quiet');
   // Jury sizes to measure: the default sweep, or whatever is asked
   // for — `--jury 4,6,8,10` — since what a jury costs is half of
   // choosing how big it should be (tool/jury_size.dart is the other
@@ -54,9 +60,15 @@ Future<void> main(List<String> args) async {
       t.clock.advance(30000);
       t.net.comeOnline(who);
     }
+    if (quiet) {
+      t.clock.runUntil(() => t.clients.first.game.phase == Phase.playing, limitMs: 5 * 60 * 1000);
+      final c = t.clients.first;
+      final held = c.botHolders(c.game.handNumber);
+      if (held.isNotEmpty) t.net.goOffline(held.values.first);
+    }
     final ok = t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 20 * 60 * 1000);
     final net = t.net;
-    print('--- 2 people, 2 bot seats, a jury of $jurors (hand reached: $ok) ---');
+    print('--- 2 people, 2 bot seats, a jury of $jurors${quiet ? ', its holder gone' : ''} (hand reached: $ok) ---');
     print('said ${net.said} bytes, handed over ${net.handed} (${(net.handed / net.said).toStringAsFixed(1)}x)');
     final by = net.saidByKind.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     for (final e in by.take(10)) {
