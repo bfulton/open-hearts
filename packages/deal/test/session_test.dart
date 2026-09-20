@@ -592,4 +592,78 @@ void main() {
     final forged = Map<String, Object?>.from(a.myKeys()!)..['pk'] = base64Encode(Uint8List(pointBytes));
     expect(make(seats, 1).acceptKeys(forged), isFalse);
   });
+
+  test('a juror brought on mid-hand is given a share, and is a custodian like any other', () {
+    // Four jurors hold a bot seat's secret; a fifth is brought on.
+    final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
+    const newcomer = 'juror4';
+    final seats = [
+      const HumanDealSeat('a'),
+      const HumanDealSeat('b'),
+      const HumanDealSeat('c'),
+      BotDealSeat(key: jury.first),
+    ];
+    final holder = make(seats, 3, key: jury.first, custodians: jury);
+    final keys = holder.myKeys()!;
+
+    final all = [for (final k in [...jury, newcomer]) make(seats, null, key: k, custodians: jury)];
+    final watcher = make(seats, 0, custodians: jury);
+    for (final x in [...all, watcher]) {
+      expect(x.acceptKeys(keys), isTrue);
+    }
+    final jurors = all.sublist(0, 4);
+    final fresh = all[4];
+    expect(fresh.holdsPieceOf(3), isFalse, reason: 'a newcomer holds nothing yet');
+
+    // Everyone learns the jury grew; the newcomer's index is its
+    // place in the list, which only ever appends.
+    for (final x in [...all, watcher]) {
+      x.extendCustodians(3, [newcomer]);
+    }
+    const at = 5;
+
+    // Two holders make the fifth share between them. Neither of them
+    // rebuilds the secret to do it.
+    final have = [1, 3];
+    final parts = [for (final i in have) jurors[i - 1].topUpPart(3, at: at, have: have)!];
+    for (final part in parts) {
+      // A part is sealed to the newcomer: nobody else opens it.
+      expect(watcher.acceptTopUpPart(part), isFalse, reason: 'a part is not for a bystander');
+    }
+    expect(fresh.acceptTopUpPart(parts[0]), isTrue);
+    expect(fresh.holdsPieceOf(3), isFalse, reason: 'one part of two is not a share');
+    expect(fresh.acceptTopUpPart(parts[1]), isTrue);
+    expect(fresh.holdsPieceOf(3), isTrue, reason: 'the set is complete, so the share is made');
+
+    // And it is a share like any other: with any one of the
+    // originals it opens the seat, and on its own it does not.
+    for (final other in [0, 1, 2, 3]) {
+      final side = make(seats, 0, custodians: jury);
+      expect(side.acceptKeys(keys), isTrue);
+      side.extendCustodians(3, [newcomer]);
+      for (final x in [...all, side]) {
+        x.seatLeft(3);
+      }
+      expect(side.acceptRelease(fresh.releaseShare(3)!), isTrue);
+      expect(side.knowsSecret(3), isFalse, reason: 'the newcomer alone is one piece');
+      expect(side.acceptRelease(jurors[other].releaseShare(3)!), isTrue);
+      expect(side.knowsSecret(3), isTrue, reason: 'the newcomer answers beside juror $other');
+    }
+
+    // A part weighed against one set does not go with a part weighed
+    // against another: the newcomer sums a set only once it has all
+    // of it.
+    final other = make(seats, null, key: newcomer, custodians: jury)..acceptKeys(keys);
+    other.extendCustodians(3, [newcomer]);
+    expect(other.acceptTopUpPart(jurors[0].topUpPart(3, at: at, have: [1, 3])!), isTrue);
+    expect(other.acceptTopUpPart(jurors[1].topUpPart(3, at: at, have: [2, 4])!), isTrue);
+    expect(other.holdsPieceOf(3), isFalse, reason: 'two parts, two different sets, no share');
+
+    // And the guards: a set this side is not in, a set with the
+    // newcomer in it, a set too small to be one.
+    expect(jurors[0].topUpPart(3, at: at, have: [2, 3]), isNull);
+    expect(jurors[0].topUpPart(3, at: at, have: [1, at]), isNull);
+    expect(jurors[0].topUpPart(3, at: at, have: [1]), isNull);
+    expect(jurors[0].topUpPart(3, at: 9, have: [1, 3]), isNull, reason: 'an index nobody holds');
+  });
 }

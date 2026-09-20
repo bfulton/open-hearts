@@ -1267,6 +1267,98 @@ class DealSession {
     return {'about': seat, 'holder': k, 'share': _b64(piece)};
   }
 
+  // ---- topping the jury up ----------------------------------------------
+  //
+  // A jury only shrinks over a hand unless somebody is brought on, and
+  // a newcomer holds nothing of a bot seat's secret until a share is
+  // made for it. Two holders make one between them: each sends what
+  // its own share is worth towards the newcomer's index, and the
+  // newcomer sums them. Neither ever holds the secret, and what each
+  // sends is worth nothing by itself (docs/04-live-play.md).
+
+  /// Custodians added to [seat] after its keys went out. The index of
+  /// a custodian is its place in the list counted from one, so this
+  /// only ever appends — a newcomer inserted among the others would
+  /// move every share after it onto the wrong index.
+  void extendCustodians(int seat, List<String> added) {
+    final have = _custodiansOf[seat];
+    if (have == null) return;
+    for (final k in added) {
+      if (!have.contains(k)) have.add(k);
+    }
+  }
+
+  /// This side's part of the share for the custodian at [at], made
+  /// with the set [have] — indices, this side's among them — and
+  /// sealed to the newcomer. Null when this side holds no piece of the
+  /// seat, the seat is not escrowed as a threshold, or [have] is not a
+  /// set this side is in.
+  ///
+  /// [have] travels with the part because it is what the part was
+  /// weighed against: two holders that picked different sets make
+  /// parts that do not go together, and the newcomer sums a set only
+  /// once it has all of it.
+  Map<String, Object?>? topUpPart(int seat, {required int at, required List<int> have}) {
+    final piece = _myPieceOf[seat];
+    final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
+    final custodianKeys = _custodiansOf[seat];
+    if (piece == null || k == null || custodianKeys == null || !_thresholdEscrow(seat, custodianKeys)) return null;
+    final mine = custodianKeys.indexOf(k) + 1;
+    if (mine < 1 || !have.contains(mine) || have.length < escrowThreshold) return null;
+    if (at < 1 || at > custodianKeys.length || have.contains(at)) return null;
+    final to = custodianKeys[at - 1];
+    final part = crypto.bytesScale(piece, crypto.bytesLagrange(have, mine, at: at));
+    // Sealed to the newcomer with the secret those two table keys
+    // share, which is what [holder] is for: the sender wraps with the
+    // recipient's key and the recipient unwraps with the sender's,
+    // and they are the same secret.
+    return {'about': seat, 'at': at, 'have': have, 'from': mine, 'holder': k, 'part': _b64(_wrapFor(to, part, seat))};
+  }
+
+  /// A part of this side's own new share. Kept by the set it was made
+  /// with; once a set is complete the parts sum into the share this
+  /// side holds from then on, and it is a custodian like any other.
+  /// True once the part is kept.
+  bool acceptTopUpPart(Map<String, Object?> m) {
+    try {
+      final about = m['about'] as int;
+      final at = m['at'] as int;
+      final from = m['from'] as int;
+      final have = [for (final i in m['have'] as List) i as int];
+      final custodianKeys = _custodiansOf[about];
+      final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
+      final w = wrap;
+      if (custodianKeys == null || k == null || w == null) return false;
+      if (at < 1 || at > custodianKeys.length || custodianKeys[at - 1] != k) return false;
+      if (_myPieceOf[about] != null) return true;
+      if (!have.contains(from) || have.contains(at) || have.length < escrowThreshold) return false;
+      if (have.toSet().length != have.length) return false;
+      if (have.any((i) => i < 1 || i > custodianKeys.length)) return false;
+      // The sender's own key, and it has to be the custodian it says
+      // it is: a part from anywhere else is not one of this set.
+      final holder = m['holder'] as String;
+      if (from < 1 || from > custodianKeys.length || custodianKeys[from - 1] != holder) return false;
+      final part = _xor(_unb64(m['part']), _pad(w(holder), 'escrow|$tableId|$hand|$about'));
+      final key = '$at|${have.join(',')}';
+      final into = _topUp.putIfAbsent(about, () => {}).putIfAbsent(key, () => {});
+      into[from] = part;
+      if (!have.every(into.containsKey)) return true;
+      _myPieceOf[about] = crypto.bytesSum([for (final i in have) into[i]!]);
+      _topUp.remove(about);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Parts of a new share, by the seat and the set they were weighed
+  /// against.
+  final Map<int, Map<String, Map<int, Uint8List>>> _topUp = {};
+
+  /// Whether this side holds a piece of [seat]'s secret — what says
+  /// whether a top-up is owed to it.
+  bool holdsPieceOf(int seat) => _myPieceOf[seat] != null;
+
   /// A released piece, by the table key that held it. Once a person's
   /// and a juror's — or, escrowed to no jury, every other person's —
   /// rebuild the secret behind the seat's key, the seat's hand is

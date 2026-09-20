@@ -236,7 +236,14 @@ offer say so, and a build that cannot run the deal does not sit down.
   is hidden from — and losing a juror no longer takes the seat with
   it. The same coefficient evaluated at another index gives a juror
   arriving later a share of its own, made by two holders out of theirs,
-  with the secret never rebuilt anywhere in the making of it.
+  with the secret never rebuilt anywhere in the making of it. That is
+  `topUpPart`: each holder sends what its share is worth towards the
+  newcomer's index, sealed to the newcomer with the secret their two
+  table keys share, and the newcomer sums them. The set a part was
+  weighed against travels with it, because two holders that picked
+  different sets make parts that do not go together — so a newcomer
+  sums a set only once it holds all of it, and needs no agreement
+  about who was live.
 - **A hand's deal is turns of the table** ([doc 04](04-live-play.md)).
   Four rounds of one turn per seat before the pass — keys, a shuffle
   in seat order, reveal tokens for the other seats' thirty-nine
