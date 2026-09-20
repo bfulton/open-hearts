@@ -1087,56 +1087,88 @@ nobody and the in-play share path could never cover it. What covers a
 departed bot seat is the secret, which is why the secret is what
 changed.
 
-The **top-up** is built as far as it can be, and stops one step short
-of paying off. The jury is drawn back up to strength rather than
-merely kept alive — both the proposer and the peers backing a
-proposal ask for `jurySize` live, where they used to ask for two —
-and whoever is drawn is given a share of every bot seat by two of the
-holders, each sending what its own share is worth towards the
-newcomer's index. The parts are carried forward with the rest of the
-record, since the peer that most needs one is the one furthest
-behind.
+The **top-up** is built, and it pays off. The jury is drawn back up to
+strength rather than merely kept alive — both the proposer and the
+peers backing a proposal ask for `jurySize` live, where they used to
+ask for two — and whoever is drawn is given a share of every bot seat
+by two of the holders, each sending what its own share is worth
+towards the newcomer's index. The parts are carried forward with the
+rest of the record, since the peer that most needs one is the one
+furthest behind. A juror summoned mid-hand takes its parts up, holds a
+piece of an escrow it was never sealed to, and carries the hand to its
+end (`packages/table/test/top_up_test.dart`).
 
-What does not work yet is the **carrying**. A juror summoned mid-hand
-starts from nothing, and in the simulator it reaches the end of the
-deal and stops: ten minutes of virtual time leaves it at the step the
-play begins on. So it never takes up the share made for it, and a
-hand still cannot be carried by the jurors brought on — only by the
-ones it was sealed to. That is a defect of the carrying rather than
-of the escrow, and until it is fixed the numbers above are still for
-a jury that only shrinks.
+Three things had to be true for that, and none of them was:
 
-And a hand that cannot open a bot seat
-mid-hand still has no graceful degradation: falling back to open bot
-seats happens only before the deal, because after it the seat's cards
-are masked and the holder's token is the only way in.
+- A piece that arrived **before the deal it belongs to** was dropped,
+  and dropped for good — its id was marked seen, so every copy said
+  again afterwards was ignored as old news. A juror handed the record
+  as it is summoned reads the pieces of a seat already given up before
+  it has built the hand they open. It keeps them now, and the drain
+  that follows each settled turn brings them back.
+- A part made out to an index **past the end of the custodian list as
+  the newcomer has it** was read as a part for somebody else. It is
+  the ordinary case for the one peer the part is for: the parts arrive
+  among the very events that say who it is. Kept too, and tried again.
+- A bot seat **given up to the escrow was played by nobody**. The
+  assignment names one juror, every other peer waits to be told, and
+  the juror is gone — so the hand stopped at that seat's turn with the
+  cards on the table. A given-up seat goes back to being everyone's to
+  work out, as an unheld bot seat always was: the escrow has opened it
+  to every side that will ever open it, and the turn it was on, opened
+  while a juror still held it, is offered to the bot again
+  (`packages/table/test/quiet_holder_test.dart`).
 
-Two mitigations this section used to lean on do not apply here. A
-**redraw** repairs who rules and who holds a seat, but not the escrow:
-the custodians are fixed in the deal's first round and a jury drawn
-later holds nothing. And the **juror of last resort** raises the floor
-on who is *available to draw*, not on a hand already dealt to a jury
-that has since gone. What does still hold is the common-mode caveat: a
-relay outage takes every juror at once and no jury size divides it, so
-these numbers are a ceiling and relay diversity is what moves the
-floor.
+The assignment itself had to become a fact of the **record** rather
+than of arrival order. A bot seat's holder is read from the first jury
+drawn for the hand, and two peers that heard the hand's two juries in
+a different order named different jurors for the same seat — a juror
+summoned into a redraw hears the redraw that summoned it first. Such a
+peer then watched the wrong juror for silence, never gave the seat up
+when the real holder went, and sat out the rest of the hand; and if it
+was holding a seat of the next hand, the next hand's deal stopped with
+it. The juries of a hand are now ordered as the record orders them,
+and an assignment fixed before the hand's first jury arrived is fixed
+again — the deal rebuilt with it — while nothing has yet been sealed
+to that deal.
+
+What is still missing is **graceful degradation** for a hand that
+cannot open a bot seat mid-hand: falling back to open bot seats
+happens only before the deal, because after it the seat's cards are
+masked and the holder's token is the only way in. A hand that loses
+more than `jurySize - escrowThreshold` of its custodians before the
+top-up reaches the newcomers stops at that seat's turn and says so.
+
+A **redraw** used not to apply here at all: it repaired who rules and
+who holds a seat, but not the escrow, whose custodians are fixed in
+the deal's first round — and a jury drawn later held nothing. The
+top-up is what changed that, and it is why the escrow is no longer a
+thing a hand can only lose. The **juror of last resort** still raises
+the floor only on who is *available to draw*, not on a hand already
+dealt to a jury that has since gone; what it buys now is somebody to
+draw *into* the top-up. And the common-mode caveat still holds
+whatever the jury's size: a relay outage takes every juror at once and
+no jury size divides it, so these numbers are a ceiling and relay
+diversity is what moves the floor.
 
 `jurySize` stays at **six** (`packages/table/lib/src/jury.dart`), which
 is five nines at f = 1% and about four and a half at 2%. Ten would buy
 five nines at 5% and cost roughly double the bytes a hand hands over
-(1.87 MB against 3.55, `tool/wire_in_sim.dart`). **The cheaper fix is
-the escrow, not the jury**: with any two of the whole jury enough
-instead of both halves, six covers f = 5% with room (4.5e-6) and four
-covers 1%. That wants Shamir shares over the same scalar field rather
-than an additive split — a share's token scales by its public Lagrange
-coefficient and still adds, so the key stays nowhere, which is the
-property the additive split was chosen for. It is a change to the
-deal's cryptography and is not built.
+(1.87 MB against 3.55, `tool/wire_in_sim.dart`). **The cheaper fix was
+the escrow, not the jury**, and it is the one that was made: with any
+two of the whole jury enough instead of both halves, six covers
+f = 5% with room (4.5e-6) and four covers 1%. The secret is split into
+Shamir shares over GF(2⁸) and the key into shares over the scalar
+field, where a share's token scales by its public Lagrange coefficient
+and still adds — so the key stays nowhere, which is the property the
+additive split was chosen for.
 
-Below four (`juryToHoldBots`) no seat is held at all: losing the holder
-from a jury of two empties its side and the seat can never be opened —
-four is the least that leaves each side a member after its holder
-goes.
+Below four (`juryToHoldBots`) no seat is held at all. That floor was
+set when the escrow went by halves — losing the holder from a jury of
+two emptied its side, and four was the least that left each side a
+member after its holder went. With any `escrowThreshold` of the whole
+jury enough, three would now do; four is kept because it is also what
+leaves a margin for the holder to be one of the ones that goes.
 
 **When quorum is lost anyway.** A hand whose bot seat has no juror
 cannot go on, and neither can one whose departed seat cannot be opened.

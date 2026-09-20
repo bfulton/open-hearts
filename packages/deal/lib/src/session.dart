@@ -622,6 +622,7 @@ class DealSession {
       final custody = [for (final c in m['custody'] as List) _unb64(c)];
       final pieces = Map<String, Object?>.from(m['pieces'] as Map);
       _pks[seat] = pk;
+      _keysIn++;
       _keyProofs[seat] = proof;
       _custodiansOf[seat] = custodianKeys;
       final shareKeys = [for (final k in (m['shareKeys'] as List? ?? const [])) _unb64(k)];
@@ -1354,6 +1355,19 @@ class DealSession {
   /// Parts of a new share, by the seat and the set they were weighed
   /// against.
   final Map<int, Map<String, Map<int, Uint8List>>> _topUp = {};
+
+  /// How many seats' keys have been read here. Zero says the deal is
+  /// as it was built and nothing has been sealed to it yet, which is
+  /// what makes it safe to throw away and build again.
+  int get keysIn => _keysIn;
+  int _keysIn = 0;
+
+  /// How many custodians this side knows [seat] escrowed to: zero
+  /// until its keys have been read here, and more as juries are drawn
+  /// and [extendCustodians] is told. A part made out to an index
+  /// beyond it is not a part for somebody else — it is one for a
+  /// custodian this side has not heard of yet.
+  int custodianCount(int seat) => _custodiansOf[seat]?.length ?? 0;
 
   /// This side's index among [seat]'s custodians, or zero: for a
   /// trace, and for a caller that wants to know whether it is one.

@@ -48,24 +48,29 @@ void main() {
         if (sealedTo.contains(j.signer.publicKey) && (j.client?.topUpsSent ?? 0) > 0) j.signer.publicKey,
     ];
     expect(sent.length, escrowThreshold, reason: 'two holders answer, not all of them');
+
+    // And the newcomers take the parts up: two parts make one share,
+    // and a juror brought on mid-hand holds a piece of the escrow it
+    // was never sealed to. This is what the topping up is for — the
+    // jury that carries the rest of the hand is the one standing at
+    // the end of it, not the one the deal went out to.
+    final carried = t.clock.runUntil(() => client.game.handNumber > hand, limitMs: 5 * 60 * 1000);
+    expect(carried, isTrue, reason: 'the hand played on: ${client.describe()}');
+    // The table does not wait for them: a juror brought on judges the
+    // silence of the one it replaced from where it came in, so it
+    // reaches the end of the hand a little after the table does.
+    final ours = [for (final j in t.jurors) if (brought.contains(j.signer.publicKey)) j];
+    final caught = t.clock.runUntil(
+      () => ours.every((j) => (j.client?.game.handNumber ?? -1) > hand),
+      limitMs: 5 * 60 * 1000,
+    );
+    expect(caught, isTrue,
+        reason: 'every juror brought on carried the hand to its end:\n'
+            '${[for (final j in ours) j.client?.describe()].join('\n')}');
+    for (final j in ours) {
+      expect(j.client?.holdsEscrowPiece(hand), isTrue,
+          reason: '${j.signer.publicKey.substring(0, 4)}, brought on at hand $hand, holds a piece of it');
+    }
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
-
-  // Two things this does not yet show, and they are the same thing.
-  //
-  // A juror summoned mid-hand is carried forward from nothing, and in
-  // the simulator it reaches the end of the deal and stops: ten
-  // minutes of virtual time leaves it at the step the play begins on.
-  // So it never takes up the share made for it, and a hand cannot yet
-  // be carried by the jurors brought on — only by the ones it was
-  // sealed to. Everything short of that holds: the jury tops back up,
-  // two holders make the parts, and the parts are carried forward
-  // with the rest of the record.
-  //
-  // That the parts make a working share is proven where it can be
-  // proven exactly, in packages/deal's session test, which drives the
-  // same calls directly: one part of two is not a share, the complete
-  // set is, and the made share opens the seat beside any one of the
-  // originals. What is missing is the carrying, which is a defect of
-  // its own rather than of the escrow (docs/04-live-play.md).
 }
