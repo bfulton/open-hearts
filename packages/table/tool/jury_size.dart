@@ -8,11 +8,14 @@
 /// (docs/04-live-play.md, packages/deal/lib/src/session.dart):
 ///
 ///  - **A bot seat whose holder goes** has to be opened from the
-///    escrow. Today the escrow is the seat's key split in two, one
-///    half of the jury holding each part — *both* halves must still
-///    have somebody live, because the split is additive: every share
-///    is needed (crypto/deal/src/lib.rs, `split`). That shape is
-///    what makes this the binding case.
+///    escrow. It is the seat's key in Shamir shares, one to each
+///    juror, any `escrowThreshold` of which rebuild it — so the seat
+///    is lost only when fewer than that many are live. It was once
+///    the key split in two with a half of the jury holding each part,
+///    every share of a side needed, and that shape is what made this
+///    the binding case; both are printed below, the halves for
+///    comparison and because the shape of the answer is the whole
+///    argument for having changed it.
 ///  - **A person's seat whose owner goes** splits across the other
 ///    people and the jury, so it wants one live juror of any.
 ///  - **A deadlocked turn** wants one live juror to rule.
@@ -255,7 +258,7 @@ void main(List<String> args) {
   print('a hand that cannot go on, per hand, at most $target — '
       '${(100 * (1 - target)).toStringAsFixed(3)}% of hands\n');
 
-  print('--- the escrow as built: the jury in halves, every share of a side needed ---');
+  print('--- the escrow as it once was: the jury in halves, every share of a side needed ---');
   print('f is a drawn juror unreachable when its piece is wanted, over one hand\n');
   print('   f      least jury    that hand-failure rate   at the jury of six we ship');
   for (final f in fs) {
@@ -268,7 +271,7 @@ void main(List<String> args) {
   }
 
   for (final t in [2, 3]) {
-    print('\n--- with a threshold escrow instead: any $t jurors of the whole jury ---');
+    print('\n--- the escrow as built: any $t jurors of the whole jury ---');
     print('   f      least jury    that hand-failure rate   at the jury of six we ship');
     for (final f in fs) {
       final n = least(f, target, t: t);

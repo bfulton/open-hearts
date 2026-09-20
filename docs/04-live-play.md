@@ -349,9 +349,12 @@ changes who you sit with.
 03](03-fair-deal.md), "As built"): its cards come from a deal nobody
 at it could rig, and its record replays through that deal, every
 proof checked, so a rating is a claim anyone can verify. One interim
-remains, and doc 03 names it: a bot's hand, and a departed person's,
-is open to the table until the bot plays inside the computation
-(below). It says "provisionally" until a rating has settled.
+remains, and doc 03 names it: a bot's hand is open to the *jury* — the
+seat's own juror, and whoever opens it from the escrow when that juror
+goes — until the bot plays inside the computation (below). A departed
+person's is open to the table, which is what it has to be for their
+seat to be played out. It says "provisionally" until a rating has
+settled.
 
 ## Filling and emptying seats
 
