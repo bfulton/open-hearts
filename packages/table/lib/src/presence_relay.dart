@@ -30,11 +30,28 @@ import 'spec.dart';
 
 /// A summons as a juror receives it.
 class Summons {
-  const Summons({required this.spec, required this.hand, required this.jurors, required this.from});
+  const Summons(
+      {required this.spec,
+      required this.hand,
+      required this.jurors,
+      required this.from,
+      this.juryId,
+      this.first = false});
   final TableSpec spec;
   final int hand;
   final List<PublicKey> jurors;
   final PublicKey from;
+
+  /// The jury event this summons names, where the sender said which.
+  final String? juryId;
+
+  /// Whether that event is the *first* jury drawn for [hand], as the
+  /// sender's record has it. A bot seat's holder is read from the
+  /// hand's first jury and no other, so a juror can act on the list
+  /// in a first summons before the event reaches it — and must not
+  /// act on the list in a redraw, which names the jury as it stands
+  /// now rather than the one the seats were dealt to.
+  final bool first;
 
   static Summons? parse(PublicKey from, Map<String, Object?> content) {
     try {
@@ -45,6 +62,8 @@ class Summons {
         hand: content['hand'] as int,
         jurors: [for (final k in content['jurors'] as List) k as String],
         from: from,
+        juryId: content['jury'] as String?,
+        first: content['first'] == true,
       );
     } catch (_) {
       return null;

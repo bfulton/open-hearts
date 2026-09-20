@@ -71,7 +71,10 @@ class SimPresence implements Presence {
     if (j == null || j.gone || !net.isUp(juror)) return;
     final spec = TableSpec.parse(summons['table']);
     if (spec == null) return;
-    clock.schedule(50, () => j.summoned(spec, summons['hand'] as int, [for (final k in summons['jurors'] as List) k as String]));
+    clock.schedule(
+        50,
+        () => j.summoned(spec, summons['hand'] as int, [for (final k in summons['jurors'] as List) k as String],
+            juryId: summons['jury'] as String?, first: summons['first'] == true));
   }
 
   @override

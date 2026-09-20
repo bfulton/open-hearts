@@ -34,7 +34,7 @@ class SimJuror {
   /// The verdicts this juror gave, for tests.
   int verdicts = 0;
 
-  void summoned(TableSpec spec, int hand, List<PublicKey> jurors) {
+  void summoned(TableSpec spec, int hand, List<PublicKey> jurors, {String? juryId, bool first = false}) {
     if (gone) return;
     var c = client;
     if (c == null || c.spec.id != spec.id) {
@@ -45,7 +45,7 @@ class SimJuror {
       c.start();
       c.changes.listen((_) => verdicts = c!.record.where((d) => d.verdict?.author == signer.publicKey).length);
     }
-    c.serveFor(hand, jurors);
+    c.serveFor(hand, jurors, juryId: juryId, first: first);
   }
 
   /// Goes, by [how]: a leave is just no longer serving; a crash and a
