@@ -72,6 +72,15 @@ void main() {
       EventKind.verdict: {'hand': 0, 'turn': 4, 'seat': 1, 'side': 'action', 'event': witnessed.toJson()},
       EventKind.deal: {'hand': 0, 'turn': -16, 'seat': 1, 'round': 0, 'keys': 'AAECAwQFBgcICQoLDA0ODw=='},
       EventKind.release: {'hand': 0, 'about': 2, 'piece': 'AAECAwQFBgcICQoLDA0ODw=='},
+      EventKind.topup: {
+        'hand': 0,
+        'about': 2,
+        'at': 5,
+        'have': [1, 3],
+        'from': 1,
+        'holder': other.publicKey,
+        'part': 'AAECAwQFBgcICQoLDA0ODw==',
+      },
     };
     expect(bodies.keys, containsAll(EventKind.values), reason: 'a new kind wants a line here');
     for (final e in bodies.entries) {

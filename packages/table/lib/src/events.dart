@@ -8,9 +8,10 @@
 /// those, and a heartbeat; the jury's four (jury.dart): a proposal
 /// of who the hand's jurors are, a juror's heartbeat while it serves,
 /// an appeal of a turn the players cannot settle, and a verdict; and
-/// the sealed deal's two (docs/03-fair-deal.md): a step of the deal —
-/// keys, a shuffle, tokens, the lead declared, the audit — and the
-/// release of a piece of a departed seat's secret.
+/// the sealed deal's three (docs/03-fair-deal.md): a step of the deal —
+/// keys, a shuffle, tokens, the lead declared, the audit — the release
+/// of a piece of a departed seat's secret, and a part of a new piece
+/// for a juror brought on mid-hand.
 library;
 
 import 'dart:convert';
@@ -18,7 +19,9 @@ import 'dart:typed_data';
 
 import 'signing.dart';
 
-enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, jury, serve, appeal, verdict, deal, release }
+/// Appended to, never reordered: a frame carries a kind as its place
+/// in this list (frame.dart).
+enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, jury, serve, appeal, verdict, deal, release, topup }
 
 /// Which moment of a hand an event is about. A hand has four pass turns
 /// (one per seat, all open at once) followed by fifty-two play turns.

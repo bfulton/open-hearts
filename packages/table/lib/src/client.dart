@@ -1067,7 +1067,7 @@ class TableClient {
       // could not back it before, its presence not yet having seen
       // the jurors, looks again.
       if (event.kind == EventKind.jury) return _reconsiderJury(event);
-      if (event.kind != EventKind.leave && event.kind != EventKind.release) _catchUp(event.turn);
+      if (event.kind != EventKind.leave && event.kind != EventKind.release && event.kind != EventKind.topup) _catchUp(event.turn);
       return;
     }
     _accept(event);
@@ -1086,7 +1086,7 @@ class TableClient {
     if (event.kind == EventKind.heartbeat || event.kind == EventKind.serve) {
       return event.hand < game.handNumber || (event.hand == game.handNumber && event.step < step);
     }
-    if (event.kind == EventKind.release) return event.hand < game.handNumber;
+    if (event.kind == EventKind.release || event.kind == EventKind.topup) return event.hand < game.handNumber;
     final t = event.turn;
     if (t.hand != game.handNumber) return t.hand < game.handNumber;
     return t.position < _herePosition;
@@ -1113,6 +1113,8 @@ class TableClient {
         _onAction(event);
       case EventKind.release:
         _onRelease(event);
+      case EventKind.topup:
+        _onTopUp(event);
       case EventKind.boot:
       case EventKind.absent:
         _onBoot(event);
@@ -1136,7 +1138,7 @@ class TableClient {
     // turn it closed.
     if (!_futureIds.add(event.id)) return;
     _future.add(event);
-    if (event.kind != EventKind.witness && event.kind != EventKind.release) {
+    if (event.kind != EventKind.witness && event.kind != EventKind.release && event.kind != EventKind.topup) {
       _trace('defer ${event.kind.name}@${event.turn} from ${event.author.substring(0, 4)}');
     }
   }
@@ -1276,6 +1278,11 @@ class TableClient {
     // And the pieces released for any seat gone this hand: a peer
     // behind cannot play the seat's bot without them.
     for (final r in _releases[turn.hand] ?? const <TableEvent>[]) {
+      _send(r.toJson());
+    }
+    // And the parts of a share made for a juror brought on: the one
+    // peer that most needs them is the one furthest behind.
+    for (final r in _topUps[turn.hand] ?? const <TableEvent>[]) {
       _send(r.toJson());
     }
     for (final t in settled) {
@@ -2248,6 +2255,143 @@ class TableClient {
     _emit(EventKind.release, {'hand': game.handNumber, 'about': seat, 'share': m['share']});
   }
 
+  // ---- topping the jury up ----------------------------------------------
+
+  /// The custodians of this hand's escrow, in the order everyone
+  /// computes: the jury the deal was sealed to, then whoever has been
+  /// drawn since, by their jury's event id and sorted within it.
+  /// Append-only, because a custodian's index is its place in this
+  /// list and a newcomer among the others would move every share
+  /// after it (packages/deal, `extendCustodians`).
+  List<PublicKey> _custodiansNow(int hand) {
+    final drawn = _juriesFor(hand).where((d) => d.event.hand == hand).toList()..sort((a, b) => a.event.id.compareTo(b.event.id));
+    if (drawn.isEmpty) return const [];
+    final out = <PublicKey>[...drawn.first.event.jurors]..sort();
+    for (final d in drawn.skip(1)) {
+      for (final k in d.event.jurors.toList()..sort()) {
+        if (!out.contains(k)) out.add(k);
+      }
+    }
+    return out;
+  }
+
+  /// Gives whoever has joined the jury a share of every bot seat's
+  /// secret, so that the jury tops back up instead of only shrinking
+  /// (docs/04-live-play.md, "The sizing").
+  ///
+  /// Two holders make a newcomer's share between them, and which two
+  /// is not agreed: each sender says what set it weighed its part
+  /// against, and the newcomer sums a set once it holds all of it. So
+  /// the senders are simply the lowest-indexed custodians still heard
+  /// from — mostly the same two everywhere, and where they are not,
+  /// the cost is a wait rather than a wrong share.
+  void _topUpJury() {
+    final d = _deal;
+    if (d == null || !spec.sealed) return;
+    final hand = game.handNumber;
+    final custodians = _custodiansNow(hand);
+    if (custodians.length <= juryToHoldBots) return;
+    final held = botHolders(hand);
+    if (held.isEmpty) return;
+    // Who this side would have answer, and whether it is one of them.
+    // The jury's own liveness, not the table's: _recentWithin reads a
+    // key never heard from as recent, which would put the very jurors
+    // that went among the senders and leave the newcomer waiting on
+    // parts nobody is making.
+    final heard = _liveJurors(hand);
+    final live = [
+      for (var i = 1; i <= custodians.length; i++)
+        if (heard.contains(custodians[i - 1])) i,
+    ];
+    final have = live.take(escrowThreshold).toList();
+    final mine = custodians.indexOf(signer.publicKey) + 1;
+    if (mine < 1 || !have.contains(mine) || have.length < escrowThreshold) return;
+    for (final seat in held.keys) {
+      if (!d.holdsPieceOf(seat)) continue;
+      for (var at = 1; at <= custodians.length; at++) {
+        if (have.contains(at) || !_isNewCustodian(hand, custodians[at - 1])) continue;
+        final key = '$seat|$at';
+        if (clock.nowMs - (_toppedUpAt[key] ?? -topUpEveryMs) < topUpEveryMs) continue;
+        final part = d.topUpPart(seat, at: at, have: have);
+        if (part == null) continue;
+        _toppedUpAt[key] = clock.nowMs;
+        topUpsSent++;
+        _emit(EventKind.topup, {
+          'hand': hand,
+          'about': seat,
+          'at': at,
+          'have': have,
+          'from': part['from'],
+          'holder': part['holder'],
+          'part': part['part'],
+        });
+      }
+    }
+  }
+
+  /// Whether this side holds a piece of some bot seat's secret at
+  /// [hand] — what a juror brought on is given, and what says the
+  /// giving worked.
+  bool holdsEscrowPiece(int hand) {
+    final d = _deal;
+    if (d == null) return false;
+    return botHolders(hand).keys.any(d.holdsPieceOf);
+  }
+
+  /// Whether [who] came to the jury after the deal was sealed to it.
+  bool _isNewCustodian(int hand, PublicKey who) {
+    final drawn = _juriesFor(hand).where((d) => d.event.hand == hand).toList()..sort((a, b) => a.event.id.compareTo(b.event.id));
+    return drawn.isNotEmpty && !drawn.first.event.jurors.contains(who);
+  }
+
+  /// Parts of a new share this side has sent, for a test to look at.
+  int topUpsSent = 0;
+
+  /// When this side last sent a part, by seat and index.
+  final Map<String, int> _toppedUpAt = {};
+
+  /// Parts heard, by hand, to carry forward to whoever is behind.
+  final Map<int, List<TableEvent>> _topUps = {};
+
+  /// How often a part is said again for the same newcomer: a part can
+  /// go missing, and the sender never learns whether the set it chose
+  /// was the one that completed.
+  static const topUpEveryMs = 10000;
+
+  void _onTopUp(TableEvent event) {
+    final d = _deal;
+    if (d == null) return;
+    if (event.hand > game.handNumber) return _defer(event);
+    if (event.hand < game.handNumber) return;
+    final about = event.about;
+    if (about < 0 || about >= seatCount) return;
+    // Kept, and carried forward like a release. A part is a broadcast
+    // and its recipient is the one peer most likely to miss it: a
+    // juror brought on mid-hand is behind by a whole hand, and may
+    // not have been listening at all when the part went out. Whoever
+    // carries it forward hands the part over with everything else.
+    final kept = _topUps.putIfAbsent(event.hand, () => []);
+    if (!kept.any((r) => r.id == event.id)) kept.add(event);
+    // Everyone learns the custodian list grew, whether or not the
+    // part is theirs to open: it is what an index means.
+    _growCustodians(about);
+    d.acceptTopUpPart({
+      'about': about,
+      'at': event.body['at'],
+      'have': event.body['have'],
+      'from': event.body['from'],
+      'holder': event.body['holder'],
+      'part': event.body['part'],
+    });
+  }
+
+  /// Tells the deal about the custodians drawn since it was sealed.
+  void _growCustodians(int seat) {
+    final d = _deal;
+    if (d == null) return;
+    d.extendCustodians(seat, _custodiansNow(game.handNumber));
+  }
+
   /// A bot seat whose juror has gone quiet is a seat nobody is
   /// playing, so it is given up to the escrow like a departed
   /// person's: the jury's own pieces open it, two of them, and
@@ -2456,6 +2600,7 @@ class TableClient {
     // still follows the hands out, and is in neither branch below.
     _startDealWhenReady();
     _forgetSaidAgain();
+    _topUpJury();
     _timers.add(clock.schedule(1000, _tick));
     if (amSeated && !_left && !done) {
       _repeat();
@@ -2684,7 +2829,13 @@ class TableClient {
     }
     if (clock.nowMs - _lastProposedAt < (_proposalsThisHand < 3 ? 10000 : 30000)) return;
     final own = juries.any((d) => d.event.hand == hand);
-    if (own && _liveJurors(hand).length >= 2) return;
+    // Up to strength, not merely alive. A jury that only shrinks is
+    // the shape the sizing was stuck on (docs/04-live-play.md, "The
+    // sizing"); whoever is drawn now is given a share of every bot
+    // seat by the ones who hold them ([_topUpJury]). The guard below
+    // still stops a redraw that would seat nobody new, so a room with
+    // nobody spare proposes nothing.
+    if (own && _liveJurors(hand).length >= jurySize) return;
     final quiet = _jurorsOf(hand).difference(_liveJurors(hand));
     final here = p.online(withinMs: 15000).difference(_humans).difference(quiet);
     // What this table needs a jury for. Escrow needs somebody; bot
@@ -2795,7 +2946,13 @@ class TableClient {
     if (backed != null && backed != e.id) {
       final earlier = _proposals[backed];
       if (earlier != null && !earlier.settled && _recentWithin(earlier.action!.author, 10000)) return false;
-      if (earlier != null && earlier.settled && _liveJurors(e.hand).length >= 2) return false;
+      // Up to strength, not merely alive — the acceptance side of the
+      // same rule the proposer uses. A peer that has backed a jury
+      // does not keep backing new ones while that jury is whole, but
+      // a jury below strength is one to top up: whoever is drawn now
+      // is given a share of every bot seat by the ones who hold them
+      // (docs/04-live-play.md, "The sizing").
+      if (earlier != null && earlier.settled && _liveJurors(e.hand).length >= jurySize) return false;
     }
     return true;
   }
@@ -2825,6 +2982,13 @@ class TableClient {
     _juryAt[e.id] = clock.nowMs;
     needsJuror = false;
     _reachOut();
+    // A jury drawn after the deal was sealed adds custodians, and the
+    // escrow has to know: an index is a place in that list.
+    if (e.hand == game.handNumber) {
+      for (final seat in botHolders(e.hand).keys) {
+        _growCustodians(seat);
+      }
+    }
     _trace('jury for hand ${e.hand}: ${e.jurors.map((k) => k.substring(0, 4))} by ${race.forAction.length}');
     final p = presence;
     if (p != null && amSeated) {

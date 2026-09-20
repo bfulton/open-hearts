@@ -1087,12 +1087,26 @@ nobody and the in-play share path could never cover it. What covers a
 departed bot seat is the secret, which is why the secret is what
 changed.
 
-What is still not built is the **top-up**: keeping the jury at a
-number of live members and giving each newcomer a share. The
-primitives for it are in and tested — two holders each send what
-their share is worth towards a new index, and the newcomer sums them
-— but nothing yet drives it. Until it does, the numbers above are for
-a jury that only shrinks. And a hand that cannot open a bot seat
+The **top-up** is built as far as it can be, and stops one step short
+of paying off. The jury is drawn back up to strength rather than
+merely kept alive — both the proposer and the peers backing a
+proposal ask for `jurySize` live, where they used to ask for two —
+and whoever is drawn is given a share of every bot seat by two of the
+holders, each sending what its own share is worth towards the
+newcomer's index. The parts are carried forward with the rest of the
+record, since the peer that most needs one is the one furthest
+behind.
+
+What does not work yet is the **carrying**. A juror summoned mid-hand
+starts from nothing, and in the simulator it reaches the end of the
+deal and stops: ten minutes of virtual time leaves it at the step the
+play begins on. So it never takes up the share made for it, and a
+hand still cannot be carried by the jurors brought on — only by the
+ones it was sealed to. That is a defect of the carrying rather than
+of the escrow, and until it is fixed the numbers above are still for
+a jury that only shrinks.
+
+And a hand that cannot open a bot seat
 mid-hand still has no graceful degradation: falling back to open bot
 seats happens only before the deal, because after it the seat's cards
 are masked and the holder's token is the only way in.

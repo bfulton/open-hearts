@@ -1355,6 +1355,15 @@ class DealSession {
   /// against.
   final Map<int, Map<String, Map<int, Uint8List>>> _topUp = {};
 
+  /// This side's index among [seat]'s custodians, or zero: for a
+  /// trace, and for a caller that wants to know whether it is one.
+  int custodianIndexOf(int seat) {
+    final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
+    final have = _custodiansOf[seat];
+    if (k == null || have == null) return 0;
+    return have.indexOf(k) + 1;
+  }
+
   /// Whether this side holds a piece of [seat]'s secret — what says
   /// whether a top-up is owed to it.
   bool holdsPieceOf(int seat) => _myPieceOf[seat] != null;
