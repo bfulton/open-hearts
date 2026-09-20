@@ -30,38 +30,81 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- the relay and the app ----------------------------------------------
 
+/// The bench of jurors of last resort: one process each, not one
+/// process for all of them.
+///
+/// A table whose bot seats the jury holds needs juryToHoldBots of
+/// them, and here there is nobody else online to make that number up,
+/// so the whole bench is the service's. One process each because a
+/// run has to be able to take a *single* juror off the air — which of
+/// them holds which bot seat is drawn, so the one to silence is not
+/// known until the deal says so, and killing a process that held four
+/// seats would say nothing about an escrow.
+///
+/// A secret each, so the keys are the same on every run and a process
+/// can be told from its key before either has said a word; each
+/// process still prints the key it derived, which is what the suite
+/// matches against.
+const benchSecrets = [
+  '1111111111111111111111111111111111111111111111111111111111111111',
+  '2222222222222222222222222222222222222222222222222222222222222222',
+  '3333333333333333333333333333333333333333333333333333333333333333',
+  '4444444444444444444444444444444444444444444444444444444444444444',
+];
+
 export async function startRelay() {
-  // The relay; and beside it, its own process, the juror of last
-  // resort: the four browsers are all at one table, so a jury can only
-  // come from the service. Its own process, because a relay verifies
-  // every event it carries and must never wait on a juror's work.
+  // The relay; and beside it, a process per juror of last resort: the
+  // four browsers are all at one table, so a jury can only come from
+  // the service. Their own processes, because a relay verifies every
+  // event it carries and must never wait on a juror's work.
   // The relay's whole log, always, at a known path for a debugging run.
   const logFile = join(root, 'app', 'build', 'logs', 'relay.log');
   mkdirSync(dirname(logFile), { recursive: true });
   const relayLog = createWriteStream(logFile);
   const args = ['run', 'bin/service.dart', '--port', '7447'];
   const proc = spawn('dart', args, { cwd: join(root, 'service') });
-  let juror = null;
+  const bench = [];
   const url = await new Promise((resolveUrl, reject) => {
     let out = '';
     proc.stdout.on('data', (d) => {
       out += d.toString();
       const m = out.match(/relay (ws:\/\/\S+)/);
       if (m) resolveUrl(m[1]);
-      // The juror of last resort's own lines, once the relay is up.
+      // The jurors of last resort's own lines, once the relay is up.
       if (relayLog) relayLog.write(d);
-      if (m && !juror) {
-        juror = spawn('dart', ['run', 'bin/juror.dart', '--relay', m[1]], { cwd: join(root, 'service') });
-        // Its whole log goes with the relay's, for a debugging run.
-        juror.stdout.on('data', (d) => { if (relayLog) relayLog.write(d); for (const line of d.toString().split('\n')) if (/juror|summoned|called|verdict|done with/.test(line)) log(`juror: ${line.trim()}`); });
-        juror.stderr.on('data', (d) => process.stderr.write(d));
-      }
+      if (m && bench.length === 0) for (const secret of benchSecrets) bench.push(startJuror(m[1], secret, relayLog));
     });
     proc.stderr.on('data', (d) => process.stderr.write(d));
     proc.on('exit', (code) => reject(new Error(`relay exited ${code}\n${out}`)));
     setTimeout(() => reject(new Error('relay did not start')), 60000);
   });
-  return { url, stop: () => { juror?.kill(); proc.kill(); } };
+  return { url, bench, stop: () => { for (const j of bench) j.kill(); proc.kill(); } };
+}
+
+/// One juror of last resort, with its own key and its own process.
+/// `key` resolves to the eight characters the process prints of it,
+/// which is how a run finds the juror that a deal named; `said` is
+/// every line it has written, for a run that has to check what a
+/// juror did rather than what a browser could see it do.
+function startJuror(relay, secret, relayLog) {
+  const juror = spawn('dart', ['run', join('bin', 'juror.dart'), '--relay', relay, '--jurors', '1'],
+      { cwd: join(root, 'service'), env: { ...process.env, OH_JUROR_SECRET: secret } });
+  const said = [];
+  let named;
+  const key = new Promise((resolve) => { named = resolve; });
+  // Its whole log goes with the relay's, for a debugging run.
+  juror.stdout.on('data', (d) => {
+    if (relayLog) relayLog.write(d);
+    for (const line of d.toString().split('\n')) {
+      if (line === '') continue;
+      said.push(line);
+      const m = line.match(/^jurors of last resort (\w{8}) /);
+      if (m) named(m[1]);
+      if (/juror|summoned|called|verdict|done with/.test(line)) log(`juror: ${line.trim()}`);
+    }
+  });
+  juror.stderr.on('data', (d) => process.stderr.write(d));
+  return { key, said, kill: () => juror.kill() };
 }
 
 const types = {

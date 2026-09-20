@@ -68,7 +68,9 @@ jobs:
 
   # Four real browsers at one table: the local relay, the built app,
   # WebRTC between headless Chromiums, and the departure cells only a
-  # browser can show (e2e/README.md).
+  # browser can show (e2e/README.md). Then one browser alone against
+  # three bot seats the jury holds, for the escrow that opens one when
+  # its juror goes.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -100,3 +102,5 @@ jobs:
         run: cd service && dart pub get
       - name: Four browsers, one table
         run: node e2e/run.mjs
+      - name: A bot seat's juror goes, and the escrow opens the seat
+        run: node e2e/escrow.mjs

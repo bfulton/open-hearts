@@ -11,6 +11,19 @@ and the built web app served from this machine.
 cd .. && node e2e/run.mjs
 ```
 
+And beside it, one browser alone against three bot seats the jury
+holds, for the thing four browsers cannot stage: the juror holding a
+seat is taken off the air and the jurors that are left open the seat
+from the escrow between themselves. One browser, because the jury has
+to be known — a jury is drawn from whoever is online, and a person
+seated is not eligible for her own table, so the jury is exactly the
+bench of jurors of last resort, which runs one process per juror so a
+single one can be silenced.
+
+```bash
+cd .. && node e2e/escrow.mjs
+```
+
 Needs Dart on the path (for the relay) and a global Playwright install
 with Chromium (`npm i -g playwright && npx playwright install chromium`).
 The relay is started on port 7447, which is where a build served from
