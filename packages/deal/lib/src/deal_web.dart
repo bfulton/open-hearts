@@ -58,6 +58,14 @@ extension type _Exports._(JSObject _) implements JSObject {
   // ignore: non_constant_identifier_names
   external JSNumber deal_share_key(JSNumber share, JSNumber out);
   // ignore: non_constant_identifier_names
+  external JSNumber deal_share_bytes(JSNumber secret, JSNumber len, JSNumber n, JSNumber t, JSNumber seed, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_bytes_lagrange(JSNumber have, JSNumber count, JSNumber index, JSNumber at);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_bytes_scale(JSNumber share, JSNumber len, JSNumber by, JSNumber out);
+  // ignore: non_constant_identifier_names
+  external JSNumber deal_bytes_sum(JSNumber parts, JSNumber count, JSNumber len, JSNumber out);
+  // ignore: non_constant_identifier_names
   external JSNumber deal_split_threshold(JSNumber secret, JSNumber n, JSNumber t, JSNumber seed, JSNumber out);
   // ignore: non_constant_identifier_names
   external JSNumber deal_lagrange(JSNumber have, JSNumber count, JSNumber index, JSNumber at, JSNumber out);
@@ -199,6 +207,37 @@ class _Wasm implements DealCrypto {
     return _must(
         _call([sealed, all], pointBytes, (i, o) => e.deal_open_shared(i[0].toJS, i[1].toJS, parts.length.toJS, o.toJS).toDartInt),
         'open shared');
+  }
+
+  @override
+  Uint8List shareBytes(Uint8List secret, {required int n, required int t, required Uint8List seed}) => _must(
+      _call([secret, seed], n * secret.length,
+          (i, o) => e.deal_share_bytes(i[0].toJS, secret.length.toJS, n.toJS, t.toJS, i[1].toJS, o.toJS).toDartInt),
+      'share bytes');
+
+  @override
+  int bytesLagrange(List<int> have, int index, {int at = 0}) {
+    var c = -1;
+    _call([Uint8List.fromList(have)], 0, (i, o) {
+      c = e.deal_bytes_lagrange(i[0].toJS, have.length.toJS, index.toJS, at.toJS).toDartInt;
+      return 0;
+    });
+    if (c < 0) throw StateError('bytes lagrange');
+    return c;
+  }
+
+  @override
+  Uint8List bytesScale(Uint8List share, int by) => _must(
+      _call([share], share.length, (i, o) => e.deal_bytes_scale(i[0].toJS, share.length.toJS, by.toJS, o.toJS).toDartInt),
+      'bytes scale');
+
+  @override
+  Uint8List bytesSum(List<Uint8List> parts) {
+    final len = parts.first.length;
+    return _must(
+        _call([Uint8List.fromList([for (final p in parts) ...p])], len,
+            (i, o) => e.deal_bytes_sum(i[0].toJS, parts.length.toJS, len.toJS, o.toJS).toDartInt),
+        'bytes sum');
   }
 
   @override

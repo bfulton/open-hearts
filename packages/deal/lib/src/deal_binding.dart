@@ -23,6 +23,10 @@ typedef _OpenShared = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, IntPtr, Poi
 typedef _VerifyToken = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _VerifySeal = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _Unmask = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size, Pointer<Uint8>);
+typedef _ShareBytes = Int32 Function(Pointer<Uint8>, Size, Size, Size, Pointer<Uint8>, Pointer<Uint8>);
+typedef _BytesLagrange = Int32 Function(Pointer<Uint8>, Size, Uint8, Uint8);
+typedef _BytesScale = Int32 Function(Pointer<Uint8>, Size, Uint8, Pointer<Uint8>);
+typedef _BytesSum = Int32 Function(Pointer<Uint8>, Size, Size, Pointer<Uint8>);
 typedef _SplitThreshold = Int32 Function(Pointer<Uint8>, Size, Size, Pointer<Uint8>, Pointer<Uint8>);
 typedef _Lagrange = Int32 Function(Pointer<Uint8>, Size, Uint8, Uint8, Pointer<Uint8>);
 typedef _TwoScalars = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
@@ -70,6 +74,11 @@ class _Ffi implements DealCrypto {
         _openShared = lib.lookupFunction<_OpenShared, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>)>('deal_open_shared'),
         _shareToken = lib.lookupFunction<_RevealToken, int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>)>('deal_share_token'),
         _unmask = lib.lookupFunction<_Unmask, int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>)>('deal_unmask'),
+        _shareBytes = lib
+            .lookupFunction<_ShareBytes, int Function(Pointer<Uint8>, int, int, int, Pointer<Uint8>, Pointer<Uint8>)>('deal_share_bytes'),
+        _bytesLagrange = lib.lookupFunction<_BytesLagrange, int Function(Pointer<Uint8>, int, int, int)>('deal_bytes_lagrange'),
+        _bytesScale = lib.lookupFunction<_BytesScale, int Function(Pointer<Uint8>, int, int, Pointer<Uint8>)>('deal_bytes_scale'),
+        _bytesSum = lib.lookupFunction<_BytesSum, int Function(Pointer<Uint8>, int, int, Pointer<Uint8>)>('deal_bytes_sum'),
         _splitThreshold =
             lib.lookupFunction<_SplitThreshold, int Function(Pointer<Uint8>, int, int, Pointer<Uint8>, Pointer<Uint8>)>('deal_split_threshold'),
         _lagrange = lib.lookupFunction<_Lagrange, int Function(Pointer<Uint8>, int, int, int, Pointer<Uint8>)>('deal_lagrange'),
@@ -101,6 +110,10 @@ class _Ffi implements DealCrypto {
   final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>) _openShared;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _shareToken;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>) _unmask;
+  final int Function(Pointer<Uint8>, int, int, int, Pointer<Uint8>, Pointer<Uint8>) _shareBytes;
+  final int Function(Pointer<Uint8>, int, int, int) _bytesLagrange;
+  final int Function(Pointer<Uint8>, int, int, Pointer<Uint8>) _bytesScale;
+  final int Function(Pointer<Uint8>, int, int, Pointer<Uint8>) _bytesSum;
   final int Function(Pointer<Uint8>, int, int, Pointer<Uint8>, Pointer<Uint8>) _splitThreshold;
   final int Function(Pointer<Uint8>, int, int, int, Pointer<Uint8>) _lagrange;
   final int Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>) _scalarMul;
@@ -190,6 +203,33 @@ class _Ffi implements DealCrypto {
   Uint8List openShared(Uint8List sealed, List<Uint8List> parts) {
     final all = Uint8List.fromList([for (final p in parts) ...Uint8List.sublistView(p, 0, pointBytes)]);
     return _must(_call([sealed, all], pointBytes, (i, o) => _openShared(i[0], i[1], parts.length, o)), 'open shared');
+  }
+
+  @override
+  Uint8List shareBytes(Uint8List secret, {required int n, required int t, required Uint8List seed}) => _must(
+      _call([secret, seed], n * secret.length, (i, o) => _shareBytes(i[0], secret.length, n, t, i[1], o)), 'share bytes');
+
+  @override
+  int bytesLagrange(List<int> have, int index, {int at = 0}) {
+    var c = -1;
+    _call([Uint8List.fromList(have)], 0, (i, o) {
+      c = _bytesLagrange(i[0], have.length, index, at);
+      return 0;
+    });
+    if (c < 0) throw StateError('bytes lagrange');
+    return c;
+  }
+
+  @override
+  Uint8List bytesScale(Uint8List share, int by) =>
+      _must(_call([share], share.length, (i, o) => _bytesScale(i[0], share.length, by, o)), 'bytes scale');
+
+  @override
+  Uint8List bytesSum(List<Uint8List> parts) {
+    final len = parts.first.length;
+    return _must(
+        _call([Uint8List.fromList([for (final p in parts) ...p])], len, (i, o) => _bytesSum(i[0], parts.length, len, o)),
+        'bytes sum');
   }
 
   @override

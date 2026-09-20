@@ -84,6 +84,28 @@ abstract class DealCrypto {
   /// of them is anything.
   Uint8List split(Uint8List secret, Uint8List seed, {int shares = 2});
 
+  /// A secret of any length in [n] shares of the same length, any [t]
+  /// of which rebuild it — the same shape [splitThreshold] gives a
+  /// key, in the field bytes live in.
+  ///
+  /// A seat's *secret* is thirty-two bytes rather than a scalar, and
+  /// it is what answers before the deck is dealt and at the audit, so
+  /// it needs the threshold as much as the key does.
+  Uint8List shareBytes(Uint8List secret, {required int n, required int t, required Uint8List seed});
+
+  /// What the byte share at [index] is worth among the shares [have]
+  /// holds, evaluated [at] an index: zero to rebuild the secret,
+  /// another index to make that index's share.
+  int bytesLagrange(List<int> have, int index, {int at = 0});
+
+  /// A byte share scaled by its coefficient: what a holder sends,
+  /// rather than the share.
+  Uint8List bytesScale(Uint8List share, int by);
+
+  /// Scaled byte shares summed — xor, in this field — into the secret,
+  /// or into the share of whatever index they were scaled towards.
+  Uint8List bytesSum(List<Uint8List> parts);
+
   /// A seat's key in [n] Shamir shares, any [t] of which rebuild it —
   /// where [split] makes shares that are all needed at once. Written
   /// in index order, [scalarBytes] each; a share's index is its place

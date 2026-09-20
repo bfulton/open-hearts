@@ -190,4 +190,53 @@ void main() {
       expect(open(pair, wider, widerKeys), card, reason: "the newcomer's share answers beside $pair");
     }
   });
+
+  test('a secret in byte shares: any two rebuild it, and a newcomer is given one', () async {
+    final d = await DealCrypto.load();
+    final secret = seed(11);
+    const n = 6;
+    final shares = d.shareBytes(secret, n: n, t: 2, seed: seed(12));
+    expect(shares.length, n * secret.length);
+    Uint8List share(Uint8List from, int i) =>
+        Uint8List.sublistView(from, (i - 1) * secret.length, i * secret.length);
+
+    // No share is the secret, and no two are alike.
+    for (var i = 1; i <= n; i++) {
+      expect(share(shares, i), isNot(secret));
+      for (var j = i + 1; j <= n; j++) {
+        expect(share(shares, i), isNot(share(shares, j)));
+      }
+    }
+
+    /// Whoever answers, each scaled by what its share is worth among
+    /// them, summed.
+    Uint8List rebuild(List<int> have, Uint8List from, {int at = 0}) =>
+        d.bytesSum([for (final i in have) d.bytesScale(share(from, i), d.bytesLagrange(have, i, at: at))]);
+
+    for (final pair in [
+      [1, 2],
+      [2, 5],
+      [3, 6],
+    ]) {
+      expect(rebuild(pair, shares), secret, reason: 'shares $pair rebuild it');
+    }
+    expect(rebuild([1, 3, 5], shares), secret, reason: 'more than two is the same secret');
+    expect(rebuild([4], shares), isNot(secret), reason: 'one share alone is not the secret');
+
+    // A juror arriving later is given share seven by two holders,
+    // neither of which ever holds the secret.
+    final seventh = rebuild([2, 5], shares, at: 7);
+    final wider = Uint8List.fromList([...shares, ...seventh]);
+    for (final pair in [
+      [7, 1],
+      [3, 7],
+    ]) {
+      expect(rebuild(pair, wider), secret, reason: "the newcomer's share answers beside $pair");
+    }
+
+    // A threshold of three needs three.
+    final three = d.shareBytes(secret, n: n, t: 3, seed: seed(13));
+    expect(rebuild([1, 2], three), isNot(secret));
+    expect(rebuild([1, 2, 4], three), secret);
+  });
 }

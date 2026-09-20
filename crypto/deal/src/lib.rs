@@ -424,6 +424,128 @@ pub fn split(secret: &[u8], shares: usize, seed: &[u8], out: &mut [u8]) -> Optio
     Some(shares * SCALAR)
 }
 
+// ---- shares of bytes ----------------------------------------------------
+//
+// A seat's *secret* is thirty-two bytes, not a scalar, and it is what
+// answers before the deck is dealt and at the audit — so it needs the
+// same t-of-n shape the key has, over the field bytes live in.
+// GF(2^8) with the usual polynomial: addition is xor, which is why
+// summing shares is summing them.
+
+/// Two bytes multiplied in GF(2^8), the field a byte is.
+fn gf_mul(mut a: u8, mut b: u8) -> u8 {
+    let mut out = 0u8;
+    for _ in 0..8 {
+        if b & 1 != 0 {
+            out ^= a;
+        }
+        let high = a & 0x80;
+        a <<= 1;
+        if high != 0 {
+            a ^= 0x1b;
+        }
+        b >>= 1;
+    }
+    out
+}
+
+/// A byte's inverse: a^254, since a^255 is one for every a but zero.
+fn gf_inv(a: u8) -> Option<u8> {
+    if a == 0 {
+        return None;
+    }
+    let mut out = 1u8;
+    let mut power = a;
+    // 254 = 0b11111110
+    for bit in 1..8 {
+        power = gf_mul(power, power);
+        if 254 >> bit & 1 != 0 {
+            out = gf_mul(out, power);
+        }
+    }
+    Some(out)
+}
+
+/// A secret of any length in [n] shares of the same length, any [t] of
+/// which rebuild it. Each byte gets its own polynomial of degree t−1
+/// over GF(2^8), drawn from [seed], and share i is every byte's
+/// polynomial at x = i; the index of a share is its place in the list,
+/// counted from one, as with [split_threshold].
+pub fn share_bytes(secret: &[u8], n: usize, t: usize, seed: &[u8], out: &mut [u8]) -> Option<usize> {
+    let len = secret.len();
+    if len == 0 || t < 2 || n < t || n > 255 || out.len() < n * len {
+        return None;
+    }
+    let mut rng = rng_from(seed);
+    // The coefficients above the constant term, one set per byte.
+    let mut above = vec![0u8; len * (t - 1)];
+    rand::RngCore::fill_bytes(&mut rng, &mut above);
+    for i in 1..=n {
+        for b in 0..len {
+            let mut y = secret[b];
+            let mut power = i as u8;
+            for c in 0..t - 1 {
+                y ^= gf_mul(above[b * (t - 1) + c], power);
+                power = gf_mul(power, i as u8);
+            }
+            out[(i - 1) * len + b] = y;
+        }
+    }
+    Some(n * len)
+}
+
+/// What the share at [index] is worth among the shares [have] holds,
+/// evaluated [at] an index — [lagrange] in the field bytes live in,
+/// and the same two uses: zero to rebuild the secret, another index to
+/// make that index's share.
+pub fn bytes_lagrange(have: &[u8], index: u8, at: u8) -> Option<u8> {
+    if have.is_empty() || !have.contains(&index) || index == 0 || have.contains(&0) {
+        return None;
+    }
+    let mut seen = have.to_vec();
+    seen.sort_unstable();
+    seen.dedup();
+    if seen.len() != have.len() {
+        return None;
+    }
+    let mut c = 1u8;
+    for k in have {
+        if *k == index {
+            continue;
+        }
+        c = gf_mul(c, gf_mul(at ^ *k, gf_inv(index ^ *k)?));
+    }
+    Some(c)
+}
+
+/// A share scaled by its coefficient: what a holder sends, rather than
+/// the share.
+pub fn bytes_scale(share: &[u8], by: u8, out: &mut [u8]) -> Option<usize> {
+    if out.len() < share.len() {
+        return None;
+    }
+    for (i, b) in share.iter().enumerate() {
+        out[i] = gf_mul(*b, by);
+    }
+    Some(share.len())
+}
+
+/// Scaled shares summed — which in this field is xor — into the
+/// secret, or into the share of whatever index they were scaled
+/// towards.
+pub fn bytes_sum(parts: &[u8], len: usize, out: &mut [u8]) -> Option<usize> {
+    if len == 0 || parts.is_empty() || parts.len() % len != 0 || out.len() < len {
+        return None;
+    }
+    out[..len].fill(0);
+    for i in 0..parts.len() / len {
+        for b in 0..len {
+            out[b] ^= parts[i * len + b];
+        }
+    }
+    Some(len)
+}
+
 /// A seat's key in [n] Shamir shares over the same scalar field, any
 /// [t] of which rebuild it — where [split] makes shares that are all
 /// needed at once.
@@ -834,6 +956,31 @@ pub unsafe extern "C" fn deal_reveal_token(secret: *const u8, masked: *const u8,
 #[no_mangle]
 pub unsafe extern "C" fn deal_split(secret: *const u8, shares: usize, seed: *const u8, out: *mut u8) -> i32 {
     done(split(input(secret, SCALAR), shares, input(seed, 32), output(out, shares * SCALAR)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_share_bytes(secret: *const u8, len: usize, n: usize, t: usize, seed: *const u8, out: *mut u8) -> i32 {
+    done(share_bytes(input(secret, len), n, t, input(seed, 32), output(out, n * len)))
+}
+
+/// The coefficient itself, since it is one byte: negative for a set
+/// that is not one.
+#[no_mangle]
+pub unsafe extern "C" fn deal_bytes_lagrange(have: *const u8, count: usize, index: u8, at: u8) -> i32 {
+    match bytes_lagrange(input(have, count), index, at) {
+        Some(c) => c as i32,
+        None => -1,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_bytes_scale(share: *const u8, len: usize, by: u8, out: *mut u8) -> i32 {
+    done(bytes_scale(input(share, len), by, output(out, len)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn deal_bytes_sum(parts: *const u8, count: usize, len: usize, out: *mut u8) -> i32 {
+    done(bytes_sum(input(parts, count * len), len, output(out, len)))
 }
 
 #[no_mangle]
@@ -1290,6 +1437,91 @@ mod wire {
     /// What the deck's m x n factorisation costs on the wire and in
     /// the browser: the argument's bytes, and the time to make and
     /// check one. Run with --nocapture, changing M and N above.
+    /// The field bytes live in, on its own: that gf_mul and gf_inv are
+    /// the field they claim to be, before anything is built on them.
+    #[test]
+    fn a_byte_is_a_field() {
+        assert_eq!(gf_inv(0), None, "zero has no inverse");
+        for a in 1..=255u8 {
+            assert_eq!(gf_mul(a, gf_inv(a).unwrap()), 1, "{a} times its inverse is one");
+            assert_eq!(gf_mul(a, 1), a);
+            assert_eq!(gf_mul(a, 0), 0);
+            for b in 1..=255u8 {
+                assert_eq!(gf_mul(a, b), gf_mul(b, a));
+                // Distributive over xor, which is what addition is here.
+                assert_eq!(gf_mul(a, b ^ 7), gf_mul(a, b) ^ gf_mul(a, 7));
+            }
+        }
+    }
+
+    /// A seat's secret in shares: any t rebuild it, t-1 say nothing,
+    /// and a juror arriving later is given one of its own.
+    #[test]
+    fn any_t_of_n_shares_rebuild_a_secret_and_a_newcomer_is_given_one() {
+        let secret = seed(11);
+        const N: usize = 6;
+        const T: usize = 2;
+        let len = secret.len();
+        let mut shares = vec![0u8; N * len];
+        assert_eq!(share_bytes(&secret, N, T, &seed(12), &mut shares), Some(N * len));
+        let share = |s: &[u8], i: u8| s[(i as usize - 1) * len..i as usize * len].to_vec();
+
+        // Nothing in a share is the secret, and no two are the same.
+        for i in 1..=N as u8 {
+            assert_ne!(share(&shares, i), secret.to_vec(), "share {i} is not the secret");
+            for j in i + 1..=N as u8 {
+                assert_ne!(share(&shares, i), share(&shares, j));
+            }
+        }
+
+        // Whoever answers, scaled by what their share is worth among
+        // them, and summed.
+        let rebuild = |have: &[u8], shares: &[u8], at: u8| -> Vec<u8> {
+            let mut parts = vec![0u8; have.len() * len];
+            for (n, &i) in have.iter().enumerate() {
+                let c = bytes_lagrange(have, i, at).unwrap();
+                bytes_scale(&share(shares, i), c, &mut parts[n * len..(n + 1) * len]).unwrap();
+            }
+            let mut out = vec![0u8; len];
+            bytes_sum(&parts, len, &mut out).unwrap();
+            out
+        };
+
+        for pair in [[1u8, 2], [2, 5], [3, 6], [1, 6]] {
+            assert_eq!(rebuild(&pair, &shares, 0), secret.to_vec(), "shares {pair:?} rebuild it");
+        }
+        assert_eq!(rebuild(&[1, 3, 5], &shares, 0), secret.to_vec(), "more than two is the same secret");
+        assert_eq!(rebuild(&[4], &shares, 0), share(&shares, 4), "one share alone is only itself");
+        assert_ne!(rebuild(&[4], &shares, 0), secret.to_vec(), "and it is not the secret");
+
+        // Share seven, made by two holders out of their own: each
+        // sends what its share is worth towards seven, and the
+        // newcomer sums them. Neither ever holds the secret.
+        let have: [u8; 2] = [2, 5];
+        let seventh = rebuild(&have, &shares, 7);
+        let mut wider = shares.clone();
+        wider.extend_from_slice(&seventh);
+        for pair in [[7u8, 1], [7, 4], [3, 7]] {
+            assert_eq!(rebuild(&pair, &wider, 0), secret.to_vec(), "the newcomer's share answers beside {pair:?}");
+        }
+
+        // At a threshold of three, two say nothing and three answer.
+        let mut three = vec![0u8; N * len];
+        share_bytes(&secret, N, 3, &seed(13), &mut three).unwrap();
+        assert_ne!(rebuild(&[1, 2], &three, 0), secret.to_vec(), "two of a threshold of three is not enough");
+        assert_eq!(rebuild(&[1, 2, 4], &three, 0), secret.to_vec());
+
+        // And the guards.
+        let mut out = vec![0u8; len];
+        assert_eq!(share_bytes(&secret, 3, 1, &seed(14), &mut out), None, "a threshold of one is no threshold");
+        assert_eq!(share_bytes(&secret, 2, 3, &seed(14), &mut shares), None, "nor more than there are shares");
+        assert_eq!(share_bytes(&[], 3, 2, &seed(14), &mut shares), None);
+        assert_eq!(bytes_lagrange(&[1, 2], 3, 0), None, "an index outside the set");
+        assert_eq!(bytes_lagrange(&[1, 1], 1, 0), None, "a repeat");
+        assert_eq!(bytes_lagrange(&[0, 1], 1, 0), None, "zero is the secret, not a share");
+        assert_eq!(bytes_sum(&[0u8; 5], 2, &mut out), None, "parts that are not whole shares");
+    }
+
     /// Any t of n open a card, t-1 do not, and a juror who arrives
     /// later is given a share of its own without the key ever being
     /// put back together.
