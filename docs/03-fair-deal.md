@@ -222,6 +222,21 @@ offer say so, and a build that cannot run the deal does not sit down.
   moment it is checked: opening a card is the sum of the seats'
   tokens, and a sum has nothing to check. So a token is verified on
   arrival and stored bare, and `unmask` takes bare tokens.
+- **A bot seat's escrow is a threshold, not two halves.** A seat's
+  secret is escrowed so that a departed seat's cards can still be
+  opened. For a person's seat that splits across the other people and
+  the jury, and one live juror of any answers it. For a **bot seat**
+  the jury is both sides, and it used to be cut in two with one piece
+  each — every share of a side needed, which is the worst shape
+  availability can have and made a jury of six behave like a jury of
+  three ([doc 04](04-live-play.md), "The sizing"). It is now Shamir
+  shares over GF(2⁸), one per juror, any `escrowThreshold` of which
+  rebuild it. One juror alone is still nothing, which is the whole
+  point — a player with one juror's help is exactly what a bot's hand
+  is hidden from — and losing a juror no longer takes the seat with
+  it. The same coefficient evaluated at another index gives a juror
+  arriving later a share of its own, made by two holders out of theirs,
+  with the secret never rebuilt anywhere in the making of it.
 - **A hand's deal is turns of the table** ([doc 04](04-live-play.md)).
   Four rounds of one turn per seat before the pass — keys, a shuffle
   in seat order, reveal tokens for the other seats' thirty-nine

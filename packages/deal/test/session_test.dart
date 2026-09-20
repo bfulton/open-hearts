@@ -411,7 +411,7 @@ void main() {
     expect((again['seals'] as Map), isNotEmpty);
   });
 
-  test('a bot seat a juror holds escrows to the jury alone: two jurors open it, a player and a juror cannot', () {
+  test('a bot seat a juror holds escrows to the jury alone: any two jurors open it, a player and a juror cannot', () {
     // Three people and a bot seat held by the first juror. Its key is
     // drawn like a person's rather than hashed from what everyone
     // knows, so the table cannot compute its hand (docs/04-live-play.md).
@@ -429,8 +429,9 @@ void main() {
     expect(keys['pieces'], isEmpty, reason: 'no player holds a piece of a bot seat');
     expect((keys['custody'] as List).length, jury.length, reason: 'one to every juror');
 
-    // Every juror opens its own piece; the two sides of the jury hold
-    // different halves, and a side on its own is noise.
+    // Every juror opens its own piece, and a piece on its own is
+    // noise: any two of them rebuild the secret and one never does
+    // (deal.dart, escrowThreshold).
     final jurors = [for (final k in jury) make(seats, null, key: k, custodians: jury)];
     for (final j in jurors) {
       expect(j.acceptKeys(keys), isTrue);
@@ -447,13 +448,30 @@ void main() {
     // hand is hidden from is exactly the pair that cannot open it.
     final fromJuror0 = jurors[0].releaseShare(3)!;
     expect(players[0].acceptRelease(fromJuror0), isTrue);
-    expect(players[0].knowsSecret(3), isFalse, reason: 'a juror and a player are not two sides');
-    expect(players[0].acceptRelease(jurors[1].releaseShare(3)!), isTrue);
-    expect(players[0].knowsSecret(3), isFalse, reason: 'nor are two jurors of the same side');
+    expect(players[0].knowsSecret(3), isFalse, reason: 'a player holds nothing, so one juror is one piece');
 
-    // Two jurors from opposite sides do.
-    expect(players[0].acceptRelease(jurors[2].releaseShare(3)!), isTrue);
-    expect(players[0].knowsSecret(3), isTrue, reason: 'one juror from each side rebuilds it');
+    // Any second juror does, whichever it is — where the escrow used
+    // to want one from each of two fixed halves, and losing a half
+    // took the seat with it (docs/04-live-play.md, "The sizing").
+    expect(players[0].acceptRelease(jurors[1].releaseShare(3)!), isTrue);
+    expect(players[0].knowsSecret(3), isTrue, reason: 'any two of the jury rebuild it');
+
+    // And it is any two, not that two: every other pair as well, each
+    // to a side that has heard nothing yet.
+    for (final pair in [
+      [1, 2],
+      [2, 3],
+      [0, 3],
+      [1, 3],
+    ]) {
+      final fresh = make(seats, 0, custodians: jury);
+      expect(fresh.acceptKeys(keys), isTrue);
+      fresh.seatLeft(3);
+      expect(fresh.acceptRelease(jurors[pair[0]].releaseShare(3)!), isTrue);
+      expect(fresh.knowsSecret(3), isFalse, reason: 'one of ${pair[0]} is still one');
+      expect(fresh.acceptRelease(jurors[pair[1]].releaseShare(3)!), isTrue);
+      expect(fresh.knowsSecret(3), isTrue, reason: 'jurors $pair open it');
+    }
   });
 
   test('a verifier that saw every message ends with the whole deal, and refuses what does not verify', () {

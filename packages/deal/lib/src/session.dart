@@ -463,16 +463,31 @@ class DealSession {
       // One piece to each of the two sides the seat escrows across:
       // the other people and the jury for a person's seat, the jury
       // split in two for a bot seat a juror holds.
-      final (sideA, sideB) = _escrowSides(me, custodians);
-      final first = _draw();
-      final second = _xor(secret, first);
-      for (final s in others) {
-        pieces['$s'] = _b64(_wrapFor(_keyOf(s), first, me));
-      }
-      for (final j in custodians) {
-        // Every juror gets its own entry at its own index, whichever
-        // side it is on, so opening one is the same either way.
-        custody.add(_b64(_wrapFor(j, sideA.contains(j) ? first : second, me)));
+      if (_thresholdEscrow(me, custodians)) {
+        // A bot seat's secret is the jury's alone, and in shares any
+        // [escrowThreshold] of which rebuild it: one juror is still
+        // nothing, and losing one no longer takes the seat with it.
+        // A share's index is its custodian's place in the list,
+        // counted from one, which is what the coefficients need.
+        final shares = crypto.shareBytes(secret, n: custodians.length, t: escrowThreshold, seed: _seed('escrow', me));
+        for (var i = 0; i < custodians.length; i++) {
+          custody.add(_b64(_wrapFor(custodians[i], Uint8List.sublistView(shares, i * secret.length, (i + 1) * secret.length), me)));
+        }
+      } else {
+        // A person's seat splits across the other people and the
+        // jury: one live juror of any answers it, which is not the
+        // shape that needed fixing.
+        final (sideA, sideB) = _escrowSides(me, custodians);
+        final first = _draw();
+        final second = _xor(secret, first);
+        for (final s in others) {
+          pieces['$s'] = _b64(_wrapFor(_keyOf(s), first, me));
+        }
+        for (final j in custodians) {
+          // Every juror gets its own entry at its own index, whichever
+          // side it is on, so opening one is the same either way.
+          custody.add(_b64(_wrapFor(j, sideA.contains(j) ? first : second, me)));
+        }
       }
       // And the key itself in two shares, to the same holders. The
       // secret's pieces answer before the deck is dealt, where a
@@ -516,6 +531,13 @@ class DealSession {
   Map<String, Object?>? _myKeysMessage;
 
   Uint8List _xor(Uint8List a, Uint8List b) => Uint8List.fromList([for (var i = 0; i < a.length; i++) a[i] ^ b[i]]);
+
+  /// Whether [seat]'s secret is escrowed as a threshold over the whole
+  /// jury rather than across two sides. A bot seat is, when there are
+  /// enough custodians to make a threshold of; a person's seat is not,
+  /// since its two sides are the other people and the jury, and one
+  /// live juror of any answers that.
+  bool _thresholdEscrow(int seat, List<String> custodians) => !_human(seat) && custodians.length >= escrowThreshold;
 
   /// The two sides a seat's secret is escrowed across, one piece each,
   /// so that one holder from each rebuilds it and neither side alone
@@ -1257,7 +1279,8 @@ class DealSession {
       final piece = _unb64(m['share']);
       if (!_keyed(about) || !_gone.contains(about) || piece.length != 32) return false;
       final custodianKeys = _custodiansOf[about] ?? const <String>[];
-      final (sideA, sideB) = _escrowSides(about, custodianKeys);
+      final threshold = _thresholdEscrow(about, custodianKeys);
+      final (sideA, sideB) = threshold ? (custodianKeys, custodianKeys) : _escrowSides(about, custodianKeys);
       if (!sideA.contains(holder) && !sideB.contains(holder)) return false;
       if (_secrets.containsKey(about)) return true;
       final got = _released.putIfAbsent(about, () => {});
@@ -1267,6 +1290,22 @@ class DealSession {
       final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
       if (own != null && k != null) got[k] = own;
       final pk = _pks[about]!;
+      if (threshold) {
+        // Any [escrowThreshold] of the custodians, each piece weighed
+        // by what its index is worth among the ones that answered, and
+        // summed. More than the threshold is the same secret, not a
+        // different one, so everything in hand goes in.
+        final have = [
+          for (final who in got.keys)
+            if (custodianKeys.contains(who)) custodianKeys.indexOf(who) + 1,
+        ]..sort();
+        if (have.length < escrowThreshold) return true;
+        final secret = crypto.bytesSum([
+          for (final i in have) crypto.bytesScale(got[custodianKeys[i - 1]]!, crypto.bytesLagrange(have, i)),
+        ]);
+        if (_same(crypto.keygen(secret), pk)) _learnSecret(about, secret);
+        return true;
+      }
       if (custodianKeys.isEmpty) {
         if (!sideA.every(got.containsKey)) return true;
         var secret = Uint8List(32);

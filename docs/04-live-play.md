@@ -1071,10 +1071,31 @@ The last two are **built** (`presence_relay.dart`, `client.dart`).
   one — which is how session lengths generally behave and is an
   assumption until there is a population to measure.
 
-What is not built is the escrow itself. A hand that cannot open a bot
-seat mid-hand still has no graceful degradation: falling back to open
-bot seats happens only before the deal, because after it the seat's
-cards are masked and the holder's token is the only way in.
+The escrow is **built too**, and it is the one that mattered: a bot
+seat's secret is now Shamir shares over GF(2⁸), one per juror, any
+`escrowThreshold` of which rebuild it (`packages/deal`,
+[doc 03](03-fair-deal.md)). Where it took one live juror from each of
+two fixed halves, it takes any two of the jury. One juror alone is
+still nothing.
+
+Worth being exact about which object that is, because it is not the
+obvious one. A bot seat has two escrows: its **secret**, xor-split,
+which did go by side; and its **key**, in two shares, where one goes
+to the other human seats and the other to the jury — and a bot seat
+has no other human seats, so one of its two key shares was held by
+nobody and the in-play share path could never cover it. What covers a
+departed bot seat is the secret, which is why the secret is what
+changed.
+
+What is still not built is the **top-up**: keeping the jury at a
+number of live members and giving each newcomer a share. The
+primitives for it are in and tested — two holders each send what
+their share is worth towards a new index, and the newcomer sums them
+— but nothing yet drives it. Until it does, the numbers above are for
+a jury that only shrinks. And a hand that cannot open a bot seat
+mid-hand still has no graceful degradation: falling back to open bot
+seats happens only before the deal, because after it the seat's cards
+are masked and the holder's token is the only way in.
 
 Two mitigations this section used to lean on do not apply here. A
 **redraw** repairs who rules and who holds a seat, but not the escrow:

@@ -27,6 +27,16 @@ const tokenBytes = 128;
 const sealedBytes = 64;
 const sealProofBytes = 160;
 
+/// How many custodians have to answer to open a bot seat: any two of
+/// the jury, where it used to be one from each of two fixed halves.
+///
+/// Two is the least that is still a secret — one juror alone is
+/// nothing, which is the whole point of a bot seat's hand being
+/// hidden from a player with one juror's help (docs/04-live-play.md).
+/// Above two it buys secrecy against a wider ring at the cost of the
+/// availability the threshold was for.
+const escrowThreshold = 2;
+
 /// One argument for a batch of reveal tokens, however many
 /// ([DealCrypto.revealTokens]).
 const batchProofBytes = 96;
