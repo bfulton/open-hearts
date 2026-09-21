@@ -2060,8 +2060,8 @@ class TableClient {
   int get _juryDrawWait => _jurorsWait - 10000;
 
   bool _everyBotHeld(Map<int, PublicKey> held) {
-    for (var s = 0; s < seatCount; s++) {
-      if (holders[s] is BotSeat && !held.containsKey(s)) return false;
+    for (final s in _botSeatsAt(game.handNumber)) {
+      if (!held.containsKey(s)) return false;
     }
     return true;
   }
@@ -2202,7 +2202,46 @@ class TableClient {
     final jury = drawn.isNotEmpty
         ? drawn.first.event.jurors
         : (_firstSummons[hand]?.jurors ?? const <PublicKey>[]);
-    return _asKeyed(hand, assignBots(jury, [for (var s = 0; s < seatCount; s++) if (holders[s] is BotSeat) s]));
+    return _asKeyed(hand, assignBots(jury, _botSeatsAt(hand)));
+  }
+
+  /// The bot seats a jury holds at [hand]: the ones that were already
+  /// bots when the hand began.
+  ///
+  /// Read from the record rather than from the seat list as it stands
+  /// here, because while a departure is in flight those are not the
+  /// same thing. A person leaving turns their seat into a bot, and
+  /// [assignBots] hands the bot seats out in order — so one seat more
+  /// than another peer has shifts every juror onto a different seat,
+  /// and each then refuses what the others say for theirs. Two jurors
+  /// sixty-five and four hundred milliseconds behind a leave fixed
+  /// two bot seats where everyone else fixed three, and the hand
+  /// stopped at a seat whose keys were nobody's to make: the juror
+  /// the others were waiting on was busy making a different seat's
+  /// (chaos seed 5; `tool/walk.dart` prints the whole of it).
+  ///
+  /// The hand a person leaves in is not the jury's to hold in any
+  /// case. That seat's cards are opened from the escrow in the clear,
+  /// because the hand they open was that person's own and the table
+  /// is entitled to check it, and from then on the seat is everyone's
+  /// to play ([_botActsHere], `_deal.gone`). It becomes a bot seat
+  /// the jury holds at the hand after, when it is dealt cards nobody
+  /// has seen.
+  List<int> _botSeatsAt(int hand) {
+    final out = <int>[];
+    for (var s = 0; s < seatCount; s++) {
+      if (holders[s] is! BotSeat) continue;
+      final was = spec.seats[s];
+      if (was is HumanSeat) {
+        // Where the leaver stood, not where this peer noticed: a
+        // removal is placed at a turn, and every side reads the same
+        // hand from it.
+        final at = _removedAt[was.key];
+        if (at == null || at.hand >= hand) continue;
+      }
+      out.add(s);
+    }
+    return out;
   }
 
   /// The draw, corrected by the record wherever the record has
@@ -2253,11 +2292,16 @@ class TableClient {
       return by != 0 ? by : a.event.id.compareTo(b.event.id);
     });
 
-  /// A jury that settles here after the assignment was fixed, and
-  /// belongs earlier in the record than the one it was read from: the
-  /// assignment was fixed too soon. It happens to a juror carried the
-  /// record — the redraw that summoned it arrives before the draw that
-  /// came first — and to any peer that hears two juries out of order.
+  /// The assignment against what the record now says it should be.
+  /// Both of its two inputs can arrive after it was fixed:
+  ///
+  /// - **The hand's first jury.** A juror carried the record hears the
+  ///   redraw that summoned it before the draw that came first, and
+  ///   any peer can hear two juries out of order.
+  /// - **Which seats are bots.** A person leaving turns their seat
+  ///   into one, and a peer that has not heard the leave counts a seat
+  ///   fewer ([_botSeatsAt]). The leave decides a hand the assignment
+  ///   is read for, so one arriving late moves it.
   ///
   /// Fixed again, and the deal built again with it — and the steps
   /// that already settled fed into the new session from the races
@@ -2267,24 +2311,28 @@ class TableClient {
     final from = _heldFrom[hand];
     if (from == null) return;
     final drawn = _juriesDrawnFor(hand);
-    if (drawn.isEmpty || drawn.first.event.id == from) return;
     // The record's draw, against the one standing here. They agree
     // almost always — a juror fixes from its summons a second before
     // the draw it was summoned into is carried to it — and agreeing
     // is not worth a rebuild: the assignment is the same, so say the
     // jury it came from and leave the deal alone.
-    final again = assignBots(
-        drawn.first.event.jurors, [for (var s = 0; s < seatCount; s++) if (holders[s] is BotSeat) s]);
+    final jury = drawn.isNotEmpty
+        ? drawn.first.event.jurors
+        : (_firstSummons[hand]?.jurors ?? const <PublicKey>[]);
+    if (jury.isEmpty) return;
+    final again = assignBots(jury, _botSeatsAt(hand));
     final standing = _heldByHand[hand];
+    final now = drawn.isNotEmpty ? drawn.first.event.id : from;
     if (standing != null &&
         standing.length == again.length &&
         standing.entries.every((e) => again[e.key] == e.value)) {
-      _heldFrom[hand] = drawn.first.event.id;
+      _heldFrom[hand] = now;
       return;
     }
     final d = _deal;
     if (d == null || d.hand != hand) return;
-    _trace('hand $hand: its first jury came late; the bot seats are dealt again');
+    _trace('hand $hand: ${now == from ? 'a seat turned into a bot after' : 'its first jury came after'} '
+        'the bot seats were fixed; they are dealt again');
     _heldByHand.remove(hand);
     _heldFrom.remove(hand);
     _startDeal();
@@ -3104,6 +3152,13 @@ class TableClient {
         _releaseFor(seat);
         _drainFuture();
       }
+      // A removal placed in an earlier hand changes which seats this
+      // hand's jury holds, and it can arrive long after the hand was
+      // dealt ([_refixHolders]). One placed in this hand changes
+      // nothing — that seat is not the jury's to hold in the hand it
+      // is given up in — so the check costs a comparison and the
+      // rebuild does not happen.
+      _refixHolders(game.handNumber);
     }
   }
 

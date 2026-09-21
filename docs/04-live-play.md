@@ -1212,6 +1212,30 @@ and an assignment fixed before the hand's first jury arrived is fixed
 again, the deal rebuilt with it and the steps that already settled fed
 back into the rebuilt session.
 
+**Which seats are bots is the other half of that**, and it was still
+being read off the seat list as it stood at the instant the
+assignment was fixed. The seats are handed out in order, so a peer
+counting one bot seat more than another does not merely disagree
+about that seat — every juror after it moves. A person leaving turns
+their seat into a bot, so a leave in flight is exactly that
+disagreement: two jurors sixty-five and four hundred milliseconds
+behind one fixed two bot seats where everyone else fixed three, and
+the hand stopped at a seat whose keys were nobody's to make, since
+the juror the others were waiting on was busy making a different
+seat's. Every peer alive, every heartbeat on time, and nothing in any
+trace to point at.
+
+So a seat counts as the jury's at a hand by where the record puts the
+departure that made it one, not by when that departure arrived. And
+the hand a person leaves in is not the jury's to hold in any case:
+that seat's cards are opened from the escrow in the clear — the hand
+they open was that person's own and the table is entitled to check it
+— and the seat is everyone's to play from then on. It becomes a bot
+seat the jury holds at the hand after, when it is dealt cards nobody
+has seen. A departure that arrives after the assignment was fixed
+moves it the same way a late jury does
+(`packages/table/test/leave_mid_deal_test.dart`).
+
 **And the escrow opens the seat to the jury, not to the table.** What
 it takes to rebuild a secret is hearing `escrowThreshold` pieces, not
 being given one — so a piece said in the clear is a piece the people
