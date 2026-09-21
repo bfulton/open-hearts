@@ -861,19 +861,13 @@ class TableClient {
   }
 
   /// And it is free, which is why it is this rather than nothing.
-  /// Over twenty seeded hands (`tool/time_to_deal.dart`), a sealed
+  /// Over twenty seeded hands (`tool/time_to_deal.dart`) a sealed
   /// deal takes the same time at zero, one, two, three and four
-  /// seconds: 6.55 s where nothing goes missing and 15.41 s where
-  /// something does, six hands of twenty being the first. Nothing in
-  /// that spread is this wait — it is a juror a step behind waiting
-  /// out [carryRepeatMs] to be carried, and with that window at two
-  /// seconds instead of eight the slow hands are 8.51 s.
-  ///
-  /// Past four seconds the shape does change: at six and eight every
-  /// hand deals in 12.68 s, the spread gone and the middle worse. Not
-  /// a reason to take it — the wait is here so that a late draw can
-  /// still be read, not to keep the jury in step — but worth knowing
-  /// that it is not monotonic.
+  /// seconds. The spread those numbers used to show — 6.55 s where
+  /// nothing went missing and 15.41 s where something did — was
+  /// never this wait; it was a deal step thrown away for arriving
+  /// just before the jury that vouches for it ([_onAction]), and it
+  /// is gone: every one of the twenty now deals in 6.6 s.
   static const _juryFirmMs = 2000;
 
   /// Whether this side is the one to say a given-up seat's moves: the
@@ -1500,23 +1494,15 @@ class TableClient {
   /// turns asking for the same jury gets one copy of it, and what it
   /// costs is the wait after a carry that goes missing.
   ///
-  /// That wait has since been measured, and it is the largest thing
-  /// in a sealed deal (`tool/time_to_deal.dart`). With a jury of ten,
-  /// fourteen hands in twenty have a juror a step behind — it settled
-  /// its own seat's keys and is missing the other bot seat's — and it
-  /// waits this window out to be sent them, because the copy that
-  /// went to another juror a moment earlier counts as having been
-  /// said. A hand deals in 6.55 s where that does not happen and
-  /// 15.41 s where it does; at two seconds here the slow hands are
-  /// 8.51 s, which is this window and nothing else.
-  ///
-  /// It stays at eight because the other side of it is measured too:
-  /// a hand says 349,305 bytes at five seconds and 269,961 at eight,
-  /// and the knee is here. Six seconds of the deal against eighty
-  /// kilobytes a hand is a trade worth making deliberately rather
-  /// than by lowering a constant — and the better answer is probably
-  /// neither, since a peer that asks again from the same step is
-  /// saying the copy did not reach it.
+  /// That wait looked for a while like the largest thing in a sealed
+  /// deal, and this window like the thing to change. It was not. A
+  /// peer waiting the window out is a peer that needed carrying, and
+  /// what was worth fixing was its needing to be carried at all
+  /// ([_onAction]). Three ways of letting a copy through sooner were
+  /// measured — a memory per asker, a way past the window for a peer
+  /// asking twice from one place, the same narrowed to the turn it
+  /// named — and each of them bought, at between a tenth and three
+  /// times the traffic, what keeping one event bought for nothing.
   static const carryRepeatMs = 8000;
 
   /// Forgets what has gone stale, so the memory is the last few
@@ -1603,9 +1589,27 @@ class TableClient {
     final seat = _turnSeat[turn]!;
     if (!_mayAct(seat, event.author, turn.hand)) return;
     if (!_valid(event, seat)) {
-      // Not valid here now — which for a deal step can mean this peer
-      // has yet to see what it is checked against; let a re-send be
-      // looked at afresh.
+      // Not valid *here, now*, which is not the same as wrong. A deal
+      // step is checked against things this side may not have yet:
+      // round 0 names the custodians it sealed to and is refused
+      // until they have all been seen proposed ([_validDeal]), and a
+      // juror hears a hand's jury a moment after the table does. So
+      // it is kept and looked at again whenever that changes
+      // ([_drainFuture]) rather than dropped.
+      //
+      // Dropping it cost the deal nine seconds in most hands. The
+      // event arrives, is refused by a hair — twenty milliseconds
+      // before the jury it was waiting on, in the run that turned
+      // this up — and from then on the only way back to it is
+      // somebody saying it again, which the carry window holds off
+      // for eight seconds ([carryRepeatMs]). Keeping the copy in hand
+      // costs nothing and asks nobody for anything.
+      //
+      // Only a deal step, and only while its turn is still open: a
+      // play or a pass that does not check out is wrong rather than
+      // early, and a turn that settles some other way takes the held
+      // copy with it at the next drain.
+      if (event.kind == EventKind.deal) return _defer(event);
       _seen.remove(event.id);
       return;
     }
@@ -3379,7 +3383,12 @@ class TableClient {
 
   void _onJury(TableEvent event) {
     try {
+      // A jury proposed is a set of keys a deal step may seal its
+      // escrow to ([_validDeal]), so a deal step held back for want
+      // of them is worth looking at again the moment they arrive.
+      final before = _everProposed.length;
       _everProposed.addAll(event.jurors);
+      if (_everProposed.length != before) _drainFuture();
     } catch (_) {}
     if (event.hand > game.handNumber) return _defer(event);
     if (event.hand < game.handNumber || !_isParticipant(event.author)) return;

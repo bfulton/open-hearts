@@ -23,14 +23,19 @@
 /// gives the same milliseconds every time.
 ///
 /// What it found, at a jury of ten and twenty seeds: neither of those
-/// two waits is what the time goes on. The deal is 6.55 s when
-/// nothing goes missing, and 15.41 s — fourteen hands in twenty —
-/// when a juror settles its own seat's keys and is missing the other
-/// bot seat's. It then waits out `carryRepeatMs` to be sent them,
-/// because the copy that went to another juror a moment earlier
-/// counts as having been said. Setting the firmness wait anywhere
-/// from zero to four seconds changes nothing; setting that window to
-/// two seconds turns the slow hands into 8.51 s.
+/// two waits was what the time went on. The deal took 6.55 s when
+/// nothing went missing and 15.41 s — fourteen hands in twenty —
+/// when a juror was sent a bot seat's keys a moment before the jury
+/// that vouches for them, refused the keys for that reason, and threw
+/// them away. From there the only way back was somebody saying them
+/// again, which the carry window held off for eight seconds. Keeping
+/// the refused step and looking at it again when the jury lands
+/// (packages/table, client.dart, `_onAction`) took every one of the
+/// twenty to 6.6 s and, averaged over eight seeded hands, took
+/// between a fifth and nearly half off the wire as well
+/// (`tool/wire_in_sim.dart --seeds 8`): a peer that keeps what it was
+/// sent does not have to be carried, and carrying is the expensive
+/// thing.
 library;
 
 // A measurement's output is its log.
@@ -52,6 +57,8 @@ Future<void> main(List<String> args) async {
   final jurors = argOf('jury', jurySize + 4);
   final took = <int>[];
   final each = <({int seed, int ms})>[];
+  var holding = 0;
+  var sworn = 0;
   for (var seed = 1; seed <= seeds; seed++) {
     final t = SimTable(humans: 2, seed: seed, crypto: crypto, jurors: jurors);
     t.start();
@@ -63,6 +70,16 @@ Future<void> main(List<String> args) async {
     }
     took.add(t.clock.nowMs);
     each.add((seed: seed, ms: t.clock.nowMs));
+    // And how much of the jury could do its job by then. A juror
+    // holds a piece of each bot seat's secret only once it has read
+    // that seat's keys out of the deal; one that missed a deal step
+    // is carrying nothing, and could not open the seat if its holder
+    // went — which is the one thing the jury is there for. Counted at
+    // the moment the first card falls, which is when a holder can
+    // first go.
+    final hand = t.clients.first.game.handNumber;
+    holding += t.jurors.where((j) => j.client?.holdsEscrowPiece(hand) ?? false).length;
+    sworn += t.jurors.length;
     t.stop();
   }
   took.sort();
@@ -76,5 +93,6 @@ Future<void> main(List<String> args) async {
       '${(mean / 1000).toStringAsFixed(2)} s on average, '
       '${(took[took.length ~/ 2] / 1000).toStringAsFixed(2)} s in the middle, '
       '${(took.last / 1000).toStringAsFixed(2)} s at worst');
+  print('  jurors holding a piece of the escrow when the first card fell: $holding of $sworn');
   print('  every hand, by seed: ${each.map((e) => '${e.seed}:${(e.ms / 1000).toStringAsFixed(2)}').join(' ')}');
 }

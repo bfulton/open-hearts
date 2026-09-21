@@ -46,8 +46,22 @@ Future<void> main(List<String> args) async {
   // half).
   final asked = args.indexOf('--jury');
   final sizes = asked >= 0 && asked + 1 < args.length ? [for (final n in args[asked + 1].split(',')) int.parse(n)] : const [4, 6];
+  // And how many seeded hands to average over. One hand is exact —
+  // the same seed gives the same bytes every time — but it is one
+  // draw, and the draw decides things that move the total by half
+  // either way: which seats the bots take, who is drawn to hold
+  // them, which peers fall behind. A single hand is enough to
+  // measure a protocol change that doubles the traffic and not one
+  // that moves it a tenth, so a change of that size is read off an
+  // average of several.
+  final over = args.indexOf('--seeds');
+  final seeds = over >= 0 && over + 1 < args.length ? int.parse(args[over + 1]) : 1;
   for (final jurors in sizes) {
-    final t = SimTable(humans: 2, seed: 7, crypto: crypto, jurors: jurors);
+    var said = 0;
+    var handed = 0;
+    var dealt = 0;
+    for (var seed = 7; seed < 7 + seeds; seed++) {
+    final t = SimTable(humans: 2, seed: seed, crypto: crypto, jurors: jurors);
     if (slow) {
       t.net.minLatencyMs = 200;
       t.net.maxLatencyMs = 400;
@@ -67,13 +81,25 @@ Future<void> main(List<String> args) async {
       if (held.isNotEmpty) t.net.goOffline(held.values.first);
     }
     final ok = t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 20 * 60 * 1000);
-    final net = t.net;
-    print('--- 2 people, 2 bot seats, a jury of $jurors${quiet ? ', its holder gone' : ''} (hand reached: $ok) ---');
-    print('said ${net.said} bytes, handed over ${net.handed} (${(net.handed / net.said).toStringAsFixed(1)}x)');
-    final by = net.saidByKind.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    for (final e in by.take(10)) {
-      print('  said ${e.key.padRight(18)} ${e.value}');
+    if (ok) dealt++;
+    said += t.net.said;
+    handed += t.net.handed;
+    for (final e in t.net.saidByKind.entries) {
+      byKind[e.key] = (byKind[e.key] ?? 0) + e.value;
     }
     t.stop();
+    }
+    final n = seeds;
+    print('--- 2 people, 2 bot seats, a jury of $jurors${quiet ? ', its holder gone' : ''} '
+        '(${seeds == 1 ? 'hand reached: ${dealt == 1}' : '$dealt of $seeds hands reached'}) ---');
+    print('said ${said ~/ n} bytes, handed over ${handed ~/ n} (${(handed / said).toStringAsFixed(1)}x)');
+    final by = byKind.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    for (final e in by.take(10)) {
+      print('  said ${e.key.padRight(18)} ${e.value ~/ n}');
+    }
+    byKind.clear();
   }
 }
+
+/// Bytes by kind, summed over the seeds of one jury size.
+final Map<String, int> byKind = {};
