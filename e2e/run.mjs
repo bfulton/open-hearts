@@ -72,17 +72,32 @@ async function main() {
       // and they are kept apart, because a duty following somebody
       // else's table says a line a trick and would push the table's
       // own account of why it stopped out of a shared list.
-      const said = { table: [], duty: [] };
+      const said = { table: { first: [], last: [] }, duty: { first: [], last: [] } };
       traces.push(said);
       page.on('console', (m) => {
         const t = m.text();
         const which = t.startsWith('table: ') ? 'table' : t.startsWith('duty: ') ? 'duty' : null;
-        if (which) {
-          // Without the bodies: a deal step carries kilobytes of
-          // proof, and none of it says why a table stopped.
-          const keep = said[which];
-          keep.push(t.length > 240 ? `${t.slice(0, 240)}…` : t);
-          if (keep.length > 500) keep.splice(0, keep.length - 500);
+        if (which && !/ emit (serve|heartbeat) /.test(t)) {
+          // Not the heartbeats. A client that has stopped says
+          // nothing else, so a ring that keeps them keeps five
+          // hundred copies of "still here" and throws away the last
+          // thing it did — which is the only line that matters.
+          //
+          // Without the bodies either: a deal step carries kilobytes
+          // of proof, and none of it says why a table stopped.
+          const line = t.length > 240 ? `${t.slice(0, 240)}…` : t;
+          // Both ends, not the last of it. A client that never moved
+          // is explained by its opening — the jury it heard, the deal
+          // it built — and a ring that keeps only the end throws that
+          // away and leaves a thousand identical lines saying it is
+          // still asking. So the first of what a client said is kept
+          // whole and the rest rolls.
+          const said_ = said[which];
+          if (said_.first.length < 250) said_.first.push(line);
+          else {
+            said_.last.push(line);
+            if (said_.last.length > 500) said_.last.splice(0, said_.last.length - 500);
+          }
         }
         // Errors, the table's and the duty's own traces about the
         // jury, and the mesh: who this device dials and whether the
@@ -244,10 +259,15 @@ async function main() {
     for (const [i, page] of pages.entries()) {
       if (page.isClosed()) continue;
       for (const which of ['table', 'duty']) {
-        const keep = traces[i]?.[which] ?? [];
-        if (!keep.length) continue;
-        log(`--- the last of ${names[i]}'s ${which === 'table' ? 'own table' : 'jury duty'} ---`);
-        for (const l of keep.slice(-70)) log(`    ${l}`);
+        const keep = traces[i]?.[which] ?? { first: [], last: [] };
+        if (!keep.first.length) continue;
+        const whose = `${names[i]}'s ${which === 'table' ? 'own table' : 'jury duty'}`;
+        log(`--- the first of ${whose} ---`);
+        for (const l of keep.first) log(`    ${l}`);
+        if (keep.last.length) {
+          log(`--- the last of ${whose} ---`);
+          for (const l of keep.last.slice(-70)) log(`    ${l}`);
+        }
       }
     }
   } finally {

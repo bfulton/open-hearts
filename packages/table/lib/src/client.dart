@@ -764,8 +764,19 @@ class TableClient {
 
   // ---- the hand ---------------------------------------------------------
 
+  /// A line a hand, for whatever this side is declining to do. What
+  /// the table sees when a juror will not act is nothing at all, and
+  /// nothing at all is also what a starved device looks like.
+  void _sayOnce(int hand, String what) {
+    if (!_saidOnce.add('$hand|$what')) return;
+    _trace('hand $hand: $what');
+  }
+
+  final Set<String> _saidOnce = {};
+
   void _openHand() {
     played.clear();
+    _saidOnce.clear();
     _botTurnSince.clear();
     step = 0;
     // The hand's jurors are the hand's to reach: a jury carried for an
@@ -2515,9 +2526,20 @@ class TableClient {
     // The seat this side acts for in the deal: its own if it is a
     // player, or the bot seat it holds if it is a juror. A player that
     // has been removed acts for nothing.
-    final me = d.mySeat;
-    if (me == null || (mySeat != null && !amSeated)) return;
     final h = game.handNumber;
+    final me = d.mySeat;
+    if (me == null || (mySeat != null && !amSeated)) {
+      // A juror serving the hand that cannot see who holds its bot
+      // seats, said once a hand. Most jurors hold nothing and that is
+      // ordinary; a juror that can see no assignment at all is one
+      // step from being the holder the table is waiting on, and from
+      // the outside it looks exactly like a device that has stopped.
+      if (mySeat == null && _serving.containsKey(h) && botHolders(h).isEmpty && holders.any((s) => s is BotSeat)) {
+        _sayOnce(h, 'serving, but no bot seat is held as far as this side can see; '
+            'juries drawn for it ${_juriesDrawnFor(h).length}, summoned into its first ${_firstSummons[h] != null}');
+      }
+      return;
+    }
     TurnId? open(TurnId t) {
       final r = _races[t];
       return r != null && !r.settled && r.action == null ? t : null;
@@ -2555,7 +2577,10 @@ class TableClient {
         // What it is here for is a share of the escrow, which the
         // holders make for it ([_topUpJury]). The deal is not its
         // business.
-        if (_joinedLate(h)) return;
+        if (_joinedLate(h)) {
+          _sayOnce(h, 'brought on after hand $h\'s first jury; no keys for seat $me from here');
+          return;
+        }
         d.custodians = jurors.toList()..sort();
         _emitDeal(keys, 0, me, d.myKeys()!);
       }
@@ -3219,6 +3244,20 @@ class TableClient {
       _actOnDeal();
       _releaseTick();
     } else if (mySeat == null && _serving.isNotEmpty && !done) {
+      // Its own again, every couple of seconds, while a turn it spoke
+      // for stands unsettled. A bot seat's holder is that seat's only
+      // voice: a step of the deal it said once and that went missing
+      // on the way to one peer was never said again, and nothing else
+      // would ever come back to it — [_actOnDeal] skips a turn that
+      // already has this side's action on it, the carry-forward
+      // carries only what has settled somewhere, and a table waiting
+      // on a deal turn is neither split nor paused, so nobody appeals
+      // and [_judgeAppeals] never runs. The hand stopped there for
+      // good, with every peer heartbeating and nobody at fault. A
+      // seated peer has had this since the beginning ([_repeat]); a
+      // juror holding a seat is as much that seat as a person is
+      // theirs.
+      _repeat(ownOnly: true);
       _judgeAppeals();
       // A juror holding a bot seat owes that seat's deal steps, and
       // owes them again whenever the last look found it too early to
@@ -3269,7 +3308,14 @@ class TableClient {
     return clock.nowMs - opened >= _allowanceMs(turn, seat) ~/ 2;
   }
 
-  void _repeat() {
+  /// [ownOnly] leaves out the carrying — somebody else's action said
+  /// again for a peer that may not have heard it. That is a seat's
+  /// job, done against the boot clock ([_carryDue]), and a jury of six
+  /// doing it as well would put six copies of a twelve-kilobyte
+  /// shuffle argument on the relay for a case that has not happened.
+  /// A juror still says its own again, because the seat it holds has
+  /// no other voice.
+  void _repeat({bool ownOnly = false}) {
     if (++_repeatTick % 2 != 0) return;
     // What stays unsettled is said again — the first time after two
     // seconds, by the usual path; the second time, and every tenth
@@ -3293,7 +3339,7 @@ class TableClient {
       // What this peer has to say again: its own, always; anybody
       // else's once the turn has been open long enough for carrying
       // to be the point ([_carryAfterMs]).
-      final carry = _carryDue(e.key);
+      final carry = !ownOnly && _carryDue(e.key);
       final action = race.action;
       final sayAction = action != null && (carry || action.author == signer.publicKey);
       final sayBoots = [

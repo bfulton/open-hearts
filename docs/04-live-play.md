@@ -624,6 +624,23 @@ and a deal step given up takes the whole hand with it rather than one
 seat (below, "When quorum is lost anyway"). A deal that cannot finish
 is still caught by silence, as it always was.
 
+**And a juror says its seat's part again, as a person does.** A
+dropped message is the ordinary reason a turn has not settled, and the
+ordinary answer is that whoever said it says it again a couple of
+seconds later. A seat had always done that; a bot seat's holder had
+not, and it is that seat's only voice. A step of the deal said once
+and lost on the way to one peer was never said again, and nothing
+else would have come back to it: the holder skips a turn that already
+carries its own action, the carry-forward carries only what has
+settled somewhere, and a table waiting on a deal turn is neither split
+nor paused, so nobody appeals and no juror relays anything. The hand
+stopped at that turn for good, with every device heartbeating and
+nobody at fault — which is what the four-browser suite had been
+failing on. What a juror still leaves to the seats is carrying
+somebody *else's* action against the boot clock: six of them
+repeating a twelve-kilobyte shuffle argument is the traffic that rule
+was written against (`packages/table/test/lost_deal_step_test.dart`).
+
 **One juror per bot seat, and this is not a detail.** A single juror
 playing three bots at a one-human table would hold thirty-nine of
 fifty-two cards, and the remaining thirteen are the human's by

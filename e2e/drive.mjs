@@ -348,7 +348,13 @@ export async function act(page) {
 export async function playUntil(pages, done, { timeout = 120000, idle = [] } = {}) {
   const until = Date.now() + timeout;
   const finished = new Set();
+  // How long one pass over every page takes, which is how often any
+  // one page is looked at. A state that comes and goes is caught only
+  // if that period is shorter than the state lasts, so when this
+  // times out the period is half the answer to why.
+  const periods = [];
   while (Date.now() < until) {
+    const round = Date.now();
     let all = true;
     for (const [i, page] of pages.entries()) {
       if (page.isClosed()) continue;
@@ -358,7 +364,14 @@ export async function playUntil(pages, done, { timeout = 120000, idle = [] } = {
     }
     if (all) return;
     await sleep(300);
+    periods.push(Date.now() - round);
   }
-  throw new Error(`timed out: ${await Promise.all(pages.filter((p) => !p.isClosed()).map(async (p) => (await texts(p)).join(' | ')))}`);
+  periods.sort((a, b) => a - b);
+  const at = (q) => periods[Math.min(periods.length - 1, Math.floor(periods.length * q))] ?? 0;
+  throw new Error(
+    `timed out after ${periods.length} passes over the pages, each taking ${at(0)}–${at(0.99)} ms ` +
+      `(median ${at(0.5)}); ${finished.size} of ${pages.length} pages were caught: ` +
+      `${await Promise.all(pages.filter((p) => !p.isClosed()).map(async (p) => (await texts(p)).join(' | ')))}`,
+  );
 }
 

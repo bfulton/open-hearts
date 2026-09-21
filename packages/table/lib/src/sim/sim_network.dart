@@ -139,8 +139,21 @@ class SimNetwork {
   void doze(PublicKey key) => _dozing.add(key);
   void wake(PublicKey key) => _dozing.remove(key);
   final Set<PublicKey> _dozing = {};
-  bool _says(PublicKey from, Map<String, Object?> message) =>
-      !_dozing.contains(from) || message['kind'] == 'heartbeat' || message['kind'] == 'serve';
+
+  /// One message eaten where it is said, chosen by the caller. What
+  /// [lossRate] gives as a rate over everything, this gives exactly:
+  /// the single copy of one event that never arrives, which is the
+  /// ordinary way a turn fails to settle and the case a test wants to
+  /// name rather than fish for. Return true to swallow.
+  bool Function(PublicKey from, Map<String, Object?> message)? swallow;
+
+  bool _says(PublicKey from, Map<String, Object?> message) {
+    if (swallow?.call(from, message) ?? false) {
+      dropped++;
+      return false;
+    }
+    return !_dozing.contains(from) || message['kind'] == 'heartbeat' || message['kind'] == 'serve';
+  }
 
   /// Only peers on the same side can reach each other.
   void partition(List<Set<PublicKey>> sides) => _partition = sides;
