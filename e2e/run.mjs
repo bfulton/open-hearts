@@ -55,14 +55,29 @@ async function main() {
   const browser = await chromium.launch();
   const contexts = [];
   const pages = [];
+  // What each device has lately said to itself. A run that passes
+  // wants the narrow filter below and nothing more; a run that stalls
+  // is unreadable without the table's own account of why, and by then
+  // it is too late to turn logging on. So it is kept, trimmed and
+  // bounded, and printed for whoever is still stuck when something
+  // times out.
+  const traces = [];
   let failed = false;
   try {
     for (let i = 0; i < 4; i++) {
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => log(`page ${names[i]} error: ${e.message}\n${(e.stack || '').slice(0, 600)}`));
+      const said = [];
+      traces.push(said);
       page.on('console', (m) => {
         const t = m.text();
+        if (/^(table|duty): /.test(t)) {
+          // Without the bodies: a deal step carries kilobytes of
+          // proof, and none of it says why a table stopped.
+          said.push(t.length > 240 ? `${t.slice(0, 240)}…` : t);
+          if (said.length > 900) said.splice(0, said.length - 900);
+        }
         // Errors, the table's and the duty's own traces about the
         // jury, and the mesh: who this device dials and whether the
         // channel came up, which is how a table that has fallen back
@@ -216,6 +231,15 @@ async function main() {
   } catch (e) {
     failed = true;
     log('FAIL', e.message);
+    // And what the devices that are still there were saying as it
+    // stopped. The one that timed out is the one to read, but a table
+    // stalls in pairs — somebody is waiting on somebody — so they all
+    // go in.
+    for (const [i, page] of pages.entries()) {
+      if (page.isClosed() || !traces[i]?.length) continue;
+      log(`--- the last hundred lines ${names[i]} said ---`);
+      for (const l of traces[i].slice(-100)) log(`    ${l}`);
+    }
   } finally {
     await browser.close();
     app.stop();
