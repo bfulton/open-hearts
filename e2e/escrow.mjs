@@ -93,9 +93,18 @@ async function main() {
     bench.find((j) => j.key === gone.key).kill();
     log(`the juror holding seat ${gone.seat} (${gone.key}) was taken off the air`);
 
-    // She judges it quiet and gives the seat to the escrow; the jurors
+    // She judges it gone and gives the seat to the escrow; the jurors
     // that are left do the rest between themselves.
-    await traced(said, new RegExp(`bot seat ${gone.seat}: its juror .* has gone quiet; to the escrow`),
+    //
+    // Either way of being gone. A juror taken off the air stops
+    // speaking and stops playing at the same instant, and which of
+    // the two the table notices first is a race the deadline usually
+    // wins: three seconds with the turn in front of it against thirty
+    // without a heartbeat (packages/table, client.dart
+    // botActsWithinMs, docs/04-live-play.md). Both are the same
+    // judgement and both say so in the same line, so this watches for
+    // the line rather than for one of its reasons.
+    await traced(said, new RegExp(`bot seat ${gone.seat}: its juror .*; to the escrow`),
         { what: 'the seat given to the escrow', page, timeout: 180000 });
     log(`seat ${gone.seat} went to the escrow`);
     const standing = bench.filter((j) => j.key !== gone.key);
