@@ -22,6 +22,14 @@ void main() {
     // More jurors online than a jury takes, so there is somebody to
     // bring on when the first lot start going.
     final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4);
+    // And a relay's latency, which is what makes there be a hand left
+    // to watch. A top-up is a mid-hand thing — a juror brought on
+    // while a hand is running — and seeing one needs the hand still
+    // running thirty seconds after a jury has been judged short. Over
+    // a data channel a bot seat reaches the escrow three seconds
+    // after its holder stops playing (client.dart, botActsWithinMs)
+    // and the rest of the jury plays it out before there is anything
+    // to see.
     t.net.minLatencyMs = 200;
     t.net.maxLatencyMs = 400;
     t.start();
@@ -61,14 +69,6 @@ void main() {
     // The table does not wait for them: a juror brought on comes to
     // the hand from where it joined it, so it holds its piece a
     // little after the table has moved on.
-    //
-    // A piece of the escrow is what is asserted, and not that each of
-    // them reached the end of the hand. Holding the piece is what the
-    // topping up is for and what this test is about; keeping up with
-    // a hand joined halfway through is a different property with a
-    // fault of its own against it (task #49), and asserting it here
-    // would only mean this test failing for that reason instead of
-    // its own.
     final ours = [for (final j in t.jurors) if (brought.contains(j.signer.publicKey)) j];
     final holding = t.clock.runUntil(
       () => ours.every((j) => j.client?.holdsEscrowPiece(hand) ?? false),
@@ -78,32 +78,18 @@ void main() {
         reason: 'every juror brought on holds a piece of the hand it was brought on to:\n'
             '${[for (final j in ours) '${j.signer.publicKey.substring(0, 4)}: '
                 '${j.client?.holdsEscrowPiece(hand)}'].join('\n')}');
+    // And carries the hand to its end, which says the share is a
+    // working one rather than a keepsake: the seat whose holder went
+    // is opened from the escrow, and the audit at the end of the hand
+    // is answered for it.
+    final caught = t.clock.runUntil(
+      () => ours.every((j) => (j.client?.game.handNumber ?? -1) > hand),
+      limitMs: 5 * 60 * 1000,
+    );
+    expect(caught, isTrue,
+        reason: 'every juror brought on carried the hand to its end:\n'
+            '${[for (final j in ours) j.client?.describe()].join('\n')}');
     t.stop();
   },
-      timeout: const Timeout(Duration(minutes: 10)),
-      // Skipped, and this is where it stands, because a skip without
-      // one rots.
-      //
-      // A top-up is a mid-hand thing: a juror brought on while a hand
-      // is running, given a share of an escrow it was not sealed to.
-      // Seeing one needs a hand still running thirty seconds after a
-      // jury has been judged short, and a bot seat now reaches the
-      // escrow three seconds after its holder stops playing rather
-      // than thirty (client.dart, botActsWithinMs), so a hand over a
-      // data channel is finished before there is anything to watch.
-      // Hence the latency above, which is what a real table has.
-      //
-      // With it, this test found two faults and they are fixed: a
-      // juror brought on late used to publish keys for a seat that
-      // had been keyed before it arrived, and the assignment it had
-      // read from the wrong jury could not be put right once any deal
-      // step had settled. Four brought on used to leave none of them
-      // able to finish the hand; three of four now do, and two of
-      // four hold a piece of the escrow.
-      //
-      // What is left is task #49: the fourth juror never finishes the
-      // hand, and the parts of a share do not reach two of the four.
-      // Neither is the deadline's doing — both fail the same with it
-      // switched off.
-      skip: 'the top-up reaches two of four jurors brought on; see task #49');
+      timeout: const Timeout(Duration(minutes: 10)));
 }

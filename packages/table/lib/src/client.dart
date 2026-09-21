@@ -1588,7 +1588,29 @@ class TableClient {
     if (race == null) return _defer(event); // current, and not open yet
     if (race.settled) return _catchUp(turn);
     final seat = _turnSeat[turn]!;
-    if (!_mayAct(seat, event.author, turn.hand)) return;
+    if (!_mayAct(seat, event.author, turn.hand)) {
+      // For a bot seat's deal step, as below: a judgement about what
+      // this side knows rather than about the event. Who may act for
+      // a bot seat is any juror of the hand ([_mayAct]), and a juror
+      // brought on mid-hand reads the hand's juries the wrong way
+      // round — the redraw that summoned it before the draw the seats
+      // were dealt to — so the seat's true holder is a stranger here
+      // for a moment and its step arrives before the jury that says
+      // otherwise. Kept for the drain.
+      //
+      // Dropping it left a juror brought on late unable to finish the
+      // hand at all: the step is dropped, its id stays seen, and
+      // every copy said again after that is read as the sender being
+      // behind rather than as the step this side is missing — so the
+      // seat's keys never arrived, nothing sealed to that seat could
+      // be opened, and no part of a share made out to it could be
+      // taken up.
+      //
+      // A person's seat is not this: who may act for it is its own
+      // key and nothing this side learns later changes that.
+      if (event.kind == EventKind.deal && holders[seat] is! HumanSeat) return _defer(event);
+      return;
+    }
     if (!_valid(event, seat)) {
       // Not valid *here, now*, which is not the same as wrong. A deal
       // step is checked against things this side may not have yet:
@@ -2789,10 +2811,11 @@ class TableClient {
     // open, trying each of them again at every turn that settled.
     final mine = d.custodianIndexOf(about);
     if (at > d.custodianCount(about)) {
+      _trace('top-up for seat $about at $at, past the ${d.custodianCount(about)} custodians known here');
       return _jurorsOf(event.hand).contains(signer.publicKey) ? _defer(event) : null;
     }
     if (at != mine) return;
-    d.acceptTopUpPart({
+    final took = d.acceptTopUpPart({
       'about': about,
       'at': at,
       'have': event.body['have'],
@@ -2800,6 +2823,8 @@ class TableClient {
       'holder': event.body['holder'],
       'part': event.body['part'],
     });
+    _trace('top-up for seat $about at $at from ${event.body['from']} of ${event.body['have']}: '
+        '${!took ? 'refused' : d.holdsPieceOf(about) ? 'the share is whole' : 'kept, waiting on the rest of the set'}');
   }
 
   /// Tells the deal about the custodians drawn since it was sealed.

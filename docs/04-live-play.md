@@ -1137,7 +1137,7 @@ furthest behind. A juror summoned mid-hand takes its parts up, holds a
 piece of an escrow it was never sealed to, and carries the hand to its
 end (`packages/table/test/top_up_test.dart`).
 
-Three things had to be true for that, and none of them was:
+Six things had to be true for that, and none of them was:
 
 - A piece that arrived **before the deal it belongs to** was dropped,
   and dropped for good — its id was marked seen, so every copy said
@@ -1155,6 +1155,32 @@ Three things had to be true for that, and none of them was:
   cards on the table. The turn it was on, opened while a juror still
   held it, is offered to the bot again when the seat changes hands
   (`packages/table/test/quiet_holder_test.dart`).
+- A juror brought on late **made round-0 keys for a deal that was
+  over**. It reads the seat assignment off the redraw that summoned
+  it, publishes keys for a seat keyed half a minute earlier, and every
+  other peer that read the same redraw takes those keys as the turn's
+  action — after which the first action a turn ever saw is the one
+  that stands, and the true one can never displace it. What a juror
+  brought on late is there for is a share of the escrow, not to help
+  build a deal that is finished, so it makes no step of one.
+- The assignment **could not be put right once a step had settled**,
+  which is the guard below and was the thing keeping a late juror
+  wrong. A settled turn was never opened again, so a rebuilt session
+  was short a seat's keys for good: nothing after them verified and
+  nothing could be asked for again. The rebuild now takes the settled
+  steps into the new session from the races that settled them, so it
+  loses nothing already agreed.
+- A step **from the seat's true holder was dropped as coming from a
+  stranger**. Who may act for a bot seat is any juror of the hand, and
+  a juror that has heard only the redraw has not yet heard that the
+  seat's holder is one — so it threw the step away, kept its id as
+  seen, and read every copy said again afterwards as the sender being
+  behind rather than as the step it was missing. That one line is what
+  left four jurors brought on unable to finish the hand: no keys for
+  the bot seats, nothing sealed to them openable, and no part of a
+  share made out to them worth taking up. A bot seat's deal step from
+  somebody this side has not yet seen become a juror is kept for the
+  drain, like one refused for anything else it does not know yet.
 
 The assignment itself had to become a fact of the **record** rather
 than of arrival order. A bot seat's holder is read from the first jury
@@ -1166,8 +1192,8 @@ when the real holder went, and sat out the rest of the hand; and if it
 was holding a seat of the next hand, the next hand's deal stopped with
 it. The juries of a hand are now ordered as the record orders them,
 and an assignment fixed before the hand's first jury arrived is fixed
-again — the deal rebuilt with it — while nothing has yet been sealed
-to that deal.
+again, the deal rebuilt with it and the steps that already settled fed
+back into the rebuilt session.
 
 **And the escrow opens the seat to the jury, not to the table.** What
 it takes to rebuild a secret is hearing `escrowThreshold` pieces, not
