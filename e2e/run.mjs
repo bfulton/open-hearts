@@ -68,15 +68,21 @@ async function main() {
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => log(`page ${names[i]} error: ${e.message}\n${(e.stack || '').slice(0, 600)}`));
-      const said = [];
+      // A device's table and its jury duty are two clients in one tab
+      // and they are kept apart, because a duty following somebody
+      // else's table says a line a trick and would push the table's
+      // own account of why it stopped out of a shared list.
+      const said = { table: [], duty: [] };
       traces.push(said);
       page.on('console', (m) => {
         const t = m.text();
-        if (/^(table|duty): /.test(t)) {
+        const which = t.startsWith('table: ') ? 'table' : t.startsWith('duty: ') ? 'duty' : null;
+        if (which) {
           // Without the bodies: a deal step carries kilobytes of
           // proof, and none of it says why a table stopped.
-          said.push(t.length > 240 ? `${t.slice(0, 240)}…` : t);
-          if (said.length > 900) said.splice(0, said.length - 900);
+          const keep = said[which];
+          keep.push(t.length > 240 ? `${t.slice(0, 240)}…` : t);
+          if (keep.length > 500) keep.splice(0, keep.length - 500);
         }
         // Errors, the table's and the duty's own traces about the
         // jury, and the mesh: who this device dials and whether the
@@ -236,9 +242,13 @@ async function main() {
     // stalls in pairs — somebody is waiting on somebody — so they all
     // go in.
     for (const [i, page] of pages.entries()) {
-      if (page.isClosed() || !traces[i]?.length) continue;
-      log(`--- the last hundred lines ${names[i]} said ---`);
-      for (const l of traces[i].slice(-100)) log(`    ${l}`);
+      if (page.isClosed()) continue;
+      for (const which of ['table', 'duty']) {
+        const keep = traces[i]?.[which] ?? [];
+        if (!keep.length) continue;
+        log(`--- the last of ${names[i]}'s ${which === 'table' ? 'own table' : 'jury duty'} ---`);
+        for (const l of keep.slice(-70)) log(`    ${l}`);
+      }
     }
   } finally {
     await browser.close();
