@@ -2499,6 +2499,23 @@ class TableClient {
         // jury standing still is enough for the draw to arrive, and
         // the ten-second escape above still bounds it.
         if (!amSeated && !_juryFirm(h) && waited < 10000) return;
+        // And a juror brought on after the hand's first jury makes no
+        // keys for it at all. Its seat's keys were made before it
+        // arrived, by somebody it may not have heard of yet: it was
+        // summoned into a redraw, so the only jury it is sure of is
+        // the redraw, and reading the seats from that names the wrong
+        // holder for every one of them ([botHolders]). It would then
+        // publish keys nobody wants — and the jurors brought on
+        // beside it, computing the same wrong answer, take each
+        // other's for the turn's action and can never be moved off
+        // it, since the first action at a turn stands. Four jurors
+        // topped up mid-hand put two of themselves out of that hand
+        // for good this way.
+        //
+        // What it is here for is a share of the escrow, which the
+        // holders make for it ([_topUpJury]). The deal is not its
+        // business.
+        if (_joinedLate(h)) return;
         d.custodians = jurors.toList()..sort();
         _emitDeal(keys, 0, me, d.myKeys()!);
       }
@@ -2792,6 +2809,53 @@ class TableClient {
   /// Judged here rather than agreed, as a juror's silence always is;
   /// peers that judge it late simply take longer to accept whoever
   /// picks the seat up, and the record shows who did.
+  /// How long a bot seat's holder has to take the seat's turn. A
+  /// bot's move is worked out rather than thought about, so this is a
+  /// deadline on a computation and not on a person: there is no grace
+  /// in it and no bank behind it, which is what a person's seat gets
+  /// instead (time_bank.dart).
+  ///
+  /// Measured rather than picked. Over six seeded hands a held bot
+  /// seat answers its turn in 69 ms at the middle and 155 ms at the
+  /// worst over a data channel, and 365 ms and 787 ms with a relay's
+  /// latency under it — so three seconds is about four times the
+  /// worst of it, and a holder that misses it is not slow, it is not
+  /// working.
+  static const botActsWithinMs = 3000;
+
+  /// Whether the seat's holder has had the seat's turn in front of it
+  /// for longer than that, and said nothing.
+  ///
+  /// Silence was the only way a bot seat could be taken off its
+  /// holder, and silence is not the only way a holder fails. One that
+  /// heartbeats and does nothing held the seat for as long as it
+  /// liked, and the table waited: the other custodians judged it gone
+  /// and released their pieces, the peers still hearing it did not,
+  /// and a hand sat at one turn for minutes with the seat's own
+  /// device apparently present. Heard from is not the same as playing.
+  ///
+  /// The seat's turn, not the deal's. A deal step is checked against
+  /// things that may not have arrived, and a juror holds its keys
+  /// back for a moment on purpose so that a late draw can still be
+  /// read ([_juryFirmMs]) — deal steps answer at 2.9 s at the
+  /// ninety-fifth percentile against a play's 0.16, and a deal step
+  /// given up takes the whole hand with it ([_giveUpUndealtHand])
+  /// rather than one seat. A deal that cannot finish is still caught,
+  /// by silence, as it was before.
+  ///
+  /// And not a turn that is waiting rather than idle: a seat whose
+  /// hand is not open here yet is stalled on a secret, which is the
+  /// escrow working and not a holder failing.
+  bool _outOfTime(int seat) {
+    final turn = _openTurnOf(seat);
+    if (turn == null || !(turn.isPlay || turn.isPass)) return false;
+    if (_stalled.containsKey(turn)) return false;
+    final race = _races[turn];
+    if (race == null || race.settled || race.action != null) return false;
+    final at = _openedAt[turn];
+    return at != null && clock.nowMs - at >= botActsWithinMs;
+  }
+
   void _handOverQuietSeats() {
     final d = _deal;
     if (d == null) return;
@@ -2801,8 +2865,13 @@ class TableClient {
     final live = _liveJurors(hand);
     final given = <int>[];
     for (final e in held.entries) {
-      if (live.contains(e.value) || d.gone.contains(e.key)) continue;
-      _trace('bot seat ${e.key}: its juror ${e.value.substring(0, 4)} has gone quiet; to the escrow');
+      if (d.gone.contains(e.key)) continue;
+      final quiet = !live.contains(e.value);
+      final slow = _outOfTime(e.key);
+      if (!quiet && !slow) continue;
+      _trace('bot seat ${e.key}: its juror ${e.value.substring(0, 4)} '
+          '${quiet ? 'has gone quiet' : 'has had the turn for ${botActsWithinMs ~/ 1000} seconds and said nothing'}; '
+          'to the escrow');
       d.seatLeft(e.key);
       given.add(e.key);
     }
@@ -3529,6 +3598,11 @@ class TableClient {
     if (first && juryId != null) _firstSummons.putIfAbsent(hand, () => (juryId: juryId, jurors: jurors));
     _notify();
   }
+
+  /// Whether this side came to [hand]'s jury after the hand's first
+  /// jury was drawn: it was summoned to the hand, and never into the
+  /// draw that the seats were dealt to ([_firstSummons]).
+  bool _joinedLate(int hand) => _serving.containsKey(hand) && _firstSummons[hand] == null;
 
   /// The first jury of each hand as a summons gave it, where one has
   /// said so. The event carries the same list and is the authority;

@@ -129,6 +129,19 @@ class SimNetwork {
   void goOffline(PublicKey key) => _offline.add(key);
   void comeOnline(PublicKey key) => _offline.remove(key);
 
+  /// A peer that is heard and does nothing: its heartbeats go out,
+  /// and everything it would otherwise say is dropped where it is
+  /// said. Not a network fault — it is what a device looks like from
+  /// the outside when its clock runs and its work does not, which a
+  /// tab starved of a processor or a phone put in a pocket both do.
+  /// Going offline models the other kind, where the silence itself is
+  /// the sign.
+  void doze(PublicKey key) => _dozing.add(key);
+  void wake(PublicKey key) => _dozing.remove(key);
+  final Set<PublicKey> _dozing = {};
+  bool _says(PublicKey from, Map<String, Object?> message) =>
+      !_dozing.contains(from) || message['kind'] == 'heartbeat' || message['kind'] == 'serve';
+
   /// Only peers on the same side can reach each other.
   void partition(List<Set<PublicKey>> sides) => _partition = sides;
 
@@ -160,6 +173,7 @@ class SimNetwork {
 
   /// The classic bus: to every reachable peer, no relay in the way.
   void _broadcastAll(PublicKey from, Map<String, Object?> message) {
+    if (!_says(from, message)) return;
     final wire = jsonEncode(message);
     var copies = 0;
     for (final to in _peers.keys) {
@@ -191,6 +205,7 @@ class SimNetwork {
   /// tells the writer so — as a refused write does — so its next event
   /// goes elsewhere.
   void _deliverVia(PublicKey from, Map<String, Object?> message, Set<String> targets) {
+    if (!_says(from, message)) return;
     final now = clock.nowMs;
     for (final r in targets) {
       if (!_relayLive(r, now)) {

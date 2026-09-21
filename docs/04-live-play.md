@@ -588,6 +588,35 @@ tests and seven of the sealed ones, which is the chaos walk doing
 exactly its job: it kills jurors, and a jury that cannot lose one is
 not a jury.
 
+**And "goes" means stops playing, not only stops speaking.** Silence
+is the obvious way a holder fails and it was for a while the only one
+the table knew about: thirty seconds without a heartbeat and the seat
+went to the escrow. A device whose clock runs and whose work does not
+— a browser tab starved of a processor, a phone put in a pocket —
+fails the other way. It goes on heartbeating, so the peers still
+hearing it go on waiting, while the custodians that stopped hearing it
+give their pieces up; a hand then sits at one turn for minutes with
+the seat's own device apparently present. Four headless browsers
+sharing four cores reproduced it about half the time.
+
+So a bot seat's holder has three seconds to take the seat's turn, and
+a seat whose turn has been in front of it for longer goes to the
+escrow like a silent one's. A bot's move is worked out rather than
+thought about, which is why the number is a deadline on a computation
+and has no grace in it and no bank behind it — what a person's seat
+gets instead. Three seconds is roughly four times the worst a held
+bot seat was measured taking: over six seeded hands it answers in 69
+ms at the middle and 155 ms at the worst over a data channel, 365 ms
+and 787 ms with a relay's latency under it.
+
+The seat's turn, not the deal's. A deal step is checked against things
+that may not have arrived, and a juror holds its keys back for a
+moment on purpose so a late draw can still be read, so deal steps
+answer at 2.9 s at the ninety-fifth percentile against a play's 0.16 —
+and a deal step given up takes the whole hand with it rather than one
+seat (below, "When quorum is lost anyway"). A deal that cannot finish
+is still caught by silence, as it always was.
+
 **One juror per bot seat, and this is not a detail.** A single juror
 playing three bots at a one-human table would hold thirty-nine of
 fifty-two cards, and the remaining thirteen are the human's by

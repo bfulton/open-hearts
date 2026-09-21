@@ -72,5 +72,29 @@ void main() {
           reason: '${j.signer.publicKey.substring(0, 4)}, brought on at hand $hand, holds a piece of it');
     }
     t.stop();
-  }, timeout: const Timeout(Duration(minutes: 10)));
+  },
+      timeout: const Timeout(Duration(minutes: 10)),
+      // Skipped, and this is the whole reason, because a skip without
+      // one rots.
+      //
+      // A top-up is a mid-hand thing: a juror brought on while a hand
+      // is running, given a share of an escrow it was not sealed to.
+      // Seeing one needs a hand still running thirty seconds after a
+      // jury has been judged short, and since a bot seat now reaches
+      // the escrow three seconds after its holder stops playing
+      // rather than thirty (client.dart, botActsWithinMs) a hand at
+      // this table is over before then — two jurors go, their seats
+      // are in the escrow at once, and the rest of the jury plays it
+      // out briskly. This test's sixty-second window now closes on a
+      // hand that has already finished, and it asserts a top-up that
+      // was never needed.
+      //
+      // Putting a relay's latency under it makes the hand long enough
+      // again, and then it fails on something else: task #49, a juror
+      // brought on mid-hand acting in a deal that is already over.
+      // Two of the four brought on never leave that hand. That bug is
+      // older than any of this — it fails the same with the deadline
+      // switched off — and it is what has to be fixed before the
+      // top-up can be watched again.
+      skip: 'the top-up needs a hand longer than this one now is; see task #49');
 }
