@@ -30,16 +30,24 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- the relay and the app ----------------------------------------------
 
-/// The bench of jurors of last resort: one process each, not one
-/// process for all of them.
+/// The bench of jurors of last resort, and how it is run.
 ///
 /// A table whose bot seats the jury holds needs juryToHoldBots of
 /// them, and here there is nobody else online to make that number up,
-/// so the whole bench is the service's. One process each because a
-/// run has to be able to take a *single* juror off the air — which of
-/// them holds which bot seat is drawn, so the one to silence is not
-/// known until the deal says so, and killing a process that held four
-/// seats would say nothing about an escrow.
+/// so the whole bench is the service's. Normally it is one process
+/// serving all four, which is what the service itself runs.
+///
+/// `apart` gives each juror a process of its own, for a run that has
+/// to take a *single* juror off the air: which of them holds which
+/// bot seat is drawn, so the one to silence is not known until the
+/// deal says so, and killing a process that held four seats would say
+/// nothing about an escrow. It is not the default because it is not
+/// free — four Dart VMs against one, on a machine already running
+/// four headless browsers, a relay and a server, and four browsers
+/// each also serving as a juror for the others' tables. At that load
+/// a browser gets starved long enough to be judged silent, its bot
+/// seat goes to the escrow, and a run fails at something that is the
+/// machine rather than the protocol.
 ///
 /// A secret each, so the keys are the same on every run and a process
 /// can be told from its key before either has said a word; each
@@ -52,11 +60,11 @@ const benchSecrets = [
   '4444444444444444444444444444444444444444444444444444444444444444',
 ];
 
-export async function startRelay() {
-  // The relay; and beside it, a process per juror of last resort: the
+export async function startRelay({ apart = false } = {}) {
+  // The relay; and beside it, the bench of jurors of last resort: the
   // four browsers are all at one table, so a jury can only come from
-  // the service. Their own processes, because a relay verifies every
-  // event it carries and must never wait on a juror's work.
+  // the service. Beside rather than inside, because a relay verifies
+  // every event it carries and must never wait on a juror's work.
   // The relay's whole log, always, at a known path for a debugging run.
   const logFile = join(root, 'app', 'build', 'logs', 'relay.log');
   mkdirSync(dirname(logFile), { recursive: true });
@@ -72,7 +80,13 @@ export async function startRelay() {
       if (m) resolveUrl(m[1]);
       // The jurors of last resort's own lines, once the relay is up.
       if (relayLog) relayLog.write(d);
-      if (m && bench.length === 0) for (const secret of benchSecrets) bench.push(startJuror(m[1], secret, relayLog));
+      if (m && bench.length === 0) {
+        if (apart) {
+          for (const secret of benchSecrets) bench.push(startJuror(m[1], secret, relayLog, 1));
+        } else {
+          bench.push(startJuror(m[1], benchSecrets[0], relayLog, benchSecrets.length));
+        }
+      }
     });
     proc.stderr.on('data', (d) => process.stderr.write(d));
     proc.on('exit', (code) => reject(new Error(`relay exited ${code}\n${out}`)));
@@ -81,13 +95,15 @@ export async function startRelay() {
   return { url, bench, stop: () => { for (const j of bench) j.kill(); proc.kill(); } };
 }
 
-/// One juror of last resort, with its own key and its own process.
-/// `key` resolves to the eight characters the process prints of it,
-/// which is how a run finds the juror that a deal named; `said` is
-/// every line it has written, for a run that has to check what a
-/// juror did rather than what a browser could see it do.
-function startJuror(relay, secret, relayLog) {
-  const juror = spawn('dart', ['run', join('bin', 'juror.dart'), '--relay', relay, '--jurors', '1'],
+/// A juror process: `size` jurors served from it, each with a key
+/// derived from `secret`. `key` resolves to the eight characters it
+/// prints of the first one, which is how a run finds the juror that a
+/// deal named; `said` is every line it has written, for a run that
+/// has to check what a juror did rather than what a browser could see
+/// it do. Both are only meaningful when the bench is `apart` and this
+/// process is one juror.
+function startJuror(relay, secret, relayLog, size) {
+  const juror = spawn('dart', ['run', join('bin', 'juror.dart'), '--relay', relay, '--jurors', `${size}`],
       { cwd: join(root, 'service'), env: { ...process.env, OH_JUROR_SECRET: secret } });
   const said = [];
   let named;

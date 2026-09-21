@@ -41,7 +41,7 @@ async function traced(lines, what, { what: name, page, timeout = 120000 } = {}) 
 }
 
 async function main() {
-  const relay = await startRelay();
+  const relay = await startRelay({ apart: true });
   const app = await serveApp();
   log(`relay ${relay.url}, app ${app.url}`);
   const browser = await chromium.launch();
