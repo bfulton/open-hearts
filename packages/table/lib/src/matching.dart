@@ -359,7 +359,25 @@ class WaitingRoom {
       case 'match':
         if (e.kind != TableKinds.lobby) return;
         final round = c['round'] as int?;
-        if (round != null) _seatingsSeen[round] = (_seatingsSeen[round] ?? 0) + 1;
+        // A seating is for the round that made it and no other. It
+        // goes out on the stored kind, so that a device arriving at a
+        // room code is handed the room announced before it got there
+        // (nostr.dart); a pool is subscribed to the same way and with
+        // no window on it, so a relay hands a device that comes back
+        // to the pool every seating it has ever carried there. One of
+        // those is this device's own, from the game it played an hour
+        // ago — and taking it put a person at a table with three
+        // people who had closed their apps, at seats that would never
+        // move.
+        //
+        // A round or two either side, and no more. Rounds are a
+        // shared clock bucket and everything else here compares them
+        // exactly — the host acts a fifth of the way into its own
+        // round, and a seating is counted against the round it names
+        // — so a device whose clock is further out than that is one
+        // that could not have been seated anyway.
+        if (round == null || (round - _roundOf(_now)).abs() > 2) return;
+        _seatingsSeen[round] = (_seatingsSeen[round] ?? 0) + 1;
         _maybeSeated(c);
     }
   }

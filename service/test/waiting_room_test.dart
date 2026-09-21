@@ -60,8 +60,9 @@ void main() {
     });
     tearDown(() => relay.close());
 
-    Future<(RelayTransport, WaitingRoom)> join(String name, {int rating = 1500, int target = gameOverScore}) async {
-      final s = SchnorrSigner.generate();
+    Future<(RelayTransport, WaitingRoom)> join(String name,
+        {int rating = 1500, int target = gameOverScore, SchnorrSigner? signer}) async {
+      final s = signer ?? SchnorrSigner.generate();
       final t = RelayTransport(relays: [relay.url], signer: s, table: poolTag('unrated', target: target));
       await t.ready;
       final room = WaitingRoom(
@@ -103,6 +104,37 @@ void main() {
         r.$2.close();
         r.$1.close();
       }
+    });
+
+    test('a seating from a round long past does not seat somebody who has come back', () async {
+      // The seating goes out on the stored kind, so that a device
+      // arriving at a room code is handed the room announced before
+      // it got there (nostr.dart, TableKinds.lobby). A pool is
+      // subscribed to the same way and with no window on it, so a
+      // relay hands a device that comes back to the pool every
+      // seating it has ever carried there — this device's own
+      // included.
+      final mine = SchnorrSigner.generate();
+      final first = [await join('A', signer: mine), await join('B'), await join('C')];
+      final was = await first.first.$2.seated.first.timeout(const Duration(seconds: 15));
+      expect(was.seats.whereType<HumanSeat>().length, 3, reason: 'three were seated together');
+      // That table is played and left; the others close their apps.
+      for (final r in first) {
+        r.$2.close();
+        r.$1.close();
+      }
+      // Rounds go by — four of them at this room's two-second round,
+      // where the real gap is a game's worth — and this device asks
+      // for a game again.
+      await Future<void>.delayed(const Duration(seconds: 8));
+      final again = await join('A', signer: mine);
+      final now = await again.$2.seated.first.timeout(const Duration(seconds: 15));
+      expect(now.id, isNot(was.id), reason: 'a new table, not the one it left');
+      expect(now.seats.whereType<HumanSeat>().map((h) => h.key), [again.$2.me],
+          reason: 'alone at the pool, so alone at the table: B and C are gone, and a seat that never moves is worse '
+              'than a bot in it');
+      again.$2.close();
+      again.$1.close();
     });
 
     test('if the lowest key falls silent, the next seats the round', () async {
