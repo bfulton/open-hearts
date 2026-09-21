@@ -65,6 +65,13 @@ class SimPresence implements Presence {
   Set<PublicKey> settled({required int withinMs, required int forMs}) =>
       {for (final k in online(withinMs: withinMs)) if (clock.nowMs - (_firstUp[k] ?? clock.nowMs) >= forMs) k};
 
+  /// How long a summons takes to arrive. A summons is not a table
+  /// event: it goes to the juror's presence over a relay rather than
+  /// down a data channel, so it is slower than the hand's own steps,
+  /// and the gap decides what a juror has in hand before it has a
+  /// deal to put it in (`test/deal_before_the_deal_test.dart`).
+  int summonsMs = 50;
+
   @override
   void summon(PublicKey juror, Map<String, Object?> summons) {
     final j = _jurors[juror];
@@ -72,7 +79,7 @@ class SimPresence implements Presence {
     final spec = TableSpec.parse(summons['table']);
     if (spec == null) return;
     clock.schedule(
-        50,
+        summonsMs,
         () => j.summoned(spec, summons['hand'] as int, [for (final k in summons['jurors'] as List) k as String],
             juryId: summons['jury'] as String?, first: summons['first'] == true));
   }

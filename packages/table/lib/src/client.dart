@@ -2114,6 +2114,23 @@ class TableClient {
     for (var s = 0; s < seatCount; s++) {
       _openTurn(TurnId.deal(game.handNumber, 0, s), s);
     }
+    // And whatever came for those turns before there was a deal to
+    // put it in. A hand's first four steps go out the moment the
+    // table has a jury, and a juror summoned a moment later — or any
+    // peer whose own deal waited on a draw it had not heard — has
+    // them in hand before it has built the session that checks them:
+    // kept, because a turn that is not open yet is not a turn the
+    // event is wrong for ([_defer]).
+    //
+    // Nothing used to come back to them. The drain runs when a turn
+    // settles, when a jury changes and when the assignment is fixed
+    // again, and the four steps this side needs to settle its first
+    // turn are exactly what it is short of, so none of those ever
+    // happened. The client sat at the hand's first step with the
+    // whole hand in its deferred list, deferring everything the table
+    // said after, and the seat it held two hands later was never
+    // dealt.
+    _drainFuture();
     _bootLiars();
     _actOnDeal();
   }
