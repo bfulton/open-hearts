@@ -601,7 +601,14 @@ sharing four cores reproduced it about half the time.
 
 So a bot seat's holder has three seconds to take the seat's turn, and
 a seat whose turn has been in front of it for longer goes to the
-escrow like a silent one's. A bot's move is worked out rather than
+escrow like a silent one's. Three seconds from when the turn became
+that holder's, which is not the same as when the turn opened: a turn
+can open while its seat is still being handed over — a person leaving
+it, the seat turning into a bot, a juror picking it up from the
+escrow — and none of that is a holder failing to play. The clock
+starts when the seat is a bot's, a holder is named for it, its turn is
+open and nothing is stalled; a seat that changes hands starts the new
+holder's clock afresh. A bot's move is worked out rather than
 thought about, which is why the number is a deadline on a computation
 and has no grace in it and no bank behind it — what a person's seat
 gets instead. Three seconds is roughly four times the worst a held

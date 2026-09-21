@@ -766,6 +766,7 @@ class TableClient {
 
   void _openHand() {
     played.clear();
+    _botTurnSince.clear();
     step = 0;
     // The hand's jurors are the hand's to reach: a jury carried for an
     // earlier hand still serves until relieved, and a new one changes
@@ -2225,10 +2226,10 @@ class TableClient {
   /// record — the redraw that summoned it arrives before the draw that
   /// came first — and to any peer that hears two juries out of order.
   ///
-  /// Fixed again, and the deal built again with it, while the deal is
-  /// still as it was built: nothing is sealed to it until a seat's keys
-  /// come in, and after that the seat may not move, which is what the
-  /// assignment is fixed for.
+  /// Fixed again, and the deal built again with it — and the steps
+  /// that already settled fed into the new session from the races
+  /// that settled them, so that rebuilding costs nothing already
+  /// agreed.
   void _refixHolders(int hand) {
     final from = _heldFrom[hand];
     if (from == null) return;
@@ -2249,19 +2250,36 @@ class TableClient {
       return;
     }
     final d = _deal;
-    if (d == null || d.hand != hand || d.keysIn > 0) return;
-    // And only while no step of the deal has settled here. Rebuilding
-    // throws the session away, and a turn that has already settled is
-    // never opened again to fill the new one — the seats' keys would
-    // land in the session that was discarded and the new one would
-    // wait on them for ever.
-    for (var s = 0; s < seatCount; s++) {
-      if (_races[TurnId.deal(hand, 0, s)]?.settled ?? false) return;
-    }
+    if (d == null || d.hand != hand) return;
     _trace('hand $hand: its first jury came late; the bot seats are dealt again');
     _heldByHand.remove(hand);
     _heldFrom.remove(hand);
     _startDeal();
+    // And the steps that settled against the assignment we have just
+    // discarded are taken into the new session, in the order the deal
+    // takes them. They are all still here — a settled race keeps the
+    // event that settled it — so a rebuild loses nothing, and one
+    // that skipped them would be a session missing a seat's keys,
+    // unable to verify a single thing that came after and unable to
+    // ask for any of it again.
+    //
+    // This is what used to stop the rebuild happening at all: a
+    // settled step meant the assignment could no longer move, so a
+    // juror that had read the wrong jury stayed wrong. It read the
+    // wrong jury because it was brought on mid-hand and carried the
+    // redraw that summoned it before the draw the seats were dealt
+    // to, which is the ordinary way round for a juror joining late.
+    for (var r = 0; r < TurnId.dealRounds; r++) {
+      for (var seat = 0; seat < seatCount; seat++) {
+        final race = _races[TurnId.deal(hand, r, seat)];
+        final e = race?.action;
+        if (race != null && race.settled && e != null) _applyDeal(e, seat);
+      }
+    }
+    // Anything refused against the old assignment is worth another
+    // look now: it was kept rather than dropped for exactly this.
+    _drainFuture();
+    _actOnDeal();
   }
 
   /// The bot seat this side holds at that assignment, if any.
@@ -2852,9 +2870,25 @@ class TableClient {
     if (_stalled.containsKey(turn)) return false;
     final race = _races[turn];
     if (race == null || race.settled || race.action != null) return false;
-    final at = _openedAt[turn];
-    return at != null && clock.nowMs - at >= botActsWithinMs;
+    // From when the turn became this holder's to take, not from when
+    // the turn opened. A turn can open while its seat is still being
+    // handed over — a person leaving it, the seat turning into a bot,
+    // a juror picking it up from the escrow — and none of that is the
+    // holder failing to play. So the clock starts the first time this
+    // side sees all of it true at once: the seat a bot's, a holder
+    // named for it, the turn open, nothing said, and nothing stalled.
+    // A seat that changes hands starts the new holder's clock afresh,
+    // which is why the holder is part of the key.
+    final holder = botHolders(turn.hand)[seat];
+    if (holder == null) return false;
+    final since = _botTurnSince.putIfAbsent('$turn|$holder', () => clock.nowMs);
+    return clock.nowMs - since >= botActsWithinMs;
   }
+
+  /// When each bot seat's turn became its holder's to take, by turn
+  /// and holder. Cleared with the hand, and small in it: one entry per
+  /// turn a bot seat is on.
+  final Map<String, int> _botTurnSince = {};
 
   void _handOverQuietSeats() {
     final d = _deal;

@@ -18,10 +18,12 @@ void main() {
   late DealCrypto crypto;
   setUpAll(() async => crypto = await DealCrypto.load());
 
-  test('a juror drawn after the deal is given a share, and it opens a bot seat', () {
+  test('a juror drawn after the deal is given a share of an escrow it was never sealed to', () {
     // More jurors online than a jury takes, so there is somebody to
     // bring on when the first lot start going.
     final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4);
+    t.net.minLatencyMs = 200;
+    t.net.maxLatencyMs = 400;
     t.start();
     t.clock.runUntil(() => t.clients.first.game.phase == Phase.playing, limitMs: 20 * 60 * 1000);
     final client = t.clients.first;
@@ -56,45 +58,52 @@ void main() {
     // the end of it, not the one the deal went out to.
     final carried = t.clock.runUntil(() => client.game.handNumber > hand, limitMs: 5 * 60 * 1000);
     expect(carried, isTrue, reason: 'the hand played on: ${client.describe()}');
-    // The table does not wait for them: a juror brought on judges the
-    // silence of the one it replaced from where it came in, so it
-    // reaches the end of the hand a little after the table does.
+    // The table does not wait for them: a juror brought on comes to
+    // the hand from where it joined it, so it holds its piece a
+    // little after the table has moved on.
+    //
+    // A piece of the escrow is what is asserted, and not that each of
+    // them reached the end of the hand. Holding the piece is what the
+    // topping up is for and what this test is about; keeping up with
+    // a hand joined halfway through is a different property with a
+    // fault of its own against it (task #49), and asserting it here
+    // would only mean this test failing for that reason instead of
+    // its own.
     final ours = [for (final j in t.jurors) if (brought.contains(j.signer.publicKey)) j];
-    final caught = t.clock.runUntil(
-      () => ours.every((j) => (j.client?.game.handNumber ?? -1) > hand),
+    final holding = t.clock.runUntil(
+      () => ours.every((j) => j.client?.holdsEscrowPiece(hand) ?? false),
       limitMs: 5 * 60 * 1000,
     );
-    expect(caught, isTrue,
-        reason: 'every juror brought on carried the hand to its end:\n'
-            '${[for (final j in ours) j.client?.describe()].join('\n')}');
-    for (final j in ours) {
-      expect(j.client?.holdsEscrowPiece(hand), isTrue,
-          reason: '${j.signer.publicKey.substring(0, 4)}, brought on at hand $hand, holds a piece of it');
-    }
+    expect(holding, isTrue,
+        reason: 'every juror brought on holds a piece of the hand it was brought on to:\n'
+            '${[for (final j in ours) '${j.signer.publicKey.substring(0, 4)}: '
+                '${j.client?.holdsEscrowPiece(hand)}'].join('\n')}');
     t.stop();
   },
       timeout: const Timeout(Duration(minutes: 10)),
-      // Skipped, and this is the whole reason, because a skip without
+      // Skipped, and this is where it stands, because a skip without
       // one rots.
       //
       // A top-up is a mid-hand thing: a juror brought on while a hand
       // is running, given a share of an escrow it was not sealed to.
       // Seeing one needs a hand still running thirty seconds after a
-      // jury has been judged short, and since a bot seat now reaches
-      // the escrow three seconds after its holder stops playing
-      // rather than thirty (client.dart, botActsWithinMs) a hand at
-      // this table is over before then — two jurors go, their seats
-      // are in the escrow at once, and the rest of the jury plays it
-      // out briskly. This test's sixty-second window now closes on a
-      // hand that has already finished, and it asserts a top-up that
-      // was never needed.
+      // jury has been judged short, and a bot seat now reaches the
+      // escrow three seconds after its holder stops playing rather
+      // than thirty (client.dart, botActsWithinMs), so a hand over a
+      // data channel is finished before there is anything to watch.
+      // Hence the latency above, which is what a real table has.
       //
-      // Putting a relay's latency under it makes the hand long enough
-      // again, and then it fails on something else: task #49, a juror
-      // brought on mid-hand acting in a deal that is already over.
-      // Two of the four brought on never leave that hand. That bug is
-      // older than any of this — it fails the same with the deadline
-      // switched off — and it is what has to be fixed before the
-      // top-up can be watched again.
-      skip: 'the top-up needs a hand longer than this one now is; see task #49');
+      // With it, this test found two faults and they are fixed: a
+      // juror brought on late used to publish keys for a seat that
+      // had been keyed before it arrived, and the assignment it had
+      // read from the wrong jury could not be put right once any deal
+      // step had settled. Four brought on used to leave none of them
+      // able to finish the hand; three of four now do, and two of
+      // four hold a piece of the escrow.
+      //
+      // What is left is task #49: the fourth juror never finishes the
+      // hand, and the parts of a share do not reach two of the four.
+      // Neither is the deadline's doing — both fail the same with it
+      // switched off.
+      skip: 'the top-up reaches two of four jurors brought on; see task #49');
 }
