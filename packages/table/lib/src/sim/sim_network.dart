@@ -162,6 +162,11 @@ class SimNetwork {
   /// channel that never opened, a relay subscription gone quiet — while
   /// every other link works.
   void cut(PublicKey a, PublicKey b) => _cuts.add({a, b});
+
+  /// And that one link back, leaving every other fault standing —
+  /// [heal] clears the lot, which is no use for a cut that is meant
+  /// to outlast nothing but a moment.
+  void uncut(PublicKey a, PublicKey b) => _cuts.removeWhere((c) => c.length == 2 && c.contains(a) && c.contains(b));
   final List<Set<PublicKey>> _cuts = [];
 
   void heal() {

@@ -15,7 +15,9 @@ import '../client.dart';
 import '../events.dart';
 import '../model.dart';
 import '../record.dart';
+import '../signing.dart';
 import 'scenarios.dart';
+import 'sim_table.dart';
 
 /// Transitive closure of a transition relation, so a state sampled
 /// after several steps is still checked against the model.
@@ -88,6 +90,52 @@ bool _sameList(List<Object?> a, List<Object?> b) {
 /// Walks [seed] to its end — sealed, with the verifiable deal run for
 /// real, when [crypto] is given — and returns the first invariant it
 /// broke, with the faults that led there, or null when every one held.
+/// Whether any two sides still following the table read a different
+/// juror for a bot seat, once everything has arrived.
+///
+/// The assignment is a function of the record — the hand's first jury
+/// and the seats that were bots when the hand began — so two sides
+/// that differ have read different records, and neither will take
+/// what the other says for the seat: one waits for keys the other
+/// juror is busy not making. It is legal for that to happen while a
+/// draw or a departure is still in flight, which is what
+/// `_refixHolders` repairs; what is never legal is for it to stand
+/// after the faults have stopped and the network has healed.
+///
+/// A side that has heard no jury for the hand answers nothing, and
+/// that is not a disagreement — it is a side that has not been told
+/// yet.
+///
+/// The walk's other invariants are each about one side's own story:
+/// the states it passes through, the record it holds, whether it
+/// finishes. This is the one that asks two sides the same question.
+String? disagreed(SimTable t) {
+  final following = [
+    ...t.survivors,
+    for (final j in t.jurors)
+      if (!j.gone && j.client != null) j.client!,
+  ];
+  var lastHand = 0;
+  for (final c in following) {
+    if (c.game.handNumber > lastHand) lastHand = c.game.handNumber;
+  }
+  String held(Map<int, PublicKey> m) =>
+      (m.entries.map((e) => '${e.key}:${e.value.substring(0, 4)}').toList()..sort()).join(' ');
+  for (var hand = 0; hand <= lastHand; hand++) {
+    final answers = <String, List<String>>{};
+    for (final c in following) {
+      final h = c.botHolders(hand);
+      if (h.isEmpty) continue;
+      answers.putIfAbsent(held(h), () => []).add(c.signer.publicKey.substring(0, 4));
+    }
+    if (answers.length > 1) {
+      return 'hand $hand: two sides read different jurors for its bot seats\n'
+          '${answers.entries.map((e) => '  ${e.value.join(', ')}: ${e.key}').join('\n')}';
+    }
+  }
+  return null;
+}
+
 String? walkChaos(int seed, {DealCrypto? crypto}) {
   final sc = ChaosScenario(seed, crypto: crypto);
   final t = sc.table;
@@ -147,6 +195,8 @@ String? walkChaos(int seed, {DealCrypto? crypto}) {
     t.run();
     final why = check('at the end after [${faults()}]');
     if (why != null) return why;
+    final apart = disagreed(t);
+    if (apart != null) return '$apart; faults were [${faults()}]';
 
     final survivors = t.survivors.toList();
     final finished = survivors.every((c) => c.done);

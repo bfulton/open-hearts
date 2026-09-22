@@ -7,6 +7,7 @@ import 'dart:math';
 
 import '../signing.dart';
 import 'scripted_human.dart';
+import 'sim_juror.dart';
 import 'sim_table.dart';
 
 /// One departure in a matrix cell: [seat] goes by [how] at [when].
@@ -100,7 +101,46 @@ class ChaosScenario {
     for (var f = 0; f < count; f++) {
       final when = at;
       final base = jurors > 0 ? 8 : 6;
-      final kind = rng.nextInt(base + 2);
+      final kind = rng.nextInt(base + 4);
+      if (kind == base + 2) {
+        // One event eaten where it is said, and only one. Loss as a
+        // rate finds the peer that is repeated at until something
+        // gets through; a single copy that never arrives finds the
+        // event nobody ever says again, which is a different fault
+        // and the one that stops a hand dead (`SimNetwork.swallow`).
+        const kinds = ['deal', 'play', 'pass', 'witness', 'jury', 'release'];
+        final eat = kinds[rng.nextInt(kinds.length)];
+        t.clock.schedule(when, () {
+          var eaten = false;
+          t.net.swallow = (from, message) {
+            if (eaten || message['kind'] != eat) return false;
+            eaten = true;
+            faults.add('ate one $eat from ${from.substring(0, 4)} at ${t.clock.nowMs}');
+            return true;
+          };
+        });
+        at += 3000 + rng.nextInt(30000);
+        continue;
+      }
+      if (kind == base + 3) {
+        // A summons that takes its time. It is not a table event — it
+        // goes to the juror's presence over a relay — so a juror can
+        // be told it is one well after the seats have said the hand's
+        // first steps, and then holds them before it has a deal to
+        // put them in.
+        final p = t.presence;
+        if (p != null) {
+          final slow = 1000 + rng.nextInt(9000);
+          final hold = 10000 + rng.nextInt(40000);
+          t.clock.schedule(when, () {
+            p.summonsMs = slow;
+            faults.add('summons takes $slow at ${t.clock.nowMs} for $hold');
+          });
+          t.clock.schedule(when + hold, () => p.summonsMs = 50);
+        }
+        at += 3000 + rng.nextInt(30000);
+        continue;
+      }
       if (kind >= base) {
         if (kind == base) {
           // A relay goes out for a while: a write to it is refused and
@@ -140,6 +180,19 @@ class ChaosScenario {
       switch (kind) {
         case 0:
         case 1:
+          // Half of them out of earshot of a juror or two as they go.
+          //
+          // A departure turns a seat into a bot, and which seats are
+          // bots is half of who holds them — so a departure still in
+          // flight is two sides answering that differently, which is
+          // the race `_botSeatsAt` is there for. The walk had no way
+          // to make it: its departures reach everyone at once bar the
+          // ordinary latency, and a relay going half-deaf lasts tens
+          // of seconds rather than the second or two that puts one
+          // side a step behind another. So the leaver loses a link to
+          // a juror or two for a moment, and they hear it carried
+          // rather than said.
+          final late = rng.nextBool();
           t.clock.schedule(when, () {
             if (exits >= maxExits) return;
             final live = t.people.where((p) => !p.gone).toList();
@@ -147,8 +200,20 @@ class ChaosScenario {
             final who = live[rng.nextInt(live.length)];
             final how = Exit.values[rng.nextInt(Exit.values.length)];
             exits++;
-            faults.add('${how.name} seat ${who.client.mySeat} at ${t.clock.nowMs}');
+            final deaf = late ? t.jurors.where((j) => !j.gone && j.client != null).take(2).toList() : const <SimJuror>[];
+            for (final j in deaf) {
+              t.net.cut(who.client.signer.publicKey, j.signer.publicKey);
+            }
+            faults.add('${how.name} seat ${who.client.mySeat} at ${t.clock.nowMs}'
+                '${deaf.isEmpty ? '' : ', ${deaf.length} juror(s) out of earshot'}');
             who.depart(how);
+            if (deaf.isNotEmpty) {
+              t.clock.schedule(1500, () {
+                for (final j in deaf) {
+                  t.net.uncut(who.client.signer.publicKey, j.signer.publicKey);
+                }
+              });
+            }
           });
         case 2:
           final side = <PublicKey>{};
@@ -217,6 +282,8 @@ class ChaosScenario {
     final t = table;
     t.net.heal();
     t.net.healRelays();
+    t.net.swallow = null;
+    t.presence?.summonsMs = 50;
     t.net.lossRate = 0;
     t.net.minLatencyMs = 20;
     t.net.maxLatencyMs = 80;
