@@ -797,6 +797,7 @@ class TableClient {
     played.clear();
     _saidOnce.clear();
     _botTurnSince.clear();
+    _closedTurns.clear();
     step = 0;
     // The hand's jurors are the hand's to reach: a jury carried for an
     // earlier hand still serves until relieved, and a new one changes
@@ -1032,6 +1033,11 @@ class TableClient {
   }
 
   final List<(TurnId, int)> _botQueue = [];
+
+  /// The turns of this hand closed here ([_closeTurn]). Not the same
+  /// as settled: a departed person's turn is settled by the removal,
+  /// and closed by the move its seat, a bot from there, still owes.
+  final Set<TurnId> _closedTurns = {};
   bool _runningBots = false;
 
   /// A bot's turn: its move is a function of the deal and the record,
@@ -1099,6 +1105,19 @@ class TableClient {
         // its own seat in the deal, not at this one, so an audit held
         // here would be an audit that never came.
         if (heldHere && !(turn.isAudit && d.gone.contains(seat))) return;
+        // Unless the seat's own juror is still here to say it
+        // ([_holderStillAudits]). Given up to the escrow is each
+        // side's own judgement, and one side can take a seat off a
+        // juror that another, a moment later, did not: the juror had
+        // only been slow. It then says its own audit, and the side
+        // that never gave the seat up waits for everyone to witness
+        // it. This side, settling from the escrow's pieces, never
+        // did — the audit it closed answered nothing — and the other
+        // waited for good, or at a table of three took the audit on
+        // the record where this side had none. Waited for here too,
+        // and witnessed, it goes on every record alike.
+        if (heldHere && _holderStillAudits(turn, seat)) return;
+        if (_closedTurns.contains(turn)) return;
         _races[turn]!.settled = true;
         _closeTurn(turn);
         return;
@@ -1158,6 +1177,7 @@ class TableClient {
 
   /// After a turn settles: sweep, deal, and open what is next.
   void _closeTurn(TurnId turn) {
+    _closedTurns.add(turn);
     step++;
     _myWitness.remove(turn);
     if (turn.isDeal) {
@@ -2890,6 +2910,15 @@ class TableClient {
     final d = _deal;
     if (d == null) return;
     for (final e in List.of(_stalled.entries)) {
+      // Closed meanwhile some other way — a held seat's audit its own
+      // juror said, which carries the secret it was stalled on — and
+      // not to be closed a second time. Settled is not enough: a
+      // departed person's turn is settled by the removal and still
+      // waits here for the move that closes it.
+      if (_closedTurns.contains(e.key)) {
+        _stalled.remove(e.key);
+        continue;
+      }
       if (d.awaitsSecret(e.value)) continue;
       _stalled.remove(e.key);
       _botTurn(e.key, e.value);
@@ -3157,14 +3186,14 @@ class TableClient {
   /// escrow working and not a holder failing.
   bool _outOfTime(int seat) {
     final turn = _openTurnOf(seat);
-    if (turn == null || !(turn.isPlay || turn.isPass || turn.isDeal)) return false;
+    if (turn == null || !(turn.isPlay || turn.isPass || turn.isDeal || turn.isAudit)) return false;
     if (_stalled.containsKey(turn)) return false;
     final race = _races[turn];
     if (race == null || race.settled || race.action != null) return false;
     // A deal step that has come and is held here for what vouches for
     // it — the jury it seals to, a draw not yet read ([_onAction]) —
     // has been said. The wait is this side's, not the juror's.
-    if (turn.isDeal && _future.any((e) => e.kind == EventKind.deal && e.turn == turn)) return false;
+    if ((turn.isDeal || turn.isAudit) && _future.any((e) => e.kind == EventKind.deal && e.turn == turn)) return false;
     // From when the turn became this holder's to take, not from when
     // the turn opened. A turn can open while its seat is still being
     // handed over — a person leaving it, the seat turning into a bot,
@@ -3190,7 +3219,22 @@ class TableClient {
       return false;
     }
     final since = _botTurnSince.putIfAbsent(key, () => clock.nowMs);
-    return clock.nowMs - since >= (turn.isDeal ? botDealsWithinMs : botActsWithinMs);
+    return clock.nowMs - since >= (turn.isDeal || turn.isAudit ? botDealsWithinMs : botActsWithinMs);
+  }
+
+  /// Whether a held seat's own juror is still to be waited for at the
+  /// seat's audit, at a side that gave the seat to the escrow: heard
+  /// from, and not yet past the allowance a deal step has
+  /// ([botDealsWithinMs]) — an audit is a step of the deal, the last.
+  /// A juror gone, or one sitting on it, leaves the audit to the
+  /// escrow's pieces, as a side that never gave the seat up leaves it
+  /// once the juror is out of time there ([_outOfTime]).
+  bool _holderStillAudits(TurnId turn, int seat) {
+    final holder = botHolders(turn.hand)[seat];
+    if (holder == null || holder == signer.publicKey) return false;
+    if (!_liveJurors(turn.hand).contains(holder)) return false;
+    final since = _botTurnSince.putIfAbsent('$turn|$holder', () => clock.nowMs);
+    return clock.nowMs - since < botDealsWithinMs;
   }
 
   /// Whether a juror has yet to be heard at [hand]: not heard from
@@ -3388,7 +3432,8 @@ class TableClient {
       final quiet = !live.contains(e.value);
       final slow = _outOfTime(e.key);
       if (!quiet && !slow) continue;
-      final allowed = (_openTurnOf(e.key)?.isDeal ?? false) ? botDealsWithinMs : botActsWithinMs;
+      final open = _openTurnOf(e.key);
+      final allowed = open != null && (open.isDeal || open.isAudit) ? botDealsWithinMs : botActsWithinMs;
       _trace('bot seat ${e.key}: its juror ${e.value.substring(0, 4)} '
           '${quiet ? 'has gone quiet' : 'has had the turn for ${allowed ~/ 1000} seconds and said nothing'}; '
           'to the escrow');

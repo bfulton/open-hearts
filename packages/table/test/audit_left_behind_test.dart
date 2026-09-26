@@ -49,4 +49,44 @@ void main() {
         reason: 'and the juror came with it:\n${holder.client?.describe()}');
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
+
+  // And the players among themselves. Given up to the escrow is each
+  // side's own judgement: a juror's move that reaches one person in
+  // time and the other late has the seat given up at one and not the
+  // other, and the table goes on — the move is the same either way
+  // (two_voices_test.dart). Not the audit. The side that gave the seat
+  // up settled it from the escrow's pieces, with nothing said; the
+  // other waited for everyone to witness the juror's own audit, which
+  // the first never did. The table stopped there for good, or finished
+  // holding two records (explorer, topup scenario).
+  test('a seat one person gave to the escrow and the other did not: its juror\'s own audit settles it on both records', () {
+    final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize, target: 1);
+    t.start();
+    final a = t.clients.first;
+    final b = t.clients.last;
+    expect(t.clock.runUntil(() => a.game.phase == Phase.playing, limitMs: 5 * 60 * 1000), isTrue);
+    final hand = a.game.handNumber;
+    final held = a.botHolders(hand);
+    expect(t.clock.runUntil(() => held.containsKey(a.game.currentSeat), limitMs: 60 * 1000), isTrue,
+        reason: 'a held seat\'s turn');
+    final seat = a.game.currentSeat!;
+    final holder = held[seat]!;
+    // The juror's moves, kept from everyone but b for four seconds: a
+    // and the jury give the seat up at three, and b has the move.
+    final until = t.clock.nowMs + 4000;
+    t.net.steer = (from, to, message) =>
+        from == holder && to != b.signer.publicKey && message['kind'] == 'play' && t.clock.nowMs < until ? -1 : null;
+    expect(t.clock.runUntil(() => a.deal!.gone.contains(seat), limitMs: 10 * 1000), isTrue, reason: 'a gave the seat up');
+    t.clock.advance(5000);
+    expect(b.deal!.gone.contains(seat), isFalse, reason: 'b did not');
+
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 10 * 60 * 1000), isTrue,
+        reason: 'the game was played out, audits and all:\n${a.describe()}${b.describe()}');
+    expect(a.record.map((d) => d.key).toList(), b.record.map((d) => d.key).toList(), reason: 'one record');
+    for (final c in t.clients) {
+      final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok && v.complete, isTrue, reason: v.reason);
+    }
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
 }

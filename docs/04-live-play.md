@@ -1454,6 +1454,23 @@ deal they had finished would have done. It gives the hand up then, as
 they did — the same inference the verifier makes from the record
 (`packages/table/test/undealt_hand_test.dart`).
 
+The audit of a held seat given to the escrow is settled with nothing
+said, from the pieces released at the hand's end — unless the seat's
+own juror is still heard from, in which case it is waited for and
+witnessed like anyone's, within the same ten seconds a deal step has.
+Giving a seat up is each side's own judgement, and a juror's move that
+reaches one person in time and another a moment late has the seat
+given up at one side and not the other. The move itself comes out the
+same either way; the audit did not. The side that gave the seat up
+settled it silently, the other waited for everyone to witness the
+juror's own audit, and the first never did: the table stopped there
+for good, or finished holding two different records
+(`packages/table/test/audit_left_behind_test.dart`, found by the
+explorer's top-up scenario at the 4,000th of 4,207 runs).
+A juror sitting on its audit is on the clock like one sitting on a
+deal step, so a side that never gave the seat up does not wait for it
+for good either.
+
 **Per hand, not per game.** The deck is resealed every hand, so shares
 are per-hand and a juror's whole obligation is one hand — p50 a minute,
 p90 two. Short enough to ask of a stranger, and short enough that an
