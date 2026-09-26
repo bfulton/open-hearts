@@ -3721,9 +3721,22 @@ class TableClient {
 
   void _reconsiderJury(TableEvent event) {
     final race = _proposals[event.id];
-    if (race == null || race.settled) return;
+    if (race == null) return;
     if (!amSeated || _left || event.author == signer.publicKey) return;
-    if (_myJuryWitnessEvents.containsKey(event.id) || !_acceptableJury(event)) return;
+    // Backed already, and said again: the proposer has not heard this
+    // side back it. A proposal is said again only until it carries, a
+    // witness is said once, and the second copy of a proposal is the
+    // same event as the first — so a witness lost on its way to the
+    // proposer was never replaced. It waited for a jury the rest of
+    // the table was dealing under; the others booted it for keys it
+    // was holding back for that jury, and once the jury ruled those
+    // stood, it had moved on to a round the others had not reached
+    // and each waited on the other for good (tool/explore.dart found
+    // it by losing that one copy). Asked again, answered again, as a
+    // turn sent again is ([_catchUp]).
+    final mine = _myJuryWitnessEvents[event.id];
+    if (mine != null) return transport.broadcast(mine.toJson());
+    if (race.settled || !_acceptableJury(event)) return;
     _witnessJury(event);
     _settleJury(event.id);
   }

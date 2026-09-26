@@ -1422,7 +1422,14 @@ On the wire:
   it when the draw is what the snapshot gives and the jurors are people
   they too have seen; a majority carries it, beside the record rather
   than in it, since two peers may hold different evidence for the same
-  authority. Everyone summons the jurors. A jury stays in force until a
+  authority. The proposer says it again every ten seconds until it
+  carries, and a proposal said again is the same event, so a peer that
+  has already backed it says its witness again rather than nothing: a
+  witness is said once, and one lost on its way to the proposer left
+  it waiting on a jury the rest of the table was dealing under, until
+  each was a round ahead of what the other waited on
+  (`packages/table/test/lost_jury_witness_test.dart`, found by
+  `tool/explore.dart`). Everyone summons the jurors. A jury stays in force until a
   later one carries: a table of two with one gone quiet cannot carry a
   new one, and that is when it needs the old. A jury gone quiet is
   redrawn from whoever is left; with nobody online to draw from — or
