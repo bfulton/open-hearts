@@ -2,12 +2,14 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:engine/engine.dart';
 import 'package:service/service.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 Waiter w(String name, {int rating = 1500, int since = 0}) =>
     Waiter(key: name.padRight(64, '0'), name: name, rating: rating, since: since);
@@ -135,6 +137,47 @@ void main() {
               'than a bot in it');
       again.$2.close();
       again.$1.close();
+    });
+
+    test('a device entering a pool is handed this round\'s seatings, not the pool\'s whole history', () async {
+      // Every seating is stored, so that a room code's joiner finds the
+      // room announced before it arrived; a pool's pile up with it, and
+      // a device pressing Play was handed every one the pool had ever
+      // carried. An hour of a busy pool's rounds, and one from now.
+      final ws = WebSocketChannel.connect(relay.url);
+      final host = SchnorrSigner.generate();
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      void store(String tag, int at, String what) => ws.sink.add(jsonEncode([
+            'EVENT',
+            NostrEvent.sign(host, kind: TableKinds.lobby, content: jsonEncode({'what': what}), tags: [
+              ['t', tag],
+            ], createdAt: at)
+                .toJson(),
+          ]));
+      final pool = poolTag('unrated');
+      for (var i = 0; i < 40; i++) {
+        store(pool, now - 3600 + i * 90, 'an old seating');
+      }
+      store(pool, now, 'this round\'s seating');
+      // And a room announced an hour ago, whose joiner still has to
+      // find it.
+      store('ROOM42', now - 3600, 'a room');
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      final entering = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: pool);
+      await entering.ready;
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect([for (final e in entering.lobbySoFar) (jsonDecode(e.content) as Map)['what']], ['this round\'s seating'],
+          reason: 'the pool as it is now, not as it has ever been');
+
+      final joining = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: 'ROOM42');
+      await joining.ready;
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(joining.lobbySoFar, hasLength(1), reason: 'a room code still hands a late joiner the room');
+
+      entering.close();
+      joining.close();
+      await ws.sink.close();
     });
 
     test('if the lowest key falls silent, the next seats the round', () async {

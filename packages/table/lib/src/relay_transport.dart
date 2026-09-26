@@ -40,13 +40,34 @@ class RelayTransport implements Transport {
             'p': [signer.publicKey]
           }).toJson()
             ..['#t'] = [table],
-          const Filter(kinds: [TableKinds.lobby, TableKinds.waiting]).toJson()..['#t'] = [table],
+          Filter(kinds: const [TableKinds.lobby, TableKinds.waiting], since: _lobbySince(table)).toJson()..['#t'] = [table],
         ],
       },
       onEvent: _onEvent,
       log: log,
     );
   }
+
+  /// What a pool's tag starts with (matching.dart, poolTag).
+  static const poolPrefix = 'queue:';
+
+  /// How far back a pool's seatings are worth reading. A seating is for
+  /// its own round of a few seconds and ignored after it, and the
+  /// rounds are cut by each device's own clock, so the pool already
+  /// takes the clocks to agree within one; a minute is that with room
+  /// to spare.
+  static const poolHistorySeconds = 60;
+
+  /// Where the stored lobby events start for [tag]: a pool's from a
+  /// minute ago, a room code's from the beginning.
+  ///
+  /// Every seating is stored, because a room code's joiner has to be
+  /// handed the room announced before it arrived — that history is the
+  /// point of a room. A pool's is not: its seatings pile up round after
+  /// round, and a device pressing Play was handed every one the pool
+  /// had ever carried, each useless the moment its round was over.
+  static int? _lobbySince(String tag) =>
+      tag.startsWith(poolPrefix) ? DateTime.now().millisecondsSinceEpoch ~/ 1000 - poolHistorySeconds : null;
 
   /// The relays, in the order this table writes to them.
   final List<Uri> relays;

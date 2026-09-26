@@ -131,6 +131,13 @@ of five seconds, and in each round the lowest key present acts as
 host: it runs the seating rule (`packages/table/lib/src/matching.dart`)
 over everyone it has heard from and publishes one signed event per
 table naming the seats, the same start event a friends' room uses.
+The relay stores it, as it stores a room's, since that is how a
+friend arriving after the room was announced still finds it; a device
+entering a pool asks for the last minute of the pool's seatings and
+no more. A seating is for its own round and ignored after it, and
+the rounds are cut by each device's own clock, so a pool already takes
+the clocks to agree within one — and the whole history a busy pool
+had ever carried was a growing download on every press of *Play live*.
 The rule: whoever has waited through a round already is seated first,
 then the rest at random; a table is four ratings within a window that
 widens a hundred points for every round the first of them has waited,
