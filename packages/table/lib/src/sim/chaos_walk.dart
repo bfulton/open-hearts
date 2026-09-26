@@ -217,7 +217,11 @@ String? walkChaos(int seed, {DealCrypto? crypto}) {
       final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries, crypto: t.crypto, releases: survivors.first.releases);
       if (!(v.ok && v.complete)) return 'the finished record does not verify complete: ${v.reason}';
     } else {
-      final up = {for (final j in t.liveJurors) j.signer.publicKey};
+      // Up and following the table: a juror drawn whose summons never
+      // reached it has no client, holds no piece it could release and
+      // hears no appeal — and the table stops counting it thirty
+      // seconds after the draw, having never heard from it.
+      final up = {for (final j in t.liveJurors) if (j.client != null) j.signer.publicKey};
       // A held seat nobody still up can open: its own juror not among
       // them, and fewer of the hand's custodians than it takes to
       // rebuild the seat — a juror holds one piece, and the escrow
