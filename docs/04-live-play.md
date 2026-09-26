@@ -1270,7 +1270,16 @@ can open a given-up seat, so a juror says its moves rather than every
 side working them out — **one** juror, the first of the hand's
 custodians still being heard from, since they all hold the same key
 and would all say the same card. Its audit is the exception: by then
-the secret is in the open and every side settles it for itself.
+the secret is in the open and every side settles it for itself. A
+juror that did not see the seat given up — the seat's own juror, only
+late, or one summoned for the next hand and carried in behind — waits
+for that audit to be said and witnessed, and it never will be, nor
+carried, since a turn settled with nothing said leaves nothing to
+carry. So a juror still at a hand's audit of a bot seat, once most of
+the table has been heard at a later hand for a few seconds, settles it
+the same way (`audit_left_behind_test.dart`; sealed chaos seed 5, where
+such a juror held a seat two hands on and the table waited on its keys
+with every juror heartbeating).
 
 One juror, but not always one voice. Which peers have given a seat up
 is each peer's own judgement, so a juror late with its card — behind,

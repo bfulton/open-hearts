@@ -893,6 +893,53 @@ class TableClient {
     return false;
   }
 
+  /// A bot seat's audit still open at a juror while the table has
+  /// moved on to a later hand.
+  ///
+  /// The table settles a given-up seat's audit with nothing said
+  /// ([_botActs]): its secret is out in the clear once the hand is
+  /// over. A juror that did not see the seat given up — its own juror,
+  /// only late where the others judged it gone, or one summoned for the
+  /// next hand and carried in behind — waits for that audit to be said
+  /// and witnessed, and it never will be; carrying it forward carries
+  /// what was decided, which for a turn settled with nothing said is
+  /// nothing. It stayed at that audit while the table dealt on without
+  /// it, and in the next hand whose draw gave it a seat the table
+  /// waited on that seat's keys with every juror heartbeating
+  /// (test/audit_left_behind_test.dart, sealed chaos seed 5).
+  ///
+  /// A majority of the participants heard from at a later hand have
+  /// settled every turn of this one, so a bot seat's audit this side
+  /// still has open was settled there without anything said: settled
+  /// here the same way, which leaves the same record as theirs. Only a
+  /// bot seat's: a person's audit is always said, and carrying brings
+  /// it.
+  void _auditLeftBehind() {
+    final h = game.handNumber;
+    if (!(game.phase == Phase.handOver || game.phase == Phase.gameOver || _openingAudit)) return;
+    final of = participants;
+    final past = of.where((k) => (_lastPosition[k]?.$1 ?? -1) > h).length;
+    if (of.isEmpty || past < _majority(of)) return;
+    // After a few seconds of it: a juror only a moment behind is about
+    // to be carried the decisions it lacks, and one settled here with
+    // nothing said would leave its record short of one that was.
+    final since = _tablePastSince.putIfAbsent(h, () => clock.nowMs);
+    if (clock.nowMs - since < 5000) return;
+    for (var s = 0; s < seatCount; s++) {
+      if (holders[s] is! BotSeat) continue;
+      final t = TurnId.audit(h, s);
+      final race = _races[t];
+      if (race == null || race.settled) continue;
+      _trace('the table is past hand $h without $t: settled here as it was there, with nothing said');
+      race.settled = true;
+      _closeTurn(t);
+    }
+  }
+
+  /// When this side first saw a majority of the participants past each
+  /// hand it was still at, for [_auditLeftBehind].
+  final Map<int, int> _tablePastSince = {};
+
   /// Whether [seat]'s bot moves are this side's to work out. A bot
   /// seat nobody holds is everyone's to compute. One a juror holds is
   /// that juror's alone: every other peer waits to be told
@@ -3456,6 +3503,7 @@ class TableClient {
       // juror holding a seat is as much that seat as a person is
       // theirs.
       _repeat(ownOnly: true);
+      _auditLeftBehind();
       _judgeAppeals();
       // A juror holding a bot seat owes that seat's deal steps, and
       // owes them again whenever the last look found it too early to
