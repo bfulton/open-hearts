@@ -217,6 +217,17 @@ class _LivePageState extends State<LivePage> {
         ),
       );
     }
+    // A game that cannot go on ends, and says why: unscored, and
+    // nothing left at the table to do but go.
+    final failure = _c.client.failure;
+    if (failure != null) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(gradient: Felt.gradient),
+          child: SafeArea(child: _Failed(failure: failure, onHome: () => Navigator.of(context).pop())),
+        ),
+      );
+    }
     final game = _c.game;
     // What the player has committed is already off the hand.
     // Nothing yet while a sealed table deals.
@@ -331,6 +342,53 @@ class _Presence extends StatelessWidget {
 }
 
 /// The table went on without you.
+/// A game ended for a connection failure: which one, and the way home.
+class _Failed extends StatelessWidget {
+  const _Failed({required this.failure, required this.onHome});
+
+  final Failure failure;
+  final VoidCallback onHome;
+
+  String get _why => switch (failure) {
+        Failure.jurorQuorumLost => 'Too few of the jurors keeping the bot seats are still online, '
+            'so the hand cannot go on. The game ends here, unscored.',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(22),
+        constraints: const BoxConstraints(maxWidth: 380),
+        decoration: BoxDecoration(
+          color: Felt.mid,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Palette.danger.withValues(alpha: 0.45)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Connection failure',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
+            const SizedBox(height: 4),
+            Text(failure.label[0].toUpperCase() + failure.label.substring(1),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Palette.chrome)),
+            const SizedBox(height: 8),
+            Text(_why, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: onHome,
+              style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
+              child: const Text('Home'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Replaced extends StatelessWidget {
   const _Replaced({required this.onBack});
 

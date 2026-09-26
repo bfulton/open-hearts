@@ -414,6 +414,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a hand nobody left can open ends the game: a connection failure, juror quorum lost', (tester) async {
+    // The jury holding the bot seats gone mid-hand, all of it: the
+    // table stops at a held seat's turn and says it waits for the
+    // jury, and when none has come back in the time a silent person
+    // is given, the game ends — unscored, and said so plainly.
+    final crypto = await DealCrypto.load();
+    final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: 4);
+    for (var guard = 0; guard < 200 && live.controller.game.phase != engine.Phase.playing; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(live.controller.game.phase, engine.Phase.playing, reason: 'the hand was dealt and passed');
+    for (final j in live.jurors) {
+      live.net.goOffline(j.signer.publicKey);
+    }
+    for (var guard = 0; guard < 400 && live.controller.client.failure == null; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 1000);
+    }
+    expect(live.controller.client.failure, Failure.jurorQuorumLost, reason: live.controller.client.describe());
+    expect(find.text('Connection failure'), findsOneWidget);
+    expect(find.text('Juror quorum lost'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Home'), findsOneWidget);
+    expect(find.byType(TableView), findsNothing, reason: 'nothing left at the table to do');
+    expect(live.controller.done, isFalse, reason: 'unscored');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('at a sealed table the deal shows, the others\' cards are backs, and the hand plays out', (tester) async {
     final crypto = await DealCrypto.load();
     final live = await pumpLive(tester, crypto: crypto);

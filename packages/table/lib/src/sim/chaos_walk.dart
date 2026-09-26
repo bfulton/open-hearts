@@ -4,8 +4,9 @@
 /// state change is one the model in model.dart allows, and once the
 /// faults stop and the network heals the table finishes — or is paused
 /// for the one reason left, the jury gone and nobody online to draw
-/// another. The test walks forty seeds on every commit; the tool walks
-/// as many as asked, sealed too.
+/// another, or has ended for it once that went on long enough. The
+/// test walks forty seeds on every commit; the tool walks as many as
+/// asked, sealed too.
 library;
 
 import 'package:deal/deal.dart';
@@ -142,8 +143,47 @@ String? walkChaos(int seed, {DealCrypto? crypto}) {
   final observed = {for (final c in t.clients) c: _Observed()};
   String faults() => sc.faults.join('; ');
 
+  // Up and following the table: a juror drawn whose summons never
+  // reached it has no client, holds no piece it could release and
+  // hears no appeal — and the table stops counting it thirty seconds
+  // after the draw, having never heard from it.
+  Set<PublicKey> upNow() => {for (final j in t.liveJurors) if (j.client != null) j.signer.publicKey};
+
+  // A seat a side is stopped at, or ended the game at, that nobody
+  // still up can open: a held seat with its own juror not among them
+  // and fewer of the jurors holding a piece of it than it takes to
+  // rebuild it; a departed person's with none of the jury the deal
+  // was sealed to. The table stopped there says so (doc 03), no juror
+  // up could end it, and after long enough the game ends (doc 04):
+  // at a play, waiting for the jury; at the audit or a departed
+  // seat's hand, stalled opening the hand. Judged here from who
+  // really is up, not from what the table believes.
+  bool unopenable(TableClient c, Set<PublicKey> up) {
+    final w = c.waitingOnGoneJury;
+    final f = c.failedAt;
+    final waits = [
+      if (w != null) (hand: w.turn.hand, seat: w.seat),
+      if (f != null) (hand: f.turn.hand, seat: f.seat),
+      for (final e in c.stalled.entries) (hand: e.key.hand, seat: e.value),
+    ];
+    if (waits.isEmpty) return false;
+    return waits.every((x) => !c.openableBy(x.hand, x.seat, up.contains));
+  }
+
+  // A game ended for a lost quorum is judged the moment it is seen,
+  // against who is up then: a juror blipped away and back later would
+  // make it look premature at the end of the walk when it was not.
+  final judged = <TableClient>{};
+
   String? check(String when) {
     final survivors = t.survivors.toList();
+    for (final c in survivors) {
+      if (c.failure == null || !judged.add(c)) continue;
+      if (!unopenable(c, upNow())) {
+        return '$when: ${c.signer.publicKey.substring(0, 6)} ended the game, ${c.failure!.label}, '
+            'with a juror up that could open the seat\n${c.describe()}';
+      }
+    }
     for (var i = 0; i < survivors.length; i++) {
       for (var j = i + 1; j < survivors.length; j++) {
         final why = conflict(survivors[i].record, survivors[j].record);
@@ -217,56 +257,31 @@ String? walkChaos(int seed, {DealCrypto? crypto}) {
       final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries, crypto: t.crypto, releases: survivors.first.releases);
       if (!(v.ok && v.complete)) return 'the finished record does not verify complete: ${v.reason}';
     } else {
-      // Up and following the table: a juror drawn whose summons never
-      // reached it has no client, holds no piece it could release and
-      // hears no appeal — and the table stops counting it thirty
-      // seconds after the draw, having never heard from it.
-      final up = {for (final j in t.liveJurors) if (j.client != null) j.signer.publicKey};
-      // A held seat nobody still up can open: its own juror not among
-      // them, and fewer of the hand's custodians than it takes to
-      // rebuild the seat — a juror holds one piece, and the escrow
-      // wants [escrowThreshold]. The table stopped there says so
-      // (doc 03), and no juror up could end it: at a play, waiting for
-      // the jury; at the audit, stalled opening the hand. Judged here
-      // from who really is up, not from what the table believes. A
-      // person's seat is never this — a person's piece and any one
-      // juror's open it — so a stall on one with a juror up is still
-      // a pause that juror should have ended.
-      bool unopenable(TableClient c) {
-        final w = c.waitingOnGoneJury;
-        final waits = [
-          if (w != null) (hand: w.turn.hand, seat: w.seat),
-          for (final e in c.stalled.entries) (hand: e.key.hand, seat: e.value),
-        ];
-        if (waits.isEmpty) return false;
-        return waits.every((x) {
-          final holder = c.botHolders(x.hand)[x.seat];
-          if (holder == null || up.contains(holder)) return false;
-          return c.custodiansOf(x.hand).where(up.contains).length < escrowThreshold;
-        });
-      }
-
+      final up = upNow();
       const paused = {TableState.pausedForJury, TableState.pausedForPeers, TableState.pausedForDeal};
       for (final c in survivors) {
+        // Ended for a lost quorum, and judged fair when it was seen.
+        if (c.tableState == TableState.failed) continue;
         if (!paused.contains(c.tableState)) {
           return 'not finished, and not paused saying why; faults were [${faults()}]\n${c.describe()}';
         }
         if (c.tableState == TableState.pausedForDeal) {
           // A departed seat's hand that no juror is left to open: the
-          // escrow's price, and only ever with the whole jury gone.
+          // escrow's price, and only ever with the whole jury gone —
+          // which, left long enough, ends the game.
           if (c.pause != Pause.openingHand) {
             return 'paused for the deal for a reason other than an unopenable hand; faults were [${faults()}]\n${c.describe()}';
           }
           continue;
         }
         final notAMajority = survivors.length < c.participants.length ~/ 2 + 1;
-        if (!(notAMajority || c.stuckSplit != null || unopenable(c))) {
+        if (!(notAMajority || c.stuckSplit != null || unopenable(c, up))) {
           return 'paused for a reason other than no majority or an even split; faults were [${faults()}]\n${c.describe()}';
         }
       }
       // With a jury there is no pause a live juror could not end — save
       // the one above, which none could.
-      if (up.isNotEmpty && !survivors.every(unopenable)) {
+      if (up.isNotEmpty && !survivors.where((c) => c.failure == null).every((c) => unopenable(c, up))) {
         return 'paused with a juror still up; faults were [${faults()}]\n${survivors.first.describe()}';
       }
     }

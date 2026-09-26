@@ -35,8 +35,10 @@
 /// players cannot settle among themselves, appealed) or for peers (not
 /// enough reachable to decide anything) or for the deal (a departed
 /// seat's hand not yet opened from its escrow, or the lead card that
-/// nobody declared), or finished. A pause always lifts when a decision
-/// lands; finished is terminal.
+/// nobody declared), or finished, or failed: stopped at a seat nobody
+/// left could open for as long as a silent person is given (client.dart,
+/// "juror quorum lost"). A pause always lifts when a decision lands;
+/// finished and failed are terminal.
 library;
 
 /// Where a turn's race stands.
@@ -61,7 +63,7 @@ enum TurnState {
 /// How a seat is held.
 enum SeatState { human, left, booted, absent, bot }
 
-enum TableState { playing, pausedForJury, pausedForPeers, pausedForDeal, finished }
+enum TableState { playing, pausedForJury, pausedForPeers, pausedForDeal, finished, failed }
 
 /// The transitions each machine allows, as data, so a test can check
 /// that nothing observed steps outside them.
@@ -83,9 +85,10 @@ const seatTransitions = <SeatState, Set<SeatState>>{
 };
 
 const tableTransitions = <TableState, Set<TableState>>{
-  TableState.playing: {TableState.pausedForJury, TableState.pausedForPeers, TableState.pausedForDeal, TableState.finished},
-  TableState.pausedForJury: {TableState.playing, TableState.pausedForPeers, TableState.pausedForDeal, TableState.finished},
-  TableState.pausedForPeers: {TableState.playing, TableState.pausedForJury, TableState.pausedForDeal, TableState.finished},
-  TableState.pausedForDeal: {TableState.playing, TableState.pausedForJury, TableState.pausedForPeers, TableState.finished},
+  TableState.playing: {TableState.pausedForJury, TableState.pausedForPeers, TableState.pausedForDeal, TableState.finished, TableState.failed},
+  TableState.pausedForJury: {TableState.playing, TableState.pausedForPeers, TableState.pausedForDeal, TableState.finished, TableState.failed},
+  TableState.pausedForPeers: {TableState.playing, TableState.pausedForJury, TableState.pausedForDeal, TableState.finished, TableState.failed},
+  TableState.pausedForDeal: {TableState.playing, TableState.pausedForJury, TableState.pausedForPeers, TableState.finished, TableState.failed},
   TableState.finished: {},
+  TableState.failed: {},
 };

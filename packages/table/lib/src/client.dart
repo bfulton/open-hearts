@@ -122,6 +122,21 @@ enum Pause {
   waitingForLead,
 }
 
+/// Why a game ended without finishing: a connection failure, and which.
+enum Failure {
+  /// A seat the table is stopped at that nobody left could open — a
+  /// held bot seat with its own juror gone and fewer than
+  /// [escrowThreshold] of the jurors holding a piece of it still
+  /// heard, or a departed person's with none — and has been, for as
+  /// long as a person is given before being removed for silence.
+  jurorQuorumLost('juror quorum lost');
+
+  const Failure(this.label);
+
+  /// As the player is told it.
+  final String label;
+}
+
 /// A settled turn or a departure, as it goes in the record.
 class Decision {
   const Decision({
@@ -452,6 +467,7 @@ class TableClient {
 
   TableState get tableState {
     if (done) return TableState.finished;
+    if (_failure != null) return TableState.failed;
     return switch (_pause) {
       null => TableState.playing,
       Pause.waitingForJury => TableState.pausedForJury,
@@ -469,6 +485,7 @@ class TableClient {
     b.writeln('${signer.publicKey.substring(0, 6)} seat $mySeat: hand ${game.handNumber} ${game.phase.name} '
         'step $step current ${game.currentSeat} pause $_pause participants ${participants.length} '
         'holders $holders');
+    if (_failure != null) b.writeln('  ended: ${_failure!.label}, at ${_failedAt?.turn} for seat ${_failedAt?.seat}');
     for (final e in _races.entries) {
       if (e.value.settled) continue;
       final r = e.value;
@@ -686,6 +703,8 @@ class TableClient {
   /// answer — must reach a peer or a juror that cannot read the relay
   /// this device writes to.
   void _emit(EventKind kind, Map<String, Object?> body, {bool everywhere = false}) {
+    // A game that has ended says nothing more, to anyone.
+    if (_failure != null) return;
     final event = TableEvent.sign(signer, table: spec.id, kind: kind, body: body);
     if (kind != EventKind.heartbeat) _trace('emit ${kind.name} $body');
     transport.broadcast(event.toJson(), everywhere: everywhere);
@@ -1222,7 +1241,7 @@ class TableClient {
   // ---- receiving --------------------------------------------------------
 
   void _onMessage(PublicKey from, Map<String, Object?> json) {
-    if (_closed) return;
+    if (_closed || _failure != null) return;
     // An event seen before was checked before; the same id is the
     // same bytes, and a signature checked again is milliseconds a peer
     // being repeated at has not got.
@@ -3207,15 +3226,124 @@ class TableClient {
     final held = botHolders(hand);
     if (held.isEmpty) return null;
     final live = _liveJurors(hand);
-    final about = _custodiansNow(hand).where(live.contains).length;
-    if (about >= escrowThreshold) return null;
     for (final e in _races.entries) {
       final t = e.key;
       if (e.value.settled || t.hand != hand || !(t.isPlay || t.isPass)) continue;
-      final holder = held[_turnSeat[t]];
-      if (holder != null && !live.contains(holder)) return t;
+      final seat = _turnSeat[t];
+      if (seat == null || held[seat] == null) continue;
+      if (!openableBy(hand, seat, live.contains)) return t;
     }
     return null;
+  }
+
+  /// Whether anyone [up] could open [seat]'s hand at [hand]: a held
+  /// seat's own juror, or [escrowThreshold] of the jurors holding a
+  /// piece of its secret ([_pieceHolders]); a departed person's, any
+  /// one of the jury the deal was sealed to, beside a person's piece.
+  /// A hand drawn no jury is escrowed to the people alone, and is no
+  /// jury's to lose.
+  bool openableBy(int hand, int seat, bool Function(PublicKey) up) {
+    if (_juriesDrawnFor(hand).isEmpty) return true;
+    final holder = botHolders(hand)[seat];
+    final pieces = _pieceHolders(hand, seat).where(up).length;
+    if (holder != null) return up(holder) || pieces >= escrowThreshold;
+    return pieces >= 1;
+  }
+
+  /// Who holds a piece of [seat]'s secret at [hand], as far as this
+  /// side can tell: the jury the deal was sealed to, which the seat's
+  /// keys split it among, and a juror drawn since once it has been
+  /// sent a whole set of parts of one ([_topUpJury]). Not a juror
+  /// drawn since that has not: it is on the list of custodians, and
+  /// heard from, and holds nothing. A jury drawn after the holders of
+  /// the pieces went has nobody to be given them by — a newcomer's
+  /// piece is made by [escrowThreshold] of the old — and the table
+  /// counted it anyway, took the seat for one the jury could still
+  /// open, and sat at its turn saying nothing, for good.
+  Set<PublicKey> _pieceHolders(int hand, int seat) {
+    final drawn = _juriesDrawnFor(hand);
+    if (drawn.isEmpty) return const {};
+    final custodians = _custodiansNow(hand);
+    final out = {...drawn.first.event.jurors};
+    final sets = <String, Set<int>>{};
+    for (final e in _topUps[hand] ?? const <TableEvent>[]) {
+      if (e.about != seat) continue;
+      final at = e.body['at'], from = e.body['from'], have = e.body['have'];
+      if (at is! int || from is! int || have is! List || at < 1 || at > custodians.length) continue;
+      if (from < 1 || from > custodians.length || custodians[from - 1] != e.author) continue;
+      final set = [for (final i in have) if (i is int) i];
+      if (set.length < escrowThreshold || !set.contains(from)) continue;
+      final got = sets.putIfAbsent('$at|${set.join(',')}', () => {})..add(from);
+      if (set.every(got.contains)) out.add(custodians[at - 1]);
+    }
+    return out;
+  }
+
+  /// For a test or a walk: [_pieceHolders].
+  Set<PublicKey> pieceHoldersOf(int hand, int seat) => _pieceHolders(hand, seat);
+
+  /// A turn this side is stopped at whose seat nobody it still hears
+  /// could open, with the seat, or null: a held seat's play or pass
+  /// with its jury gone ([_heldTurnNobodyCanTake]), or a turn stalled
+  /// on a seat's secret — a departed person's, or a held seat's at its
+  /// audit — that nobody still heard holds enough of.
+  ({TurnId turn, int seat})? _unopenable() {
+    final hand = game.handNumber;
+    final t = _heldTurnNobodyCanTake();
+    if (t != null) return (turn: t, seat: _turnSeat[t]!);
+    final live = _liveJurors(hand);
+    for (final e in _stalled.entries) {
+      if (e.key.hand != hand) continue;
+      if (!openableBy(hand, e.value, live.contains)) return (turn: e.key, seat: e.value);
+    }
+    return null;
+  }
+
+  /// Why the game ended without finishing, or null while it has not.
+  Failure? get failure => _failure;
+  Failure? _failure;
+
+  /// The turn it ended at, and the seat nobody could open there.
+  ({TurnId turn, int seat})? get failedAt => _failedAt;
+  ({TurnId turn, int seat})? _failedAt;
+
+  /// Since when this side has been stopped at [_unopenable]'s turn.
+  ({TurnId turn, int since})? _unopenableSince;
+
+  /// Ends the game when the table has been stopped at one turn, with
+  /// nobody left who could open the seat it waits on, for as long as a
+  /// person is given before being removed for silence
+  /// ([silenceAfterMs]) — the jurors that would have opened it by then
+  /// not heard from for half a minute more than that.
+  ///
+  /// The hand cannot go on, and was waited on for good; giving it up
+  /// and dealing the next would throw away a hand whose cards have
+  /// been seen, and enough jurors leaving together could do that to
+  /// order. So the game ends — a connection failure, as the player is
+  /// told, and unscored. Each side judges it for itself, as it judges
+  /// a juror's silence, and says nothing more once it has: a side that
+  /// judged it wrongly, cut off from jurors the rest still hear, is to
+  /// the rest a player gone silent, and the table goes on without it
+  /// the way it goes on without anyone else who drops.
+  ///
+  /// Only while this side hears most of the table. A device that has
+  /// lost its own connection hears no juror either, and that is not
+  /// the jury gone: the rest remove it for its silence, and it finds
+  /// its seat taken when it is back ([Pause.waitingForPeers] meanwhile).
+  void _judgeQuorum() {
+    final at = _unopenable();
+    if (at == null || !connectedToMajority) {
+      _unopenableSince = null;
+      return;
+    }
+    if (_unopenableSince?.turn != at.turn) _unopenableSince = (turn: at.turn, since: clock.nowMs);
+    if (clock.nowMs - _unopenableSince!.since < silenceAfterMs) return;
+    _trace('stopped at ${at.turn} for ${silenceAfterMs ~/ 1000} seconds: seat ${at.seat} has nobody left to open it; '
+        'the game ends, ${Failure.jurorQuorumLost.label}');
+    _failure = Failure.jurorQuorumLost;
+    _failedAt = at;
+    _pause = null;
+    _notify();
   }
 
   /// Whether the pause up is this side's word that a held seat has
@@ -3486,7 +3614,7 @@ class TableClient {
   // ---- timers -------------------------------------------------------------
 
   void _heartbeat() {
-    if (_closed) return;
+    if (_closed || _failure != null) return;
     // The next one is booked before this one is sent — a send that
     // throws must not end the heartbeat for good — and behind a peer
     // heard lately, every second, since a heartbeat is what brings the
@@ -3525,7 +3653,7 @@ class TableClient {
   /// and repeat what is still unsettled — a message lost to a partition
   /// or a reconnect is recovered by whoever still holds it.
   void _tick() {
-    if (_closed) return;
+    if (_closed || _failure != null) return;
     // Before either branch: a hand's deal can be deferred waiting on
     // its jury, and the peer that has to come back to it is not always
     // a seated one or a serving one — a client that has left the table
@@ -3564,6 +3692,10 @@ class TableClient {
         _waitingOnGoneJury = false;
         if (_pause == Pause.waitingForJury && !_races.values.any((r) => !r.settled && r.split)) _pause = null;
       }
+      // And stopped there, or at a departed seat's hand, for as long as
+      // a silent person is given: the game ends ([_judgeQuorum]).
+      _judgeQuorum();
+      if (_failure != null) return;
       // Anyone not heard from for two minutes whose turn is open is
       // booted at once, for silence.
       for (final e in List.of(_races.entries)) {

@@ -116,8 +116,10 @@ rigged. Roughly in order:
    values, one juror per seat so that nobody holds enough to take the
    last hand by subtraction, its escrow among jurors alone so no
    player holds a piece, another juror taking it over when its holder
-   goes, and the audit publishing its secret so the verifier still
-   checks every bot move was the policy's. A table short of jurors to
+   goes — and, with nobody left who could open it mid-hand, the game
+   ending unscored after two minutes, a connection failure: "juror
+   quorum lost" — and the audit publishing its secret so the verifier
+   still checks every bot move was the policy's. A table short of jurors to
    hold its bot seats calls for them and waits rather than dealing a
    hand everyone can see, and what answers on an empty night is a
    bench of jurors of last resort rather than one, since one cannot

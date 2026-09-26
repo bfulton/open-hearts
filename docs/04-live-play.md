@@ -1378,13 +1378,25 @@ leaves a margin for the holder to be one of the ones that goes.
 
 **When quorum is lost anyway.** A hand whose bot seat has no juror
 cannot go on, and neither can one whose departed seat cannot be opened.
-That hand is given up unscored and the next is dealt, the way a hand
-nobody can lead already is — with the difference that this one cannot
-be opened to say why, so it ends without an audit and the verifier has
-to accept an abandoned hand as a terminal state rather than an
-incomplete one. Killing the whole table is the other option and costs
-three innocent players their game, so it is the answer only if a table
-cannot get a jury at all, hand after hand.
+In the deal, before anybody has seen a card, that hand is given up
+unscored and the next is dealt, the way a hand nobody can lead already
+is — with the difference that this one cannot be opened to say why, so
+it ends without an audit and the verifier has to accept an abandoned
+hand as a terminal state rather than an incomplete one.
+
+Once the cards are out, the game ends instead. Giving a hand up then
+throws away a hand whose cards have been seen, and a player looking at
+a bad one would only need the jurors holding the bot seats' pieces to
+leave together to have it dealt again. So a table stopped at a seat
+nobody left can open waits, says so, and goes on if they come back;
+if nobody who could open it has come back in two minutes — the time a
+person gets before the table removes them for silence — the game ends,
+unscored: a connection failure, "juror quorum lost". Ending it costs
+the innocent players their game, which is the price; what it does not
+do is let anybody choose which hand to keep. The most it can do for a
+player who is losing is leave the game unrated, and that takes the
+jurors holding the pieces — strangers drawn at random for the hand —
+leaving together, which is the bound the escrow already rests on.
 
 As built, for the deal. A held seat given up with *any* step of the
 deal still to take gives the hand up — not only one whose turn is open
@@ -1401,6 +1413,33 @@ also rebuilds a held seat given up to the escrow from the pieces
 released at the hand's end, as it does a person's: the table settles
 that seat's audit with nothing said, and a finished game was being
 turned down for it.
+
+As built, once the cards are out. Each side judges it for itself, as it
+judges a juror's silence: stopped at one turn — a held seat's play or
+pass, or a seat's hand stalled unopened, a departed person's or a held
+seat's at its audit — with nobody it has heard from in half a minute
+who could open that seat, for two minutes, and hearing most of the
+table all the while. A held seat is opened by its own juror or by two
+jurors holding a piece of it; a person's by one juror of the jury the
+deal was sealed to, beside a person's piece. The side then ends the
+game and says nothing more to anyone (`TableState.failed`,
+`Failure.jurorQuorumLost`); the screen says "Connection failure —
+juror quorum lost", unscored, and offers the way home. Hearing most of
+the table is what keeps a device that has lost its own connection —
+which hears no juror either — from blaming the jury: the rest remove
+it for its silence, as they would anyone who drops, and it finds its
+seat taken when it is back. A side that judged it wrongly, cut off
+from jurors the rest still hear, is to the rest exactly that.
+
+Counting who holds a piece turned up the hang this replaces, in the
+commoner case. With jurors online beyond the jury, the table draws
+again the moment it stops hearing its own; a juror drawn after the
+pieces' holders went holds nothing — a newcomer's piece is made by two
+of the old — but the table counted every juror on the list, took the
+seat for one the jury could still open, and sat at its turn saying
+nothing, for good. It counts the jury the deal was sealed to and the
+newcomers it has seen sent a whole set of parts
+(`packages/table/test/quorum_lost_test.dart`).
 
 A hand given up in its deal leaves nothing in the record — each side
 judges it for itself — so a juror carried in afterwards, drawn for the
@@ -1438,8 +1477,10 @@ the human's by elimination. If a holder drops, another juror rebuilds
 the seat from the escrow and plays on.
 
 **If the jury is lost anyway**, the table pauses, says so, and resumes
-when one is rebuilt. Nobody at the table controls whether strangers
-elsewhere go offline, so the pause is not a lever.
+when one is rebuilt — or, stopped at a hand nobody left can open, ends
+the game after two minutes ("When quorum is lost anyway", above).
+Nobody at the table controls whether strangers elsewhere go offline,
+so the pause is not a lever, and the ending is not one either.
 
 **Jurors of last resort.** When a table cannot draw a jury — because
 too few people are online — it says so, and clients we manage come
@@ -1584,7 +1625,9 @@ going quiet; nobody online and a juror of last resort; nobody online
 and none. The chaos walk draws four jurors and lets them go too, and
 ends every seed finished, or paused only where no juror left up could
 end the pause — none at all, or, at a held bot seat, fewer than the two
-custodians it takes to open it and not the seat's own juror. The
+jurors holding a piece that it takes to open it and not the seat's own
+juror — or ended for a lost quorum, judged against who really was up
+the moment the ending was seen. The
 browser suite runs the two-person case over real sockets against the
 service's juror of last resort.
 
