@@ -633,6 +633,23 @@ had given it to, splitting a table of two with nothing to see the
 split (`two_voices_test.dart`). `--match` replays one run with every
 client's trace.
 
+A single change to one message cannot move the scenario's own fault,
+and some faults matter only at a moment — a leave that lands while the
+deal is being built rather than after its keys — so `--fault-at`
+walks the fault through several times, each time's baseline first.
+Measured against five fixes of the kind, each undone in a scratch copy
+of the client: the walk, given eight sealed seeds and about twelve
+minutes each, caught one (a juror saying its own deal step again). The
+explorer caught that one at its 25th run, six seconds in, and one the
+walk missed — bot seats read from the seat list as it stood rather
+than as the hand began — at its 11th, with the leave moved to half a
+second. The other three it missed over five to eight thousand runs
+each: two want a juror summoned into a redraw partway through a hand,
+which only the top-up scenario makes and which plays a whole hand at
+1.7 s a run; the third (a drain after the deal's turns open) the
+simulator never reproduces at all — its own unit test never failed
+either — and it was found in the browsers.
+
 What every cell asserts:
 
 - **The game reaches its end** with a bot in every departed seat — or,

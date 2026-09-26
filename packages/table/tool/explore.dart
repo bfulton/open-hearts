@@ -2,6 +2,7 @@
 ///
 ///     cd packages/table && dart run tool/explore.dart --scenario deal
 ///     dart run tool/explore.dart --scenario leave --shard 1/4 --first
+///     dart run tool/explore.dart --scenario leave --fault-at 500,1500,3000
 ///     dart run tool/explore.dart --scenario deal --census
 ///
 /// The chaos walk (`tool/chaos.dart`) throws faults at a table at
@@ -56,10 +57,14 @@ import 'package:table/table.dart';
 /// way, and how long it has.
 class Scenario {
   const Scenario(this.about, this.build,
-      {this.script, this.windowMs = 20000, this.horizonMs = 5 * 60 * 1000, this.whole = false});
+      {this.script, this.faultAt = 0, this.windowMs = 20000, this.horizonMs = 5 * 60 * 1000, this.whole = false});
   final String about;
   final SimTable Function(DealCrypto crypto) build;
-  final void Function(SimTable t)? script;
+  /// What the game does to itself, at [at] milliseconds.
+  final void Function(SimTable t, int at)? script;
+
+  /// When the scripted fault comes, unless `--fault-at` says otherwise.
+  final int faultAt;
 
   /// Played out and judged whole, whatever `--whole` says: a scenario
   /// whose point comes after the first trick.
@@ -92,12 +97,23 @@ final scenarios = <String, Scenario>{
   'leave': Scenario(
     'three people, one of whom leaves during the deal',
     (crypto) => _relayPaced(SimTable(humans: 3, seed: 12, crypto: crypto, jurors: jurySize, target: 1)),
-    script: (t) => t.clock.schedule(3000, () => t.people[2].depart(Exit.leave)),
+    script: (t, at) => t.clock.schedule(at, () => t.people[2].depart(Exit.leave)),
+    faultAt: 3000,
+  ),
+  'summons': Scenario(
+    'one person and three held seats, the jurors hearing their summons late — by the fault time',
+    (crypto) => _relayPaced(SimTable(humans: 1, seed: 4, crypto: crypto, jurors: jurySize, target: 1)),
+    // Not a message on the network, so no change to one can move it:
+    // the summons goes by presence, and a juror summoned late is the
+    // one that holds a hand's first steps before it has a deal to put
+    // them in.
+    script: (t, at) => t.presence!.summonsMs = at,
+    faultAt: 50,
   ),
   'topup': Scenario(
     'two people; two jurors holding no seat go quiet during the deal, and the jury is topped up while it deals',
     (crypto) => _relayPaced(SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4, target: 1)),
-    script: (t) => t.clock.schedule(2500, () {
+    script: (t, at) => t.clock.schedule(at, () {
       final c = t.clients.first;
       final drawn = c.juries.isEmpty ? const <PublicKey>[] : c.juries.first.event.jurors;
       // Two that hold no seat. A holder that goes during the deal takes
@@ -108,6 +124,7 @@ final scenarios = <String, Scenario>{
         t.net.goOffline(k);
       }
     }),
+    faultAt: 2500,
     // A jury is judged short thirty seconds after it goes quiet, so
     // the top-up comes well after the first trick.
     windowMs: 45000,
@@ -152,7 +169,13 @@ enum Change { lose, late }
 /// table owed and did not do; null when it held. [seen] collects the
 /// targets, for the baseline; [trace] prints every client's.
 String? runOnce(Scenario s, DealCrypto crypto,
-    {Target? target, Change? change, int holdMs = 2500, bool whole = false, List<Target>? seen, bool trace = false}) {
+    {Target? target,
+    Change? change,
+    int holdMs = 2500,
+    bool whole = false,
+    List<Target>? seen,
+    bool trace = false,
+    int? faultAt}) {
   final t = s.build(crypto);
   if (trace) {
     for (final c in t.clients) {
@@ -190,8 +213,9 @@ String? runOnce(Scenario s, DealCrypto crypto,
     return t.clock.nowMs < until ? until - t.clock.nowMs : null;
   };
   try {
+    // Before the start, so a script can set up as well as schedule.
+    s.script?.call(t, faultAt ?? s.faultAt);
     t.start();
-    s.script?.call(t);
     if (whole) {
       t.clock.runUntil(() => t.survivors.every((c) => c.done), limitMs: s.horizonMs);
       return judgeWhole(t, s);
@@ -274,69 +298,91 @@ Future<void> main(List<String> args) async {
   final started = DateTime.now();
   String secs() => (DateTime.now().difference(started).inMilliseconds / 1000).toStringAsFixed(1);
 
-  final targets = <Target>[];
-  final base = runOnce(s, crypto, whole: whole, seen: targets);
+  // When the scenario's own fault comes: `--fault-at 1000,3000,5000`
+  // walks each. A fault is the one thing a single-message change
+  // cannot move, and some faults matter only at a moment — a leave
+  // that lands while the deal is being built, and not after its keys.
+  final faultTimes = [for (final x in (_arg(args, 'fault-at') ?? '${s.faultAt}').split(',')) int.parse(x)];
   print('$name: ${s.about}');
-  print('baseline ${base == null ? 'held' : 'BROKE: $base'}; '
-      '${targets.length} event-to-peer pairs in the first ${s.windowMs ~/ 1000} s (${secs()} s)');
-  if (base != null) exit(1);
+
+  var runs = 0;
+  var broke = 0;
+  // Every fault time's baseline first, a run each: at the wrong moment
+  // the fault alone may be enough.
+  final baselines = <int, List<Target>>{};
+  for (final f in faultTimes) {
+    final targets = baselines[f] = <Target>[];
+    runs++;
+    final base = runOnce(s, crypto, whole: whole, seen: targets, faultAt: f);
+    print('fault at ${f}ms: baseline ${base == null ? 'held' : 'BROKE: $base'}; '
+        '${targets.length} event-to-peer pairs in the first ${s.windowMs ~/ 1000} s (${secs()} s)');
+    if (base == null) continue;
+    broke++;
+    if (stopAtFirst) {
+      print('first break after $runs run(s), ${secs()} s');
+      exit(1);
+    }
+  }
   int rank(Target t) {
     final i = _kindOrder.indexOf(t.kind);
     return i < 0 ? _kindOrder.length : i;
   }
 
-  // Kind by kind, then as said. A stable sort keeps the second.
-  final order = List.of(targets)..sort((a, b) => rank(a).compareTo(rank(b)));
-  if (args.contains('--census')) {
-    final byKind = <String, int>{};
-    for (final t in order) {
-      byKind[t.kind] = (byKind[t.kind] ?? 0) + 1;
-    }
-    print('by kind: ${byKind.entries.map((e) => '${e.key} ${e.value}').join(', ')}');
-    exit(0);
-  }
-
-  // One run again, with every client's trace: `--at 693 --changes lose`
-  // repeats the run the sweep numbered 1387 (two changes an event,
-  // counted from one), and `--match 'witness aeaa→6eab first said at
-  // 308ms'` the same one by what it was.
-  // Or by what it was, which outlives a change to the code: a fix that
-  // alters the traffic renumbers everything after it.
-  final match = _arg(args, 'match');
-  final at = match != null ? order.indexWhere((t) => '$t'.contains(match)) : int.tryParse(_arg(args, 'at') ?? '');
-  if (match != null && at == -1) {
-    print('no event matches "$match"');
-    exit(2);
-  }
-  if (at != null) {
-    print('replaying ${order[at]}, ${changes.single.name}');
-    final why = runOnce(s, crypto, target: order[at], change: changes.single, holdMs: holdMs, whole: whole, trace: true);
-    print('=== ${why ?? 'held'}');
-    exit(why == null ? 0 : 1);
-  }
-
-  var runs = 0;
-  var broke = 0;
-  for (var i = 0; i < order.length; i++) {
-    if (i % shard[1] != shard[0]) continue;
-    for (final (:change, :hold) in tries) {
-      if (limit != null && runs >= limit) break;
-      runs++;
-      final why = runOnce(s, crypto, target: order[i], change: change, holdMs: hold, whole: whole);
-      if (runs % 25 == 0) {
-        final asked = crypto.hits + crypto.misses;
-        print('$runs runs (${secs()} s), up to ${order[i].kind}; '
-            '${asked == 0 ? 0 : (100 * crypto.hits / asked).round()}% of the cryptography from memory');
+  for (final f in faultTimes) {
+    // Kind by kind, then as said. A stable sort keeps the second.
+    final order = List.of(baselines[f]!)..sort((a, b) => rank(a).compareTo(rank(b)));
+    if (args.contains('--census')) {
+      final byKind = <String, int>{};
+      for (final t in order) {
+        byKind[t.kind] = (byKind[t.kind] ?? 0) + 1;
       }
-      if (why == null) continue;
-      broke++;
-      print('run $runs (${secs()} s): ${order[i]}, ${change == Change.lose ? 'its first copy lost' : 'held ${hold}ms'}\n  $why');
-      if (stopAtFirst) {
-        print('first break after $runs run(s), ${secs()} s');
-        exit(1);
+      print('by kind: ${byKind.entries.map((e) => '${e.key} ${e.value}').join(', ')}');
+      continue;
+    }
+
+    // One run again, with every client's trace: `--at 693 --changes
+    // lose` repeats the run the sweep numbered 1387 (two changes an
+    // event, counted from one); `--match 'witness aeaa→6eab first said
+    // at 308ms'` the same one by what it was, which outlives a change
+    // to the code — a fix that alters the traffic renumbers everything
+    // after it.
+    final match = _arg(args, 'match');
+    final at = match != null ? order.indexWhere((t) => '$t'.contains(match)) : int.tryParse(_arg(args, 'at') ?? '');
+    if (match != null && at == -1) {
+      print('no event matches "$match"');
+      exit(2);
+    }
+    if (at != null) {
+      print('replaying ${order[at]}, ${changes.single.name}');
+      final why = runOnce(s, crypto,
+          target: order[at], change: changes.single, holdMs: holdMs, whole: whole, trace: true, faultAt: f);
+      print('=== ${why ?? 'held'}');
+      exit(why == null ? 0 : 1);
+    }
+
+    for (var i = 0; i < order.length; i++) {
+      if (i % shard[1] != shard[0]) continue;
+      for (final (:change, :hold) in tries) {
+        if (limit != null && runs >= limit) break;
+        runs++;
+        final why = runOnce(s, crypto, target: order[i], change: change, holdMs: hold, whole: whole, faultAt: f);
+        if (runs % 25 == 0) {
+          final asked = crypto.hits + crypto.misses;
+          print('$runs runs (${secs()} s), up to ${order[i].kind}; '
+              '${asked == 0 ? 0 : (100 * crypto.hits / asked).round()}% of the cryptography from memory');
+        }
+        if (why == null) continue;
+        broke++;
+        print('run $runs (${secs()} s): fault at ${f}ms, ${order[i]}, '
+            '${change == Change.lose ? 'its first copy lost' : 'held ${hold}ms'}\n  $why');
+        if (stopAtFirst) {
+          print('first break after $runs run(s), ${secs()} s');
+          exit(1);
+        }
       }
     }
   }
+  if (args.contains('--census')) exit(0);
   print('$runs runs in ${secs()} s: ${broke == 0 ? 'every one held' : '$broke broke'}');
   exit(broke == 0 ? 0 : 1);
 }
