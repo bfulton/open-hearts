@@ -1647,7 +1647,23 @@ class TableClient {
       _seen.remove(event.id);
       return;
     }
-    if (race.action != null && race.action!.id != event.id) return; // equivocation: the first stands
+    if (race.action != null && race.action!.id != event.id) {
+      // Equivocation at a person's seat: the first stands. At a bot seat
+      // a second voice is allowed — its juror back from being late, a
+      // custodian the table gave the seat to meanwhile — and each peer
+      // witnesses whichever it heard first; the other is kept with its
+      // witnesses, so that the one a majority backs is the one every
+      // side ends on, or the jury picks when none can ([_settle]).
+      if (holders[seat] is BotSeat) {
+        race.rivals[event.id] = event;
+        race.forRival.putIfAbsent(event.id, () => {})
+          ..add(event.author)
+          ..addAll(_earlyWitnesses.remove(event.id) ?? const {});
+        race.witnessEvents.addAll(_earlyWitnessEvents.remove(event.id) ?? const []);
+        _settle(turn);
+      }
+      return;
+    }
     race.action = event;
     race.forAction.add(event.author);
     race.forAction.addAll(_earlyWitnesses.remove(event.id) ?? const {});
@@ -1839,6 +1855,11 @@ class TableClient {
         race.witnessEvents.add(event);
         return _settle(turn);
       }
+      if (race.rivals.containsKey(id)) {
+        race.forRival[id]!.add(event.author);
+        race.witnessEvents.add(event);
+        return _settle(turn);
+      }
     }
     if (_compare(turn) > 0) return _defer(event);
     _earlyWitnesses.putIfAbsent(id, () => {}).add(event.author);
@@ -1851,6 +1872,15 @@ class TableClient {
     final of = _participantsAt(turn);
     final needed = _majority(of);
     final seat = _turnSeat[turn]!;
+    // A bot seat's other move, backed by a majority: that is the one
+    // that carried, and this side ends on it too.
+    for (final e in race.forRival.entries.toList()) {
+      if (e.value.intersection(of).length >= needed && race.forAction.intersection(of).length < needed) {
+        _trace('at $turn bot seat $seat\'s other move carried; taken instead of the one heard first');
+        race.adopt(e.key);
+        break;
+      }
+    }
     final forAction = race.forAction.intersection(of);
     final forRemoval = race.forRemoval.intersection(of);
     if (forAction.length >= needed) {
@@ -1868,7 +1898,17 @@ class TableClient {
       // cannot be removed before their own turn. Only the jury breaks a
       // deadlock.
       final holder = holders[seat];
-      if (holder is! HumanSeat) return;
+      if (holder is! HumanSeat) {
+        // Two moves for a bot seat, and neither can carry: everyone who
+        // could still vote is behind one or the other or silent. The
+        // same card, as it happens, but two events, and a record holds
+        // one. Only the jury breaks it ([_judge]).
+        if (race.rivals.isEmpty || !_rivalsDeadlocked(race, of)) return;
+        race.split = true;
+        _pause = Pause.waitingForJury;
+        _trace('split at $turn: bot seat $seat said two ways, neither with a majority behind it');
+        return;
+      }
       final gone = of.where((k) => k != signer.publicKey && _silent(k)).toSet();
       final actionReachable = of.difference(forRemoval).difference(gone.difference(forAction)).length >= needed;
       final removalReachable =
@@ -1879,6 +1919,19 @@ class TableClient {
         _trace('split at $turn: ${forAction.length} for the action, ${forRemoval.length} against');
       }
     }
+  }
+
+  /// Whether no move for a bot seat can still carry: every
+  /// participant who could vote is behind one of them already or has
+  /// gone silent, and none of the moves has a majority among them.
+  bool _rivalsDeadlocked(_Race race, Set<PublicKey> of) {
+    final needed = _majority(of);
+    final backing = [race.forAction.intersection(of), for (final w in race.forRival.values) w.intersection(of)];
+    final committed = {for (final w in backing) ...w};
+    // As at a person's seat: nobody this side has not heard from for
+    // two minutes is a vote still coming, and this side always is.
+    final free = of.difference(committed).where((k) => k == signer.publicKey || !_silent(k)).length;
+    return backing.every((w) => w.length + free < needed);
   }
 
   /// The seat's action wins the race for [turn]: by a majority, or by
@@ -3952,7 +4005,19 @@ class TableClient {
     if (last != null && clock.nowMs - last < 10000) return;
     final seat = _turnSeat[turn]!;
     final holder = holders[seat];
-    if (holder is! HumanSeat) return;
+    if (holder is! HumanSeat) {
+      // A bot seat said two ways, neither able to carry. Either will
+      // do — the same card, by two voices the seat may have — so the
+      // rule is one every juror reaches alone: the lowest id. Nobody is
+      // removed from a bot seat, so there is no other side.
+      final a = race.action;
+      if (a == null || race.rivals.isEmpty || !_rivalsDeadlocked(race, _participantsAt(turn))) return;
+      final winner = [a, ...race.rivals.values].reduce((x, y) => x.id.compareTo(y.id) <= 0 ? x : y);
+      _verdictAt[turn] = clock.nowMs;
+      _emit(EventKind.verdict, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'side': 'action', 'event': winner.toJson()},
+          everywhere: true);
+      return;
+    }
     final of = _participantsAt(turn);
     final needed = _majority(of);
     final forAction = race.forAction.intersection(of);
@@ -4003,10 +4068,25 @@ class TableClient {
     final seat = _turnSeat[turn]!;
     if (event.seat != seat) return;
     final holder = holders[seat];
-    if (holder is! HumanSeat) return;
     final ruled = event.ruled;
     if (ruled == null || ruled.table != spec.id || ruled.seat != seat || ruled.turn != turn) return;
     final of = _participantsAt(turn);
+    if (holder is! HumanSeat) {
+      // A bot seat's two moves, one ruled for: by a voice the seat may
+      // have, and a move this side can check. Whichever this side heard
+      // first gives way, and its witnesses with it.
+      if (event.side != 'action' || !_mayAct(seat, ruled.author, turn.hand)) return;
+      if (ruled.kind != EventKind.pass && ruled.kind != EventKind.play) return;
+      if (race.action?.id != ruled.id) {
+        if (!_valid(ruled, seat)) return;
+        race.rivals.putIfAbsent(ruled.id, () => ruled);
+        race.forRival.putIfAbsent(ruled.id, () => {ruled.author});
+        race.adopt(ruled.id);
+      }
+      _seen.add(ruled.id);
+      _trace('verdict at $turn by ${event.author.substring(0, 4)}: bot seat $seat\'s move by ${ruled.author.substring(0, 4)} stands');
+      return _carryAction(turn, race, ruled, of, verdict: event);
+    }
     if (event.side == 'action') {
       if (ruled.author != holder.key) return;
       if (ruled.kind != EventKind.pass && ruled.kind != EventKind.play && ruled.kind != EventKind.deal) return;
@@ -4076,4 +4156,26 @@ class _Race {
   final Set<PublicKey> forRemoval = {};
   bool settled = false;
   bool split = false;
+
+  /// At a bot seat, the moves said for it other than [action], by id,
+  /// and who has witnessed each. A person's seat has one voice, and a
+  /// second move from it is equivocation that the first outlasts; a bot
+  /// seat can have two — its juror, and a custodian the table gave it
+  /// to — each saying the same card for it, and the table has to end
+  /// up on one of them.
+  final Map<String, TableEvent> rivals = {};
+  final Map<String, Set<PublicKey>> forRival = {};
+
+  /// [action] and its witnesses swapped for the rival [id]'s.
+  void adopt(String id) {
+    final was = action;
+    if (was != null) {
+      rivals[was.id] = was;
+      forRival[was.id] = Set.of(forAction);
+    }
+    action = rivals.remove(id);
+    forAction
+      ..clear()
+      ..addAll(forRival.remove(id) ?? const {});
+  }
 }

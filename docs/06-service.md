@@ -605,6 +605,34 @@ turn"). A thousand seeds now finish or pause for the jury with every
 survivor holding the same record. CI walks forty seeds on every commit;
 `dart run tool/chaos.dart --seeds 1000` walks a thousand.
 
+**The explorer** (`packages/table/tool/explore.dart`) is the chaos
+test's complement for orderings. Random faults find what random faults
+find — a juror gone, a relay out, loss for a while — and rarely the
+other kind: one peer hearing two things the other way round from
+everybody else, or the one copy of something that mattered not
+arriving at one peer. Five fixes of that kind, undone one at a time,
+and the walk caught one. The explorer takes a small sealed game, runs
+it once to list every event said in its first seconds and every peer
+it went to, and then runs it again once per event, peer and change:
+the first copy lost, or every copy held back a couple of seconds. The
+simulator is deterministic and the change draws no randomness of its
+own (`SimNetwork.steer`), so each run is the first with exactly one
+thing different, held to a finished first trick, one reading of every
+bot seat's juror, and a sound record. Membership changes go first — a
+jury, a top-up, a leave — then the protocol's steps, then the routine
+traffic. The deal's cryptography is remembered across runs
+(`MemoCrypto`), since each run repeats most of the one before: a run
+is a seventh of a second where it was eight, and a scenario's thousand
+or so runs take two to five minutes.
+
+Its first sweeps found two faults in code the walk had passed: a
+jury witness lost on its way to the proposer, which nothing ever
+said again (`lost_jury_witness_test.dart`); and a bot seat played
+twice, the same card by its late juror and by the custodian the table
+had given it to, splitting a table of two with nothing to see the
+split (`two_voices_test.dart`). `--match` replays one run with every
+client's trace.
+
 What every cell asserts:
 
 - **The game reaches its end** with a bot in every departed seat — or,

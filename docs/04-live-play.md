@@ -1272,6 +1272,20 @@ custodians still being heard from, since they all hold the same key
 and would all say the same card. Its audit is the exception: by then
 the secret is in the open and every side settles it for itself.
 
+One juror, but not always one voice. Which peers have given a seat up
+is each peer's own judgement, so a juror late with its card — behind,
+not gone — comes back and says it while the custodian is saying the
+same card for it: two events, one move. Each peer witnesses whichever
+it hears first, and at a table of two that can leave each person
+behind a different one with neither able to carry. A person's seat
+never has this, since one key saying two things is equivocation and
+the first stands; a bot seat keeps the other move with its witnesses.
+If a majority backs it, every side ends on it; if neither can carry,
+the turn has split, and the jury rules as it does any split — for the
+move with the lowest id, a rule every juror reaches alone, since either
+move is the seat's (`packages/table/test/two_voices_test.dart`; found
+by `tool/explore.dart`).
+
 A seat's **holder is a fact of the record**: whoever's keys settled
 that seat's first deal round. The draw only says who goes first. Two
 peers reading the draw could disagree — a juror summoned into a redraw
