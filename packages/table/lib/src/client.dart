@@ -3000,6 +3000,51 @@ class TableClient {
     return clock.nowMs - since >= botActsWithinMs;
   }
 
+  /// An open turn of a bot seat a juror holds that nobody still being
+  /// heard from can take, or null. Its holder would say the move, or,
+  /// once the seat is the escrow's, the first of the hand's custodians
+  /// still about — and it takes [escrowThreshold] of them to rebuild
+  /// the seat between them. With the holder gone and fewer than that
+  /// left, the move is not coming from anyone this side can hear.
+  ///
+  /// A play or a pass. A held seat's deal step owed by a juror that
+  /// goes gives the hand up ([_handOverQuietSeats]), and its audit
+  /// stalls on the pieces and says so ([_stall]).
+  TurnId? _heldTurnNobodyCanTake() {
+    final hand = game.handNumber;
+    final held = botHolders(hand);
+    if (held.isEmpty) return null;
+    final live = _liveJurors(hand);
+    final about = _custodiansNow(hand).where(live.contains).length;
+    if (about >= escrowThreshold) return null;
+    for (final e in _races.entries) {
+      final t = e.key;
+      if (e.value.settled || t.hand != hand || !(t.isPlay || t.isPass)) continue;
+      final holder = held[_turnSeat[t]];
+      if (holder != null && !live.contains(holder)) return t;
+    }
+    return null;
+  }
+
+  /// Whether the pause up is this side's word that a held seat has
+  /// nobody left to play it, so that it comes down when somebody is.
+  bool _waitingOnGoneJury = false;
+
+  /// The held seat this side has stopped at with nobody left to play
+  /// it, while it is saying so; null otherwise. For a view, and for
+  /// the chaos walk to hold the table to its word.
+  ({TurnId turn, int seat})? get waitingOnGoneJury {
+    if (!_waitingOnGoneJury) return null;
+    final t = _heldTurnNobodyCanTake();
+    return t == null ? null : (turn: t, seat: _turnSeat[t]!);
+  }
+
+  /// Who holds a piece of [hand]'s bot seats, in the escrow's order.
+  List<PublicKey> custodiansOf(int hand) => _custodiansNow(hand);
+
+  /// The turns stalled on a seat's secret, with the seat each waits on.
+  Map<TurnId, int> get stalled => Map.unmodifiable(_stalled);
+
   /// When each bot seat's turn became its holder's to take, by turn
   /// and holder. Cleared with the hand, and small in it: one entry per
   /// turn a bot seat is on.
@@ -3298,6 +3343,26 @@ class TableClient {
         _pause = participants.length <= 2 ? Pause.waitingForJury : Pause.waitingForPeers;
       } else if (connectedToMajority && _pause == Pause.waitingForPeers && !_races.values.any((r) => r.forRemoval.isNotEmpty)) {
         _pause = null;
+      }
+      // Stopped at a bot seat nobody left can take? Say that too. A
+      // player never says a held seat's move — the jury does — so a
+      // table whose jury has gone reaches the seat's turn and waits,
+      // and without this it waited with nothing on the screen.
+      //
+      // Taking over a pause for the jury already up, too: one put up
+      // while this side was cut off stays up after it is back (a
+      // decision landing is what lifts it), and a table that is back
+      // and stopped here is waiting for this, not for that.
+      final waits = _heldTurnNobodyCanTake();
+      if (waits != null && (_pause == null || _pause == Pause.waitingForJury)) {
+        if (!_waitingOnGoneJury) {
+          _trace('stopped at $waits: bot seat ${_turnSeat[waits]} has nobody left to play it; waiting for the jury');
+        }
+        _pause = Pause.waitingForJury;
+        _waitingOnGoneJury = true;
+      } else if (waits == null && _waitingOnGoneJury) {
+        _waitingOnGoneJury = false;
+        if (_pause == Pause.waitingForJury && !_races.values.any((r) => !r.settled && r.split)) _pause = null;
       }
       // Anyone not heard from for two minutes whose turn is open is
       // booted at once, for silence.

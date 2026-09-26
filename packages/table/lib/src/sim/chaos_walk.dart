@@ -217,6 +217,31 @@ String? walkChaos(int seed, {DealCrypto? crypto}) {
       final v = verifyRecord(t.spec, survivors.first.record, juries: survivors.first.juries, crypto: t.crypto, releases: survivors.first.releases);
       if (!(v.ok && v.complete)) return 'the finished record does not verify complete: ${v.reason}';
     } else {
+      final up = {for (final j in t.liveJurors) j.signer.publicKey};
+      // A held seat nobody still up can open: its own juror not among
+      // them, and fewer of the hand's custodians than it takes to
+      // rebuild the seat — a juror holds one piece, and the escrow
+      // wants [escrowThreshold]. The table stopped there says so
+      // (doc 03), and no juror up could end it: at a play, waiting for
+      // the jury; at the audit, stalled opening the hand. Judged here
+      // from who really is up, not from what the table believes. A
+      // person's seat is never this — a person's piece and any one
+      // juror's open it — so a stall on one with a juror up is still
+      // a pause that juror should have ended.
+      bool unopenable(TableClient c) {
+        final w = c.waitingOnGoneJury;
+        final waits = [
+          if (w != null) (hand: w.turn.hand, seat: w.seat),
+          for (final e in c.stalled.entries) (hand: e.key.hand, seat: e.value),
+        ];
+        if (waits.isEmpty) return false;
+        return waits.every((x) {
+          final holder = c.botHolders(x.hand)[x.seat];
+          if (holder == null || up.contains(holder)) return false;
+          return c.custodiansOf(x.hand).where(up.contains).length < escrowThreshold;
+        });
+      }
+
       const paused = {TableState.pausedForJury, TableState.pausedForPeers, TableState.pausedForDeal};
       for (final c in survivors) {
         if (!paused.contains(c.tableState)) {
@@ -231,12 +256,15 @@ String? walkChaos(int seed, {DealCrypto? crypto}) {
           continue;
         }
         final notAMajority = survivors.length < c.participants.length ~/ 2 + 1;
-        if (!(notAMajority || c.stuckSplit != null)) {
+        if (!(notAMajority || c.stuckSplit != null || unopenable(c))) {
           return 'paused for a reason other than no majority or an even split; faults were [${faults()}]\n${c.describe()}';
         }
       }
-      // With a jury there is no pause a live juror could not end.
-      if (t.liveJurors.isNotEmpty) return 'paused with a juror still up; faults were [${faults()}]\n${survivors.first.describe()}';
+      // With a jury there is no pause a live juror could not end — save
+      // the one above, which none could.
+      if (up.isNotEmpty && !survivors.every(unopenable)) {
+        return 'paused with a juror still up; faults were [${faults()}]\n${survivors.first.describe()}';
+      }
     }
     return null;
   } finally {

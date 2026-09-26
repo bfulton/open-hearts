@@ -42,6 +42,10 @@ Future<void> main(List<String> args) async {
   print('=== faults: ${sc.faults.join('; ')}');
   for (final c in t.survivors) {
     print('=== survivor ${c.signer.publicKey.substring(0, 6)}: ${c.describe()}');
+    final h = c.game.handNumber;
+    String k(PublicKey p) => p.substring(0, 4);
+    print('=== holders ${c.botHolders(h).map((s, p) => MapEntry(s, k(p)))}; custodians ${c.custodiansOf(h).map(k).toList()}; '
+        'up ${[for (final j in t.liveJurors) k(j.signer.publicKey)]}; waiting on a gone jury ${c.waitingOnGoneJury}');
   }
   for (final j in t.jurors) {
     print('=== juror ${j.signer.publicKey.substring(0, 6)} gone ${j.gone}: ${j.client?.describe() ?? 'no client'}');

@@ -301,7 +301,13 @@ offer say so, and a build that cannot run the deal does not sit down.
   of the bound: with the whole jury of a hand gone — every juror it
   was drawn with crashed — a seat that leaves it can no longer be
   opened, and the table pauses for the rest of the hand and says so;
-  the chaos walk reaches that state only by crashing four jurors.
+  the chaos walk reaches that state only by crashing four jurors. A
+  bot seat a juror holds is opened by any two of its custodians
+  (doc 04, "The sizing"), so for one of those it is fewer than two
+  left, the seat's own juror among the gone: the players stop at its
+  turn waiting for the jury, or at its audit opening the hand, and
+  say which — where they used to wait at its turn with nothing on the
+  screen, since a player never says a held seat's move.
 
   **The pieces are of the secret, and rebuilding it opens the whole
   hand** to whoever rebuilt it — which is the thing

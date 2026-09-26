@@ -1512,7 +1512,9 @@ table of two with one gone quiet off turn and on it; four cut two and
 two with the jury reaching all; the foreman crashing; the whole jury
 going quiet; nobody online and a juror of last resort; nobody online
 and none. The chaos walk draws four jurors and lets them go too, and
-ends every seed finished, or paused only with no juror left up. The
+ends every seed finished, or paused only where no juror left up could
+end the pause — none at all, or, at a held bot seat, fewer than the two
+custodians it takes to open it and not the seat's own juror. The
 browser suite runs the two-person case over real sockets against the
 service's juror of last resort.
 
