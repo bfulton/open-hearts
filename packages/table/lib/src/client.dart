@@ -1402,7 +1402,10 @@ class TableClient {
     // stayed behind through a couple more — three peers answering the
     // same heartbeat with the same turns is three times the traffic.
     _behindSince.putIfAbsent(asker, () => clock.nowMs);
-    final live = participants.where((k) => k == signer.publicKey || _recent(k)).toList()..sort();
+    // Not counting the asker, which cannot carry itself: where its key
+    // was the lowest, nobody was first, and every peer waited out the
+    // couple of heartbeats meant for the second in line.
+    final live = participants.where((k) => k != asker && (k == signer.publicKey || _recent(k))).toList()..sort();
     // A juror is no participant: it answers once the participants have
     // had their turn to, or at once when it hears none of them.
     final first = live.isEmpty ? null : live.first;
@@ -3155,7 +3158,15 @@ class TableClient {
     final holder = botHolders(turn.hand)[seat];
     if (holder == null) return false;
     final key = '$turn|$holder';
-    if (turn.isDeal && _arriving(holder, turn.hand)) {
+    // Nor while this side is behind the table. A peer heard at a later
+    // place has seen more settle than this side has, and a turn open
+    // here may be one the table took long ago — the holder's move
+    // said, and this side's copy of it lost. What is missing then is
+    // this side's, not the holder's, and the carry-forward brings it
+    // ([_carryForward]); timed meanwhile, a deal step lost on the way
+    // to one player gave the hand up at that player alone, and the
+    // table went on without it.
+    if (_behind || (turn.isDeal && _arriving(holder, turn.hand))) {
       _botTurnSince.remove(key);
       return false;
     }
