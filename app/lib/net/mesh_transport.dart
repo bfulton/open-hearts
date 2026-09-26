@@ -216,7 +216,13 @@ class MeshTransport implements Transport {
     link.pc?.close();
     link.pc = null;
     link.channel = null;
-    final steps = link.tries > 4 ? 4 : link.tries - 1;
+    // Dialling again is the lower key's, as dialling is ([_dial]); a
+    // side that only answered lets the connection go and waits to be
+    // offered to. It counts no tries, and worked its wait out from
+    // none: a shift by minus one, which throws, inside the browser's
+    // connection callback.
+    if (peer.compareTo(relay.signer.publicKey) < 0) return;
+    final steps = (link.tries - 1).clamp(0, 4);
     Future<void>.delayed(Duration(minutes: 1 << steps), () {
       if (_closed || !peers.contains(peer)) return;
       if (_links[peer]?.open ?? false) return;
