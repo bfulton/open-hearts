@@ -112,16 +112,36 @@ class MeshTransport implements Transport {
     final wire = frame == null
         ? RTCDataChannelMessage(jsonEncode(message))
         : RTCDataChannelMessage.fromBinary(frame);
+    // A channel can be closing under the send: the browser has it
+    // closing, and the state change that says so is still on its way
+    // here. The browser's send throws then, and the throw left this
+    // loop — the peers after it and the relay lane below never had
+    // the message — and went on up into whatever was being handled
+    // when the send was made, which stopped half done. So a channel
+    // that refuses is passed over, and the relay carries the message
+    // to that peer as it would with no channel up. Whether the
+    // channel is up stays the state change's to say: a send can also
+    // be refused for a queue that is full, on a channel that is fine.
+    final refused = <PublicKey>{};
     for (final p in peers) {
       if (p == relay.signer.publicKey) continue;
       final link = _links[p];
-      if (link != null && link.open) link.channel!.send(wire);
+      if (link == null || !link.open) continue;
+      try {
+        // Thrown here in a browser; a failed future on a phone.
+        link.channel!.send(wire).catchError((Object e) {
+          log?.call('${p.substring(0, 6)} channel refused a send: $e');
+        });
+      } catch (e) {
+        refused.add(p);
+        log?.call('${p.substring(0, 6)} channel refused a send ($e); the relay carries it');
+      }
     }
     // And the relay lane for whoever has no channel up — doc 02's
     // fallback, not a second primary path. With every peer connected
     // this says nothing at all, which is the point: a table at full
     // strength costs the relays a heartbeat and its signalling.
-    if (peers.any((p) => p != relay.signer.publicKey && !(_links[p]?.open ?? false))) {
+    if (refused.isNotEmpty || peers.any((p) => p != relay.signer.publicKey && !(_links[p]?.open ?? false))) {
       relay.broadcast(message, everywhere: everywhere);
     }
   }
