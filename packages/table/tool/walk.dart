@@ -14,6 +14,7 @@ library;
 
 import 'package:deal/deal.dart';
 import 'package:table/src/sim/sim.dart';
+import 'package:table/table.dart';
 
 Future<void> main(List<String> args) async {
   final seed = args.isEmpty ? 0 : int.parse(args.first);
@@ -45,5 +46,13 @@ Future<void> main(List<String> args) async {
   for (final j in t.jurors) {
     print('=== juror ${j.signer.publicKey.substring(0, 6)} gone ${j.gone}: ${j.client?.describe() ?? 'no client'}');
   }
+  // And what each survivor's record says for itself, which is the
+  // verdict the walk gives when a finished game does not check out.
+  for (final c in t.survivors) {
+    final v = verifyRecord(t.spec, c.record, allowPartial: !c.done, juries: c.juries, crypto: t.crypto, releases: c.releases);
+    print('=== ${c.signer.publicKey.substring(0, 6)} verifies ${v.ok ? (v.complete ? 'complete' : 'so far') : 'NOT: ${v.reason}'}');
+  }
+  final apart = disagreed(t);
+  if (apart != null) print('=== $apart');
   t.stop();
 }

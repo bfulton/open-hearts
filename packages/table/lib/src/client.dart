@@ -3025,12 +3025,20 @@ class TableClient {
       given.add(e.key);
     }
     if (given.isEmpty) return;
-    // A seat given up with a deal turn of its still open is a deal
+    // A seat given up with a step of the deal still to take is a deal
     // that cannot finish: give the hand up rather than wait on a step
-    // nobody can take.
-    for (final seat in given) {
-      final turn = _openTurnOf(seat);
-      if (turn != null && turn.isDeal) return _giveUpUndealtHand(seat);
+    // nobody can take. Any step, not just one open now. The shuffles
+    // go one at a time, so a seat whose juror goes while somebody
+    // else's is awaited has no turn open yet — and when its own comes
+    // round, the players cannot open a seat whose pieces are sealed to
+    // the jury, and no juror says a held seat's deal steps. A table
+    // that waited for that turn waited for good. Its last step is the
+    // declaration; once that has settled, nothing of the deal is owed
+    // by it and the escrow plays it from there.
+    if (game.phase == Phase.dealing) {
+      for (final seat in given) {
+        if (_races[TurnId.deal(hand, TurnId.dealRounds - 1, seat)]?.settled != true) return _giveUpUndealtHand(seat);
+      }
     }
     // Pieces that arrived before this side judged the seat gone were
     // put by, a release being no use for a seat still here: taken up

@@ -272,6 +272,17 @@ Verification verifyRecord(
         if (all && !d.gone.contains(about) && !d.knowsSecret(about)) {
           final h = holders[about];
           if (h is HumanSeat && allRemovals[h.key]?.hand == game.handNumber) d.seatLeft(about);
+          // A bot seat a juror held and the table gave up to the escrow
+          // — its holder quiet, or slow to play — which no decision
+          // records: the table judged it, each side for itself. Its
+          // audit is settled with nothing said, the pieces having
+          // opened it in the clear, so a held seat the audits do not
+          // open is one whose pieces are its whole account. As with a
+          // person's: taken only from the custodians the seat's own
+          // deal steps named, and what they rebuild opens nothing
+          // unless it is the secret behind the key the seat dealt
+          // with — the one its own audit would have said.
+          if (h is BotSeat && heldAt(game.handNumber).containsKey(about)) d.seatLeft(about);
         }
         if (!d.awaitsSecret(about)) continue;
         d.acceptRelease({'about': about, 'holder': r.author, 'share': r.body['share']});
@@ -466,6 +477,43 @@ Verification verifyRecord(
     return null;
   }
 
+  /// Whether a bot seat a juror holds still has a step of [d] to take
+  /// — any step, not only one of the round the deal is at. The table
+  /// gives the hand up for a held seat that goes with anything of the
+  /// deal still to come (_handOverQuietSeats in client.dart), and the
+  /// seat's last step is its word on the lead card.
+  bool heldSeatOwes(DealSession d) {
+    final hand = game.handNumber;
+    if (heldAt(hand).keys.any((s) => !d.hasDeclared(s))) return true;
+    // Or a seat whose juror never said a word of the hand. The replay
+    // takes a seat nobody spoke for as one nobody held, and works its
+    // keys out in public — but the hand's draw named a juror for it,
+    // and a table stopped at the keys was waiting on that juror's.
+    // Only at the keys: a hand that got as far as a shuffle had every
+    // seat's keys, so no seat there was waiting on a juror's first
+    // word. And nothing is lost by giving such a hand up; with keys
+    // still owed there is not yet a deck, let alone a card anybody
+    // has seen.
+    for (var i = index - 1; i >= 0 && record[i].turn.hand == hand; i--) {
+      final t = record[i].turn;
+      if (t.isDeal && t.dealRound > 0) return false;
+    }
+    final spoken = spokenFor[hand] ?? const <int>{};
+    // The seats that were bots as the hand began, as the table reads
+    // them (_botSeatsAt in client.dart): a person removed in this hand
+    // is a bot now, and not one the draw was ever asked to hold.
+    bool botAtStart(int s) {
+      if (holders[s] is! BotSeat) return false;
+      final was = spec.seats[s];
+      if (was is! HumanSeat) return true;
+      final at = removedAt[was.key];
+      return at != null && at.hand < hand;
+    }
+
+    final drawn = assignBots(juryOrderAt(hand), [for (var s = 0; s < seatCount; s++) if (botAtStart(s)) s]);
+    return drawn.keys.any((s) => !spoken.contains(s));
+  }
+
   var incomplete = false;
 
   while (game.phase != Phase.gameOver) {
@@ -482,6 +530,27 @@ Verification verifyRecord(
       if (dealDone) {
         if (d.phase != DealPhase.dealt && d.phase != DealPhase.audited) {
           if (allowPartial && index >= record.length) return partial();
+          // A hand given up in its deal: a bot seat's juror went with
+          // a step of the seat still owed, and nobody else can take it
+          // — the juror drew the key. The table gives the hand up
+          // unscored and deals the next (_giveUpUndealtHand in
+          // client.dart), with no audit, since the seat that stopped
+          // it cannot be opened to show anything. So the record goes
+          // on to a later hand with this one's deal short, and that
+          // is a hand over, not a deal left unfinished
+          // (docs/04-live-play.md, "When quorum is lost anyway").
+          //
+          // Only where a held seat is what the deal is waiting on.
+          // Every other step has somebody to take it: a person's is
+          // theirs until they are removed, and the record shows the
+          // removal; a seat nobody holds is worked out by everyone.
+          // And nothing of the hand was passed or played, so there is
+          // nothing to check of it beyond the steps that were said.
+          if (index < record.length && record[index].turn.hand > game.handNumber && heldSeatOwes(d)) {
+            game.abandonHand();
+            deal = null;
+            continue;
+          }
           return fail('hand ${game.handNumber}: the deal is not complete (${d.phase.name})');
         }
         // A hand whose audits follow its deal with nothing in between

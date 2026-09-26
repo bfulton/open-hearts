@@ -28,6 +28,7 @@ class SimTable {
     bool lastResort = false,
     int? lastResorts,
     bool withPresence = false,
+    int target = gameOverScore,
     this.crypto,
   })  : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
@@ -54,6 +55,7 @@ class SimTable {
       id: 'table-$seed',
       seed: seed,
       sealed: crypto != null,
+      target: target,
       seats: [
         for (var s = 0; s < seatCount; s++)
           s < humans ? HumanSeat(signers[s].publicKey) : BotSeat(Persona.roster[(s + seed) % Persona.roster.length]),

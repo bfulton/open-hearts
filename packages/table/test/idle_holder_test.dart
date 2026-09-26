@@ -51,4 +51,32 @@ void main() {
         reason: 'and the hand was played out: ${c.describe()}');
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
+
+  // And the record says so, which is the other half. The seat's audit
+  // is settled at every side with nothing said — its secret is out in
+  // the clear already, the escrow's pieces released at the hand's end
+  // — so the verifier has to rebuild it from those pieces the way the
+  // table did. It rebuilt only a person's that way, one the record
+  // shows removed, and turned down the finished game: every card of
+  // the seat unopened, though every side at the table had opened it.
+  test('the record of a hand whose bot seat went to the escrow checks out to the last card', () {
+    // A game of one hand, so the record is a finished one.
+    final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 1);
+    t.start();
+    expect(t.clock.runUntil(() => t.clients.first.game.phase == Phase.playing, limitMs: 5 * 60 * 1000), isTrue,
+        reason: 'the hand was dealt');
+    final c = t.clients.first;
+    final hand = c.game.handNumber;
+    final seat = c.botHolders(hand).keys.first;
+    t.net.doze(c.botHolders(hand)[seat]!);
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 5 * 60 * 1000), isTrue,
+        reason: 'the game was played out: ${c.describe()}');
+    expect(c.deal!.gone, contains(seat), reason: 'the seat went to the escrow');
+    for (final c in t.clients) {
+      final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok, isTrue, reason: v.reason);
+      expect(v.complete, isTrue, reason: v.reason);
+    }
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
 }

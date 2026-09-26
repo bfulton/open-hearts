@@ -1336,6 +1336,22 @@ incomplete one. Killing the whole table is the other option and costs
 three innocent players their game, so it is the answer only if a table
 cannot get a jury at all, hand after hand.
 
+As built, for the deal. A held seat given up with *any* step of the
+deal still to take gives the hand up — not only one whose turn is open
+at that moment: the shuffles go one at a time, and a seat whose juror
+went while somebody else's shuffle was awaited used to have its own
+come round to a table that could never take it (the players cannot
+open a seat sealed to the jury, and no juror says a held seat's deal
+steps), which sat there for good. The verifier accepts a deal that
+stops short and is followed by a later hand exactly when a held seat
+still owed a step — or, where no juror spoke for the seat at all, when
+the hand's draw named one and the record never got past the keys —
+and turns down one walked away from with every held seat done. It
+also rebuilds a held seat given up to the escrow from the pieces
+released at the hand's end, as it does a person's: the table settles
+that seat's audit with nothing said, and a finished game was being
+turned down for it.
+
 **Per hand, not per game.** The deck is resealed every hand, so shares
 are per-hand and a juror's whole obligation is one hand — p50 a minute,
 p90 two. Short enough to ask of a stranger, and short enough that an
