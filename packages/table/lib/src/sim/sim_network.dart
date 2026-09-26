@@ -147,6 +147,19 @@ class SimNetwork {
   /// name rather than fish for. Return true to swallow.
   bool Function(PublicKey from, Map<String, Object?> message)? swallow;
 
+  /// One copy of one message steered, chosen per copy as it leaves:
+  /// null sends it as the network would, a number of milliseconds
+  /// holds it back that much longer, and a negative number loses it.
+  /// Where [swallow] eats a message at its source, this reaches a
+  /// single recipient — the shape of a reordering, one peer hearing
+  /// two things the other way round from everybody else — which is
+  /// what `tool/explore.dart` walks through one copy at a time.
+  ///
+  /// The copy's latency is drawn before it is asked, so a steered run
+  /// draws the same numbers as an unsteered one and differs from it by
+  /// the one copy and whatever that copy changes.
+  int? Function(PublicKey from, PublicKey to, Map<String, Object?> message)? steer;
+
   bool _says(PublicKey from, Map<String, Object?> message) {
     if (swallow?.call(from, message) ?? false) {
       dropped++;
@@ -204,8 +217,14 @@ class SimNetwork {
         dropped++;
         continue;
       }
+      final latency = _latency();
+      final held = steer?.call(from, to, message);
+      if (held != null && held < 0) {
+        dropped++;
+        continue;
+      }
       copies++;
-      clock.schedule(_latency(), () {
+      clock.schedule(latency + (held ?? 0), () {
         if (!_reachable(from, to)) {
           dropped++;
           return;
@@ -251,8 +270,14 @@ class SimNetwork {
         dropped++;
         continue;
       }
+      final latency = _latency();
+      final held = steer?.call(from, to, message);
+      if (held != null && held < 0) {
+        dropped++;
+        continue;
+      }
       copies++;
-      clock.schedule(_latency(), () {
+      clock.schedule(latency + (held ?? 0), () {
         if (!_reachable(from, to)) {
           dropped++;
           return;
