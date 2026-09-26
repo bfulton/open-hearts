@@ -623,13 +623,33 @@ bot seat was measured taking: over six seeded hands it answers in 69
 ms at the middle and 155 ms at the worst over a data channel, 365 ms
 and 787 ms with a relay's latency under it.
 
-The seat's turn, not the deal's. A deal step is checked against things
+A deal step has ten seconds. A deal step is checked against things
 that may not have arrived, and a juror holds its keys back for a
 moment on purpose so a late draw can still be read, so deal steps
-answer at 2.9 s at the ninety-fifth percentile against a play's 0.16 —
-and a deal step given up takes the whole hand with it rather than one
-seat (below, "When quorum is lost anyway"). A deal that cannot finish
-is still caught by silence, as it always was.
+answer at 2.9 s at the ninety-fifth percentile against a play's 0.16;
+ten is three and a half times that. A held seat that misses it goes to
+the escrow like one that misses a card, and since a deal step given up
+takes the whole hand with it rather than one seat (below, "When quorum
+is lost anyway"), the hand is given up undealt. There was no allowance
+here at all at first, a deal that could not finish being caught by
+silence alone — and a juror heard from and doing nothing is never
+silent, so the deal waited on its keys for good.
+
+The deal step's clock waits for its holder to be at the hand. A deal
+step is the first thing a holder does in a hand, so it is the one turn
+a holder can still be arriving at: drawn this minute, summoned,
+connecting, replaying the record up to it. Arriving is not idle, and
+counted from the draw the allowance was gone before the juror could
+see the turn — the hand after one given up went too, its newcomer
+still replaying the one before, and the juror that was only late was
+left out of the next draw as if it had sat on the seat. So the clock
+starts when the holder is heard at the hand. One not heard since it
+was drawn is left to silence, half a minute from the draw; one heard
+at an earlier hand is arriving while its heartbeats move — one really
+catching up moves, every event it applies another step — and one that
+has said the same earlier place for ten seconds has stopped. A juror the table did take a seat off for
+sitting on it is left out of the next draw: heard from is not the same
+as playing (`packages/table/test/idle_holder_test.dart`).
 
 **And a juror says its seat's part again, as a person does.** A
 dropped message is the ordinary reason a turn has not settled, and the
@@ -1381,6 +1401,19 @@ also rebuilds a held seat given up to the escrow from the pieces
 released at the hand's end, as it does a person's: the table settles
 that seat's audit with nothing said, and a finished game was being
 turned down for it.
+
+A hand given up in its deal leaves nothing in the record — each side
+judges it for itself — so a juror carried in afterwards, drawn for the
+next hand, replays that deal as far as it went and waits there. Where
+the seat's holder went silent it would wait half a minute from when
+the jury naming that holder reached it, which for a newcomer is now;
+the table dealing the next hand stopped waiting for the newcomer's
+seat long before, and gave that hand up too. What a newcomer can see
+at once is the table: a majority of the players heard at a later hand,
+and five seconds more without the rest of this deal arriving, which a
+deal they had finished would have done. It gives the hand up then, as
+they did — the same inference the verifier makes from the record
+(`packages/table/test/undealt_hand_test.dart`).
 
 **Per hand, not per game.** The deck is resealed every hand, so shares
 are per-hand and a juror's whole obligation is one hand — p50 a minute,

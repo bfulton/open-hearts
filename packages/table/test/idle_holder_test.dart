@@ -79,4 +79,63 @@ void main() {
     }
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
+
+  // The same juror in the deal. A play or a pass has three seconds; a
+  // deal step had no allowance at all, so a juror heard and idle with
+  // its seat's keys owed held the deal for good — only silence was
+  // ever caught there, and it was never silent.
+  test('a bot seat whose holder is heard but never takes its deal step gives the hand up, and the game goes on', () {
+    final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 2, target: 1);
+    t.start();
+    final c = t.clients.first;
+    // Asleep from the moment the hand's seats are named, before any
+    // of their keys could have gone out.
+    expect(t.clock.runUntil(() => c.botHolders(c.game.handNumber).isNotEmpty, limitMs: 60 * 1000), isTrue);
+    final hand = c.game.handNumber;
+    final seat = c.botHolders(hand).keys.first;
+    t.net.doze(c.botHolders(hand)[seat]!);
+    expect(t.clock.runUntil(() => c.game.handNumber > hand, limitMs: 2 * 60 * 1000), isTrue,
+        reason: 'the hand was given up rather than waited on:\n${c.describe()}');
+    expect(c.jury.live, greaterThan(0), reason: 'with the jury heard from all along');
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 10 * 60 * 1000), isTrue,
+        reason: 'the game was played out: ${c.describe()}');
+    for (final c in t.clients) {
+      final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok && v.complete, isTrue, reason: v.reason);
+    }
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  // And the hand after it. The draw for it leaves the idle juror out
+  // and so takes one the table has not had: summoned, connecting, and
+  // replaying a hand the record says nothing more about, since a hand
+  // given up in its deal is each side's own judgement. That juror has
+  // to work out that the hand is over ([TableClient] reads it from the
+  // table's heartbeats), and the deal it was drawn for has to wait for
+  // it to arrive rather than count the arriving against it — on the
+  // table's clock, the second hand went the way of the first, and the
+  // juror that was only late was left out of the next draw.
+  test('a juror drawn for the hand after one given up undealt arrives, and deals it', () {
+    final t = SimTable(humans: 2, seed: 1, crypto: crypto, jurors: jurySize + 1, target: 1);
+    t.start();
+    final c = t.clients.first;
+    expect(t.clock.runUntil(() => c.botHolders(c.game.handNumber).isNotEmpty, limitMs: 60 * 1000), isTrue);
+    final drawn = c.juries.first.event.jurors.toSet();
+    final first = c.botHolders(0);
+    t.net.doze(first[first.keys.first]!);
+    expect(t.clock.runUntil(() => c.game.handNumber == 1 && c.botHolders(1).isNotEmpty, limitMs: 2 * 60 * 1000), isTrue,
+        reason: 'the first hand was given up: ${c.describe()}');
+    // The case is a newcomer holding a seat; a seed that drew only
+    // jurors the table already had would not be testing it.
+    expect(c.botHolders(1).values.where((k) => !drawn.contains(k)), isNotEmpty, reason: 'a juror new to the table holds a seat');
+    expect(t.clock.runUntil(() => c.game.phase == Phase.playing || c.game.handNumber > 1, limitMs: 2 * 60 * 1000), isTrue);
+    expect(c.game.handNumber, 1, reason: 'the second hand was dealt, not given up after the first: ${c.describe()}');
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 10 * 60 * 1000), isTrue,
+        reason: 'the game was played out: ${c.describe()}');
+    for (final c in t.clients) {
+      final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok && v.complete, isTrue, reason: v.reason);
+    }
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
 }

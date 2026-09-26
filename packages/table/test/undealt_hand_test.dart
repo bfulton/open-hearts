@@ -183,4 +183,36 @@ void main() {
     expect(v.complete, isTrue, reason: v.reason);
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
+
+  // A juror the table has not had, drawn for the hand after one given
+  // up. A hand given up in its deal leaves nothing in the record, so
+  // the newcomer replays that deal as far as it went and waits there
+  // for the step that never came — and since the jury it reads the
+  // gone holder from reached it only now, it would count that holder
+  // live for half a minute more before judging the hand for itself.
+  // Long before then, the table dealing the next hand had stopped
+  // waiting for the seat the newcomer holds in it, and gave that hand
+  // up too. What the newcomer can see at once is the table: everyone
+  // at the next hand, and nothing more of this one arriving.
+  test('a juror drawn for the hand after one given up undealt sees it was, and deals the next', () {
+    final t = SimTable(humans: 2, seed: 1, crypto: crypto, jurors: jurySize + 1, target: 1);
+    t.start();
+    final c = t.clients.first;
+    expect(t.clock.runUntil(() => c.botHolders(c.game.handNumber).isNotEmpty, limitMs: 60 * 1000), isTrue);
+    final drawn = c.juries.first.event.jurors.toSet();
+    final first = c.botHolders(0);
+    t.net.goOffline(first[first.keys.first]!);
+    expect(t.clock.runUntil(() => c.game.handNumber == 1 && c.botHolders(1).isNotEmpty, limitMs: 2 * 60 * 1000), isTrue,
+        reason: 'the first hand was given up: ${c.describe()}');
+    expect(c.botHolders(1).values.where((k) => !drawn.contains(k)), isNotEmpty, reason: 'a juror new to the table holds a seat');
+    expect(t.clock.runUntil(() => c.game.phase == Phase.playing || c.game.handNumber > 1, limitMs: 2 * 60 * 1000), isTrue);
+    expect(c.game.handNumber, 1, reason: 'the second hand was dealt, not given up after the first: ${c.describe()}');
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 10 * 60 * 1000), isTrue,
+        reason: 'the game was played out: ${c.describe()}');
+    for (final c in t.clients) {
+      final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok && v.complete, isTrue, reason: v.reason);
+    }
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
 }

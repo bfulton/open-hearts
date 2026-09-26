@@ -936,6 +936,41 @@ class TableClient {
     }
   }
 
+  /// A hand's deal this side is still in, short of a held seat's step,
+  /// while the table has moved on to a later hand.
+  ///
+  /// A hand given up in its deal leaves nothing in the record: each
+  /// side judges it for itself ([_giveUpUndealtHand]). A peer carried in
+  /// behind — a juror drawn for the next hand, one back from being cut
+  /// off — replays the deal as far as it went and then waits, on its own
+  /// clock, for the step that never came. Where the seat's holder went
+  /// silent, that clock is half a minute from when the jury naming the
+  /// holder reached this side ([_liveJurors]), which for a newcomer is
+  /// now. Meanwhile the table, dealing the next hand with a seat that
+  /// newcomer holds, waits for it only while it is seen to move
+  /// ([_arriving]), and gave that hand up too.
+  ///
+  /// A majority of the participants heard at a later hand have finished
+  /// this one, and a deal they finished is carried here within seconds.
+  /// So a deal still short of a held seat's step after a few seconds of
+  /// that was given up there, and is given up here the same way — the
+  /// inference the verifier makes from the record (record.dart,
+  /// heldSeatOwes).
+  void _dealLeftBehind() {
+    if (game.phase != Phase.dealing || _deal == null) return;
+    final h = game.handNumber;
+    final of = participants;
+    final past = of.where((k) => (_lastPosition[k]?.$1 ?? -1) > h).length;
+    if (of.isEmpty || past < _majority(of)) return;
+    final since = _tablePastSince.putIfAbsent(h, () => clock.nowMs);
+    if (clock.nowMs - since < 5000) return;
+    for (final seat in botHolders(h).keys) {
+      if (_races[TurnId.deal(h, TurnId.dealRounds - 1, seat)]?.settled == true) continue;
+      _trace('the table is past hand $h, whose deal is short here of seat $seat\'s steps: given up here as it was there');
+      return _giveUpUndealtHand(seat);
+    }
+  }
+
   /// When this side first saw a majority of the participants past each
   /// hand it was still at, for [_auditLeftBehind].
   final Map<int, int> _tablePastSince = {};
@@ -3056,6 +3091,21 @@ class TableClient {
   /// working.
   static const botActsWithinMs = 3000;
 
+  /// And its deal steps. A deal step is slower and waits on more — the
+  /// keys are held back a moment on purpose so a late draw can still be
+  /// read ([_juryFirmMs]), and a step is checked against things that
+  /// may not have arrived — and it answers at 2.9 s at the ninety-fifth
+  /// percentile against a play's 0.16. Ten seconds is three and a half
+  /// times that. A held seat that misses it goes to the escrow like one
+  /// that misses a card, and a seat given up with deal steps still to
+  /// take gives the hand up undealt ([_handOverQuietSeats]).
+  ///
+  /// There was no allowance here at all before: a deal that could not
+  /// finish was caught by silence alone, and a juror heard from and
+  /// doing nothing — a tab starved of a processor, a phone in a pocket
+  /// — is never silent, so the deal waited on its keys for good.
+  static const botDealsWithinMs = 10000;
+
   /// Whether the seat's holder has had the seat's turn in front of it
   /// for longer than that, and said nothing.
   ///
@@ -3067,24 +3117,32 @@ class TableClient {
   /// and a hand sat at one turn for minutes with the seat's own
   /// device apparently present. Heard from is not the same as playing.
   ///
-  /// The seat's turn, not the deal's. A deal step is checked against
-  /// things that may not have arrived, and a juror holds its keys
-  /// back for a moment on purpose so that a late draw can still be
-  /// read ([_juryFirmMs]) — deal steps answer at 2.9 s at the
-  /// ninety-fifth percentile against a play's 0.16, and a deal step
-  /// given up takes the whole hand with it ([_giveUpUndealtHand])
-  /// rather than one seat. A deal that cannot finish is still caught,
-  /// by silence, as it was before.
+  /// A deal step has longer ([botDealsWithinMs]), and its clock waits
+  /// for the holder to be at the hand at all. A deal step is the first
+  /// thing a holder does in a hand, so it is the one turn a holder can
+  /// still be arriving at: drawn this minute, summoned, connecting, and
+  /// replaying the record up to it — or replaying a hand given up
+  /// undealt, which leaves nothing in the record to say so, and working
+  /// that out ([_dealLeftBehind]). None of that is idle, and on the
+  /// table's clock it had eaten the whole allowance before the juror
+  /// could see the turn: the hand after one given up went too, and the
+  /// juror that was only late was left out of the next draw ([_letGo])
+  /// as if it had sat on the seat. A play or a pass comes after the
+  /// holder's own deal steps, so its holder is at the hand already.
   ///
   /// And not a turn that is waiting rather than idle: a seat whose
   /// hand is not open here yet is stalled on a secret, which is the
   /// escrow working and not a holder failing.
   bool _outOfTime(int seat) {
     final turn = _openTurnOf(seat);
-    if (turn == null || !(turn.isPlay || turn.isPass)) return false;
+    if (turn == null || !(turn.isPlay || turn.isPass || turn.isDeal)) return false;
     if (_stalled.containsKey(turn)) return false;
     final race = _races[turn];
     if (race == null || race.settled || race.action != null) return false;
+    // A deal step that has come and is held here for what vouches for
+    // it — the jury it seals to, a draw not yet read ([_onAction]) —
+    // has been said. The wait is this side's, not the juror's.
+    if (turn.isDeal && _future.any((e) => e.kind == EventKind.deal && e.turn == turn)) return false;
     // From when the turn became this holder's to take, not from when
     // the turn opened. A turn can open while its seat is still being
     // handed over — a person leaving it, the seat turning into a bot,
@@ -3096,8 +3154,31 @@ class TableClient {
     // which is why the holder is part of the key.
     final holder = botHolders(turn.hand)[seat];
     if (holder == null) return false;
-    final since = _botTurnSince.putIfAbsent('$turn|$holder', () => clock.nowMs);
-    return clock.nowMs - since >= botActsWithinMs;
+    final key = '$turn|$holder';
+    if (turn.isDeal && _arriving(holder, turn.hand)) {
+      _botTurnSince.remove(key);
+      return false;
+    }
+    final since = _botTurnSince.putIfAbsent(key, () => clock.nowMs);
+    return clock.nowMs - since >= (turn.isDeal ? botDealsWithinMs : botActsWithinMs);
+  }
+
+  /// Whether a juror has yet to be heard at [hand]: not heard from
+  /// since it was drawn — silence covers one that never comes, half a
+  /// minute from the draw ([_liveJurors]) — or heard at an earlier
+  /// hand and still moving. One whose heartbeats have said the same
+  /// earlier place for as long as a deal step may take is not
+  /// arriving, it has stopped, the way a person's is ([_catchingUp]).
+  bool _arriving(PublicKey juror, int hand) {
+    if (juror == signer.publicKey) return false;
+    final heard = _jurorHeard[juror];
+    final pos = _lastPosition[juror];
+    if (heard == null || pos == null) return true;
+    for (final d in _juriesFor(hand)) {
+      if (d.event.jurors.contains(juror) && heard < (_juryAt[d.event.id] ?? 0)) return true;
+    }
+    if (pos.$1 >= hand) return false;
+    return clock.nowMs - (_positionMovedAt[juror] ?? clock.nowMs) < botDealsWithinMs;
   }
 
   /// An open turn of a bot seat a juror holds that nobody still being
@@ -3145,6 +3226,11 @@ class TableClient {
   /// The turns stalled on a seat's secret, with the seat each waits on.
   Map<TurnId, int> get stalled => Map.unmodifiable(_stalled);
 
+  /// Jurors this side took a seat off for having the turn and not
+  /// playing it — not for going quiet, which the draw already leaves
+  /// out ([_proposeJury]).
+  final Set<PublicKey> _letGo = {};
+
   /// When each bot seat's turn became its holder's to take, by turn
   /// and holder. Cleared with the hand, and small in it: one entry per
   /// turn a bot seat is on.
@@ -3163,11 +3249,13 @@ class TableClient {
       final quiet = !live.contains(e.value);
       final slow = _outOfTime(e.key);
       if (!quiet && !slow) continue;
+      final allowed = (_openTurnOf(e.key)?.isDeal ?? false) ? botDealsWithinMs : botActsWithinMs;
       _trace('bot seat ${e.key}: its juror ${e.value.substring(0, 4)} '
-          '${quiet ? 'has gone quiet' : 'has had the turn for ${botActsWithinMs ~/ 1000} seconds and said nothing'}; '
+          '${quiet ? 'has gone quiet' : 'has had the turn for ${allowed ~/ 1000} seconds and said nothing'}; '
           'to the escrow');
       d.seatLeft(e.key);
       given.add(e.key);
+      if (slow) _letGo.add(e.value);
     }
     if (given.isEmpty) return;
     // A seat given up with a step of the deal still to take is a deal
@@ -3432,6 +3520,7 @@ class TableClient {
     // a seated one or a serving one — a client that has left the table
     // still follows the hands out, and is in neither branch below.
     _startDealWhenReady();
+    _dealLeftBehind();
     _forgetSaidAgain();
     _topUpJury();
     _timers.add(clock.schedule(1000, _tick));
@@ -3733,7 +3822,10 @@ class TableClient {
     // still stops a redraw that would seat nobody new, so a room with
     // nobody spare proposes nothing.
     if (own && _liveJurors(hand).length >= jurySize) return;
-    final quiet = _jurorsOf(hand).difference(_liveJurors(hand));
+    // Nor one this table has had to take a seat off for not playing
+    // it ([_letGo]): heard from is not the same as playing, and drawn
+    // again it would hold a seat again and cost the table the hand.
+    final quiet = _jurorsOf(hand).difference(_liveJurors(hand)).union(_letGo);
     final here = p.online(withinMs: 15000).difference(_humans).difference(quiet);
     // What this table needs a jury for. Escrow needs somebody; bot
     // seats need enough jurors that a seat survives its holder going
