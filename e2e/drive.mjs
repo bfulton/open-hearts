@@ -341,6 +341,18 @@ export async function act(page) {
   return null;
 }
 
+/// Every node carrying a card's name, as the driver sees it: the label,
+/// the role, and whether it is disabled — what act() filters on.
+export const cardNodes = (page) =>
+  page.evaluate(`((src) => {
+    const labelOf = ${labelOf};
+    const re = new RegExp(src);
+    return [...document.querySelectorAll('flt-semantics')]
+      .filter((e) => re.test(labelOf(e)))
+      .map((e) => labelOf(e) + ' [role ' + e.getAttribute('role') + ', disabled ' + e.getAttribute('aria-disabled') +
+        ', selected ' + e.getAttribute('aria-selected') + ', ' + [...e.attributes].map((a) => a.name).join(' ') + ']');
+  })(${JSON.stringify(cardName.source)})`);
+
 /// Plays on every live page until [done] holds on every one of them.
 /// A page counts as done from the first poll that finds it so: the
 /// pages pace their own tables, so a state that comes and goes — the
@@ -358,7 +370,19 @@ export async function playUntil(pages, done, { timeout = 120000, idle = [] } = {
     let all = true;
     for (const [i, page] of pages.entries()) {
       if (page.isClosed()) continue;
-      if (!idle.includes(i)) await act(page);
+      if (!idle.includes(i)) {
+        const did = await act(page);
+        // A page that has shown "Your turn" fifteen polls running: what
+        // act() did about it this time, and every node carrying a
+        // card's name as act() reads them — once, then every thirty
+        // polls, so a timeout says why rather than only that.
+        const onTurn = await has(page, /^Your (turn|lead)$/);
+        page.__onTurn = onTurn ? (page.__onTurn ?? 0) + 1 : 0;
+        if (page.__onTurn === 15 || (page.__onTurn > 15 && page.__onTurn % 30 === 0)) {
+          console.log(`page ${i}: "Your turn" ${page.__onTurn} polls running; act() did: ${did ?? 'nothing'}; ` +
+            `cards: ${(await cardNodes(page)).join(' | ')}`);
+        }
+      }
       if (!finished.has(i) && (await done(page, i))) finished.add(i);
       if (!finished.has(i)) all = false;
     }
