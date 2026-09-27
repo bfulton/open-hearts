@@ -4,6 +4,7 @@
 ///     dart run tool/explore.dart --scenario leave --shard 1/4 --first
 ///     dart run tool/explore.dart --scenario leave --fault-at 500,1500,3000
 ///     dart run tool/explore.dart --scenario deal --census
+///     dart run tool/explore.dart --scenario topup --structure
 ///
 /// The chaos walk (`tool/chaos.dart`) throws faults at a table at
 /// random, and finds what random faults find: a juror gone, a relay
@@ -175,8 +176,19 @@ String? runOnce(Scenario s, DealCrypto crypto,
     bool whole = false,
     List<Target>? seen,
     bool trace = false,
-    int? faultAt}) {
+    int? faultAt,
+    StructureLog? structure}) {
   final t = s.build(crypto);
+  // Read every second, and once more at the end: what each side waits
+  // for against who can end it (lib/src/sim/structure.dart).
+  if (structure != null) {
+    void read() {
+      structure.take(t);
+      t.clock.schedule(1000, read);
+    }
+
+    t.clock.schedule(1000, read);
+  }
   if (trace) {
     for (final c in t.clients) {
       c.log = print;
@@ -218,12 +230,14 @@ String? runOnce(Scenario s, DealCrypto crypto,
     t.start();
     if (whole) {
       t.clock.runUntil(() => t.survivors.every((c) => c.done), limitMs: s.horizonMs);
+      structure?.take(t);
       return judgeWhole(t, s);
     }
     bool pastFirstTrick(TableClient c) => c.done || (c.game.phase == Phase.playing && c.game.tricksPlayed >= 1) || c.game.handNumber > 0;
     t.clock.runUntil(() => t.survivors.every(pastFirstTrick), limitMs: s.horizonMs);
     // A moment more, for the last of the first trick to reach everyone.
     t.clock.advance(3000);
+    structure?.take(t);
     return judgeDealt(t, s, pastFirstTrick);
   } finally {
     t.stop();
@@ -307,15 +321,54 @@ Future<void> main(List<String> args) async {
 
   var runs = 0;
   var broke = 0;
+  // `--structure`: each run read every second against who can end each
+  // wait. Counts runs with each kind of finding; prints the first run
+  // of each kind. Measures; decides nothing.
+  final measure = args.contains('--structure');
+  final runsWith = <String, int>{};
+  final runsEndedWith = <String, int>{};
+  final runsEndedOnline = <String, int>{};
+  void tally(StructureLog log, String what) {
+    for (final kind in log.standing.keys) {
+      runsEndedWith[kind.name] = (runsEndedWith[kind.name] ?? 0) + 1;
+    }
+    for (final kind in log.standingOnline.keys) {
+      runsEndedOnline[kind.name] = (runsEndedOnline[kind.name] ?? 0) + 1;
+    }
+    for (final kind in log.counts.keys) {
+      final n = runsWith[kind.name] = (runsWith[kind.name] ?? 0) + 1;
+      if (n == 1) {
+        final e = log.seen.values.firstWhere((e) => e.finding.what == kind);
+        print('first ${kind.name}: run $runs, $what\n  ${e.finding} (${e.first} to ${e.last} ms)');
+      }
+    }
+  }
   // Every fault time's baseline first, a run each: at the wrong moment
   // the fault alone may be enough.
   final baselines = <int, List<Target>>{};
   for (final f in faultTimes) {
     final targets = baselines[f] = <Target>[];
     runs++;
-    final base = runOnce(s, crypto, whole: whole, seen: targets, faultAt: f);
+    final baseLog = measure ? StructureLog() : null;
+    final base = runOnce(s, crypto, whole: whole, seen: targets, faultAt: f, structure: baseLog);
     print('fault at ${f}ms: baseline ${base == null ? 'held' : 'BROKE: $base'}; '
         '${targets.length} event-to-peer pairs in the first ${s.windowMs ~/ 1000} s (${secs()} s)');
+    if (baseLog != null) {
+      // With nothing changed: what every run below starts from.
+      String counts(Map<Enum, int> m) => m.isEmpty ? 'nothing' : m.entries.map((e) => '${e.key.name} ${e.value}').join(', ');
+      print('  baseline structure: ${counts(baseLog.counts)}; at the end ${counts(baseLog.standing)} '
+          '(${counts(baseLog.standingOnline)} among sides online)');
+      final shown = <Enum>{};
+      for (final e in baseLog.seen.values) {
+        if (shown.add(e.finding.what)) print('    ${e.finding} (${e.first} to ${e.last} ms)');
+      }
+      final standing = baseLog.seen.values.where((e) => e.last == baseLog.lastTaken).toList();
+      if (standing.isNotEmpty) print('  still there at the end:');
+      for (final e in standing.take(12)) {
+        print('    ${e.finding} (from ${e.first} ms)');
+      }
+      if (standing.length > 12) print('    and ${standing.length - 12} more');
+    }
     if (base == null) continue;
     broke++;
     if (stopAtFirst) {
@@ -365,7 +418,9 @@ Future<void> main(List<String> args) async {
       for (final (:change, :hold) in tries) {
         if (limit != null && runs >= limit) break;
         runs++;
-        final why = runOnce(s, crypto, target: order[i], change: change, holdMs: hold, whole: whole, faultAt: f);
+        final log = measure ? StructureLog() : null;
+        final why = runOnce(s, crypto, target: order[i], change: change, holdMs: hold, whole: whole, faultAt: f, structure: log);
+        if (log != null) tally(log, '${order[i]}, ${change == Change.lose ? 'first copy lost' : 'held ${hold}ms'}');
         if (runs % 25 == 0) {
           final asked = crypto.hits + crypto.misses;
           print('$runs runs (${secs()} s), up to ${order[i].kind}; '
@@ -383,6 +438,10 @@ Future<void> main(List<String> args) async {
     }
   }
   if (args.contains('--census')) exit(0);
+  if (measure) {
+    print('structure: ${runsWith.isEmpty ? 'nothing found' : runsWith.entries.map((e) => '${e.key} in ${e.value} run(s), '
+        'still there at the end of ${runsEndedWith[e.key] ?? 0} (${runsEndedOnline[e.key] ?? 0} among sides online)').join('; ')}');
+  }
   print('$runs runs in ${secs()} s: ${broke == 0 ? 'every one held' : '$broke broke'}');
   exit(broke == 0 ? 0 : 1);
 }

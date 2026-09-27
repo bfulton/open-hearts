@@ -19,6 +19,7 @@ import '../record.dart';
 import '../signing.dart';
 import 'scenarios.dart';
 import 'sim_table.dart';
+import 'structure.dart';
 
 /// Transitive closure of a transition relation, so a state sampled
 /// after several steps is still checked against the model.
@@ -137,7 +138,7 @@ String? disagreed(SimTable t) {
   return null;
 }
 
-String? walkChaos(int seed, {DealCrypto? crypto}) {
+String? walkChaos(int seed, {DealCrypto? crypto, StructureLog? structure}) {
   final sc = ChaosScenario(seed, crypto: crypto);
   final t = sc.table;
   final observed = {for (final c in t.clients) c: _Observed()};
@@ -176,6 +177,8 @@ String? walkChaos(int seed, {DealCrypto? crypto}) {
   final judged = <TableClient>{};
 
   String? check(String when) {
+    // Read only: what each side waits for, for docs/07-states.md.
+    structure?.take(t);
     final survivors = t.survivors.toList();
     for (final c in survivors) {
       if (c.failure == null || !judged.add(c)) continue;

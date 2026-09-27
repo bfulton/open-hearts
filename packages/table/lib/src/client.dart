@@ -441,7 +441,8 @@ class TableClient {
     final race = _races[turn];
     if (race == null) return null;
     if (race.settled) {
-      return _removedAtTurn.contains(turn) ? TurnState.settledByRemoval : TurnState.settledByAction;
+      if (_removedAtTurn.contains(turn)) return TurnState.settledByRemoval;
+      return _onRecord.contains(turn) ? TurnState.settledByAction : TurnState.settledSilently;
     }
     if (race.split) return TurnState.split;
     if (race.boots.isNotEmpty) return TurnState.contested;
@@ -451,6 +452,121 @@ class TableClient {
 
   /// Every turn this peer has opened, with its state.
   Map<TurnId, TurnState> get turnStates => {for (final t in _races.keys) t: turnStateOf(t)!};
+
+  /// The turns settled by an action on the record — not by a removal,
+  /// not a jury's — whatever the hand.
+  final Set<TurnId> _onRecord = {};
+
+  /// Whether [turn] was settled here by an action the record holds:
+  /// something a side that is behind can be carried to.
+  bool onRecord(TurnId turn) => _onRecord.contains(turn);
+
+  /// Where the current hand stands ([HandState]).
+  HandState get handState {
+    if (_openingAudit) return HandState.opening;
+    switch (game.phase) {
+      case Phase.dealing:
+        return spec.sealed && _deal?.hand != game.handNumber ? HandState.awaitingJury : HandState.dealing;
+      case Phase.passing:
+        return HandState.passing;
+      case Phase.playing:
+        return HandState.playing;
+      case Phase.handOver:
+      case Phase.gameOver:
+        return spec.sealed && !_auditDone ? HandState.auditing : HandState.over;
+    }
+  }
+
+  /// How each hand this side has left behind ended: over, given up
+  /// opened, or abandoned in its deal.
+  final Map<int, HandState> _handEnds = {};
+
+  /// How [hand] ended here, or null while it has not. The last hand
+  /// of a finished game ends with the game, not by moving on.
+  HandState? handOutcome(int hand) => _handEnds[hand] ?? (done && hand == game.handNumber ? HandState.over : null);
+
+  /// Where a bot seat the current hand's jury holds stands; null for a
+  /// seat that is a person's or a bot nobody holds.
+  HeldSeatState? heldSeatState(int seat) {
+    if (botHolders(game.handNumber)[seat] == null) return null;
+    return (_deal?.gone.contains(seat) ?? false) ? HeldSeatState.escrowed : HeldSeatState.held;
+  }
+
+  /// The jury draw each hand's deal was sealed to, as this side read it.
+  String? sealedTo(int hand) => _heldFrom[hand];
+
+  /// The action this side holds for [turn], if any.
+  TableEvent? actionAt(TurnId turn) => _races[turn]?.action;
+
+  /// Whether this side has backed the action it holds for [turn].
+  bool backs(TurnId turn) => _races[turn]?.forAction.contains(signer.publicKey) ?? false;
+
+  /// The seats of the current hand this side has given to the escrow
+  /// or seen depart: the ones it releases its pieces of.
+  Set<int> get goneSeats => {...?_deal?.gone};
+
+  /// What this side is waiting for, each with who can end the wait
+  /// ([Wait]). Read from the same state the client acts on; it decides
+  /// nothing.
+  List<Wait> get waits {
+    final out = <Wait>[];
+    if (done || _failure != null) return out;
+    if (handState == HandState.awaitingJury) out.add(const Wait(WaitKind.jury, outside: true));
+    final d = _deal;
+    for (final e in _races.entries) {
+      final t = e.key;
+      final race = e.value;
+      if (race.settled) continue;
+      final seat = _turnSeat[t];
+      if (seat == null) continue;
+      if (race.split) {
+        out.add(Wait(WaitKind.verdict, turn: t, seat: seat, movers: _jurorsOf(t.hand)));
+        continue;
+      }
+      if (race.action != null || race.boots.isNotEmpty) {
+        // Backing from those who have not given it, or, once a voter's
+        // silence has split the turn, the hand's jurors' ruling.
+        final of = _participantsAt(t);
+        out.add(Wait(WaitKind.witnesses, turn: t, seat: seat, movers: {
+          ...of.difference(race.forAction).difference(race.forRemoval),
+          ..._jurorsOf(t.hand),
+        }));
+        continue;
+      }
+      final holder = holders[seat];
+      if (_stalled.containsKey(t)) {
+        // A seat's secret, from those holding its pieces: the jury the
+        // deal was sealed to and whoever was given one since, and for
+        // a person's seat the people still at the table beside them.
+        out.add(Wait(WaitKind.secret, turn: t, seat: seat, movers: {
+          ..._pieceHolders(t.hand, seat),
+          if (botHolders(t.hand)[seat] == null) ...participants,
+        }));
+        continue;
+      }
+      // A seat's move, or the seat's removal: a person's by the people
+      // at the table, whose clock and whose claim of silence can each
+      // end the wait; a held seat's by this side, which gives it to the
+      // escrow when its juror is silent or out of time, and then by
+      // those holding its pieces.
+      if (holder is HumanSeat) {
+        out.add(Wait(WaitKind.action, turn: t, seat: seat, movers: {holder.key, ...participants}));
+        continue;
+      }
+      final held = botHolders(t.hand)[seat];
+      if (held == null) continue; // everyone's to work out, and being worked out
+      final given = d?.gone.contains(seat) ?? false;
+      out.add(Wait(WaitKind.action,
+          turn: t, seat: seat, movers: {held, if (given) ..._pieceHolders(t.hand, seat) else signer.publicKey}));
+    }
+    return out;
+  }
+
+  /// The turn [seat]'s person was removed at here, or null.
+  TurnId? removedAt(int seat) => switch (spec.seats[seat]) {
+        HumanSeat(:final key) => _removedAt[key],
+        _ => null,
+      };
 
   SeatState seatStateOf(int seat) {
     final original = spec.seats[seat];
@@ -1227,6 +1343,7 @@ class TableClient {
   /// deal. The table does not wait on anyone to look at the score
   /// sheet; a view that wants to show it takes it from here.
   void _finishHand() {
+    _handEnds[game.handNumber] = HandState.over;
     lastHand = (
       hand: game.handNumber,
       scores: game.handScores,
@@ -2685,6 +2802,7 @@ class TableClient {
       if (holder is HumanSeat) _liars.add(holder.key);
     }
     _trace('hand ${game.handNumber} given up, opened${blamed.isEmpty ? '' : '; seat(s) $blamed broke it'}');
+    _handEnds[game.handNumber] = HandState.givenUp;
     _openingAudit = false;
     _abandonHand();
   }
@@ -2725,6 +2843,7 @@ class TableClient {
   /// came early were deferred rather than lost.
   void _giveUpUndealtHand(int seat) {
     _trace('hand ${game.handNumber}: seat $seat cannot finish its deal; the hand is given up undealt');
+    _handEnds[game.handNumber] = HandState.abandoned;
     _abandonHand();
   }
 
@@ -4446,6 +4565,7 @@ class TableClient {
   }
 
   void _log(Decision d) {
+    if (!d.removal && !d.jury) _onRecord.add(d.turn);
     var i = record.length;
     while (i > 0 && record[i - 1].compareTo(d) > 0) {
       i--;

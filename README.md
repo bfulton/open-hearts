@@ -37,6 +37,9 @@ Pages deployment.
 - [06 — The service](docs/06-service.md): the little that runs on our
   side — identity, entitlement, a juror for an empty room — and how it
   runs locally for end-to-end tests
+- [07 — The table's states](docs/07-states.md): every state a table,
+  a hand, a turn and a seat can be in, what decides each way out, and
+  which are still each device's own judgement
 
 ## Where this is going
 
