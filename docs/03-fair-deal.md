@@ -309,7 +309,7 @@ offer say so, and a build that cannot run the deal does not sit down.
   waiting for the jury, or at its audit opening the hand, and say
   which — where they used to wait at its turn with nothing on the
   screen, since a player never says a held seat's move. If nobody who
-  could open the seat is back within two minutes, the game ends
+  could open the seat is back within twenty seconds, the game ends
   unscored, a connection failure: "juror quorum lost" (doc 04, "When
   quorum is lost anyway").
 

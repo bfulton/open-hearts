@@ -1389,9 +1389,13 @@ throws away a hand whose cards have been seen, and a player looking at
 a bad one would only need the jurors holding the bot seats' pieces to
 leave together to have it dealt again. So a table stopped at a seat
 nobody left can open waits, says so, and goes on if they come back;
-if nobody who could open it has come back in two minutes — the time a
-person gets before the table removes them for silence — the game ends,
-unscored: a connection failure, "juror quorum lost". Ending it costs
+if nobody who could open it has come back in twenty seconds, the game
+ends, unscored: a connection failure, "juror quorum lost". Those who
+could open it have been unheard for half a minute by the time the
+table stops there, so the game ends no sooner than fifty seconds after
+the last of them was heard. It was two minutes at first, the silence a person
+gets, and that was two minutes of a stopped table in front of people
+who could do nothing about it. Ending it costs
 the innocent players their game, which is the price; what it does not
 do is let anybody choose which hand to keep. The most it can do for a
 player who is losing is leave the game unrated, and that takes the
@@ -1418,7 +1422,8 @@ As built, once the cards are out. Each side judges it for itself, as it
 judges a juror's silence: stopped at one turn — a held seat's play or
 pass, or a seat's hand stalled unopened, a departed person's or a held
 seat's at its audit — with nobody it has heard from in half a minute
-who could open that seat, for two minutes, and hearing most of the
+who could open that seat, for twenty seconds
+(`TableClient.quorumLostAfterMs`), and hearing most of the
 table all the while. A held seat is opened by its own juror or by two
 jurors holding a piece of it; a person's by one juror of the jury the
 deal was sealed to, beside a person's piece. The side then ends the
@@ -1495,7 +1500,7 @@ the seat from the escrow and plays on.
 
 **If the jury is lost anyway**, the table pauses, says so, and resumes
 when one is rebuilt — or, stopped at a hand nobody left can open, ends
-the game after two minutes ("When quorum is lost anyway", above).
+the game after twenty seconds ("When quorum is lost anyway", above).
 Nobody at the table controls whether strangers elsewhere go offline,
 so the pause is not a lever, and the ending is not one either.
 

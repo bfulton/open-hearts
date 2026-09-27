@@ -36,8 +36,8 @@
 /// enough reachable to decide anything) or for the deal (a departed
 /// seat's hand not yet opened from its escrow, or the lead card that
 /// nobody declared), or finished, or failed: stopped at a seat nobody
-/// left could open for as long as a silent person is given (client.dart,
-/// "juror quorum lost"). A pause always lifts when a decision lands;
+/// left could open for twenty seconds (client.dart, "juror quorum
+/// lost"). A pause always lifts when a decision lands;
 /// finished and failed are terminal.
 library;
 

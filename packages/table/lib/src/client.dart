@@ -127,8 +127,8 @@ enum Failure {
   /// A seat the table is stopped at that nobody left could open — a
   /// held bot seat with its own juror gone and fewer than
   /// [escrowThreshold] of the jurors holding a piece of it still
-  /// heard, or a departed person's with none — and has been, for as
-  /// long as a person is given before being removed for silence.
+  /// heard, or a departed person's with none — and has been, for
+  /// [TableClient.quorumLostAfterMs].
   jurorQuorumLost('juror quorum lost');
 
   const Failure(this.label);
@@ -3354,11 +3354,18 @@ class TableClient {
   /// Since when this side has been stopped at [_unopenable]'s turn.
   ({TurnId turn, int since})? _unopenableSince;
 
+  /// How long a table stopped at a seat nobody left can open waits,
+  /// saying so, before the game ends ([_judgeQuorum]). Those who could
+  /// open it have not been heard from for half a minute by then
+  /// ([_liveJurors]), so the game ends no sooner than fifty seconds
+  /// after the last of them was. It was two minutes, the silence a person is given, and
+  /// that was two minutes of a stopped table in front of people who
+  /// could do nothing about it.
+  static const quorumLostAfterMs = 20000;
+
   /// Ends the game when the table has been stopped at one turn, with
-  /// nobody left who could open the seat it waits on, for as long as a
-  /// person is given before being removed for silence
-  /// ([silenceAfterMs]) — the jurors that would have opened it by then
-  /// not heard from for half a minute more than that.
+  /// nobody left who could open the seat it waits on, for
+  /// [quorumLostAfterMs].
   ///
   /// The hand cannot go on, and was waited on for good; giving it up
   /// and dealing the next would throw away a hand whose cards have
@@ -3381,8 +3388,8 @@ class TableClient {
       return;
     }
     if (_unopenableSince?.turn != at.turn) _unopenableSince = (turn: at.turn, since: clock.nowMs);
-    if (clock.nowMs - _unopenableSince!.since < silenceAfterMs) return;
-    _trace('stopped at ${at.turn} for ${silenceAfterMs ~/ 1000} seconds: seat ${at.seat} has nobody left to open it; '
+    if (clock.nowMs - _unopenableSince!.since < quorumLostAfterMs) return;
+    _trace('stopped at ${at.turn} for ${quorumLostAfterMs ~/ 1000} seconds: seat ${at.seat} has nobody left to open it; '
         'the game ends, ${Failure.jurorQuorumLost.label}');
     _failure = Failure.jurorQuorumLost;
     _failedAt = at;

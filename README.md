@@ -117,7 +117,7 @@ rigged. Roughly in order:
    last hand by subtraction, its escrow among jurors alone so no
    player holds a piece, another juror taking it over when its holder
    goes — and, with nobody left who could open it mid-hand, the game
-   ending unscored after two minutes, a connection failure: "juror
+   ending unscored after twenty seconds, a connection failure: "juror
    quorum lost" — and the audit publishing its secret so the verifier
    still checks every bot move was the policy's. A table short of jurors to
    hold its bot seats calls for them and waits rather than dealing a

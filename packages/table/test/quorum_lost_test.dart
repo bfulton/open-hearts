@@ -9,9 +9,8 @@
 /// hand whose cards have been seen, which enough jurors leaving
 /// together could do to order. So the game ends — a connection
 /// failure, "juror quorum lost", unscored — once the table has been
-/// stopped there for as long as a person is given before the table
-/// removes them for silence (docs/04-live-play.md, "When quorum is
-/// lost anyway").
+/// stopped there for twenty seconds ([TableClient.quorumLostAfterMs];
+/// docs/04-live-play.md, "When quorum is lost anyway").
 library;
 
 import 'package:deal/deal.dart';
@@ -45,14 +44,15 @@ void main() {
         reason: 'the table said it was waiting for the jury:\n${c.describe()}');
     final pausedAt = t.clock.nowMs;
     expect(c.botHolders(hand).keys, contains(c.game.currentSeat), reason: 'at a held seat');
-    // And still says so once the jury drawn again is heard from.
-    t.clock.advance(30 * 1000);
+    // And still says so once the jury drawn again is heard from, which
+    // is moments after the pause.
+    t.clock.advance(TableClient.quorumLostAfterMs ~/ 2);
     expect(c.custodiansOf(hand).length, greaterThan(drawn.length), reason: 'a jury was drawn again');
     expect(c.tableState, TableState.pausedForJury, reason: 'with nothing in it to open the seat with:\n${c.describe()}');
 
     expect(t.clock.runUntil(() => t.clients.every((c) => c.tableState == TableState.failed), limitMs: 4 * 60 * 1000), isTrue,
         reason: 'the game ended:\n${c.describe()}');
-    expect(t.clock.nowMs - pausedAt, greaterThanOrEqualTo(c.silenceAfterMs), reason: 'and not before the table had waited');
+    expect(t.clock.nowMs - pausedAt, greaterThanOrEqualTo(TableClient.quorumLostAfterMs), reason: 'and not before the table had waited');
     for (final c in t.clients) {
       expect(c.failure, Failure.jurorQuorumLost);
       expect(c.done, isFalse, reason: 'unfinished, so unscored');
@@ -77,7 +77,7 @@ void main() {
 
   // The allowance is the whole of it: the jury back inside it and the
   // table goes on as it always did (jury_gone_test.dart).
-  test('the jury back inside the two minutes: the table goes on, and does not end', () {
+  test('the jury back inside the twenty seconds: the table goes on, and does not end', () {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4);
     t.start();
     final c = t.clients.first;
@@ -89,7 +89,7 @@ void main() {
     }
     expect(t.clock.runUntil(() => c.pause == Pause.waitingForJury, limitMs: 3 * 60 * 1000), isTrue,
         reason: 'the table said it was waiting for the jury:\n${c.describe()}');
-    t.clock.advance(c.silenceAfterMs - 20 * 1000);
+    t.clock.advance(TableClient.quorumLostAfterMs ~/ 2);
     expect(c.tableState, TableState.pausedForJury, reason: 'still waiting, not ended: ${c.describe()}');
     for (final j in drawn) {
       t.net.comeOnline(j);
@@ -122,7 +122,7 @@ void main() {
     final stoppedAt = t.clock.nowMs;
     final seat = c.stalled.values.first;
     expect(t.clock.runUntil(() => c.failure != null, limitMs: 4 * 60 * 1000), isTrue, reason: 'the game ended:\n${c.describe()}');
-    expect(t.clock.nowMs - stoppedAt, greaterThanOrEqualTo(c.silenceAfterMs - 1000));
+    expect(t.clock.nowMs - stoppedAt, greaterThanOrEqualTo(TableClient.quorumLostAfterMs));
     expect(c.failure, Failure.jurorQuorumLost);
     expect(c.failedAt?.seat, seat);
     for (final c in t.clients.take(3)) {
