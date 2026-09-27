@@ -10,6 +10,7 @@ import '../client.dart';
 import '../jury.dart';
 import '../signing.dart';
 import '../spec.dart';
+import '../time_bank.dart';
 import 'scripted_human.dart';
 import 'sim_juror.dart';
 import 'sim_network.dart';
@@ -30,6 +31,7 @@ class SimTable {
     bool withPresence = false,
     int target = gameOverScore,
     this.crypto,
+    TimeBank timeBank = TimeBank.standard,
   })  : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
@@ -69,6 +71,7 @@ class SimTable {
           clock: clock,
           presence: presence,
           crypto: crypto,
+          timeBank: timeBank,
           random: Random(seed * 1000 + i));
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }

@@ -124,11 +124,12 @@ enum Pause {
 
 /// Why a game ended without finishing: a connection failure, and which.
 enum Failure {
-  /// A seat the table is stopped at that nobody left could open — a
-  /// held bot seat with its own juror gone and fewer than
-  /// [escrowThreshold] of the jurors holding a piece of it still
-  /// heard, or a departed person's with none — and has been, for
-  /// [TableClient.quorumLostAfterMs].
+  /// A turn the table is stopped at that nobody left could move, and
+  /// has been, for [TableClient.quorumLostAfterMs]: a seat nobody left
+  /// could open — a held bot seat with its own juror gone and fewer
+  /// than [escrowThreshold] of the jurors holding a piece of it still
+  /// heard, or a departed person's with none — or a turn put to a jury
+  /// none of whose jurors is left to rule on it.
   jurorQuorumLost('juror quorum lost');
 
   const Failure(this.label);
@@ -1378,7 +1379,8 @@ class TableClient {
   // ---- receiving --------------------------------------------------------
 
   void _onMessage(PublicKey from, Map<String, Object?> json) {
-    if (_closed || _failure != null) return;
+    if (_closed) return;
+    if (_failure != null) return _answerEnded(json);
     // An event seen before was checked before; the same id is the
     // same bytes, and a signature checked again is milliseconds a peer
     // being repeated at has not got.
@@ -1434,6 +1436,7 @@ class TableClient {
       _carryForward(from, event.hand, event.step);
       return;
     }
+    if (event.kind == EventKind.ended) return _onEnded(event);
     if (_seen.contains(event.id)) {
       // Seen before, and sent again: the sender is still waiting on a
       // turn this peer may have settled. Answer with what settled it.
@@ -1503,6 +1506,8 @@ class TableClient {
         _onAppeal(event);
       case EventKind.verdict:
         _onVerdict(event);
+      case EventKind.ended:
+        return; // this side's own word; nothing in the record
     }
   }
 
@@ -3483,37 +3488,143 @@ class TableClient {
   static const quorumLostAfterMs = 20000;
 
   /// Ends the game when the table has been stopped at one turn, with
-  /// nobody left who could open the seat it waits on, for
-  /// [quorumLostAfterMs].
+  /// nobody left who could move it, for [quorumLostAfterMs]: a seat
+  /// nobody left could open ([_unopenable]), or a turn put to a jury
+  /// none of whose jurors is left to rule on it ([_unruled]).
   ///
   /// The hand cannot go on, and was waited on for good; giving it up
   /// and dealing the next would throw away a hand whose cards have
   /// been seen, and enough jurors leaving together could do that to
   /// order. So the game ends — a connection failure, as the player is
   /// told, and unscored. Each side judges it for itself, as it judges
-  /// a juror's silence, and says nothing more once it has: a side that
-  /// judged it wrongly, cut off from jurors the rest still hear, is to
-  /// the rest a player gone silent, and the table goes on without it
-  /// the way it goes on without anyone else who drops.
+  /// a juror's silence, says so ([_end]), and says nothing new: a side
+  /// that judged it wrongly, cut off from jurors the rest still hear,
+  /// is to the rest a player gone silent, and the table goes on without
+  /// it the way it goes on without anyone else who drops.
   ///
-  /// Only while this side hears most of the table. A device that has
-  /// lost its own connection hears no juror either, and that is not
-  /// the jury gone: the rest remove it for its silence, and it finds
-  /// its seat taken when it is back ([Pause.waitingForPeers] meanwhile).
+  /// Only while this side hears most of the table, or once everyone it
+  /// does not hear — the people and the hand's jury alike — has been
+  /// silent as long as the table gives a person ([_unheardAreGone]). A
+  /// device that has lost its own connection hears no juror either,
+  /// and that is not the jury gone: the rest remove it for its silence,
+  /// and it finds its seat taken when it is back
+  /// ([Pause.waitingForPeers] meanwhile). But the last person
+  /// left at a table hears nobody, and waited for good. By the time
+  /// the rest have been silent that long it has been removed wherever
+  /// they are — or there is nobody else. A juror heard at any time in
+  /// those two minutes counts, not only in the last half: one cut off
+  /// from this side for less may already have ruled, and its ruling be
+  /// on its way — though not one that could not open the seat anyway.
   void _judgeQuorum() {
-    final at = _unopenable();
-    if (at == null || !connectedToMajority) {
+    final seat = _unopenable();
+    final at = seat ?? _unruled();
+    if (at == null || !(connectedToMajority || _unheardAreGone(seat))) {
       _unopenableSince = null;
       return;
     }
     if (_unopenableSince?.turn != at.turn) _unopenableSince = (turn: at.turn, since: clock.nowMs);
     if (clock.nowMs - _unopenableSince!.since < quorumLostAfterMs) return;
-    _trace('stopped at ${at.turn} for ${quorumLostAfterMs ~/ 1000} seconds: seat ${at.seat} has nobody left to open it; '
+    _trace('stopped at ${at.turn} for ${quorumLostAfterMs ~/ 1000} seconds: nobody left can move it (seat ${at.seat}); '
         'the game ends, ${Failure.jurorQuorumLost.label}');
+    _end(at);
+  }
+
+  /// Whether everyone at the table this side does not hear has been
+  /// silent as long as a person is given before the table removes
+  /// them — and no juror heard in that time could move the turn it is
+  /// stopped at: open [seat], where it waits on one, or else rule.
+  bool _unheardAreGone(({TurnId turn, int seat})? seat) {
+    if (!participants.every((k) => k == signer.publicKey || _recent(k) || _silent(k))) return false;
+    final heard = _liveJurors(game.handNumber, withinMs: silenceAfterMs);
+    return seat == null ? heard.isEmpty : !openableBy(game.handNumber, seat.seat, heard.contains);
+  }
+
+  /// A turn only the jury can settle — split, or open while this side
+  /// hears too few of the table to carry anything, which only a verdict
+  /// on the silent can end ([_juryTick]) — with none of the hand's
+  /// jurors left to rule on it: none heard from for half a minute, and
+  /// none drawn since ([_liveJurors]). A jury drawn again from whoever
+  /// is online is live from the draw, so this is a table with nobody
+  /// left to draw from, too.
+  ///
+  /// Read from the turn and from who is heard now, not from the pause
+  /// up: a pause for the jury put up while this side was cut off stays
+  /// up once it is back, until a decision lands, and by then the turn
+  /// may be the people's to settle again.
+  ({TurnId turn, int seat})? _unruled() {
+    final heard = connectedToMajority;
+    for (final e in _races.entries) {
+      if (e.value.settled || e.key.hand != game.handNumber) continue;
+      if (heard && !e.value.split) continue;
+      if (_liveJurors(e.key.hand).isNotEmpty) return null;
+      return (turn: e.key, seat: _turnSeat[e.key]!);
+    }
+    return null;
+  }
+
+  /// The game ends here, stopped at [at]. Said by every road as this
+  /// side goes quiet: a juror still following stops once every person
+  /// it hears has said so, and a person stopped where nobody left could
+  /// move the table ends with it ([_onEnded]).
+  void _end(({TurnId turn, int seat}) at) {
+    if (_failure != null) return;
+    if (amSeated) {
+      final e = TableEvent.sign(signer,
+          table: spec.id, kind: EventKind.ended, body: {'hand': at.turn.hand, 'turn': at.turn.index, 'seat': at.seat});
+      _trace('emit ended ${e.body}');
+      _endedWord = e;
+      _endedSaidAt = clock.nowMs;
+      transport.broadcast(e.toJson(), everywhere: true);
+    }
     _failure = Failure.jurorQuorumLost;
     _failedAt = at;
     _pause = null;
     _notify();
+  }
+
+  /// This side's word that the game ended for it, and when it last
+  /// said it.
+  TableEvent? _endedWord;
+  int _endedSaidAt = 0;
+
+  /// An ended side says nothing new. To anyone still talking to it — a
+  /// juror still serving, a person still playing — it says again, no
+  /// more than every ten seconds, that it has ended: one cut off when
+  /// it first said so learns it once it is back, as a side behind is
+  /// carried forward.
+  void _answerEnded(Map<String, Object?> json) {
+    final word = _endedWord;
+    final kind = json['kind'];
+    if (word == null || (kind != EventKind.heartbeat.name && kind != EventKind.serve.name)) return;
+    if (clock.nowMs - _endedSaidAt < 10000) return;
+    _endedSaidAt = clock.nowMs;
+    transport.broadcast(word.toJson(), everywhere: true);
+  }
+
+  /// The people who have said the game ended for them ([_end]).
+  final Set<PublicKey> _ended = {};
+
+  /// A person's word that the game has ended for them. It changes
+  /// nothing in the record, and moves nobody on its own say-so. A
+  /// juror stops once every person it still hears has said it: there
+  /// is nobody left to serve. A person ends with it only if it is
+  /// itself stopped where nobody left could move the table, and then
+  /// the table's sides end together rather than each on its own clock.
+  void _onEnded(TableEvent event) {
+    if (!_isParticipant(event.author) || !_ended.add(event.author)) return;
+    if (mySeat == null) {
+      if (!participants.every((k) => _ended.contains(k) || _silent(k))) return;
+      _trace('everyone at the table has ended the game; nothing left to serve');
+      _failure = Failure.jurorQuorumLost;
+      _failedAt = (turn: event.turn, seat: event.seat);
+      _notify();
+      return;
+    }
+    if (!amSeated || _left || done) return;
+    final at = _unopenable() ?? _unruled();
+    if (at == null) return;
+    _trace('${event.author.substring(0, 4)} ended the game at ${event.turn}; stopped at ${at.turn} here too, so ending with it');
+    _end(at);
   }
 
   /// Whether the pause up is this side's word that a held seat has
@@ -3531,6 +3642,10 @@ class TableClient {
 
   /// Who holds a piece of [hand]'s bot seats, in the escrow's order.
   List<PublicKey> custodiansOf(int hand) => _custodiansNow(hand);
+
+  /// Every juror of [hand] as this side has them: each jury drawn for
+  /// it, and the one this side serves in.
+  Set<PublicKey> jurorsOf(int hand) => _jurorsOf(hand);
 
   /// The turns stalled on a seat's secret, with the seat each waits on.
   Map<TurnId, int> get stalled => Map.unmodifiable(_stalled);
@@ -4076,8 +4191,8 @@ class TableClient {
   }
 
   /// Jurors in force at [hand] heard from lately, or drawn too recently
-  /// to have been.
-  Set<PublicKey> _liveJurors(int hand) {
+  /// to have been: within half a minute, or [withinMs].
+  Set<PublicKey> _liveJurors(int hand, {int withinMs = 30000}) {
     final live = <PublicKey>{};
     // This side is live to itself while it serves the hand. Heard-from
     // is how a juror knows about the others, and a client never hears
@@ -4089,7 +4204,7 @@ class TableClient {
       for (final j in jurors) {
         if (live.contains(j)) continue;
         final heard = _jurorHeard[j];
-        if ((heard != null && clock.nowMs - heard < 30000) || clock.nowMs - drawn < 30000) live.add(j);
+        if ((heard != null && clock.nowMs - heard < withinMs) || clock.nowMs - drawn < withinMs) live.add(j);
       }
     }
 
@@ -4389,11 +4504,13 @@ class TableClient {
 
   /// Whether this client is still a juror of the hand in play or one
   /// to come; false once the table has moved past every hand it served,
-  /// the game is over, or nobody at the table has been heard for five
-  /// minutes — a table everyone walked away from is nobody's to serve.
+  /// the game is over or has ended ([_onEnded]), or nobody at the table
+  /// has been heard for five minutes — a table everyone walked away
+  /// from is nobody's to serve.
   bool get serving =>
       mySeat == null &&
       !done &&
+      _failure == null &&
       (_serving.keys.any((h) => h >= game.handNumber) || _jurorsOf(game.handNumber).contains(signer.publicKey)) &&
       participants.any((k) => clock.nowMs - (_lastHeard[k] ?? 0) < 5 * 60 * 1000);
 

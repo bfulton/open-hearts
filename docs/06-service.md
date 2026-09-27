@@ -653,8 +653,11 @@ either — and it was found in the browsers.
 What every cell asserts:
 
 - **The game reaches its end** with a bot in every departed seat — or,
-  at two humans with an inferred departure and no jury to be drawn, the
-  table **pauses and says so**, and stays consistent while paused.
+  where the survivors are too few to carry a removal and there is no
+  jury to be drawn, the table **pauses and says so**, stays consistent
+  while paused, and ends the game once the departed have been silent
+  as long as a person is given: "juror quorum lost" ([doc
+  04](04-live-play.md), "When quorum is lost anyway").
 - **Every surviving client holds the same record**, event for event,
   once the network settles.
 - **The record verifies**: every human play signed by its seat's key and

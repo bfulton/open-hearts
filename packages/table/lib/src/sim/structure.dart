@@ -95,11 +95,13 @@ class Finding {
 
 /// Every stuck wait and every disagreement at this moment.
 List<Finding> readStructure(SimTable t) {
+  // A juror no longer serving is one its host closes (JurorDuty), and
+  // the simulator's never does.
   final sides = <PublicKey, TableClient>{
     for (final p in t.people)
       if (!p.gone) p.client.signer.publicKey: p.client,
     for (final j in t.jurors)
-      if (!j.gone && j.client != null) j.signer.publicKey: j.client!,
+      if (!j.gone && j.client != null && j.client!.serving) j.signer.publicKey: j.client!,
   };
   // Up is not gone for good. A side cut off for a while — a blip, a
   // partition, a relay down — is coming back, and a wait on it is a

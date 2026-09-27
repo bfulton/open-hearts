@@ -178,18 +178,24 @@ void main() {
       t.stop();
     });
 
-    test('nobody online and no last resort: the table pauses and says why', () {
+    // Nobody comes. The table cannot go on without a juror, and none
+    // can be found: once the other person has been silent as long as a
+    // person is given, the game ends rather than wait for good
+    // (docs/04-live-play.md, "When quorum is lost anyway").
+    test('nobody online and no last resort: the table pauses and says why, then the game ends', () {
       final t = SimTable(humans: 2, seed: 68, withPresence: true);
       t.people[1]
         ..exit = Exit.idle
         ..exitAt = Moment.offTurn;
       t.start();
-      expect(t.run(limitMs: 20 * 60 * 1000), isFalse);
       final c = t.people[0].client;
-      expect(c.pause, Pause.waitingForJury);
+      expect(t.clock.runUntil(() => c.pause == Pause.waitingForJury, limitMs: 20 * 60 * 1000), isTrue, reason: c.describe());
       expect(c.needsJuror, isTrue);
       expect(t.presence!.calls, greaterThan(0));
       expect(c.juries, isEmpty);
+      expect(t.clock.runUntil(() => c.failure != null, limitMs: 10 * 60 * 1000), isTrue, reason: c.describe());
+      expect(c.failure, Failure.jurorQuorumLost);
+      expect(c.done, isFalse, reason: 'unfinished, so unscored');
       t.stop();
     });
   });

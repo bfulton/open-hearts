@@ -171,6 +171,19 @@ String? walkChaos(int seed, {DealCrypto? crypto, StructureLog? structure}) {
     return waits.every((x) => !c.openableBy(x.hand, x.seat, up.contains));
   }
 
+  // Stopped where nobody really up could move the table: a seat nobody
+  // up could open, or a turn put to the jury — split, or open while
+  // the table waits for want of a majority — with none of the hand's
+  // jurors up to rule on it. The game ends there (doc 04), and only
+  // there.
+  bool immovable(TableClient c, Set<PublicKey> up) {
+    if (unopenable(c, up)) return true;
+    final f = c.failedAt;
+    final hand = f?.turn.hand ?? c.game.handNumber;
+    final putToJury = f != null || c.tableState == TableState.pausedForJury || c.tableState == TableState.pausedForPeers;
+    return putToJury && !c.jurorsOf(hand).any(up.contains);
+  }
+
   // A game ended for a lost quorum is judged the moment it is seen,
   // against who is up then: a juror blipped away and back later would
   // make it look premature at the end of the walk when it was not.
@@ -182,9 +195,9 @@ String? walkChaos(int seed, {DealCrypto? crypto, StructureLog? structure}) {
     final survivors = t.survivors.toList();
     for (final c in survivors) {
       if (c.failure == null || !judged.add(c)) continue;
-      if (!unopenable(c, upNow())) {
+      if (!immovable(c, upNow())) {
         return '$when: ${c.signer.publicKey.substring(0, 6)} ended the game, ${c.failure!.label}, '
-            'with a juror up that could open the seat\n${c.describe()}';
+            'with a juror up that could move the table\n${c.describe()}';
       }
     }
     for (var i = 0; i < survivors.length; i++) {
@@ -265,6 +278,12 @@ String? walkChaos(int seed, {DealCrypto? crypto, StructureLog? structure}) {
       for (final c in survivors) {
         // Ended for a lost quorum, and judged fair when it was seen.
         if (c.tableState == TableState.failed) continue;
+        // Stopped for good where nobody up could move it: the game
+        // ends rather than wait on a jury that is gone.
+        if (immovable(c, up)) {
+          return 'stopped for good where nobody up could move the table, and the game did not end; '
+              'faults were [${faults()}]\n${c.describe()}';
+        }
         if (!paused.contains(c.tableState)) {
           return 'not finished, and not paused saying why; faults were [${faults()}]\n${c.describe()}';
         }

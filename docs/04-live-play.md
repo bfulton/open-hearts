@@ -1377,7 +1377,8 @@ jury enough, three would now do; four is kept because it is also what
 leaves a margin for the holder to be one of the ones that goes.
 
 **When quorum is lost anyway.** A hand whose bot seat has no juror
-cannot go on, and neither can one whose departed seat cannot be opened.
+cannot go on, and neither can one whose departed seat cannot be opened,
+nor a turn only the jury can settle once none of its jurors is left.
 In the deal, before anybody has seen a card, that hand is given up
 unscored and the next is dealt, the way a hand nobody can lead already
 is — with the difference that this one cannot be opened to say why, so
@@ -1419,22 +1420,55 @@ that seat's audit with nothing said, and a finished game was being
 turned down for it.
 
 As built, once the cards are out. Each side judges it for itself, as it
-judges a juror's silence: stopped at one turn — a held seat's play or
-pass, or a seat's hand stalled unopened, a departed person's or a held
-seat's at its audit — with nobody it has heard from in half a minute
-who could open that seat, for twenty seconds
-(`TableClient.quorumLostAfterMs`), and hearing most of the
-table all the while. A held seat is opened by its own juror or by two
-jurors holding a piece of it; a person's by one juror of the jury the
-deal was sealed to, beside a person's piece. The side then ends the
-game and says nothing more to anyone (`TableState.failed`,
+judges a juror's silence. It must be stopped at one turn for twenty
+seconds (`TableClient.quorumLostAfterMs`), and the turn must be one of
+these:
+- a held seat's play or pass, or a seat's hand stalled unopened (a
+  departed person's, or a held seat's at its audit), with nobody it
+  has heard from in half a minute who could open that seat;
+- a turn only the jury can settle — split between the action and a
+  boot, or open while the side hears too few of the table to carry
+  anything, which only a verdict on the silent can end — with none of
+  the hand's jurors heard from in half a minute, or drawn since. This
+  is read from the turn and from who is heard at that moment, not
+  from the pause on the screen. A pause for the jury put up while two
+  people were cut off from each other stays up after they are back in
+  touch, until a decision lands. By then the turn is theirs to settle
+  again, and the chaos walk found a side that ended the game on the
+  pause alone.
+
+A held seat is opened by its own juror or by two jurors holding a
+piece of it; a person's by one juror of the jury the deal was sealed
+to, beside a person's piece. And the side must hear most of the table
+all the while, or else have heard nothing, for the two minutes a
+silent person is given, from any person it cannot hear, nor from any
+juror who could have moved the turn: opened the seat, or ruled.
+
+The side then ends the game (`TableState.failed`,
 `Failure.jurorQuorumLost`); the screen says "Connection failure —
-juror quorum lost", unscored, and offers the way home. Hearing most of
-the table is what keeps a device that has lost its own connection —
-which hears no juror either — from blaming the jury: the rest remove
-it for its silence, as they would anyone who drops, and it finds its
-seat taken when it is back. A side that judged it wrongly, cut off
-from jurors the rest still hear, is to the rest exactly that.
+juror quorum lost", unscored, and offers the way home. It says so
+once, by every road, and after that says nothing new. To anyone
+still sending to it, it repeats that it has ended, no more than every
+ten seconds, so a juror cut off at the moment learns it once it is
+back. A juror still following stops once every person it still hears
+has said so. A person stopped at such a turn itself ends on hearing
+it, rather than on its own clock, so the sides end together. Nothing
+goes in the record.
+
+Hearing most of the table is what keeps a device that has lost its
+own connection — which hears no juror either — from blaming the jury:
+the rest remove it for its silence, as they would anyone who drops,
+and it finds its seat taken when it is back. A side that judged it
+wrongly, cut off from jurors the rest still hear, is to the rest
+exactly that. The last person left at a table hears nobody at all,
+and until the chaos walk measured it (docs/07-states.md) waited for
+good. By the time everyone it cannot hear has been silent two
+minutes, a device that was the one cut off has been removed wherever
+the rest are, so it loses nothing by ending; and if there is no rest,
+the game is over anyway. A juror counts there if heard at any time in
+those two minutes, not only in the last half: the chaos walk found a
+jury cut off from the last person for a minute that had already
+ruled, with its ruling on the way.
 
 Counting who holds a piece turned up the hang this replaces, in the
 commoner case. With jurors online beyond the jury, the table draws
@@ -1499,8 +1533,9 @@ the human's by elimination. If a holder drops, another juror rebuilds
 the seat from the escrow and plays on.
 
 **If the jury is lost anyway**, the table pauses, says so, and resumes
-when one is rebuilt — or, stopped at a hand nobody left can open, ends
-the game after twenty seconds ("When quorum is lost anyway", above).
+when one is rebuilt — or, stopped at a hand nobody left can open or a
+turn nobody is left to rule on, ends the game after twenty seconds
+("When quorum is lost anyway", above).
 Nobody at the table controls whether strangers elsewhere go offline,
 so the pause is not a lever, and the ending is not one either.
 
@@ -1644,14 +1679,16 @@ The simulator's jury rows (`packages/table/test/jury_test.dart`): a
 table of two with one gone quiet off turn and on it; four cut two and
 two with the jury reaching all; the foreman crashing; the whole jury
 going quiet; nobody online and a juror of last resort; nobody online
-and none. The chaos walk draws four jurors and lets them go too, and
-ends every seed finished, or paused only where no juror left up could
-end the pause — none at all, or, at a held bot seat, fewer than the two
-jurors holding a piece that it takes to open it and not the seat's own
-juror — or ended for a lost quorum, judged against who really was up
-the moment the ending was seen. The
-browser suite runs the two-person case over real sockets against the
-service's juror of last resort.
+and none. The chaos walk draws four jurors and lets them go too. It
+ends every seed finished, or ended for a lost quorum, judged against
+who really was up the moment the ending was seen. A seed left stopped
+where nobody up could move the table fails the walk, since the game
+should have ended there. That means a seat nobody up could open (at a
+held bot seat, fewer than the two jurors holding a piece that it
+takes, and not the seat's own juror), or a turn put to a jury none of
+whose jurors is up, paused for the jury or for want of a majority.
+The browser suite runs the two-person case over real sockets against
+the service's juror of last resort.
 
 ## What the jury does not change
 

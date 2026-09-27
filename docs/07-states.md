@@ -114,8 +114,13 @@ A seeded table's hand starts at passing or playing and ends at over.
 says what it is waiting for; `finished`; `failed`. A pause is a
 reading of the hand's and turns' states, not a state of its own.
 `failed` is **decided here**, each side ending the game for itself.
-A side ends it once it has been stopped for twenty seconds at a seat
-nobody left can open, provided it still hears most of the table.
+A side ends it once it has been stopped for twenty seconds at a turn
+nobody left can move: a seat nobody left can open, or a turn put to a
+jury none of whose jurors is left to rule. It must also hear most of
+the table, or else have heard nothing for two minutes from everyone
+it cannot hear, the jury included. It says so, and the others hear
+it: a person stopped at such a turn ends with it, and a juror stops
+once every person it still hears has ended.
 
 ## What each waiting state waits for
 
@@ -208,7 +213,7 @@ on the record:
 | An escrowed seat's audit closed silently | the audit case above | as for the escrow |
 | Which draw a deal is sealed to | holders read from different juries while a draw is in flight, for two seconds in most top-up runs (below) | `_juryFirmMs` (2 s), `_refixHolders` |
 | Bot seats dealt in the open at 40 s | not seen; two sides judging the 40 s differently would deal one hand two ways | — |
-| The game ended for a lost quorum | the people ending it up to five seconds apart; the last juror never told, and waiting for good (below) | — |
+| The game ended for a lost quorum | the people ending it up to five seconds apart, and the last juror not told (below). It is said now: a juror stops on hearing it, and a person stopped at the same turn ends with it | the two minutes a side that hears too little of the table waits |
 | Which way a seat left, where a leave crosses a boot | the people and the jurors holding different records to the end of a game (below) | `_onLeave` passing over a leave for a seat already removed |
 
 ## The clocks that stay
@@ -239,23 +244,30 @@ walk, every second of an explorer run, and once more when a run ends.
 Most of what it reads mid-run passes, such as an event in flight or a
 wait on someone gone before anyone has noticed. What counts is what
 is still read when a run ends, and whether the sides that disagree
-are both online.
+are both online. A juror that has stopped serving is not read: its
+host closes it (`JurorDuty`), though the simulator's never does.
 
-**The chaos walk**, 250 seeds and 14 sealed. Every invariant held.
+Measured twice: first as the table was, then with the game ending
+wherever the jury is gone and nobody is left to draw (below, and doc
+04, "When quorum is lost anyway").
 
-| Read | Walks | Still read at the end |
-|---|---|---|
-| stuck on nobody | 6 | 4 |
-| apart on the escrow | 8 | 1 |
-| apart on a seat | 1 | 1 |
-| apart on the game's end | 1 | 0 |
+**The chaos walk**, 250 seeds and 14 sealed. Every invariant held,
+both times; the second time under a walk that also fails any seed
+left stopped where nobody up could move the table.
+
+| Read | Walks | Still read at the end, first | Now |
+|---|---|---|---|
+| stuck on nobody | 6 | 4 | 0 |
+| apart on the escrow | 8 | 1 | 0 |
+| apart on a seat | 1 | 1 | 0, for the jurors holding the other exit stop serving |
+| apart on the game's end | 1 | 0 | 0 |
 
 Nothing was left behind, and nothing was read in a cycle. No sides
 were apart on a turn, on a hand's outcome, or on the draw a deal was
 sealed to.
 
 **The explorer**, each run losing or holding back one copy of one
-message. Every run held.
+message. Every run held, both times.
 
 | Scenario | Runs | Read |
 |---|---|---|
@@ -263,29 +275,31 @@ message. Every run held.
 | two | 1,387 | apart on the escrow in 3 |
 | leave | 1,343 | apart on the escrow in 1 |
 | summons | 869 | apart on the escrow in 11 |
-| topup, played to the end of the hand | 4,208 | apart on the hand's outcome in every run, always with a side cut off; apart on the draw in 3,830, for about two seconds each; apart on the escrow in 14, to the end |
+| topup, played to the end of the hand | 4,208 | apart on the draw in 3,830, for about two seconds each; apart on the escrow in 14, and in 13 still at the end. At first also apart on the hand's outcome in every run, always with a juror cut off for good (below) |
 
 What the readings are:
 
-- **Stuck on nobody, for good: 4 walks.** In every one the jury is
-  gone and nobody is left to draw, since the walk's table has exactly
-  four jurors. Each side is waiting on something only a juror can
-  give.
+- **Stuck on nobody.** In every one the jury is gone and nobody is
+  left to draw, since the walk's table has exactly four jurors. Each
+  side is waiting on something only a juror can give. Four walks were
+  stuck for good; each now ends the game.
   - Seeds 1 and 72 are unsealed two-person tables, each with a turn
     only the jury can settle. In seed 1 a play is met by a boot, one
     vote each. In seed 72 it is a claim of silence against the only
-    other person. Both tables pause for the jury, and stay paused. In
-    seed 1 the person whose play it was then leaves. The leave is
-    placed after the turn it has an action in, so it waits behind
+    other person. Both tables paused for the jury and stayed paused.
+    In seed 1 the person whose play it was then left. The leave is
+    placed after the turn it has an action in, so it waited behind
     that turn.
   - In sealed seed 8, one of two people and three of four jurors go.
-    Nobody still up can open a seat's secret. The person left hears
+    Nobody still up can open a seat's secret. The person left heard
     too little of the table to end the game for a lost quorum, and
-    stays paused.
-  - In sealed seed 2 the people do end the game for a lost quorum.
-    The last juror is never told, and waits at the seat.
-- **Stuck on nobody, for a while: 2 walks.** Sealed seeds 1 and 3 are
-  the same case, ended by the game ending for a lost quorum.
+    stayed paused.
+  - In sealed seed 2 the people did end the game for a lost quorum.
+    The last juror was never told, and waited at the seat. Its host
+    would have closed it after five minutes of hearing nobody.
+
+  Sealed seeds 1 and 3 are the same case, ended for a lost quorum
+  from the start.
 - **Apart on the escrow.** One side gives a held seat to the escrow
   and another does not: the seat's juror is out of time as one side
   sees it and not as the other does. In the first case the explorer
@@ -293,18 +307,30 @@ What the readings are:
   which gave the seat up alone. Nothing brings the sides back
   together before the hand ends.
 - **Apart on a hand's outcome.** In the topup scenario, two jurors cut
-  off for good give up hand 0 thirty-one seconds in. The table deals
-  the hand and plays it out. If those jurors came back, they would
-  hold a hand as abandoned that the record shows played.
+  off for good give up hand 0 thirty-one seconds in, while the table
+  deals the hand and plays it out. If those jurors came back, they
+  would hold as abandoned a hand the record shows played. They stop
+  serving once they have given it up, so a host closes them, and the
+  second measurement does not read them.
 - **Apart on the draw.** In the topup scenario the sides read a hand's
   deal as sealed to different draws for about two seconds, then agree
   on one.
 - **Apart on a seat.** Seed 43: the leave and the boot described
   under *A seat*. The people's records and the jurors' records hold
-  different exits to the end of the game. The walk compares only the
-  people's records, so it passed.
+  different exits for as long as those jurors serve. The walk compares
+  only the people's records, so it passed.
 - **Apart on the game's end.** Sealed seed 2: the two people end the
   game for a lost quorum no more than five seconds apart.
+
+The ending found two faults of its own in the chaos walk before it
+held, each now a test (`quorum_lost_test.dart`):
+- **The pause alone.** In seed 3, a pause for the jury put up while
+  two people were cut off from each other outlasted their being cut
+  off. One of them ended the game on it, though the turn was theirs to
+  settle again.
+- **A jury cut off, not gone.** In seed 8, a juror cut off from the
+  last person for a minute had already ruled, and the person ended the
+  game before its ruling arrived.
 
 ## Next
 
@@ -320,16 +346,18 @@ record, in this order:
 6. the leave, settled in the seat's turn as a boot is, so that a leave
    and a boot at one seat are one race with one winner.
 
-Separately, the measurement found states with no way out once the
-jury is gone and nobody is left to draw:
-- a turn only the jury can settle;
-- a seat's secret that nobody still up can open, at a side that hears
-  too little of the table to end the game;
-- a juror still waiting at a game the people have ended.
-
-Each of these needs a transition out. Which transition is a question
-to settle before step 2.
-
 Each would be settled the way a boot is, and each would remove the
 guessing rules it stands behind. The checker above goes from
 measuring to asserting as each lands.
+
+The measurement also found states with no way out once the jury is
+gone and nobody is left to draw:
+- a turn only the jury can settle;
+- a seat's secret that nobody still up can open, at a side that hears
+  too little of the table to end the game;
+- a juror following a game the people had ended, never told, until
+  its host gave up on hearing nobody.
+
+Each now ends the game, and the ending is said ([doc
+04](04-live-play.md), "When quorum is lost anyway"). The chaos walk
+now fails a seed left stopped where nobody up could move the table.

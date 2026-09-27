@@ -4,7 +4,11 @@
 /// way and at the moment the cell says, then checks what every cell
 /// must satisfy: the survivors agree on one record, the record
 /// verifies, departed seats are bots, ratings follow the two rules,
-/// and the table either finishes or pauses for a reason it can name.
+/// and the table either finishes or — its survivors too few to carry a
+/// removal, and no jury to rule for them — pauses, says why, and once
+/// the departed have been silent as long as a person is given, ends:
+/// juror quorum lost (docs/04-live-play.md, "When quorum is lost
+/// anyway").
 library;
 
 import 'package:engine/engine.dart';
@@ -75,12 +79,12 @@ void checkFinished(SimTable t, {required Set<int> departedSeats}) {
   }
 }
 
-void checkPaused(SimTable t) {
+void checkEnded(SimTable t) {
   final survivors = t.survivors.toList();
   expect(survivors, isNotEmpty);
   for (final c in survivors) {
-    expect(c.done, isFalse);
-    expect(c.pause, isNotNull, reason: 'a table that cannot go on says why');
+    expect(c.done, isFalse, reason: 'unfinished, so unscored');
+    expect(c.failure, Failure.jurorQuorumLost, reason: 'a table nobody can move ends:\n${c.describe()}');
   }
   checkAgreement(t, among: survivors);
 }
@@ -91,7 +95,7 @@ void main() {
       for (final exit in Exit.values) {
         for (final moment in Moment.all) {
           final finish = expectFinish(humans, [(exit, false)]);
-          test('$humans humans, seat 0 ${exit.name}s $moment → ${finish ? 'finishes' : 'pauses'}', () {
+          test('$humans humans, seat 0 ${exit.name}s $moment → ${finish ? 'finishes' : 'ends'}', () {
             final t = SimTable(humans: humans, seed: 11 + humans);
             t.people[0]
               ..exit = exit
@@ -102,7 +106,7 @@ void main() {
             if (finish) {
               checkFinished(t, departedSeats: {0});
             } else {
-              checkPaused(t);
+              checkEnded(t);
             }
             t.stop();
           });
@@ -115,7 +119,7 @@ void main() {
     for (final humans in [3, 4]) {
       for (final exit in Exit.values) {
         final together = expectFinish(humans, [(exit, true), (exit, true)]);
-        test('$humans humans, seats 0 and 1 ${exit.name} in the same window → ${together ? 'finishes' : 'pauses'}', () {
+        test('$humans humans, seats 0 and 1 ${exit.name} in the same window → ${together ? 'finishes' : 'ends'}', () {
           final t = SimTable(humans: humans, seed: 21 + humans);
           for (final i in [0, 1]) {
             t.people[i]
@@ -128,13 +132,13 @@ void main() {
           if (together) {
             checkFinished(t, departedSeats: {0, 1});
           } else {
-            checkPaused(t);
+            checkEnded(t);
           }
           t.stop();
         });
 
         final inTurn = expectFinish(humans, [(exit, false), (exit, false)]);
-        test('$humans humans, seat 0 ${exit.name}s in hand 1 and seat 1 in hand 2 → ${inTurn ? 'finishes' : 'pauses'}', () {
+        test('$humans humans, seat 0 ${exit.name}s in hand 1 and seat 1 in hand 2 → ${inTurn ? 'finishes' : 'ends'}', () {
           final t = SimTable(humans: humans, seed: 31 + humans);
           t.people[0]
             ..exit = exit
@@ -149,7 +153,7 @@ void main() {
             expect(t.people[1].gone, isTrue);
             checkFinished(t, departedSeats: {0, 1});
           } else {
-            checkPaused(t);
+            checkEnded(t);
           }
           t.stop();
         });
@@ -266,7 +270,11 @@ void main() {
       expect(v.ok, isTrue, reason: v.reason);
       final alone = t.people[2].client;
       expect(alone.done, isFalse);
-      expect(alone.pause, isNotNull, reason: 'the one on its own knows it is stuck');
+      // Removed where the rest are, and on its own for good: it waits,
+      // saying why, until they have been silent as long as a person is
+      // given, and then its game ends.
+      expect(t.clock.runUntil(() => alone.failure != null, limitMs: 5 * 60 * 1000), isTrue, reason: alone.describe());
+      expect(alone.failure, Failure.jurorQuorumLost);
       t.stop();
     });
   });

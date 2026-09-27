@@ -47,10 +47,11 @@
 /// players cannot settle among themselves, appealed) or for peers (not
 /// enough reachable to decide anything) or for the deal (a departed
 /// seat's hand not yet opened from its escrow, or the lead card that
-/// nobody declared), or finished, or failed: stopped at a seat nobody
-/// left could open for twenty seconds (client.dart, "juror quorum
-/// lost"). A pause always lifts when a decision lands;
-/// finished and failed are terminal.
+/// nobody declared), or finished, or failed: stopped for twenty seconds
+/// at a seat nobody left could open, or at a turn put to a jury with
+/// none of its jurors left to rule (client.dart, "juror quorum lost").
+/// A pause always lifts when a decision lands; finished and failed are
+/// terminal.
 library;
 
 import 'events.dart';
