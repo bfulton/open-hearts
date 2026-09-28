@@ -275,7 +275,12 @@ offer say so, and a build that cannot run the deal does not sit down.
   "Playing a seat nobody holds"), from a secret drawn like a person's
   and published at the audit with everyone else's — so its shuffle
   carries an argument and its tokens carry proofs, and the table checks
-  them without being able to see the hand behind them.
+  them without being able to see the hand behind them. Which juror
+  that is comes from the draw the deal is sealed to, and the keys say
+  it: each seat's keys name the draw they were sealed to, the first
+  person's to settle name the hand's, and a bot seat's are taken only
+  after, naming the same draw, from the juror it names for the seat
+  ([doc 07](07-states.md), "The draw on the record").
 - **A pass** moves positions, for all to see, with the tokens that
   open them sealed to the receiver (ElGamal under its deal key, the
   reveal proof in the clear beside it) — or in the clear outright when

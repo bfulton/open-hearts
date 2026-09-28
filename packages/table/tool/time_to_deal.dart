@@ -11,9 +11,12 @@
 /// and the client holds back in two places on purpose, which is what
 /// this is here to price:
 ///
-///  - a juror will not publish its seat's keys until the hand's first
-///    jury has stood still for a moment (`_juryFirmMs`), so that a
-///    draw belonging before the one it read has time to arrive;
+///  - a juror will not publish its seat's keys until the record has
+///    said which draw the deal is sealed to — the first person's keys,
+///    settled (`_checkSealed`). It used to wait two seconds for the
+///    draw to stand still instead (`_juryFirmMs`); the record costs
+///    three tenths of a second more to the first card, 6.90 s against
+///    6.60 at a jury of ten over twenty seeds;
 ///  - a hand with bot seats waits for a jury big enough to hold them
 ///    (`_jurorsWaitMs`), which on a table with jurors about is over as
 ///    soon as the draw carries.

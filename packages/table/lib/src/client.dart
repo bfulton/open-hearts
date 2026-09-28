@@ -513,8 +513,10 @@ class TableClient {
     return (_deal?.gone.contains(seat) ?? false) ? HeldSeatState.escrowed : HeldSeatState.held;
   }
 
-  /// The jury draw each hand's deal was sealed to, as this side read it.
-  String? sealedTo(int hand) => _heldFrom[hand];
+  /// The jury draw each hand's deal was sealed to: the record's, once
+  /// the keys that say it have settled here ([_checkSealed]), and until
+  /// then the one this side read.
+  String? sealedTo(int hand) => _sealedTo.containsKey(hand) ? _sealedTo[hand] : _heldFrom[hand];
 
   /// The action this side holds for [turn], if any.
   TableEvent? actionAt(TurnId turn) => _races[turn]?.action;
@@ -1039,29 +1041,6 @@ class TableClient {
     return out;
   }
 
-  /// Whether the hand's first jury has stood long enough here to seal
-  /// a deal to: it settled at least [_juryFirmMs] ago, so a draw that
-  /// belongs before it has had time to arrive.
-  ///
-  /// Or, where no jury has been carried here yet, long enough since
-  /// this side was summoned into one ([_servingSince]). A juror hears
-  /// its summons about a second before the event that drew it, and
-  /// without this it waited out the ten-second escape below instead.
-  bool _juryFirm(int hand) {
-    final drawn = _juriesDrawnFor(hand);
-    final at = drawn.isEmpty ? _servingSince[hand] : _juryAt[drawn.first.event.id];
-    return at != null && clock.nowMs - at >= _juryFirmMs;
-  }
-
-  /// And it is free, which is why it is this rather than nothing.
-  /// Over twenty seeded hands (`tool/time_to_deal.dart`) a sealed
-  /// deal takes the same time at zero, one, two, three and four
-  /// seconds. The spread those numbers used to show — 6.55 s where
-  /// nothing went missing and 15.41 s where something did — was
-  /// never this wait; it was a deal step thrown away for arriving
-  /// just before the jury that vouches for it ([_onAction]), and it
-  /// is gone: every one of the twenty now deals in 6.6 s.
-  static const _juryFirmMs = 2000;
 
   /// Whether this side is the one to say a given-up seat's moves: the
   /// first of the hand's custodians, in the escrow's own order, that
@@ -1201,6 +1180,16 @@ class TableClient {
         // its own seat in the deal, not at this one, so an audit held
         // here would be an audit that never came.
         if (heldHere && !(turn.isAudit && d.gone.contains(seat))) return;
+        // Nor a bot seat's keys before the record has said whether the
+        // jury holds it: a side that dealt its bots in the open for want
+        // of a jury settled their keys with nothing said, and when the
+        // record then sealed the hand to a draw it could not unsettle
+        // them — it sat at the keys of a seat whose holder it now knew
+        // and whose keys it had closed. Offered again once the record
+        // has said ([_checkSealed]). Not a seat whose person left in
+        // this hand: no jury holds that one, and its keys are the ones
+        // anybody computes ([_botSeatsAt]).
+        if (turn.isDeal && turn.dealRound == 0 && !_sealedTo.containsKey(turn.hand) && _botSeatsAt(turn.hand).contains(seat)) return;
         if (_closedTurns.contains(turn)) return;
         _races[turn]!.settled = true;
         _closeTurn(turn);
@@ -1954,6 +1943,7 @@ class TableClient {
       case 0:
         final custodians = [for (final k in b['custodians'] as List) k as String];
         if (!custodians.every(_everProposed.contains)) return false;
+        if (!_keysNameTheDraw(e, seat)) return false;
         return d.verifyKeys(b);
       case 1:
         return d.verifyShuffle(b);
@@ -2014,6 +2004,10 @@ class TableClient {
       return _catchUp(turn);
     }
     if (race == null) return _defer(event); // current, and not open yet
+    // Nor a seat at its keys the record has not yet said is held: which
+    // seats a jury holds, and whose, is the draw the deal is sealed to
+    // ([_checkSealed]).
+    if (turn.isDeal && turn.dealRound == 0 && !_sealedTo.containsKey(turn.hand)) return _defer(event);
     final seat = _turnSeat[turn]!;
     if (event.seat != seat || !_isParticipant(event.author)) return;
     if (botHolders(turn.hand)[seat] == null || _isEscrowed(turn.hand, seat)) return;
@@ -2381,6 +2375,7 @@ class TableClient {
     _trace('settled $turn ${e.kind.name} by ${race.forAction.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
     _liftPause();
     _closeTurn(turn);
+    if (turn.isDeal && turn.dealRound == 0) _checkSealed(turn.hand);
   }
 
   /// The removal wins the race for [turn]: by a majority, or by a
@@ -2402,6 +2397,7 @@ class TableClient {
     _liftPause();
     _botTurn(turn, seat);
     _reconsider();
+    if (turn.isDeal && turn.dealRound == 0) _checkSealed(turn.hand);
   }
 
   /// The escrow wins the race for [turn]: by a majority, or by a
@@ -2614,9 +2610,16 @@ class TableClient {
     final c = crypto!;
     final held = botHolders(game.handNumber);
     _heldByHand[game.handNumber] = held;
-    final drawn = _juriesDrawnFor(game.handNumber);
-    final from = drawn.isNotEmpty ? drawn.first.event.id : _firstSummons[game.handNumber]?.juryId;
+    final from = _sealedTo.containsKey(game.handNumber) ? _sealedTo[game.handNumber] : _provisionalDraw(game.handNumber).id;
     if (from != null) _heldFrom[game.handNumber] = from;
+    // The deal's notion of this side's seat is not the table's: a juror
+    // sits at no seat here and still acts for the bot seat it holds.
+    final me = amSeated
+        ? mySeat
+        : _beforeSummons(game.handNumber)
+            ? null
+            : _seatHeldHere(held);
+    final before = _dealsByHand[game.handNumber];
     _deal = DealSession(
       c,
       tableId: spec.id,
@@ -2633,14 +2636,15 @@ class TableClient {
           },
       ],
       leadCard: twoOfClubs.index,
-      // The deal's notion of this side's seat is not the table's: a
-      // juror sits at no seat here and still acts for the bot seat it
-      // holds.
-      mySeat: amSeated
-          ? mySeat
-          : _beforeSummons(game.handNumber)
-              ? null
-              : _seatHeldHere(held),
+      mySeat: me,
+      // Built again for the same hand and the same seat, the deal goes on
+      // with the secret this side's keys were made from ([_refixHolders]).
+      // A new one put this side's own key apart from the one on the
+      // record — a session keeps its own seat's keys and no other — and
+      // nothing shuffled from the record's could be checked here: a
+      // person whose table was sealed to another draw than it had built
+      // against sat at the next shuffle (sealed_to_draw_test.dart).
+      mySecret: before != null && before.mySeat == me ? before.mySecret : null,
       myKey: signer.publicKey,
       wrap: signer.sharedSecretWith,
       random: _random,
@@ -2680,6 +2684,9 @@ class TableClient {
     // Not yet when the deal is built again ([_refixHolders]): the
     // steps that already settled go back in first.
     if (!drain) return;
+    // A hand with nobody at the table to key it is sealed to no draw at
+    // once ([_checkSealed]); any other waits for its first person's keys.
+    _checkSealed(game.handNumber);
     _drainFuture();
     _bootLiars();
     _actOnDeal();
@@ -2738,6 +2745,13 @@ class TableClient {
   /// one fixed after ([_refixHolders]).
   final Map<int, String> _heldFrom = {};
 
+  /// The draw each hand's deal is sealed to, as the record says it: the
+  /// one named by the keys of the first person at the table whose keys
+  /// for the hand have settled ([_checkSealed]). Null for keys that
+  /// name none, the hand's bot seats dealt in the open. Absent until
+  /// the record has said.
+  final Map<int, String?> _sealedTo = {};
+
 
   /// Who keyed each seat at [hand], by the event that settled its
   /// first deal round.
@@ -2754,26 +2768,135 @@ class TableClient {
     // protect nothing and only take the seat away from the peers that
     // work its moves out between them.
     if (!spec.sealed) return const {};
+    // The record's, once it has said which draw the deal is sealed to.
+    if (_sealedTo.containsKey(hand)) return _asKeyed(hand, _heldAtSeal(hand));
     final fixed = _heldByHand[hand];
     if (fixed != null) return _asKeyed(hand, Map.of(fixed));
-    // In the jury's own drawn order, and across several juries in the
-    // record's ([_juriesDrawnFor]) rather than in the order they
-    // happened to settle here. _jurorsOf is a set whose iteration
-    // order follows this peer's own history, and two peers that saw
-    // the same juries in a different order would hand the same seat to
-    // different jurors — each then rejecting what the other said for
-    // it.
+    return _asKeyed(hand, assignBots(_provisionalDraw(hand).jurors, _botSeatsAt(hand)));
+  }
+
+  /// The holders the draw the record seals [hand] to names.
+  Map<int, PublicKey> _heldAtSeal(int hand) {
+    final jury = _juryById(_sealedTo[hand], hand);
+    return jury == null ? {} : assignBots(jury, _botSeatsAt(hand));
+  }
+
+  /// A draw carried here for [hand], by its event's id.
+  List<PublicKey>? _juryById(String? id, int hand) {
+    if (id == null) return null;
+    for (final d in juries) {
+      if (d.event.id == id && d.event.hand == hand) return d.event.jurors;
+    }
+    return null;
+  }
+
+  /// Whether [jury] can hold every one of [bots]: a draw of fewer than
+  /// [juryToHoldBots] holds none.
+  bool _holdsAll(List<PublicKey> jury, List<int> bots) => assignBots(jury, bots).length == bots.length;
+
+  /// The draw a hand's bot seats are read from here until the record
+  /// says which one its deal is sealed to ([_sealedTo]).
+  ///
+  /// The first drawn for the hand that can hold every bot seat, in the
+  /// order every side reads them ([_juriesDrawnFor]) rather than the
+  /// order they settled here — _jurorsOf is a set whose iteration order
+  /// follows this peer's own history, and two peers that saw the same
+  /// juries in a different order would hand the same seat to different
+  /// jurors. Not a draw that holds nothing: a redraw of three strangers
+  /// proposed from an earlier place than the draw of six, read first,
+  /// put a hand's bot seats in the open at one side while the others
+  /// dealt them to a jury (sealed chaos seed 2, nine strangers).
+  ///
+  /// Or the hand's first jury as the summons gave it, where the event
+  /// that drew it has not been carried here yet ([_firstSummons]). Only
+  /// that one: a juror topped up mid-hand is summoned with the jury as
+  /// it stands then, and reading the seats from that list named a
+  /// different holder for each of them.
+  ({String? id, List<PublicKey> jurors}) _provisionalDraw(int hand) {
+    final bots = _botSeatsAt(hand);
     final drawn = _juriesDrawnFor(hand);
-    // Or the hand's first jury as the summons gave it, where the
-    // event that drew it has not been carried here yet
-    // ([_firstSummons]). Only that one: a juror topped up mid-hand is
-    // summoned with the jury as it stands then, and reading the seats
-    // from that list named a different holder for each of them — it
-    // then made keys nobody wanted and sat out the rest of the hand.
-    final jury = drawn.isNotEmpty
-        ? drawn.first.event.jurors
-        : (_firstSummons[hand]?.jurors ?? const <PublicKey>[]);
-    return _asKeyed(hand, assignBots(jury, _botSeatsAt(hand)));
+    for (final d in drawn) {
+      if (_holdsAll(d.event.jurors, bots)) return (id: d.event.id, jurors: d.event.jurors);
+    }
+    if (drawn.isNotEmpty) return (id: drawn.first.event.id, jurors: drawn.first.event.jurors);
+    final summoned = _firstSummons[hand];
+    return (id: summoned?.juryId, jurors: summoned?.jurors ?? const <PublicKey>[]);
+  }
+
+  /// The draw this side's keys for [hand] name: the record's where it
+  /// has said, and otherwise the one its deal was built against, if
+  /// that holds the bot seats; none where it holds nothing.
+  String? _drawNamed(int hand) {
+    if (_sealedTo.containsKey(hand)) return _sealedTo[hand];
+    final held = _heldByHand[hand];
+    return held != null && held.isNotEmpty ? _heldFrom[hand] : null;
+  }
+
+  /// Whether the record now says which draw [hand]'s deal is sealed to,
+  /// and the deal made to follow it if so.
+  ///
+  /// Each side read the draw for itself, from the juries it had heard,
+  /// and a draw proposed from an earlier place can arrive after one
+  /// proposed from a later place: a step settled on one draw at one
+  /// side and on another at the next, and a hand was sealed to two
+  /// draws (sealed chaos seed 2). The record says it now. Every seat's
+  /// keys name the draw they were sealed to, and the draw named by the
+  /// first person whose keys settle — lowest seat first, passing over a
+  /// person whose turn went to a removal or to the bot their seat
+  /// turned into — is the hand's. A held seat's keys are taken only
+  /// once that has settled, naming the same draw, from the juror it
+  /// names for the seat ([_keysNameTheDraw]); its juror waits for it
+  /// before making them ([_actOnDeal]).
+  void _checkSealed(int hand) {
+    if (!spec.sealed || _sealedTo.containsKey(hand)) return;
+    final bots = _botSeatsAt(hand);
+    String? named;
+    int? by;
+    for (var s = 0; s < seatCount; s++) {
+      if (bots.contains(s)) continue;
+      final turn = TurnId.deal(hand, 0, s);
+      final race = _races[turn];
+      if (race == null || !race.settled) return;
+      final e = race.action;
+      if (_removedAtTurn.contains(turn) || e == null) continue;
+      final jury = e.body['jury'];
+      // A draw not carried here yet: [_settleJury] looks again.
+      if (jury is String && _juryById(jury, hand) == null) return;
+      named = jury is String ? jury : null;
+      by = s;
+      break;
+    }
+    // With no person left to say it — every seat a bot's when the hand
+    // began, a leaver's client looking on — there is no jury to seal to.
+    _sealedTo[hand] = named;
+    _trace('hand $hand: sealed to ${named != null ? 'the draw ${named.substring(0, 8)}' : 'no draw, its bot seats in the open'}'
+        '${by != null ? ', by seat $by\'s keys' : ', with nobody at the table to key it'}');
+    _refixHolders(hand);
+    // A bot seat's keys waited for this ([_botActs]).
+    for (final s in bots) {
+      _takeUpSeat(s);
+    }
+    _drainFuture();
+    _actOnDeal();
+    _notify();
+  }
+
+  /// Whether a seat's keys name a draw this side can take them against:
+  /// a person's, none or a draw carried here that holds every bot seat;
+  /// a held seat's, the draw the record has sealed the hand to, made by
+  /// the juror that draw names for the seat ([_checkSealed]).
+  bool _keysNameTheDraw(TableEvent e, int seat) {
+    final hand = e.turn.hand;
+    final named = e.body['jury'];
+    if (named != null && named is! String) return false;
+    final bots = _botSeatsAt(hand);
+    if (!bots.contains(seat)) {
+      if (named == null) return true;
+      final jury = _juryById(named as String, hand);
+      return jury != null && _holdsAll(jury, bots);
+    }
+    if (!_sealedTo.containsKey(hand) || named != _sealedTo[hand]) return false;
+    return _heldAtSeal(hand)[seat] == e.author;
   }
 
   /// The bot seats a jury holds at [hand]: the ones that were already
@@ -2875,25 +2998,27 @@ class TableClient {
   /// that settled them, so that rebuilding costs nothing already
   /// agreed.
   void _refixHolders(int hand) {
-    final from = _heldFrom[hand];
-    if (from == null) return;
-    final drawn = _juriesDrawnFor(hand);
-    // The record's draw, against the one standing here. They agree
-    // almost always — a juror fixes from its summons a second before
-    // the draw it was summoned into is carried to it — and agreeing
-    // is not worth a rebuild: the assignment is the same, so say the
-    // jury it came from and leave the deal alone.
-    final jury = drawn.isNotEmpty
-        ? drawn.first.event.jurors
-        : (_firstSummons[hand]?.jurors ?? const <PublicKey>[]);
-    if (jury.isEmpty) return;
-    final again = assignBots(jury, _botSeatsAt(hand));
     final standing = _heldByHand[hand];
-    final now = drawn.isNotEmpty ? drawn.first.event.id : from;
-    if (standing != null &&
-        standing.length == again.length &&
-        standing.entries.every((e) => again[e.key] == e.value)) {
-      _heldFrom[hand] = now;
+    if (standing == null) return;
+    final from = _heldFrom[hand];
+    final sealed = _sealedTo.containsKey(hand);
+    // Short of the record's word, a deal dealt with its bots in the
+    // open stays that way: it went ahead for want of a jury, and one
+    // arriving later does not reach back into it.
+    if (!sealed && from == null) return;
+    final draw = sealed
+        ? (id: _sealedTo[hand], jurors: _juryById(_sealedTo[hand], hand) ?? const <PublicKey>[])
+        : _provisionalDraw(hand);
+    if (!sealed && draw.jurors.isEmpty) return;
+    // The draw against the one standing here. They agree almost always
+    // — a juror fixes from its summons a second before the draw it was
+    // summoned into is carried to it — and agreeing is not worth a
+    // rebuild: the assignment is the same, so say the jury it came from
+    // and leave the deal alone.
+    final again = assignBots(draw.jurors, _botSeatsAt(hand));
+    final now = draw.id;
+    if (standing.length == again.length && standing.entries.every((e) => again[e.key] == e.value)) {
+      if (now != null) _heldFrom[hand] = now;
       return;
     }
     // Only a hand still in play here. A hand the table has left — given
@@ -2904,7 +3029,7 @@ class TableClient {
     // hand to this one's jury.
     final d = _deal;
     if (d == null || d.hand != hand || hand != game.handNumber) return;
-    _trace('hand $hand: ${now == from ? 'a seat turned into a bot after' : 'its first jury came after'} '
+    _trace('hand $hand: ${sealed ? 'the record seals it to another draw than' : now == from ? 'a seat turned into a bot after' : 'its first jury came after'} '
         'the bot seats were fixed; they are dealt again');
     _heldByHand.remove(hand);
     _heldFrom.remove(hand);
@@ -3182,39 +3307,20 @@ class TableClient {
       final jurors = _jurorsOf(h);
       final waited = clock.nowMs - _openedAt[keys]!;
       if (jurors.isNotEmpty || presence == null || needsJuror || waited >= 10000) {
-        // A juror does not seal a deal to an assignment it read a
-        // moment ago. The seat it holds comes from the hand's first
-        // jury, and a juror summoned into a redraw hears the redraw
-        // before it is carried the draw that came first: it would
-        // read itself into a seat that is somebody else's, publish
-        // keys for it, and be stuck — the assignment can be put right
-        // ([_refixHolders]) only until a step of the deal has settled,
-        // and its own keys are such a step. A second or two of the
-        // jury standing still is enough for the draw to arrive, and
-        // the ten-second escape above still bounds it.
-        if (!amSeated && !_juryFirm(h) && waited < 10000) return;
-        // And a juror brought on after the hand's first jury makes no
-        // keys for it at all. Its seat's keys were made before it
-        // arrived, by somebody it may not have heard of yet: it was
-        // summoned into a redraw, so the only jury it is sure of is
-        // the redraw, and reading the seats from that names the wrong
-        // holder for every one of them ([botHolders]). It would then
-        // publish keys nobody wants — and the jurors brought on
-        // beside it, computing the same wrong answer, take each
-        // other's for the turn's action and can never be moved off
-        // it, since the first action at a turn stands. Four jurors
-        // topped up mid-hand put two of themselves out of that hand
-        // for good this way.
-        //
-        // What it is here for is a share of the escrow, which the
-        // holders make for it ([_topUpJury]). The deal is not its
-        // business.
-        if (_joinedLate(h)) {
-          _sayOnce(h, 'brought on after hand $h\'s first jury; no keys for seat $me from here');
-          return;
-        }
-        d.custodians = jurors.toList()..sort();
-        _emitDeal(keys, 0, me, d.myKeys()!);
+        // A juror holds a seat by the draw the record seals the hand
+        // to, and makes no keys until the record has said which that is
+        // ([_checkSealed]): read for itself, the draw was wrong for any
+        // juror that heard a redraw before the draw that came first,
+        // and keys made for the wrong seat are a step that settles —
+        // the first action at a turn stands.
+        if (!amSeated && !_sealedTo.containsKey(h)) return;
+        // A held seat's shares are indexed by their custodian's place in
+        // the list, and a newcomer's by its place in the list as it
+        // grows: the same list ([_custodiansNow]), or a top-up made for
+        // one place lands at another. A person's escrow goes by sides,
+        // in no order.
+        d.custodians = amSeated ? (jurors.toList()..sort()) : _custodiansNow(h);
+        _emitDeal(keys, 0, me, {...d.myKeys()!, 'jury': _drawNamed(h)});
       }
     }
     final shuffle = open(TurnId.deal(h, 1, me));
@@ -3342,20 +3448,32 @@ class TableClient {
 
   /// The custodians of this hand's escrow, in the order everyone
   /// computes: the jury the deal was sealed to, then whoever has been
-  /// drawn since, by their jury's event id and sorted within it.
-  /// Append-only, because a custodian's index is its place in this
-  /// list and a newcomer among the others would move every share
-  /// after it (packages/deal, `extendCustodians`).
+  /// drawn since, in the juries' own order ([compareJuries]) and
+  /// sorted within each. Append-only, because a custodian's index is
+  /// its place in this list and a newcomer among the others would move
+  /// every share after it (packages/deal, `extendCustodians`).
   List<PublicKey> _custodiansNow(int hand) {
     final drawn = _juriesDrawnFor(hand);
-    if (drawn.isEmpty) return const [];
-    final out = <PublicKey>[...drawn.first.event.jurors]..sort();
-    for (final d in drawn.skip(1)) {
+    final dealt = _dealtTo(hand);
+    if (drawn.isEmpty && dealt.isEmpty) return const [];
+    final out = <PublicKey>[...dealt]..sort();
+    for (final d in drawn) {
       for (final k in d.event.jurors.toList()..sort()) {
         if (!out.contains(k)) out.add(k);
       }
     }
     return out;
+  }
+
+  /// The jury [hand]'s deal was sealed to: the record's, once it has
+  /// said ([_checkSealed]); until then the one this side reads
+  /// ([_provisionalDraw]). What the escrow's custodians start from, and
+  /// who counts as drawn since. Read as the first draw by order, it was
+  /// another draw than the deal's wherever the record sealed the hand
+  /// to one proposed from a later place.
+  List<PublicKey> _dealtTo(int hand) {
+    if (_sealedTo.containsKey(hand)) return _juryById(_sealedTo[hand], hand) ?? const [];
+    return _provisionalDraw(hand).jurors;
   }
 
   /// Gives whoever has joined the jury a share of every bot seat's
@@ -3428,8 +3546,8 @@ class TableClient {
 
   /// Whether [who] came to the jury after the deal was sealed to it.
   bool _isNewCustodian(int hand, PublicKey who) {
-    final drawn = _juriesDrawnFor(hand);
-    return drawn.isNotEmpty && !drawn.first.event.jurors.contains(who);
+    final dealt = _dealtTo(hand);
+    return dealt.isNotEmpty && !dealt.contains(who);
   }
 
   /// Parts of a new share this side has sent, for a test to look at.
@@ -3524,10 +3642,10 @@ class TableClient {
   /// working.
   static const botActsWithinMs = 3000;
 
-  /// And its deal steps. A deal step is slower and waits on more — the
-  /// keys are held back a moment on purpose so a late draw can still be
-  /// read ([_juryFirmMs]), and a step is checked against things that
-  /// may not have arrived — and it answers at 2.9 s at the ninety-fifth
+  /// And its deal steps. A deal step is slower and waits on more — a
+  /// held seat's keys wait for the record to say which draw the hand is
+  /// sealed to ([_checkSealed]), and a step is checked against things
+  /// that may not have arrived — and it answers at 2.9 s at the ninety-fifth
   /// percentile against a play's 0.16. Ten seconds is three and a half
   /// times that. A held seat that misses it goes to the escrow like one
   /// that misses a card, and a seat given up with deal steps still to
@@ -3672,10 +3790,10 @@ class TableClient {
   /// counted it anyway, took the seat for one the jury could still
   /// open, and sat at its turn saying nothing, for good.
   Set<PublicKey> _pieceHolders(int hand, int seat) {
-    final drawn = _juriesDrawnFor(hand);
-    if (drawn.isEmpty) return const {};
+    final dealt = _dealtTo(hand);
+    if (dealt.isEmpty) return const {};
     final custodians = _custodiansNow(hand);
-    final out = {...drawn.first.event.jurors};
+    final out = {...dealt};
     final sets = <String, Set<int>>{};
     for (final e in _topUps[hand] ?? const <TableEvent>[]) {
       if (e.about != seat) continue;
@@ -3931,6 +4049,7 @@ class TableClient {
       if (_isEscrowed(hand, seat)) continue;
       final turn = _openTurnOf(seat);
       if (turn == null) continue;
+      if (turn.isDeal && turn.dealRound == 0 && !_sealedTo.containsKey(hand)) continue;
       final race = _races[turn]!;
       if (race.action != null || _myWitness.containsKey(turn)) continue;
       if (!_jurorOut(seat)) continue;
@@ -4645,6 +4764,11 @@ class TableClient {
     needsJuror = false;
     _reachOut();
     _refixHolders(e.hand);
+    _checkSealed(e.hand);
+    // And whatever was held back for it: keys name the draw they were
+    // sealed to, and are taken only against a draw carried here
+    // ([_keysNameTheDraw]).
+    _drainFuture();
     // A jury drawn after the deal was sealed adds custodians, and the
     // escrow has to know: an index is a place in that list.
     if (e.hand == game.handNumber) {
@@ -4711,11 +4835,6 @@ class TableClient {
     _notify();
   }
 
-  /// Whether this side came to [hand]'s jury after the hand's first
-  /// jury was drawn: it was summoned to the hand, and never into the
-  /// draw that the seats were dealt to ([_firstSummons]).
-  bool _joinedLate(int hand) => _serving.containsKey(hand) && _firstSummons[hand] == null;
-
   /// Whether [hand] is history to this side: it serves as a juror, and
   /// the hand was over before the first summons that brought it here.
   ///
@@ -4752,9 +4871,9 @@ class TableClient {
   /// on it.
   final Map<int, ({String juryId, List<PublicKey> jurors})> _firstSummons = {};
 
-  /// When this side was first summoned to each hand, for [_juryFirm]:
-  /// a summons is the jury arriving by another road, and it stands as
-  /// long before a deal is sealed to it as a jury event would.
+  /// When this side was first summoned to each hand: a summons is the
+  /// jury arriving by another road, and a juror named in it is live
+  /// from then as one named in a jury event would be ([_liveJurors]).
   final Map<int, int> _servingSince = {};
 
   /// Whether this client is still a juror of the hand in play or one

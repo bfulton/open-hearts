@@ -1,7 +1,8 @@
 /// Random walks through the departure matrix: forty seeds on every
 /// commit. The walk and its invariants live in
 /// lib/src/sim/chaos_walk.dart; `dart run tool/chaos.dart --seeds 250
-/// --sealed 6` walks further, the verifiable deal run for real.
+/// --sealed 6` walks further, the verifiable deal run for real, and
+/// chaos_sealed_test.dart runs the sealed walks that found something.
 library;
 
 import 'package:table/src/sim/sim.dart';

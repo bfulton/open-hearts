@@ -143,7 +143,7 @@ Verification verifyRecord(
 
   /// Every juror the hand ever had, across redraws, filled in as the
   /// juries are checked below. Who *may* act for a bot seat, as
-  /// against [juryOrder], which says who goes first.
+  /// against [sealedAt], which says whose each seat is.
   final jurors = <int, Set<PublicKey>>{};
 
   /// The jurors in force at [hand]: its own, or until it has any, the
@@ -157,63 +157,103 @@ Verification verifyRecord(
     return latest < 0 ? const {} : jurors[latest]!;
   }
 
-  /// The jury in its drawn order, per hand, filled in as the juries
-  /// are checked below. A bot seat's holder comes out of this, and a
-  /// set's iteration order would hand the same seat to different
-  /// jurors here than at the table (docs/04-live-play.md).
-  final juryOrder = <int, List<PublicKey>>{};
+  /// The bot seats a jury holds at [hand], if it holds any: the ones
+  /// that were bots when the hand began. A person who leaves turns
+  /// their seat into one from the next hand, not this one — that hand
+  /// is opened from their escrow in the clear (_botSeatsAt in
+  /// client.dart).
+  List<int> botSeatsAt(int hand) => [
+        for (var s = 0; s < seatCount; s++)
+          if (switch (spec.seats[s]) {
+            HumanSeat(:final key) => (allRemovals[key]?.hand ?? hand) < hand,
+            BotSeat() => true,
+          })
+            s,
+      ];
 
-  /// The jury drawn for [hand] itself, in the draw's order — not the
-  /// one in force, which falls back to an earlier hand's. A bot seat's
-  /// holder is named by its own hand's draw, so that the table and
-  /// this agree on it.
-  List<PublicKey> juryOrderAt(int hand) => juryOrder[hand] ?? const [];
-
-  /// Bot seats that somebody spoke for, by hand: a seat whose steps
-  /// are in the record was held, and one whose are not was everyone's
-  /// to compute. Read from the record rather than from any setting,
-  /// because the record is all a verifier has — it cannot be told how
-  /// the table was configured, only shown what the table did.
-  final spokenFor = <int, Set<int>>{};
-  for (final d in record) {
-    try {
-      // Only the kinds that act *for* a seat. A juror ruling on a seat
-      // carries that seat too, and counting a verdict here would mark
-      // the seat juror-held and then refuse the person's own plays
-      // for it.
-      final k = d.event.kind;
-      if (k != EventKind.deal && k != EventKind.pass && k != EventKind.play) continue;
-      final s = d.event.seat;
-      if (s < 0 || s >= seatCount) continue;
-      // By somebody who is not at the table: a juror. Not filtered on
-      // the seat being a bot's, because holders here is where the
-      // seats started — a seat that becomes a bot in a later hand
-      // would never be counted, and its juror's steps would then be
-      // refused for coming from a juror.
-      if (humans.contains(d.event.author)) continue;
-      spokenFor.putIfAbsent(d.turn.hand, () => {}).add(s);
-    } catch (_) {}
-  }
-  // And a seat claimed for the escrow: the table only gives a held seat
-  // to the escrow, and one given up before its juror said a word — a
-  // hand stopped at its keys — has nothing else in the record to show
-  // it was held.
-  for (final d in record) {
-    try {
-      if (!d.removal || d.event.kind != EventKind.escrow) continue;
-      final s = d.event.seat;
-      if (s >= 0 && s < seatCount) spokenFor.putIfAbsent(d.turn.hand, () => {}).add(s);
-    } catch (_) {}
+  /// A draw the hand carried, by its event's id.
+  List<PublicKey>? juryById(String id, int hand) {
+    for (final d in juries) {
+      if (d.event.id == id && d.event.hand == hand) return d.event.jurors;
+    }
+    return null;
   }
 
-  /// Which juror holds which bot seat at [hand] — the same assignment
-  /// the table computed, from the same jury, and only for the seats
-  /// the record shows were spoken for.
+  /// The draw each hand's deal was sealed to, as the table reads it
+  /// (_checkSealed in client.dart): named by the keys of the first
+  /// person at the table, lowest seat first, whose keys for the hand
+  /// are on the record — passing over a person removed at or before
+  /// their own keys. Null where those keys name none, or there is
+  /// nobody at the table to key the hand, its bot seats dealt in the
+  /// open; not [said] where the record stops before them.
+  final sealed = <int, ({bool said, String? jury})>{};
+  ({bool said, String? jury}) sealedAt(int hand) => sealed.putIfAbsent(hand, () {
+        final bots = botSeatsAt(hand);
+        for (var s = 0; s < seatCount; s++) {
+          if (bots.contains(s)) continue;
+          final turn = TurnId.deal(hand, 0, s);
+          for (final d in record) {
+            if (d.removal || d.turn != turn || d.event.kind != EventKind.deal) continue;
+            final named = d.event.body['jury'];
+            return (said: true, jury: named is String ? named : null);
+          }
+          final out = allRemovals[(spec.seats[s] as HumanSeat).key];
+          if (out != null && out.hand == hand && out.position <= turn.position) continue;
+          return (said: false, jury: null);
+        }
+        // Nobody at the table to key it: sealed to no draw.
+        return (said: true, jury: null);
+      });
+
+  /// Which juror holds which bot seat at [hand]: the draw the hand's
+  /// deal was sealed to, read as the table reads it ([sealedAt]).
   Map<int, PublicKey> heldAt(int hand) {
-    final spoken = spokenFor[hand] ?? const <int>{};
-    if (spoken.isEmpty) return const {};
-    final all = assignBots(juryOrderAt(hand), [for (var s = 0; s < seatCount; s++) if (holders[s] is BotSeat) s]);
-    return {for (final e in all.entries) if (spoken.contains(e.key)) e.key: e.value};
+    final at = sealedAt(hand);
+    final jury = at.jury == null ? null : juryById(at.jury!, hand);
+    return jury == null ? const {} : assignBots(jury, botSeatsAt(hand));
+  }
+
+  /// The custodians of [hand]'s escrow, as the table orders them
+  /// (_custodiansNow in client.dart): the draw the deal was sealed to,
+  /// then whoever the hand's other draws brought in, in the juries'
+  /// own order ([compareJuries]) and sorted within each. A seat's
+  /// pieces are indexed by this list, a topped-up juror's among them,
+  /// and a piece that juror releases counts only where its place is
+  /// known.
+  List<PublicKey> custodiansNow(int hand) {
+    final at = sealedAt(hand);
+    final dealt = at.jury == null ? null : juryById(at.jury!, hand);
+    final out = <PublicKey>[...?dealt]..sort();
+    for (final d in juries.where((d) => d.event.hand == hand).toList()..sort(compareJuries)) {
+      for (final k in d.event.jurors.toList()..sort()) {
+        if (!out.contains(k)) out.add(k);
+      }
+    }
+    return out;
+  }
+
+  /// Why a seat's keys are not sealed where the table would take them
+  /// (_keysNameTheDraw in client.dart), or null: a person's name none,
+  /// or a draw the hand carried that holds every bot seat; a held
+  /// seat's name the draw the hand was sealed to, and come from the
+  /// juror that draw names for the seat.
+  String? keysNameTheDraw(TableEvent e, int seat, int hand) {
+    final named = e.body['jury'];
+    if (named != null && named is! String) return 'hand $hand: seat $seat\'s keys name a draw that is not one';
+    final bots = botSeatsAt(hand);
+    if (!bots.contains(seat)) {
+      if (named == null) return null;
+      final jury = juryById(named as String, hand);
+      if (jury == null) return 'hand $hand: seat $seat\'s keys are sealed to a draw the hand never carried';
+      if (assignBots(jury, bots).length != bots.length) {
+        return 'hand $hand: seat $seat\'s keys are sealed to a draw too small to hold the bot seats';
+      }
+      return null;
+    }
+    final at = sealedAt(hand);
+    if (!at.said || named != at.jury) return 'hand $hand: seat $seat\'s keys are sealed to another draw than the hand\'s';
+    if (heldAt(hand)[seat] != e.author) return 'hand $hand: seat $seat keyed by a juror the hand\'s draw does not name for it';
+    return null;
   }
 
   /// Who said each held seat's keys, by hand: the seat's own juror from
@@ -361,14 +401,6 @@ Verification verifyRecord(
       return fail('a jury for hand ${e.hand} without a majority behind it (${d.witnesses.length} of ${d.among.length})');
     }
     jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
-  }
-
-  // The first jury drawn for each hand, in the table's order
-  // ([compareJuries]): a bot seat's holder is named by the draw the hand
-  // opened with, and a redraw later in the hand moves the jury without
-  // moving the seat.
-  for (final d in juries.toList()..sort(compareJuries)) {
-    juryOrder.putIfAbsent(d.event.hand, () => d.event.jurors);
   }
 
   /// Whether [d] is carried by a verdict: a juror of the hand ruled
@@ -641,6 +673,10 @@ Verification verifyRecord(
       final (dec, whyNot) = takeAction(next.turn, seat, EventKind.deal);
       if (whyNot != null) return fail(whyNot);
       if (dec == null) return partial();
+      if (round == 0) {
+        final why = keysNameTheDraw(e, seat, game.handNumber);
+        if (why != null) return fail(why);
+      }
       final b = Map<String, Object?>.from(e.body);
       final ok = switch (round) {
         0 => d.acceptKeys(b),
@@ -649,6 +685,14 @@ Verification verifyRecord(
         _ => d.acceptDeclaration(b),
       };
       if (!ok) return fail('hand ${game.handNumber}: a deal step by seat $seat that does not verify (round $round)');
+      // A held seat's custodians grow as the hand's jury is topped up,
+      // at the table as each draw carries (_growCustodians in
+      // client.dart). A newcomer's piece is released like any other,
+      // and one this side could not place was taken for nobody's: a
+      // seat given to the escrow, opened at the table from a topped-up
+      // juror's piece and another, was never opened here (sealed chaos
+      // seed 10, nine strangers).
+      if (round == 0 && heldAt(game.handNumber).containsKey(seat)) d.extendCustodians(seat, custodiansNow(game.handNumber));
       continue;
     }
     if (game.phase == Phase.passing) {

@@ -1213,8 +1213,12 @@ strength rather than merely kept alive — both the proposer and the
 peers backing a proposal ask for `jurySize` live, where they used to
 ask for two — and whoever is drawn is given a share of every bot seat
 by two of the holders, each sending what its own share is worth
-towards the newcomer's index. The parts are carried forward with the
-rest of the record, since the peer that most needs one is the one
+towards the newcomer's index. The seat's own juror can be one of the
+two: it keeps the share its keys made out to its own place, as the
+others keep theirs. Until it did, a pair that named it was one part
+short for good, and the newcomer held nothing
+(`packages/table/test/top_up_test.dart`). The parts are carried
+forward with the rest of the record, since the peer that most needs one is the one
 furthest behind. A juror summoned mid-hand takes its parts up, holds a
 piece of an escrow it was never sealed to, and carries the hand to its
 end (`packages/table/test/top_up_test.dart`).
@@ -1244,7 +1248,9 @@ Six things had to be true for that, and none of them was:
   action — after which the first action a turn ever saw is the one
   that stands, and the true one can never displace it. What a juror
   brought on late is there for is a share of the escrow, not to help
-  build a deal that is finished, so it makes no step of one.
+  build a deal that is finished, so it made no step of one — until the
+  record said which draw the deal is sealed to, and so whether it holds
+  a seat at all ([doc 07](07-states.md), "The draw on the record").
 - The assignment **could not be put right once a step had settled**,
   which is the guard below and was the thing keeping a late juror
   wrong. A settled turn was never opened again, so a rebuilt session
@@ -1287,9 +1293,10 @@ with nine strangers to draw from). Both read one order now
 proposed it, then the id (`packages/table/test/jury_order_test.dart`).
 That is still each side reading the draws it has heard, though. A draw
 proposed earlier can arrive after a step has settled on a later one,
-and sides then seal one hand to two draws (seed 2); which draw a deal
-is sealed to is the next thing to put on the record
-([doc 07](07-states.md), "Decided here").
+and sides then seal one hand to two draws (seed 2). So which draw a
+deal is sealed to is on the record now, and the verifier reads the draw
+the record names rather than ordering the juries at all
+([doc 07](07-states.md), "The draw on the record").
 
 **Which seats are bots is the other half of that**, and it was still
 being read off the seat list as it stood at the instant the
@@ -1781,9 +1788,13 @@ On the wire:
   online, and says on the table that it is waiting. That juror draws the
   seat's key, takes its turns in the deal, says its pass and its
   plays, and publishes its secret at the audit with everyone else's.
-  The assignment is frozen at the hand's first jury (`botHolders`), so
-  a jury redrawn mid-hand moves permission — which juror may act for
-  the seat — without moving the seat itself. When a holder is gone, or
+  The assignment is the draw the hand's deal is sealed to, and the
+  record says which: every seat's keys name the draw they were sealed
+  to, and the first person's keys to settle name the hand's
+  (`_checkSealed`; [doc 07](07-states.md), "The draw on the record").
+  A held seat's juror keys it only once that has settled, and a jury
+  redrawn mid-hand moves permission — which juror may act for the
+  seat — without moving the seat itself. When a holder is gone, or
   out of time on the seat's turn, the people claim the seat for the
   escrow and carry the claim as they carry a boot; another juror
   rebuilds the seat from the escrow and plays on. The verifier

@@ -104,7 +104,7 @@ playing ──last trick──▶ auditing ──every audit──▶ over
 
 | From | To | Decided |
 |---|---|---|
-| awaitingJury | dealing | **here** — the draws are on the record, but a deal is sealed to whichever draw arrived here first (held back 2 s for a late one), and at 40 s the table deals its bot seats in the open |
+| awaitingJury | dealing | on the record — every seat's keys name the draw they are sealed to, and the hand's is the one the first person to key it named, lowest seat first: none where that person dealt the bot seats in the open, at 40 s without a jury able to hold them |
 | dealing | passing, playing, opening | from the record |
 | dealing | abandoned | from the record — follows from the escrow of a held seat that still owed a step, which a side behind is carried to; the verifier asks for it |
 | passing | playing | from the record |
@@ -212,17 +212,17 @@ escrow on the record").
 
 Seven transitions when this was written. The escrow is on the record
 now, and the abandoned hand and the escrowed seat's audit follow from
-it (below, "The escrow on the record"). What is still decided here,
-and the rules that exist only because it is not on the record:
+it (below, "The escrow on the record"); so are the draw a deal is
+sealed to and, with it, the fall-back to bot seats in the open (below,
+"The draw on the record"). What is still decided here, and the rules
+that exist only because it is not on the record:
 
 | Decided here | What it has cost | Rules standing in for a record |
 |---|---|---|
-| Which draw a deal is sealed to | holders read from different juries while a draw is in flight, for two seconds in most top-up runs (below); and one hand sealed to two draws, where a draw proposed earlier arrived after a step had settled on a later one (sealed chaos seed 2 with nine strangers to draw from, `tool/chaos.dart --jurors 9`) | `_juryFirmMs` (2 s), `_refixHolders` |
-| Bot seats dealt in the open at 40 s | not seen; two sides judging the 40 s differently would deal one hand two ways | — |
 | The game ended for a lost quorum | the people ending it up to five seconds apart, and the last juror not told (below). It is said now: a juror stops on hearing it, and a person stopped at the same turn ends with it | the two minutes a side that hears too little of the table waits |
 | Which way a seat left, where a leave crosses a boot | the people and the jurors holding different records to the end of a game (below) | `_onLeave` passing over a leave for a seat already removed |
 
-The three rows that are gone read:
+The five rows that are gone read:
 
 - a held seat given to the escrow, which had cost two jurors playing
   the same card for one seat, settled only by the jury's rule for two
@@ -233,11 +233,24 @@ The three rows that are gone read:
   table had left, and jurors cut off abandoning a hand the table
   played;
 - an escrowed seat's audit closed silently, which had cost the audit
-  case above.
+  case above;
+- the draw a deal is sealed to, which had cost holders read from
+  different juries while a draw was in flight, for two seconds in most
+  top-up runs, and one hand sealed to two draws, where a draw proposed
+  from an earlier place arrived after a step had settled on a later
+  one (sealed chaos seed 2 with nine strangers to draw from,
+  `tool/chaos.dart --jurors 9`);
+- bot seats dealt in the open after forty seconds without a jury able
+  to hold them, which had not been seen to cost anything, and would
+  have dealt one hand two ways at two sides judging the forty seconds
+  differently.
 
 The rules that stood in for them were `_holderStillAudits`,
 `_auditLeftBehind`, `_dealLeftBehind` and the verifier's
-`heldSeatOwes`, all gone. The two-voices rule stays, for a different
+`heldSeatOwes`; and for the draw, the two seconds a juror waited for
+it to stand still (`_juryFirmMs`) and a juror brought on after a
+hand's first jury making no keys for it. All gone. `_refixHolders`
+stays, following the record now rather than the latest draw heard. The two-voices rule stays, for a different
 reason: a move by the seat's juror that lands after the escrow is as
 good as the escrow's own. So does the ten-second cap in `_arriving`,
 which was listed with the abandoned hand: it tells a juror that has
@@ -492,6 +505,99 @@ every walk and every run held, and what is read is what was read with
 them — nothing stuck and nothing apart at the end among sides still
 playing, in the walk or in any scenario.
 
+## The draw on the record
+
+The fourth of the seven, taken ahead of the third: the chaos walk
+drawing from nine strangers rather than four found it failing
+(`tool/chaos.dart --jurors 9`), in sealed seed 2, and in seed 3 once
+jurors were let go of and summoned again, as the duty does
+(`--sweep`).
+
+A hand's bot seats are held by the draw its deal is sealed to, and each
+side read that for itself: the first draw of the hand it had heard, by
+where each was proposed, with two seconds for a late draw to arrive
+and a rebuild of the deal when one did. Where a draw was proposed is
+its proposer's own place, though, not a time. A redraw of three
+strangers, too few to hold anything, proposed from the first person's
+place after the table had dealt to a draw of six from the second
+person's, read as the hand's first. Sides then dealt the bots in the
+open or to the six by what they had heard; a juror had keyed a seat,
+which settles and does not come back; and the hand stopped at a seat
+whose keys nobody would make.
+
+Now the record says it. Every seat's keys name the draw they were
+sealed to — the draw's event id, or none — and the draw named by the
+keys of the first person to key the hand is the hand's, at every side
+and at the verifier: lowest seat first, passing over a person removed
+at their keys or gone before them. A person's keys name a draw carried
+where they are taken that can hold every bot seat, or none. A hand
+nobody at the table can key — every seat a bot's, a leaver's client
+looking on — is sealed to none. Until the first person's keys have
+settled at a side:
+
+- a held seat's juror makes no keys, and its time for them has not
+  started;
+- no side takes a held seat's keys, and afterwards takes them only
+  naming the same draw, from the juror that draw names for the seat;
+- no bot seat's keys are settled with nothing said. Whether the jury
+  holds a seat is the draw's to say, and a side that had dealt its bots
+  in the open for want of a jury, and settled their keys, could not
+  take that back when the record sealed the hand to a draw: it sat at
+  the keys of a seat whose holder it now knew;
+- nobody claims a held seat for the escrow at its keys, and a claim
+  that comes is kept for when the record has said: a claim names the
+  seat, not the juror, so one made against a guessed holder counts
+  against the real one.
+
+Building it found one more thing, and it is a test now: keys that
+arrive before the draw they name has been carried at a side were kept
+but never looked at again. Held-back steps were taken up when a draw
+was proposed, not when it carried, so every juror summoned a moment
+after its table's jury carried sat at the keys, and each of its seats
+went to the escrow (`packages/table/test/sealed_to_draw_test.dart`).
+
+The escrow's custodians are the same story one level down, and the
+nine-stranger walk found that too. A held seat's pieces are indexed by
+each custodian's place in a list that starts with the jury the deal
+was sealed to and grows as the jury is topped up; the list started
+from the first draw by order, and a held seat's keys sealed their
+pieces to every draw heard by then, sorted, which is another order
+again. Both read the record's draw now, and a juror's keys seal to the
+list itself. And the verifier never grew the list at all: a piece
+released by a juror brought on in a top-up counted for nobody, and a
+seat the table had opened from such a piece and one other did not
+open for it (sealed seed 10, `packages/table/test/top_up_test.dart`).
+It grows a held seat's custodians as the table does, in the juries'
+own order.
+
+A test of the top-up after a seat's keys found one more, older than
+any of this. A newcomer's share is made by the first two custodians
+still heard, and the seat's own juror is a custodian with no share of
+its seat: it holds the whole secret, and its session had kept neither
+its own share nor the list of who the others went to. Where it was one
+of the two, the newcomer was sent one part of every pair and never the
+other, for as long as the hand lasted. It keeps both now
+(`packages/deal`, `myKeys`).
+
+Which leaves one thing decided by arrival: the table grows the list as
+each redraw carries, and two redraws of one hand carried in the other
+order at two sides would give their newcomers different places. The
+juries' own order and the order they carry in have agreed in every
+walk and run so far; it goes on the list below.
+
+The fall-back to bot seats in the open comes with the draw. A person
+whose table has had no jury able to hold the bot seats for forty
+seconds deals without one, and its keys then name no draw; where those
+are the first person's keys, that is the hand's, and every side deals
+the bots in the open, a side that had a jury by then included. Two
+sides judging the forty seconds differently now deal one hand one way.
+
+It costs one round trip in the deal. A juror's keys now wait for the
+first person's to settle, where the two seconds it used to wait ran
+beside the people's own steps: 6.90 s to the first card on average
+over twenty seeded hands at a jury of ten, against 6.60 before
+(`tool/time_to_deal.dart --seeds 20`).
+
 ## Next
 
 The step after this document puts the seven transitions on the
@@ -500,10 +606,15 @@ record, in this order:
 2. the abandoned hand and the escrowed audit — done (above);
 3. the lost-quorum ending;
 4. the jury draw a deal is sealed to, read in record order rather than
-   arrival order;
-5. the open-bots fall-back;
+   arrival order — done (above, "The draw on the record"), ahead of
+   the third, since a walk found it failing;
+5. the open-bots fall-back — done with the fourth: the first person's
+   keys naming no draw are the fall-back, on the record;
 6. the leave, settled in the seat's turn as a boot is, so that a leave
-   and a boot at one seat are one race with one winner.
+   and a boot at one seat are one race with one winner;
+7. found on the way, and decided the same way as the draw was: the
+   order a hand's redraws add their newcomers to the escrow's
+   custodians in (above, "The draw on the record").
 
 Each would be settled the way a boot is, and each would remove the
 guessing rules it stands behind. The checker above goes from

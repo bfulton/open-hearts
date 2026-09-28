@@ -346,6 +346,12 @@ class DealSession {
 
   Uint8List? pkOf(int seat) => _pks[seat];
 
+  /// This side's own seat's secret, for a session built again for the
+  /// same hand to go on with: the keys already said are this secret's,
+  /// and a session drawing another would hold its own seat's key apart
+  /// from everybody else's.
+  Uint8List? get mySecret => mySeat == null ? null : _secrets[mySeat!];
+
   /// The seat's hand as this side knows it — every card, or null for a
   /// person's hand not opened here.
   List<int>? handOf(int seat) {
@@ -470,8 +476,18 @@ class DealSession {
         // A share's index is its custodian's place in the list,
         // counted from one, which is what the coefficients need.
         final shares = crypto.shareBytes(secret, n: custodians.length, t: escrowThreshold, seed: _seed('escrow', me));
+        // The seat's own juror is one of the custodians, and keeps the
+        // share made out to its place as each of the others keeps
+        // theirs from these keys. It holds the whole secret besides,
+        // which is no use to a newcomer: a newcomer's share is made from
+        // the shares of whichever custodians are first still heard, and
+        // one of them holding no share left the set short for good —
+        // the parts came from the others and never from it.
+        final mine = myKey == null ? -1 : custodians.indexOf(myKey!);
         for (var i = 0; i < custodians.length; i++) {
-          custody.add(_b64(_wrapFor(custodians[i], Uint8List.sublistView(shares, i * secret.length, (i + 1) * secret.length), me)));
+          final share = Uint8List.sublistView(shares, i * secret.length, (i + 1) * secret.length);
+          custody.add(_b64(_wrapFor(custodians[i], share, me)));
+          if (i == mine) _myPieceOf[me] = Uint8List.fromList(share);
         }
       } else {
         // A person's seat splits across the other people and the
@@ -515,6 +531,10 @@ class DealSession {
         pieces['${others[i]}'] = _b64(_wrapFor(_keyOf(others[i]), piece, me));
       }
     }
+    // And who they went to, as every other side learns it from these
+    // keys ([acceptKeys]), so that this seat's list can grow as theirs
+    // does and its own share be weighed at its place in it.
+    _custodiansOf[me] = List.of(custodians);
     return _myKeysMessage = {
       'seat': me,
       'pk': _b64(_pks[me]!),
