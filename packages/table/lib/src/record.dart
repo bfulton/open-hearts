@@ -228,8 +228,10 @@ Verification verifyRecord(
   }
 
   /// The held seats the record has given to the escrow, by hand, as
-  /// far as the replay has come ([takeRemovals]).
+  /// far as the replay has come ([takeRemovals]); and those given up at
+  /// one of their deal steps.
   final escrowedAt = <int, Set<int>>{};
+  final escrowedInDeal = <int, Set<int>>{};
 
   /// Whether [who] may act for [seat] at [hand]: the person sitting
   /// there, or the juror holding it when it is a bot seat the jury
@@ -459,6 +461,7 @@ Verification verifyRecord(
           return 'an escrow of seat $seat at ${d.turn} without a majority behind it (${d.witnesses.length} of ${d.among.length})';
         }
         escrowedAt.putIfAbsent(d.turn.hand, () => {}).add(seat);
+        if (d.turn.isDeal) escrowedInDeal.putIfAbsent(d.turn.hand, () => {}).add(seat);
         if (d.turn.hand == game.handNumber) deal?.seatLeft(seat);
         continue;
       }
@@ -536,42 +539,14 @@ Verification verifyRecord(
     return null;
   }
 
-  /// Whether a bot seat a juror holds still has a step of [d] to take
-  /// — any step, not only one of the round the deal is at. The table
-  /// gives the hand up for a held seat that goes with anything of the
-  /// deal still to come (_carryEscrow in client.dart), and the
-  /// seat's last step is its word on the lead card.
-  bool heldSeatOwes(DealSession d) {
-    final hand = game.handNumber;
-    if (heldAt(hand).keys.any((s) => !d.hasDeclared(s))) return true;
-    // Or a seat whose juror never said a word of the hand. The replay
-    // takes a seat nobody spoke for as one nobody held, and works its
-    // keys out in public — but the hand's draw named a juror for it,
-    // and a table stopped at the keys was waiting on that juror's.
-    // Only at the keys: a hand that got as far as a shuffle had every
-    // seat's keys, so no seat there was waiting on a juror's first
-    // word. And nothing is lost by giving such a hand up; with keys
-    // still owed there is not yet a deck, let alone a card anybody
-    // has seen.
-    for (var i = index - 1; i >= 0 && record[i].turn.hand == hand; i--) {
-      final t = record[i].turn;
-      if (t.isDeal && t.dealRound > 0) return false;
-    }
-    final spoken = spokenFor[hand] ?? const <int>{};
-    // The seats that were bots as the hand began, as the table reads
-    // them (_botSeatsAt in client.dart): a person removed in this hand
-    // is a bot now, and not one the draw was ever asked to hold.
-    bool botAtStart(int s) {
-      if (holders[s] is! BotSeat) return false;
-      final was = spec.seats[s];
-      if (was is! HumanSeat) return true;
-      final at = removedAt[was.key];
-      return at != null && at.hand < hand;
-    }
-
-    final drawn = assignBots(juryOrderAt(hand), [for (var s = 0; s < seatCount; s++) if (botAtStart(s)) s]);
-    return drawn.keys.any((s) => !spoken.contains(s));
-  }
+  /// Whether the record gives the hand up in its deal: a held seat
+  /// given to the escrow at one of its own deal steps, with a step of
+  /// the deal still to take — its word on the lead card is the last.
+  /// Nobody else can take it (its juror drew the key), and the table
+  /// gives the hand up (_carryEscrow in client.dart). The escrow is on
+  /// the record; nothing here is worked out from what is missing.
+  bool givenUpUndealt(DealSession d) =>
+      (escrowedInDeal[game.handNumber] ?? const <int>{}).any((s) => !d.hasDeclared(s));
 
   var incomplete = false;
 
@@ -599,13 +574,14 @@ Verification verifyRecord(
           // is a hand over, not a deal left unfinished
           // (docs/04-live-play.md, "When quorum is lost anyway").
           //
-          // Only where a held seat is what the deal is waiting on.
-          // Every other step has somebody to take it: a person's is
-          // theirs until they are removed, and the record shows the
-          // removal; a seat nobody holds is worked out by everyone.
-          // And nothing of the hand was passed or played, so there is
-          // nothing to check of it beyond the steps that were said.
-          if (index < record.length && record[index].turn.hand > game.handNumber && heldSeatOwes(d)) {
+          // Only where the record gives a held seat to the escrow with
+          // a step of the deal still owed. Every other step has
+          // somebody to take it: a person's is theirs until they are
+          // removed, and the record shows the removal; a seat nobody
+          // holds is worked out by everyone. And nothing of the hand
+          // was passed or played, so there is nothing to check of it
+          // beyond the steps that were said.
+          if (index < record.length && record[index].turn.hand > game.handNumber && givenUpUndealt(d)) {
             game.abandonHand();
             deal = null;
             continue;

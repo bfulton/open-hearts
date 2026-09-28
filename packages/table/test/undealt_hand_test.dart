@@ -83,6 +83,14 @@ void main() {
         expect(v.ok, isTrue, reason: v.reason);
         expect(v.complete, isTrue, reason: v.reason);
       }
+      // And only with the escrow that gave it up on the record: without
+      // it, a record walking away from a deal is a hand somebody did not
+      // want dealt, whatever the deal was still waiting for.
+      final without = [...c.record]..removeWhere((d) => d.removal && d.event.kind == EventKind.escrow && d.turn.hand == hand);
+      expect(without.length, lessThan(c.record.length), reason: 'the escrow is on the record');
+      final v = verifyRecord(t.spec, without, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok, isFalse);
+      expect(v.reason, contains('not complete'));
 
       t.stop();
     }, timeout: const Timeout(Duration(minutes: 10)));
@@ -225,6 +233,52 @@ void main() {
         reason: 'the game was played out: ${c.describe()}');
     for (final c in t.clients) {
       final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok && v.complete, isTrue, reason: v.reason);
+    }
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  // Carried to the escrow that gave the hand up, from wherever it
+  // stopped. A person who missed the claims is still at the turn the
+  // hand stopped at — the first shuffle, where the held seat is the
+  // first to shuffle — and it is only told what it missed from what the
+  // others settled there, which for a hand given up at that turn is
+  // nothing: it waited there for good while the table dealt on. What
+  // decided the hand is the escrow, and that is what it is told.
+  test('a person who missed the escrow that gave the hand up at its first shuffle is carried to it', () {
+    final t = SimTable(humans: 3, seed: 9, crypto: crypto, jurors: jurySize + 2, target: 1, botsFirst: true);
+    t.start();
+    final a = t.clients.first;
+    final c = t.clients.last;
+    expect(t.clock.runUntil(() => a.keyedBy(a.game.handNumber).containsKey(0), limitMs: 2 * 60 * 1000), isTrue,
+        reason: 'seat 0\'s keys are out: ${a.describe()}');
+    final hand = a.game.handNumber;
+    final holder = a.botHolders(hand)[0]!;
+    t.net.goOffline(holder);
+    // Every claim for the escrow, and every witness to one, kept from c
+    // until the others have been at the next hand for five seconds.
+    final claims = <String>{};
+    int? until;
+    t.net.steer = (from, to, message) {
+      final kind = message['kind'];
+      final body = message['body'] as Map<String, Object?>;
+      if (kind == 'escrow') {
+        claims.add(message['id'] as String);
+      } else if (kind != 'witness' || !claims.contains(body['event'])) {
+        return null;
+      }
+      if (to != c.signer.publicKey || from == c.signer.publicKey) return null;
+      if (a.game.handNumber > hand) until ??= t.clock.nowMs + 5000;
+      return until == null || t.clock.nowMs < until! ? -1 : null;
+    };
+    expect(t.clock.runUntil(() => t.clients.every((x) => x.done), limitMs: 10 * 60 * 1000), isTrue,
+        reason: 'the game was played out:\n${t.clients.map((x) => x.describe()).join('\n')}');
+    expect(until, isNotNull, reason: 'the others gave the hand up without c');
+    expect(c.amSeated, isTrue, reason: 'c was not left behind and put out');
+    expect(c.escrowedAt(hand), a.escrowedAt(hand));
+    for (final x in t.clients) {
+      expect(x.record.map((d) => d.key).toList(), a.record.map((d) => d.key).toList(), reason: 'one record');
+      final v = verifyRecord(t.spec, x.record, juries: x.juries, crypto: crypto, releases: x.releases);
       expect(v.ok && v.complete, isTrue, reason: v.reason);
     }
     t.stop();

@@ -1042,91 +1042,6 @@ class TableClient {
     return [...order.where((k) => k != held), ...order.where((k) => k == held)];
   }
 
-  /// A bot seat's audit still open at a juror while the table has
-  /// moved on to a later hand.
-  ///
-  /// The table settles a given-up seat's audit with nothing said
-  /// ([_botActs]): its secret is out in the clear once the hand is
-  /// over. A juror that did not see the seat given up — its own juror,
-  /// only late where the others judged it gone, or one summoned for the
-  /// next hand and carried in behind — waits for that audit to be said
-  /// and witnessed, and it never will be; carrying it forward carries
-  /// what was decided, which for a turn settled with nothing said is
-  /// nothing. It stayed at that audit while the table dealt on without
-  /// it, and in the next hand whose draw gave it a seat the table
-  /// waited on that seat's keys with every juror heartbeating
-  /// (test/audit_left_behind_test.dart, sealed chaos seed 5).
-  ///
-  /// A majority of the participants heard from at a later hand have
-  /// settled every turn of this one, so a bot seat's audit this side
-  /// still has open was settled there without anything said: settled
-  /// here the same way, which leaves the same record as theirs. Only a
-  /// bot seat's: a person's audit is always said, and carrying brings
-  /// it.
-  void _auditLeftBehind() {
-    final h = game.handNumber;
-    if (!(game.phase == Phase.handOver || game.phase == Phase.gameOver || _openingAudit)) return;
-    final of = participants;
-    final past = of.where((k) => (_lastPosition[k]?.$1 ?? -1) > h).length;
-    if (of.isEmpty || past < _majority(of)) return;
-    // After a few seconds of it: a juror only a moment behind is about
-    // to be carried the decisions it lacks, and one settled here with
-    // nothing said would leave its record short of one that was.
-    final since = _tablePastSince.putIfAbsent(h, () => clock.nowMs);
-    if (clock.nowMs - since < 5000) return;
-    for (var s = 0; s < seatCount; s++) {
-      if (holders[s] is! BotSeat) continue;
-      final t = TurnId.audit(h, s);
-      final race = _races[t];
-      if (race == null || race.settled) continue;
-      _trace('the table is past hand $h without $t: settled here as it was there, with nothing said');
-      race.settled = true;
-      _closeTurn(t);
-    }
-  }
-
-  /// A hand's deal this side is still in, short of a held seat's step,
-  /// while the table has moved on to a later hand.
-  ///
-  /// A hand given up in its deal is on the record as the escrow that
-  /// gave it up ([_carryEscrow]), and a peer carried in behind is
-  /// carried to that. Before that was so, it left nothing in the
-  /// record: each side judged it for itself, and a peer carried in
-  /// behind — a juror drawn for the next hand, one back from being cut
-  /// off — replayed the deal as far as it went and then waited, on its
-  /// own clock, for the step that never came. Where the seat's holder went
-  /// silent, that clock is half a minute from when the jury naming the
-  /// holder reached this side ([_liveJurors]), which for a newcomer is
-  /// now. Meanwhile the table, dealing the next hand with a seat that
-  /// newcomer holds, waits for it only while it is seen to move
-  /// ([_arriving]), and gave that hand up too.
-  ///
-  /// A majority of the participants heard at a later hand have finished
-  /// this one, and a deal they finished is carried here within seconds.
-  /// So a deal still short of a held seat's step after a few seconds of
-  /// that was given up there, and is given up here the same way — the
-  /// inference the verifier makes from the record (record.dart,
-  /// heldSeatOwes). Both stay behind the escrow on the record until the
-  /// abandoned hand is taken from it alone (docs/07-states.md, "Next").
-  void _dealLeftBehind() {
-    if (game.phase != Phase.dealing || _deal == null) return;
-    final h = game.handNumber;
-    final of = participants;
-    final past = of.where((k) => (_lastPosition[k]?.$1 ?? -1) > h).length;
-    if (of.isEmpty || past < _majority(of)) return;
-    final since = _tablePastSince.putIfAbsent(h, () => clock.nowMs);
-    if (clock.nowMs - since < 5000) return;
-    for (final seat in botHolders(h).keys) {
-      if (_races[TurnId.deal(h, TurnId.dealRounds - 1, seat)]?.settled == true) continue;
-      _trace('the table is past hand $h, whose deal is short here of seat $seat\'s steps: given up here as it was there');
-      return _giveUpUndealtHand(seat);
-    }
-  }
-
-  /// When this side first saw a majority of the participants past each
-  /// hand it was still at, for [_auditLeftBehind].
-  final Map<int, int> _tablePastSince = {};
-
   /// Whether [seat]'s bot moves are this side's to work out. A bot
   /// seat nobody holds is everyone's to compute. One a juror holds is
   /// that juror's alone: every other peer waits to be told
@@ -1672,7 +1587,14 @@ class TableClient {
     // all of them, and they count as one for the limit.
     final turns = _setOf(turn);
     final settled = turns.where((t) => _races[t]?.settled == true).toList();
-    if (settled.isEmpty) return;
+    // Nothing settled there, nothing to send — except in a hand this
+    // side gave up in its deal. The turn that hand stopped at never
+    // settles, nor any after it, and a peer still at one of them needs
+    // what decided the hand, which is the escrow that gave it up: the
+    // removals below. Sent nothing, it waited there for good while the
+    // table dealt on, and was put out at the next hand's keys
+    // (undealt_hand_test.dart).
+    if (settled.isEmpty && _handEnds[turn.hand] != HandState.abandoned) return;
     // Once a couple of seconds per turn, whoever is asking: a peer far
     // behind repeats a lot, and every answer is itself repeated evidence
     // to everyone else.
@@ -2138,6 +2060,21 @@ class TableClient {
     _escrowed.putIfAbsent(hand, () => {})[seat] = turn;
     final holder = botHolders(hand)[seat];
     if (holder != null && _liveJurors(hand).contains(holder)) _letGo.add(holder);
+    // And its audit, if the hand has come that far here, is the pieces'
+    // now and nobody's move ([_isEscrowedAudit]): one said there by the
+    // seat's own juror before it knew goes, as it does where the escrow
+    // is carried at the audit itself ([_carryEscrow]).
+    final audit = TurnId.audit(hand, seat);
+    final atAudit = _races[audit];
+    if (atAudit != null && !atAudit.settled) {
+      atAudit
+        ..action = null
+        ..forAction.clear()
+        ..rivals.clear()
+        ..forRival.clear();
+      _myWitness.remove(audit);
+      _myWitnessEvents.remove(audit);
+    }
     if (hand == game.handNumber) {
       final d = _deal;
       if (d != null) {
@@ -3128,10 +3065,9 @@ class TableClient {
   /// opened to say so. The verifier takes an abandoned hand as a
   /// terminal state rather than an incomplete one.
   ///
-  /// Follows from the record: the escrow of a held seat that still owed
-  /// a step of the deal ([_carryEscrow]), which every side is carried
-  /// to. Short of that, a side left behind at the deal while the table
-  /// has moved on works it out for itself ([_dealLeftBehind]).
+  /// Follows from the record, and only from it: the escrow of a held
+  /// seat that still owed a step of the deal ([_carryEscrow]), which a
+  /// side behind is carried to like any removal ([_carryForward]).
   void _giveUpUndealtHand(int seat) {
     _trace('hand ${game.handNumber}: seat $seat cannot finish its deal; the hand is given up undealt');
     _handEnds[game.handNumber] = HandState.abandoned;
@@ -3565,8 +3501,8 @@ class TableClient {
   /// thing a holder does in a hand, so it is the one turn a holder can
   /// still be arriving at: drawn this minute, summoned, connecting, and
   /// replaying the record up to it — or replaying a hand given up
-  /// undealt, and being carried to the escrow that gave it up, or
-  /// working that out ([_dealLeftBehind]). None of that is idle, and on the
+  /// undealt, and being carried to the escrow that gave it up. None of
+  /// that is idle, and on the
   /// table's clock it had eaten the whole allowance before the juror
   /// could see the turn: the hand after one given up went too, and the
   /// juror that was only late was left out of the next draw ([_letGo])
@@ -4183,7 +4119,6 @@ class TableClient {
     // a seated one or a serving one — a client that has left the table
     // still follows the hands out, and is in neither branch below.
     _startDealWhenReady();
-    _dealLeftBehind();
     _forgetSaidAgain();
     _topUpJury();
     _timers.add(clock.schedule(1000, _tick));
@@ -4259,7 +4194,6 @@ class TableClient {
       // juror holding a seat is as much that seat as a person is
       // theirs.
       _repeat(ownOnly: true);
-      _auditLeftBehind();
       _judgeAppeals();
       // A juror holding a bot seat owes that seat's deal steps, and
       // owes them again whenever the last look found it too early to

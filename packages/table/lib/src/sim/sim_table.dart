@@ -18,8 +18,9 @@ import 'sim_presence.dart';
 import 'virtual_clock.dart';
 
 /// A simulated table: [humans] scripted people in the first seats,
-/// bots in the rest. With [crypto] the table is sealed: the cards come
-/// from the verifiable deal, run for real on the virtual clock.
+/// bots in the rest — or the bots first, with [botsFirst]. With
+/// [crypto] the table is sealed: the cards come from the verifiable
+/// deal, run for real on the virtual clock.
 class SimTable {
   SimTable({
     required this.humans,
@@ -32,6 +33,7 @@ class SimTable {
     int target = gameOverScore,
     this.crypto,
     TimeBank timeBank = TimeBank.standard,
+    bool botsFirst = false,
   })  : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
@@ -60,7 +62,10 @@ class SimTable {
       target: target,
       seats: [
         for (var s = 0; s < seatCount; s++)
-          s < humans ? HumanSeat(signers[s].publicKey) : BotSeat(Persona.roster[(s + seed) % Persona.roster.length]),
+          if (botsFirst ? s >= seatCount - humans : s < humans)
+            HumanSeat(signers[botsFirst ? s - (seatCount - humans) : s].publicKey)
+          else
+            BotSeat(Persona.roster[(s + seed) % Persona.roster.length]),
       ],
     );
     for (var i = 0; i < humans; i++) {
