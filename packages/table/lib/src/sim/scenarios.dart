@@ -64,9 +64,9 @@ class MatrixCell {
 /// A random walk: departures, partitions, blips, loss and latency at
 /// random times over the first few minutes, then quiet.
 class ChaosScenario {
-  ChaosScenario(this.seed, {this.jurors = 4, DealCrypto? crypto}) : rng = Random(seed) {
+  ChaosScenario(this.seed, {this.jurors = 4, DealCrypto? crypto, bool sweepJurors = false}) : rng = Random(seed) {
     humans = 2 + rng.nextInt(3);
-    table = SimTable(humans: humans, seed: 100 + seed, netSeed: seed, jurors: jurors, crypto: crypto);
+    table = SimTable(humans: humans, seed: 100 + seed, netSeed: seed, jurors: jurors, crypto: crypto, sweepJurors: sweepJurors);
     // Three relays under the table, everyone reaching all of them to
     // start: the same as a single bus until a fault takes a relay out
     // or leaves a peer reaching fewer, which is where a table learns

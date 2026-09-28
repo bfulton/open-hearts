@@ -4,11 +4,14 @@
 ///     cd packages/table && dart run tool/chaos.dart --seeds 250 --sealed 6
 ///     dart run tool/chaos.dart --seeds 0 --sealed-only 1,2,3
 ///     dart run tool/chaos.dart --seeds 250 --sealed 14 --structure
+///     dart run tool/chaos.dart --seeds 100 --sealed 14 --jurors 9 --sweep
 ///
 /// The second walks just the sealed seeds named — the ones a longer
 /// walk said broke, again after a fix, without the hour in between.
 /// The third also reads every side against the state machines as it
-/// walks (docs/07-states.md, "Measured").
+/// walks (docs/07-states.md, "Measured"). The fourth draws from more
+/// strangers than a jury, each letting go of the table once it has
+/// served, as the duty does, and summoned again later.
 ///
 /// Prints every broken invariant with the faults that led there, and
 /// exits non-zero if there was one.
@@ -44,6 +47,20 @@ Future<void> main(List<String> args) async {
   // waits for, read against who can end it (lib/src/sim/structure.dart).
   // Measures; decides nothing.
   final measure = args.contains('--structure');
+  // `--jurors N --sweep`: more strangers than a jury, each letting go
+  // of the table once it has served and summoned again later, as the
+  // duty does — and what any of them would have said about a hand
+  // from before its summons, by kind.
+  final jurors = _intArg(args, 'jurors', 4);
+  final sweep = args.contains('--sweep');
+  final saidBefore = <String, int>{};
+  void jurorLog(String line) {
+    final at = line.indexOf('over before this side was summoned: ');
+    if (at < 0) return;
+    final kind = line.substring(at + 'over before this side was summoned: '.length).split(' ').first;
+    saidBefore[kind] = (saidBefore[kind] ?? 0) + 1;
+  }
+
   final totals = <String, int>{};
   final withAny = <String, int>{};
   final endedWith = <String, int>{};
@@ -72,7 +89,7 @@ Future<void> main(List<String> args) async {
 
   for (var seed = 0; seed < seeds; seed++) {
     final s = log();
-    final why = walkChaos(seed, structure: s);
+    final why = walkChaos(seed, structure: s, jurors: jurors, sweep: sweep, jurorLog: sweep ? jurorLog : null);
     report('seed $seed', s);
     if (why != null) {
       failed++;
@@ -83,7 +100,7 @@ Future<void> main(List<String> args) async {
   }
   for (final seed in sealedSeeds) {
     final s = log();
-    final why = walkChaos(seed, crypto: crypto, structure: s);
+    final why = walkChaos(seed, crypto: crypto, structure: s, jurors: jurors, sweep: sweep, jurorLog: sweep ? jurorLog : null);
     report('sealed seed $seed', s);
     print(why == null ? 'sealed seed $seed held' : 'sealed seed $seed: $why');
     if (why != null) failed++;
@@ -92,6 +109,7 @@ Future<void> main(List<String> args) async {
     print('structure: ${totals.isEmpty ? 'nothing found' : totals.entries.map((e) => '${e.key} ${e.value} in ${withAny[e.key]} walk(s), '
         'still there at the end of ${endedWith[e.key] ?? 0} (${endedOnline[e.key] ?? 0} among sides online)').join('; ')}');
   }
+  if (sweep) print('said about a hand before the summons: ${saidBefore.isEmpty ? 'nothing' : saidBefore}');
   final took = DateTime.now().difference(started).inSeconds;
   print('$seeds seeds and $sealed sealed in $took s: ${failed == 0 ? 'every invariant held' : '$failed broke one'}');
   exit(failed == 0 ? 0 : 1);

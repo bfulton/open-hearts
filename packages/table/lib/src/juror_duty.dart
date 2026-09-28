@@ -63,6 +63,9 @@ class JurorDuty {
   final Transport Function(TableSpec spec, RelayTransport relay)? dial;
 
   final Map<String, ({TableClient client, Transport transport})> _tables = {};
+
+  /// How far each table's client had got when it was let go of.
+  final letGo = LetGo();
   StreamSubscription<Summons>? _sub;
   Timer? _sweep;
 
@@ -82,6 +85,10 @@ class JurorDuty {
 
   void _onSummons(Summons s) {
     var t = _tables[s.spec.id];
+    if (t == null && letGo.stale(s.spec.id, s.hand)) {
+      log?.call('summoned to ${s.spec.id} for hand ${s.hand}, which it had followed past: stale');
+      return;
+    }
     if (t == null) {
       final lane = RelayTransport(relays: relays, signer: signer, table: s.spec.id, log: log, pinned: pinned);
       final transport = dial?.call(s.spec, lane) ?? lane;
@@ -111,6 +118,7 @@ class JurorDuty {
           'heartbeats ${c.heartbeatsSent} deferred ${c.deferred} serving ${c.serving}');
       if (c.serving) continue;
       log?.call('done with ${e.key}');
+      letGo.record(e.key, c.game.handNumber);
       c.close();
       e.value.transport.close();
       _tables.remove(e.key);
@@ -125,6 +133,31 @@ class JurorDuty {
       t.transport.close();
     }
     _tables.clear();
+  }
+}
+
+/// The tables a juror has been let go of, and the hand each had
+/// reached by then.
+///
+/// A summons to a hand before that one is one a player sent from
+/// behind: catching up on a jury it missed, it summons that jury's
+/// jurors as if the hand were new. The client that could have served
+/// the hand is gone, with every secret it drew for it. One started on
+/// the summons would read the record from the first hand, find the
+/// hand's seat held by its key, and take it for its own — and a client
+/// holds nothing in a hand before its first summons, so no summons may
+/// be the first that names a hand an earlier client had reached
+/// ([TableClient.serveFor]).
+class LetGo {
+  final Map<String, int> _reached = {};
+
+  void record(String table, int reached) => _reached[table] = reached;
+
+  /// Whether a summons to [hand] of [table] names a hand a client here
+  /// had already followed past.
+  bool stale(String table, int hand) {
+    final r = _reached[table];
+    return r != null && hand < r;
   }
 }
 

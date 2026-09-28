@@ -682,6 +682,19 @@ class TableClient {
   // As a juror: the hands this client serves, each with the jury it was
   // summoned into, foreman first; the appeals heard; the verdicts given.
   final Map<int, List<PublicKey>> _serving = {};
+
+  /// The first hand this client was summoned to. Everything before it
+  /// is history the client reads and has no part in: any seat this key
+  /// held earlier was held by a client that has since been let go of,
+  /// with secrets this one never had ([_beforeSummons]); and the duty
+  /// starts no client on a summons to a hand that one had reached
+  /// (juror_duty.dart).
+  int? _summonedFrom;
+
+  /// What this side would have said about a hand before its summons,
+  /// and did not ([_emit]): nothing, when every way of acting in one is
+  /// closed where it starts, which the chaos walk holds it to.
+  int saidBeforeSummons = 0;
   final Map<TurnId, int> _appealSeenAt = {};
   final Map<TurnId, int> _verdictAt = {};
   final Map<TurnId, int> _waitSaidAt = {};
@@ -824,6 +837,14 @@ class TableClient {
   void _emit(EventKind kind, Map<String, Object?> body, {bool everywhere = false}) {
     // A game that has ended says nothing more, to anyone.
     if (_failure != null) return;
+    // Nor does a juror about a hand that was over before it was
+    // summoned; that it serves at all is said in its heartbeats.
+    final hand = body['hand'];
+    if (kind != EventKind.heartbeat && kind != EventKind.serve && hand is int && _beforeSummons(hand)) {
+      saidBeforeSummons++;
+      _trace('nothing to say about hand $hand, over before this side was summoned: ${kind.name} $body');
+      return;
+    }
     final event = TableEvent.sign(signer, table: spec.id, kind: kind, body: body);
     if (kind != EventKind.heartbeat) _trace('emit ${kind.name} $body');
     transport.broadcast(event.toJson(), everywhere: everywhere);
@@ -1136,6 +1157,9 @@ class TableClient {
     // audit, though: those are settled by each side for itself below,
     // with nothing said by anyone.
     if (heldHere && !turn.isDeal && !turn.isAudit) {
+      // Nobody's here at all in a hand that was over before this side
+      // was summoned ([_beforeSummons]).
+      if (_beforeSummons(turn.hand)) return;
       // Its own juror until the record gives it to the escrow; then the
       // first of the escrow's jurors still heard, which is that same
       // juror only when it is the one back ([_sayers]).
@@ -2592,7 +2616,11 @@ class TableClient {
       // The deal's notion of this side's seat is not the table's: a
       // juror sits at no seat here and still acts for the bot seat it
       // holds.
-      mySeat: amSeated ? mySeat : _seatHeldHere(held),
+      mySeat: amSeated
+          ? mySeat
+          : _beforeSummons(game.handNumber)
+              ? null
+              : _seatHeldHere(held),
       myKey: signer.publicKey,
       wrap: signer.sharedSecretWith,
       random: _random,
@@ -3274,6 +3302,11 @@ class TableClient {
 
   /// This side's piece of a departed seat's secret, for everyone.
   void _releaseFor(int seat) {
+    // Not in a hand that was over before this side was summoned. The
+    // key is one of the hand's custodians, and the piece was the
+    // client's that served it to say; the table this one follows has
+    // long since moved on ([_beforeSummons]).
+    if (_beforeSummons(game.handNumber)) return;
     // In the open once the hand is over: the audit publishes every
     // secret then, and a bot seat's piece kept from the players would
     // leave a hand only the jury could check.
@@ -3323,6 +3356,11 @@ class TableClient {
     final d = _deal;
     if (d == null || !spec.sealed) return;
     final hand = game.handNumber;
+    // A custodian of a hand over before this side was summoned has the
+    // share, read from the record, and no part in the hand: the parts
+    // were its earlier client's to make, for a table long past them
+    // ([_beforeSummons]).
+    if (_beforeSummons(hand)) return;
     final custodians = _custodiansNow(hand);
     if (custodians.length <= juryToHoldBots) return;
     final held = botHolders(hand);
@@ -4648,6 +4686,7 @@ class TableClient {
     if (mySeat != null) return;
     _serving[hand] = jurors;
     _servingSince.putIfAbsent(hand, () => clock.nowMs);
+    _summonedFrom ??= hand;
     // A summons into the hand's *first* jury is the draw a bot seat's
     // holder is read from, arriving by the shorter road: kept apart
     // from the rest so that a redraw, which names the jury as it
@@ -4660,6 +4699,34 @@ class TableClient {
   /// jury was drawn: it was summoned to the hand, and never into the
   /// draw that the seats were dealt to ([_firstSummons]).
   bool _joinedLate(int hand) => _serving.containsKey(hand) && _firstSummons[hand] == null;
+
+  /// Whether [hand] is history to this side: it serves as a juror, and
+  /// the hand was over before the first summons that brought it here.
+  ///
+  /// A juror's client is let go of once the table has moved past every
+  /// hand it serves, and a later summons starts a new one, which reads
+  /// the record from the first hand. The key is the same, so the record
+  /// names it as the holder of every bot seat its earlier client held;
+  /// the secrets are not, and never were. Acting on that name, a juror
+  /// drawn again at hand six drew fresh keys for the seat it had held
+  /// in hand nought, took them over the ones on the record — a session
+  /// keeps its own seat's keys and no other — and could verify nothing
+  /// the table shuffled from them: it sat at hand nought's first
+  /// shuffle while the table played the hands it had been summoned to
+  /// without it, giving each of its seats to the escrow in turn
+  /// (the two-tables test in service/, over a real relay).
+  ///
+  /// So an earlier hand is one where this side holds nothing and makes
+  /// no move for any seat: it follows the record there as a player
+  /// does, and says nothing about it ([_emit]). A summons to an earlier
+  /// hand arriving after the first does not move the line back. The
+  /// table was past that hand when it drew the jury that brought this
+  /// client, and the key may have served it in a client before this
+  /// one, heard of from the jury rather than the summons.
+  bool _beforeSummons(int hand) {
+    final from = _summonedFrom;
+    return mySeat == null && from != null && hand < from;
+  }
 
   /// The first jury of each hand as a summons gave it, where one has
   /// said so. The event carries the same list and is the authority;

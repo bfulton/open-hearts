@@ -139,9 +139,16 @@ String? disagreed(SimTable t) {
   return null;
 }
 
-String? walkChaos(int seed, {DealCrypto? crypto, StructureLog? structure}) {
-  final sc = ChaosScenario(seed, crypto: crypto);
+/// [jurors] strangers to draw from, and with [sweep] each lets go of
+/// the table once it has served, as the duty does ([SimTable]); its
+/// clients' traces go to [jurorLog].
+String? walkChaos(int seed,
+    {DealCrypto? crypto, StructureLog? structure, int jurors = 4, bool sweep = false, void Function(String line)? jurorLog}) {
+  final sc = ChaosScenario(seed, crypto: crypto, jurors: jurors, sweepJurors: sweep);
   final t = sc.table;
+  for (final j in t.jurors) {
+    j.log = jurorLog;
+  }
   final observed = {for (final c in t.clients) c: _Observed()};
   String faults() => sc.faults.join('; ');
 
@@ -210,6 +217,15 @@ String? walkChaos(int seed, {DealCrypto? crypto, StructureLog? structure}) {
     for (final c in survivors) {
       final v = verifyRecord(t.spec, c.record, allowPartial: true, juries: c.juries, crypto: t.crypto, releases: c.releases);
       if (!v.ok) return '$when: ${c.signer.publicKey.substring(0, 6)} record: ${v.reason}';
+    }
+    // A juror has no part in a hand that was over before its summons,
+    // and every way of taking one is closed where it starts: the
+    // client's last refusal ([TableClient.saidBeforeSummons]) is never
+    // what stops it.
+    for (final j in t.jurors) {
+      if (j.saidBeforeSummons > 0) {
+        return '$when: juror ${j.signer.publicKey.substring(0, 4)} went to say something about a hand before its summons';
+      }
     }
     for (final c in t.clients) {
       final o = observed[c]!;

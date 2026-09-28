@@ -1369,6 +1369,43 @@ for silence and gave up a seat nobody had lost. One keys message
 settles a seat's round, so every side and the verifier read the same
 holder from it.
 
+**A juror summoned again is a new client.** The duty lets go of a
+table once the table has moved past every hand the juror serves, and a
+later summons to the same table starts a new client, which reads the
+record from the first hand. The record names its key as the holder of
+whatever seat its earlier client held; the secrets went with that
+client. The new one took the seat for its own: it drew fresh keys for a
+hand long over, kept them over the ones on the record — a deal session
+keeps its own seat's keys and no other — and could verify nothing
+shuffled from them. It sat at that hand's first shuffle while the table
+played the hands it had been summoned to without it, and each of its
+seats went to the escrow in turn (the two-tables test in `service/`,
+over a real relay). The simulator never let go of a juror's client, so
+it could not see this until it could (`SimTable.sweepJurors`).
+
+A hand before the first one a client was summoned to is history to it
+now. It holds no seat there, makes no move for one, releases no piece
+of one, makes no part of a share for a juror brought on in it, and
+says nothing about the hand; a last refusal where events are said
+would stop anything else, and the chaos walk fails a seed if that
+refusal is ever what stops it — which is how the pieces and the parts
+were found, by a walk that draws from nine strangers and lets each go
+as the duty does (`tool/chaos.dart --jurors 9 --sweep`). A summons can still name such a
+hand: a player behind, catching up on a jury it missed, summons that
+jury's jurors as if the hand were new. So the duty keeps how far its
+last client at a table had got, and starts no client on a summons to a
+hand before that (`juror_summoned_again_test.dart`).
+Eight games in the simulator — one or two people, nine jurors letting
+go and summoned again — had given eleven seats to the escrow between
+them with no fault put in, and ended with jurors still at hands 0 to 5;
+now none, and every juror ends with the table.
+
+It is not free. A juror summoned again reads the whole table before it
+can act at its hand, since table events are not kept by a relay and the
+history comes from the peers carrying it forward, and the hand waits on
+its keys meanwhile: 17 to 40 seconds in the simulator, where a juror
+already following makes them in two.
+
 What is still missing is **graceful degradation** for a hand that
 cannot open a bot seat mid-hand: falling back to open bot seats
 happens only before the deal, because after it the seat's cards are

@@ -96,6 +96,14 @@ class SimNetwork {
     return t;
   }
 
+  /// [key]'s link let go of, as a juror's duty lets go of a table it
+  /// has served ([SimJuror.sweeps]): nothing more reaches it. A later
+  /// [attach] for the same key is a new link, and whatever was already
+  /// on its way goes to that one or nowhere.
+  void detach(PublicKey key, SimTransport t) {
+    if (_peers[key] == t) _peers.remove(key);
+  }
+
   /// The relays [key] reaches: all of them until it has lost some.
   Set<String> reachOf(PublicKey key) => relays.isEmpty ? const {} : (_reaches[key] ?? relays.toSet());
 
@@ -229,8 +237,13 @@ class SimNetwork {
           dropped++;
           return;
         }
+        final t = _peers[to];
+        if (t == null) {
+          dropped++;
+          return;
+        }
         delivered++;
-        _peers[to]!._incoming.add((from: from, message: jsonDecode(wire) as Map<String, Object?>));
+        t._incoming.add((from: from, message: jsonDecode(wire) as Map<String, Object?>));
       });
     }
     _tally(from, message, wire, copies);
@@ -282,8 +295,13 @@ class SimNetwork {
           dropped++;
           return;
         }
+        final t = _peers[to];
+        if (t == null) {
+          dropped++;
+          return;
+        }
         delivered++;
-        _peers[to]!._incoming.add((from: from, message: jsonDecode(wire) as Map<String, Object?>));
+        t._incoming.add((from: from, message: jsonDecode(wire) as Map<String, Object?>));
       });
     }
     _tally(from, message, wire, copies);

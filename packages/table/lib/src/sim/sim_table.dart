@@ -20,7 +20,9 @@ import 'virtual_clock.dart';
 /// A simulated table: [humans] scripted people in the first seats,
 /// bots in the rest — or the bots first, with [botsFirst]. With
 /// [crypto] the table is sealed: the cards come from the verifiable
-/// deal, run for real on the virtual clock.
+/// deal, run for real on the virtual clock. With [sweepJurors] a
+/// juror lets go of the table once it has served, as the duty does,
+/// and a later summons starts it again from the first hand.
 class SimTable {
   SimTable({
     required this.humans,
@@ -34,13 +36,14 @@ class SimTable {
     this.crypto,
     TimeBank timeBank = TimeBank.standard,
     bool botsFirst = false,
+    bool sweepJurors = false,
   })  : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
     if (jurors > 0 || lastResort || (lastResorts ?? 0) > 0 || withPresence) {
       final p = presence = SimPresence(net, clock);
       for (var j = 0; j < jurors; j++) {
-        final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock, crypto: crypto);
+        final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock, crypto: crypto)..sweeps = sweepJurors;
         this.jurors.add(juror);
         p.register(juror);
       }
@@ -49,7 +52,7 @@ class SimTable {
       // else to make that up (docs/04-live-play.md).
       final bench = lastResorts ?? (lastResort ? juryToHoldBots : 0);
       for (var b = 0; b < bench; b++) {
-        final juror = SimJuror(FakeSigner('last-resort$b-$seed'), net, clock, crypto: crypto);
+        final juror = SimJuror(FakeSigner('last-resort$b-$seed'), net, clock, crypto: crypto)..sweeps = sweepJurors;
         this.jurors.add(juror);
         p.register(juror);
         p.lastResorts.add(juror);
