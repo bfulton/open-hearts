@@ -487,6 +487,11 @@ and was put out at that hand's keys (`undealt_hand_test.dart`, with
 the bots seated first so that a held seat shuffles first). From any
 turn of a hand given up in its deal, the hand's removals are sent now.
 
+Measured again without the rules, with the same walk and explorer:
+every walk and every run held, and what is read is what was read with
+them — nothing stuck and nothing apart at the end among sides still
+playing, in the walk or in any scenario.
+
 ## Next
 
 The step after this document puts the seven transitions on the
