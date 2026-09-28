@@ -106,7 +106,7 @@ playing ──last trick──▶ auditing ──every audit──▶ over
 |---|---|---|
 | awaitingJury | dealing | **here** — the draws are on the record, but a deal is sealed to whichever draw arrived here first (held back 2 s for a late one), and at 40 s the table deals its bot seats in the open |
 | dealing | passing, playing, opening | from the record |
-| dealing | abandoned | from the record — follows from the escrow of a held seat that still owed a step. A side the escrow does not reach still works it out **here** (`_dealLeftBehind`), and the verifier infers it (`heldSeatOwes`) |
+| dealing | abandoned | from the record — follows from the escrow of a held seat that still owed a step, which a side behind is carried to; the verifier asks for it |
 | passing | playing | from the record |
 | playing | auditing (sealed), over (seeded) | from the record |
 | auditing | over | from the record — every audit in, and the audit of a seat the record gave to the escrow closes silently from its pieces |
@@ -212,27 +212,37 @@ escrow on the record").
 
 Seven transitions when this was written. The escrow is on the record
 now, and the abandoned hand and the escrowed seat's audit follow from
-it wherever it reaches (below, "The escrow on the record"). What is
-still decided here, and the rules that exist only because it is not
-on the record:
+it (below, "The escrow on the record"). What is still decided here,
+and the rules that exist only because it is not on the record:
 
 | Decided here | What it has cost | Rules standing in for a record |
 |---|---|---|
-| A hand abandoned in its deal, at a side the escrow has not reached | a player abandoning alone (the fork above, since fixed); newcomers replaying a hand the table has left; jurors cut off abandoning a hand the table played (below) | `_dealLeftBehind` (5 s after most of the table is heard past it), the verifier's `heldSeatOwes`, the 10 s cap in `_arriving` |
-| An escrowed seat's audit, at a side the escrow has not reached | a juror carried in behind, waiting on an audit nobody would say (since fixed) | `_auditLeftBehind` |
 | Which draw a deal is sealed to | holders read from different juries while a draw is in flight, for two seconds in most top-up runs (below) | `_juryFirmMs` (2 s), `_refixHolders` |
 | Bot seats dealt in the open at 40 s | not seen; two sides judging the 40 s differently would deal one hand two ways | — |
 | The game ended for a lost quorum | the people ending it up to five seconds apart, and the last juror not told (below). It is said now: a juror stops on hearing it, and a person stopped at the same turn ends with it | the two minutes a side that hears too little of the table waits |
 | Which way a seat left, where a leave crosses a boot | the people and the jurors holding different records to the end of a game (below) | `_onLeave` passing over a leave for a seat already removed |
 
-The escrow's own row read: a held seat given to the escrow, which had
-cost two jurors playing the same card for one seat, settled only by
-the jury's rule for two voices; one audit on two records (since
-fixed); and sides apart on it for the rest of a hand. The rules that
-stood in for it were `_holderStillAudits` and `_auditLeftBehind`. The
-first is gone. The two-voices rule stays, for a different reason: a
-move by the seat's juror that lands after the escrow is as good as
-the escrow's own.
+The three rows that are gone read:
+
+- a held seat given to the escrow, which had cost two jurors playing
+  the same card for one seat, settled only by the jury's rule for two
+  voices; one audit on two records (since fixed); and sides apart on
+  it for the rest of a hand;
+- a hand abandoned in its deal, which had cost a player abandoning
+  alone (the fork above, since fixed), newcomers replaying a hand the
+  table had left, and jurors cut off abandoning a hand the table
+  played;
+- an escrowed seat's audit closed silently, which had cost the audit
+  case above.
+
+The rules that stood in for them were `_holderStillAudits`,
+`_auditLeftBehind`, `_dealLeftBehind` and the verifier's
+`heldSeatOwes`, all gone. The two-voices rule stays, for a different
+reason: a move by the seat's juror that lands after the escrow is as
+good as the escrow's own. So does the ten-second cap in `_arriving`,
+which was listed with the abandoned hand: it tells a juror that has
+stopped from one still catching up, which is noticing absence, one of
+the clocks that stay (below).
 
 ## The clocks that stay
 
@@ -456,16 +466,33 @@ lack the move — and its ruling is for a real move, which the verifier
 checks against the policy. Kept off, it left such a turn with nobody
 able to rule.
 
+## The abandoned hand and the escrowed audit
+
+The second of the seven. With the escrow on the record both follow
+from it, and the rules that worked them out without it are gone: a
+side still in a hand's deal, or at a bot seat's audit, five seconds
+after most of the table was heard at a later hand, settled it as the
+table must have (`_dealLeftBehind`, `_auditLeftBehind`); and the
+verifier took a deal short of a held seat's step for one given up
+(`heldSeatOwes`). The verifier now asks for the escrow that gave the
+hand up, at one of that seat's deal steps with a step still owed.
+
+A side behind is carried to the escrow like any removal, and taking
+the rules out found the one place it was not: a hand given up at a
+held seat's first shuffle. Nothing settles at the turn such a hand
+stops at, and what a side behind is sent from a turn is what settled
+there — so a person who missed the escrow there, and asked from that
+turn, was sent nothing. It waited while the table dealt the next hand,
+and was put out at that hand's keys (`undealt_hand_test.dart`, with
+the bots seated first so that a held seat shuffles first). From any
+turn of a hand given up in its deal, the hand's removals are sent now.
+
 ## Next
 
 The step after this document puts the seven transitions on the
 record, in this order:
 1. the escrow — done (above);
-2. the abandoned hand and the escrowed audit. They follow from the
-   escrow now, wherever it has reached; what is left is to carry a
-   side left behind to the escrow in every case, and take out the
-   rules that stand in for it where it has not — `_dealLeftBehind`,
-   `_auditLeftBehind`, and the verifier's `heldSeatOwes`;
+2. the abandoned hand and the escrowed audit — done (above);
 3. the lost-quorum ending;
 4. the jury draw a deal is sealed to, read in record order rather than
    arrival order;

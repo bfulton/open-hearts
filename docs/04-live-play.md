@@ -1335,12 +1335,14 @@ to wait for that audit to be said and witnessed, and it never would
 be, nor carried, since a turn settled with nothing said leaves nothing
 to carry. So a juror still at a hand's audit of a bot seat, once most
 of the table has been heard at a later hand for a few seconds,
-settles it the same way (`audit_left_behind_test.dart`; sealed chaos
+settled it the same way (`audit_left_behind_test.dart`; sealed chaos
 seed 5, where such a juror held a seat two hands on and the table
 waited on its keys with every juror heartbeating). With the escrow on
 the record there is something to carry — the escrow itself, and a
 side carried to it closes the audit from the pieces — and that rule
-stays behind it until the next step ([doc 07](07-states.md), "Next").
+is gone. And a juror's audit taken for the seat's before the escrow
+was heard is dropped once it is, and the turn closes from the pieces
+as everywhere else.
 
 One juror, but not always one voice. A juror late with its card —
 behind, not gone — has it on the wire while the custodian the record
@@ -1535,11 +1537,18 @@ the table dealing the next hand stopped waiting for the newcomer's
 seat long before, and gave that hand up too. What a newcomer can see
 at once is the table: a majority of the players heard at a later hand,
 and five seconds more without the rest of this deal arriving, which a
-deal they had finished would have done. It gives the hand up then, as
-they did — the same inference the verifier makes from the record
-(`packages/table/test/undealt_hand_test.dart`). Both are still there
-behind the escrow on the record, until the next step takes them out
-([doc 07](07-states.md), "Next").
+deal they had finished would have done. It gave the hand up then, as
+they did — the same inference the verifier made from the record. Both
+are gone: the hand is given up where the escrow is carried, and a side
+behind is carried to the escrow like any removal, from whichever turn
+of the hand it is at. That last needed saying. A hand given up at a
+held seat's first shuffle has nothing settled at the turn it stopped
+at, and a person who missed the escrow there was sent nothing when it
+asked from that turn; it waited while the table dealt on, and was put
+out at the next hand's keys. It is sent the hand's removals now. The
+verifier asks for the escrow too: a record that walks away from a deal
+without one is a hand somebody did not want dealt, and is refused
+(`packages/table/test/undealt_hand_test.dart`).
 
 The escrow on the record and a jury drawn again without the silent
 juror race here, each a round trip, and a side can carry them in
