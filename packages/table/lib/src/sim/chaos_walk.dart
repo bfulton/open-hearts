@@ -2,7 +2,8 @@
 /// that must hold whatever happens: survivors never hold conflicting
 /// decisions, every record verifies as far as it goes, every observed
 /// state change is one the model in model.dart allows, and once the
-/// faults stop and the network heals the table finishes — or is paused
+/// faults stop and the network heals no two sides still up hold a
+/// held seat's escrow differently, and the table finishes — or is paused
 /// for the one reason left, the jury gone and nobody online to draw
 /// another, or has ended for it once that went on long enough. The
 /// test walks forty seeds on every commit; the tool walks as many as
@@ -253,6 +254,13 @@ String? walkChaos(int seed, {DealCrypto? crypto, StructureLog? structure}) {
     if (why != null) return why;
     final apart = disagreed(t);
     if (apart != null) return '$apart; faults were [${faults()}]';
+    // A held seat given to the escrow is on the record, so once the
+    // faults have stopped and the network has healed, two sides still
+    // up at the same hand holding the seat differently are holding two
+    // records, not waiting on a message in flight (docs/07-states.md).
+    for (final f in readStructure(t)) {
+      if (f.what == Apart.escrow && !f.cutOff) return 'apart on the escrow at the end: ${f.detail}; faults were [${faults()}]';
+    }
 
     final survivors = t.survivors.toList();
     final finished = survivors.every((c) => c.done);

@@ -221,10 +221,13 @@ _Rel _relation(Wait w, TurnId turn, TableClient c, TableClient m) {
     case TurnState.settledSilently:
       // Closed with nothing said. For a bot seat nobody holds, its move
       // worked out from the record, which a side not there yet reaches
-      // by the removal that made the seat one; for a held seat, closed
-      // from the escrow's pieces, which is this mover's own judgement.
+      // by the removal that made the seat one; for a held seat, its
+      // audit closed from the escrow's pieces once the record gave it
+      // to the escrow, which a side behind is carried to. Anything else
+      // closed silently at a held seat is this mover's own judgement.
       final seat = w.seat;
-      return seat != null && m.botHolders(turn.hand)[seat] != null ? _Rel.silent : _Rel.covered;
+      if (seat == null || m.botHolders(turn.hand)[seat] == null) return _Rel.covered;
+      return m.escrowedAt(turn.hand).containsKey(seat) ? _Rel.covered : _Rel.silent;
     case TurnState.open:
     case TurnState.acting:
     case TurnState.contested:

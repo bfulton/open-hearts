@@ -41,12 +41,16 @@ void main() {
     expect(held.keys, contains(seat), reason: 'it stopped at a held seat');
     final at = c.game.tricksPlayed * seatCount + c.game.trick.length;
 
-    // The seat's own juror back, which still speaks for it.
+    // The seat's own juror back. The table gave its seat to the escrow
+    // while it was away, and it is the one juror of the escrow left, so
+    // it plays the seat on as the escrow's (escrow_on_record_test.dart).
+    final hand = c.game.handNumber;
     t.net.comeOnline(held[seat]!);
     expect(
         t.clock.runUntil(() => c.game.tricksPlayed * seatCount + c.game.trick.length > at, limitMs: 3 * 60 * 1000), isTrue,
         reason: 'the table went on once a juror was back:\n${c.describe()}');
     expect(c.pause, isNot(Pause.waitingForJury), reason: 'and stopped saying it waited: ${c.describe()}');
+    expect(c.escrowedAt(hand), contains(seat), reason: 'the seat went to the escrow while the jury was away');
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 }

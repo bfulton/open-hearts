@@ -301,10 +301,13 @@ offer say so, and a build that cannot run the deal does not sit down.
   of the bound: with the whole jury of a hand gone — every juror it
   was drawn with crashed — a seat that leaves it can no longer be
   opened, and the table stops and says so; the chaos walk reaches that
-  state only by crashing four jurors. A bot seat a juror holds is
-  opened by any two of the jurors holding a piece of it (doc 04, "The
-  sizing") — the jury the deal was sealed to, and any drawn since that
-  were given one — so for one of those it is fewer than two left, the
+  state only by crashing four jurors. A bot seat a juror holds goes
+  when the record gives it to the escrow — claimed by the people at
+  its turn when its juror is gone or out of time, and carried as a
+  boot is (doc 04, "Given up on the record") — and is opened by any
+  two of the jurors holding a piece of it (doc 04, "The sizing"): the
+  jury the deal was sealed to, and any drawn since that were given
+  one. What stops such a seat is fewer than two of those left, the
   seat's own juror among the gone: the players stop at its turn
   waiting for the jury, or at its audit opening the hand, and say
   which — where they used to wait at its turn with nothing on the
@@ -461,6 +464,12 @@ offer say so, and a build that cannot run the deal does not sit down.
   every play is checked against the hand it came from as fully as a
   seeded game's. Until a hand's audit is in, its plays are checked as
   far as the rules allow and the verification says it is not complete.
+  Each seat is audited once, and a seat the record gave to the escrow
+  not at all: its pieces are its audit. The last hand's removals are
+  taken before its audits, as every other hand's are — a claim made at
+  an audit sorts ahead of the audits, and the replay once stopped
+  there and left the last hand's audits unchecked — and a record that
+  goes on past the end of the game is turned down.
 - **Measured here**, the reference crate on this machine's core,
   native: a shuffle with its argument 110 ms, verifying one 108 ms, a
   token 1.1 ms to make and 2.3 ms to check, a sealed token with its

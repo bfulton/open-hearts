@@ -95,11 +95,23 @@ const turnTransitions = <TurnState, Set<TurnState>>{
     TurnState.settledByRemoval,
     TurnState.settledSilently,
   },
-  // A held seat's own audit, said and then outlived by its juror: the
-  // side that gave the seat up closes it from the escrow's pieces.
+  // A held seat's audit its juror said that the escrow won all the
+  // same, closed from the escrow's pieces: seen here without the claim
+  // in between.
   TurnState.acting: {TurnState.contested, TurnState.settledByAction, TurnState.settledSilently},
-  TurnState.contested: {TurnState.split, TurnState.settledByAction, TurnState.settledByRemoval},
-  TurnState.split: {TurnState.settledByAction, TurnState.settledByRemoval},
+  // A held seat's turn that the escrow wins opens again, for the
+  // escrow: the claims against its juror are done with. A move already
+  // said for the seat stays, as good after the escrow as before
+  // (acting); a turn with none waits for the escrow's (open), and so
+  // does an audit, which the escrow closes from its pieces.
+  TurnState.contested: {
+    TurnState.split,
+    TurnState.settledByAction,
+    TurnState.settledByRemoval,
+    TurnState.acting,
+    TurnState.open,
+  },
+  TurnState.split: {TurnState.settledByAction, TurnState.settledByRemoval, TurnState.acting, TurnState.open},
   TurnState.settledByAction: {},
   TurnState.settledByRemoval: {},
   TurnState.settledSilently: {},
@@ -154,14 +166,16 @@ enum Decided {
 }
 
 /// **A bot seat a juror holds**, for one hand: held by its juror, until
-/// the seat is given to the escrow — its juror not heard from for half
-/// a minute, or out of time on a turn it has in front of it — and
-/// played from then on by the first of the jurors holding a piece of
-/// it. Given up for good for the hand; the next hand draws again.
+/// the seat is given to the escrow and played from then on by the first
+/// of the jurors holding a piece of it. Given up for good for the
+/// hand; the next hand draws again. On the record: a person at the
+/// table claims the escrow at the seat's own turn when the juror has
+/// not been heard from for half a minute or is out of time on it, and
+/// the claim is carried as a boot is (client.dart, _carryEscrow).
 enum HeldSeatState { held, escrowed }
 
 const heldSeatTransitions = <HeldSeatState, Map<HeldSeatState, Decided>>{
-  HeldSeatState.held: {HeldSeatState.escrowed: Decided.here},
+  HeldSeatState.held: {HeldSeatState.escrowed: Decided.onRecord},
   HeldSeatState.escrowed: {},
 };
 
@@ -189,15 +203,16 @@ const handTransitions = <HandState, Map<HandState, Decided>>{
     HandState.passing: Decided.fromRecord,
     HandState.playing: Decided.fromRecord,
     HandState.opening: Decided.fromRecord,
-    // A held seat given to the escrow while it owed a deal step.
-    HandState.abandoned: Decided.here,
+    // A held seat given to the escrow, on the record, while it owed a
+    // deal step.
+    HandState.abandoned: Decided.fromRecord,
   },
   HandState.passing: {HandState.playing: Decided.fromRecord},
   HandState.playing: {HandState.auditing: Decided.fromRecord, HandState.over: Decided.fromRecord},
   // Every audit in: a person's and a held seat's own by their events,
-  // a bot's nobody holds worked out, and a held seat's given to the
-  // escrow closed from its pieces — escrowed or not being decided here.
-  HandState.auditing: {HandState.over: Decided.here},
+  // a bot's nobody holds worked out, and a held seat's the record gave
+  // to the escrow closed from its pieces.
+  HandState.auditing: {HandState.over: Decided.fromRecord},
   HandState.opening: {HandState.givenUp: Decided.fromRecord},
   HandState.over: {},
   HandState.givenUp: {},

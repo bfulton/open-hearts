@@ -117,6 +117,15 @@ Verification verifyRecord(
     final h = spec.seats[d.event.seat];
     if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
   }
+  // And the held seats the record gives to the escrow, by hand, for
+  // the same reason: a seat the hand will lose is opened from its
+  // pieces from the start of the replay ([feedSecrets]).
+  final allEscrows = <int, Set<int>>{};
+  for (final d in record) {
+    try {
+      if (d.removal && d.event.kind == EventKind.escrow) allEscrows.putIfAbsent(d.turn.hand, () => {}).add(d.event.seat);
+    } catch (_) {}
+  }
   Set<PublicKey> floorAt(TurnId turn) => {
     for (final k in humans)
       if (!allRemovals.containsKey(k) || !atOrBefore(allRemovals[k]!, turn)) k,
@@ -185,6 +194,17 @@ Verification verifyRecord(
       spokenFor.putIfAbsent(d.turn.hand, () => {}).add(s);
     } catch (_) {}
   }
+  // And a seat claimed for the escrow: the table only gives a held seat
+  // to the escrow, and one given up before its juror said a word — a
+  // hand stopped at its keys — has nothing else in the record to show
+  // it was held.
+  for (final d in record) {
+    try {
+      if (!d.removal || d.event.kind != EventKind.escrow) continue;
+      final s = d.event.seat;
+      if (s >= 0 && s < seatCount) spokenFor.putIfAbsent(d.turn.hand, () => {}).add(s);
+    } catch (_) {}
+  }
 
   /// Which juror holds which bot seat at [hand] — the same assignment
   /// the table computed, from the same jury, and only for the seats
@@ -196,6 +216,21 @@ Verification verifyRecord(
     return {for (final e in all.entries) if (spoken.contains(e.key)) e.key: e.value};
   }
 
+  /// Who said each held seat's keys, by hand: the seat's own juror from
+  /// then on, as the table reads it (_asKeyed in client.dart).
+  final keyedBy = <int, Map<int, PublicKey>>{};
+  for (final d in record) {
+    try {
+      final e = d.event;
+      if (d.removal || e.kind != EventKind.deal || e.round != 0 || humans.contains(e.author)) continue;
+      keyedBy.putIfAbsent(d.turn.hand, () => {})[e.seat] = e.author;
+    } catch (_) {}
+  }
+
+  /// The held seats the record has given to the escrow, by hand, as
+  /// far as the replay has come ([takeRemovals]).
+  final escrowedAt = <int, Set<int>>{};
+
   /// Whether [who] may act for [seat] at [hand]: the person sitting
   /// there, or the juror holding it when it is a bot seat the jury
   /// holds. A bot seat nobody holds is acted for by nobody, and its
@@ -203,13 +238,15 @@ Verification verifyRecord(
   bool mayAct(int seat, PublicKey who, int hand) {
     final holder = holders[seat];
     if (holder is HumanSeat) return holder.key == who;
-    // Any juror the hand had, redraws included — as at the table. The
-    // assignment says who goes first; the seat's key, which only its
-    // holder drew and only the jury's own escrow passes on, says who
-    // can go at all. So a seat taken over after its juror went quiet
-    // is spoken for by whichever juror came by the key, and that juror
-    // may be from a draw the first one did not name.
-    return heldAt(hand).containsKey(seat) && jurorsAt(hand).contains(who);
+    if (!heldAt(hand).containsKey(seat) || !jurorsAt(hand).contains(who)) return false;
+    // As at the table (_mayAct in client.dart): before the seat's keys,
+    // any juror the hand had, redraws included; from then on only the
+    // juror that made them, until the record gives the seat to the
+    // escrow; and from then on any juror that has the key, from
+    // whatever draw, the seat's own included.
+    final keyed = keyedBy[hand]?[seat];
+    if (keyed == null) return true;
+    return (escrowedAt[hand]?.contains(seat) ?? false) || who == keyed;
   }
 
   DealSession startDeal() => deal = DealSession(
@@ -272,17 +309,18 @@ Verification verifyRecord(
         if (all && !d.gone.contains(about) && !d.knowsSecret(about)) {
           final h = holders[about];
           if (h is HumanSeat && allRemovals[h.key]?.hand == game.handNumber) d.seatLeft(about);
-          // A bot seat a juror held and the table gave up to the escrow
-          // — its holder quiet, or slow to play — which no decision
-          // records: the table judged it, each side for itself. Its
+          // A bot seat a juror held that the record gives to the
+          // escrow this hand — its holder quiet, or slow to play. Its
           // audit is settled with nothing said, the pieces having
-          // opened it in the clear, so a held seat the audits do not
-          // open is one whose pieces are its whole account. As with a
-          // person's: taken only from the custodians the seat's own
-          // deal steps named, and what they rebuild opens nothing
-          // unless it is the secret behind the key the seat dealt
-          // with — the one its own audit would have said.
-          if (h is BotSeat && heldAt(game.handNumber).containsKey(about)) d.seatLeft(about);
+          // opened it in the clear, so its pieces are its whole
+          // account. As with a person's: taken only from the
+          // custodians the seat's own deal steps named, and what they
+          // rebuild opens nothing unless it is the secret behind the
+          // key the seat dealt with — the one its own audit would have
+          // said. A held seat the record did not give up owes its own
+          // audit, as at the table (_botActs in client.dart), and
+          // pieces are no substitute.
+          if (h is BotSeat && (allEscrows[game.handNumber]?.contains(about) ?? false)) d.seatLeft(about);
         }
         if (!d.awaitsSecret(about)) continue;
         d.acceptRelease({'about': about, 'holder': r.author, 'share': r.body['share']});
@@ -408,7 +446,23 @@ Verification verifyRecord(
       final e = d.event;
       final seat = e.seat;
       final holder = holders[seat];
-      if (holder is! HumanSeat) continue;
+      if (holder is! HumanSeat) {
+        // A held seat given to the escrow: a claim by a person at the
+        // table, carried by the people or ruled by the jury as a boot is
+        // (_carryEscrow in client.dart). The seat is the escrow's from
+        // there to the end of the hand.
+        if (e.kind != EventKind.escrow) continue;
+        if (!heldAt(d.turn.hand).containsKey(seat)) return 'an escrow of seat $seat, which no juror held';
+        if (escrowedAt[d.turn.hand]?.contains(seat) ?? false) return 'seat $seat given to the escrow twice in hand ${d.turn.hand}';
+        if (!humans.contains(e.author)) return 'an escrow of seat $seat claimed by someone not at the table';
+        if (!carried(d.witnesses, d.turn, d.among) && !byVerdict(d)) {
+          return 'an escrow of seat $seat at ${d.turn} without a majority behind it (${d.witnesses.length} of ${d.among.length})';
+        }
+        escrowedAt.putIfAbsent(d.turn.hand, () => {}).add(seat);
+        if (d.turn.hand == game.handNumber) deal?.seatLeft(seat);
+        continue;
+      }
+      if (e.kind == EventKind.escrow) return 'an escrow of seat $seat, which is a person\'s';
       if (e.kind == EventKind.leave) {
         if (e.author != holder.key) return 'a leave signed by someone else';
       } else {
@@ -451,11 +505,16 @@ Verification verifyRecord(
   /// card, else the verification to return.
   Verification? takeAudits() {
     final d = deal!;
+    final audited = <int>{};
     while (nextIsAudit()) {
       final dec = record[index++];
       final e = dec.event;
       final seat = dec.turn.auditSeat;
       if (e.kind != EventKind.deal || e.round != 4 || e.seat != seat) return fail('expected an audit by seat $seat, saw ${e.kind.name}');
+      if (!audited.add(seat)) return fail('hand ${game.handNumber}: seat $seat audited twice');
+      // A seat the record gave to the escrow is audited from its pieces,
+      // with nothing said (_isEscrowedAudit in client.dart).
+      if (escrowedAt[dec.turn.hand]?.contains(seat) ?? false) return fail('an audit of seat $seat, which the record gave to the escrow');
       if (!mayAct(seat, e.author, dec.turn.hand)) return fail('an audit by a key that did not hold seat $seat');
       if (!carried(dec.witnesses, dec.turn, dec.among) && !byVerdict(dec)) {
         return fail('an audit at ${dec.turn} by seat $seat without a majority behind it (${dec.witnesses.length} of ${dec.among.length})');
@@ -480,7 +539,7 @@ Verification verifyRecord(
   /// Whether a bot seat a juror holds still has a step of [d] to take
   /// — any step, not only one of the round the deal is at. The table
   /// gives the hand up for a held seat that goes with anything of the
-  /// deal still to come (_handOverQuietSeats in client.dart), and the
+  /// deal still to come (_carryEscrow in client.dart), and the
   /// seat's last step is its word on the lead card.
   bool heldSeatOwes(DealSession d) {
     final hand = game.handNumber;
@@ -749,9 +808,21 @@ Verification verifyRecord(
     sweep();
   }
   if (deal != null) {
-    // The last hand is audited too.
+    // The last hand is audited too — after whatever the record removes
+    // at its audits, which comes first at their position as at every
+    // hand's. Taken straight to the audits, a claim for the escrow at
+    // one of them stopped the replay before any audit, and the hand's
+    // audits and that claim went unchecked.
+    final why = takeRemovals();
+    if (why != null) return fail(why);
     final v = takeAudits();
     if (v != null) return v;
+  }
+  // And nothing after: a decision the replay never reached is one it
+  // never checked.
+  if (index < record.length) {
+    final d = record[index];
+    return fail('the record goes on past the end of the game: ${d.removal ? 'a removal' : 'a ${d.event.kind.name}'} at ${d.turn}');
   }
   if (incomplete) return partial();
 

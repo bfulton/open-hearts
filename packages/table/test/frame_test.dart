@@ -82,6 +82,7 @@ void main() {
         'part': 'AAECAwQFBgcICQoLDA0ODw==',
       },
       EventKind.ended: {'hand': 0, 'turn': 59, 'seat': 3},
+      EventKind.escrow: {'hand': 0, 'turn': 9, 'seat': 3},
     };
     expect(bodies.keys, containsAll(EventKind.values), reason: 'a new kind wants a line here');
     for (final e in bodies.entries) {

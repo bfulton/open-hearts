@@ -11,9 +11,12 @@
 /// the sealed deal's three (docs/03-fair-deal.md): a step of the deal —
 /// keys, a shuffle, tokens, the lead declared, the audit — the release
 /// of a piece of a departed seat's secret, and a part of a new piece
-/// for a juror brought on mid-hand. And one more, outside the record: a
-/// person's word that the game has ended for them, stopped where
-/// nobody left could move it (client.dart, "juror quorum lost").
+/// for a juror brought on mid-hand. A claim that a held bot seat's
+/// juror is out at the seat's turn, which gives the seat to the escrow
+/// once it carries, as a boot removes a person. And one more, outside
+/// the record: a person's word that the game has ended for them,
+/// stopped where nobody left could move it (client.dart, "juror
+/// quorum lost").
 library;
 
 import 'dart:convert';
@@ -23,7 +26,7 @@ import 'signing.dart';
 
 /// Appended to, never reordered: a frame carries a kind as its place
 /// in this list (frame.dart).
-enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, jury, serve, appeal, verdict, deal, release, topup, ended }
+enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, jury, serve, appeal, verdict, deal, release, topup, ended, escrow }
 
 /// Which moment of a hand an event is about. A hand has four pass turns
 /// (one per seat, all open at once) followed by fifty-two play turns.

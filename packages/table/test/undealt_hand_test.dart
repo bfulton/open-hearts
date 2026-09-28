@@ -75,6 +75,9 @@ void main() {
       expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 10 * 60 * 1000), isTrue,
           reason: 'the game was played out: ${c.describe()}');
       expect(c.game.handNumber, greaterThan(hand), reason: 'the hand was given up and another played');
+      for (final other in t.clients) {
+        expect(other.record.map((d) => d.key).toList(), c.record.map((d) => d.key).toList(), reason: 'one record');
+      }
       for (final c in t.clients) {
         final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
         expect(v.ok, isTrue, reason: v.reason);
@@ -86,12 +89,19 @@ void main() {
   }
 
   // A table whose only held seat's juror goes before it says a word:
-  // three people and one bot. Nothing in the record speaks for the
-  // seat, so the replay has no juror's step to tell it the seat was
-  // held at all, and took it for one everybody works out — dealt its
-  // keys in public and found the deal stopped at a person's shuffle.
-  // The hand's draw names a juror for it, and a hand stopped at the
-  // keys with a named juror silent is the one the table gave up.
+  // three people and one bot. Nothing its juror said is in the record,
+  // so the replay had no juror's step to tell it the seat was held at
+  // all, and took it for one everybody works out — dealt its keys in
+  // public and found the deal stopped at a person's shuffle. The
+  // hand's draw names a juror for it; and now the escrow claimed at
+  // the seat's keys turn is on the record too, a claim the table only
+  // makes of a held seat.
+  //
+  // It is also where the escrow and a jury drawn again without the
+  // silent juror race, each a round trip. A side that carried the
+  // escrow first gave the hand up and then, carried the draw, dealt
+  // the next hand to it — the hand given up's jury — and never met the
+  // rest of the table again.
   test('a hand given up because its one held seat never spoke checks out', () {
     final t = SimTable(humans: 3, seed: 9, crypto: crypto, jurors: jurySize + 4, target: 1);
     t.start();
@@ -105,8 +115,12 @@ void main() {
     expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 15 * 60 * 1000), isTrue,
         reason: 'the game went on: ${c.describe()}');
     expect(c.game.handNumber, greaterThan(hand), reason: 'the hand was given up and another played');
-    expect(c.record.where((d) => d.turn.hand == hand && d.event.seat == held.keys.single), isEmpty,
-        reason: 'nothing in the record speaks for the seat in the hand given up');
+    expect(c.record.where((d) => d.turn.hand == hand && d.event.seat == held.keys.single).map((d) => (d.removal, d.event.kind)),
+        [(true, EventKind.escrow)],
+        reason: 'the escrow claimed at its keys is all the record holds of the seat in the hand given up');
+    for (final other in t.clients) {
+      expect(other.record.map((d) => d.key).toList(), c.record.map((d) => d.key).toList(), reason: 'one record');
+    }
     for (final c in t.clients) {
       final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
       expect(v.ok, isTrue, reason: v.reason);

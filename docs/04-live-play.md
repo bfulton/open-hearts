@@ -635,6 +635,41 @@ here at all at first, a deal that could not finish being caught by
 silence alone — and a juror heard from and doing nothing is never
 silent, so the deal waited on its keys for good.
 
+**Given up on the record.** Which of those says the juror is out —
+half a minute's silence, or its time on the turn — is each side's own
+reading, and it once decided the seat too: each side gave the seat up
+for itself, with nothing in the record, and two sides could give it up
+at different turns, or one could and the other not. Now a reading only
+proposes. A person at the table whose clocks say the juror is out
+claims the seat for the escrow at the seat's own turn, and the claim
+is carried as a boot is: by a majority of the people, or, where they
+split — the juror's move reached some of them in time and the rest had
+claimed — by the jury, which rules for the move if the juror is heard
+and for the escrow if it is not, or is out of time by the juror's own
+clock. Every record holds the claim that carried, at the turn it was
+made, and from there to the end of the hand the seat is the escrow's.
+It is played by the first of the escrow's jurors still heard, the
+seat's own juror left to last: the seat moves off a slow juror while
+anyone else is about, and is not stranded when that juror is the one
+back. A move the juror said before it knew, landing after the escrow,
+is as good as the escrow's own — the same card by another voice, which
+the table settles as it settles two voices anywhere
+(`packages/table/test/two_voices_test.dart`). Its audit is the
+exception: a seat given to the escrow is audited from its pieces, in
+the open, and that audit is nobody's move. Its juror does not say it,
+and one said before the juror knew is not taken, even when it is
+already in hand as the escrow carries: taken at a side still waiting
+for the pieces and witnessed, it would carry there while the rest
+closed the turn from the pieces. A split on a held seat's deal step
+or its audit — the step reaching some of the people, the claim made
+by the rest — is ruled as a card's is. Every side used to drop a
+ruling for a held seat's step, taking only a card from the jury, and
+the turn waited for good. The verifier holds the
+record to the same: an escrow claimed by a person at the table,
+carried or ruled for, of a seat the hand's draw gave a juror, once in
+a hand; only the seat's own juror moving it before, and any juror of
+the hand after (`packages/table/test/escrow_on_record_test.dart`).
+
 The deal step's clock waits for its holder to be at the hand. A deal
 step is the first thing a holder does in a hand, so it is the one turn
 a holder can still be arriving at: drawn this minute, summoned,
@@ -1292,19 +1327,24 @@ custodians still being heard from, since they all hold the same key
 and would all say the same card. Its audit is the exception: by then
 the secret is in the open and every side settles it for itself. A
 juror that did not see the seat given up — the seat's own juror, only
-late, or one summoned for the next hand and carried in behind — waits
-for that audit to be said and witnessed, and it never will be, nor
-carried, since a turn settled with nothing said leaves nothing to
-carry. So a juror still at a hand's audit of a bot seat, once most of
-the table has been heard at a later hand for a few seconds, settles it
-the same way (`audit_left_behind_test.dart`; sealed chaos seed 5, where
-such a juror held a seat two hands on and the table waited on its keys
-with every juror heartbeating).
+late, or one summoned for the next hand and carried in behind — used
+to wait for that audit to be said and witnessed, and it never would
+be, nor carried, since a turn settled with nothing said leaves nothing
+to carry. So a juror still at a hand's audit of a bot seat, once most
+of the table has been heard at a later hand for a few seconds,
+settles it the same way (`audit_left_behind_test.dart`; sealed chaos
+seed 5, where such a juror held a seat two hands on and the table
+waited on its keys with every juror heartbeating). With the escrow on
+the record there is something to carry — the escrow itself, and a
+side carried to it closes the audit from the pieces — and that rule
+stays behind it until the next step ([doc 07](07-states.md), "Next").
 
-One juror, but not always one voice. Which peers have given a seat up
-is each peer's own judgement, so a juror late with its card — behind,
-not gone — comes back and says it while the custodian is saying the
-same card for it: two events, one move. Each peer witnesses whichever
+One juror, but not always one voice. A juror late with its card —
+behind, not gone — has it on the wire while the custodian the record
+gave the seat to says the same card for it: two events, one move.
+(When giving a seat up was each peer's own judgement, the two voices
+overlapped before anything was on the record; now the juror's card
+has to land after the escrow to be one of two.) Each peer witnesses whichever
 it hears first, and at a table of two that can leave each person
 behind a different one with neither able to carry. A person's seat
 never has this, since one key saying two things is equivocation and
@@ -1480,9 +1520,12 @@ nothing, for good. It counts the jury the deal was sealed to and the
 newcomers it has seen sent a whole set of parts
 (`packages/table/test/quorum_lost_test.dart`).
 
-A hand given up in its deal leaves nothing in the record — each side
-judges it for itself — so a juror carried in afterwards, drawn for the
-next hand, replays that deal as far as it went and waits there. Where
+A hand given up in its deal is on the record now, as the escrow of the
+held seat that still owed a step of it (above), and a juror carried in
+afterwards is carried to that escrow and gives the hand up with it.
+Until that, it left nothing in the record — each side judged it for
+itself — so a juror carried in afterwards, drawn for the next hand,
+replayed that deal as far as it went and waited there. Where
 the seat's holder went silent it would wait half a minute from when
 the jury naming that holder reached it, which for a newcomer is now;
 the table dealing the next hand stopped waiting for the newcomer's
@@ -1491,24 +1534,33 @@ at once is the table: a majority of the players heard at a later hand,
 and five seconds more without the rest of this deal arriving, which a
 deal they had finished would have done. It gives the hand up then, as
 they did — the same inference the verifier makes from the record
-(`packages/table/test/undealt_hand_test.dart`).
+(`packages/table/test/undealt_hand_test.dart`). Both are still there
+behind the escrow on the record, until the next step takes them out
+([doc 07](07-states.md), "Next").
+
+The escrow on the record and a jury drawn again without the silent
+juror race here, each a round trip, and a side can carry them in
+either order. One that gave the hand up first and was then carried the
+draw rebuilt its deal for it — the next hand's deal, dealt to the
+hand given up's jury — and never met the rest of the table again. A
+jury carried for a hand the table has left rebuilds nothing now.
 
 The audit of a held seat given to the escrow is settled with nothing
-said, from the pieces released at the hand's end — unless the seat's
-own juror is still heard from, in which case it is waited for and
-witnessed like anyone's, within the same ten seconds a deal step has.
-Giving a seat up is each side's own judgement, and a juror's move that
-reaches one person in time and another a moment late has the seat
-given up at one side and not the other. The move itself comes out the
-same either way; the audit did not. The side that gave the seat up
-settled it silently, the other waited for everyone to witness the
-juror's own audit, and the first never did: the table stopped there
-for good, or finished holding two different records
+said, from the pieces released at the hand's end. Until the record
+gives the seat up, its own juror's audit is waited for and witnessed
+like anyone's — and a juror sitting on it is on the clock like one
+sitting on a deal step, so the people claim the seat for the escrow at
+the audit itself. When giving a seat up was each side's own judgement,
+a juror's move that reached one person in time and another a moment
+late had the seat given up at one side and not the other. The move
+came out the same either way; the audit did not. The side that gave
+the seat up settled it silently, the other waited for everyone to
+witness the juror's own audit, and the first never did: the table
+stopped there for good, or finished holding two different records
 (`packages/table/test/audit_left_behind_test.dart`, found by the
-explorer's top-up scenario at the 4,000th of 4,207 runs).
-A juror sitting on its audit is on the clock like one sitting on a
-deal step, so a side that never gave the seat up does not wait for it
-for good either.
+explorer's top-up scenario at the 4,000th of 4,207 runs). On the
+record, the same timing is one race between the move and the claim,
+and every record holds its winner.
 
 **Per hand, not per game.** The deck is resealed every hand, so shares
 are per-hand and a juror's whole obligation is one hand — p50 a minute,
@@ -1529,8 +1581,8 @@ three seats are bots, and each is held and played by a juror of its own
 ("Playing a seat nobody holds" above) — not computed with the survivor,
 who would then be a party to a hand they must not learn. One juror per
 seat, so no juror can subtract its own thirteen from the deck and read
-the human's by elimination. If a holder drops, another juror rebuilds
-the seat from the escrow and plays on.
+the human's by elimination. If a holder drops, the table gives its seat
+to the escrow, and another juror rebuilds the seat and plays on.
 
 **If the jury is lost anyway**, the table pauses, says so, and resumes
 when one is rebuilt — or, stopped at a hand nobody left can open or a
@@ -1668,12 +1720,15 @@ On the wire:
   plays, and publishes its secret at the audit with everyone else's.
   The assignment is frozen at the hand's first jury (`botHolders`), so
   a jury redrawn mid-hand moves permission — which juror may act for
-  the seat — without moving the seat itself. When a holder is no
-  longer among the live jurors, another rebuilds the seat from the
-  escrow and plays on. The verifier recomputes the assignment from the
-  record, checks the author of every move for a held seat against the
-  hand's jury, and checks the move itself against the policy once the
-  audit opens the hand.
+  the seat — without moving the seat itself. When a holder is gone, or
+  out of time on the seat's turn, the people claim the seat for the
+  escrow and carry the claim as they carry a boot; another juror
+  rebuilds the seat from the escrow and plays on. The verifier
+  recomputes the assignment from the record, checks the author of every
+  move for a held seat against the hand's jury — its own juror until
+  the record gives it to the escrow, any juror of the hand after — and
+  checks the move itself against the policy once the audit opens the
+  hand.
 
 The simulator's jury rows (`packages/table/test/jury_test.dart`): a
 table of two with one gone quiet off turn and on it; four cut two and
