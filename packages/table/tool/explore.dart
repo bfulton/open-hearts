@@ -118,8 +118,8 @@ final scenarios = <String, Scenario>{
       final c = t.clients.first;
       final drawn = c.juries.isEmpty ? const <PublicKey>[] : c.juries.first.event.jurors;
       // Two that hold no seat. A holder that goes during the deal takes
-      // the hand with it (_handOverQuietSeats), which is its own case
-      // and would leave no top-up to watch.
+      // the hand with it (_carryEscrow), which is its own case and
+      // would leave no top-up to watch.
       final held = c.botHolders(c.game.handNumber).values.toSet();
       for (final k in drawn.where((k) => !held.contains(k)).take(2)) {
         t.net.goOffline(k);

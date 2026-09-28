@@ -2629,7 +2629,7 @@ class TableClient {
 
   bool get _hasBotSeats => holders.any((h) => h is BotSeat);
 
-  void _startDeal() {
+  void _startDeal({bool drain = true}) {
     final c = crypto!;
     final held = botHolders(game.handNumber);
     _heldByHand[game.handNumber] = held;
@@ -2691,6 +2691,10 @@ class TableClient {
     // whole hand in its deferred list, deferring everything the table
     // said after, and the seat it held two hands later was never
     // dealt.
+    //
+    // Not yet when the deal is built again ([_refixHolders]): the
+    // steps that already settled go back in first.
+    if (!drain) return;
     _drainFuture();
     _bootLiars();
     _actOnDeal();
@@ -2923,7 +2927,7 @@ class TableClient {
         'the bot seats were fixed; they are dealt again');
     _heldByHand.remove(hand);
     _heldFrom.remove(hand);
-    _startDeal();
+    _startDeal(drain: false);
     // And the steps that settled against the assignment we have just
     // discarded are taken into the new session, in the order the deal
     // takes them. They are all still here — a settled race keeps the
@@ -2945,6 +2949,17 @@ class TableClient {
         if (race != null && race.settled && e != null) _applyDeal(e, seat);
       }
     }
+    // With them back in, the deal may be further on than the turns
+    // open here: a round whose steps had all settled opens the next.
+    // And only then what was held back for it, taken against the whole
+    // of the deal rather than the part rebuilt so far. The other way
+    // round, one held-back seat's keys went into a session that had
+    // none of the others', the round closed with the deal still at its
+    // keys, and nothing asked the deal to go on again — every turn of
+    // that round had settled, and the shuffles were waiting on it. A
+    // juror topped up mid-hand sat at the keys to the end of the game
+    // (explorer, topup scenario).
+    _advanceDeal();
     // Anything refused against the old assignment is worth another
     // look now: it was kept rather than dropped for exactly this.
     _drainFuture();
