@@ -267,7 +267,8 @@ host closes it (`JurorDuty`), though the simulator's never does.
 
 Measured twice: first as the table was, then with the game ending
 wherever the jury is gone and nobody is left to draw (below, and doc
-04, "When quorum is lost anyway").
+04, "When quorum is lost anyway"). A third time, with the escrow on
+the record, is under "The escrow on the record".
 
 **The chaos walk**, 250 seeds and 14 sealed. Every invariant held,
 both times; the second time under a walk that also fails any seed
@@ -428,6 +429,24 @@ stopped and the network has healed, with sides still playing apart on
 the escrow. Sides that have ended the game for a lost quorum are left
 out: one can carry an escrow the other never hears of, over a game
 that is over and unscored (sealed seed 2).
+
+Measured again with the same walk and explorer as above, on the code
+with all of this in:
+
+| Where | Before: apart on the escrow, still at the end among sides online | Now |
+|---|---|---|
+| chaos walk, 250 seeds and 14 sealed | 8 walks, none at the end | 1 walk, 1 at the end: sealed seed 2, both people having ended the game |
+| explorer, deal (869 runs) | 11 runs, 11 at the end | 2 runs, none at the end |
+| explorer, two (1,387) | 3, 3 | 2, none |
+| explorer, leave (1,343) | 1, 1 | none |
+| explorer, summons (869) | 11, 11 | 2, none |
+| explorer, topup (4,208) | 14, 13 | 11, none: in each the side still apart is one of the two jurors the scenario takes offline for good |
+
+Every walk and every run held. The rest of what the walk reads is as
+before: stuck on nobody in six walks and in none at the end, apart on a
+seat in seed 43 and on the game's end in sealed seed 2, neither at the
+end. What is read now is an escrow in flight: claimed at a turn and
+carried at some sides a moment before the rest.
 
 And one rule was tried and taken out again: keeping the seat's own
 juror off the jury's ruling on its own seat, since to itself it is
