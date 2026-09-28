@@ -654,7 +654,10 @@ anyone else is about, and is not stranded when that juror is the one
 back. A move the juror said before it knew, landing after the escrow,
 is as good as the escrow's own — the same card by another voice, which
 the table settles as it settles two voices anywhere
-(`packages/table/test/two_voices_test.dart`). Its audit is the
+(`packages/table/test/two_voices_test.dart`). So a turn can hold both
+the escrow and a move, and a side that hears the backing for the move
+before the claims takes the escrow all the same when they come. Its
+audit is the
 exception: a seat given to the escrow is audited from its pieces, in
 the open, and that audit is nobody's move. Its juror does not say it,
 and one said before the juror knew is not taken, even when it is

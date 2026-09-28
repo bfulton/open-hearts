@@ -396,6 +396,15 @@ Building it turned up these, each now a test:
   audit. The jury ruled for the step, and every side dropped the
   ruling, taking only a card from the jury; the turn would have
   waited for good.
+- **An escrow heard too late to count.** A turn can hold both the
+  escrow and a move after it. A side that heard the backing for the
+  move before the claims settled the move, then dropped the claims as
+  late, and held the seat as its juror's for the rest of the hand:
+  four jurors topped up mid-hand, in the explorer's topup scenario,
+  would have taken none of the escrow's moves for it. Claims, their
+  witnesses and a ruling for the escrow are now taken at a play or a
+  pass already settled by the move, and the escrow is recorded beside
+  it.
 - **The last hand's audits unchecked.** A hand's four audits share a
   position, and a removal sorts first at a position, so an escrow
   claimed at an audit comes before the audits. The verifier took each
@@ -403,6 +412,12 @@ Building it turned up these, each now a test:
   stopped at the claim and checked neither it nor the audits. It also
   took a seat audited twice, and a record that went on past the end
   of the game.
+
+The chaos walk now fails a seed that ends, once the faults have
+stopped and the network has healed, with sides still playing apart on
+the escrow. Sides that have ended the game for a lost quorum are left
+out: one can carry an escrow the other never hears of, over a game
+that is over and unscored (sealed seed 2).
 
 And one rule was tried and taken out again: keeping the seat's own
 juror off the jury's ruling on its own seat, since to itself it is
