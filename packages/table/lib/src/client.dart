@@ -2040,10 +2040,14 @@ class TableClient {
     final turn = event.turn;
     final where = _compare(turn);
     if (where > 0) return _defer(event);
-    if (where < 0) return _catchUp(turn);
     final race = _races[turn];
+    if (where < 0 || (race?.settled ?? false)) {
+      if (_lateEscrowAt(turn) && event.seat == _turnSeat[turn] && _participantsAt(turn).contains(event.author)) {
+        _takeLateClaim(turn, event);
+      }
+      return _catchUp(turn);
+    }
     if (race == null) return _defer(event); // current, and not open yet
-    if (race.settled) return _catchUp(turn);
     final seat = _turnSeat[turn]!;
     if (event.seat != seat || !_isParticipant(event.author)) return;
     if (botHolders(turn.hand)[seat] == null || _isEscrowed(turn.hand, seat)) return;
@@ -2078,6 +2082,73 @@ class TableClient {
   /// would differ. So its juror does not say it ([_actOnDeal]), and
   /// one said anyway — before the juror knew — is not taken.
   bool _isEscrowedAudit(TurnId turn, int seat) => turn.isAudit && _isEscrowed(turn.hand, seat);
+
+  /// Whether a claim for the escrow at [turn] is still to be taken here
+  /// although the turn has settled here by the seat's move.
+  ///
+  /// The record elsewhere can hold both at one turn: the escrow carried,
+  /// the turn opened again, and the people backing a move — the seat's
+  /// own juror's, said before it knew, or the escrow's. A side carried
+  /// in behind, or one that heard the backing for the move before the
+  /// claims, settles the move first; the claims then arrive at a turn
+  /// that is over, and were dropped. That side held the seat as its
+  /// juror's for the rest of the hand, where every other side held it
+  /// as the escrow's, and took none of the escrow's moves (a juror
+  /// topped up mid-hand, in the explorer's topup scenario). So they are
+  /// still taken, and the escrow recorded once a majority is seen
+  /// behind it, or the jury's ruling ([_settleLateEscrow]). Only at a
+  /// play or a pass: at a deal step the escrow ends the hand, and at an
+  /// audit nothing is moved after it, so neither holds both.
+  bool _lateEscrowAt(TurnId turn) {
+    final seat = _turnSeat[turn];
+    if (seat == null || !(turn.isPlay || turn.isPass)) return false;
+    if (_races[turn]?.settled != true) return false;
+    return botHolders(turn.hand)[seat] != null && !_isEscrowed(turn.hand, seat);
+  }
+
+  void _takeLateClaim(TurnId turn, TableEvent claim) {
+    final race = _races[turn]!;
+    if (!race.boots.any((b) => b.id == claim.id)) race.boots.add(claim);
+    race.forRemoval.add(claim.author);
+    race.forRemoval.addAll(_earlyWitnesses.remove(claim.id) ?? const {});
+    race.witnessEvents.addAll(_earlyWitnessEvents.remove(claim.id) ?? const []);
+    _settleLateEscrow(turn);
+  }
+
+  /// The escrow at [turn], carried elsewhere and settled here by the
+  /// seat's move first: recorded beside the move, and the seat the
+  /// escrow's from there, as at every other side ([_lateEscrowAt]).
+  /// Nothing opens again: the move stands, as it does on their records.
+  void _settleLateEscrow(TurnId turn, {TableEvent? verdict}) {
+    final race = _races[turn]!;
+    final of = _participantsAt(turn);
+    if (verdict == null && race.forRemoval.intersection(of).length < _majority(of)) return;
+    final seat = _turnSeat[turn]!;
+    final hand = turn.hand;
+    final claim = verdict?.ruled ?? race.boots.first;
+    _log(Decision(
+      turn: turn,
+      event: claim,
+      witnesses: {...race.forRemoval, if (verdict != null) verdict.author},
+      removal: true,
+      among: of,
+      verdict: verdict,
+    ));
+    _trace('bot seat $seat to the escrow at $turn, carried there after its move had settled here');
+    _escrowed.putIfAbsent(hand, () => {})[seat] = turn;
+    final holder = botHolders(hand)[seat];
+    if (holder != null && _liveJurors(hand).contains(holder)) _letGo.add(holder);
+    if (hand == game.handNumber) {
+      final d = _deal;
+      if (d != null) {
+        d.seatLeft(seat);
+        _releaseFor(seat);
+      }
+      _drainFuture();
+      _takeUpSeat(seat);
+    }
+    _notify();
+  }
 
   /// Whether a held seat's juror is out, by this side's clocks: not
   /// heard from for half a minute, or past its allowance on the turn
@@ -2169,7 +2240,20 @@ class TableClient {
     }
     final race = _races[turn];
     if (race != null) {
-      if (race.settled) return _catchUp(turn);
+      if (race.settled) {
+        if (_lateEscrowAt(turn)) {
+          if (race.boots.any((b) => b.id == id)) {
+            race.forRemoval.add(event.author);
+            race.witnessEvents.add(event);
+            _settleLateEscrow(turn);
+          } else if (race.action?.id != id && !race.rivals.containsKey(id)) {
+            // To a claim not heard here yet, perhaps: kept for it.
+            _earlyWitnesses.putIfAbsent(id, () => {}).add(event.author);
+            _earlyWitnessEvents.putIfAbsent(id, () => []).add(event);
+          }
+        }
+        return _catchUp(turn);
+      }
       if (race.action?.id == id) {
         race.forAction.add(event.author);
         race.witnessEvents.add(event);
@@ -4801,10 +4885,27 @@ class TableClient {
     if (!_jurorsOf(turn.hand).contains(event.author) && !_orderFor(turn.hand).contains(event.author)) return;
     final where = _compare(turn);
     if (where > 0) return _defer(event);
-    if (where < 0) return _catchUp(turn);
     final race = _races[turn];
+    if (where < 0 || (race?.settled ?? false)) {
+      // The escrow ruled for at a turn settled here by the seat's move
+      // first ([_lateEscrowAt]).
+      final ruled = event.ruled;
+      if (event.side == 'removal' &&
+          _lateEscrowAt(turn) &&
+          ruled != null &&
+          ruled.kind == EventKind.escrow &&
+          ruled.table == spec.id &&
+          ruled.turn == turn &&
+          ruled.seat == _turnSeat[turn] &&
+          event.seat == ruled.seat &&
+          _participantsAt(turn).contains(ruled.author)) {
+        if (!race!.boots.any((b) => b.id == ruled.id)) race.boots.add(ruled);
+        _seen.add(ruled.id);
+        _settleLateEscrow(turn, verdict: event);
+      }
+      return _catchUp(turn);
+    }
     if (race == null) return _defer(event);
-    if (race.settled) return _catchUp(turn);
     final seat = _turnSeat[turn]!;
     if (event.seat != seat) return;
     final holder = holders[seat];

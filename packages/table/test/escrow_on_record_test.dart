@@ -415,6 +415,62 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
+  // A turn that holds both the escrow and a move after it can settle
+  // by the move first where the claims come late: three people, a and
+  // b carrying the escrow between them and then backing the juror's
+  // card, which lands after it; c, whose copies of their claims are
+  // held back, holding the card and their backing for it first. The
+  // claims that come after are taken all the same, and c's record is
+  // theirs.
+  test('an escrow carried elsewhere is taken where its turn settled by the move first', () {
+    final t = SimTable(humans: 3, seed: 9, crypto: crypto, jurors: jurySize + 2, target: 1);
+    t.start();
+    final a = t.clients.first;
+    final c = t.clients.last;
+    final at = soonestHeld(t);
+    // The seat's juror the one juror up, so that the card it said is
+    // the only one the seat will have.
+    for (final j in t.jurors) {
+      if (j.signer.publicKey != at.holder) t.net.goOffline(j.signer.publicKey);
+    }
+    final claims = <String>{};
+    int? cardAt, claimsUntil;
+    t.net.steer = (from, to, message) {
+      final kind = message['kind'];
+      final body = message['body'] as Map<String, Object?>;
+      if (kind == 'play' && message['author'] == at.holder && body['hand'] == at.hand && body['seat'] == at.seat) {
+        cardAt ??= t.clock.nowMs + 6000;
+        return t.clock.nowMs < cardAt! ? cardAt! - t.clock.nowMs : null;
+      }
+      if (kind == 'escrow') {
+        claims.add(message['id'] as String);
+        claimsUntil ??= t.clock.nowMs + 12000;
+      } else if (kind != 'witness' || !claims.contains(body['event'])) {
+        return null;
+      }
+      if (to != c.signer.publicKey || from == c.signer.publicKey || t.clock.nowMs >= claimsUntil!) return null;
+      return claimsUntil! - t.clock.nowMs;
+    };
+    final lines = <String>[];
+    c.log = lines.add;
+    expect(t.clock.runUntil(() => t.clients.every((x) => x.game.tricksPlayed >= 1), limitMs: 3 * 60 * 1000), isTrue,
+        reason: 'the table moved past the seat:\n${t.clients.map((x) => x.describe()).join('\n')}');
+    t.clock.advance(15000);
+    expect(lines.any((l) => l.contains('settled ${at.turn} play')), isTrue);
+    final settledFirst = lines.indexWhere((l) => l.contains('settled ${at.turn} play'));
+    final givenAfter = lines.indexWhere((l) => l.contains('bot seat ${at.seat} to the escrow at ${at.turn}'));
+    expect(givenAfter, greaterThan(settledFirst), reason: 'c settled the card first, and took the escrow after');
+    for (final x in t.clients) {
+      expect(x.escrowedAt(at.hand), {at.seat: at.turn}, reason: 'at ${x.signer.publicKey.substring(0, 4)}');
+      final upTo = x.record.where((d) => d.turn.hand == at.hand && d.turn.index <= at.turn.index).map((d) => d.key).toList();
+      expect(upTo, a.record.where((d) => d.turn.hand == at.hand && d.turn.index <= at.turn.index).map((d) => d.key).toList(),
+          reason: 'one record as far as the seat\'s turn');
+      final v = verifyRecord(t.spec, x.record, allowPartial: true, juries: x.juries, crypto: crypto, releases: x.releases);
+      expect(v.ok, isTrue, reason: v.reason);
+    }
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   // A custodian says the seat's move once the escrow is carried where
   // it is, and that can be before it is carried somewhere else. There
   // the move is by a juror the seat is not yet given to, so it is kept
