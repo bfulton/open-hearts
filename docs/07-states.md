@@ -405,6 +405,16 @@ Building it turned up these, each now a test:
   witnesses and a ruling for the escrow are now taken at a play or a
   pass already settled by the move, and the escrow is recorded beside
   it.
+- **A deal built again, out of order.** A juror topped up mid-hand
+  reads the redraw before the draw the deal was sealed to, and builds
+  its deal again when that draw comes. The rebuild took up what had
+  been held back for the deal before putting back the steps already
+  settled, so one held-back seat's keys went into a session that had
+  none of the others'. The round of keys closed with the deal still
+  at its keys, and nothing asked it to go on: the juror sat at the
+  hand's keys to the end of the game (`deal_rebuilt_test.dart`). This
+  one is older than the escrow on the record; the traffic of the
+  escrow moved the timing onto it.
 - **The last hand's audits unchecked.** A hand's four audits share a
   position, and a removal sorts first at a position, so an escrow
   claimed at an audit comes before the audits. The verifier took each
