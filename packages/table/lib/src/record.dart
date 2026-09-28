@@ -363,14 +363,11 @@ Verification verifyRecord(
     jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
   }
 
-  // The jury in its drawn order, across several juries by their event
-  // ids: a bot seat's holder comes out of this, and a set's iteration
-  // order would hand the same seat to different jurors here than at
-  // the table (docs/04-live-play.md).
-  // The first jury drawn for each hand, by event id: a bot seat's
-  // holder is named by the draw the hand opened with, and a redraw
-  // later in the hand moves the jury without moving the seat.
-  for (final d in juries.toList()..sort((a, b) => a.event.id.compareTo(b.event.id))) {
+  // The first jury drawn for each hand, in the table's order
+  // ([compareJuries]): a bot seat's holder is named by the draw the hand
+  // opened with, and a redraw later in the hand moves the jury without
+  // moving the seat.
+  for (final d in juries.toList()..sort(compareJuries)) {
     juryOrder.putIfAbsent(d.event.hand, () => d.event.jurors);
   }
 

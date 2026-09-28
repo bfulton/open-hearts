@@ -217,7 +217,7 @@ and the rules that exist only because it is not on the record:
 
 | Decided here | What it has cost | Rules standing in for a record |
 |---|---|---|
-| Which draw a deal is sealed to | holders read from different juries while a draw is in flight, for two seconds in most top-up runs (below) | `_juryFirmMs` (2 s), `_refixHolders` |
+| Which draw a deal is sealed to | holders read from different juries while a draw is in flight, for two seconds in most top-up runs (below); and one hand sealed to two draws, where a draw proposed earlier arrived after a step had settled on a later one (sealed chaos seed 2 with nine strangers to draw from, `tool/chaos.dart --jurors 9`) | `_juryFirmMs` (2 s), `_refixHolders` |
 | Bot seats dealt in the open at 40 s | not seen; two sides judging the 40 s differently would deal one hand two ways | — |
 | The game ended for a lost quorum | the people ending it up to five seconds apart, and the last juror not told (below). It is said now: a juror stops on hearing it, and a person stopped at the same turn ends with it | the two minutes a side that hears too little of the table waits |
 | Which way a seat left, where a leave crosses a boot | the people and the jurors holding different records to the end of a game (below) | `_onLeave` passing over a leave for a seat already removed |

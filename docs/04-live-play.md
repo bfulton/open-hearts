@@ -1277,6 +1277,20 @@ and an assignment fixed before the hand's first jury arrived is fixed
 again, the deal rebuilt with it and the steps that already settled fed
 back into the rebuilt session.
 
+The verifier did not order them that way. It took a hand's first jury
+by event id, and a hand drawn again twice at one trick, the lower id
+on a redraw of three strangers, read to it as a hand with no jury able
+to hold a bot seat: it computed their keys itself and turned down a
+record the table had played by the first draw (sealed chaos seed 1,
+with nine strangers to draw from). Both read one order now
+(`compareJuries`): where each draw was proposed, then whose seat
+proposed it, then the id (`packages/table/test/jury_order_test.dart`).
+That is still each side reading the draws it has heard, though. A draw
+proposed earlier can arrive after a step has settled on a later one,
+and sides then seal one hand to two draws (seed 2); which draw a deal
+is sealed to is the next thing to put on the record
+([doc 07](07-states.md), "Decided here").
+
 **Which seats are bots is the other half of that**, and it was still
 being read off the seat list as it stood at the instant the
 assignment was fixed. The seats are handed out in order, so a peer
@@ -1785,7 +1799,13 @@ two with the jury reaching all; the foreman crashing; the whole jury
 going quiet; nobody online and a juror of last resort; nobody online
 and none. The chaos walk draws four jurors and lets them go too. It
 ends every seed finished, or ended for a lost quorum, judged against
-who really was up the moment the ending was seen. A seed left stopped
+who really was up the moment the ending was seen — and up to that
+side: a juror across a partition is up and can do nothing for it, and
+the side cannot tell that silence from a crash. That moment is the
+instant the side ends, not the walk's next look five seconds later: a
+partition that healed in between once made an ending over fifty
+seconds of silence look like one with two jurors in reach (sealed
+seed 4, nine strangers). A seed left stopped
 where nobody up could move the table fails the walk, since the game
 should have ended there. That means a seat nobody up could open (at a
 held bot seat, fewer than the two jurors holding a piece that it

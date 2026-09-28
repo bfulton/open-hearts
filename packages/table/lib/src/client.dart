@@ -213,6 +213,26 @@ class Decision {
       '$turn ${jury ? 'JURY' : removal ? 'OUT' : 'ok'} $event by ${witnesses.length}${verdict != null ? ' by verdict' : ''}';
 }
 
+/// The order a hand's juries come in: where each was proposed, then by
+/// whose seat, then by id. Read from the proposal alone, so that every
+/// side, whatever order it heard them in, and the verifier, which is
+/// handed them loose, put them the same way round — the first is the
+/// draw a bot seat's holder is read from.
+///
+/// The verifier used to go by id alone. A hand drawn again twice at one
+/// trick, with the lower id on a redraw of three, was then read as
+/// having no jury able to hold its bot seats: the verifier took their
+/// keys to be anybody's to compute, and turned down a record the table
+/// had played by the first draw (sealed chaos seed 1, nine jurors).
+int compareJuries(Decision a, Decision b) {
+  final x = a.event.turn;
+  final y = b.event.turn;
+  if (x.hand != y.hand) return x.hand.compareTo(y.hand);
+  if (x.position != y.position) return x.position.compareTo(y.position);
+  final by = a.event.seat.compareTo(b.event.seat);
+  return by != 0 ? by : a.event.id.compareTo(b.event.id);
+}
+
 class TableClient {
   TableClient({
     required this.spec,
@@ -2837,11 +2857,7 @@ class TableClient {
   /// different juror for every bot seat. It then watched the wrong
   /// juror for silence, never gave the seat up when the real holder
   /// went, and sat out the rest of the hand.
-  List<Decision> _juriesDrawnFor(int hand) => _juriesFor(hand).where((d) => d.event.hand == hand).toList()
-    ..sort((a, b) {
-      final by = a.compareTo(b);
-      return by != 0 ? by : a.event.id.compareTo(b.event.id);
-    });
+  List<Decision> _juriesDrawnFor(int hand) => _juriesFor(hand).where((d) => d.event.hand == hand).toList()..sort(compareJuries);
 
   /// The assignment against what the record now says it should be.
   /// Both of its two inputs can arrive after it was fixed:

@@ -198,6 +198,11 @@ class SimNetwork {
   /// Whether [key]'s process is running and its link is not silent.
   bool isUp(PublicKey key) => !_dead.contains(key) && !_offline.contains(key);
 
+  /// Whether anything [from] says can reach [to] at all just now: both
+  /// up, on the same side of any partition, and the link between them
+  /// not cut.
+  bool canReach(PublicKey from, PublicKey to) => _reachable(from, to);
+
   bool _reachable(PublicKey from, PublicKey to) {
     if (_dead.contains(from) || _dead.contains(to)) return false;
     if (_offline.contains(from) || _offline.contains(to)) return false;

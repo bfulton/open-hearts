@@ -158,6 +158,23 @@ String? walkChaos(int seed,
   // after the draw, having never heard from it.
   Set<PublicKey> upNow() => {for (final j in t.liveJurors) if (j.client != null) j.signer.publicKey};
 
+  // And of those, the ones [c] can reach just now. A juror across a
+  // partition is up and can do nothing for this side: nothing it says
+  // arrives, and the side ends the game on exactly that silence, which
+  // it cannot tell from a crash (doc 04, "When quorum is lost anyway").
+  Set<PublicKey> reachableFrom(TableClient c) =>
+      {for (final k in upNow()) if (t.net.canReach(c.signer.publicKey, k)) k};
+
+  // Taken the instant each side ends the game, not at the next check:
+  // a partition that heals in the five seconds between would make an
+  // ending over a silence look like one with a juror in reach.
+  final reachAtEnd = <TableClient, Set<PublicKey>>{};
+  for (final c in t.clients) {
+    c.changes.listen((_) {
+      if (c.failure != null && !reachAtEnd.containsKey(c)) reachAtEnd[c] = reachableFrom(c);
+    });
+  }
+
   // A seat a side is stopped at, or ended the game at, that nobody
   // still up can open: a held seat with its own juror not among them
   // and fewer of the jurors holding a piece of it than it takes to
@@ -203,9 +220,9 @@ String? walkChaos(int seed,
     final survivors = t.survivors.toList();
     for (final c in survivors) {
       if (c.failure == null || !judged.add(c)) continue;
-      if (!immovable(c, upNow())) {
+      if (!immovable(c, reachAtEnd[c] ?? reachableFrom(c))) {
         return '$when: ${c.signer.publicKey.substring(0, 6)} ended the game, ${c.failure!.label}, '
-            'with a juror up that could move the table\n${c.describe()}';
+            'with a juror it could reach that could move the table\n${c.describe()}';
       }
     }
     for (var i = 0; i < survivors.length; i++) {
