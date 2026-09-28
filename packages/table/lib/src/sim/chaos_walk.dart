@@ -256,10 +256,26 @@ String? walkChaos(int seed, {DealCrypto? crypto, StructureLog? structure}) {
     if (apart != null) return '$apart; faults were [${faults()}]';
     // A held seat given to the escrow is on the record, so once the
     // faults have stopped and the network has healed, two sides still
-    // up at the same hand holding the seat differently are holding two
-    // records, not waiting on a message in flight (docs/07-states.md).
-    for (final f in readStructure(t)) {
-      if (f.what == Apart.escrow && !f.cutOff) return 'apart on the escrow at the end: ${f.detail}; faults were [${faults()}]';
+    // playing at the same hand hold the seat alike: anything else is
+    // two records, not a message in flight (docs/07-states.md). Not a
+    // side whose game has ended for a lost quorum: it says nothing new,
+    // and a claim it carried just before is one the others may never
+    // hear — over a game that is over, and unscored (sealed seed 2).
+    final playing = [
+      for (final p in t.people)
+        if (!p.gone && p.client.failure == null) p.client,
+      for (final j in t.jurors)
+        if (!j.gone && j.client != null && j.client!.serving && j.client!.failure == null) j.client!,
+    ];
+    final byHand = <int, List<TableClient>>{};
+    for (final c in playing) {
+      byHand.putIfAbsent(c.game.handNumber, () => []).add(c);
+    }
+    for (final MapEntry(key: hand, value: at) in byHand.entries) {
+      for (var seat = 0; seat < seatCount; seat++) {
+        final states = {for (final c in at) c.heldSeatState(seat)}..remove(null);
+        if (states.length > 1) return 'apart on the escrow at the end: hand $hand seat $seat; faults were [${faults()}]';
+      }
     }
 
     final survivors = t.survivors.toList();

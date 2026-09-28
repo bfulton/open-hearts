@@ -335,6 +335,12 @@ Future<void> main(List<String> args) async {
     for (final kind in log.standingOnline.keys) {
       runsEndedOnline[kind.name] = (runsEndedOnline[kind.name] ?? 0) + 1;
     }
+    // Every run with something still read among sides online when it
+    // ended, each named so it can be replayed (`--match`).
+    for (final e in log.seen.values) {
+      if (e.last != log.lastTaken || e.finding.cutOff) continue;
+      print('still read at the end, run $runs, $what\n  ${e.finding} (${e.first} to ${e.last} ms)');
+    }
     for (final kind in log.counts.keys) {
       final n = runsWith[kind.name] = (runsWith[kind.name] ?? 0) + 1;
       if (n == 1) {
