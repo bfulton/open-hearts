@@ -76,22 +76,30 @@ void main() {
   // every record — and the audit follows from it.
   test('a juror\'s move one person heard in time and the other did not: the move or the escrow, the same on both records', () {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize, target: 1);
-    t.start();
     final a = t.clients.first;
     final b = t.clients.last;
-    expect(t.clock.runUntil(() => a.game.phase == Phase.playing, limitMs: 5 * 60 * 1000), isTrue);
-    final hand = a.game.handNumber;
-    final held = a.botHolders(hand);
-    expect(t.clock.runUntil(() => held.containsKey(a.game.currentSeat), limitMs: 60 * 1000), isTrue,
-        reason: 'a held seat\'s turn');
-    final seat = a.game.currentSeat!;
-    final holder = held[seat]!;
-    final turn = TurnId.play(hand, a.game.tricksPlayed * seatCount + a.game.trick.length);
-    // The juror's moves, kept from everyone but b for four seconds: a
-    // claims the escrow at three, and b has the move.
-    final until = t.clock.nowMs + 4000;
-    t.net.steer = (from, to, message) =>
-        from == holder && to != b.signer.publicKey && message['kind'] == 'play' && t.clock.nowMs < until ? -1 : null;
+    // The first held seat's juror's moves, kept from everyone but b for
+    // four seconds from its first card: a claims the escrow at three,
+    // and b has the move. Set from the start, and found by that card: a
+    // juror can play a moment before a person has the turn open, and a
+    // steer set once a person does was too late for it.
+    final jurors = {for (final j in t.jurors) j.signer.publicKey};
+    PublicKey? holder;
+    TurnId? turn;
+    var until = 0;
+    t.net.steer = (from, to, message) {
+      if (message['kind'] != 'play' || !jurors.contains(from)) return null;
+      if (holder == null) {
+        final body = message['body'] as Map<String, Object?>;
+        holder = from;
+        turn = TurnId(body['hand'] as int, body['turn'] as int);
+        until = t.clock.nowMs + 4000;
+      }
+      return from == holder && to != b.signer.publicKey && t.clock.nowMs < until ? -1 : null;
+    };
+    t.start();
+    expect(t.clock.runUntil(() => turn != null, limitMs: 5 * 60 * 1000), isTrue, reason: 'a held seat played');
+    final hand = turn!.hand;
     final claimed = <String>{};
     t.net.swallow = (from, message) {
       if (message['kind'] == 'escrow') claimed.add(from);

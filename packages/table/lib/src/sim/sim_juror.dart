@@ -64,7 +64,8 @@ class SimJuror {
   /// The verdicts this juror gave, for tests.
   int verdicts = 0;
 
-  void summoned(TableSpec spec, int hand, List<PublicKey> jurors, {String? juryId, bool first = false}) {
+  void summoned(TableSpec spec, int hand, List<PublicKey> jurors,
+      {String? juryId, bool first = false, List<Map<String, Object?>> draws = const []}) {
     if (gone) return;
     var c = client;
     if (c == null && letGo.stale(spec.id, hand)) {
@@ -90,7 +91,7 @@ class SimJuror {
       if (sweeps) _sweep(c);
       c.changes.listen((_) => verdicts = c!.record.where((d) => d.verdict?.author == signer.publicKey).length);
     }
-    c.serveFor(hand, jurors, juryId: juryId, first: first);
+    c.serveFor(hand, jurors, juryId: juryId, first: first, draws: draws);
   }
 
   void _sweep(TableClient c) {

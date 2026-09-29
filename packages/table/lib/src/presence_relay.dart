@@ -36,7 +36,8 @@ class Summons {
       required this.jurors,
       required this.from,
       this.juryId,
-      this.first = false});
+      this.first = false,
+      this.draws = const []});
   final TableSpec spec;
   final int hand;
   final List<PublicKey> jurors;
@@ -53,6 +54,11 @@ class Summons {
   /// now rather than the one the seats were dealt to.
   final bool first;
 
+  /// The draws the sender's table had carried for [hand], each with
+  /// the witnesses that carried it, as signed events
+  /// ([TableClient.serveFor]).
+  final List<Map<String, Object?>> draws;
+
   static Summons? parse(PublicKey from, Map<String, Object?> content) {
     try {
       final spec = TableSpec.parse(content['table']);
@@ -64,6 +70,10 @@ class Summons {
         from: from,
         juryId: content['jury'] as String?,
         first: content['first'] == true,
+        draws: [
+          for (final d in content['draws'] as List? ?? const [])
+            if (d is Map) Map<String, Object?>.from(d),
+        ],
       );
     } catch (_) {
       return null;

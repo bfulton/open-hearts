@@ -654,7 +654,11 @@ anyone else is about, and is not stranded when that juror is the one
 back. A move the juror said before it knew, landing after the escrow,
 is as good as the escrow's own — the same card by another voice, which
 the table settles as it settles two voices anywhere
-(`packages/table/test/two_voices_test.dart`). So a turn can hold both
+(`packages/table/test/two_voices_test.dart`). One the juror said
+before it went can have reached the jury and nobody at the table; the
+juror whose place it is to play the seat then holds a move already
+and makes none of its own, so it says the one it holds again, as the
+seat's own juror would have. So a turn can hold both
 the escrow and a move, and a side that hears the backing for the move
 before the claims takes the escrow all the same when they come. Its
 audit is the
@@ -1688,7 +1692,17 @@ On the wire:
 - **Presence.** Every open app announces itself on one topic every
   five seconds — written to every relay, listened for on all of them
   — and keeps who was heard when. A summons is an event on that
-  topic addressed to one key, carrying the table's spec and the hand.
+  topic addressed to one key, carrying the table's spec and the hand,
+  and the hand's draws as the summoner carried them, each with its
+  witnesses. A seat's keys name the draw they were sealed to and are
+  taken only once it has carried ([doc 07](07-states.md), "The draw
+  on the record"), so a juror summoned into a redraw needs the draws
+  before it. By carry alone they reached it up to eight seconds late:
+  every carry says every jury, so one had nearly always just been
+  said, to the sides already there, a moment before the newcomer
+  was, and an event goes once in eight seconds whoever is asking. A
+  summons from an app that sends none leaves the juror to be carried
+  them as before.
   A juror follows the table on its own relay list, so a table on
   relays a juror does not listen to has no jurors from that pool.
 - **The draw.** At each hand the lowest key among the participants

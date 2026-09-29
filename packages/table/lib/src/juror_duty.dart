@@ -106,7 +106,7 @@ class JurorDuty {
       client.start();
       log?.call('summoned to ${s.spec.id} for hand ${s.hand} by ${s.from.substring(0, 6)}');
     }
-    t.client.serveFor(s.hand, s.jurors, juryId: s.juryId, first: s.first);
+    t.client.serveFor(s.hand, s.jurors, juryId: s.juryId, first: s.first, draws: s.draws);
   }
 
   void _sweepTables() {

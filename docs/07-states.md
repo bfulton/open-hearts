@@ -556,6 +556,33 @@ was proposed, not when it carried, so every juror summoned a moment
 after its table's jury carried sat at the keys, and each of its seats
 went to the escrow (`packages/table/test/sealed_to_draw_test.dart`).
 
+Measuring it found the same wait a level up. In the explorer's topup
+scenario with no fault at all, the jurors a redraw brought in read the
+redraw as the hand's draw for eight seconds, where the code before
+this read the sides apart on the draw for two. They were waiting for
+the hand's first draw to be carried to them. Every carry says every
+jury, so the table had said that one again, to the sides already
+there, a second before the newcomers were; an event goes once in
+eight seconds whoever is asking; and keys naming a draw not carried
+are not taken, so they sat at the keys until it came. A summons now
+carries the hand's draws, each with its witnesses, and the newcomers
+read the table's draw from the moment they are summoned — and seal
+six seconds sooner (`sealed_to_draw_test.dart`, doc 04, "On the
+wire").
+
+With the draws in hand the jury deals a little sooner, and that moved
+a timing a test had been leaning on into a gap in the escrow. A held
+seat's juror played its card and went, the card reaching three of the
+jury and neither person. The people gave the seat to the escrow, as
+they should. The escrow keeps a move said at its turn, since a juror
+of the hand's is good after it; so the custodian whose place it was to
+say the seat's move held one already and said nothing, the move's
+author was gone, and a juror says only its own moves again. The hand
+stopped at the seat for good (`quiet_holder_test.dart`). The custodian
+that speaks for a given-up seat now says again what the seat's turn
+holds, as the seat's own juror would have
+(`escrow_on_record_test.dart`).
+
 The escrow's custodians are the same story one level down, and the
 nine-stranger walk found that too. A held seat's pieces are indexed by
 each custodian's place in a list that starts with the jury the deal

@@ -55,17 +55,67 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 10)));
 
   test('keys that come before the draw they name is carried here are taken up when it is', () {
-    // A juror is summoned a moment after the table has its jury, and the
-    // people key at once: their keys reach it before the jury event does.
+    // A summons without the hand's draws, as an app from before they
+    // were sent with it says one: the juror hears it a moment after the
+    // table has its jury, and the people key at once, so their keys
+    // reach it before the jury event does.
     final t = SimTable(humans: 2, seed: 7, crypto: crypto, jurors: 4);
+    t.presence!.withDraws = false;
     final a = t.clients.first;
+    final heldBack = <String>{};
+    for (final j in t.jurors) {
+      final k = j.signer.publicKey.substring(0, 4);
+      j.log = (l) {
+        if (l.contains('defer deal@h0/deal0.')) heldBack.add(k);
+      };
+    }
     t.start();
     expect(t.clock.runUntil(() => a.game.handNumber >= 1, limitMs: 20 * 60 * 1000), isTrue, reason: a.describe());
+    expect(heldBack, isNotEmpty, reason: 'keys reached a juror before the draw they name');
     expect(a.botHolders(0), isNotEmpty);
     for (final j in t.jurors) {
       expect(j.client?.sealedTo(0), a.sealedTo(0), reason: 'every juror read the draw');
     }
     expect(a.record.where((d) => d.removal && d.event.kind == EventKind.escrow), isEmpty, reason: 'every holder keyed its seat');
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  test('a juror summoned into a redraw has the hand\'s draws from its summons', () {
+    // The explorer's topup scenario, as played: two of the jury holding
+    // no seat go quiet during the deal and the jury is drawn again, a
+    // hand's first draw at a play turn. Every carry says every jury,
+    // so the table had just said the first draw again, to the sides
+    // already there, a moment before the newcomers were; an event goes
+    // once per eight seconds whoever is asking, and they sat at the
+    // keys that long, reading the redraw for the hand's.
+    final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4, target: 1);
+    t.net.minLatencyMs = 200;
+    t.net.maxLatencyMs = 400;
+    t.clock.schedule(2500, () {
+      final c = t.clients.first;
+      final held = c.botHolders(0).values.toSet();
+      for (final k in c.juries.first.event.jurors.where((k) => !held.contains(k)).take(2)) {
+        t.net.goOffline(k);
+      }
+    });
+    final a = t.clients.first;
+    final apart = <String>{};
+    t.start();
+    // Read every quarter second, as the explorer reads every second.
+    void look() {
+      for (final j in t.jurors) {
+        final s = j.client?.sealedTo(0);
+        if (s != null && s != a.sealedTo(0)) apart.add(j.signer.publicKey.substring(0, 4));
+      }
+      if (t.clock.nowMs < 60000) t.clock.schedule(250, look);
+    }
+
+    t.clock.schedule(250, look);
+    expect(t.clock.runUntil(() => a.juries.length >= 2 && t.clock.nowMs >= 60000, limitMs: 5 * 60 * 1000), isTrue, reason: a.describe());
+    final redraw = a.juries.last.event;
+    final newcomers = redraw.jurors.where((k) => !a.juries.first.event.jurors.contains(k)).toList();
+    expect(newcomers, isNotEmpty, reason: 'the redraw brought jurors new to the hand');
+    expect(apart, isEmpty, reason: 'a newcomer read another draw for the hand than the table\'s');
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 

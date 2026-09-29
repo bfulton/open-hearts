@@ -83,26 +83,61 @@ void main() {
     for (final c in clients) {
       c.start();
     }
-    // Both games, to the end. The browser suite gives this cell three
-    // minutes and that is the number worth holding to: it is what a
-    // person waiting on a screen is being asked to sit through.
+    // Both games, to the end, held to two things. Neither table stands
+    // still for a minute: what this test has caught is a table that
+    // stopped — a juror that never made its seat's keys, a person
+    // whose turn went unplayed — and a stopped table stops moving long
+    // before any clock on the whole game runs out. And a hand takes no
+    // more than forty-five seconds on average, a person's wait at a
+    // screen. It used to be three minutes for the whole game, the
+    // browser suite's, but a game is as many hands as its deal takes
+    // to reach the target, and that is the deal's randomness: two to
+    // six hands, at thirty-odd seconds a hand here on either side of
+    // the change that had it failing, so a six-hand game failed and a
+    // four-hand one passed with nothing else different.
+    final started = DateTime.now();
+    final finishedAt = <String, Duration>{};
+    final moved = {for (final c in clients) c.spec.id: DateTime.now()};
+    final mark = <String, int>{};
+    int progress(String table) =>
+        clients.where((c) => c.spec.id == table).fold(0, (n, c) => n + c.record.length + c.step + c.game.handNumber * 1000);
+    String state() => '${[
+          for (final c in clients) '${c.signer.publicKey.substring(0, 4)} ${c.describe()}'
+        ].join('\n')}\n'
+        'duties: ${[for (final d in duties) '${d.signer.publicKey.substring(0, 4)} serving ${d.serving}'].join(', ')}\n'
+        '${[
+          for (final d in duties)
+            for (final e in d.clients.entries) '${d.signer.publicKey.substring(0, 4)} at ${e.key}: ${e.value.describe()}'
+        ].join('\n')}';
     final done = Completer<void>();
     final subs = [
       for (final c in clients)
         c.changes.listen((_) {
+          if (c.done) finishedAt.putIfAbsent(c.spec.id, () => DateTime.now().difference(started));
           if (clients.every((c) => c.done) && !done.isCompleted) done.complete();
         }),
     ];
-    await done.future.timeout(const Duration(minutes: 3), onTimeout: () {
-      fail('both games finished:\n${[
-        for (final c in clients) '${c.signer.publicKey.substring(0, 4)} ${c.describe()}'
-      ].join('\n')}\n'
-          'duties: ${[for (final d in duties) '${d.signer.publicKey.substring(0, 4)} serving ${d.serving}'].join(', ')}\n'
-          '${[
-        for (final d in duties)
-          for (final e in d.clients.entries) '${d.signer.publicKey.substring(0, 4)} at ${e.key}: ${e.value.describe()}'
-      ].join('\n')}');
+    final watch = Timer.periodic(const Duration(seconds: 5), (_) {
+      for (final table in moved.keys) {
+        if (clients.where((c) => c.spec.id == table).every((c) => c.done)) continue;
+        final now = progress(table);
+        if (now != mark[table]) {
+          mark[table] = now;
+          moved[table] = DateTime.now();
+        } else if (DateTime.now().difference(moved[table]!) > const Duration(minutes: 1) && !done.isCompleted) {
+          done.completeError(TestFailure('$table stood still for a minute:\n${state()}'));
+        }
+      }
     });
+    await done.future.timeout(const Duration(minutes: 9), onTimeout: () {
+      fail('both games finished:\n${state()}');
+    });
+    watch.cancel();
+    for (final c in [clients.first, clients.last]) {
+      final hands = c.game.handNumber + 1;
+      final each = finishedAt[c.spec.id]!.inMilliseconds / hands;
+      expect(each, lessThan(45000), reason: '${c.spec.id}: $hands hands, ${(each / 1000).toStringAsFixed(1)} s a hand');
+    }
     for (final s in subs) {
       s.cancel();
     }
@@ -129,5 +164,5 @@ void main() {
     for (final j in bench) {
       j.close();
     }
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, timeout: const Timeout(Duration(minutes: 10)));
 }

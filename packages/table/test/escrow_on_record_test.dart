@@ -385,6 +385,39 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  // The same, with the juror's card reaching the jury and nobody at the
+  // table. The escrow keeps a move said at its turn — a juror of the
+  // hand's is good after it — so the custodian whose place it is to
+  // say the seat's move held one already, and said nothing; its author
+  // was out of earshot of the table, and a juror says only its own
+  // moves again. The hand stopped there for good (quiet_holder_test,
+  // once the jury's deal ran a little sooner). Now the custodian that
+  // speaks for the seat says the move it holds again, as the seat's
+  // juror would have.
+  test('a held seat\'s card that reached only the jury is said to the table by the custodian speaking for the seat', () {
+    final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 2, target: 1);
+    t.start();
+    final at = soonestHeld(t);
+    final people = {for (final c in t.clients) c.signer.publicKey};
+    t.net.steer = (from, to, message) {
+      if (from != at.holder || !people.contains(to) || message['kind'] != 'play') return null;
+      return (message['body'] as Map<String, Object?>)['seat'] == at.seat ? -1 : null;
+    };
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.game.tricksPlayed >= 1), limitMs: 3 * 60 * 1000), isTrue,
+        reason: 'the table moved past the seat:\n${t.clients.map((c) => c.describe()).join('\n')}');
+    final held = [
+      for (final j in t.jurors)
+        if (j.client?.actionAt(at.turn)?.author == at.holder) j.signer.publicKey.substring(0, 4),
+    ];
+    expect(held, isNotEmpty, reason: 'the jury had the juror\'s card');
+    for (final c in t.clients) {
+      expect(c.escrowedAt(at.hand), {at.seat: at.turn});
+      final move = c.record.firstWhere((d) => !d.removal && d.turn == at.turn);
+      expect(move.event.author, at.holder, reason: 'the card the juror said, carried to the table by the escrow');
+    }
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   // The seat's own juror is left to last among those who say the
   // escrow's moves, not left out: when it is the one juror back, the
   // seat is its to play or nobody's. Three people and one bot seat, so

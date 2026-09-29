@@ -4450,7 +4450,7 @@ class TableClient {
       // to be the point ([_carryAfterMs]).
       final carry = !ownOnly && _carryDue(e.key);
       final action = race.action;
-      final sayAction = action != null && (carry || action.author == signer.publicKey);
+      final sayAction = action != null && (carry || action.author == signer.publicKey || _speaksFor(e.key));
       final sayBoots = [
         for (final b in race.boots)
           if (carry || b.author == signer.publicKey) b,
@@ -4473,6 +4473,22 @@ class TableClient {
     for (final e in _myJuryWitnessEvents.entries) {
       if (_proposals[e.key]?.settled == false) transport.broadcast(e.value.toJson(), everywhere: insist);
     }
+  }
+
+  /// Whether this side is the voice of [turn]'s seat: a held seat the
+  /// record has given to the escrow, and this side the custodian whose
+  /// place it is to say the seat's moves ([_firstToSay]). What the
+  /// seat's turn holds is this side's to say again, then, as the seat's
+  /// own juror's was: the escrow keeps a move said at its turn, since a
+  /// juror of the hand's is good after it ([_carryEscrow]), and one the
+  /// seat's juror said before it went can have reached the jury and
+  /// nobody at the table. A juror says only its own moves again, and
+  /// this one, holding a move already, made none of its own
+  /// ([_takeUpSeat]); the move's author was out of earshot of the
+  /// table. The hand stopped at the seat for good.
+  bool _speaksFor(TurnId turn) {
+    final seat = _turnSeat[turn];
+    return seat != null && _isEscrowed(turn.hand, seat) && _firstToSay(turn.hand, seat);
   }
 
   /// This peer's own unsettled witnesses, kept to repeat.
@@ -4779,6 +4795,12 @@ class TableClient {
     _trace('jury for hand ${e.hand}: ${e.jurors.map((k) => k.substring(0, 4))} by ${race.forAction.length}');
     final p = presence;
     if (p != null && amSeated) {
+      final draws = [
+        for (final d in _juriesDrawnFor(e.hand)) ...[
+          d.event.toJson(),
+          for (final w in _proposals[d.event.id]?.witnessEvents ?? const <TableEvent>[]) w.toJson(),
+        ],
+      ];
       for (final j in e.jurors) {
         p.summon(j, {
           'table': spec.toJson(),
@@ -4790,6 +4812,9 @@ class TableClient {
           // redraw is told the jury as it stands now; acting on that
           // list would name a different holder for every bot seat.
           'first': _juriesDrawnFor(e.hand).first.event.id == e.id,
+          // And every draw of the hand so far, as carried here
+          // ([serveFor]).
+          'draws': draws,
         });
       }
     }
@@ -4822,7 +4847,8 @@ class TableClient {
   /// Summoned into the jury of [hand] at this table, [jurors] being
   /// the draw, foreman first. The client follows the table from then
   /// on and answers appeals in its place in the order.
-  void serveFor(int hand, List<PublicKey> jurors, {String? juryId, bool first = false}) {
+  void serveFor(int hand, List<PublicKey> jurors,
+      {String? juryId, bool first = false, List<Map<String, Object?>> draws = const []}) {
     if (mySeat != null) return;
     _serving[hand] = jurors;
     _servingSince.putIfAbsent(hand, () => clock.nowMs);
@@ -4832,6 +4858,21 @@ class TableClient {
     // from the rest so that a redraw, which names the jury as it
     // stands now, never moves a seat ([botHolders]).
     if (first && juryId != null) _firstSummons.putIfAbsent(hand, () => (juryId: juryId, jurors: jurors));
+    // And the hand's draws, each with the witnesses that carried it,
+    // taken as a carry would give them. A seat's keys name the draw
+    // they were sealed to and are taken only once it has carried here
+    // ([_keysNameTheDraw]), and a juror summoned into a redraw needs
+    // the draws before it. By carry alone they came up to eight seconds
+    // late: every carry sends every jury, so one had nearly always just
+    // been said, to the sides already there, a moment before the
+    // newcomer was, and an event goes once per [carryRepeatMs] whoever
+    // is asking. The newcomer sat at the keys for that long. Only
+    // proposals and their witnesses, each checked as any event is.
+    for (final json in draws) {
+      final e = TableEvent.parse(json);
+      if (e == null || e.table != spec.id || (e.kind != EventKind.jury && e.kind != EventKind.witness)) continue;
+      _accept(e);
+    }
     _notify();
   }
 

@@ -72,6 +72,11 @@ class SimPresence implements Presence {
   /// deal to put it in (`test/deal_before_the_deal_test.dart`).
   int summonsMs = 50;
 
+  /// Whether a summons carries the hand's draws. An app from before
+  /// they did sends none, and a juror then waits for the draws to be
+  /// carried to it like any other event.
+  bool withDraws = true;
+
   @override
   void summon(PublicKey juror, Map<String, Object?> summons) {
     final j = _jurors[juror];
@@ -81,7 +86,12 @@ class SimPresence implements Presence {
     clock.schedule(
         summonsMs,
         () => j.summoned(spec, summons['hand'] as int, [for (final k in summons['jurors'] as List) k as String],
-            juryId: summons['jury'] as String?, first: summons['first'] == true));
+            juryId: summons['jury'] as String?,
+            first: summons['first'] == true,
+            draws: [
+              if (withDraws)
+                for (final d in summons['draws'] as List? ?? const []) Map<String, Object?>.from(d as Map),
+            ]));
   }
 
   @override
