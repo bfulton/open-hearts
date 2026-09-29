@@ -238,23 +238,39 @@ Verification verifyRecord(
     return jury == null ? const {} : assignBots(jury, botSeatsAt(hand));
   }
 
-  /// The custodians of [hand]'s escrow, as the table orders them
-  /// (_custodiansNow in client.dart): the draw the deal was sealed to,
-  /// then whoever the hand's other draws brought in, in the juries'
-  /// own order ([compareJuries]) and sorted within each. A seat's
-  /// pieces are indexed by this list, a topped-up juror's among them,
-  /// and a piece that juror releases counts only where its place is
-  /// known.
-  List<PublicKey> custodiansNow(int hand) {
-    final at = sealedAt(hand);
-    final dealt = at.jury == null ? null : juryById(at.jury!, hand);
-    final out = <PublicKey>[...?dealt]..sort();
-    for (final d in juries.where((d) => d.event.hand == hand).toList()..sort(compareJuries)) {
-      for (final k in d.event.jurors.toList()..sort()) {
-        if (!out.contains(k)) out.add(k);
+  /// Grows each held seat's custodians as the table grows them
+  /// (_applyGrowth in client.dart): after the list the seat's keys
+  /// named, whoever the draws named in the hand's people's own plays
+  /// brought in, in the order the record names them, and sorted within
+  /// each draw. A seat's pieces are indexed by that list, a topped-up
+  /// juror's among them, and a piece that juror releases counts only
+  /// where its place is known. Read ahead from [from], since the
+  /// replay opens a seat the hand will lose from the start; the places
+  /// are the ones the table gave as each play carried. A draw named
+  /// and not in hand holds up the ones after it, as at the table.
+  void growCustodians(DealSession d, int hand, int from) {
+    final named = <String>[];
+    for (var i = from; i < record.length; i++) {
+      final dec = record[i];
+      final e = dec.event;
+      if (dec.turn.hand != hand || !dec.turn.isPlay || dec.removal || e.kind != EventKind.play) continue;
+      final h = spec.seats[e.seat];
+      final grew = e.body['grew'];
+      if (h is! HumanSeat || h.key != e.author || grew is! List) continue;
+      for (final id in grew) {
+        if (id is String && !named.contains(id)) named.add(id);
       }
     }
-    return out;
+    final added = <PublicKey>[];
+    for (final id in named) {
+      final jurors = juryById(id, hand);
+      if (jurors == null) break;
+      added.addAll(jurors.toList()..sort());
+    }
+    if (added.isEmpty) return;
+    for (final seat in heldAt(hand).keys) {
+      d.extendCustodians(seat, added);
+    }
   }
 
   /// Why a seat's keys are not sealed where the table would take them
@@ -668,6 +684,12 @@ Verification verifyRecord(
         // is the hand played on with every card in the open, and it
         // cannot: the audits are where the hand ends.
         final givenUp = nextIsAudit();
+        // A newcomer's piece is released like any other, and one this
+        // side could not place was taken for nobody's: a seat given to
+        // the escrow, opened at the table from a topped-up juror's
+        // piece and another, was never opened here (sealed chaos seed
+        // 10, nine strangers).
+        growCustodians(d, game.handNumber, index);
         feedSecrets(d, all: true);
         if (givenUp) {
           if (!d.leadDisclaimed) {
@@ -726,14 +748,6 @@ Verification verifyRecord(
         _ => d.acceptDeclaration(b),
       };
       if (!ok) return fail('hand ${game.handNumber}: a deal step by seat $seat that does not verify (round $round)');
-      // A held seat's custodians grow as the hand's jury is topped up,
-      // at the table as each draw carries (_growCustodians in
-      // client.dart). A newcomer's piece is released like any other,
-      // and one this side could not place was taken for nobody's: a
-      // seat given to the escrow, opened at the table from a topped-up
-      // juror's piece and another, was never opened here (sealed chaos
-      // seed 10, nine strangers).
-      if (round == 0 && heldAt(game.handNumber).containsKey(seat)) d.extendCustodians(seat, custodiansNow(game.handNumber));
       continue;
     }
     if (game.phase == Phase.passing) {

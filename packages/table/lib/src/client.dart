@@ -823,6 +823,13 @@ class TableClient {
       final m = d.playToken(p);
       if (m == null) return;
       body.addAll(m);
+      // A person's own play puts on the record the draws that have
+      // brought someone into a held seat's escrow since the last one
+      // that did ([_takeGrowth]).
+      if (seat == mySeat && _personOf(seat) == signer.publicKey) {
+        final grew = _growthToName(game.handNumber);
+        if (grew.isNotEmpty) body['grew'] = grew;
+      }
     }
     _emit(EventKind.play, body);
   }
@@ -1019,7 +1026,7 @@ class TableClient {
   /// Said again every few seconds from a fresh reading, so a list
   /// drawn up when somebody was still being heard corrects itself.
   Set<int> _whoNeedsIt(int hand, int seat) {
-    final order = _custodiansNow(hand);
+    final order = _escrowOrder(hand, seat);
     const want = escrowThreshold + 1;
     final out = <int>{};
     for (final k in _sayers(hand, seat)) {
@@ -1060,9 +1067,15 @@ class TableClient {
   List<PublicKey> _sayers(int hand, int seat) {
     final live = _liveJurors(hand);
     final held = botHolders(hand)[seat];
-    final order = _custodiansNow(hand).where(live.contains).toList();
+    final order = _escrowOrder(hand, seat).where(live.contains).toList();
     return [...order.where((k) => k != held), ...order.where((k) => k == held)];
   }
+
+  /// [seat]'s custodians in the escrow's own order: the list its keys
+  /// named, grown on the record ([_applyGrowth]) — the order a sealed
+  /// piece is addressed by. Before its keys are read here, the hand's
+  /// jurors as this side has them.
+  List<PublicKey> _escrowOrder(int hand, int seat) => _dealsByHand[hand]?.custodiansOf(seat) ?? _custodiansNow(hand);
 
   /// Whether [seat]'s bot moves are this side's to work out. A bot
   /// seat nobody holds is everyone's to compute. One a juror holds is
@@ -2407,6 +2420,7 @@ class TableClient {
       verdict: verdict,
     ));
     _trace('settled $turn ${e.kind.name} by ${race.forAction.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
+    if (e.kind == EventKind.play && e.author == _personOf(seat)) _takeGrowth(turn.hand, e);
     _liftPause();
     _closeTurn(turn);
     if (turn.isDeal && turn.dealRound == 0) _checkSealed(turn.hand);
@@ -3349,10 +3363,10 @@ class TableClient {
         // the first action at a turn stands.
         if (!amSeated && !_sealedTo.containsKey(h)) return;
         // A held seat's shares are indexed by their custodian's place in
-        // the list, and a newcomer's by its place in the list as it
-        // grows: the same list ([_custodiansNow]), or a top-up made for
-        // one place lands at another. A person's escrow goes by sides,
-        // in no order.
+        // the list its keys name, which the record then grows
+        // ([_applyGrowth]): every juror of the hand heard of here, in
+        // the juries' own order. A person's escrow goes by sides, in no
+        // order.
         d.custodians = amSeated ? (jurors.toList()..sort()) : _custodiansNow(h);
         _emitDeal(keys, 0, me, {...d.myKeys()!, 'jury': _drawNamed(h)});
       }
@@ -3396,6 +3410,7 @@ class TableClient {
       _ => false,
     };
     if (!ok) _trace('a deal step settled that the session would not take: $e');
+    if (ok && e.round == 0) _applyGrowth(e.hand);
     if (e.round == 4 || d.gone.isNotEmpty) _resumeStalled();
   }
 
@@ -3482,12 +3497,13 @@ class TableClient {
 
   // ---- topping the jury up ----------------------------------------------
 
-  /// The custodians of this hand's escrow, in the order everyone
-  /// computes: the jury the deal was sealed to, then whoever has been
-  /// drawn since, in the juries' own order ([compareJuries]) and
-  /// sorted within each. Append-only, because a custodian's index is
-  /// its place in this list and a newcomer among the others would move
-  /// every share after it (packages/deal, `extendCustodians`).
+  /// The hand's jurors as this side has them: the jury the deal was
+  /// sealed to, then whoever has been drawn since, in the juries' own
+  /// order ([compareJuries]) and sorted within each. What a held
+  /// seat's keys name as its custodians, and so on the record from
+  /// there; the list grows after that only as the record names draws
+  /// ([_applyGrowth]), since the draws carried here since are this
+  /// side's to know, in an order another side may not share.
   List<PublicKey> _custodiansNow(int hand) {
     final drawn = _juriesDrawnFor(hand);
     final dealt = _dealtTo(hand);
@@ -3531,8 +3547,6 @@ class TableClient {
     // were its earlier client's to make, for a table long past them
     // ([_beforeSummons]).
     if (_beforeSummons(hand)) return;
-    final custodians = _custodiansNow(hand);
-    if (custodians.length <= juryToHoldBots) return;
     final held = botHolders(hand);
     if (held.isEmpty) return;
     // Who this side would have answer, and whether it is one of them.
@@ -3541,15 +3555,20 @@ class TableClient {
     // that went among the senders and leave the newcomer waiting on
     // parts nobody is making.
     final heard = _liveJurors(hand);
-    final live = [
-      for (var i = 1; i <= custodians.length; i++)
-        if (heard.contains(custodians[i - 1])) i,
-    ];
-    final have = live.take(escrowThreshold).toList();
-    final mine = custodians.indexOf(signer.publicKey) + 1;
-    if (mine < 1 || !have.contains(mine) || have.length < escrowThreshold) return;
     for (final seat in held.keys) {
       if (!d.holdsPieceOf(seat)) continue;
+      // By the seat's own list, as the record has grown it
+      // ([_applyGrowth]): the place a part is made for is the place
+      // its newcomer's piece is weighed at, everywhere.
+      final custodians = d.custodiansOf(seat);
+      if (custodians == null || custodians.length <= juryToHoldBots) continue;
+      final live = [
+        for (var i = 1; i <= custodians.length; i++)
+          if (heard.contains(custodians[i - 1])) i,
+      ];
+      final have = live.take(escrowThreshold).toList();
+      final mine = custodians.indexOf(signer.publicKey) + 1;
+      if (mine < 1 || !have.contains(mine) || have.length < escrowThreshold) continue;
       for (var at = 1; at <= custodians.length; at++) {
         if (have.contains(at) || !_isNewCustodian(hand, custodians[at - 1])) continue;
         final key = '$seat|$at';
@@ -3615,24 +3634,17 @@ class TableClient {
     // carries it forward hands the part over with everything else.
     final kept = _topUps.putIfAbsent(event.hand, () => []);
     if (!kept.any((r) => r.id == event.id)) kept.add(event);
-    // Everyone learns the custodian list grew, whether or not the
-    // part is theirs to open: it is what an index means.
-    _growCustodians(about);
-    // A part made out past the end of the list as this side has it is
-    // for a custodian this side has not heard of yet — the seat's keys
-    // unread, or the jury that drew the newcomer not yet settled. A
-    // juror carried the record gets the parts made for it among the
-    // very events that say who it is, so this is the ordinary case for
-    // the one peer the part is for. Kept, not dropped: the drain after
-    // each settled turn tries it again.
     final at = event.body['at'];
     if (at is! int || at < 1) return;
     // A part made out past the end of the list as this side has it is
-    // for a custodian this side has not heard of yet — the seat's keys
-    // unread, or the jury that drew the newcomer not yet settled. That
-    // custodian may be this side itself, so a juror keeps it for the
-    // drain to try again; anyone else will never be a custodian and
-    // drops it.
+    // for a custodian this side has no place for yet — the seat's keys
+    // unread, or the play that named the newcomer's draw not yet
+    // carried here ([_applyGrowth]). A juror carried the record gets
+    // the parts made for it among the very events that say who it is,
+    // so this is the ordinary case for the one peer the part is for.
+    // That custodian may be this side itself, so a juror keeps it for
+    // the drain after each settled turn to try again; anyone else will
+    // never be a custodian and drops it.
     //
     // Within the list, this side knows its own place, and only the
     // part made out to that place is any use here. Four jurors brought
@@ -3657,11 +3669,92 @@ class TableClient {
         '${!took ? 'refused' : d.holdsPieceOf(about) ? 'the share is whole' : 'kept, waiting on the rest of the set'}');
   }
 
-  /// Tells the deal about the custodians drawn since it was sealed.
-  void _growCustodians(int seat) {
-    final d = _deal;
-    if (d == null) return;
-    d.extendCustodians(seat, _custodiansNow(game.handNumber));
+  // ---- the escrow's custodians, grown on the record ---------------------
+  //
+  // A held seat's pieces are indexed by each custodian's place in a
+  // list: the one the seat's keys named, and after it whoever the
+  // hand's later draws bring in. The list grew as each draw carried
+  // here, and two draws of one hand can carry in either order, at two
+  // sides the one way and the other, and at the verifier in neither.
+  // A newcomer given its share at one place had its piece weighed at
+  // another, and pieces sealed to a place went to another custodian
+  // (sealed chaos seed 10, nine strangers: two redraws, the one
+  // proposed at the thirty-second turn carried after the one at the
+  // thirty-fifth). So the order is the record's, as the draw a deal is
+  // sealed to is: a person's own play names the draws that have grown
+  // the escrow since the last one that did, and every side grows the
+  // list from those plays in the order the record has them, the
+  // verifier with it. People's plays, and not every move, because
+  // they carry one after another and with an event every time: passes
+  // race side by side and settle in a different order at each side,
+  // and a bot seat's move settles with nothing said where the seat is
+  // everyone's to work out.
+
+  /// The draws named in [hand]'s people's plays so far, in the order
+  /// the record names them.
+  final Map<int, List<String>> _grown = {};
+
+  /// Who sat down at [seat]: the one key whose plays name the escrow's
+  /// growth. Null at a seat that was a bot's from the start.
+  PublicKey? _personOf(int seat) {
+    final h = spec.seats[seat];
+    return h is HumanSeat ? h.key : null;
+  }
+
+  /// The draws this side's next play names: the hand's, in the juries'
+  /// own order, that bring someone into a held seat's escrow and have
+  /// not been named yet.
+  List<String> _growthToName(int hand) {
+    final d = _dealsByHand[hand];
+    final held = botHolders(hand).keys;
+    if (d == null || held.isEmpty) return const [];
+    final named = {...?_grown[hand]};
+    return [
+      for (final j in _juriesDrawnFor(hand))
+        if (!named.contains(j.event.id) &&
+            held.any((s) {
+              final c = d.custodiansOf(s);
+              return c == null || j.event.jurors.any((k) => !c.contains(k));
+            }))
+          j.event.id,
+    ];
+  }
+
+  /// A person's play has carried: the draws it names go on the list.
+  void _takeGrowth(int hand, TableEvent play) {
+    final named = play.body['grew'];
+    if (named is! List) return;
+    final list = _grown.putIfAbsent(hand, () => []);
+    for (final id in named) {
+      if (id is String && !list.contains(id)) list.add(id);
+    }
+    _applyGrowth(hand);
+  }
+
+  /// Grows each held seat's custodians by the draws the record names,
+  /// in its order. A draw named and not carried here yet holds up the
+  /// ones after it, since a place is a place in the whole list; its
+  /// carrying brings it on. Pieces a newcomer released before this
+  /// side had it on the list were refused, and are taken again.
+  void _applyGrowth(int hand) {
+    final d = _dealsByHand[hand];
+    final named = _grown[hand];
+    if (d == null || named == null) return;
+    final added = <PublicKey>[];
+    for (final id in named) {
+      final jurors = _juryById(id, hand);
+      if (jurors == null) break;
+      added.addAll(jurors.toList()..sort());
+    }
+    if (added.isEmpty) return;
+    for (final seat in botHolders(hand).keys) {
+      final before = d.custodianCount(seat);
+      d.extendCustodians(seat, added);
+      if (d.custodianCount(seat) == before || !d.awaitsSecret(seat)) continue;
+      for (final r in List.of(_releases[hand] ?? const <TableEvent>[])) {
+        if (r.about == seat) _onRelease(r);
+      }
+    }
   }
 
   /// How long a bot seat's holder has to take the seat's turn. A
@@ -3838,7 +3931,7 @@ class TableClient {
     }
     final dealt = _dealtTo(hand);
     if (dealt.isEmpty) return const {};
-    final custodians = _custodiansNow(hand);
+    final custodians = _escrowOrder(hand, seat);
     final out = {...dealt};
     final sets = <String, Set<int>>{};
     for (final e in _topUps[hand] ?? const <TableEvent>[]) {
@@ -4251,8 +4344,13 @@ class TableClient {
     return t == null ? null : (turn: t, seat: _turnSeat[t]!);
   }
 
-  /// Who holds a piece of [hand]'s bot seats, in the escrow's order.
+  /// Every juror [hand]'s bot seats could be escrowed to, as this side
+  /// has heard them drawn ([_custodiansNow]); a seat's own list, in
+  /// the escrow's order, is [escrowOrderOf].
   List<PublicKey> custodiansOf(int hand) => _custodiansNow(hand);
+
+  /// [seat]'s custodians at [hand], in the escrow's order: for a test.
+  List<PublicKey> escrowOrderOf(int hand, int seat) => _escrowOrder(hand, seat);
 
   /// Every juror of [hand] as this side has them: each jury drawn for
   /// it, and the one this side serves in.
@@ -5043,13 +5141,9 @@ class TableClient {
     // sealed to, and are taken only against a draw carried here
     // ([_keysNameTheDraw]).
     _drainFuture();
-    // A jury drawn after the deal was sealed adds custodians, and the
-    // escrow has to know: an index is a place in that list.
-    if (e.hand == game.handNumber) {
-      for (final seat in botHolders(e.hand).keys) {
-        _growCustodians(seat);
-      }
-    }
+    // A draw the record has named to grow the escrow, carried here
+    // after the play that named it, and holding up those after it.
+    _applyGrowth(e.hand);
     _trace('jury for hand ${e.hand}: ${e.jurors.map((k) => k.substring(0, 4))} by ${race.forAction.length}');
     final p = presence;
     if (p != null && amSeated) {

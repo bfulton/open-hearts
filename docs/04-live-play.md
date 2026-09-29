@@ -1217,7 +1217,12 @@ strength rather than merely kept alive — both the proposer and the
 peers backing a proposal ask for `jurySize` live, where they used to
 ask for two — and whoever is drawn is given a share of every bot seat
 by two of the holders, each sending what its own share is worth
-towards the newcomer's index. The seat's own juror can be one of the
+towards the newcomer's index — its place in the seat's list of
+custodians, which the record grows: a person's own play names the
+draws that have brought somebody in since the last one that did, and
+every side adds their jurors in that order, so a newcomer's piece is
+weighed at the place it was made for wherever it goes ([doc
+07](07-states.md), "The escrow's custodians on the record"). The seat's own juror can be one of the
 two: it keeps the share its keys made out to its own place, as the
 others keep theirs. Until it did, a pair that named it was one part
 short for good, and the newcomer held nothing

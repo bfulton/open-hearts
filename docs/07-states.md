@@ -221,8 +221,10 @@ it (below, "The escrow on the record"); so are the draw a deal is
 sealed to and, with it, the fall-back to bot seats in the open (below,
 "The draw on the record"); and the game's end for a lost quorum,
 wherever a majority of the people can say it (below, "The lost-quorum
-ending on the record"). What is still decided here, and the rules
-that exist only because it is not on the record:
+ending on the record"); and the order a hand's redraws add their
+newcomers to a held seat's escrow in, found on the way (below, "The
+escrow's custodians on the record"). What is still decided here, and
+the rules that exist only because it is not on the record:
 
 | Decided here | What it has cost | Rules standing in for a record |
 |---|---|---|
@@ -614,11 +616,12 @@ of the two, the newcomer was sent one part of every pair and never the
 other, for as long as the hand lasted. It keeps both now
 (`packages/deal`, `myKeys`).
 
-Which leaves one thing decided by arrival: the table grows the list as
-each redraw carries, and two redraws of one hand carried in the other
+Which left one thing decided by arrival: the table grew the list as
+each redraw carried, and two redraws of one hand carried in the other
 order at two sides would give their newcomers different places. The
-juries' own order and the order they carry in have agreed in every
-walk and run so far; it goes on the list below.
+juries' own order and the order they carry in had agreed in every
+walk and run until then; it went on the list below, and is on the
+record now (below, "The escrow's custodians on the record").
 
 The fall-back to bot seats in the open comes with the draw. A person
 whose table has had no jury able to hold the bot seats for forty
@@ -656,6 +659,73 @@ released by a juror topped up from the later of them counted at
 another place; the verifier could not open the seat the table had
 given to the escrow. It passed before only because the two carried the
 other way round.
+
+## The escrow's custodians on the record
+
+The seventh, found on the way. A held seat's pieces are indexed by each
+custodian's place in a list: the one the seat's keys named, and after
+it whoever the hand's later draws bring in. The list grew as each draw
+carried, and two draws of one hand can carry in either order — the one
+way at one side, the other way at another, and at the verifier, which
+is handed them loose, in neither: it read them in the juries' own
+order. A newcomer given its share for one place had its piece weighed
+at another, and a piece sealed to a place went to another custodian
+than the one meant.
+
+Now the record says the order, as it says the draw a deal is sealed
+to. A person's own play names the draws that have brought somebody
+into a held seat's escrow since the last one that did; every side
+grows each held seat's list from those plays, in the order the record
+has them, and the verifier reads the same plays ahead of the replay,
+since it opens a seat the hand will lose from the start. A draw named
+and not yet carried at a side holds up the ones after it there until
+it is. A newcomer is given its share once its place is on the record,
+and every index reads the seat's own list: the place a part is made
+for, the custodian a piece is sealed to, and which custodian says a
+given-up seat's moves (`packages/table/test/top_up_test.dart`: two
+draws carried the other way round at the two people, the jury the
+deal was sealed to then gone, and one newcomer from each draw opening
+the seat for the verifier with nothing else to open it by).
+
+People's plays, and not every move, because they are the moves that
+carry one after another with an event every time. Passes race side by
+side and settle in a different order at each side, as the steps of
+one round of the deal do; a bot seat's move settles with nothing said
+wherever the seat is everyone's to work out, and a claim for it can
+come late at one side and never at another.
+
+What it costs is a wait. A newcomer is given nothing until the next
+person's play — up to a trick, and to the hand's first play for a draw
+made in the deal or the passing — and a draw carried after the hand's
+last person's play grows nothing in that hand, which keeps the
+custodians it had. A person can name a draw that was never carried,
+and that holds up the growth for the rest of the hand at every side
+alike: the escrow keeps the custodians it has, which is a hand less
+able to lose jurors and nothing given away.
+
+A piece is taken only from a custodian with a place, and one from a
+newcomer a side has no place for yet — the play that named it not yet
+carried there — is refused. Nobody says it again for the asking: a
+custodian says its piece again only while it still waits on the secret
+itself. A custodian of a seat given to the escrow before the play that
+named the newcomers, still behind that play, with every other
+custodian on its list gone, had every newcomer's piece refused for
+good; it was the one left to say the seat's moves, and the table
+stopped at the seat's turn. The pieces a side has refused are taken
+again as its list grows (`top_up_test.dart`).
+
+Building it found why seed 10 failed where it did. The pieces in hand
+were summed whole, so one that was not what its place said spoiled the
+sum of all of them, and the verifier held the seat shut with enough
+good pieces to open it twice over. When the whole sum does not open a
+seat, each pair a new piece makes is tried against the seat's key
+(`packages/deal`, `acceptRelease`): a piece that is wrong, for
+whatever reason, costs nothing but itself.
+
+The rules that stood in for the record were the table growing the list
+as each draw carried and as each part of a share was heard
+(`_growCustodians`), and the verifier growing it from every draw of the
+hand in the juries' own order (`custodiansNow`). Both are gone.
 
 ## The lost-quorum ending on the record
 
@@ -718,7 +788,7 @@ The step after this document puts the seven transitions on the
 record, in this order:
 1. the escrow — done (above);
 2. the abandoned hand and the escrowed audit — done (above);
-3. the lost-quorum ending — done (below, "The lost-quorum ending on
+3. the lost-quorum ending — done (above, "The lost-quorum ending on
    the record"), on the record where a majority of the people can
    carry it;
 4. the jury draw a deal is sealed to, read in record order rather than
@@ -730,7 +800,8 @@ record, in this order:
    and a boot at one seat are one race with one winner;
 7. found on the way, and decided the same way as the draw was: the
    order a hand's redraws add their newcomers to the escrow's
-   custodians in (above, "The draw on the record").
+   custodians in — done (above, "The escrow's custodians on the
+   record"), named in people's plays.
 
 Each would be settled the way a boot is, and each would remove the
 guessing rules it stands behind. The checker above goes from
