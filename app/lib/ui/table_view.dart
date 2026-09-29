@@ -136,11 +136,11 @@ class TableView extends StatelessWidget {
         final cardHeight = cardHeightFor(cardWidth);
         final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
 
-        // In portrait the badge above the trick and the one below it
-        // are as wide as the trick's own column, so each reads as the
-        // label on the card it caps, and the two at the sides take the
-        // strip between their card and the felt's edge, and the height
-        // of that card. Either way the pair are one size.
+        // A badge hugs what it says, up to the room it has: the width
+        // of the trick's own column for the seat across the felt and
+        // your own, and the strip between a card and the felt's edge
+        // for the two at the sides. They used to fill that room, so a
+        // short name sat in a wide bar and a side seat in a tall box.
         final facing = trickBox.width;
 
         Widget badge(int position) => SeatBadge(
@@ -211,42 +211,27 @@ class TableView extends StatelessWidget {
         final gap = (_badgeGap - inset).clamp(0.0, _badgeGap);
         // Where a side badge's inner edge falls: a gap out from the far
         // edge of the card beside it, measured from the middle of the
-        // felt. In portrait the badge fills the strip from there to the
-        // felt's edge, so the pair come out one size.
+        // felt.
         final sideOut = (box.width - 2 * _badgeInset) / 2 + cardWidth * reach + _badgeGap;
-        // On a wide felt a badge hugs its name — there is no strip
-        // beside the card to fill, and a box the width of the trick
-        // would be a bar with a word in it — so the two of a pair are
-        // each laid out over a ghost of the other, which takes up its
-        // room and draws nothing: whichever name is the longer, the
-        // pair come out one size.
-        Widget ghost(int position) => ExcludeSemantics(
-              child: Visibility(
-                visible: false,
-                maintainSize: true,
-                maintainAnimation: true,
-                maintainState: true,
-                child: badge(position),
-              ),
-            );
+        // Each badge hugs its name, so the two of a pair are each laid
+        // out over a ghost of the other, which takes up its room and
+        // draws nothing: whichever name is the longer, the pair come out
+        // one size.
+        Widget ghost(int position) => BadgeGhost(child: badge(position));
 
         Widget seat(int position) {
-          if (wide) {
-            return SizedBox(
-              height: line,
-              child: Stack(
-                children: [
-                  // The two ghosts make the box; the badge fills it.
-                  ghost(position),
-                  ghost((position + 2) % seatCount),
-                  Positioned.fill(child: badge(position)),
-                ],
-              ),
-            );
-          }
-          return position.isEven
-              ? SizedBox(width: facing, height: line, child: badge(position))
-              : SizedBox(width: sideRoom, child: badge(position));
+          final pair = Stack(
+            children: [
+              // The two ghosts make the box; the badge fills it.
+              ghost(position),
+              ghost((position + 2) % seatCount),
+              Positioned.fill(child: badge(position)),
+            ],
+          );
+          // A side badge is anchored by its inner edge, a gap out from
+          // its card (below), and runs out towards the felt's edge as
+          // far as its name takes it.
+          return wide || position.isEven ? SizedBox(height: line, child: pair) : pair;
         }
 
         // Where the table sits in the felt. A phone's felt is the size
@@ -829,6 +814,26 @@ int clockSeconds(int ms) => (ms / 1000).ceil();
 /// A seat's remaining clock, on a badge or the score line: the seconds
 /// and a small dial, red, since a running clock is the one thing on
 /// the felt that asks for haste.
+/// A badge laid out for its size alone: it takes up its room and is not
+/// drawn, heard or touched. The two of a pair are each laid out over a
+/// ghost of the other, so they come out one size.
+class BadgeGhost extends StatelessWidget {
+  const BadgeGhost({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+        child: Visibility(
+          visible: false,
+          maintainSize: true,
+          maintainAnimation: true,
+          maintainState: true,
+          child: child,
+        ),
+      );
+}
+
 class ClockText extends StatelessWidget {
   const ClockText({super.key, required this.ms});
 

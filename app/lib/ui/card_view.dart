@@ -182,22 +182,16 @@ class CardBack extends StatelessWidget {
   }
 }
 
-/// An empty slot where a card will land — keeps the trick area from
-/// jumping as cards arrive.
+/// The place a card will land: the room it takes, and nothing drawn.
+/// The room is what keeps the trick from jumping as cards arrive; the
+/// outline each empty place used to draw was four rules on the felt
+/// before anything had been played, and a trick reads as a trick
+/// without them.
 class CardGhost extends StatelessWidget {
   const CardGhost({super.key, required this.width});
 
   final double width;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: cardHeightFor(width),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(width * 0.11),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SizedBox(width: width, height: cardHeightFor(width));
 }

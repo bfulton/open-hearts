@@ -21,6 +21,8 @@ import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
 
+import 'drawn.dart';
+
 /// A phone-shaped surface: the fan layout is the part most likely to
 /// break, and it only breaks when width is scarce.
 const _phone = Size(390, 844);
@@ -550,17 +552,17 @@ void main() {
       for (final slot in _trickSlots(tester)) {
         expect(east.overlaps(slot), isFalse, reason: '$name\'s badge stays clear of the trick');
       }
-      expect(find.text(name), findsOneWidget, reason: 'the name, on the badge');
+      expect(drawn(find.text(name)), findsOneWidget, reason: 'the name, on the badge');
       // One size for everyone: a name that does not fit is cut, not
       // shrunk, so nobody's name is smaller than anybody else's.
       final painted = <double>{
         for (final seat in [name, names[1], names[2]])
-          tester.widget<Text>(find.text(seat)).style!.fontSize!
+          tester.widget<Text>(drawn(find.text(seat))).style!.fontSize!
       };
       expect(painted, hasLength(1), reason: 'every badge sets the same size');
       for (final seat in [name, names[1], names[2]]) {
-        final box = tester.renderObject<RenderBox>(find.text(seat));
-        final scale = _scaleOf(tester, find.text(seat));
+        final box = tester.renderObject<RenderBox>(drawn(find.text(seat)));
+        final scale = _scaleOf(tester, drawn(find.text(seat)));
         expect(scale, closeTo(1.0, 0.001), reason: '$seat is drawn at the size it sets, not scaled to fit');
         expect(box.size.height, greaterThan(0));
       }
@@ -569,7 +571,7 @@ void main() {
         // the whole width and stays on one.
         final north = tester.getRect(find.bySemanticsLabel(RegExp('^${names[2]}: ')));
         expect(east.height, greaterThan(north.height + 10));
-        expect(tester.widget<Text>(find.text(name)).maxLines, 2);
+        expect(tester.widget<Text>(drawn(find.text(name))).maxLines, 2);
       }
     }
   });
@@ -659,7 +661,7 @@ void main() {
   testWidgets('every player has an icon: their initials on their colour, on the badges, your line and the sheet', (tester) async {
     await pumpTable(tester);
     final model = tester.widget<TableView>(find.byType(TableView)).controller;
-    final icons = tester.widgetList<PlayerIcon>(find.byType(PlayerIcon)).toList();
+    final icons = tester.widgetList<PlayerIcon>(drawn(find.byType(PlayerIcon))).toList();
     expect(icons.length, engine.seatCount, reason: 'three badges and your own line');
     for (var seat = 0; seat < engine.seatCount; seat++) {
       final mine = icons.where((i) => i.name == model.names[seat]).toList();
@@ -678,7 +680,7 @@ void main() {
       await tapCard(tester, playable.first.card);
     }
     expect(find.text('Next hand'), findsOneWidget);
-    expect(find.byType(PlayerIcon), findsNWidgets(engine.seatCount * 2), reason: 'the table\'s four, and the sheet\'s four');
+    expect(drawn(find.byType(PlayerIcon)), findsNWidgets(engine.seatCount * 2), reason: 'the table\'s four, and the sheet\'s four');
   });
 
   testWidgets('sideways, the same header, a shorter and wider hand', (tester) async {

@@ -21,6 +21,7 @@ import 'package:table/src/sim/sim.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
+import 'drawn.dart';
 import 'table_page_test.dart' show fanCards, tapCard;
 
 const _me = 2;
@@ -354,7 +355,7 @@ void main() {
     await act(tester, live);
     await live.advance(tester, 2000);
     expect(live.controller.game.phase, engine.Phase.playing);
-    expect(find.byType(ClockText), findsNothing, reason: 'nothing on the felt while everyone is within their grace');
+    expect(drawn(find.byType(ClockText)), findsNothing, reason: 'nothing on the felt while everyone is within their grace');
 
     // Up to Ada's turn, then past her six seconds of grace.
     for (var guard = 0; guard < 120 && live.controller.clockMs(0) == null; guard++) {
@@ -363,7 +364,7 @@ void main() {
     }
     expect(live.controller.clockMs(0), isNotNull, reason: 'Ada is on turn and past her grace');
     expect(find.bySemanticsLabel(RegExp(r'^Ada: .*, on turn, \d+ s on the clock$')), findsOneWidget);
-    expect(find.byType(ClockText), findsOneWidget);
+    expect(drawn(find.byType(ClockText)), findsOneWidget);
     expect(find.text('Boot Ada'), findsNothing, reason: 'the bank is not spent');
     expect(find.textContaining(' has '), findsNothing, reason: 'the old note is gone');
 
