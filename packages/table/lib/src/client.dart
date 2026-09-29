@@ -353,6 +353,8 @@ class TableClient {
   bool canBoot(int seat) {
     if (!amSeated || seat == mySeat || holders[seat] is! HumanSeat) return false;
     if (!connectedToMajority || writesRefused) return false;
+    // Backing their leave, this side has given its voice on the seat.
+    if (!_mayBackBoot((holders[seat] as HumanSeat).key)) return false;
     if (_catchingUp((holders[seat] as HumanSeat).key)) return false;
     // A seat waiting on an answer it is owed is not idle: three of its
     // cards will not open and it cannot play what it cannot see
@@ -834,8 +836,11 @@ class TableClient {
     _emit(EventKind.play, body);
   }
 
-  /// The polite exit: signed, so nobody needs to agree. Made at this
-  /// peer's current position, which is where it takes effect — unless
+  /// The polite exit: this peer's own word, carried as a boot is — the
+  /// others back it as it reaches them, and a majority of the people
+  /// at its turn carries it, this peer's signature its own vote
+  /// ([_onLeave]). Made at this peer's current position, which is where
+  /// it takes effect — unless
   /// this seat has an action or a vote in flight there, in which case
   /// it is made at the next position, so those are settled first: no
   /// peer can then hold both the action and a bot's move for the same
@@ -856,6 +861,7 @@ class TableClient {
     if (!canBoot(seat)) return;
     final turn = _openTurnOf(seat)!;
     if (_myWitness.containsKey(turn)) return;
+    if (!_mayBackBoot((holders[seat] as HumanSeat).key)) return;
     _emit(EventKind.boot, {'hand': turn.hand, 'turn': turn.index, 'seat': seat}, everywhere: true);
   }
 
@@ -1684,6 +1690,14 @@ class TableClient {
     for (final d in record) {
       if (d.removal && !settled.contains(d.turn)) _sendEvidence(d.turn);
     }
+    // And every leave with its backing, carried or not: the leaver has
+    // gone, and a peer that missed it has nobody else to hear it from.
+    for (final c in _leaves.values) {
+      _send(c.event.toJson());
+      for (final w in c.witnessEvents) {
+        _send(w.toJson());
+      }
+    }
     // A turn the jury settled travels with its verdict: the votes alone
     // never made a majority, so the votes alone would leave the asker
     // where the table was stuck.
@@ -1994,6 +2008,7 @@ class TableClient {
     race.witnessEvents.addAll(_earlyWitnessEvents.remove(event.id) ?? const []);
     if (event.author == signer.publicKey) {
       _myWitness[turn] = event.id; // a side taken
+      _bootBacked[holder.key] = turn;
     } else {
       _considerCountersigning(turn, event);
     }
@@ -2190,6 +2205,7 @@ class TableClient {
     if (_myWitness.containsKey(turn) || !connectedToMajority || writesRefused) return;
     final seat = _turnSeat[turn]!;
     final holder = holders[seat];
+    if (holder is HumanSeat && !_mayBackBoot(holder.key)) return;
     // By this peer's own accounting of the seat's clock; the tick asks
     // again every second until it agrees. For a held seat, the juror's
     // clock and silence ([_jurorOut]).
@@ -2200,6 +2216,8 @@ class TableClient {
 
   void _witness(TurnId turn, TableEvent of) {
     _myWitness[turn] = of.id;
+    final holder = holders[of.seat];
+    if ((of.kind == EventKind.boot || of.kind == EventKind.absent) && holder is HumanSeat) _bootBacked[holder.key] = turn;
     final w = TableEvent.sign(signer, table: spec.id, kind: EventKind.witness, body: {
       'event': of.id,
       'hand': turn.hand,
@@ -2223,6 +2241,7 @@ class TableClient {
       proposal.witnessEvents.add(event);
       return _settleJury(id);
     }
+    if (event.body['leave'] == true) return _onLeaveWitness(event);
     if (event.body['jury'] == true) {
       // For a proposal not seen yet: kept by its id, never deferred,
       // since its position is the proposer's, not a turn of this hand.
@@ -2354,11 +2373,17 @@ class TableClient {
         return;
       }
       final gone = of.where((k) => k != signer.publicKey && _silent(k)).toSet();
+      // Nor is the boot anyone's to back who has backed this person's
+      // leave: each backs one way out of a seat ([_mayBackBoot]). At a
+      // table of four, two for the leave and two for the boot is a turn
+      // neither can carry, and it waited on those two for good.
+      final leaving = _leaveBackers[holder.key] ?? const <PublicKey>{};
       final actionReachable = of.difference(forRemoval).difference(forEnd).difference(gone.difference(forAction)).length >= needed;
       final removalReachable = of
               .difference(forAction)
               .difference(forEnd)
               .difference({holder.key})
+              .difference(leaving.difference(forRemoval))
               .difference(gone.difference(forRemoval))
               .length >=
           needed;
@@ -3308,6 +3333,7 @@ class TableClient {
       final holder = holders[seat];
       if (holder is! HumanSeat || holder.key == signer.publicKey) continue;
       if (!_liars.contains(holder.key) || !_isParticipant(holder.key)) continue;
+      if (!_mayBackBoot(holder.key)) continue;
       final turn = _openTurnOf(seat);
       if (turn == null || _myWitness.containsKey(turn)) continue;
       _emit(EventKind.boot, {'hand': turn.hand, 'turn': turn.index, 'seat': seat}, everywhere: true);
@@ -4544,16 +4570,128 @@ class TableClient {
     }
   }
 
+  // ---- the leave, on the record -----------------------------------------
+  //
+  // A leave is its author's own word, made where they stood ([leave]),
+  // and carried as a boot is: the people at the table back it as it
+  // reaches them, and a majority of them at its turn carries it, the
+  // leaver's signature its own vote. Each person backs one way out of a
+  // seat — a leave, or a boot or a claim of silence at the seat's turn
+  // — so a leave and a boot at one seat cannot both carry, and every
+  // record, the jury's too, says the same one.
+  //
+  // It needed nobody's agreement until this, and took effect wherever
+  // it arrived before the seat was removed some other way: a side that
+  // had booted the seat passed over the leave, one that had the leave
+  // passed over the boot, and the people and the jurors kept different
+  // exits for as long as they served (chaos seed 43). Settling it at
+  // the seat's own next turn instead, as a boot is, would stop a table
+  // of two people dead — every turn needs both of them, and the
+  // leaver's next turn cannot come until the ones before it carry — and
+  // would deal the hand after a leave made between hands with the
+  // leaver's cards open to the table, a seat given up at its keys.
+
+  /// Leaves heard, by id, with who backs each.
+  final Map<String, _Leave> _leaves = {};
+
+  /// The leave this side has backed, by the leaver's key: its voice on
+  /// that seat's way out, given ([_mayBackBoot]).
+  final Map<PublicKey, String> _leaveBacked = {};
+
+  /// The turn of the boot or claim of silence this side has backed, by
+  /// the key of the person it would remove ([_mayBackLeave]).
+  final Map<PublicKey, TurnId> _bootBacked = {};
+
+  /// Who has backed each person's leave, by the leaver's key, whether
+  /// or not the leave itself has been heard here: none of them will
+  /// back a boot of the seat ([_settle]).
+  final Map<PublicKey, Set<PublicKey>> _leaveBackers = {};
+
   void _onLeave(TableEvent event) {
     final seat = event.seat;
     if (seat < 0 || seat >= seatCount) return;
     final holder = holders[seat];
     if (holder is! HumanSeat || holder.key != event.author) return;
-    final turn = event.turn;
-    final where = _compare(turn);
-    if (where > 0) return _defer(event);
-    _log(Decision(turn: turn, event: event, witnesses: {event.author}, removal: true));
-    _trace('left seat $seat at $turn');
+    if (_compare(event.turn) > 0) return _defer(event);
+    final claim = _leaves.putIfAbsent(event.id, () => _Leave(event));
+    claim.backers.add(event.author);
+    claim.backers.addAll(_earlyWitnesses.remove(event.id) ?? const {});
+    claim.witnessEvents.addAll(_earlyWitnessEvents.remove(event.id) ?? const []);
+    _trace('leave by seat $seat at ${event.turn}');
+    _backLeave(claim);
+    _settleLeave(claim);
+  }
+
+  /// Backs [claim], once, if this side is at the table at its turn and
+  /// has not backed another way out of the seat. Nothing to judge: it
+  /// is the leaver's own word.
+  void _backLeave(_Leave claim) {
+    final e = claim.event;
+    if (!amSeated || _left || e.author == signer.publicKey) return;
+    if (!_mayBackLeave(e.author)) return;
+    if (!_participantsAt(e.turn).contains(signer.publicKey)) return;
+    _leaveBacked[e.author] = e.id;
+    final w = TableEvent.sign(signer, table: spec.id, kind: EventKind.witness, body: {
+      'event': e.id,
+      'hand': e.turn.hand,
+      'turn': e.turn.index,
+      'seat': e.seat,
+      'leave': true,
+    });
+    transport.broadcast(w.toJson(), everywhere: true);
+    _accept(w);
+  }
+
+  /// Whether this side's voice on [person]'s way out is free for their
+  /// leave: not given to a boot or a claim of silence that could still
+  /// carry. One whose turn settled with the seat still here lost.
+  bool _mayBackLeave(PublicKey person) {
+    if (_leaveBacked.containsKey(person)) return false;
+    final boot = _bootBacked[person];
+    return boot == null || (_races[boot]?.settled ?? true);
+  }
+
+  /// Whether this side may back a boot or a claim of silence against
+  /// [person]: not once it has backed their leave.
+  bool _mayBackBoot(PublicKey person) => !_leaveBacked.containsKey(person);
+
+  void _onLeaveWitness(TableEvent event) {
+    final id = event.witnessed;
+    final leaver = event.seat >= 0 && event.seat < seatCount ? _personOf(event.seat) : null;
+    if (leaver != null && leaver != event.author) {
+      if (_leaveBackers.putIfAbsent(leaver, () => {}).add(event.author)) {
+        // A turn at the seat waiting on this voice may be split now.
+        for (final e in List.of(_races.entries)) {
+          if (!e.value.settled && _turnSeat[e.key] == event.seat) _settle(e.key);
+        }
+      }
+    }
+    final claim = _leaves[id];
+    if (claim == null) {
+      // For a leave not heard yet: kept by its id, as a jury's are.
+      _earlyWitnesses.putIfAbsent(id, () => {}).add(event.author);
+      _earlyWitnessEvents.putIfAbsent(id, () => []).add(event);
+      return;
+    }
+    if (claim.backers.add(event.author)) claim.witnessEvents.add(event);
+    _settleLeave(claim);
+  }
+
+  /// Carries [claim] once a majority of the people at its turn back
+  /// it: the seat is a bot's from there, as a boot would leave it.
+  void _settleLeave(_Leave claim) {
+    if (claim.carried) return;
+    final e = claim.event;
+    final seat = e.seat;
+    final holder = holders[seat];
+    // Gone some other way first: a boot carried at its turn.
+    if (holder is! HumanSeat || holder.key != e.author) return;
+    final turn = e.turn;
+    final of = _participantsAt(turn);
+    if (!of.contains(e.author) || claim.backers.intersection(of).length < _majority(of)) return;
+    claim.carried = true;
+    _log(Decision(turn: turn, event: e, witnesses: {...claim.backers}, among: of, removal: true));
+    _trace('left seat $seat at $turn by ${claim.backers.intersection(of).length} of ${of.length}');
     _remove(seat, at: turn, how: EventKind.leave);
     final open = _openTurnOf(seat);
     if (open != null) {
@@ -4592,6 +4730,10 @@ class TableClient {
     _liftPause();
     for (final turn in List.of(_races.keys)) {
       if (!_races[turn]!.settled) _settle(turn);
+    }
+    // A leave is a majority of fewer people once someone else has gone.
+    for (final claim in List.of(_leaves.values)) {
+      _settleLeave(claim);
     }
     _notify();
   }
@@ -4689,6 +4831,7 @@ class TableClient {
         final h = holders[seat];
         if (h is! HumanSeat || h.key == signer.publicKey || !_isParticipant(h.key)) continue;
         if (!_silent(h.key) || !connectedToMajority || writesRefused) continue;
+        if (!_mayBackBoot(h.key)) continue;
         _emit(EventKind.absent, {'hand': e.key.hand, 'turn': e.key.index, 'seat': seat}, everywhere: true);
       }
       // Boots this peer held back on until its own clock agreed; and
@@ -5390,7 +5533,20 @@ class TableClient {
     final needed = _majority(of);
     final forAction = race.forAction.intersection(of);
     final forRemoval = race.forRemoval.intersection(of);
-    final awake = of.difference(forAction).difference(forRemoval).difference(race.forEnd).where((k) => !_silent(k)).toSet();
+    // Whoever has backed this person's leave has given their voice on
+    // the seat's way out, and will back neither its move nor its boot
+    // ([_mayBackBoot]); and a person whose own leave is heard here is
+    // not coming back to move, however long their device goes on
+    // being heard.
+    final leaving = _leaveBackers[holder.key] ?? const <PublicKey>{};
+    final left = _leaves.values.any((c) => c.event.author == holder.key);
+    final awake = of
+        .difference(forAction)
+        .difference(forRemoval)
+        .difference(race.forEnd)
+        .difference(leaving)
+        .where((k) => !_silent(k) && !(left && k == holder.key))
+        .toSet();
     final actionPossible = forAction.length + awake.length >= needed;
     final removalPossible = forRemoval.length + awake.difference({holder.key}).length >= needed;
     final said = _waitSaidAt[turn];
@@ -5403,7 +5559,7 @@ class TableClient {
     if (actionPossible || removalPossible) return;
     TableEvent winner;
     String side;
-    if (!_silent(holder.key)) {
+    if (!_silent(holder.key) && !left) {
       if (race.action == null) return;
       winner = race.action!;
       side = 'action';
@@ -5536,6 +5692,19 @@ class TableClient {
     } while (_notifyAgain && !_closed);
     _notifying = false;
   }
+}
+
+/// A leave heard, and who backs it: the leaver first, its signature its
+/// own vote ([TableClient._settleLeave]).
+class _Leave {
+  _Leave(this.event);
+  final TableEvent event;
+  final Set<PublicKey> backers = {};
+
+  /// Every backing received, so the whole decision can be handed to a
+  /// peer that missed some of it.
+  final List<TableEvent> witnessEvents = [];
+  bool carried = false;
 }
 
 class _Race {

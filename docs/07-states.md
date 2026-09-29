@@ -69,14 +69,14 @@ never comes back.
 | From | To | Decided |
 |---|---|---|
 | human | booted, absent | on the record: votes in the seat's own turn, settled as it is |
-| human | left | **here**, where it crosses a boot |
+| human | left | on the record: the leaver's word at the turn they stood at, carried by a majority of the people there |
 
-A leave needs nobody's agreement. It takes effect at the turn its
-author put it at, on every side that has not already removed the seat
-some other way. So when a leave and a boot cross, which way the seat
-left, and at which turn, depends on which arrived first. The cross
-happens when the leave reaches some sides only after the rest have
-booted the seat for its silence.
+A leave is its author's own word, and their signature is their vote
+for it; the others back it as it reaches them, and it carries as a boot
+does. Each person backs one way out of a seat, so where a leave and a
+boot cross — the leave reaching some sides only after the rest have
+booted the seat for its silence — only one of them carries. Until this
+step it was decided **here** (below, "The leave on the record").
 
 ### A held bot seat, for one hand
 
@@ -221,17 +221,18 @@ it (below, "The escrow on the record"); so are the draw a deal is
 sealed to and, with it, the fall-back to bot seats in the open (below,
 "The draw on the record"); and the game's end for a lost quorum,
 wherever a majority of the people can say it (below, "The lost-quorum
-ending on the record"); and the order a hand's redraws add their
+ending on the record"); the order a hand's redraws add their
 newcomers to a held seat's escrow in, found on the way (below, "The
-escrow's custodians on the record"). What is still decided here, and
-the rules that exist only because it is not on the record:
+escrow's custodians on the record"); and which way a seat left, where
+a leave crosses a boot (below, "The leave on the record"). What is
+still decided here, and the rules that exist only because it is not on
+the record:
 
 | Decided here | What it has cost | Rules standing in for a record |
 |---|---|---|
 | The game ended for a lost quorum, where no majority can say so | nothing seen: each side's record stops at the same turn, one a prefix of the table's (below, "The lost-quorum ending on the record") | the two minutes a side that hears too little of the table waits |
-| Which way a seat left, where a leave crosses a boot | the people and the jurors holding different records to the end of a game (below) | `_onLeave` passing over a leave for a seat already removed |
 
-The five rows that are gone read:
+The six rows that are gone read:
 
 - a held seat given to the escrow, which had cost two jurors playing
   the same card for one seat, settled only by the jury's rule for two
@@ -252,7 +253,11 @@ The five rows that are gone read:
 - bot seats dealt in the open after forty seconds without a jury able
   to hold them, which had not been seen to cost anything, and would
   have dealt one hand two ways at two sides judging the forty seconds
-  differently.
+  differently;
+- which way a seat left, where a leave crosses a boot, which had cost
+  the people and the jurors holding different records to the end of a
+  game (chaos seed 43), and could have dealt the hand after a leave two
+  ways.
 
 The rules that stood in for them were `_holderStillAudits`,
 `_auditLeftBehind`, `_dealLeftBehind` and the verifier's
@@ -782,6 +787,74 @@ the game twenty seconds in with the jury there and its pieces on their
 way. A seat's piece holders are the custodians its keys named
 (`quorum_lost_test.dart`).
 
+## The leave on the record
+
+The sixth. A leave needed nobody's agreement: it took effect at the
+turn its author put it at, at every side that had not already removed
+the seat another way. Where a leave crossed a boot — the leave reaching
+some sides only after the rest had booted the seat for its silence — a
+side that had booted the seat passed over the leave, one that had the
+leave passed over the boot, and the people and the jurors kept
+different exits for as long as they served (chaos seed 43).
+
+Two exits at one turn play the same game, and seed 43 cost only the
+label. Two exits at different turns need not. A person who leaves after
+their own audit, while the others are still auditing theirs, has the
+next hand's keys as their next turn of their own: where the leave was
+heard, that hand is dealt with the seat a juror's to hold; where it was
+not, the seat stays a person's until it is booted at its keys, and is
+dealt as a departed person's, its cards computed by everyone. The two
+sides then wait on different moves at the same turn.
+
+The plan was to settle the leave in the seat's own turn, as a boot is.
+That would have stopped a table of two people dead: every turn needs
+both of them, the leaver is gone, and the leaver's next turn cannot
+come until the turns before it carry. It would also have dealt the
+hand after a leave made between hands as the seat given up at its keys
+is, with its cards open to the table.
+
+So the leave is carried where it is said. The leaver's signature is
+its own vote, the others back it as it reaches them — there is nothing
+to judge, it being the leaver's own word — and a majority of the people
+at its turn carries it; at a table of two, the other person's backing
+is that majority, a round trip after the leave. Each person backs one
+way out of a seat: a leave, or a boot or a claim of silence at the
+seat's turn, and not the other while the one it backed can still
+carry. Two majorities of one table meet in somebody, so a leave and a
+boot cannot both carry, and every record, the jurors' too, says the
+same one. The verifier turns down a leave without its majority. The
+leaver has gone and cannot say it again, so whoever holds the leave
+carries it forward with its backing, and a juror, with no voice of its
+own to make up the majority, carries it on the backing it is handed
+(`packages/table/test/leave_on_record_test.dart`: a table of two
+carrying a leave without the jury; the jurors hearing a leave the
+people hear only after booting the seat, and taking the boot with
+them; a person who booted the seat carried the leave the others
+backed; a person who has booted the seat not backing its leave while
+the boot can still carry, and one who has backed a leave not backing a
+boot of the seat; a juror that missed the leave and its backing; a
+table of four split two and two).
+
+Building it found where one voice per exit leaves a table without a
+majority either way: at a table of four, two backing the leave, the
+leaver among them, and two booting the seat. Neither can carry, and the
+boot's side counted the one who had backed the leave as a vote still to
+come, so nobody asked the jury and the turn waited on that vote for
+good. A person known to have backed a seat's leave is not a vote for
+its boot, the turn is split, and the jury rules it; a juror holding the
+leave does not wait on the leaver's device to go quiet before ruling,
+nor on the leave's backers to back anything else (`leave_on_record_test.dart`).
+
+What remains is the jury. A turn split between a boot and nothing —
+the seat silent — goes to a juror, and a juror that has not heard of a
+leave carried elsewhere can rule the boot: the leave's backers cut off
+both from the side that appealed and from the juror, for as long as
+the seat's turn waits. The two records then name different exits
+again.
+
+The rule that stood in for the record was `_onLeave` taking a leave at
+once and passing over one for a seat already removed. It is gone.
+
 ## Next
 
 The step after this document puts the seven transitions on the
@@ -796,8 +869,10 @@ record, in this order:
    the third, since a walk found it failing;
 5. the open-bots fall-back — done with the fourth: the first person's
    keys naming no draw are the fall-back, on the record;
-6. the leave, settled in the seat's turn as a boot is, so that a leave
-   and a boot at one seat are one race with one winner;
+6. the leave — done (above, "The leave on the record"): carried as a
+   boot is, by a majority of the people at the turn it was made, so
+   that a leave and a boot at one seat have one winner; not in the
+   seat's own turn, which would stop a table of two people;
 7. found on the way, and decided the same way as the draw was: the
    order a hand's redraws add their newcomers to the escrow's
    custodians in — done (above, "The escrow's custodians on the

@@ -380,8 +380,9 @@ Strangers leave. That is not misbehaviour, it is the medium, and the
 design assumes it rather than penalising it.
 
 **Explicit.** A Leave button, and the event is signed by the leaver so
-nobody can forge one for someone else, and relayed by whoever receives it
-so a partial delivery still converges.
+nobody can forge one for someone else, backed by the others as it
+reaches them, and relayed by whoever has it — the leaver has gone — so a
+partial delivery still converges.
 
 A graceful leave does something the other two doors cannot: the leaver
 takes part in one final re-share before disconnecting, handing their
@@ -447,12 +448,19 @@ bank is spent.
 All three doors produce the same event: **"seat N is out as of game state
 S."** One code path for the consequences, three ways in.
 
-They differ in what backs the event. A signed Leave is evidence and
-needs nobody's agreement. Boot and timeout are *inferences* about
-someone's absence, and an inference needs **a strict majority of the
-last agreed participant set** behind it — three of four, two of three.
-At two humans no majority exists among the players, and that case goes
-to the jury, below.
+They differ in what backs the event. Boot and timeout are *inferences*
+about someone's absence, and an inference needs **a strict majority of
+the last agreed participant set** behind it — three of four, two of
+three. At two humans no majority exists among the players, and that
+case goes to the jury, below. A signed Leave is evidence, and the
+leaver's signature is its own vote: the others back it as it reaches
+them, with nothing to judge, and at two humans the other one's backing
+is the majority. It needed nobody's agreement once; but where a leave
+crossed a boot — reaching some sides only after the rest had booted the
+seat for its silence — each side kept whichever it heard first, and
+two sides could deal the next hand two ways. So it is carried as a boot
+is, and each person backs one way out of a seat: a leave and a boot
+cannot both carry ([doc 07](07-states.md), "The leave on the record").
 
 There is no rejoining. Without persistent identity there is nothing to
 rejoin as, so a removed player goes back to matchmaking.
@@ -472,7 +480,8 @@ once by a peer that has not heard from the seat for two minutes. Every other
 participant backs one side or the other with a signature, never both,
 and a side wins with a **strict majority of the participants at that
 turn**. Only then does the next turn open, so nothing is ever rolled
-back. A signed Leave is evidence and needs no majority.
+back. A signed Leave is placed where its author stood and carried by a
+majority of the people there, the leaver's own signature among them.
 
 **Silence is answered at the seat's own turn, and nowhere else.** A
 peer that has heard nothing from a seat for two minutes boots it the

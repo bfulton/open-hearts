@@ -551,7 +551,14 @@ Verification verifyRecord(
       }
       if (e.kind == EventKind.escrow) return 'an escrow of seat $seat, which is a person\'s';
       if (e.kind == EventKind.leave) {
+        // The leaver's own word, carried as a boot is: a majority of the
+        // people at its turn, the leaver's signature its own vote
+        // (_settleLeave in client.dart).
         if (e.author != holder.key) return 'a leave signed by someone else';
+        if (e.turn != d.turn) return 'a leave recorded at ${d.turn}, said at ${e.turn}';
+        if (!carried(d.witnesses, d.turn, d.among)) {
+          return 'a leave of seat $seat at ${d.turn} without a majority behind it (${d.witnesses.length} of ${d.among.length})';
+        }
       } else {
         final backers = Set.of(d.witnesses)..remove(holder.key);
         if (!carried(backers, d.turn, d.among) && !byVerdict(d)) {

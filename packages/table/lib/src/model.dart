@@ -141,17 +141,18 @@ const seatTransitions = <SeatState, Set<SeatState>>{
 };
 
 /// How each way out of a seat is decided. A boot and a claim of absence
-/// are votes in the seat's own turn and settle as it does. A leave
-/// needs nobody's agreement: it takes effect at the turn its author
-/// put it at, at every side that has not already removed the seat
-/// another way. So where a leave and a boot cross — the leave reaching
-/// some sides only after the rest have booted the seat for its silence
-/// — the door the seat went through, and the turn, is decided here, by
+/// are votes in the seat's own turn and settle as it does. A leave is
+/// its author's word at the turn they stood at, backed by the others as
+/// it reaches them and carried by a majority of the people there, the
+/// leaver's signature its own vote. Each person backs one way out of a
+/// seat, so where a leave and a boot cross only one of them carries,
+/// and every record says which (client.dart, _settleLeave). Until that,
+/// a leave needed nobody's agreement and the door was decided here, by
 /// whichever arrived first.
 const seatExits = <SeatState, Decided>{
   SeatState.booted: Decided.onRecord,
   SeatState.absent: Decided.onRecord,
-  SeatState.left: Decided.here,
+  SeatState.left: Decided.onRecord,
 };
 
 const tableTransitions = <TableState, Set<TableState>>{
