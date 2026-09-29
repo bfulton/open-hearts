@@ -211,6 +211,19 @@ class LiveController extends ChangeNotifier implements TableModel {
   bool _givenUp(List<Decision> record) =>
       _consumed.length < record.length && record[_consumed.length].turn.hand > _shown.handNumber;
 
+  /// A deal the view cannot show yet: it waits for the table to have
+  /// the hand and its lead. Unless the table gave the hand up before
+  /// either came — its deal abandoned when a held seat's juror could
+  /// not take its step, or the hand opened and given up when nobody
+  /// could lead it (the table's hand states, packages/table
+  /// model.dart). That deal will never be shown, and the record has
+  /// moved on to the next hand's pass, which a view still waiting here
+  /// would never offer.
+  ({Duration delay, void Function() act})? _dealNotShown(int hand) => switch (client.handOutcome(hand)) {
+        HandState.abandoned || HandState.givenUp => (delay: sweepBeat, act: _giveUpShownHand),
+        _ => null,
+      };
+
   /// A hand given up, as the view shows it: the beat of bare felt that
   /// ends any hand, and then the next one dealt. No sheet — nothing was
   /// scored, because no hand happened.
@@ -378,9 +391,9 @@ class LiveController extends ChangeNotifier implements TableModel {
       final hand = _shown.handNumber;
       final deal = client.dealOf(hand);
       final dealt = deal != null && (client.game.handNumber > hand || client.game.phase != Phase.dealing);
-      if (!dealt) return null;
+      if (!dealt) return _dealNotShown(hand);
       final leader = deal.leader;
-      if (leader == null) return null;
+      if (leader == null) return _dealNotShown(hand);
       return (
         delay: Duration.zero,
         act: () {

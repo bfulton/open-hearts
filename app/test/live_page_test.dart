@@ -486,6 +486,41 @@ void main() {
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  testWidgets('a hand given up in its deal gives way on the screen to the next', (tester) async {
+    // A bot seat's juror goes while the seat still owes a step of the
+    // deal. Nobody else holds the key it deals with, so the table gives
+    // the hand up undealt and deals the next (packages/table,
+    // undealt_hand_test.dart). The screen stayed in the old hand's
+    // deal, waiting for a lead that deal would never name, and never
+    // offered the pass the table then waited on.
+    final crypto = await DealCrypto.load();
+    final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: jurySize + 4);
+    final c = live.controller;
+    for (var guard = 0; guard < 200 && c.client.botHolders(0).isEmpty; guard++) {
+      await live.advance(tester, 500);
+    }
+    final held = c.client.botHolders(0);
+    expect(held, isNotEmpty, reason: 'a jury holds the bot seats');
+    expect(c.client.game.phase, engine.Phase.dealing, reason: 'still in the deal when the holder goes');
+    live.net.goOffline(held.values.first);
+    for (var guard = 0; guard < 400 && c.client.game.handNumber == 0; guard++) {
+      await live.advance(tester, 500);
+    }
+    expect(c.client.handOutcome(0), HandState.abandoned, reason: c.client.describe());
+
+    // And the screen goes with it, to the pass of the hand dealt in its
+    // place, with no sheet on the way: nothing was scored.
+    for (var guard = 0; guard < 200 && !c.awaitingPass; guard++) {
+      await live.advance(tester, 500);
+    }
+    expect(c.game.handNumber, 1, reason: 'the screen shows the next hand: ${c.behind}');
+    expect(c.awaitingPass, isTrue, reason: c.behind);
+    expect(find.text('Pass'), findsOneWidget);
+    expect(c.handJustEnded, isNull);
+    expect(c.game.totals, everyElement(0));
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   testWidgets('a hand that ends while the others play on gives way to the next', (tester) async {
     final live = await pumpLive(tester);
     final c = live.controller;
