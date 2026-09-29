@@ -10,11 +10,15 @@ on:
   push:
     branches: [main]
 
-# Three jobs where there was one, side by side: on a hosted runner the
-# table's suite alone takes about twenty-five minutes and the relay's two
-# about twelve, so one job running everything in turn ran out of time
-# before it reached the app. Each builds the Rust libraries its suites
-# load over FFI.
+# Jobs side by side where there was one: on a hosted runner the table's
+# suite alone takes about twenty-five minutes and the relay's two about
+# twelve, so one job running everything in turn ran out of time before it
+# reached the app. Each builds the Rust libraries its suites load over
+# FFI.
+#
+# And with room for a slow machine. Runners differ: the same table suite
+# took 25 minutes on one and 43 on another, every test in it 1.6 to 1.8
+# times slower, so each limit here is well clear of the slow end.
 jobs:
   app:
     runs-on: ubuntu-latest
@@ -63,9 +67,16 @@ jobs:
           flutter build web --release --no-web-resources-cdn \
             --base-href /play/
 
+  # In two halves, on two runners: each takes the first or second half
+  # of every test file (dart test's shards), about 13 minutes a half, 22
+  # on a slow runner.
   table:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -82,11 +93,11 @@ jobs:
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
         run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
       - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
-        run: cd packages/table && dart pub get && dart analyze && dart test
+        run: cd packages/table && dart pub get && dart analyze && dart test --total-shards 2 --shard-index ${{ matrix.shard }}
 
   service:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -121,7 +132,7 @@ jobs:
   # its juror goes.
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2

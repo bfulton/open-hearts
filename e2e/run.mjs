@@ -60,10 +60,11 @@ const handOver = (n) => {
 };
 
 /// How long a whole hand may take. Four browsers, a relay and a bench
-/// of jurors on a hosted runner's two cores took 172 s over the first
-/// cell's; the last cell's, two minutes of which are a silence the
-/// jury waits out, took 171 s on two cores of a faster machine.
-const aHand = 300000;
+/// of jurors on a hosted runner's two cores took 172 and 173 s over the
+/// first cell's on two runs, and runners differ: one ran the table's
+/// suite 1.7 times slower than another (ci.yml), which makes that
+/// hand nearly five minutes.
+const aHand = 480000;
 
 async function main() {
   const relay = await startRelay();
