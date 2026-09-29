@@ -258,7 +258,15 @@ async function main() {
     log("Bao's browser closed off his turn");
     await playUntil([pages[0]], (p) => has(p, /^Asking the jury$/), { timeout: 150000 });
     log('Ada is asking the jury');
-    await playUntil([pages[0]], (p) => has(p, /^1 of 4 here/), { timeout: 300000 });
+    // The ruling is Bao's badge going to a bot, and nothing sooner. Not
+    // "1 of 4 here", which counts who is connected and says so the
+    // moment his browser closes, two minutes before the jury rules. All
+    // four badges on the screen and none of them his, so a moment with
+    // no badges drawn is not taken for one without Bao.
+    await playUntil([pages[0]], async (p) => {
+      const badges = (await texts(p)).filter((t) => /^[A-Z][\w ]*: \d+ in the game/.test(t));
+      return badges.length === 4 && !badges.some((t) => t.startsWith('Bao: '));
+    }, { timeout: 300000 });
     log('the jury ruled; Ada alone with three bots');
     // The hand ends when the header moves on to the next one — a sheet
     // that comes and goes is not the thing to wait for — or the game
