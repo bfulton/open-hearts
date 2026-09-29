@@ -473,6 +473,38 @@ void main() {
     }
   });
 
+  // Each piece is weighed by its custodian's place, and the pieces in
+  // hand are summed. One that is not what its place says — a custodian
+  // brought on from a redraw whose share was made at another place, or
+  // one that released something else — spoiled the sum, and the seat
+  // stayed shut however many good pieces came after it (sealed chaos
+  // seed 10 with nine strangers, at the verifier). Any two that agree,
+  // checked against the seat's key, are the secret.
+  test('a piece that is not what its place says does not keep a bot seat shut: any two good ones open it', () {
+    final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
+    final seats = [
+      const HumanDealSeat('a'),
+      const HumanDealSeat('b'),
+      const HumanDealSeat('c'),
+      BotDealSeat(key: jury.first),
+    ];
+    final keys = make(seats, 3, key: jury.first, custodians: jury).myKeys()!;
+    final jurors = [for (final k in jury) make(seats, null, key: k, custodians: jury)];
+    for (final j in jurors) {
+      expect(j.acceptKeys(keys), isTrue);
+      j.seatLeft(3);
+    }
+    final p = make(seats, 0, custodians: jury);
+    expect(p.acceptKeys(keys), isTrue);
+    p.seatLeft(3);
+    final bad = {'about': 3, 'holder': jury[1], 'share': base64Encode(List.generate(32, (i) => i + 1))};
+    expect(p.acceptRelease(bad), isTrue);
+    expect(p.acceptRelease(jurors[2].releaseShare(3, inTheOpen: true)!), isTrue);
+    expect(p.knowsSecret(3), isFalse, reason: 'one good piece and one that is not');
+    expect(p.acceptRelease(jurors[3].releaseShare(3, inTheOpen: true)!), isTrue);
+    expect(p.knowsSecret(3), isTrue, reason: 'two good pieces open it, whatever lies beside them');
+  });
+
   test('a bot seat a juror holds is awaited when its keys have not been read, never guessed', () {
     // The case a juror summoned mid-hand is in: it has been told the
     // seat is given up before it has been carried the keys that say

@@ -1510,6 +1510,7 @@ class DealSession {
       if (!sideA.contains(holder) && !sideB.contains(holder)) return false;
       if (_secrets.containsKey(about)) return true;
       final got = _released.putIfAbsent(about, () => {});
+      final fresh = !_same(got[holder] ?? Uint8List(0), piece);
       got[holder] = piece;
       // This side's own piece counts, released or not.
       final own = _myPieceOf[about];
@@ -1526,10 +1527,35 @@ class DealSession {
             if (custodianKeys.contains(who)) custodianKeys.indexOf(who) + 1,
         ]..sort();
         if (have.length < escrowThreshold) return true;
-        final secret = crypto.bytesSum([
-          for (final i in have) crypto.bytesScale(got[custodianKeys[i - 1]]!, crypto.bytesLagrange(have, i)),
-        ]);
-        if (_same(crypto.keygen(secret), pk)) _learnSecret(about, secret);
+        Uint8List combine(List<int> set) => crypto.bytesSum([
+              for (final i in set) crypto.bytesScale(got[custodianKeys[i - 1]]!, crypto.bytesLagrange(set, i)),
+            ]);
+        final secret = combine(have);
+        if (_same(crypto.keygen(secret), pk)) {
+          _learnSecret(about, secret);
+          return true;
+        }
+        // One piece that is not what its place says spoils the sum of
+        // them all: a custodian brought on from a redraw whose share was
+        // made at another place than this side gives it, or one that
+        // released something else. The seat stayed shut for good with
+        // enough good pieces in hand to open it twice over (sealed chaos
+        // seed 10, nine strangers, at the verifier). Any [escrowThreshold]
+        // of them that agree are the secret, so each pair the new piece
+        // makes is tried in turn, each against the seat's key — the pairs
+        // among the rest were tried as they came.
+        if (!fresh || escrowThreshold != 2) return true;
+        final mine = custodianKeys.indexOf(holder) + 1;
+        if (mine < 1) return true;
+        for (final other in have) {
+          if (other == mine) continue;
+          final pair = [mine, other]..sort();
+          final s = combine(pair);
+          if (_same(crypto.keygen(s), pk)) {
+            _learnSecret(about, s);
+            return true;
+          }
+        }
         return true;
       }
       if (custodianKeys.isEmpty) {
