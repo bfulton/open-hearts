@@ -878,6 +878,42 @@ again.
 The rule that stood in for the record was `_onLeave` taking a leave at
 once and passing over one for a seat already removed. It is gone.
 
+## Measured, all seven on the record
+
+The same walks and explorer as before, on the code with all seven on
+the record:
+
+| Where | Found |
+|---|---|
+| chaos walk, 250 seeds | every invariant held; stuck on nobody in one walk (seed 1), not at the end |
+| the same, 14 sealed | every invariant held; stuck on nobody in 4 walks, none at the end; apart on the escrow in 3 (sealed seeds 1, 2 and 10) and at the end of one: sealed seed 2, where one person, hearing too little of the table, ended the game for itself before the escrow the other had carried reached it — its record a prefix of the other's, the residual above |
+| the same, 14 sealed drawing from nine strangers (`--jurors 9`) | every seed held, seeds 10 and 12 among them |
+| and the jurors let go of and summoned again (`--sweep`) | every seed held |
+| explorer, deal / two / leave / summons | every run held (861 / 1,389 / 1,511 / 861); apart on the escrow for a moment in two deal runs and two summons runs, in none at the end |
+| explorer, topup | every run held (3,922); apart on the escrow in 17, each still at the end with one of the two jurors the scenario takes offline for good |
+
+Before these, the walks found the sides apart on a seat (seed 43) and
+on the game's end (sealed seed 2); neither is found now. The first
+run of this measurement, before the three fixes under "The lost-quorum
+ending on the record", broke sealed seeds 1 and 2, and sealed seed 12
+drawing from nine strangers.
+
+With every transition on the record, the walk asserts one thing more:
+that every record has the same exit for each seat that has one — the
+people's and every juror's that followed the table, one that has
+stopped serving or whose game ended for a lost quorum among them. A
+record holds only what carried, so two exits for one seat are two
+majorities. The walk compared the records of the people who finished,
+by a key that names a removal's turn and seat and not its door, and
+the jurors' not at all; with a leave carried by its author alone,
+seed 43 fails it now — a leave at the thirty-third turn on the jurors'
+records, a boot at the thirty-ninth on the people's. Every walk above
+holds it (`packages/table/lib/src/sim/chaos_walk.dart`).
+
+What stays a measurement is each side's own state beside the record:
+the sides are apart on it at a walk's end only where one of them ended
+the game for itself, which is the residual that nothing reconciles.
+
 ## Next
 
 The step after this document puts the seven transitions on the
@@ -901,9 +937,10 @@ record, in this order:
    custodians in — done (above, "The escrow's custodians on the
    record"), named in people's plays.
 
-Each would be settled the way a boot is, and each would remove the
-guessing rules it stands behind. The checker above goes from
-measuring to asserting as each lands.
+Each is settled the way a boot is, and each removed the guessing
+rules it stood behind. The checker above measured each as it landed,
+and the walk now asserts what the records say (above, "Measured, all
+seven on the record").
 
 The measurement also found states with no way out once the jury is
 gone and nobody is left to draw:

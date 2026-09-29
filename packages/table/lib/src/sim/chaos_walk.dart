@@ -310,6 +310,34 @@ String? walkChaos(int seed,
         if (states.length > 1) return 'apart on the escrow at the end: hand $hand seat $seat; faults were [${faults()}]';
       }
     }
+    // And the way each person went, on every record that has it — the
+    // jurors' beside the people's, those that have stopped serving and
+    // those whose game ended for a lost quorum among them, since a
+    // record holds only what carried. A leave is carried as a boot is
+    // now, so a seat left on one record and booted on another is two
+    // majorities. The record's key for a removal names its turn and
+    // seat and not the door, and records compared alike with a leave on
+    // one and a boot on the other; the jurors kept theirs for as long as
+    // they served (chaos seed 43).
+    final records = [
+      for (final p in t.people) p.client,
+      for (final j in t.jurors)
+        if (j.client != null) j.client!,
+    ];
+    for (var seat = 0; seat < seatCount; seat++) {
+      final exits = <String, List<String>>{};
+      for (final c in records) {
+        for (final d in c.record) {
+          final kind = d.event.kind;
+          if (!d.removal || d.event.seat != seat || !(kind == EventKind.leave || kind == EventKind.boot || kind == EventKind.absent)) continue;
+          exits.putIfAbsent('${kind.name} at ${d.turn}', () => []).add(c.signer.publicKey.substring(0, 4));
+        }
+      }
+      if (exits.length > 1) {
+        return 'apart on a seat at the end: seat $seat ${exits.entries.map((e) => '${e.key} at ${e.value.join(', ')}').join('; ')}; '
+            'faults were [${faults()}]';
+      }
+    }
 
     final survivors = t.survivors.toList();
     final finished = survivors.every((c) => c.done);
