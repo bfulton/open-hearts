@@ -382,6 +382,10 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
   List<(engine.Card, int)> _taken = const [];
   Offset _towards = Offset.zero;
 
+  /// The position of the card that took the trick: the others are
+  /// gathered onto it.
+  int _taker = 0;
+
   @override
   void dispose() {
     _sweep.dispose();
@@ -402,8 +406,16 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
     if (swept.length < seatCount) return;
     if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
     // No setState: this is a widget update, and the build is next.
-    _taken = swept;
+    // The taker's own card first, so the other three are drawn over it
+    // as they are gathered onto it.
+    _taken = [
+      for (final s in swept)
+        if (s.$2 == winner) s,
+      for (final s in swept)
+        if (s.$2 != winner) s,
+    ];
     _towards = seatDirection[winner]!;
+    _taker = winner;
     _sweep.forward(from: 0);
   }
 
@@ -438,12 +450,24 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
             AnimatedBuilder(
               animation: _sweep,
               builder: (context, child) {
-                final t = Curves.easeIn.transform(_sweep.value);
+                final v = _sweep.value;
+                // Gathered and taken: the other three are swept onto
+                // the card that took the trick, which is the one
+                // furthest towards its taker, so every card only ever
+                // moves the one way; and the pile is pulled off towards
+                // the taker, getting up to speed as it goes. It used to
+                // leave as a picture of four cards sliding off in
+                // formation. Solid while it is plainly on the felt, and
+                // gone by the end.
+                final go = Easing.standardAccelerate.transform(v);
+                final together = Curves.easeInOutCubic.transform((v / 0.7).clamp(0.0, 1.0));
+                final fade = Curves.easeIn.transform(((v - 0.4) / 0.6).clamp(0.0, 1.0));
+                final at = _at(position);
                 return Transform.translate(
-                  offset: _at(position) + away * t,
+                  offset: Offset.lerp(at, _at(_taker), together)! + away * go,
                   child: Opacity(
-                    opacity: 1 - t,
-                    child: Transform.scale(scale: 1 - 0.3 * t, child: child),
+                    opacity: 1 - fade,
+                    child: Transform.scale(scale: 1 - 0.3 * go, child: child),
                   ),
                 );
               },
@@ -492,13 +516,32 @@ class _TrickSlot extends StatelessWidget {
       // What leaves a slot is carried off by the sweep above, so there
       // is nothing here to play backwards.
       reverseDuration: Duration.zero,
-      switchInCurve: Curves.easeOutCubic,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween(begin: from * 1.7, end: Offset.zero).animate(animation),
-          child: child,
-        ),
+      // Eased below, a curve to each part of the landing.
+      switchInCurve: Curves.linear,
+      transitionBuilder: (child, animation) => AnimatedBuilder(
+        animation: animation,
+        child: child,
+        builder: (context, child) {
+          final v = animation.value;
+          // In fast and settling long, the way a card played onto a
+          // table arrives: already solid a third of the way in rather
+          // than fading up the whole way like something appearing, and
+          // coming down onto the felt — a touch big, a touch askew —
+          // as it lands.
+          final t = Easing.emphasizedDecelerate.transform(v);
+          final solid = Curves.easeOut.transform((v / 0.3).clamp(0.0, 1.0));
+          final left = 1 - t;
+          return Opacity(
+            opacity: solid,
+            child: FractionalTranslation(
+              translation: from * 1.7 * left,
+              child: Transform.rotate(
+                angle: 0.07 * (from.dx + from.dy) * left,
+                child: Transform.scale(scale: 1 + 0.06 * left, child: child),
+              ),
+            ),
+          );
+        },
       ),
       child: card == null
           ? CardGhost(key: const ValueKey('empty'), width: width)

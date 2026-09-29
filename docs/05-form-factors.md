@@ -234,20 +234,39 @@ Four movements, one rule each:
 - **A card played** rises out of the hand towards the table, and arrives
   in its slot from the side of the screen its player sits on. Dragged up
   and let go, it carries on from where the finger left it rather than
-  dropping back into the row first.
+  dropping back into the row first. It lands the way a card played onto
+  a table does: in fast and settling long, solid a third of the way in,
+  and coming down onto the felt — a touch big and a few degrees askew —
+  as it arrives. It used to fade up over the whole of its flight, which
+  is how something appears, not how a card lands.
 - **The three passed** leave the hand off the side of the screen the
   player they are passed to sits on, and **the three received** fly in
   from the side the passer sits on. Nobody has to read the arrow to know
   which way the hand went.
-- **The finished trick** goes to whoever took it, all four cards the one
-  way, shrinking as they go.
+- **The finished trick** goes to whoever took it: the other three are
+  gathered onto the card that took it and the pile is pulled off towards
+  its taker, shrinking and fading as it goes. The taking card is the one
+  furthest towards its taker, so every card still only moves the one
+  way. It used to leave as a picture of four cards sliding off in
+  formation, fading from the first frame.
 - **The hand closes** over the gap a card leaves, and opens for one that
   arrives, rather than snapping to its new fan.
+
+Each is eased by what it is doing, with the platform's own curves
+(Flutter's `Easing`): what arrives decelerates — in fast, a long
+settle — what leaves accelerates, and what moves within the screen, the
+hand closing up or a card lifted for the pass, eases in and out. The
+hand used to close at full speed from its first frame, so the
+neighbours of a played card jumped. The one exception is a card leaving
+the hand, which goes at speed from the tap, for the reason below.
 
 The heart at the front door is the one thing that moves on its own,
 and it does not move for long: it folds away and opens out over nine
 seconds, and then is simply a heart until twenty seconds are up and
-its turn comes round again. Between turns it asks for no frames at
+its turn comes round again. The first turn waits three seconds, so the
+door opens on the heart whole and still; it used to begin its fold the
+moment the page opened, so the first anybody saw of the mark was it
+leaving. Between turns it asks for no frames at
 all, which is the difference between a flourish and a fidget on a door
 somebody leaves open in a tab.
 
@@ -315,7 +334,11 @@ that is yours, the rating you have, what a game did to it, the trick
 somebody just took, the icon and colour you chose on your profile —
 ringed in white, standing off the disc by a gap of felt so the ring
 shows on every colour; it was gold, on the disc's own edge, which on
-the amber disc was no ring at all. **Red is the game's own** — a heart, a suit,
+the amber disc was no ring at all. And one gold thing to press is the
+most a screen has that it is for: the door's is Play solo, and
+Subscribe, on the card that says what live play is, is drawn in gold
+rather than filled with it — still something you can do, not the thing
+the door is for. **Red is the game's own** — a heart, a suit,
 points against you, the game that went the other way. A score sheet
 ends up white over red with one gold button on it, which is exactly
 what it is: this is what happened, and here is the way on.

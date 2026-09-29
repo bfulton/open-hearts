@@ -373,6 +373,113 @@ void main() {
     expect(cardFinder(last), findsNothing, reason: 'and then gone');
   });
 
+  testWidgets('a card played lands: solid a third of the way in, and down flat on the felt', (tester) async {
+    await pumpTable(tester, paced: true);
+    await _passAnything(tester);
+    final controller = tester.widget<TableView>(find.byType(TableView)).controller;
+    // A bot's card, the moment it is on the table.
+    var before = controller.game.trick.length;
+    engine.Card? card;
+    for (var guard = 0; guard < 3000 && card == null; guard++) {
+      await tester.pump(const Duration(milliseconds: 10));
+      final now = controller.game.trick.length;
+      if (now > before) card = controller.game.trick.last.card;
+      before = now;
+    }
+    expect(card, isNotNull);
+    final onFelt = find.descendant(
+        of: find.byType(TableView), matching: find.byWidgetPredicate((w) => w is CardView && w.card == card));
+    final width = tester.widget<CardView>(onFelt).width;
+    double opacity() => tester.widget<Opacity>(find.ancestor(of: onFelt, matching: find.byType(Opacity)).first).opacity;
+
+    await tester.pump(const Duration(milliseconds: 30));
+    final early = tester.getRect(onFelt);
+    expect(early.width, greaterThan(width + 1), reason: 'coming down onto the felt: a touch big and askew');
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(opacity(), 1.0, reason: 'solid a third of the way in, not fading up the whole way');
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.getRect(onFelt).width, closeTo(width, 0.01), reason: 'and down flat, at its own size');
+    expect(opacity(), 1.0);
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the finished trick is gathered onto the card that took it, and taken', (tester) async {
+    await pumpTable(tester, paced: true);
+    await _passAnything(tester);
+    final controller = tester.widget<TableView>(find.byType(TableView)).controller;
+    for (var guard = 0; guard < 80 && controller.game.pendingTrick == null; guard++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      final playable = fanCards(tester).where((c) => !c.dimmed).toList();
+      if (controller.awaitingPlay && playable.isNotEmpty) await tapCard(tester, playable.first.card);
+    }
+    final trick = controller.game.pendingTrick!;
+    // Settled on the table, so the start is where the cards sit.
+    for (var guard = 0; guard < 100 && controller.game.pendingTrick != null; guard++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    final towards = seatDirection[controller.positionOf(trick.winner)]!;
+    double along(Offset o) => o.dx * towards.dx + o.dy * towards.dy;
+    final cards = [for (final play in trick.plays) play.card];
+    var last = {for (final card in cards) card: along(_feltCentre(tester, card))};
+    final spreads = <int, double>{};
+    final opacities = <int, double>{};
+    for (var ms = 10; ms <= 280; ms += 10) {
+      await tester.pump(const Duration(milliseconds: 10));
+      final centres = {for (final card in cards) card: _feltCentre(tester, card)};
+      for (final card in cards) {
+        expect(along(centres[card]!), greaterThanOrEqualTo(last[card]! - 0.01),
+            reason: '$card only ever moves towards the seat that took it ($ms ms)');
+        last[card] = along(centres[card]!);
+      }
+      final xs = centres.values.map((c) => c.dx);
+      final ys = centres.values.map((c) => c.dy);
+      spreads[ms] = (xs.reduce((a, b) => a > b ? a : b) - xs.reduce((a, b) => a < b ? a : b)) +
+          (ys.reduce((a, b) => a > b ? a : b) - ys.reduce((a, b) => a < b ? a : b));
+      opacities[ms] = tester
+          .widget<Opacity>(find.ancestor(
+              of: find.descendant(
+                  of: find.byType(TableView),
+                  matching: find.byWidgetPredicate((w) => w is CardView && w.card == cards.first)),
+              matching: find.byType(Opacity)).first)
+          .opacity;
+    }
+    expect(opacities[100], 1.0, reason: 'solid while it is plainly on the felt');
+    expect(spreads[10]!, greaterThan(50), reason: 'four cards apart at the start');
+    expect(spreads[240]!, lessThan(1), reason: 'and one pile before it goes');
+    expect(opacities[280]!, lessThan(0.2), reason: 'and gone by the end');
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the hand closes over a played card without a jump', (tester) async {
+    final hand = [for (final c in '2C.3C.4C.5C.6C'.split('.')) engine.Card.parse(c)];
+    Widget fan(List<engine.Card> cards) => MaterialApp(
+          home: Scaffold(
+            body: SizedBox(height: TableLayout.portraitHandHeight, child: HandFan(hand: cards, onTap: (_) {})),
+          ),
+        );
+    tester.view
+      ..physicalSize = _phone
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(fan(hand));
+    final neighbour = hand.last;
+    final was = tester.getTopLeft(cardFinder(neighbour)).dx;
+    await tester.pumpWidget(fan(hand.sublist(0, 4)..removeAt(1) ..add(neighbour)));
+    await tester.pump(const Duration(milliseconds: 16));
+    final first = tester.getTopLeft(cardFinder(neighbour)).dx;
+    await tester.pumpAndSettle();
+    final settled = tester.getTopLeft(cardFinder(neighbour)).dx;
+    final way = settled - was;
+    expect(way.abs(), greaterThan(10), reason: 'the hand reflows');
+    final share = (first - was) / way;
+    expect(share, greaterThan(0), reason: 'under way on the first frame');
+    expect(share, lessThan(0.15), reason: 'but eased off the mark, not a fifth of the way at once');
+  });
+
   testWidgets('the finished trick goes to whoever took it', (tester) async {
     await pumpTable(tester, paced: true);
     await _passAnything(tester);

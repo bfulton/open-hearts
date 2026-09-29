@@ -297,14 +297,17 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
             // one that has come, rather than snapping to the new fan.
             // Under the finger there is nothing to catch up with.
             duration: dragging ? Duration.zero : const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
+            // Moving within the hand, so easing in and out: gently off
+            // the mark and a long settle. Full speed from the first
+            // frame had the neighbours of a played card jump.
+            curve: Easing.standard,
             left: x,
             bottom: 0,
             child: _carried(arriving, AnimatedContainer(
               // Under the finger the card follows it; let go, it settles
               // back or up over a few frames.
               duration: dragging ? Duration.zero : const Duration(milliseconds: 160),
-              curve: Curves.easeOut,
+              curve: Easing.standard,
               transform: Matrix4.translationValues(0, (isSelected ? -_lift : 0) + dy, 0),
               // One semantics node per card — its name, and the tap —
               // so a screen reader, and the end-to-end suite, can play
@@ -413,7 +416,9 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
     return AnimatedBuilder(
       animation: flight.controller,
       builder: (context, child) => Transform.translate(
-        offset: flight.travel * (1 - Curves.easeOutCubic.transform(flight.controller.value)),
+        // Coming in from off the screen: in fast, and a long settle
+        // into its place.
+        offset: flight.travel * (1 - Easing.emphasizedDecelerate.transform(flight.controller.value)),
         child: child,
       ),
       child: card,
