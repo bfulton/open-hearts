@@ -627,11 +627,35 @@ are the first person's keys, that is the hand's, and every side deals
 the bots in the open, a side that had a jury by then included. Two
 sides judging the forty seconds differently now deal one hand one way.
 
-It costs one round trip in the deal. A juror's keys now wait for the
-first person's to settle, where the two seconds it used to wait ran
-beside the people's own steps: 6.90 s to the first card on average
-over twenty seeded hands at a jury of ten, against 6.60 before
-(`tool/time_to_deal.dart --seeds 20`).
+It costs a little over a tenth of a second in the deal. A juror's keys
+now wait for the first person's to settle, where the two seconds it
+used to wait ran beside the people's own steps: 6.77 s to the first
+card on average over twenty seeded hands at a jury of ten, against
+6.60 before (`tool/time_to_deal.dart --seeds 20`). It was 6.90 until a
+summons carried the hand's draws, and a juror no longer waited to be
+carried the one its seat's keys name.
+
+Measured with the same walk and explorer as the escrow was, on the
+code with all of this in:
+
+| Where | Before | Now |
+|---|---|---|
+| chaos walk, 250 seeds and 14 sealed | every invariant held | every invariant held; stuck on nobody in 5 walks, apart on the escrow in 3 and at the end of one (sealed seed 2, both people having ended the game), apart on a seat in seed 43 and on the game's end in sealed seed 2, neither at the end — none of them new |
+| the same, 14 sealed drawing from nine strangers (`--jurors 9`) | sealed seed 2 broke: one hand sealed to two draws | seed 10 broke: the redraw order the next item is about (below) |
+| and the jurors let go of and summoned again (`--sweep`) | seeds 2 and 3 broke, the same way | every seed held |
+| explorer, deal / two / leave / summons | every run held | every run held (861 / 1,389 / 1,457 / 861) |
+| explorer, topup | apart on the draw in 3,830 of 4,208 runs, for about two seconds each | apart on the draw in none of 3,946; apart on the escrow in 17, each still at the end with one of the two jurors the scenario takes offline for good |
+
+Sealed seed 10 with nine strangers is the order a hand's redraws add
+their newcomers to the escrow's custodians in, from the list above,
+now seen breaking something: two redraws of one hand, the one proposed
+at the thirty-second turn carried two seconds after the one proposed
+at the thirty-fifth. The table grew the list in the order they
+carried, the verifier in the order they were proposed, and a piece
+released by a juror topped up from the later of them counted at
+another place; the verifier could not open the seat the table had
+given to the escrow. It passed before only because the two carried the
+other way round.
 
 ## The lost-quorum ending on the record
 
