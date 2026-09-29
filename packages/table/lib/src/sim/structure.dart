@@ -215,6 +215,7 @@ _Rel _relation(Wait w, TurnId turn, TableClient c, TableClient m) {
   switch (st) {
     case TurnState.settledByAction:
     case TurnState.settledByRemoval:
+    case TurnState.ended:
       // On the record, at whatever hand, and carried to whoever is
       // behind — by a side whose game is over, too.
       return _Rel.covered;

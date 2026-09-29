@@ -65,8 +65,11 @@ void main() {
     for (final c in t.clients) {
       expect(c.failure, Failure.jurorQuorumLost);
       expect(c.done, isFalse, reason: 'unfinished, so unscored');
-      final v = verifyRecord(t.spec, c.record, allowPartial: true, juries: c.juries, crypto: crypto, releases: c.releases);
-      expect(v.ok, isTrue, reason: v.reason);
+      // On the record, where both people could say so at the turn
+      // (ended_on_record_test.dart).
+      expect(c.record.last.event.kind, EventKind.ended);
+      final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok && v.ended, isTrue, reason: v.reason);
     }
 
     // And that is the end of it here: nothing more said, whoever comes
@@ -180,8 +183,13 @@ void main() {
       expect(c.failure, Failure.jurorQuorumLost);
       expect(c.failedAt?.turn, turn);
       expect(c.done, isFalse, reason: 'unfinished, so unscored');
+      // Each ends for itself. Both voices at the turn are spent, one on
+      // the play and one on the boot, and with no jury there is nobody
+      // to put the end on the record: each record stops at the turn.
+      expect(c.record.any((d) => d.event.kind == EventKind.ended), isFalse);
       final v = verifyRecord(t.spec, c.record, allowPartial: true, juries: c.juries);
       expect(v.ok, isTrue, reason: v.reason);
+      expect(v.ended, isFalse);
     }
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
@@ -388,6 +396,35 @@ void main() {
         reason: 'told once back, not five minutes on:\n${juror.describe()}');
     expect(juror.failure, Failure.jurorQuorumLost);
     expect([for (final c in t.clients) c.record.length], records, reason: 'nothing new in the record');
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  // A table of four people has no bot seats, so its hands are sealed to
+  // no draw — and still escrowed to the jury, whose pieces with a
+  // person's open a leaver's hand. Read from the draw a hand was sealed
+  // to, the table counted nobody holding such a piece, took the
+  // leaver's seat for one nobody could open, and ended the game twenty
+  // seconds in, with the jury there and its pieces on their way. The
+  // custodians a seat's keys named are who holds them.
+  test('a leaver\'s hand at a table of four people, the jury slow with its pieces: the game waits, and goes on', () {
+    final t = SimTable(humans: 4, seed: 3, crypto: crypto, jurors: jurySize);
+    t.start();
+    final c = t.clients.first;
+    expect(t.clock.runUntil(() => c.game.phase == Phase.playing && c.game.tricksPlayed >= 1, limitMs: 5 * 60 * 1000), isTrue);
+    expect(c.sealedTo(c.game.handNumber), isNull, reason: 'no bot seats, so no draw holds any');
+    final jurors = {for (final j in t.jurors) j.signer.publicKey};
+    final until = t.clock.nowMs + 45 * 1000;
+    t.net.steer = (from, to, message) => message['kind'] == 'release' && jurors.contains(from) && t.clock.nowMs < until ? -1 : null;
+    final hand = c.game.handNumber;
+    t.clients.last.leave();
+    expect(t.clock.runUntil(() => c.pause == Pause.openingHand, limitMs: 60 * 1000), isTrue, reason: 'stopped at the leaver\'s seat');
+    final seat = c.stalled.values.first;
+    expect(c.pieceHoldersOf(hand, seat), isNotEmpty, reason: 'the jury holds pieces of the leaver\'s hand');
+    expect(t.clock.runUntil(() => c.game.handNumber > hand, limitMs: 5 * 60 * 1000), isTrue,
+        reason: 'the hand was played out once the pieces came:\n${c.describe()}');
+    for (final x in t.clients.take(3)) {
+      expect(x.failure, isNull, reason: x.describe());
+    }
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 }

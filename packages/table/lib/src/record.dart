@@ -29,6 +29,7 @@ class Verification {
     required this.ratings,
     required this.finalHolders,
     this.complete = true,
+    this.ended = false,
   });
 
   final bool ok;
@@ -37,6 +38,13 @@ class Verification {
   /// Whether the record ran to the end of the game. A partial record can
   /// still be [ok]: everything in it checked.
   final bool complete;
+
+  /// Whether the record ends the game where nobody left could move the
+  /// table: a majority of the people said so at the turn it stopped at
+  /// (client.dart, _claimEnd). Not [complete] — the game did not run to
+  /// its end, and nobody is rated on it — and not partial either:
+  /// nothing more is owed.
+  final bool ended;
 
   /// Winning seats, when the replay reached the end of the game.
   final List<int> winners;
@@ -85,6 +93,11 @@ Verification verifyRecord(
   DealCrypto? crypto,
   List<TableEvent> releases = const [],
 }) {
+  // A record that ends the game where nobody could move the table ends
+  // mid-hand, before the audit that opens every seat's cards: what it
+  // says is checked as far as the cards known allow, as a partial
+  // record's is, and then it is over ([Verification.ended]).
+  if (record.any((d) => d.removal && d.event.kind == EventKind.ended)) allowPartial = true;
   final game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
   final holders = List.of(spec.seats);
   final humans = {
@@ -101,6 +114,18 @@ Verification verifyRecord(
 
   Verification partial() =>
       Verification(ok: true, reason: 'verified so far', winners: const [], ratings: const {}, finalHolders: holders, complete: false);
+
+  /// The decision that ends the game, where the record holds one.
+  Decision? endedBy;
+
+  Verification endedHere() => Verification(
+      ok: true,
+      reason: 'the game ended at ${endedBy!.turn}: nobody left could move it',
+      winners: const [],
+      ratings: const {},
+      finalHolders: holders,
+      complete: false,
+      ended: true);
 
   bool atOrBefore(TurnId a, TurnId b) {
     if (a.hand != b.hand) return a.hand < b.hand;
@@ -476,6 +501,20 @@ Verification verifyRecord(
       final d = record[index++];
       final e = d.event;
       final seat = e.seat;
+      // The game's end, where nobody left could move the table: claimed
+      // at the turn it stopped at by a person there, and carried by a
+      // majority of them, as a boot is. Nobody rules on it — there was
+      // no jury left to — and nothing comes after it.
+      if (e.kind == EventKind.ended) {
+        if (!humans.contains(e.author)) return 'the game ended by someone not at the table';
+        if (e.turn != d.turn) return 'the game ended at ${d.turn} by a claim made at ${e.turn}';
+        if (!carried(d.witnesses, d.turn, d.among)) {
+          return 'the game ended at ${d.turn} without a majority behind it (${d.witnesses.length} of ${d.among.length})';
+        }
+        if (index < record.length) return 'the record goes on past the game\'s end at ${d.turn}';
+        endedBy = d;
+        return null;
+      }
       final holder = holders[seat];
       if (holder is! HumanSeat) {
         // A held seat given to the escrow: a claim by a person at the
@@ -556,6 +595,7 @@ Verification verifyRecord(
       }
       final why = takeRemovals();
       if (why != null) return fail(why);
+      if (endedBy != null) return endedHere();
     }
     final ended = index >= record.length;
     for (var s = 0; s < seatCount; s++) {
@@ -582,6 +622,7 @@ Verification verifyRecord(
   while (game.phase != Phase.gameOver) {
     final why = takeRemovals();
     if (why != null) return fail(why);
+    if (endedBy != null) return endedHere();
     if (game.phase == Phase.dealing) {
       final d = deal ?? startDeal();
       scanAudits(d);
@@ -832,6 +873,7 @@ Verification verifyRecord(
     // audits and that claim went unchecked.
     final why = takeRemovals();
     if (why != null) return fail(why);
+    if (endedBy != null) return endedHere();
     final v = takeAudits();
     if (v != null) return v;
   }

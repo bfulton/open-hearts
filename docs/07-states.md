@@ -119,14 +119,19 @@ A seeded table's hand starts at passing or playing and ends at over.
 `playing`; `pausedForJury`, `pausedForPeers` or `pausedForDeal` while it
 says what it is waiting for; `finished`; `failed`. A pause is a
 reading of the hand's and turns' states, not a state of its own.
-`failed` is **decided here**, each side ending the game for itself.
-A side ends it once it has been stopped for twenty seconds at a turn
-nobody left can move: a seat nobody left can open, or a turn put to a
-jury none of whose jurors is left to rule. It must also hear most of
-the table, or else have heard nothing for two minutes from everyone
-it cannot hear, the jury included. It says so, and the others hear
-it: a person stopped at such a turn ends with it, and a juror stops
-once every person it still hears has ended.
+`failed` is **on the record** where a majority of the people can say
+so, and **decided here** where they cannot. A side stopped for twenty
+seconds at a turn nobody left can move — a seat nobody left can open,
+or a turn put to a jury none of whose jurors is left to rule — claims
+the game's end at that turn, and it is carried as a boot is: one
+voice each at the turn, a majority ending the game on every record
+([below](#the-lost-quorum-ending-on-the-record)). Where no majority can
+be had — every voice at the turn already given, as at a split with the
+jury gone, or a side that hears too little of the table — the side
+ends it for itself, as before. It must also hear most of the table,
+or else have heard nothing for two minutes from everyone it cannot
+hear, the jury included. A juror stops when the record ends the game,
+or once every person it still hears has said so.
 
 ## What each waiting state waits for
 
@@ -214,12 +219,14 @@ Seven transitions when this was written. The escrow is on the record
 now, and the abandoned hand and the escrowed seat's audit follow from
 it (below, "The escrow on the record"); so are the draw a deal is
 sealed to and, with it, the fall-back to bot seats in the open (below,
-"The draw on the record"). What is still decided here, and the rules
+"The draw on the record"); and the game's end for a lost quorum,
+wherever a majority of the people can say it (below, "The lost-quorum
+ending on the record"). What is still decided here, and the rules
 that exist only because it is not on the record:
 
 | Decided here | What it has cost | Rules standing in for a record |
 |---|---|---|
-| The game ended for a lost quorum | the people ending it up to five seconds apart, and the last juror not told (below). It is said now: a juror stops on hearing it, and a person stopped at the same turn ends with it | the two minutes a side that hears too little of the table waits |
+| The game ended for a lost quorum, where no majority can say so | nothing seen: each side's record stops at the same turn, one a prefix of the table's (below, "The lost-quorum ending on the record") | the two minutes a side that hears too little of the table waits |
 | Which way a seat left, where a leave crosses a boot | the people and the jurors holding different records to the end of a game (below) | `_onLeave` passing over a leave for a seat already removed |
 
 The five rows that are gone read:
@@ -275,8 +282,9 @@ are of three kinds:
   clock.
 
 Each of these *proposes* a transition, and the table settles it on
-the record — as a boot has always worked. The same would hold for the
-twenty seconds of a lost quorum.
+the record — as a boot has always worked. So now do the twenty
+seconds of a lost quorum, wherever a majority of the people can carry
+what they propose.
 
 ## Measured
 
@@ -625,13 +633,70 @@ beside the people's own steps: 6.90 s to the first card on average
 over twenty seeded hands at a jury of ten, against 6.60 before
 (`tool/time_to_deal.dart --seeds 20`).
 
+## The lost-quorum ending on the record
+
+The third of the seven. A side stopped for twenty seconds where nobody
+left could move the table ended the game for itself and said so; a
+person stopped at the same turn ended with it, and a juror stopped once
+every person it heard had. Two sides ended it up to five seconds apart,
+each record stopping at the turn with nothing in it to say why: a
+verifier could not tell a game that ended from one cut short.
+
+Now the twenty seconds only propose the end, as a clock proposes a
+boot. The side claims the game's end at the turn it is stopped at, and
+the claim is a vote in that turn's race: the third way a turn can go,
+beside the move and the removal. A person has one voice at a turn, and
+it goes one way. A person stopped at the same turn backs the claim at
+once; a majority of the people carries it; every side then ends the
+game at that turn, and every record says so (`TurnState.ended`). The
+verifier reads a record that ends with it as a game ended — not
+complete, nobody rated on it, and not partial either — and turns down
+one that goes on past it, has it without a majority, or has it claimed
+by somebody not at the table or at another turn than it stands at
+(`packages/table/test/ended_on_record_test.dart`).
+
+A voice already given at the turn waits for the end the rest carry and
+takes it with them: a person who backed a held seat's card that reached
+nobody else, the jury then gone, and the seat given to an escrow nobody
+left can play.
+
+The end is not always the only thing left to happen at the turn. A
+departed seat's move is worked out by every side once its hand opens,
+with nothing said and nobody asked; a side that has said the game ends
+there and then sees the hand open would put its voice on the end and
+on the table going on at once. So it holds at the turn while the end
+can still carry, and lets go once it cannot: once the rest are known
+to stand past the turn, by where their heartbeats put them or by their
+steps held back here for later turns, and their voices there are not
+the end's to have. And a side that worked the turn out first, with
+nothing recorded after it, takes the end when it comes.
+
+Where no majority can be had, nothing can go on the record — a record
+needs a majority of the people or a jury, and there is neither: a turn
+split between a card and a boot with the jury gone, every voice spent
+(chaos seeds 1 and 72, cut down in `quorum_lost_test.dart`); the last
+person at a table of two, hearing too little of the table (seed 8).
+The side ends the game for itself there, as every side used to, and
+its record stops at the turn, a prefix of the table's.
+
+Building it found one more thing, left by the draw on the record. A
+table of four people has no bot seats, so its hands are sealed to no
+draw — and are escrowed to the jury all the same. Read from the draw a
+hand was sealed to, the table counted nobody holding a piece of a
+leaver's hand, took the seat for one nobody could open, and would end
+the game twenty seconds in with the jury there and its pieces on their
+way. A seat's piece holders are the custodians its keys named
+(`quorum_lost_test.dart`).
+
 ## Next
 
 The step after this document puts the seven transitions on the
 record, in this order:
 1. the escrow — done (above);
 2. the abandoned hand and the escrowed audit — done (above);
-3. the lost-quorum ending;
+3. the lost-quorum ending — done (below, "The lost-quorum ending on
+   the record"), on the record where a majority of the people can
+   carry it;
 4. the jury draw a deal is sealed to, read in record order rather than
    arrival order — done (above, "The draw on the record"), ahead of
    the third, since a walk found it failing;

@@ -50,8 +50,11 @@
 /// nobody declared), or finished, or failed: stopped for twenty seconds
 /// at a seat nobody left could open, or at a turn put to a jury with
 /// none of its jurors left to rule (client.dart, "juror quorum lost").
-/// A pause always lifts when a decision lands; finished and failed are
-/// terminal.
+/// Failed is on the record where a majority of the people can say so
+/// at that turn ([TurnState.ended]), and decided here where they
+/// cannot: a split with the jury gone, a side that hears too little of
+/// the table. A pause always lifts when a decision lands; finished and
+/// failed are terminal.
 library;
 
 import 'events.dart';
@@ -78,6 +81,11 @@ enum TurnState {
   /// Closed with nothing said and nothing in the record: a turn every
   /// side works out for itself.
   settledSilently,
+
+  /// The game ended here, on the record: nobody left could move the
+  /// turn, and a majority of the people said so (client.dart,
+  /// _claimEnd). Nothing comes after it.
+  ended,
 }
 
 /// How a seat is held.
@@ -94,11 +102,12 @@ const turnTransitions = <TurnState, Set<TurnState>>{
     TurnState.settledByAction,
     TurnState.settledByRemoval,
     TurnState.settledSilently,
+    TurnState.ended,
   },
   // A held seat's audit its juror said that the escrow won all the
   // same, closed from the escrow's pieces: seen here without the claim
   // in between.
-  TurnState.acting: {TurnState.contested, TurnState.settledByAction, TurnState.settledSilently},
+  TurnState.acting: {TurnState.contested, TurnState.settledByAction, TurnState.settledSilently, TurnState.ended},
   // A held seat's turn that the escrow wins opens again, for the
   // escrow: the claims against its juror are done with. A move already
   // said for the seat stays, as good after the escrow as before
@@ -110,11 +119,17 @@ const turnTransitions = <TurnState, Set<TurnState>>{
     TurnState.settledByRemoval,
     TurnState.acting,
     TurnState.open,
+    TurnState.ended,
   },
   TurnState.split: {TurnState.settledByAction, TurnState.settledByRemoval, TurnState.acting, TurnState.open},
   TurnState.settledByAction: {},
   TurnState.settledByRemoval: {},
-  TurnState.settledSilently: {},
+  // A departed seat's move worked out here once its hand opened, where
+  // the rest of the table, which never saw it open, ended the game at
+  // that turn: the ending taken when it comes (client.dart,
+  // _lateEndingAt). Nothing past the turn had carried here by then.
+  TurnState.settledSilently: {TurnState.ended},
+  TurnState.ended: {},
 };
 
 const seatTransitions = <SeatState, Set<SeatState>>{
@@ -195,10 +210,10 @@ const heldSeatTransitions = <HeldSeatState, Map<HeldSeatState, Decided>>{
 enum HandState { awaitingJury, dealing, passing, playing, auditing, opening, over, givenUp, abandoned }
 
 const handTransitions = <HandState, Map<HandState, Decided>>{
-  // The jury is on the record; which draw a deal is sealed to is the
-  // first to arrive here, held back two seconds for a late one, and the
-  // table deals its bot seats in the open at forty seconds here.
-  HandState.awaitingJury: {HandState.dealing: Decided.here},
+  // The draw a deal is sealed to is the one the first person's keys
+  // name, and none where they deal the bot seats in the open for want
+  // of a jury (client.dart, _checkSealed).
+  HandState.awaitingJury: {HandState.dealing: Decided.onRecord},
   HandState.dealing: {
     HandState.passing: Decided.fromRecord,
     HandState.playing: Decided.fromRecord,

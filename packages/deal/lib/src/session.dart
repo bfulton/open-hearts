@@ -1471,6 +1471,14 @@ class DealSession {
   /// custodian this side has not heard of yet.
   int custodianCount(int seat) => _custodiansOf[seat]?.length ?? 0;
 
+  /// The custodians of [seat]'s escrow, in their order: those its keys
+  /// named, and for a seat [extendCustodians] grows, whoever it has
+  /// been told of since. Null until its keys have been read here.
+  List<String>? custodiansOf(int seat) {
+    final list = _custodiansOf[seat];
+    return list == null ? null : List.unmodifiable(list);
+  }
+
   /// This side's index among [seat]'s custodians, or zero: for a
   /// trace, and for a caller that wants to know whether it is one.
   int custodianIndexOf(int seat) {

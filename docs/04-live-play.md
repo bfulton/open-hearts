@@ -1498,7 +1498,14 @@ a bad one would only need the jurors holding the bot seats' pieces to
 leave together to have it dealt again. So a table stopped at a seat
 nobody left can open waits, says so, and goes on if they come back;
 if nobody who could open it has come back in twenty seconds, the game
-ends, unscored: a connection failure, "juror quorum lost". Those who
+ends, unscored: a connection failure, "juror quorum lost". The twenty
+seconds propose it and the people carry it, on the record: a person
+claims the game's end at the turn, one voice each there as for a boot,
+and a majority ends the game at that turn on every record. Where no
+majority can be had — every voice at the turn already given, as at a
+split with the jury gone, or a side that hears too little of the
+table — each side ends it for itself, as all of them once did
+([doc 07](07-states.md), "The lost-quorum ending on the record"). Those who
 could open it have been unheard for half a minute by the time the
 table stops there, so the game ends no sooner than fifty seconds after
 the last of them was heard. It was two minutes at first, the silence a person

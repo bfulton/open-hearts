@@ -462,6 +462,7 @@ class TableClient {
     final race = _races[turn];
     if (race == null) return null;
     if (race.settled) {
+      if (_endedAt == turn) return TurnState.ended;
       if (_removedAtTurn.contains(turn)) return TurnState.settledByRemoval;
       return _onRecord.contains(turn) ? TurnState.settledByAction : TurnState.settledSilently;
     }
@@ -545,12 +546,13 @@ class TableClient {
         out.add(Wait(WaitKind.verdict, turn: t, seat: seat, movers: _jurorsOf(t.hand)));
         continue;
       }
-      if (race.action != null || race.boots.isNotEmpty) {
-        // Backing from those who have not given it, or, once a voter's
-        // silence has split the turn, the hand's jurors' ruling.
+      if (race.action != null || race.boots.isNotEmpty || race.ends.isNotEmpty) {
+        // Backing from those who have not given it — for the move, a
+        // removal, or the game's end — or, once a voter's silence has
+        // split the turn, the hand's jurors' ruling.
         final of = _participantsAt(t);
         out.add(Wait(WaitKind.witnesses, turn: t, seat: seat, movers: {
-          ...of.difference(race.forAction).difference(race.forRemoval),
+          ...of.difference(race.forAction).difference(race.forRemoval).difference(race.forEnd),
           ..._jurorsOf(t.hand),
         }));
         continue;
@@ -1167,6 +1169,9 @@ class TableClient {
     }
     if (d != null) {
       if (d.awaitsSecret(seat)) return _stall(turn, seat);
+      // Held for the game's end, which this side said at the turn
+      // ([_holdsForEnding]): looked at again as the stalled are.
+      if (_holdsForEnding(turn)) return _stall(turn, seat);
       if (turn.isDeal || turn.isAudit) {
         // A bot seat nobody holds has deal steps everyone computes, so
         // the turn settles here with nothing said. A held seat's are
@@ -1392,7 +1397,6 @@ class TableClient {
       _carryForward(from, event.hand, event.step);
       return;
     }
-    if (event.kind == EventKind.ended) return _onEnded(event);
     if (_seen.contains(event.id)) {
       // Seen before, and sent again: the sender is still waiting on a
       // turn this peer may have settled. Answer with what settled it.
@@ -1465,7 +1469,7 @@ class TableClient {
       case EventKind.verdict:
         _onVerdict(event);
       case EventKind.ended:
-        return; // this side's own word; nothing in the record
+        _onEndedClaim(event);
     }
   }
 
@@ -2227,7 +2231,26 @@ class TableClient {
             _earlyWitnessEvents.putIfAbsent(id, () => []).add(event);
           }
         }
+        // Backing for the game's end at a turn worked out here first
+        // ([_lateEndingAt]), or for a claim of it not heard yet.
+        if (_lateEndingAt(turn)) {
+          if (race.ends.any((c) => c.id == id)) {
+            race.forEnd.add(event.author);
+            race.witnessEvents.add(event);
+            _settleLateEnding(turn);
+            return;
+          }
+          if (race.action?.id != id && !race.boots.any((b) => b.id == id) && !race.rivals.containsKey(id)) {
+            _earlyWitnesses.putIfAbsent(id, () => {}).add(event.author);
+            _earlyWitnessEvents.putIfAbsent(id, () => []).add(event);
+          }
+        }
         return _catchUp(turn);
+      }
+      if (race.ends.any((c) => c.id == id)) {
+        race.forEnd.add(event.author);
+        race.witnessEvents.add(event);
+        return _settle(turn);
       }
       if (race.action?.id == id) {
         race.forAction.add(event.author);
@@ -2267,6 +2290,10 @@ class TableClient {
     }
     final forAction = race.forAction.intersection(of);
     final forRemoval = race.forRemoval.intersection(of);
+    final forEnd = race.forEnd.intersection(of);
+    // A turn a claim of the game's end could still carry is not split:
+    // the people are ending it, and there is no jury to put it to.
+    final ending = race.ends.isNotEmpty && _endingCanCarry(turn);
     if (forAction.length >= needed) {
       _carryAction(turn, race, race.action!, of);
     } else if (forRemoval.length >= needed) {
@@ -2275,6 +2302,8 @@ class TableClient {
       } else {
         _carryEscrow(turn, race, race.boots.first, of);
       }
+    } else if (forEnd.length >= needed) {
+      _carryEnded(turn, race, race.ends.first, of);
     } else if (race.split) {
       _pause = Pause.waitingForJury; // still, whatever else was reconsidered
     } else if (race.action != null || race.forRemoval.isNotEmpty) {
@@ -2291,9 +2320,9 @@ class TableClient {
         // can carry: as at a person's seat, save that the juror is no
         // voter to leave out of the escrow's count.
         final gone = of.where((k) => k != signer.publicKey && _silent(k)).toSet();
-        final moveReachable = of.difference(forRemoval).difference(gone.difference(forAction)).length >= needed;
-        final escrowReachable = of.difference(forAction).difference(gone.difference(forRemoval)).length >= needed;
-        if (!moveReachable && !escrowReachable) {
+        final moveReachable = of.difference(forRemoval).difference(forEnd).difference(gone.difference(forAction)).length >= needed;
+        final escrowReachable = of.difference(forAction).difference(forEnd).difference(gone.difference(forRemoval)).length >= needed;
+        if (!moveReachable && !escrowReachable && !ending) {
           race.split = true;
           _pause = Pause.waitingForJury;
           _trace('split at $turn: ${forAction.length} for bot seat $seat\'s juror, ${forRemoval.length} for the escrow');
@@ -2312,10 +2341,15 @@ class TableClient {
         return;
       }
       final gone = of.where((k) => k != signer.publicKey && _silent(k)).toSet();
-      final actionReachable = of.difference(forRemoval).difference(gone.difference(forAction)).length >= needed;
-      final removalReachable =
-          of.difference(forAction).difference({holder.key}).difference(gone.difference(forRemoval)).length >= needed;
-      if (!actionReachable && !removalReachable) {
+      final actionReachable = of.difference(forRemoval).difference(forEnd).difference(gone.difference(forAction)).length >= needed;
+      final removalReachable = of
+              .difference(forAction)
+              .difference(forEnd)
+              .difference({holder.key})
+              .difference(gone.difference(forRemoval))
+              .length >=
+          needed;
+      if (!actionReachable && !removalReachable && !ending) {
         race.split = true;
         _pause = Pause.waitingForJury;
         _trace('split at $turn: ${forAction.length} for the action, ${forRemoval.length} against');
@@ -2329,7 +2363,7 @@ class TableClient {
   bool _rivalsDeadlocked(_Race race, Set<PublicKey> of) {
     final needed = _majority(of);
     final backing = [race.forAction.intersection(of), for (final w in race.forRival.values) w.intersection(of)];
-    final committed = {for (final w in backing) ...w};
+    final committed = {for (final w in backing) ...w, ...race.forEnd};
     // As at a person's seat: nobody this side has not heard from for
     // two minutes is a vote still coming, and this side always is.
     final free = of.difference(committed).where((k) => k == signer.publicKey || !_silent(k)).length;
@@ -3416,6 +3450,8 @@ class TableClient {
         continue;
       }
       if (d.awaitsSecret(e.value)) continue;
+      // Nor one this side said the game ends at, while that can carry.
+      if (_holdsForEnding(e.key)) continue;
       _stalled.remove(e.key);
       _botTurn(e.key, e.value);
     }
@@ -3790,6 +3826,16 @@ class TableClient {
   /// counted it anyway, took the seat for one the jury could still
   /// open, and sat at its turn saying nothing, for good.
   Set<PublicKey> _pieceHolders(int hand, int seat) {
+    // A person's seat: the custodians its keys named, which is the jury
+    // in force when it keyed, whatever draw the hand was sealed to. A
+    // hand dealt its bot seats in the open is sealed to no draw at all,
+    // and read from that, a table of four people with its jury there
+    // counted nobody holding a piece of a leaver's hand, took the seat
+    // for one nobody could open, and ended the game over it.
+    if (botHolders(hand)[seat] == null) {
+      final named = _dealsByHand[hand]?.custodiansOf(seat);
+      if (named != null) return named.toSet();
+    }
     final dealt = _dealtTo(hand);
     if (dealt.isEmpty) return const {};
     final custodians = _custodiansNow(hand);
@@ -3821,8 +3867,12 @@ class TableClient {
     final t = _heldTurnNobodyCanTake();
     if (t != null) return (turn: t, seat: _turnSeat[t]!);
     final live = _liveJurors(hand);
+    final d = _deal;
     for (final e in _stalled.entries) {
       if (e.key.hand != hand) continue;
+      // Open here already, and held for the game's end this side said
+      // there ([_holdsForEnding]): not a seat nobody can open.
+      if (d != null && d.hand == hand && !d.awaitsSecret(e.value)) continue;
       if (!openableBy(hand, e.value, live.contains)) return (turn: e.key, seat: e.value);
     }
     return null;
@@ -3857,11 +3907,9 @@ class TableClient {
   /// and dealing the next would throw away a hand whose cards have
   /// been seen, and enough jurors leaving together could do that to
   /// order. So the game ends — a connection failure, as the player is
-  /// told, and unscored. Each side judges it for itself, as it judges
-  /// a juror's silence, says so ([_end]), and says nothing new: a side
-  /// that judged it wrongly, cut off from jurors the rest still hear,
-  /// is to the rest a player gone silent, and the table goes on without
-  /// it the way it goes on without anyone else who drops.
+  /// told, and unscored. On the record where it can be: the twenty
+  /// seconds only propose it, as a clock proposes a boot, and the
+  /// people carry it at the turn ([_claimEnd]).
   ///
   /// Only while this side hears most of the table, or once everyone it
   /// does not hear — the people and the hand's jury alike — has been
@@ -3883,11 +3931,12 @@ class TableClient {
       _unopenableSince = null;
       return;
     }
+    // Somebody has claimed the end here already: stopped here too,
+    // this side takes its part at once, as it used to end with it.
+    if (_races[at.turn]?.ends.isNotEmpty ?? false) return _claimEnd(at);
     if (_unopenableSince?.turn != at.turn) _unopenableSince = (turn: at.turn, since: clock.nowMs);
     if (clock.nowMs - _unopenableSince!.since < quorumLostAfterMs) return;
-    _trace('stopped at ${at.turn} for ${quorumLostAfterMs ~/ 1000} seconds: nobody left can move it (seat ${at.seat}); '
-        'the game ends, ${Failure.jurorQuorumLost.label}');
-    _end(at);
+    _claimEnd(at);
   }
 
   /// Whether everyone at the table this side does not hear has been
@@ -3923,25 +3972,163 @@ class TableClient {
     return null;
   }
 
-  /// The game ends here, stopped at [at]. Said by every road as this
-  /// side goes quiet: a juror still following stops once every person
-  /// it hears has said so, and a person stopped where nobody left could
-  /// move the table ends with it ([_onEnded]).
-  void _end(({TurnId turn, int seat}) at) {
+  /// This side's part in ending the game at [at], where it is stopped
+  /// with nobody left to move the table.
+  ///
+  /// The game's end is the third way a turn can go, beside the move
+  /// and the removal, and it is carried the way they are: a majority of
+  /// the people at the table, each with one voice at the turn. So this
+  /// side claims it — or backs the claim already made — where its voice
+  /// at the turn is still its own to give, it hears most of the table,
+  /// and enough voices are left that a majority could still say it
+  /// ([_endingCanCarry]). Then every side ends at that turn, and every
+  /// record says so ([_carryEnded]). A voice already given at the turn
+  /// waits for the ending all the same, while it can still carry.
+  ///
+  /// Where it cannot, the game ends here, for this side alone: nothing
+  /// can go on the record without a majority of the people or a jury,
+  /// and there is neither — a turn split between the move and a boot
+  /// with the jury gone, every voice spent; the last person, who hears
+  /// too little of the table to carry anything. It says so, so that a
+  /// juror still following stops once every person it hears has ended,
+  /// and a person stopped at the same turn does the same. This side's
+  /// record then stops at the turn: a record the rest may go on past
+  /// only once they have taken it for a player gone silent.
+  void _claimEnd(({TurnId turn, int seat}) at) {
     if (_failure != null) return;
-    if (amSeated) {
-      final e = TableEvent.sign(signer,
-          table: spec.id, kind: EventKind.ended, body: {'hand': at.turn.hand, 'turn': at.turn.index, 'seat': at.seat});
-      _trace('emit ended ${e.body}');
-      _endedWord = e;
-      _endedSaidAt = clock.nowMs;
-      transport.broadcast(e.toJson(), everywhere: true);
+    final turn = at.turn;
+    final race = _races[turn];
+    if (amSeated && !_left && race != null && !race.settled) {
+      final mine = race.forEnd.contains(signer.publicKey);
+      final free = !mine && !_myWitness.containsKey(turn);
+      if (free && connectedToMajority && _endingCanCarry(turn)) {
+        if (race.ends.isEmpty) {
+          _trace('stopped at $turn for ${quorumLostAfterMs ~/ 1000} seconds: nobody left can move it (seat ${at.seat}); '
+              'claiming the game\'s end there');
+          _endedWord = _say(EventKind.ended, {'hand': turn.hand, 'turn': turn.index, 'seat': at.seat, 'vote': true});
+        } else {
+          _trace('stopped at $turn too, with nobody left to move it: backing the claim that the game ends there');
+          _witness(turn, race.ends.first);
+        }
+        return;
+      }
+      if ((mine || connectedToMajority) && _endingCanCarry(turn)) return;
     }
+    // Nothing this side can put on the record: the game ends here.
+    if (amSeated && !_left && _endedWord == null) {
+      _endedWord = _say(EventKind.ended, {'hand': turn.hand, 'turn': turn.index, 'seat': at.seat, 'vote': false});
+    }
+    _endHere(at);
+  }
+
+  /// Signs, sends by every road and takes one event of this side's own,
+  /// and hands it back.
+  TableEvent? _say(EventKind kind, Map<String, Object?> body) {
+    if (_failure != null) return null;
+    final e = TableEvent.sign(signer, table: spec.id, kind: kind, body: body);
+    _trace('emit ${kind.name} $body');
+    transport.broadcast(e.toJson(), everywhere: true);
+    _accept(e);
+    return e;
+  }
+
+  /// Whether a majority of the people at [turn] could still say the game
+  /// ends there: those who have, and those whose voice at the turn is
+  /// not known to have gone elsewhere — to the move, to a removal, to
+  /// another move for a bot seat, or to a turn after this one
+  /// ([_votedPast]) — and who have been heard from in the silence a
+  /// person is given. Nobody silent that long is a vote still coming,
+  /// as a split counts them ([_settle]): counted, a claim would wait on
+  /// the gone for good.
+  bool _endingCanCarry(TurnId turn) {
+    final race = _races[turn];
+    if (race == null) return false;
+    final of = _participantsAt(turn);
+    final spent = {...race.forAction, ...race.forRemoval, for (final w in race.forRival.values) ...w};
+    final past = _votedPast(turn);
+    final could = of.where((k) =>
+        race.forEnd.contains(k) ||
+        (!spent.contains(k) && !past.contains(k) && !_standsPast(k, turn) && (k == signer.publicKey || !_silent(k))));
+    return could.length >= _majority(of);
+  }
+
+  /// Whether [key] says, by where its heartbeat puts it, that it has
+  /// closed [turn]: every turn of the turn's set behind it. A side that
+  /// has closed a turn never backs the game's end there
+  /// ([_onEndedClaim]), so its voice at the turn is not one the end can
+  /// have — and a side waiting on it past the turn is a side waiting on
+  /// this one: where the next turn is this side's own, holding would
+  /// have it put out for its silence there.
+  bool _standsPast(PublicKey key, TurnId turn) {
+    final at = _lastPosition[key];
+    if (at == null || key == signer.publicKey) return false;
+    return at.$1 > turn.hand || (at.$1 == turn.hand && at.$2 >= _stepOf(turn) + _setOf(turn).length);
+  }
+
+  /// The people this side holds a vote from at a turn after [turn]: a
+  /// move, a witness or a claim of theirs held back for a turn this
+  /// side has not reached. Their voice there is spent on the table
+  /// going on, and a majority for ending the game at [turn] must not
+  /// count it.
+  Set<PublicKey> _votedPast(TurnId turn) => {
+        for (final e in _future)
+          if (_humans.contains(e.author) && _votes(e) && _pastTurn(e, turn)) e.author,
+      };
+
+  static bool _votes(TableEvent e) => switch (e.kind) {
+        EventKind.witness || EventKind.pass || EventKind.play || EventKind.deal => true,
+        EventKind.boot || EventKind.absent || EventKind.escrow || EventKind.ended => true,
+        _ => false,
+      };
+
+  static bool _pastTurn(TableEvent e, TurnId turn) {
+    try {
+      final t = e.turn;
+      return t.hand > turn.hand || (t.hand == turn.hand && t.position > turn.position);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Whether this side is holding [turn] for the game's end: it backed
+  /// the end there, and the ending could still carry. A departed seat's
+  /// move is worked out by every side once its hand opens, with nothing
+  /// said and nobody asked; one that opened here after this side had
+  /// said the game ends at that turn, taken, would put this side past
+  /// the turn while its voice went to a majority that ends the game at
+  /// it — one voice on two outcomes, and two records. So it waits,
+  /// until the ending carries or can no longer ([_endingCanCarry]).
+  bool _holdsForEnding(TurnId turn) {
+    final race = _races[turn];
+    return race != null && !race.settled && race.forEnd.contains(signer.publicKey) && _endingCanCarry(turn);
+  }
+
+  /// The game ends here for this side alone ([_claimEnd]).
+  void _endHere(({TurnId turn, int seat}) at) {
+    if (_failure != null) return;
+    _trace('the game ends here at ${at.turn}, ${Failure.jurorQuorumLost.label}; not on the record: '
+        'nobody left could carry it');
     _failure = Failure.jurorQuorumLost;
     _failedAt = at;
     _pause = null;
     _notify();
   }
+
+  /// A majority of the people at [turn] said the game ends there: it
+  /// does, on this side's record as on everyone's.
+  void _carryEnded(TurnId turn, _Race race, TableEvent claim, Set<PublicKey> of) {
+    race.settled = true;
+    _log(Decision(turn: turn, event: claim, witnesses: {...race.forEnd}, removal: true, among: of));
+    _endedAt = turn;
+    _trace('the game ends at $turn, ${Failure.jurorQuorumLost.label}: carried by ${race.forEnd.intersection(of).length}');
+    _failure = Failure.jurorQuorumLost;
+    _failedAt = (turn: turn, seat: _turnSeat[turn]!);
+    _pause = null;
+    _notify();
+  }
+
+  /// The turn the record ends the game at, where it does.
+  TurnId? _endedAt;
 
   /// This side's word that the game ended for it, and when it last
   /// said it.
@@ -3950,42 +4137,105 @@ class TableClient {
 
   /// An ended side says nothing new. To anyone still talking to it — a
   /// juror still serving, a person still playing — it says again, no
-  /// more than every ten seconds, that it has ended: one cut off when
-  /// it first said so learns it once it is back, as a side behind is
-  /// carried forward.
+  /// more than every ten seconds, how it ended: the claims and the
+  /// backing that carried the end where the record holds it, which a
+  /// side behind takes as it takes any turn it is carried; or else its
+  /// own word.
   void _answerEnded(Map<String, Object?> json) {
-    final word = _endedWord;
     final kind = json['kind'];
-    if (word == null || (kind != EventKind.heartbeat.name && kind != EventKind.serve.name)) return;
+    if (kind != EventKind.heartbeat.name && kind != EventKind.serve.name) return;
     if (clock.nowMs - _endedSaidAt < 10000) return;
+    final at = _endedAt;
+    final race = at == null ? null : _races[at];
+    final word = _endedWord;
+    if (race == null && word == null) return;
     _endedSaidAt = clock.nowMs;
-    transport.broadcast(word.toJson(), everywhere: true);
+    if (race != null) {
+      for (final e in [...race.ends, ...race.witnessEvents.where((w) => race.ends.any((c) => c.id == w.witnessed))]) {
+        transport.broadcast(e.toJson(), everywhere: true);
+      }
+    } else {
+      transport.broadcast(word!.toJson(), everywhere: true);
+    }
   }
 
-  /// The people who have said the game ended for them ([_end]).
+  /// The people who have said the game ended for them ([_claimEnd]).
   final Set<PublicKey> _ended = {};
 
-  /// A person's word that the game has ended for them. It changes
-  /// nothing in the record, and moves nobody on its own say-so. A
-  /// juror stops once every person it still hears has said it: there
-  /// is nobody left to serve. A person ends with it only if it is
-  /// itself stopped where nobody left could move the table, and then
-  /// the table's sides end together rather than each on its own clock.
-  void _onEnded(TableEvent event) {
-    if (!_isParticipant(event.author) || !_ended.add(event.author)) return;
-    if (mySeat == null) {
-      if (!participants.every((k) => _ended.contains(k) || _silent(k))) return;
-      _trace('everyone at the table has ended the game; nothing left to serve');
-      _failure = Failure.jurorQuorumLost;
-      _failedAt = (turn: event.turn, seat: event.seat);
-      _notify();
+  /// A person's claim that the game ends at a turn, or their word that
+  /// it has ended for them: a vote in the turn's race where it says it
+  /// is one, carried as a boot is ([_settle]), and taken by a side
+  /// stopped at the same turn as its cue to take its own part
+  /// ([_claimEnd]). A juror stops once the record ends the game, or
+  /// once every person it still hears has said so: there is nobody
+  /// left to serve.
+  void _onEndedClaim(TableEvent event) {
+    if (!_humans.contains(event.author)) return;
+    _ended.add(event.author);
+    _jurorStopsIfAllEnded(event);
+    final turn = event.turn;
+    final where = _compare(turn);
+    if (where > 0) return _defer(event);
+    final race = _races[turn];
+    if (race == null && where == 0) return _defer(event); // current, and not open yet
+    if (race == null || race.settled || where < 0) {
+      if (race != null && _lateEndingAt(turn)) _takeLateEnding(turn, race, event);
       return;
     }
-    if (!amSeated || _left || done) return;
+    if (event.seat != _turnSeat[turn] || !_participantsAt(turn).contains(event.author)) return;
+    if (!race.ends.any((e) => e.id == event.id)) race.ends.add(event);
+    if (event.body['vote'] == true) {
+      race.forEnd.add(event.author);
+      if (event.author == signer.publicKey) _myWitness[turn] = event.id;
+    }
+    race.forEnd.addAll(_earlyWitnesses.remove(event.id) ?? const {});
+    race.witnessEvents.addAll(_earlyWitnessEvents.remove(event.id) ?? const []);
+    _settle(turn);
+    if (event.author == signer.publicKey || _failure != null || !amSeated || _left) return;
     final at = _unopenable() ?? _unruled();
-    if (at == null) return;
-    _trace('${event.author.substring(0, 4)} ended the game at ${event.turn}; stopped at ${at.turn} here too, so ending with it');
-    _end(at);
+    if (at != null && at.turn == turn && (connectedToMajority || _unheardAreGone(_unopenable()))) _claimEnd(at);
+  }
+
+  void _jurorStopsIfAllEnded(TableEvent event) {
+    if (mySeat != null || _failure != null) return;
+    if (!participants.every((k) => _ended.contains(k) || _silent(k))) return;
+    _trace('everyone at the table has ended the game; nothing left to serve');
+    _failure = Failure.jurorQuorumLost;
+    _failedAt = (turn: event.turn, seat: event.seat);
+    _notify();
+  }
+
+  /// Whether the game's end at [turn] is still to be taken here although
+  /// the turn has settled here: by a departed seat's move worked out
+  /// once its hand opened here, where the rest never saw it open and
+  /// ended the game at that turn. Nothing past it has carried here —
+  /// not while the rest had gone — and nothing has been recorded after
+  /// it, so this side's record is the table's up to the turn, and the
+  /// end is taken there ([TurnState.ended]).
+  bool _lateEndingAt(TurnId turn) {
+    if (_failure != null || _removedAtTurn.contains(turn) || _onRecord.contains(turn)) return false;
+    final race = _races[turn];
+    if (race == null || !race.settled) return false;
+    return !record.any((d) => d.turn.hand > turn.hand || (d.turn.hand == turn.hand && d.turn.position > turn.position));
+  }
+
+  void _takeLateEnding(TurnId turn, _Race race, TableEvent claim) {
+    if (claim.seat != _turnSeat[turn] || !_participantsAt(turn).contains(claim.author)) return;
+    if (!race.ends.any((e) => e.id == claim.id)) race.ends.add(claim);
+    if (claim.body['vote'] == true) race.forEnd.add(claim.author);
+    race.forEnd.addAll(_earlyWitnesses.remove(claim.id) ?? const {});
+    race.witnessEvents.addAll(_earlyWitnessEvents.remove(claim.id) ?? const []);
+    _settleLateEnding(turn);
+  }
+
+  /// The game's end at [turn], settled here by a move worked out first,
+  /// once a majority is seen behind it ([_lateEndingAt]).
+  void _settleLateEnding(TurnId turn) {
+    final race = _races[turn]!;
+    final of = _participantsAt(turn);
+    if (race.forEnd.intersection(of).length < _majority(of)) return;
+    _trace('the game ended at $turn elsewhere, where this side had worked the turn out: taken');
+    _carryEnded(turn, race, race.ends.first, of);
   }
 
   /// Whether the pause up is this side's word that a held seat has
@@ -4082,6 +4332,10 @@ class TableClient {
     _claimEscrows();
     final d = _deal;
     if (d == null) return;
+    // A turn held for the game's end whose ending can no longer carry
+    // is let go of here, once the rest have gone on past it
+    // ([_holdsForEnding]).
+    if (_stalled.isNotEmpty) _resumeStalled();
     // A given-up seat's open turn, offered again. The juror whose
     // place it is to say the move may not have been able to when the
     // seat opened, and the one ahead of it may since have gone.
@@ -4442,7 +4696,7 @@ class TableClient {
       // shared relay. Every half minute is enough to say it is still
       // split.
       if (race.split && _repeatTick % 30 != 0) continue;
-      if (race.action == null && race.boots.isEmpty) continue; // nothing to say yet
+      if (race.action == null && race.boots.isEmpty && race.ends.isEmpty) continue; // nothing to say yet
       // And the rest widen as they go ([_Race.nextRepeatTick]).
       if (_repeatTick < race.nextRepeatTick) continue;
       // What this peer has to say again: its own, always; anybody
@@ -4455,12 +4709,16 @@ class TableClient {
         for (final b in race.boots)
           if (carry || b.author == signer.publicKey) b,
       ];
-      if (!sayAction && sayBoots.isEmpty) continue;
+      final sayEnds = [
+        for (final c in race.ends)
+          if (carry || c.author == signer.publicKey) c,
+      ];
+      if (!sayAction && sayBoots.isEmpty && sayEnds.isEmpty) continue;
       race.nextRepeatTick = _repeatTick + _repeatGap(race.repeats);
       race.repeats++;
       final everywhere = race.repeats == 2 || insist;
       if (sayAction) transport.broadcast(action.toJson(), everywhere: everywhere);
-      for (final b in sayBoots) {
+      for (final b in [...sayBoots, ...sayEnds]) {
         transport.broadcast(b.toJson(), everywhere: everywhere);
       }
     }
@@ -4919,7 +5177,7 @@ class TableClient {
 
   /// Whether this client is still a juror of the hand in play or one
   /// to come; false once the table has moved past every hand it served,
-  /// the game is over or has ended ([_onEnded]), or nobody at the table
+  /// the game is over or has ended ([_onEndedClaim]), or nobody at the table
   /// has been heard for five minutes — a table everyone walked away
   /// from is nobody's to serve.
   bool get serving =>
@@ -5001,7 +5259,7 @@ class TableClient {
       final needed = _majority(of);
       final forAction = race.forAction.intersection(of);
       final forRemoval = race.forRemoval.intersection(of);
-      final awake = of.difference(forAction).difference(forRemoval).where((k) => !_silent(k)).length;
+      final awake = of.difference(forAction).difference(forRemoval).difference(race.forEnd).where((k) => !_silent(k)).length;
       if (forAction.length + awake >= needed || forRemoval.length + awake >= needed) return;
       final held = botHolders(turn.hand)[seat];
       final heard = held != null && _liveJurors(turn.hand).contains(held);
@@ -5038,7 +5296,7 @@ class TableClient {
     final needed = _majority(of);
     final forAction = race.forAction.intersection(of);
     final forRemoval = race.forRemoval.intersection(of);
-    final awake = of.difference(forAction).difference(forRemoval).where((k) => !_silent(k)).toSet();
+    final awake = of.difference(forAction).difference(forRemoval).difference(race.forEnd).where((k) => !_silent(k)).toSet();
     final actionPossible = forAction.length + awake.length >= needed;
     final removalPossible = forRemoval.length + awake.difference({holder.key}).length >= needed;
     final said = _waitSaidAt[turn];
@@ -5207,6 +5465,14 @@ class _Race {
   final List<TableEvent> witnessEvents = [];
   final Set<PublicKey> forAction = {};
   final Set<PublicKey> forRemoval = {};
+
+  /// Claims that the game ends here, and who backs one: the third way a
+  /// turn can go, where nobody left can move it ([TableClient._claimEnd]).
+  /// A person's voice at a turn goes one way, so these are counted
+  /// apart from the move and the removal, and a majority of them ends
+  /// the game at the turn, on every record.
+  final List<TableEvent> ends = [];
+  final Set<PublicKey> forEnd = {};
   bool settled = false;
   bool split = false;
 
