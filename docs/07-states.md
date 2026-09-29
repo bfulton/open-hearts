@@ -84,7 +84,7 @@ step it was decided **here** (below, "The leave on the record").
 holding a piece of it. **On the record.** A person at the table claims
 the seat for the escrow at the seat's own turn when the juror has not
 been heard from for half a minute, or has had the turn in front of it
-for too long: 3 s for a play or a pass, 10 s for a deal step or its
+for too long: 3 s for a play or a pass, 40 s for a deal step or its
 audit. The clock starts once the juror is heard at the hand, and does
 not run while this side is behind the table. The claim is carried as a
 boot is, by a majority of the people or by the jury; the clocks only
@@ -285,7 +285,7 @@ are of three kinds:
   minute from a juror, and "heard lately" for who is here. Nothing but
   time tells gone from slow.
 - **Deadlines on someone present:** a person's grace and bank, and a
-  held seat's 3 s and 10 s. These are rules of the game, like a chess
+  held seat's 3 s and 40 s. These are rules of the game, like a chess
   clock.
 
 Each of these *proposes* a transition, and the table settles it on

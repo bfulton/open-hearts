@@ -241,9 +241,10 @@ void main() {
     final seat = a.game.trick.firstWhere((p) => held.containsKey(p.seat)).seat;
     final holder = held[seat]!;
     final people = {for (final c in t.clients) c.signer.publicKey};
-    // Its audit held back twenty seconds, past the escrow claimed at
-    // ten; the seat's pieces kept from the people until four seconds
-    // after that.
+    // Its audit held back ten seconds past the escrow, which is
+    // claimed once a deal step's allowance is up; the seat's pieces kept
+    // from the people until four seconds after that.
+    const late = TableClient.botDealsWithinMs + 10000;
     int? said;
     TableEvent? audit;
     t.net.steer = (from, to, message) {
@@ -251,10 +252,10 @@ void main() {
       if (message['kind'] == 'deal' && from == holder && body['round'] == 4) {
         audit ??= TableEvent.parse(message);
         said ??= t.clock.nowMs;
-        return said! + 20000 - t.clock.nowMs;
+        return said! + late - t.clock.nowMs;
       }
       if (message['kind'] == 'release' && body['about'] == seat && people.contains(to) && said != null) {
-        final until = said! + 24000;
+        final until = said! + late + 4000;
         return t.clock.nowMs < until ? until - t.clock.nowMs : null;
       }
       return null;
@@ -329,7 +330,9 @@ void main() {
     expect(t.clock.runUntil(() => a.botHolders(a.game.handNumber).isNotEmpty, limitMs: 5 * 60 * 1000), isTrue);
     final hand = a.game.handNumber;
     final MapEntry(key: seat, value: holder) = a.botHolders(hand).entries.first;
-    final until = t.clock.nowMs + 15000;
+    // Kept from a five seconds past the deal step's allowance, so a
+    // claims the seat while b has its keys.
+    final until = t.clock.nowMs + TableClient.botDealsWithinMs + 5000;
     t.net.steer = (from, to, message) {
       final body = message['body'] as Map<String, Object?>;
       // Every copy, whoever passes it on: the people say an unsettled

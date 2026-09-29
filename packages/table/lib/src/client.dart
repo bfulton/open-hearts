@@ -3812,16 +3812,28 @@ class TableClient {
   /// held seat's keys wait for the record to say which draw the hand is
   /// sealed to ([_checkSealed]), and a step is checked against things
   /// that may not have arrived — and it answers at 2.9 s at the ninety-fifth
-  /// percentile against a play's 0.16. Ten seconds is three and a half
-  /// times that. A held seat that misses it goes to the escrow like one
-  /// that misses a card, and a seat given up with deal steps still to
-  /// take gives the hand up undealt ([_carryEscrow]).
+  /// percentile against a play's 0.16 on a machine with room to spare.
+  /// A held seat that misses it goes to the escrow like one that misses
+  /// a card, and a seat given up with deal steps still to take gives
+  /// the hand up undealt ([_carryEscrow]).
+  ///
+  /// Forty seconds, measured on a slow machine rather than a fast one.
+  /// It was ten, three and a half times that 2.9 s. On two cores
+  /// shared by four browsers — a hosted runner, nearer a cheap phone
+  /// than a desk is — held seats' deal steps took 3.9 s at the middle,
+  /// 11.7 at the ninety-fifth percentile and 24.9 at the worst of 187,
+  /// one in eleven of them past ten; and a working juror that missed
+  /// the ten cost its table the whole hand, twice in four runs. Forty
+  /// is the same three and a half times, now of the slow machine's
+  /// 11.7, and 1.6 times the worst it did. A juror gone quiet is still
+  /// let go at half a minute's silence ([_liveJurors]); this is only
+  /// how long one still heard from may sit on a step.
   ///
   /// There was no allowance here at all before: a deal that could not
   /// finish was caught by silence alone, and a juror heard from and
   /// doing nothing — a tab starved of a processor, a phone in a pocket
   /// — is never silent, so the deal waited on its keys for good.
-  static const botDealsWithinMs = 10000;
+  static const botDealsWithinMs = 40000;
 
   /// Whether the seat's holder has had the seat's turn in front of it
   /// for longer than that, and said nothing.

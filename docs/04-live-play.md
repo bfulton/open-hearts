@@ -642,15 +642,25 @@ bot seat was measured taking: over six seeded hands it answers in 69
 ms at the middle and 155 ms at the worst over a data channel, 365 ms
 and 787 ms with a relay's latency under it.
 
-A deal step has ten seconds. A deal step is checked against things
+A deal step has forty seconds. A deal step is checked against things
 that may not have arrived, and a juror holds its keys back for a
 moment on purpose so a late draw can still be read, so deal steps
-answer at 2.9 s at the ninety-fifth percentile against a play's 0.16;
-ten is three and a half times that. A held seat that misses it goes to
-the escrow like one that misses a card, and since a deal step given up
-takes the whole hand with it rather than one seat (below, "When quorum
-is lost anyway"), the hand is given up undealt. There was no allowance
-here at all at first, a deal that could not finish being caught by
+answer at 2.9 s at the ninety-fifth percentile against a play's 0.16
+on a machine with room to spare. The allowance was ten seconds, three
+and a half times that, and a slow machine blew through it: on two
+cores shared by four browsers — a hosted runner, nearer a cheap phone
+than a desk is — held seats' deal steps took 3.9 s at the middle, 11.7
+at the ninety-fifth percentile and 24.9 at the worst of 187, one in
+eleven past ten, and a juror that was working, only slowly, cost its
+table the hand twice in four runs. Forty is the same three and a half
+times, of the slow machine's 11.7, and 1.6 times the worst it did. A
+held seat that misses it goes to the escrow like one that misses a
+card, and since a deal step given up takes the whole hand with it
+rather than one seat (below, "When quorum is lost anyway"), the hand
+is given up undealt. A juror gone quiet is let go at half a minute's
+silence whatever step it is on; the forty seconds are only how long
+one still heard from may sit on a step. There was no allowance here
+at all at first, a deal that could not finish being caught by
 silence alone — and a juror heard from and doing nothing is never
 silent, so the deal waited on its keys for good.
 
@@ -708,7 +718,8 @@ starts when the holder is heard at the hand. One not heard since it
 was drawn is left to silence, half a minute from the draw; one heard
 at an earlier hand is arriving while its heartbeats move — one really
 catching up moves, every event it applies another step — and one that
-has said the same earlier place for ten seconds has stopped. A juror the table did take a seat off for
+has said the same earlier place for as long as a deal step may take,
+forty seconds, has stopped. A juror the table did take a seat off for
 sitting on it is left out of the next draw: heard from is not the same
 as playing (`packages/table/test/idle_holder_test.dart`).
 
