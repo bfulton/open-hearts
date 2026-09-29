@@ -282,7 +282,7 @@ class _LivePageState extends State<LivePage> {
                   // rises to the table instead (ui/hand_fan.dart).
                   passTo: game.phase == Phase.passing ? passesTo(_c) : null,
                   receivedFrom: passesFrom(_c),
-                  spread: landscape ? 0.8 : 0.64,
+                  spread: HandFan.spreadFor(landscape: landscape),
                 ),
               ),
               if (ended != null && !_c.done)

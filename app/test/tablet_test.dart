@@ -15,11 +15,15 @@ library;
 import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/gone.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
+import 'package:open_hearts/ui/scaled.dart';
 import 'package:open_hearts/ui/table_layout.dart';
+import 'package:open_hearts/ui/table_view.dart';
 
-import 'table_page_test.dart' show fanCards, pumpTable, tapCard;
+import 'drawn.dart';
+import 'table_page_test.dart' show cardFinder, fanCards, pumpTable, tapCard;
 
 const _phone = Size(390, 844);
 const _phoneSide = Size(844, 390);
@@ -31,6 +35,24 @@ const _desktop = Size(1600, 1000);
 
 /// Where the hand fan sits, and how wide it is drawn.
 Rect _fan(WidgetTester tester) => tester.getRect(find.byType(HandFan));
+
+/// How much bigger [finder] is drawn than it is laid out.
+double _drawnAt(WidgetTester tester, Finder finder) {
+  final box = tester.renderObject<RenderBox>(finder);
+  return tester.getRect(finder).width / box.size.width;
+}
+
+/// The table's scale, as the layout gave it.
+double _scale(WidgetTester tester) => tester.widget<TableScale>(find.byType(TableScale)).scale;
+
+/// Where the cards of the fan run from and to.
+(double, double) _fanSpan(WidgetTester tester) {
+  final rects = [for (final c in fanCards(tester)) tester.getRect(cardFinder(c.card))];
+  return (
+    rects.map((r) => r.left).reduce((a, b) => a < b ? a : b),
+    rects.map((r) => r.right).reduce((a, b) => a > b ? a : b),
+  );
+}
 
 Future<void> resize(WidgetTester tester, Size to) async {
   tester.view.physicalSize = to;
@@ -85,6 +107,77 @@ void main() {
 
       await resize(tester, _tabletTall);
       expect(find.byType(Gone), findsNothing, reason: 'a tablet in portrait is a wide table, not a table with a rail');
+    });
+
+    testWidgets('draws its type at the scale its cards grew by, and a phone\'s at exactly one', (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await pumpTable(tester, size: _phone);
+      expect(_scale(tester), 1.0);
+      expect(tester.widgetList<Scaled>(find.byType(Scaled)).every((s) => s.scale == 1.0), isTrue,
+          reason: 'a phone\'s table is drawn exactly as it was');
+
+      await resize(tester, _tabletTall);
+      final scale = _scale(tester);
+      expect(scale, closeTo(TableScale.mostCard / TableScale.phoneCard, 1e-9),
+          reason: 'a tablet\'s cards are as big as cards get');
+      final names = tester.widget<TableView>(find.byType(TableView)).controller.names;
+      for (final seat in names.skip(1)) {
+        expect(_drawnAt(tester, drawn(find.text(seat))), closeTo(scale, 1e-6), reason: '$seat, at the table\'s scale');
+      }
+      expect(_drawnAt(tester, find.text('Choose 3 more to pass')), closeTo(scale, 1e-6));
+      expect(_drawnAt(tester, find.widgetWithText(FilledButton, 'Pass')), closeTo(scale, 1e-6));
+
+      // The cards on the felt grew by the same: the first one played
+      // is at the most a card can be.
+      final hand = fanCards(tester);
+      for (var i = 0; i < 3; i++) {
+        await tapCard(tester, hand[i].card);
+      }
+      await tester.tap(find.widgetWithText(FilledButton, 'Pass'));
+      await tester.pumpAndSettle();
+      final playable = fanCards(tester).where((c) => !c.dimmed).toList();
+      if (playable.isNotEmpty) await tapCard(tester, playable.first.card);
+      await tester.pumpAndSettle();
+      final onFelt = find.descendant(of: find.byType(TableView), matching: find.byType(CardView));
+      expect(onFelt, findsWidgets);
+      for (final card in onFelt.evaluate()) {
+        expect(tester.getRect(find.byWidget(card.widget)).width, closeTo(TableScale.phoneCard * scale, 0.01));
+      }
+
+      // And the rail, where there is one.
+      await resize(tester, _tabletWide);
+      expect(_drawnAt(tester, find.text('What has gone')), closeTo(_scale(tester), 1e-6));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('and its rail are centred as one, with the same margin either side', (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await pumpTable(tester, size: _desktop);
+      final table = tester.getRect(find.byType(TableScale));
+      final rail = tester.getRect(find.byType(Gone));
+      expect(table.width, TableLayout.tableWidth);
+      expect(rail.left, closeTo(table.right, 0.01), reason: 'the rail is beside the table');
+      expect(table.left, greaterThan(0), reason: 'a desktop has room to spare');
+      expect(_desktop.width - rail.right, closeTo(table.left, 0.01));
+    });
+
+    testWidgets('the action line spans the hand it is about, at every shape', (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await pumpTable(tester, size: _phone);
+      for (final shape in [_phone, _phoneSide, _split, _tabletTall, _tabletWide, _desktop]) {
+        await resize(tester, shape);
+        final (left, right) = _fanSpan(tester);
+        final note = tester.getRect(find.text('Choose 3 more to pass'));
+        final pass = tester.getRect(find.widgetWithText(FilledButton, 'Pass'));
+        // The line is a whole hand's width and a margin, and keeps its
+        // own padding inside that: its ends sit just inside the fan's,
+        // give or take the gap a missing suit leaves out of this hand.
+        expect((note.left - left).abs(), lessThan(30), reason: '$shape: the note starts where the hand does');
+        expect((right - pass.right).abs(), lessThan(30), reason: '$shape: the Pass button ends where the hand does');
+      }
     });
 
     testWidgets('the rail says which cards have gone, and keeps up as they go', (tester) async {

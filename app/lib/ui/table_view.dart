@@ -11,6 +11,7 @@ import '../theme.dart';
 import 'card_view.dart';
 import 'pip.dart';
 import 'player_icon.dart';
+import 'scaled.dart';
 
 /// More height than a table is ever going to use, at which point where
 /// it sits in the felt stops being a rounding error and starts being a
@@ -19,7 +20,8 @@ import 'player_icon.dart';
 const _roomToSpare = 240.0;
 
 /// The badges' inset from the felt's edge, and the gap every badge
-/// keeps from the card it labels.
+/// keeps from the card it labels. These and the pill's row are at a
+/// phone's scale, and grow with the table's (ui/scaled.dart).
 const _badgeInset = 6.0;
 const _badgeGap = 8.0;
 
@@ -93,6 +95,12 @@ class TableView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final box = constraints.biggest;
+        // How much bigger than a phone's this table is drawn: its
+        // layout's, or on a felt of its own, the felt's.
+        final scale = TableScale.maybeOf(context) ?? TableScale.forFelt(box);
+        final edge = _badgeInset * scale;
+        final badgeGap = _badgeGap * scale;
+        final pillRow = _pillRow * scale;
         // A wide felt — a landscape phone — lays the trick out flatter
         // and its badges on one line, since height is what it lacks.
         final wide = box.width > box.height * 1.3;
@@ -109,15 +117,16 @@ class TableView extends StatelessWidget {
         // as a face wants unless that would leave the cards under what
         // a card can be read at, where it takes the smaller size back.
         double cardsUnder(double line) =>
-            (box.height - 2 * (line + _badgeGap) - (wide ? 0.0 : 2 * _pillRow)) / ((wide ? 2.3 : 2.7) / cardAspect);
-        final line = cardsUnder(SeatBadge.line) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine;
+            (box.height - 2 * (line + badgeGap) - (wide ? 0.0 : 2 * pillRow)) / ((wide ? 2.3 : 2.7) / cardAspect);
+        final line = (cardsUnder(SeatBadge.line * scale) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine) * scale;
         // The biggest a card is allowed to be, from the felt's own
         // size. A phone is held at arm's length and its felt is small,
         // so seventy-six points is the whole of what fits; a tablet's
         // felt is further away and has room, and cards that stayed a
         // phone's size on it would be a phone's game with green around
-        // it (docs/05-form-factors.md).
-        final most = (box.shortestSide * 0.17).clamp(76.0, 108.0);
+        // it (docs/05-form-factors.md). That is the table's scale, the
+        // one its type is drawn at too.
+        final most = TableScale.phoneCard * scale;
         var cardWidth = [
           box.width * (wide ? 0.16 : 0.21),
           cardsUnder(line),
@@ -128,11 +137,12 @@ class TableView extends StatelessWidget {
         // must; and on a felt too narrow for both, the trick gives way
         // rather than running under the badges.
         final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
-        double sideRoomFor(double cw) => box.width / 2 - cw * reach - _badgeInset - _badgeGap;
-        if (sideRoomFor(cardWidth) < SeatBadge.minWidth) {
-          cardWidth = ((box.width / 2 - _badgeInset - _badgeGap - SeatBadge.minWidth) / reach).clamp(34.0, cardWidth);
+        double sideRoomFor(double cw) => box.width / 2 - cw * reach - edge - badgeGap;
+        final leastRoom = SeatBadge.minWidth * scale;
+        if (sideRoomFor(cardWidth) < leastRoom) {
+          cardWidth = ((box.width / 2 - edge - badgeGap - leastRoom) / reach).clamp(34.0, cardWidth);
         }
-        final sideRoom = sideRoomFor(cardWidth).clamp(SeatBadge.minWidth, box.width);
+        final sideRoom = sideRoomFor(cardWidth).clamp(leastRoom, box.width);
         final cardHeight = cardHeightFor(cardWidth);
         final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
 
@@ -143,6 +153,8 @@ class TableView extends StatelessWidget {
         // short name sat in a wide bar and a side seat in a tall box.
         final facing = trickBox.width;
 
+        // A badge is laid out at a phone's scale and drawn at the
+        // table's, so the room it is given here is in a phone's points.
         Widget badge(int position) => SeatBadge(
               onHold: onHold == null ? null : () => onHold!(controller.seatAt(position)),
               seat: controller.seatAt(position),
@@ -157,11 +169,11 @@ class TableView extends StatelessWidget {
               // player's own line at the near edge: one line, icon
               // first. The side badges have a strip, so they stack.
               oneLine: wide || position.isEven,
-              maxWidth: !wide && position.isEven ? facing : sideRoom,
+              maxWidth: (!wide && position.isEven ? facing : sideRoom) / scale,
               // A stacked badge takes the height of the row it is in,
               // which is the taller of the pair's (below).
-              height: wide || position.isEven ? line : null,
-              iconSize: wide || position.isEven ? SeatBadge.iconOn(line) : SeatBadge.iconIn(cardHeight),
+              height: wide || position.isEven ? line / scale : null,
+              iconSize: wide || position.isEven ? SeatBadge.iconOn(line / scale) : SeatBadge.iconIn(cardHeight / scale),
             );
 
         // The trick, as one centred block. Slots hold their place so
@@ -208,11 +220,11 @@ class TableView extends StatelessWidget {
         // felt, where the action line sits on a row of its own, it is
         // split evenly and the table rides in the middle.
         final inset = trickBox.height / 2 - (offsets[2]!.dy.abs() * cardHeight * 1.02 + cardHeight / 2);
-        final gap = (_badgeGap - inset).clamp(0.0, _badgeGap);
+        final gap = (badgeGap - inset).clamp(0.0, badgeGap);
         // Where a side badge's inner edge falls: a gap out from the far
         // edge of the card beside it, measured from the middle of the
         // felt.
-        final sideOut = (box.width - 2 * _badgeInset) / 2 + cardWidth * reach + _badgeGap;
+        final sideOut = (box.width - 2 * edge) / 2 + cardWidth * reach + badgeGap;
         // Each badge hugs its name, so the two of a pair are each laid
         // out over a ghost of the other, which takes up its room and
         // draws nothing: whichever name is the longer, the pair come out
@@ -231,7 +243,10 @@ class TableView extends StatelessWidget {
           // A side badge is anchored by its inner edge, a gap out from
           // its card (below), and runs out towards the felt's edge as
           // far as its name takes it.
-          return wide || position.isEven ? SizedBox(height: line, child: pair) : pair;
+          return Scaled(
+            scale: scale,
+            child: wide || position.isEven ? SizedBox(height: line / scale, child: pair) : pair,
+          );
         }
 
         // Where the table sits in the felt. A phone's felt is the size
@@ -241,12 +256,12 @@ class TableView extends StatelessWidget {
         // beyond the far seat reads as the far end of the table, while
         // the room under your own badge is the gap between you and your
         // own cards, and wants to be small.
-        final cluster = 2 * line + 2 * gap + trickBox.height + (wide ? 0.0 : 2 * _pillRow);
+        final cluster = 2 * line + 2 * gap + trickBox.height + (wide ? 0.0 : 2 * pillRow);
         final slack = (box.height - cluster).clamp(0.0, double.infinity);
         final above = slack > _roomToSpare ? slack * 0.7 : slack / 2;
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _badgeInset),
+          padding: EdgeInsets.symmetric(horizontal: edge),
           child: Column(
             children: [
               SizedBox(height: above),
@@ -279,7 +294,10 @@ class TableView extends StatelessWidget {
                       Expanded(
                         child: Align(
                           alignment: Alignment.centerLeft,
-                          child: Padding(padding: const EdgeInsets.only(left: 12), child: pill),
+                          child: Scaled(
+                            scale: scale,
+                            child: Padding(padding: const EdgeInsets.only(left: 12), child: pill),
+                          ),
                         ),
                       ),
                     ],
@@ -290,7 +308,7 @@ class TableView extends StatelessWidget {
                 // The room under the near seat, with the line the table
                 // says in the middle of it: the action line has the row
                 // against the hand (table_layout.dart).
-                Expanded(child: Center(child: pill)),
+                Expanded(child: Center(child: Scaled(scale: scale, child: pill))),
               ],
               if (wide) const Spacer(),
             ],

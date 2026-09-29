@@ -57,8 +57,8 @@ with theirs.
 
 That line is the fourth seat, on the felt with the other three, in
 both compositions. All four badges are the same widget and each is
-eight points from the card it labels — on all four sides, at every
-shape — which is what makes a badge read as that card's label rather
+the same gap from the card it labels — eight points at a phone's
+scale, on all four sides, at every shape — which is what makes a badge read as that card's label rather
 than as furniture along an edge. They are placed against the trick,
 not against the felt, so the felt's spare height is rail around the
 table instead of distance between a seat and its card; and because
@@ -67,14 +67,21 @@ they leave rather than the other way round, which is why nothing
 overflows when a name wraps or the reader turns the text up (a badge
 scales its contents into its box).
 
-Each pair comes out one size. In portrait that falls out of the room:
-the two facing each other across the trick are as wide as the trick's
-own column, and the two at the sides take the strip between their card
-and the felt's edge, and the height of that card. On a wide felt there
-is no strip to fill and a box the width of the trick would be a bar
-with a word in it, so a badge hugs its name — and the two of a pair
-are each laid out over a ghost of the other, which takes up its room
-and draws nothing, so whichever name is the longer, the pair match.
+Every badge hugs its name, up to the room it has — the width of the
+trick's own column for the two facing each other across it, the strip
+between a card and the felt's edge for the two at the sides — and each
+pair comes out one size: the two are each laid out over a ghost of the
+other, which takes up its room and draws nothing, so whichever name is
+the longer, the pair match. A side badge is anchored by its inner
+edge, that gap out from its card, and runs towards the felt's edge
+as far as its name takes it. The badges used to fill their room, so a
+short name sat in a wide bar and a side seat in a tall box, and a
+tablet stretched them wider still.
+
+The trick's four places keep their room and draw nothing until a card
+lands in one. They used to draw a faint outline each, four rules on the
+felt before anything had been played, and a trick reads as a trick
+without them.
 
 The two lines under the table say different things and sit where each
 belongs. What the table says — who took the trick, or that it is your
@@ -83,7 +90,12 @@ player's badge, which is sized for it twice over so it is never
 against the badge. The action line is about the hand — what you were
 passed, how many more to choose — so it sits against the hand, in a
 row of the height of its tallest state, the pass, whatever it is
-holding: the table above it never shifts when the line changes. A wide
+holding: the table above it never shifts when the line changes. And it
+is as wide as a whole hand's fan and the margin round it, centred over
+it, so its ends — the note at one, the Pass button at the other — line
+up with the fan's. On a phone upright the fan takes the width and so
+does the line; anywhere the fan is narrower than the table, the line
+used to run past both ends of it. A wide
 felt has no height for the table's line at all, and plenty of width,
 so there it sits beside the player's badge, with the same room kept on
 the other side so the badge holds the middle. What is left
@@ -153,23 +165,40 @@ The hand should stay near the bottom edge and near the thumbs, which on a
 tablet in landscape means it does not want to be one wide fan across the
 full width.
 
-**As built.** Three things, all read off the constraints.
+**As built.** Four things, all read off the constraints.
 
-*The table holds a width.* Past nine hundred points it stops spreading
-and is centred, because a fan any wider is a fan you reach across the
-device to touch. Whatever is left over is a rail, when there is enough
-of it to be one — two hundred and sixty points — and no more than four
-hundred and twenty, past which a rail is a column of air and the table
-would rather have the width back. A tablet in portrait has a hundred
-and twenty-four points left over, so it gets a wide table and no rail;
-in landscape it gets both.
+*The table holds a width.* Past nine hundred points it stops spreading,
+because a fan any wider is a fan you reach across the device to touch.
+Whatever is left over is a rail, when there is enough of it to be one
+— two hundred and sixty points — and no more than four hundred and
+twenty, past which a rail is a column of air and the table would rather
+have the width back. A tablet in portrait has a hundred and twenty-four
+points left over, so it gets a wide table and no rail; in landscape it
+gets both. The table and its rail are one composition, centred
+together, so on a screen wider than both the margins either side of
+them match; the table used to be centred in what the rail left, with
+the rail against the screen's edge.
 
 *The cards grow with the felt.* Seventy-six points was a phone's cap,
 and a phone's cap on a tablet is a phone's game with green around it.
-The cap is now the felt's own shortest side, between seventy-six and a
-hundred and eight: a phone lands exactly where it did, and a tablet's
-trick comes up to a size you can read from across a desk. The hand's
-own row grows a little too, since it is the part anybody touches.
+The cap is now seventeen hundredths of the felt's own shortest side,
+between seventy-six and a hundred and eight: a phone lands exactly
+where it did, and a tablet's trick comes up to a size you can read from
+across a desk. The hand's own row grows a little too, since it is the
+part anybody touches.
+
+*The type grows with the cards.* The names on the badges, the line the
+table says, the action line and its Pass button, and the rail were a
+phone's size on every felt, so a tablet had a big game with small words
+on it. Now the table has one scale — how much bigger than a phone's its
+cards may be, up to a hundred and eight over seventy-six — and all of
+that is drawn at it: laid out in that much less room and drawn that
+much bigger, type, icons, padding and the gaps between together
+(`app/lib/ui/scaled.dart`). The felt the scale is read from is the
+one the layout leaves it, with the action line drawn at the scale
+being found, so the layout solves for it. A phone's table is at
+exactly one, and is drawn exactly as it was; the header, which is the
+app's line rather than the table's, stays as it is everywhere.
 
 *The table sits low in a felt with height to spare.* A phone's felt is
 the size of its table and the slack is a few points either way, so it

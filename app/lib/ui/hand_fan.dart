@@ -93,6 +93,23 @@ class HandFan extends StatefulWidget {
   /// hand has the width to show more of every card.
   final double spread;
 
+  /// The spread in each composition.
+  static double spreadFor({required bool landscape}) => landscape ? 0.8 : 0.64;
+
+  /// How wide a card in the fan is in a row [height] tall, before a
+  /// narrow row shrinks it.
+  static double cardWidthFor(double height) =>
+      (height > 0 ? (height - _lift - 6) * cardAspect : 62.0).clamp(40.0, 76.0);
+
+  /// How wide a whole hand's fan is in a row [height] tall with width
+  /// to spare: thirteen cards at the widest step [spread] allows, and
+  /// the gaps between four suits. The action line spans this, so it is
+  /// as wide as the hand it is about (table_layout.dart).
+  static double fullWidth(double height, double spread) {
+    final width = cardWidthFor(height);
+    return width + (engine.Rank.values.length - 1) * width * spread + (engine.Suit.values.length - 1) * _suitGap;
+  }
+
   /// How far up a card has to be dragged, as a fraction of its height,
   /// for letting go to play it.
   static const dragToPlay = 0.33;
@@ -237,10 +254,7 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
 
         // Cards are as large as the row allows, capped so a short hand
         // does not turn into playing-card billboards.
-        var width = constraints.maxHeight > 0
-            ? (constraints.maxHeight - _lift - 6) * cardAspect
-            : 62.0;
-        width = width.clamp(40.0, 76.0);
+        var width = HandFan.cardWidthFor(constraints.maxHeight);
         // Then shrunk if even at full overlap the row would spill.
         final maxStep = width * widget.spread;
         var step = n > 1 ? (available - width) / (n - 1) : 0.0;
