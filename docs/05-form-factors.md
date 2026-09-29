@@ -312,7 +312,10 @@ means nothing when it is your turn.
 
 So the things a game tells you are white: which hand ended, the row
 that is yours, the rating you have, what a game did to it, the trick
-somebody just took. **Red is the game's own** — a heart, a suit,
+somebody just took, the icon and colour you chose on your profile —
+ringed in white, standing off the disc by a gap of felt so the ring
+shows on every colour; it was gold, on the disc's own edge, which on
+the amber disc was no ring at all. **Red is the game's own** — a heart, a suit,
 points against you, the game that went the other way. A score sheet
 ends up white over red with one gold button on it, which is exactly
 what it is: this is what happened, and here is the way on.

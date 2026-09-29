@@ -59,8 +59,8 @@ void main() {
 
   testWidgets('the profile says what it is going to state about you, and when it does not know', (tester) async {
     await pumpProfile(tester, const PlayerStats(reached: true));
-    expect(find.textContaining('not yet known'), findsOneWidget);
-    expect(find.textContaining('seated with people who play at your speed'), findsOneWidget);
+    expect(find.textContaining('not known yet'), findsOneWidget);
+    expect(find.textContaining('you will be seated with players at a similar pace'), findsOneWidget);
 
     await pumpProfile(
       tester,
@@ -72,6 +72,6 @@ void main() {
     );
     expect(find.textContaining('steady pace'), findsOneWidget);
     expect(find.textContaining('7 seconds a card'), findsOneWidget);
-    expect(find.textContaining('which is who you are seated with'), findsOneWidget);
+    expect(find.textContaining('and are seated with players at a similar pace'), findsOneWidget);
   });
 }

@@ -260,8 +260,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 12),
                 // The icons: a grid, the chosen one ringed.
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     for (final key in icons)
                       _Choice(
@@ -276,8 +276,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 14),
                 // The colours.
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     for (var i = 0; i < PlayerIcon.palette.length; i++)
                       _Choice(
@@ -285,7 +285,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         selected: (_avatar.color ?? _derivedIndex()) == i,
                         onTap: () => setState(() => _avatar = _avatar.copyWith(color: i)),
                         color: PlayerIcon.palette[i],
-                        size: 30,
+                        size: 36,
                       ),
                   ],
                 ),
@@ -395,9 +395,9 @@ class _PaceLine extends StatelessWidget {
         Flexible(
           child: Text(
             pace.known
-                ? 'You play at a ${pace.word} pace — about ${pace.stated} second${pace.stated == 1 ? '' : 's'} a card, '
-                    'which is who you are seated with'
-                : 'Your pace is not yet known: play a live game or two and you will be seated with people who play at your speed',
+                ? 'You play at a ${pace.word} pace, about ${pace.stated} second${pace.stated == 1 ? '' : 's'} a card, '
+                    'and are seated with players at a similar pace'
+                : 'Your pace is not known yet. After a live game or two you will be seated with players at a similar pace',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 12, height: 1.4, color: Palette.chromeDim),
           ),
@@ -447,12 +447,12 @@ class _Record extends StatelessWidget {
                 stats == null
                     ? 'Counting up your games…'
                     : !stats.reached
-                    ? 'No relay answered, so this is the part nobody can tell you'
+                    ? 'The relays did not answer, so it cannot be shown just now'
                     : !rated
                     ? 'Play a rated live game and you will have one'
                     : rating.provisional
-                    ? 'provisionally, from ${_games(stats.ratedGames)}'
-                    : 'from ${_games(stats.ratedGames)}',
+                    ? 'Provisional, from ${_games(stats.ratedGames)}'
+                    : 'From ${_games(stats.ratedGames)}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
               ),
@@ -464,18 +464,7 @@ class _Record extends StatelessWidget {
         const SizedBox(height: 18),
         const _Heading('Your games'),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _Half(title: 'Live', tally: stats?.live, missing: stats != null && !stats.reached),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _Half(title: 'Alone', tally: stats?.alone),
-            ),
-          ],
-        ),
+        _Games(live: stats?.live, alone: stats?.alone, liveMissing: stats != null && !stats.reached),
       ],
     );
   }
@@ -483,70 +472,69 @@ class _Record extends StatelessWidget {
   static String _games(int n) => n == 1 ? 'one game' : '$n games';
 }
 
-/// One half of the game, in three lines. A player with no games in it
-/// gets the lines all the same, at nothing: an empty column says "not
+/// The two halves of the game side by side: what each line is, once,
+/// down the left, and a column of numbers for each half, right-aligned
+/// under its name so the figures line up. A half with no games in it
+/// gets its column all the same, at nothing: an empty column says "not
 /// yet" better than an absent one says anything.
-class _Half extends StatelessWidget {
-  const _Half({required this.title, required this.tally, this.missing = false});
+class _Games extends StatelessWidget {
+  const _Games({required this.live, required this.alone, this.liveMissing = false});
 
-  final String title;
-  final Tally? tally;
+  final Tally? live;
+  final Tally? alone;
 
-  /// The relays did not answer, so this half is unknown rather than
+  /// The relays did not answer, so the live half is unknown rather than
   /// empty.
-  final bool missing;
+  final bool liveMissing;
+
+  static const _column = 76.0;
+  static const _label = TextStyle(fontSize: 12.5, color: Palette.chromeDim);
+  static const _title = TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Palette.chrome);
+  static const _number = TextStyle(
+    fontSize: 14.5,
+    fontWeight: FontWeight.w600,
+    color: Palette.chrome,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
 
   @override
   Widget build(BuildContext context) {
-    final t = tally;
-    String value(String Function(Tally t) of) => t == null || missing ? '—' : of(t);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    String value(Tally? t, String Function(Tally t) of, {bool missing = false}) => t == null || missing ? '—' : of(t);
+    TableRow line(String label, String Function(Tally t) of) => TableRow(children: [
+          Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text(label, style: _label)),
+          Text(value(live, of, missing: liveMissing), textAlign: TextAlign.right, style: _number),
+          Text(value(alone, of), textAlign: TextAlign.right, style: _number),
+        ]);
+    return Table(
+      columnWidths: const {1: FixedColumnWidth(_column), 2: FixedColumnWidth(_column)},
+      defaultVerticalAlignment: TableCellVerticalAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Palette.chrome),
-        ),
-        const SizedBox(height: 8),
-        _Stat(label: 'played', value: value((t) => '${t.games}')),
-        _Stat(label: 'won', value: value((t) => '${t.won}')),
-        _Stat(label: 'average', value: value((t) => t.average?.round().toString() ?? '—')),
+        const TableRow(children: [
+          SizedBox.shrink(),
+          Padding(padding: EdgeInsets.only(bottom: 6), child: Text('Live', textAlign: TextAlign.right, style: _title)),
+          Padding(padding: EdgeInsets.only(bottom: 6), child: Text('Alone', textAlign: TextAlign.right, style: _title)),
+        ]),
+        line('played', (t) => '${t.games}'),
+        line('won', (t) => '${t.won}'),
+        line('average', (t) => t.average?.round().toString() ?? '—'),
         // Low is good: the best game is the one you came out of with
         // the fewest.
-        _Stat(label: 'best', value: value((t) => t.best?.toString() ?? '—')),
+        line('best', (t) => t.best?.toString() ?? '—'),
       ],
     );
   }
 }
 
-/// A number and what it is.
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Palette.chrome),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One thing to pick: a disc, ringed in gold when it is the choice.
+/// One thing to pick: a disc, ringed when it is the choice.
+///
+/// The ring is white, since which one you chose is what a thing is,
+/// not something to do (docs/05-form-factors.md); and it stands off the
+/// disc by a gap of felt, so it shows on every colour. It was gold and
+/// drawn on the disc's own edge, which on the amber disc was no ring at
+/// all.
 class _Choice extends StatelessWidget {
-  const _Choice({required this.label, required this.selected, required this.onTap, required this.color, this.child, this.size = 44});
+  const _Choice({required this.label, required this.selected, required this.onTap, required this.color, this.child, this.size = 50});
 
   final String label;
   final bool selected;
@@ -554,6 +542,9 @@ class _Choice extends StatelessWidget {
   final Color color;
   final Widget? child;
   final double size;
+
+  static const _ring = 2.0;
+  static const _gap = 2.0;
 
   @override
   Widget build(BuildContext context) {
@@ -568,14 +559,17 @@ class _Choice extends StatelessWidget {
           child: Container(
             width: size,
             height: size,
-            alignment: Alignment.center,
+            // Inside the ring, which the decoration's border takes
+            // its own width for.
+            padding: const EdgeInsets.all(_gap),
             decoration: BoxDecoration(
-              color: color,
               shape: BoxShape.circle,
-              border: Border.all(color: selected ? Palette.gold : Colors.transparent, width: 3),
-              boxShadow: selected ? [BoxShadow(color: Palette.gold.withValues(alpha: 0.5), blurRadius: 10)] : null,
+              border: Border.all(color: selected ? Palette.chrome : Colors.transparent, width: _ring),
             ),
-            child: child,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              child: Center(child: child),
+            ),
           ),
         ),
       ),
