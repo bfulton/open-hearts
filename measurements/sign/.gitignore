@@ -1,0 +1,4 @@
+main.dart.js
+main.dart.js.*
+wasm/target/
+schnorr.wasm

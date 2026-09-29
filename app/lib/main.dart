@@ -1,0 +1,101 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+
+import 'crypto/deal.dart';
+import 'crypto/schnorr.dart';
+import 'entitlement.dart';
+import 'home_page.dart';
+import 'identity.dart';
+import 'net/buying.dart';
+import 'net/duty.dart';
+import 'net/household.dart';
+import 'net/room.dart';
+import 'theme.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // The end-to-end suite drives the app through its accessibility
+  // tree, which the web build only grows on request.
+  if (Uri.base.queryParameters.containsKey('e2e')) {
+    SemanticsBinding.instance.ensureSemantics();
+  }
+  await installFastSchnorr();
+  await loadDeal();
+  // What this device may do, before the front door is drawn: read off
+  // the device, so a device that cannot reach us answers anyway, and
+  // asked of the service behind the first frame (docs/06-service.md).
+  final signer = await Identity.signer();
+  await Entitlement.current.load(signer.publicKey);
+  unawaited(Entitlement.current.refresh(signer));
+  runApp(const OpenHeartsApp());
+}
+
+/// The app, and the one thing the app as a whole has to say for
+/// itself: whether it is here.
+///
+/// A device that closes its tab or goes into the background is no use
+/// as a juror, and a table that has drawn it should not have to wait
+/// out a missed heartbeat to find that out — five seconds in which a
+/// hand's escrow rests on somebody who is gone
+/// (docs/04-live-play.md, "The sizing"). So say it, and say it again
+/// on the way back. Best effort by its nature: a crash, a killed tab
+/// or a dead link says nothing at all, which is why silence is still
+/// timed out.
+class OpenHeartsApp extends StatefulWidget {
+  const OpenHeartsApp({super.key});
+
+  @override
+  State<OpenHeartsApp> createState() => _OpenHeartsAppState();
+}
+
+class _OpenHeartsAppState extends State<OpenHeartsApp> {
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onStateChange: (state) {
+      switch (state) {
+        case AppLifecycleState.resumed:
+          Duty.back();
+        // Hidden is a tab switched away from or a phone's home button:
+        // timers throttle, sockets may go, and this device is not
+        // answering a summons until it is back. Detached is the page
+        // unloading, which is the case worth having most.
+        case AppLifecycleState.inactive:
+        case AppLifecycleState.hidden:
+        case AppLifecycleState.paused:
+        case AppLifecycleState.detached:
+          Duty.leaving();
+      }
+    },
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle;
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // What the address is asking for, read here rather than by the page
+    // it is asking: a room shared by a link, a code another device
+    // showed, a checkout coming back.
+    final room = Uri.base.queryParameters['room']?.trim().toUpperCase();
+    return MaterialApp(
+      title: 'Open Hearts',
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(),
+      home: HomePage(
+        openRoom: room != null && Room.validCode(room) ? room : null,
+        openClaim: claimInAddress(),
+        justBought: boughtJustNow(),
+      ),
+    );
+  }
+}

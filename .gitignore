@@ -1,0 +1,19 @@
+# Flutter / Dart
+app/build/
+app/.dart_tool/
+app/.flutter-plugins-dependencies
+build/
+.dart_tool/
+pubspec.lock
+*.iml
+
+# Rust (measurements)
+measurements/*/target/
+measurements/*/wasm/target/
+
+# Tooling
+node_modules/
+.wrangler/
+
+# OS
+.DS_Store

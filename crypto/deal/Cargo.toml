@@ -1,0 +1,42 @@
+[package]
+name = "deal"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "The verifiable deal (docs/03-fair-deal.md): Barnett–Smart mental poker with a Bayer–Groth shuffle argument, as flat byte functions for the app's wasm and the VM's FFI"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+barnett-smart-card-protocol = { git = "https://github.com/geometryxyz/mental-poker.git", rev = "b1313f3" }
+# The proof library and the curve, vendored (crypto/vendor) with one
+# fix: points in a transcript normalised, so proofs survive their bytes.
+proof-essentials = { path = "../vendor/proof-essentials" }
+starknet-curve = { path = "../vendor/starknet-curve" }
+ark-ec = "0.3.0"
+ark-ff = "0.3.0"
+ark-serialize = "0.3.0"
+ark-std = { version = "0.3.0", features = ["std"] }
+rand = "0.8"
+rand_chacha = "0.3"
+blake2 = { version = "0.9", default-features = false }
+
+# On wasm, rand still wants an entropy source. There is none to give it
+# and none is wanted: every random value comes in as a seed the caller
+# drew. A custom source that refuses keeps wasm-bindgen out and makes
+# any accidental use fail loudly.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+
+# The reference crate pins its sibling crates by ssh URL; give it the
+# vendored ones.
+[patch."ssh://git@github.com/geometryresearch/proof-toolbox.git"]
+proof-essentials = { path = "../vendor/proof-essentials" }
+starknet-curve = { path = "../vendor/starknet-curve" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

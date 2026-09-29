@@ -1,0 +1,260 @@
+/// Serving as a juror: the client any player's app runs in the
+/// background, and the one the service runs as juror of last resort.
+///
+/// A summons names a table and a hand. The duty opens a client on that
+/// table's tag — following, not seated — tells it which hand and which
+/// jury it was drawn into, and closes it once the table has moved past
+/// every hand it served. Several tables at once are several clients.
+library;
+
+import 'dart:async';
+
+import 'package:deal/deal.dart';
+
+import 'client.dart';
+import 'clock.dart';
+import 'presence_relay.dart';
+import 'relay_transport.dart';
+import 'signing.dart';
+import 'spec.dart';
+import 'transport.dart';
+
+class JurorDuty {
+  JurorDuty(
+      {required this.relays,
+      required this.signer,
+      required this.presence,
+      this.log,
+      Clock? clock,
+      this.silenceAfterMs = 120000,
+      this.pinned = 0,
+      this.dial,
+      this.crypto})
+      : clock = clock ?? WallClock();
+
+  /// The relays a summoned client follows a table on; every one of
+  /// them, whichever the table's peers write to (relays.dart).
+  final List<Uri> relays;
+  final Signer signer;
+  final RelayPresence presence;
+  final void Function(String line)? log;
+  final Clock clock;
+
+  /// The silence a juror's clients count as absence; the protocol's
+  /// two minutes, shorter in a test.
+  final int silenceAfterMs;
+
+  /// The deal's primitives, to serve at sealed tables.
+  final DealCrypto? crypto;
+
+  /// Relays at the front of [relays] kept primary — ours to run.
+  final int pinned;
+
+  /// How a juror talks to the table it is summoned to. The default is
+  /// the relay it was summoned over, which is all a juror had for a
+  /// long time — and the reason the table copied every event there
+  /// (docs/02-multiplayer.md gives the relay signalling and a fallback
+  /// lane, not the play). An app hands over a mesh instead: the relay
+  /// under it for signalling, and a data channel to each seat, so a
+  /// juror is dialled like anybody else at the table.
+  ///
+  /// The service's own jurors keep the relay, having no WebRTC in the
+  /// VM to dial with — which is what the fallback lane is for.
+  final Transport Function(TableSpec spec, RelayTransport relay)? dial;
+
+  final Map<String, ({TableClient client, Transport transport})> _tables = {};
+
+  /// How far each table's client had got when it was let go of.
+  final letGo = LetGo();
+  StreamSubscription<Summons>? _sub;
+  Timer? _sweep;
+
+  /// Tables this client is following as a juror.
+  int get serving => _tables.length;
+
+  /// The clients following, by table id, for a test to look at.
+  Map<String, TableClient> get clients => {for (final e in _tables.entries) e.key: e.value.client};
+
+  /// Verdicts given, over every table.
+  int verdicts = 0;
+
+  void start() {
+    _sub = presence.summonses.listen(_onSummons);
+    _sweep = Timer.periodic(const Duration(seconds: 10), (_) => _sweepTables());
+  }
+
+  void _onSummons(Summons s) {
+    var t = _tables[s.spec.id];
+    if (t == null && letGo.stale(s.spec.id, s.hand)) {
+      log?.call('summoned to ${s.spec.id} for hand ${s.hand}, which it had followed past: stale');
+      return;
+    }
+    if (t == null) {
+      final lane = RelayTransport(relays: relays, signer: signer, table: s.spec.id, log: log, pinned: pinned);
+      final transport = dial?.call(s.spec, lane) ?? lane;
+      if (s.spec.sealed && crypto == null) {
+        log?.call('duty: summoned to a sealed table without the deal\'s cryptography; cannot serve');
+        return;
+      }
+      final client =
+          TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, silenceAfterMs: silenceAfterMs, crypto: crypto);
+      client.log = log;
+      t = _tables[s.spec.id] = (client: client, transport: transport);
+      client.changes.listen((_) {
+        verdicts = _tables.values.fold(0, (n, t) => n + t.client.record.where((d) => d.verdict?.author == signer.publicKey).length);
+      });
+      client.start();
+      log?.call('summoned to ${s.spec.id} for hand ${s.hand} by ${s.from.substring(0, 6)}');
+    }
+    t.client.serveFor(s.hand, s.jurors, juryId: s.juryId, first: s.first, draws: s.draws);
+  }
+
+  void _sweepTables() {
+    for (final e in List.of(_tables.entries)) {
+      final c = e.value.client;
+      // A line every ten seconds per table followed: where the juror
+      // stands, for a log read after the fact.
+      log?.call('following ${e.key}: hand ${c.game.handNumber} ${c.game.phase.name} step ${c.step} pause ${c.pause?.name} '
+          'heartbeats ${c.heartbeatsSent} deferred ${c.deferred} serving ${c.serving}');
+      if (c.serving) continue;
+      log?.call('done with ${e.key}');
+      letGo.record(e.key, c.game.handNumber);
+      c.close();
+      e.value.transport.close();
+      _tables.remove(e.key);
+    }
+  }
+
+  void close() {
+    _sub?.cancel();
+    _sweep?.cancel();
+    for (final t in _tables.values) {
+      t.client.close();
+      t.transport.close();
+    }
+    _tables.clear();
+  }
+}
+
+/// The tables a juror has been let go of, and the hand each had
+/// reached by then.
+///
+/// A summons to a hand before that one is one a player sent from
+/// behind: catching up on a jury it missed, it summons that jury's
+/// jurors as if the hand were new. The client that could have served
+/// the hand is gone, with every secret it drew for it. One started on
+/// the summons would read the record from the first hand, find the
+/// hand's seat held by its key, and take it for its own — and a client
+/// holds nothing in a hand before its first summons, so no summons may
+/// be the first that names a hand an earlier client had reached
+/// ([TableClient.serveFor]).
+class LetGo {
+  final Map<String, int> _reached = {};
+
+  void record(String table, int reached) => _reached[table] = reached;
+
+  /// Whether a summons to [hand] of [table] names a hand a client here
+  /// had already followed past.
+  bool stale(String table, int hand) {
+    final r = _reached[table];
+    return r != null && hand < r;
+  }
+}
+
+/// A bench of them. A table whose bot seats are the jury's to hold
+/// needs [juryToHoldBots] jurors before it can hold any (jury.dart),
+/// and the call for a last resort comes exactly when there is nobody
+/// else to make that number up — so what answers is a bench rather
+/// than a juror, and a quiet night keeps the bots' hands hidden
+/// instead of handing them back to the table.
+///
+/// Each seat on the bench is its own identity, its own presence and
+/// its own duty, so the draw takes them as it takes anyone: one bot
+/// seat each, and none of them holding enough of the deck to subtract
+/// the rest. They are all ours, which is the bend doc 04 names — ours
+/// rather than another player's, and only when the room is empty.
+class LastResortBench {
+  LastResortBench({
+    required List<Signer> signers,
+    required List<Uri> relays,
+    void Function(String line)? log,
+    int idleMs = 10 * 60 * 1000,
+    int silenceAfterMs = 120000,
+    DealCrypto? crypto,
+  }) : jurors = [
+          for (final s in signers)
+            LastResortJuror(relays: relays, signer: s, log: log, idleMs: idleMs, silenceAfterMs: silenceAfterMs, crypto: crypto),
+        ];
+
+  final List<LastResortJuror> jurors;
+
+  /// Whether any of the bench is up.
+  bool get online => jurors.any((j) => j.online);
+
+  void start() {
+    for (final j in jurors) {
+      j.start();
+    }
+  }
+
+  void close() {
+    for (final j in jurors) {
+      j.close();
+    }
+  }
+}
+
+/// The juror of last resort (docs/04-live-play.md): quiet until a
+/// table says it has nobody to draw from, then online — the same code
+/// every other juror runs — and quiet again once it has been idle for
+/// a while.
+class LastResortJuror {
+  LastResortJuror(
+      {required this.relays, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int silenceAfterMs = 120000, DealCrypto? crypto}) {
+    presence = RelayPresence(relays: relays, signer: signer, status: 'last-resort', log: log)..silent = true;
+    duty = JurorDuty(relays: relays, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs, crypto: crypto);
+  }
+
+  final List<Uri> relays;
+  final Signer signer;
+  final void Function(String line)? log;
+
+  /// How long to stay online after the last call with nothing to serve.
+  final int idleMs;
+
+  late final RelayPresence presence;
+  late final JurorDuty duty;
+  StreamSubscription<String>? _calls;
+  Timer? _idle;
+  int _calledAt = 0;
+  bool online = false;
+
+  void start() {
+    duty.start();
+    _calls = presence.calls.listen(_onCall);
+    _idle = Timer.periodic(const Duration(seconds: 30), (_) => _checkIdle());
+  }
+
+  void _onCall(String table) {
+    _calledAt = DateTime.now().millisecondsSinceEpoch;
+    if (online) return;
+    online = true;
+    presence.silent = false;
+    log?.call('called for by $table; online');
+  }
+
+  void _checkIdle() {
+    if (!online || duty.serving > 0) return;
+    if (DateTime.now().millisecondsSinceEpoch - _calledAt < idleMs) return;
+    online = false;
+    presence.silent = true;
+    log?.call('idle; quiet again');
+  }
+
+  void close() {
+    _calls?.cancel();
+    _idle?.cancel();
+    duty.close();
+    presence.close();
+  }
+}

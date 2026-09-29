@@ -1,0 +1,23 @@
+name: service
+description: The service — for now the local NIP-01 relay the table clients meet on; handlers, juror and storage adapters to come.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  # For minting the service's signing pair (bin/service_key.dart): the
+  # only place here that needs a public key derived from a secret.
+  bip340: ^0.3.1
+  web_socket_channel: ^3.0.3
+  table:
+    path: ../packages/table
+  deal:
+    path: ../packages/deal
+  engine:
+    path: ../packages/engine
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0
