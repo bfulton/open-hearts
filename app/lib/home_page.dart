@@ -690,10 +690,12 @@ class _HomePageState extends State<HomePage> {
         MenuButton(
           height: _chromeHeight,
           menu: [
-            // Reachable whether live play is open here or not: shut, the
-            // door itself says what it costs; open, this is where the
-            // date on the licence is.
-            MenuAction('Live play', icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
+            // Once live play is open here, this is where the date on the
+            // licence is. Shut, the door itself says what it costs and has
+            // the way to it, and the menu saying it again was a second way
+            // to the one page.
+            if (liveOpen)
+              MenuAction('Live play', icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
             MenuAction('About', icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
           ],
         ),
@@ -821,6 +823,16 @@ class _HomePageState extends State<HomePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       );
 
+  /// A way on that is not the door's own: gold, since it is something
+  /// you can do, but drawn rather than filled, so that a screen has one
+  /// thing it is for.
+  static ButtonStyle _secondary() => OutlinedButton.styleFrom(
+        foregroundColor: Palette.gold,
+        side: const BorderSide(color: Palette.gold, width: 1.4),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      );
+
 }
 
 /// The two ways into a live game, while one of them is being opened.
@@ -904,12 +916,11 @@ class _PlayLive extends StatelessWidget {
   }
 }
 
-/// Live play before it is opened: what is behind the lock, and that it
-/// is not open yet. Nothing here asks for money — that is for the day
-/// [liveOpen] answers something other than yes.
 /// Live play, not open here. The padlock is not the point: what live
-/// play is and what it costs is, and the way to it is one gold button
-/// like every other way into a game.
+/// play is and what it costs is, and the way to it — gold, like every
+/// way on, but drawn rather than filled: Play solo is what the door is
+/// for, and two filled buttons of one gold on one screen asked the eye
+/// to choose before it had read either.
 class _LiveLocked extends StatelessWidget {
   const _LiveLocked({required this.onTap});
 
@@ -942,9 +953,9 @@ class _LiveLocked extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: Palette.chromeDim),
           ),
           const SizedBox(height: 12),
-          FilledButton(
+          OutlinedButton(
             onPressed: onTap,
-            style: _HomePageState._primary(),
+            style: _HomePageState._secondary(),
             child: const Text('Subscribe', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
           ),
           const SizedBox(height: 6),

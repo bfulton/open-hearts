@@ -301,6 +301,16 @@ void main() {
     expect(find.text('Subscribe'), findsOneWidget);
   });
 
+  testWidgets('shut, the door has the one way to live play, and the menu does not say it again', (tester) async {
+    await pumpHome(tester, live: false);
+    expect(find.widgetWithText(OutlinedButton, 'Subscribe'), findsOneWidget, reason: 'drawn, not filled: Play solo is the door\'s');
+    expect(find.widgetWithText(FilledButton, 'Play solo'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(find.text('About'), findsOneWidget);
+    expect(find.text('Live play'), findsOneWidget, reason: 'the card on the door, and not a second one in the menu');
+  });
+
   testWidgets('with live play open the menu is where the date on the licence is', (tester) async {
     await pumpHome(tester);
     expect(find.text('Play live'), findsOneWidget);

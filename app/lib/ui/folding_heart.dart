@@ -47,6 +47,12 @@ class FoldingHeart extends StatefulWidget {
   static const every = Duration(seconds: 20);
   static const turn = Duration(seconds: 9);
 
+  /// How long a door just opened shows the heart whole before its first
+  /// turn. It used to fold away the moment the door opened, so the first
+  /// thing anybody saw of the mark was it leaving; a heart has to be
+  /// seen as one before its folding reads as a flourish.
+  static const first = Duration(seconds: 3);
+
   /// Held at this point of the turn rather than turning, for a still
   /// picture of it — a screenshot, or a test reading one frame.
   final double? at;
@@ -108,7 +114,10 @@ class _FoldingHeartState extends State<FoldingHeart> with SingleTickerProviderSt
       _resting = null;
       _folding.stop();
     } else if (!_folding.isAnimating && _resting == null) {
-      _folding.forward(from: 0);
+      _resting = Timer(widget.period < FoldingHeart.first ? widget.period : FoldingHeart.first, () {
+        _resting = null;
+        if (mounted && !_held) _folding.forward(from: 0);
+      });
     }
   }
 

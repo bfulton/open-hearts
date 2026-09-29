@@ -57,6 +57,12 @@ void main() {
       ),
     );
     expect(turnAt(tester), 0, reason: 'whole, to begin with');
+    // And still, for a beat: seen as a heart before it folds.
+    await tester.pump(FoldingHeart.first - const Duration(milliseconds: 100));
+    expect(turnAt(tester), 0, reason: 'still whole a moment before its first turn');
+    expect(tester.binding.hasScheduledFrame, isFalse, reason: 'and asking for nothing while it waits');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(frame);
 
     await tester.pump(FoldingHeart.turn ~/ 2);
     expect(turnAt(tester), closeTo(0.5, 0.02), reason: 'shut, half way through the turn');
