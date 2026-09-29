@@ -78,13 +78,13 @@ void main() {
       final bus = Bus();
       final signers = [FakeSigner('a'), FakeSigner('b')];
       int now() => async.elapsed.inMilliseconds;
-      final a = Room(channel: bus.attach(signers[0]), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final a = Room(canDeal: true, channel: bus.attach(signers[0]), code: 'ROOM', myName: 'Ada', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(a.members.map((m) => m.name), ['Ada']);
       expect(a.amLeader, isTrue, reason: 'alone, you lead');
       expect(a.secondsToStart, isNull);
 
-      final b = Room(channel: bus.attach(signers[1]), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final b = Room(canDeal: true, channel: bus.attach(signers[1]), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(a.members.map((m) => m.name), ['Ada', 'Bao'], reason: 'arrival order');
       expect(b.members.map((m) => m.name), ['Ada', 'Bao']);
@@ -117,12 +117,12 @@ void main() {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
       async.elapse(const Duration(seconds: 3));
       expect(rooms.every((r) => r.spec != null), isTrue, reason: 'four is a table');
       expect(rooms.every((r) => r.seated), isTrue);
       expect(rooms.first.spec!.seats.whereType<BotSeat>(), isEmpty);
-      final late = Room(channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
+      final late = Room(canDeal: true, channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(late.spec, isNotNull, reason: 'the start is on the relay');
       expect(late.seated, isFalse);
@@ -141,11 +141,11 @@ void main() {
       // the front door and sitting in a room that will never fill.
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
       async.elapse(const Duration(seconds: 3));
       expect(rooms.every((r) => r.seated), isTrue);
 
-      final late = Room(channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
+      final late = Room(canDeal: true, channel: bus.attach(FakeSigner('Eve')), code: 'ROOM', myName: 'Eve', nowMs: now);
       expect(late.spec, isNotNull, reason: 'decided in the constructor, before anyone listens');
       var told = 0;
       late.addListener(() => told++);
@@ -166,7 +166,7 @@ void main() {
       // starts the table has a say, and everyone plays that game.
       final rooms = [
         for (final n in ['Ada', 'Bao'])
-          Room(channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, target: n == 'Ada' ? 100 : 50, nowMs: now)
+          Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, target: n == 'Ada' ? 100 : 50, nowMs: now)
       ];
       async.elapse(const Duration(seconds: 14));
       final leader = rooms.firstWhere((r) => r.amLeader);
@@ -189,7 +189,7 @@ void main() {
       fakeAsync((async) {
         final bus = Bus();
         int now() => async.elapsed.inMilliseconds;
-        final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(channel: bus.attach(FakeSigner(n)), code: code, myName: n, nowMs: now)];
+        final rooms = [for (final n in ['Ada', 'Bao', 'Cara', 'Dee']) Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: code, myName: n, nowMs: now)];
         async.elapse(const Duration(seconds: 3));
         final spec = rooms.first.spec!;
         expect(spec.seats.whereType<HumanSeat>(), hasLength(4), reason: 'everyone is seated');
@@ -211,12 +211,12 @@ void main() {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final a = Room(channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       a.start();
       async.elapse(const Duration(seconds: 1));
       expect(a.spec, isNull, reason: 'alone');
-      final b = Room(channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       final follower = a.amLeader ? b : a;
       final leader = a.amLeader ? a : b;
@@ -236,8 +236,8 @@ void main() {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final a = Room(channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
-      final b = Room(channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       final leader = a.amLeader ? a : b;
       final other = a.amLeader ? b : a;
@@ -251,7 +251,7 @@ void main() {
       expect(other.amLeader, isTrue);
       expect(other.spec, isNull, reason: 'alone again, nothing starts');
       // A third arrives: the countdown runs from them.
-      final c = Room(channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      final c = Room(canDeal: true, channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(other.members.map((m) => m.name).toSet(), {other.myName, 'Cara'});
       async.elapse(const Duration(seconds: 9));
@@ -267,7 +267,7 @@ void main() {
     fakeAsync((async) {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
-      final three = [for (final n in ['Ada', 'Bao', 'Cara']) Room(channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
+      final three = [for (final n in ['Ada', 'Bao', 'Cara']) Room(canDeal: true, channel: bus.attach(FakeSigner(n)), code: 'ROOM', myName: n, nowMs: now)];
       async.elapse(const Duration(seconds: 3));
       expect(three.every((r) => r.spec == null), isTrue, reason: 'three is not a table on its own');
 
@@ -276,7 +276,7 @@ void main() {
       // room four — which starts the table at once, from a device
       // whose beat has not come round again. Waiting for that beat is
       // waiting for a room everyone else has just left.
-      final last = Room(channel: bus.attach(FakeSigner('Dee')), code: 'ROOM', myName: 'Dee', nowMs: now);
+      final last = Room(canDeal: true, channel: bus.attach(FakeSigner('Dee')), code: 'ROOM', myName: 'Dee', nowMs: now);
       async.elapse(const Duration(seconds: 12));
 
       expect(three.every((r) => r.seated), isTrue, reason: 'the three are at it');
@@ -298,10 +298,10 @@ void main() {
       // any beat of the sender's has come round again.
       final bus = Bus();
       final ada = FakeSigner('a');
-      final b = Room(channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus.publish(NostrEvent.sign(ada, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': ada.publicKey, 'name': 'Ada'}, {'key': b.me, 'name': 'Bao'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -316,10 +316,10 @@ void main() {
       // least here, and dropped when none comes.
       final bus2 = Bus();
       final ghost = FakeSigner('ghost');
-      final c = Room(channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      final c = Room(canDeal: true, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': c.me, 'name': 'Cara'}, {'bot': 'Han'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -332,10 +332,10 @@ void main() {
       c.dispose();
 
       final bus3 = Bus();
-      final d = Room(channel: bus3.attach(FakeSigner('d')), code: 'ROOM', myName: 'Dee', nowMs: now);
+      final d = Room(canDeal: true, channel: bus3.attach(FakeSigner('d')), code: 'ROOM', myName: 'Dee', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus3.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': d.me, 'name': 'Dee'}, {'bot': 'Han'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -352,10 +352,10 @@ void main() {
       final bus4 = Bus();
       final before = now();
       async.elapse(const Duration(seconds: 6));
-      final e = Room(channel: bus4.attach(FakeSigner('e')), code: 'ROOM', myName: 'Eve', nowMs: now);
+      final e = Room(canDeal: true, channel: bus4.attach(FakeSigner('e')), code: 'ROOM', myName: 'Eve', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus4.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': before,
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': before,
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': e.me, 'name': 'Eve'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -371,14 +371,14 @@ void main() {
       final bus = Bus();
       int now() => async.elapsed.inMilliseconds;
       final picture = Uint8List.fromList(List.generate(200, (i) => (i * 7) % 256));
-      final a = Room(channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', myAvatar: Avatar(icon: 'rocket', color: 3, picture: picture), nowMs: now);
-      final b = Room(channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', myAvatar: const Avatar(icon: 'cake'), nowMs: now);
+      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', myAvatar: Avatar(icon: 'rocket', color: 3, picture: picture), nowMs: now);
+      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', myAvatar: const Avatar(icon: 'cake'), nowMs: now);
       async.elapse(const Duration(seconds: 3));
       final adaAtB = b.members.firstWhere((m) => m.name == 'Ada');
       expect(adaAtB.avatar, Avatar(icon: 'rocket', color: 3, picture: picture), reason: 'icon, colour and picture');
       expect(a.members.firstWhere((m) => m.name == 'Bao').avatar, const Avatar(icon: 'cake'));
       // A third arrives after the picture went by: the relay kept it.
-      final c = Room(channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      final c = Room(canDeal: true, channel: bus.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       async.elapse(const Duration(seconds: 3));
       expect(c.members.firstWhere((m) => m.name == 'Ada').avatar.picture, picture);
       async.elapse(const Duration(seconds: 10));
@@ -393,6 +393,87 @@ void main() {
     });
   });
 
+  test('every table a room starts is sealed, and a start that is not is not sat at', () {
+    fakeAsync((async) {
+      int now() => async.elapsed.inMilliseconds;
+
+      // Two rooms that can deal: the start the leader makes says so.
+      final bus = Bus();
+      final said = <Map<String, Object?>>[];
+      bus.attach(FakeSigner('watcher')).lobby.listen((e) {
+        final c = Map<String, Object?>.from(jsonDecode(e.content) as Map);
+        if (c['kind'] == 'start') said.add(c);
+      });
+      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      async.elapse(const Duration(seconds: 12));
+      expect(said, isNotEmpty, reason: 'the leader started the table');
+      expect(said.every((c) => c['sealed'] == true), isTrue, reason: 'every live table is sealed');
+      expect(a.spec!.sealed, isTrue);
+      a.dispose();
+      b.dispose();
+
+      // An unsealed start that seats this device — an older build's, or
+      // one that could not run the deal and started anyway — is not
+      // sat at: its cards could be read by anyone at the table.
+      final bus2 = Bus();
+      final ghost = FakeSigner('ghost');
+      final c = Room(canDeal: true, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      bus2.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
+      async.elapse(const Duration(seconds: 1));
+      bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
+        'seats': [
+          {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': c.me, 'name': 'Cara'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
+        ],
+      }), tags: const [['t', 'ROOM']]), ephemeral: false);
+      async.elapse(const Duration(seconds: 1));
+      expect(c.spec, isNull, reason: 'not a table this device sits at');
+      expect(c.refusal, isNotNull, reason: 'and it says why');
+      c.dispose();
+    });
+  });
+
+  test('a device that cannot run the deal sits at no table, starts none, and says so', () {
+    fakeAsync((async) {
+      int now() => async.elapsed.inMilliseconds;
+      final bus = Bus();
+      final said = <Map<String, Object?>>[];
+      bus.attach(FakeSigner('watcher')).lobby.listen((e) {
+        final c = Map<String, Object?>.from(jsonDecode(e.content) as Map);
+        if (c['kind'] == 'start') said.add(c);
+      });
+      // The lowest key leads, so a device that cannot deal is given the
+      // lead here: it is the one that would have started the table.
+      final signers = [FakeSigner('0'), FakeSigner('1')]..sort((x, y) => x.publicKey.compareTo(y.publicKey));
+      final lead = Room(canDeal: false, channel: bus.attach(signers[0]), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final other = Room(canDeal: true, channel: bus.attach(signers[1]), code: 'ROOM', myName: 'Bao', nowMs: now);
+      async.elapse(const Duration(seconds: 12));
+      expect(lead.refusal, Room.noDeal, reason: 'said before any start');
+      expect(said.where((c) => (c['seats'] as List).any((s) => (s as Map)['key'] == lead.me)), isEmpty,
+          reason: 'and it started no table for itself to sit at');
+      lead.dispose();
+
+      // Handed a sealed start that seats it, it still does not sit.
+      final ghost = FakeSigner('ghost');
+      final bus2 = Bus();
+      final c = Room(canDeal: false, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
+      bus2.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
+      async.elapse(const Duration(seconds: 1));
+      bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        'seats': [
+          {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': c.me, 'name': 'Cara'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
+        ],
+      }), tags: const [['t', 'ROOM']]), ephemeral: false);
+      async.elapse(const Duration(seconds: 1));
+      expect(c.spec, isNull);
+      expect(c.refusal, Room.noDeal);
+      c.dispose();
+      other.dispose();
+    });
+  });
+
   test('a start from long ago, or from nobody here, is not a table', () {
     fakeAsync((async) {
       final bus = Bus();
@@ -401,18 +482,18 @@ void main() {
       // The relay still holds the start of a game under this code an
       // hour ago, by someone who is not here.
       bus.stored.add(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now() - 3600000,
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now() - 3600000,
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'bot': 'Westley'}, {'bot': 'Romeo'}, {'bot': 'Juliet'},
         ],
       }), tags: const [['t', 'ROOM']]));
-      final a = Room(channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
+      final a = Room(canDeal: true, channel: bus.attach(FakeSigner('a')), code: 'ROOM', myName: 'Ada', nowMs: now);
       async.elapse(const Duration(seconds: 2));
       expect(a.spec, isNull);
       expect(a.members.length, 1);
       // And a recent one from someone not present: still not a table.
       bus.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
+        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': a.me, 'name': 'Ada'}, {'bot': 'Westley'}, {'bot': 'Romeo'}, {'bot': 'Juliet'},
         ],

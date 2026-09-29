@@ -347,7 +347,11 @@ human at the table publishes the same result — the table, the seats,
 the totals, who was there from the deal and who left — signed with
 their key, on the relay under one tag (`results.dart`). A table's
 result stands when a majority of the humans who sat down published the
-same one; a stranger's word counts for nothing. Anyone can fold every
+same one; a stranger's word counts for nothing. At a table of two that
+is both of them, so each device waits for a relay to say it has its
+copy, and tries again on a fresh connection when none has — it used to
+send the result and close a moment later, whatever the relays said.
+Anyone can fold every
 standing result, oldest first, into every rating; the app does so when
 it reaches the relays, shows the player theirs in the live area of the
 front door, and states it when waiting to be seated. At the end of a

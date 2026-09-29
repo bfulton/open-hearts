@@ -149,6 +149,47 @@ void main() {
     tb.close();
   });
 
+  test('what must not go nowhere quietly is waited on: taken, refused everywhere, or nowhere to go', () async {
+    final a = SchnorrSigner.generate();
+    final relays = [r1.url, r2.url];
+    final ta = RelayTransport(relays: relays, signer: a, table: 'taken', refusalMs: 5000);
+    await ta.allReady.timeout(const Duration(seconds: 5));
+
+    // One relay refusing and one taking: taken — and stored, so a
+    // reader who comes later finds it.
+    r1.refuse = (_) => 'rate-limited: slow down';
+    expect(await ta.announceTaken({'n': 1}), isTrue);
+    final later = RelayTransport(relays: [r2.url], signer: SchnorrSigner.generate(), table: 'taken');
+    await later.allReady.timeout(const Duration(seconds: 5));
+    expect([for (final e in later.lobbySoFar) jsonDecode(e.content)], contains(equals({'n': 1})));
+    later.close();
+
+    // Every relay refusing: not taken, and said as soon as the last
+    // refusal is in rather than when the wait runs out.
+    r2.refuse = (_) => 'rate-limited: slow down';
+    final clock = Stopwatch()..start();
+    expect(await ta.announceTaken({'n': 2}, within: const Duration(seconds: 8)), isFalse);
+    expect(clock.elapsed, lessThan(const Duration(seconds: 4)));
+    ta.close();
+
+    // Every relay gone: nowhere to go, and said at once.
+    r1.refuse = null;
+    r2.refuse = null;
+    final tb = RelayTransport(relays: relays, signer: a, table: 'taken');
+    await tb.allReady.timeout(const Duration(seconds: 5));
+    await r1.close();
+    await r2.close();
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    clock.reset();
+    expect(await tb.announceTaken({'n': 3}, within: const Duration(seconds: 8)), isFalse);
+    expect(clock.elapsed, lessThan(const Duration(seconds: 4)));
+
+    // And closing with an answer still owed gives it: not taken.
+    final owed = tb.announceTaken({'n': 4}, within: const Duration(seconds: 30));
+    tb.close();
+    expect(await owed.timeout(const Duration(seconds: 2)), isFalse);
+  });
+
   test('presence over two relays: everyone sees everyone', () async {
     final a = SchnorrSigner.generate();
     final b = SchnorrSigner.generate();

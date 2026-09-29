@@ -219,6 +219,9 @@ class RelayGroup {
   /// have refused so far: a flood has no next relay to move on to, so
   /// this is how the group still learns that nobody would take it.
   final Map<String, ({Set<Uri> targets, Set<Uri> refused})> _flooded = {};
+
+  /// Waiting to hear whether an event was taken: see [taken].
+  final Map<String, Completer<bool>> _taking = {};
   final _refusals = StreamController<String?>.broadcast();
   String? _refusal;
   Timer? _sweeper;
@@ -234,6 +237,21 @@ class RelayGroup {
 
   /// [refusal] as it changes.
   Stream<String?> get refusals => _refusals.stream;
+
+  /// Whether a relay takes the event [id]: true once one stores it, or
+  /// says it had it already; false once every relay it went to has
+  /// refused it, or none was up to take it, or [within] runs out first.
+  /// Asked before the event is published, so no answer can arrive
+  /// before anybody is listening for it.
+  Future<bool> taken(String id, {required Duration within}) {
+    final waiting = _taking.putIfAbsent(id, Completer<bool>.new);
+    return waiting.future.timeout(within, onTimeout: () {
+      _taking.remove(id);
+      return false;
+    });
+  }
+
+  void _answer(String id, bool taken) => _taking.remove(id)?.complete(taken);
 
   /// Writes [e] to the first relay in order that is up and has not
   /// refused this client lately; a refusal moves it on to the next.
@@ -257,7 +275,11 @@ class RelayGroup {
           c.publish(e);
         }
       }
-      if (targets.isNotEmpty) _flooded[e.id] = (targets: targets, refused: <Uri>{});
+      if (targets.isNotEmpty) {
+        _flooded[e.id] = (targets: targets, refused: <Uri>{});
+      } else {
+        _answer(e.id, false);
+      }
       return;
     }
     if (readBy == null) return _send(e, const {}, null);
@@ -280,6 +302,7 @@ class RelayGroup {
     // the protocol repeats what matters, and while a refusal lasts a
     // write would only be refused again. Refused everywhere just now
     // is worth saying; refused earlier is already said.
+    _answer(e.id, false);
     if (lastReason != null) _setRefusal(lastReason);
   }
 
@@ -310,6 +333,7 @@ class RelayGroup {
         if (taken) {
           _refusedUntil.remove(from.url);
           _flooded.remove(id);
+          _answer(id, true);
           _setRefusal(null);
           return;
         }
@@ -323,6 +347,7 @@ class RelayGroup {
           flood.refused.add(from.url);
           if (flood.refused.containsAll(flood.targets)) {
             _flooded.remove(id);
+            _answer(id, false);
             _setRefusal(reason);
           }
           return;
@@ -353,6 +378,10 @@ class RelayGroup {
   void close() {
     _closed = true;
     _sweeper?.cancel();
+    for (final waiting in _taking.values) {
+      waiting.complete(false);
+    }
+    _taking.clear();
     for (final c in connections) {
       c.close();
     }

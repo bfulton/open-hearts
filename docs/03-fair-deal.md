@@ -189,6 +189,13 @@ The deal is built — `crypto/deal` and `crypto/vendor`, `packages/deal`,
 and "the deal" section of `packages/table/lib/src/client.dart` — and
 every live table is sealed: the room's start event and the matchmaking
 offer say so, and a build that cannot run the deal does not sit down.
+It says so at the door and opens no room and joins no pool, and a
+device that can refuses any start that is not sealed. (It used to be
+otherwise, found in review: a device whose deal had not loaded started
+its room unsealed, and the others sat down at it.) The web build ships
+the deal as wasm beside the page; the phone and desktop builds do not
+bundle the native library yet — it is found beside the repository's
+own build — so until they do, they play alone.
 
 - **The primitives** are the reference crate measured above —
   Barnett–Smart with the Bayer–Groth argument on the Starknet curve,

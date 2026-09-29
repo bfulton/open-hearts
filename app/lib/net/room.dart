@@ -88,8 +88,10 @@ class Room extends ChangeNotifier {
     this.startAfterMs = 10000,
     int Function()? nowMs,
     Random? random,
+    bool? canDeal,
   })  : _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch),
-        seed = (random ?? Random.secure()).nextInt(1 << 31) {
+        seed = (random ?? Random.secure()).nextInt(1 << 31),
+        canDeal = canDeal ?? dealCrypto != null {
     since = _nowMs();
     for (final e in List.of(channel.lobbySoFar)) {
       _onLobby(e);
@@ -180,9 +182,16 @@ class Room extends ChangeNotifier {
   final int seed;
 
   /// Why this device will not sit at the table, if so: the leader's
-  /// bots play by a different version of the policy, or this browser
+  /// bots play by a different version of the policy, or this device
   /// cannot run the deal.
   String? refusal;
+
+  /// Whether this device can run the deal: whether it loaded
+  /// (crypto/deal.dart), unless a test says. Every live table is
+  /// sealed, and a device that cannot run the deal does not sit down
+  /// (docs/03-fair-deal.md, "As built") — nor start one, nor sit at a
+  /// start that is not sealed.
+  final bool canDeal;
 
   final Map<PublicKey, _Present> _others = {};
 
@@ -279,7 +288,10 @@ class Room extends ChangeNotifier {
     // the start, not at it.
     final lead = _others[leader];
     if (lead != null && lead.policy != botPolicyVersion) refusal = _mismatch;
-    if (amLeader && !_started) {
+    // Said before it is anyone's start rather than at one: the door
+    // takes this device out of the room, and whoever is left leads.
+    if (!canDeal) refusal = noDeal;
+    if (amLeader && !_started && canDeal) {
       final n = members.length;
       if (n >= seatCount || (n >= 2 && now - _lastArrival >= startAfterMs)) start();
     }
@@ -385,14 +397,20 @@ class Room extends ChangeNotifier {
       'seed': seed,
       'seats': seats,
       'policy': botPolicyVersion,
-      'sealed': dealCrypto != null,
+      // Every live table is sealed (docs/03-fair-deal.md).
+      'sealed': true,
       'target': target,
       'at': _nowMs(),
     });
   }
 
   static const _mismatch = "Someone's app is on another build than yours — one of you is older. Update, and try again.";
-  static const _noDeal = "This browser can't run the deal that keeps the cards honest. Try a current Chrome, Firefox or Safari.";
+
+  /// What a device that cannot run the deal is told, wherever it tries
+  /// to sit at a live table.
+  static String get noDeal => kIsWeb
+      ? "This browser can't run the deal that keeps the cards honest. Try a current Chrome, Firefox or Safari."
+      : "This build can't run the deal that keeps the cards honest, so it can't sit at a live table.";
 
   void _applyStart(Map<String, Object?> c) {
     final seed = c['seed'] as int;
@@ -427,9 +445,17 @@ class Room extends ChangeNotifier {
       refusal = _mismatch;
       return;
     }
-    final sealed = c['sealed'] == true;
-    if (mine && sealed && dealCrypto == null) {
-      refusal = _noDeal;
+    // Every live table is sealed: a start that is not was made by
+    // another build, or by one that could not run the deal and sat
+    // down anyway — and sitting at it would be dealt cards anyone at
+    // the table could read. One this device cannot deal it cannot sit
+    // at either.
+    if (mine && c['sealed'] != true) {
+      refusal = _mismatch;
+      return;
+    }
+    if (mine && !canDeal) {
+      refusal = noDeal;
       return;
     }
     // The table's own id, not the code: a code is reused, and two
@@ -439,7 +465,7 @@ class Room extends ChangeNotifier {
       id: '$code-${seed.toRadixString(36)}-${(c['at'] as int).toRadixString(36)}',
       seed: seed,
       seats: seats,
-      sealed: sealed,
+      sealed: c['sealed'] == true,
       // The leader's game, not this device's: a start event from a
       // build that had no say says fifty.
       target: c['target'] as int? ?? gameOverScore,

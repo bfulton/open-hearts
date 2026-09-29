@@ -20,12 +20,13 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
 
   <!-- Without this a phone browser lays the page out at its default
-       980 points and scales it down to fit, which is desktop mode: the
-       table comes out small, and the page can be pinched and panned,
-       which moves what you see away from where the app thinks you
-       touched. The app is a canvas that does its own scaling, so it
-       asks for the device's own width and no zoom of the browser's. -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+       980 points and scales it down to fit, which is desktop mode, and
+       the page comes up small while the app loads. Once it is running,
+       Flutter replaces this tag with its own — the same, with zoom up
+       to five times allowed, because a page that cannot be zoomed
+       fails the people who need it to be (WCAG 1.4.4). This one says
+       what that one will, so nothing changes when it is swapped. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <meta name="description" content="Open source, no ads. Play alone or live.">
 
   <!-- iOS meta tags & icons -->

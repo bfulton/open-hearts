@@ -152,7 +152,9 @@ rigged. Roughly in order:
    sign-in, so a lost phone is recovered by signing in, is built on the
    service's side and waits on a Google client id and an Apple service
    id for the app's.
-9. **The stores.**
+9. **The stores.** And with them the deal's native library bundled
+   into the phone builds, as the web build ships its wasm: every live
+   table is sealed, so a build without it plays alone.
 
 ### Backlog
 
@@ -193,12 +195,20 @@ node --test service/do/*.test.mjs   # that relay's own tests, and the sockets un
 node --test service/functions/*.test.mjs  # the site's handlers: TURN, licences, the shop
 cd app && flutter test              # the widgets
 cd app && flutter run -d chrome
+cd app && flutter build apk --release  # needs app/android/key.properties (below)
 
 ./e2e/build.sh                      # the app as the suites drive it
 node e2e/flows.mjs                  # every flow one device can drive, in a browser
 node e2e/run.mjs                    # four browsers at one table, over the local relay
 node e2e/escrow.mjs                 # a bot seat's juror goes, and the escrow opens the seat
 ```
+
+An Android release is signed with the release key named in
+`app/android/key.properties` — `storeFile`, `storePassword`,
+`keyAlias`, `keyPassword` — which is never checked in and is written
+from the store's secrets wherever a release is built. Without it a
+release build stops and says so rather than signing with the debug
+key; a debug build needs none.
 
 The deal ([doc 03](docs/03-fair-deal.md)) is one Rust crate built
 twice by `crypto/deal/build.sh`: a cdylib the Dart VM loads over FFI —

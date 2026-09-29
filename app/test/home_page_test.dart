@@ -9,8 +9,10 @@ library;
 
 import 'dart:async';
 
+import 'package:deal/deal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/crypto/deal.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
@@ -72,6 +74,10 @@ Widget still(Widget home) => MaterialApp(
     );
 
 void main() {
+  // A device that can run the deal, as every device that plays live
+  // is: the one that cannot is a test of its own (below).
+  setUpAll(() async => dealCrypto = await DealCrypto.load());
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     // Every test stands up a service of its own, and takes it down
@@ -248,6 +254,22 @@ void main() {
     expect(find.text('Share the link'), findsNothing, reason: 'the link did not open a room either');
     expect(find.text(r'$2.99 a year'), findsOneWidget, reason: 'what it costs, said on the door');
     expect(find.text('Subscribe'), findsOneWidget);
+  });
+
+  testWidgets('a device that cannot run the deal is told so at the door, and opens no table', (tester) async {
+    final kept = dealCrypto;
+    dealCrypto = null;
+    addTearDown(() => dealCrypto = kept);
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
+    await pumpHome(tester);
+    for (final way in ['Play friends', 'Play live']) {
+      await tester.tap(find.text(way));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text(Room.noDeal), findsOneWidget, reason: '$way: every live table is sealed');
+      expect(find.byType(CircularProgressIndicator), findsNothing, reason: '$way: and nothing is being opened');
+      expect(find.text('Share the link'), findsNothing, reason: '$way: no room either');
+    }
   });
 
   testWidgets('a licence run out is no licence, and one for another device is none either', (tester) async {

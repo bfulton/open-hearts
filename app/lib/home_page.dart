@@ -398,11 +398,22 @@ class _HomePageState extends State<HomePage> {
 
 
 
+  /// Every live table is sealed, and a device that cannot run the deal
+  /// does not sit down (docs/03-fair-deal.md, "As built"). It says so
+  /// here, at the door, rather than connecting to find out; true when
+  /// it has.
+  bool _withoutDeal() {
+    if (dealCrypto != null) return false;
+    setState(() => _error = Room.noDeal);
+    return true;
+  }
+
   /// Into the pool the options ask for, and wait to be seated — by
   /// whoever among the waiting has the lowest key, this device
   /// included. Everyone in a pool wants the same game, so the score it
   /// plays to is part of the pool's own name.
   Future<void> _play() async {
+    if (_withoutDeal()) return;
     final options = _options;
     final transport = await _connect(poolTag(options.pool, target: options.target), _Opening.live);
     if (transport == null) return;
@@ -417,7 +428,7 @@ class _HomePageState extends State<HomePage> {
       // with people who play at about its speed (pace_store.dart).
       pace: _pace.stated,
       botRating: Standing.botPicker(ledger),
-      sealed: dealCrypto != null,
+      sealed: true,
       avatar: _avatar.isDefault ? null : _avatar.toJson(withPicture: false),
       picture: _avatar.picture == null ? null : base64Encode(_avatar.picture!),
     );
@@ -474,7 +485,9 @@ class _HomePageState extends State<HomePage> {
         // off a relay — and the door behind the table has the new
         // rating on it when you get there.
         ledger.apply(result);
-        unawaited(Standing.publish(relays, signer, result));
+        unawaited(Standing.publish(relays, signer, result).then((taken) {
+          if (!taken) debugPrint('result: no relay took it, after every try');
+        }));
       },
       pictures: _pictures,
     );
@@ -505,6 +518,7 @@ class _HomePageState extends State<HomePage> {
   /// opened from a link someone sent. Whoever is there is the table,
   /// and the first to arrive is nobody special.
   Future<void> _enter() async {
+    if (_withoutDeal()) return;
     final code = widget.openRoom ?? Room.newCode();
     final transport = await _connect(code, _Opening.friends);
     if (transport == null) return;

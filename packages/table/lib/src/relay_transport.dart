@@ -120,10 +120,24 @@ class RelayTransport implements Transport {
   /// peer that has lost one relay must still hear this device on the
   /// others, or two tables start under one code.
   void announce(Map<String, Object?> content, {bool ephemeral = false}) {
-    _group.publish(NostrEvent.sign(signer, kind: ephemeral ? TableKinds.waiting : TableKinds.lobby, content: jsonEncode(content), tags: [
-      ['t', table],
-    ]), everywhere: true);
+    _group.publish(_lobbyEvent(content, ephemeral: ephemeral), everywhere: true);
   }
+
+  /// [announce]d and stored, and whether a relay took it: true once one
+  /// has, false once every relay it went to refused it, or none was up,
+  /// or [within] ran out. For what must not go nowhere quietly: a
+  /// game's result.
+  Future<bool> announceTaken(Map<String, Object?> content, {Duration within = const Duration(seconds: 10)}) {
+    final e = _lobbyEvent(content);
+    final taken = _group.taken(e.id, within: within);
+    _group.publish(e, everywhere: true);
+    return taken;
+  }
+
+  NostrEvent _lobbyEvent(Map<String, Object?> content, {bool ephemeral = false}) =>
+      NostrEvent.sign(signer, kind: ephemeral ? TableKinds.waiting : TableKinds.lobby, content: jsonEncode(content), tags: [
+        ['t', table],
+      ]);
 
   @override
   void broadcast(Map<String, Object?> message, {bool everywhere = false}) {

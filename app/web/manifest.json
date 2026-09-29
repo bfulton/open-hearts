@@ -6,7 +6,7 @@
     "background_color": "#06231A",
     "theme_color": "#06231A",
     "description": "Open source, no ads. Play alone or live.",
-    "orientation": "portrait-primary",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
