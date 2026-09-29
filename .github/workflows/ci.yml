@@ -10,10 +10,15 @@ on:
   push:
     branches: [main]
 
+# Three jobs where there was one, side by side: on a hosted runner the
+# table's suite alone takes about twenty-five minutes and the relay's two
+# about twelve, so one job running everything in turn ran out of time
+# before it reached the app. Each builds the Rust libraries its suites
+# load over FFI.
 jobs:
   app:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -45,14 +50,6 @@ jobs:
         run: cd packages/engine && dart pub get && dart analyze && dart test
       - name: Deal (the primitives over FFI, and a hand's deal among four sessions)
         run: cd packages/deal && dart pub get && dart analyze && dart test
-      - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
-        run: cd packages/table && dart pub get && dart analyze && dart test
-      - name: Service (the local relay, and a hand played over it with real signatures)
-        run: cd service && dart pub get && dart analyze && dart test
-      - name: Service, against the object's relay (the same suite, the other implementation)
-        run: cd service && OH_RELAY=js dart test
-      - name: The object's relay (its own tests, in node's test runner)
-        run: node --test service/do/relay.test.mjs service/do/host.test.mjs
       - name: Analyze
         run: cd app && flutter pub get && flutter analyze
       - name: Test (widgets)
@@ -65,6 +62,57 @@ jobs:
           cd app
           flutter build web --release --no-web-resources-cdn \
             --base-href /play/
+
+  table:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.2
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            crypto/deal
+            crypto/schnorr
+      - name: Deal and Schnorr (Rust — the cdylibs for the VM)
+        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
+      - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
+        run: cd packages/table && dart pub get && dart analyze && dart test
+
+  service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.2
+          cache: true
+      # The object's relay's socket tests talk through node's own
+      # WebSocket, which is there from node 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            crypto/deal
+            crypto/schnorr
+      - name: Deal and Schnorr (Rust — the cdylibs the relay and the juror load)
+        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
+      - name: Service (the local relay, and a hand played over it with real signatures)
+        run: cd service && dart pub get && dart analyze && dart test
+      - name: Service, against the object's relay (the same suite, the other implementation)
+        run: cd service && OH_RELAY=js dart test
+      - name: The object's relay (its own tests, in node's test runner)
+        run: node --test service/do/relay.test.mjs service/do/host.test.mjs
 
   # Four real browsers at one table: the local relay, the built app,
   # WebRTC between headless Chromiums, and the departure cells only a

@@ -48,6 +48,23 @@ const driven = 'e2e=1&roomWait=45';
 /// A seat badge that is not one of the four people: a bot took a seat.
 const roster = /^(?!Ada:|Bao:|Cara:|Dee:)[A-Z][\w ]+: \d+ in the game, \d+ this hand/;
 
+/// Whether hand [n] is over on a page: its score sheet is up, or the
+/// sheet has been and gone and the header is on the next hand. Not the
+/// sheet alone: it goes by itself after six seconds, and one pass over
+/// four pages can take longer than that — on a hosted runner's two
+/// cores, up to half a minute — so a page whose sheet came and went
+/// between two looks would never count, though its hand was over.
+const handOver = (n) => {
+  const next = new RegExp(`^Hand ${n + 1} `);
+  return async (p) => (await texts(p)).some((t) => t === 'On with it' || next.test(t));
+};
+
+/// How long a whole hand may take. Four browsers, a relay and a bench
+/// of jurors on a hosted runner's two cores took 172 s over the first
+/// cell's; the last cell's, two minutes of which are a silence the
+/// jury waits out, took 171 s on two cores of a faster machine.
+const aHand = 300000;
+
 async function main() {
   const relay = await startRelay();
   const app = await serveApp();
@@ -145,7 +162,7 @@ async function main() {
     for (const page of pages.slice(0, 3)) await waitFor(page, /^3 of 3 here  ·  unrated$/, { what: 'the unrated table', timeout: 40000 });
     await waitFor(pages[3], /^1 of 1 here  ·  rated$/, { what: 'the rated table', timeout: 40000 });
     log('matched: three together, one with bots');
-    await playUntil(pages, (p) => has(p, /^On with it$/), { timeout: 180000 });
+    await playUntil(pages, handOver(1), { timeout: aHand });
     log('a matched hand played on every screen');
     // Back to the front door for the rest: leave by the menu. The score
     // sheet goes on its own after a few seconds, so it may be gone by
@@ -198,7 +215,7 @@ async function main() {
     log('all four at the table');
 
     // Cell 1: a whole hand over WebRTC.
-    await playUntil(pages, (p) => has(p, /^On with it$/), { timeout: 180000 });
+    await playUntil(pages, handOver(1), { timeout: aHand });
     log('hand 1 played on every screen');
     // The sheet goes on its own after a few seconds, and the screens
     // reach the end of a hand a few seconds apart, so one may be gone
@@ -220,7 +237,9 @@ async function main() {
 
     // Cell 3: Cara stops acting. On her turn the clock runs; at fifteen
     // seconds the others get the Boot button, and one press does it.
-    await playUntil(others, (p, i) => i === 2 || has(p, /^Boot Cara$/), { timeout: 120000, idle: [2] });
+    // Her turn can be most of a trick away, and on two cores the whole
+    // of it took 69 s.
+    await playUntil(others, (p, i) => i === 2 || has(p, /^Boot Cara$/), { timeout: 180000, idle: [2] });
     await click(pages[0], /^Boot Cara$/);
     log('Ada pressed Boot');
     await playUntil([pages[0], pages[1]], (p) => has(p, /^2 of 4 here/), { timeout: 60000 });
@@ -245,7 +264,7 @@ async function main() {
     // ends, which a game to fifty can do here.
     const before = (await texts(pages[0])).find((t) => /^Hand \d/.test(t));
     const next = `Hand ${Number(before.match(/^Hand (\d+)/)[1]) + 1}`;
-    await playUntil([pages[0]], async (p) => (await has(p, new RegExp(`^${next} `))) || (await has(p, /^Home$/)), { timeout: 180000 });
+    await playUntil([pages[0]], async (p) => (await has(p, new RegExp(`^${next} `))) || (await has(p, /^Home$/)), { timeout: aHand });
     log(`Ada finished the hand that began as "${before}"`);
 
     log('PASS');
