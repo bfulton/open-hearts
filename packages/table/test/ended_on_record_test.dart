@@ -315,13 +315,67 @@ void main() {
     final word = TableEvent.sign(x.signer,
         table: t.spec.id, kind: EventKind.ended, body: {'hand': at.turn.hand, 'turn': at.turn.index, 'seat': at.seat, 'vote': false});
     x.transport.broadcast(word.toJson());
-    t.clock.advance(3000);
-    expect(y.failure, isNull, reason: 'one voice for the end is not a majority of two:\n${y.describe()}');
-    expect(t.clock.runUntil(() => x.failure != null && y.failure != null, limitMs: 3 * 60 * 1000), isTrue,
-        reason: 'and the game ended once x said so itself:\n${x.describe()}\n${y.describe()}');
+    // A word is said by a side ending the game for itself, and that side
+    // says nothing after it: not a vote, and no vote coming. So y can
+    // put nothing on the record — one voice is not a majority of two —
+    // and ends the game for itself too.
+    expect(t.clock.runUntil(() => y.failure != null, limitMs: 60000), isTrue, reason: y.describe());
+    expect(y.record.any((d) => d.event.kind == EventKind.ended), isFalse,
+        reason: 'the word carried nothing onto the record:\n${y.describe()}');
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  test('a side that ended the game for itself is not a vote still coming for the end', () {
+    // Sealed chaos seed 1: at a table of two with the jury gone, one
+    // person, hearing too little of the table, said its word and ended
+    // the game for itself. The other backed that word as a claim, and
+    // waited for good on a vote from somebody who had already gone.
+    final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4);
+    t.start();
+    final x = t.clients.first, y = t.clients.last;
+    expect(t.clock.runUntil(() => x.game.phase == Phase.playing, limitMs: 5 * 60 * 1000), isTrue);
+    for (final j in x.juries.last.event.jurors) {
+      t.net.goOffline(j);
+    }
+    // x stops hearing y; y still hears x.
+    t.net.steer = (from, to, message) => from == y.signer.publicKey && to == x.signer.publicKey ? -1 : null;
+    expect(t.clock.runUntil(() => x.failure != null, limitMs: 5 * 60 * 1000), isTrue, reason: x.describe());
+    expect(x.record.any((d) => d.event.kind == EventKind.ended), isFalse, reason: 'x ended for itself, on no record');
+    expect(t.clock.runUntil(() => y.failure != null, limitMs: 60000), isTrue,
+        reason: 'y is left with no majority to end it by, and ends it for itself too:\n${y.describe()}');
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  test('an end at a held seat\'s audit comes after the audits said beside it, on the record and to the verifier', () {
+    // Sealed chaos seed 12, nine strangers: the table stopped at a held
+    // seat's audit, given to the escrow with nobody left to open it, and
+    // ended the game there. The people's own audits, the same position
+    // and said before it, sorted after the end — removals come first in
+    // a position — and the verifier read the record as going on past it.
+    final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 1);
+    final jurors = {for (final j in t.jurors) j.signer.publicKey};
+    // No held seat's audit is ever said.
+    t.net.steer = (from, to, message) {
+      final body = message['body'];
+      return message['kind'] == 'deal' && body is Map && body['round'] == 4 && jurors.contains(from) ? -1 : null;
+    };
+    t.start();
+    final x = t.clients.first, y = t.clients.last;
+    expect(t.clock.runUntil(() => x.game.phase == Phase.handOver || x.game.phase == Phase.gameOver, limitMs: 20 * 60 * 1000), isTrue,
+        reason: x.describe());
+    for (final k in jurors) {
+      t.net.goOffline(k);
+    }
+    expect(t.clock.runUntil(() => x.failure != null && y.failure != null, limitMs: 5 * 60 * 1000), isTrue,
+        reason: '${x.describe()}\n${y.describe()}');
     for (final c in [x, y]) {
-      expect(c.record.last.event.kind, EventKind.ended, reason: c.describe());
-      expect(c.record.last.turn, at.turn);
+      final end = c.record.lastWhere((d) => d.event.kind == EventKind.ended, orElse: () => throw 'no end on the record:\n${c.describe()}');
+      expect(end.turn.isAudit, isTrue);
+      expect(c.record.last, same(end), reason: 'the end is the last thing on the record');
+      expect(c.record.where((d) => d.turn.isAudit && !d.removal).length, 2, reason: 'both people audited, at the same position');
+      final v = verifyRecord(t.spec, c.record, juries: c.juries, crypto: crypto, releases: c.releases);
+      expect(v.ok, isTrue, reason: v.reason);
+      expect(v.ended, isTrue);
     }
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));

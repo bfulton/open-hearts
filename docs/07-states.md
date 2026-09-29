@@ -787,6 +787,29 @@ the game twenty seconds in with the jury there and its pieces on their
 way. A seat's piece holders are the custodians its keys named
 (`quorum_lost_test.dart`).
 
+Measuring it found three more, each a test in `ended_on_record_test.dart`.
+
+- **The word counted as a vote to come.** At a table of two with the
+  jury gone, one person, its own voice spent at the turn on a claim
+  for the escrow that could no longer carry, said its word and ended
+  the game for itself (sealed seed 1). The other
+  backed that word as though it were a claim, and waited for good on a
+  vote from somebody who had already gone. A side that has ended the
+  game for itself says nothing more, and is no vote still coming.
+- **Two ends at two turns.** A table stopped at two held seats' audits,
+  both given to the escrow with nobody left to open them, and each
+  person named the one it had stopped at first — which is the order its
+  escrows carried in — and claimed the end there. One vote each, at
+  two turns, and neither end could carry. Where a table is stopped at
+  several turns of one position, every side names the lowest seat's.
+- **The end first in its position.** The table stopped at a held
+  seat's audit and ended the game there, the people's own audits said
+  beside it before. Removals come first in a position, and the end is
+  one, so the audits sorted after it, and the verifier turned the
+  record down as going on past the game's end (sealed seed 12, nine
+  strangers). The end is the last thing at its position now: after
+  whatever settled beside it, with nothing after it.
+
 ## The leave on the record
 
 The sixth. A leave needed nobody's agreement: it took effect at the

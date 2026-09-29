@@ -198,12 +198,23 @@ class Decision {
   /// round's, the pass, the audit — settle in a different order at
   /// every peer; ordering by position (TurnId.position), with
   /// departures ahead of the actions at the same position and those by
-  /// seat, makes every peer's record the same list.
+  /// seat, and the game's end after them all, makes every peer's record
+  /// the same list.
   int compareTo(Decision other) {
     if (turn.hand != other.turn.hand) return turn.hand.compareTo(other.turn.hand);
     final a = turn.position;
     final b = other.turn.position;
     if (a != b) return a.compareTo(b);
+    // The game's end is the last thing at its position. Claimed where
+    // the table stopped, it comes after whatever settled beside it in a
+    // set of turns open together — the audits the people said before a
+    // held seat's audit stopped it — and nothing is recorded after it.
+    // First among the removals, as removals are, it put those audits
+    // past the end, and the verifier turned the record down (sealed
+    // chaos seed 12, nine strangers).
+    final endA = removal && event.kind == EventKind.ended;
+    final endB = other.removal && other.event.kind == EventKind.ended;
+    if (endA != endB) return endA ? 1 : -1;
     if (removal != other.removal) return removal ? -1 : 1;
     return event.seat.compareTo(other.event.seat);
   }
@@ -3910,14 +3921,29 @@ class TableClient {
     final held = botHolders(hand);
     if (held.isEmpty) return null;
     final live = _liveJurors(hand);
+    TurnId? first;
     for (final e in _races.entries) {
       final t = e.key;
       if (e.value.settled || t.hand != hand || !(t.isPlay || t.isPass)) continue;
       final seat = _turnSeat[t];
       if (seat == null || held[seat] == null) continue;
-      if (!openableBy(hand, seat, live.contains)) return t;
+      if (!openableBy(hand, seat, live.contains) && (first == null || _stopsBefore(t, seat, first, _turnSeat[first]!))) first = t;
     }
-    return null;
+    return first;
+  }
+
+  /// Which of two turns a table stopped at both of names as the one it
+  /// is stopped at: the earlier by position, and of a set of turns
+  /// open together — the passes, the audits — the lower seat. Every
+  /// side names the same one, whatever order it stopped at them in, so
+  /// that the people's voices for the game's end meet at one turn
+  /// ([_claimEnd]). By the order each side stopped in, two people at a
+  /// table stopped at two held seats' audits each claimed the end at a
+  /// different one, and neither claim could carry.
+  static bool _stopsBefore(TurnId a, int seatA, TurnId b, int seatB) {
+    if (a.hand != b.hand) return a.hand < b.hand;
+    if (a.position != b.position) return a.position < b.position;
+    return seatA < seatB;
   }
 
   /// Whether anyone [up] could open [seat]'s hand at [hand]: a held
@@ -3987,14 +4013,16 @@ class TableClient {
     if (t != null) return (turn: t, seat: _turnSeat[t]!);
     final live = _liveJurors(hand);
     final d = _deal;
+    ({TurnId turn, int seat})? first;
     for (final e in _stalled.entries) {
       if (e.key.hand != hand) continue;
       // Open here already, and held for the game's end this side said
       // there ([_holdsForEnding]): not a seat nobody can open.
       if (d != null && d.hand == hand && !d.awaitsSecret(e.value)) continue;
-      if (!openableBy(hand, e.value, live.contains)) return (turn: e.key, seat: e.value);
+      if (openableBy(hand, e.value, live.contains)) continue;
+      if (first == null || _stopsBefore(e.key, e.value, first.turn, first.seat)) first = (turn: e.key, seat: e.value);
     }
-    return null;
+    return first;
   }
 
   /// Why the game ended without finishing, or null while it has not.
@@ -4159,11 +4187,22 @@ class TableClient {
   /// person is given. Nobody silent that long is a vote still coming,
   /// as a split counts them ([_settle]): counted, a claim would wait on
   /// the gone for good.
+  ///
+  /// Nor is anybody who has ended the game for itself, with its word
+  /// rather than a vote here: it says nothing more. Counted, the last
+  /// person at a table of two backed the other's word as a claim, and
+  /// waited for good on a vote from somebody who had already gone
+  /// (sealed chaos seed 1).
   bool _endingCanCarry(TurnId turn) {
     final race = _races[turn];
     if (race == null) return false;
     final of = _participantsAt(turn);
-    final spent = {...race.forAction, ...race.forRemoval, for (final w in race.forRival.values) ...w};
+    final spent = {
+      ...race.forAction,
+      ...race.forRemoval,
+      for (final w in race.forRival.values) ...w,
+      ..._ended.difference(race.forEnd),
+    };
     final past = _votedPast(turn);
     final could = of.where((k) =>
         race.forEnd.contains(k) ||
