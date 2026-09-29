@@ -93,8 +93,10 @@ async function main() {
     bench.find((j) => j.key === gone.key).kill();
     log(`the juror holding seat ${gone.seat} (${gone.key}) was taken off the air`);
 
-    // She judges it gone and gives the seat to the escrow; the jurors
-    // that are left do the rest between themselves.
+    // She judges it gone and claims the seat for the escrow; the claim
+    // is settled on the record the way a boot is (docs/07-states.md,
+    // "The escrow on the record"), and the jurors that are left do the
+    // rest between themselves.
     //
     // Either way of being gone. A juror taken off the air stops
     // speaking and stops playing at the same instant, and which of
@@ -104,8 +106,10 @@ async function main() {
     // botActsWithinMs, docs/04-live-play.md). Both are the same
     // judgement and both say so in the same line, so this watches for
     // the line rather than for one of its reasons.
-    await traced(said, new RegExp(`bot seat ${gone.seat}: its juror .*; to the escrow`),
-        { what: 'the seat given to the escrow', page, timeout: 180000 });
+    await traced(said, new RegExp(`bot seat ${gone.seat}: its juror .*; claimed for the escrow`),
+        { what: 'the seat claimed for the escrow', page, timeout: 180000 });
+    await traced(said, new RegExp(`bot seat ${gone.seat} to the escrow at `),
+        { what: 'the seat given to the escrow on the record', page, timeout: 180000 });
     log(`seat ${gone.seat} went to the escrow`);
     const standing = bench.filter((j) => j.key !== gone.key);
     const since = () => standing.flatMap((j) => j.said);
