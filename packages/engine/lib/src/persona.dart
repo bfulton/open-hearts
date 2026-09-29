@@ -147,11 +147,14 @@ class Persona {
 
   /// From a run of twenty thousand tables, each a random four from the
   /// ladder at nearby rungs, fitted by Bradley–Terry (the model behind
-  /// a rating's expected score) to two or three points a rung. The
-  /// whole ladder spans about 240 points: a first game finishes ahead
-  /// of the character itself in one pair of three. The characters at
-  /// one rung sit within about twenty-five points of each other.
-  static const priors = [1259, 1301, 1325, 1345, 1386, 1413, 1455, 1487, 1500];
+  /// a rating's expected score) to two or three points a rung, over
+  /// games to fifty. The whole ladder spans about 170 points: a first
+  /// game finishes ahead of the character itself in a little over one
+  /// pair in four. The middle half of the characters at one rung sit
+  /// within about thirty points of each other. A game half as long is a
+  /// noisier one, which is what closed the ladder up from the 240
+  /// points it spanned over games to a hundred.
+  static const priors = [1329, 1353, 1365, 1387, 1415, 1431, 1469, 1478, 1500];
 
   /// One line, in the table's voice, for the seat and the lobby.
   final String epithet;

@@ -95,11 +95,17 @@ that could be farmed that way would poison every rating it touched;
 so defending the moon is not a rung, it is the floor. The ladder is
 calibrated in the arena (`packages/table/tool/ladder.dart`): twenty
 thousand tables of random fours from nearby rungs, fitted by the same
-model a rating's expected score uses, to two or three points a rung.
-It spans about 240 points — a first game finishes ahead of the whole
-policy in one pair of three — with rungs thirteen to forty-two points
-apart and the forty characters at a rung within about twenty-five
-points of each other. Those are the ratings a bot starts from; from there it
+model a rating's expected score uses, to two or three points a rung,
+over games to fifty. It spans about 170 points — a first game finishes
+ahead of the whole policy in a little over one pair in four — with
+rungs nine to thirty-eight points apart and the middle half of the
+forty characters at a rung within about thirty points of each other.
+A game half as long is a noisier one, and that is what closed the
+ladder up: over games to a hundred it spanned 240, with a first game
+ahead in one pair in five. The game went to fifty after that
+calibration and the priors did not follow until the tool was run again
+(measured at the commits either side of the change; nothing since has
+moved it). Those are the ratings a bot starts from; from there it
 floats on its results like anyone, one rating per character per rung.
 A bot's identity is its name and its rung: `Westley` at the top,
 `Westley/3` on the third rung up from a first game.
