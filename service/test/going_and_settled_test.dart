@@ -58,6 +58,38 @@ void main() {
     await relay.close();
   });
 
+  test('a device that cannot serve as a juror is not online, and one that stops being able to says it is going', () async {
+    final relay = Relay();
+    await relay.serve();
+    var able = true;
+    final watcher = RelayPresence(relays: [relay.url], signer: SchnorrSigner.generate(), everyMs: 300);
+    // Its deal never loaded: nothing to draw.
+    final never = RelayPresence(relays: [relay.url], signer: SchnorrSigner.generate(), everyMs: 300, canServe: () => false);
+    // Its deal loaded, and its worker fails later.
+    final later = RelayPresence(relays: [relay.url], signer: SchnorrSigner.generate(), everyMs: 300, canServe: () => able);
+    await Future.wait([watcher.ready, never.ready, later.ready]).timeout(const Duration(seconds: 10));
+    await until('the one that can serve was not seen', () => watcher.online(withinMs: 60000).contains(later.signer.publicKey));
+    expect(watcher.online(withinMs: 60000).contains(never.signer.publicKey), isFalse,
+        reason: 'a device that cannot deal said it was here, and a table could draw it');
+    expect(never.online(withinMs: 60000), isNot(contains(never.signer.publicKey)), reason: 'nor counts itself');
+    expect(never.online(withinMs: 60000), contains(watcher.signer.publicKey), reason: 'it still hears the others');
+
+    able = false;
+    await until('it did not say it was going', () => !watcher.online(withinMs: 60000).contains(later.signer.publicKey));
+    expect(later.online(withinMs: 60000), isNot(contains(later.signer.publicKey)));
+    // Back to the foreground (Duty.back) is not back to being able to
+    // serve: it stays gone.
+    later.silent = false;
+    await Future<void>.delayed(const Duration(milliseconds: 1000));
+    expect(watcher.online(withinMs: 60000).contains(later.signer.publicKey), isFalse,
+        reason: 'a device that cannot serve announced itself back');
+
+    watcher.close();
+    never.close();
+    later.close();
+    await relay.close();
+  });
+
   test('settled is who has been announcing a while, or is seated at a table', () async {
     final relay = Relay();
     await relay.serve();

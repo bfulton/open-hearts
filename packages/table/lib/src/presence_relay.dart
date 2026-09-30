@@ -109,7 +109,8 @@ List<Uri> relaysForTag(List<Uri> relays, String tag) => [
     ];
 
 class RelayPresence implements Presence {
-  RelayPresence({required List<Uri> relays, required this.signer, this.status = 'online', this.everyMs = 5000, this.log})
+  RelayPresence(
+      {required List<Uri> relays, required this.signer, this.status = 'online', this.everyMs = 5000, this.canServe, this.log})
       : relays = Relays.turnedBy(relaysForTag(relays, topic), signer.publicKey) {
     _group = RelayGroup(
       urls: this.relays,
@@ -135,6 +136,17 @@ class RelayPresence implements Presence {
   /// the juror a service brings up.
   String status;
   final int everyMs;
+
+  /// Whether this device can serve as a juror at the tables that would
+  /// draw it — for the app, whether its deal loaded and its worker has
+  /// not failed for good since. Every live table is sealed, so one that
+  /// cannot deal cannot serve any of them, and drawn it would hold a
+  /// bot seat and a piece of every escrow it never answers for. While
+  /// this is false the device says nothing of itself, and if it had
+  /// said it was here it says it is going; it still listens. Read at
+  /// every beat, so a device that stops being able to is gone for
+  /// everyone within one. Null is always.
+  final bool Function()? canServe;
   final void Function(String line)? log;
 
   static const topic = 'online';
@@ -158,6 +170,13 @@ class RelayPresence implements Presence {
   /// long enough to ride out one missed announcement, short enough
   /// that somebody back from a real absence starts their run again.
   static const _gapMs = 15000;
+
+  /// Whether this device has said it is here since it last said it
+  /// was going.
+  bool _announced = false;
+
+  bool get _able => canServe?.call() ?? true;
+
   final _summonses = StreamController<Summons>.broadcast();
   final _calls = StreamController<String>.broadcast();
   Timer? _beat;
@@ -189,7 +208,7 @@ class RelayPresence implements Presence {
     return {
       for (final e in _seen.entries)
         if (now - e.value < withinMs && !_went.contains(e.key)) e.key,
-      if (!_silent) signer.publicKey,
+      if (!_silent && _able) signer.publicKey,
     };
   }
 
@@ -213,14 +232,19 @@ class RelayPresence implements Presence {
   /// table still times out anyone silent.
   void leaving() {
     if (_closed || _silent) return;
+    _sayGone();
+    // And stop saying it is here, or the next beat would undo this.
+    // Announcing resumes when something sets [silent] back.
+    _silent = true;
+  }
+
+  void _sayGone() {
+    _announced = false;
     _group.publish(
         NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'gone'}), tags: [
           ['t', topic],
         ]),
         everywhere: true);
-    // And stop saying it is here, or the next beat would undo this.
-    // Announcing resumes when something sets [silent] back.
-    _silent = true;
   }
 
   @override
@@ -240,6 +264,14 @@ class RelayPresence implements Presence {
 
   void _announce() {
     if (_silent || _closed) return;
+    if (!_able) {
+      if (_announced) {
+        log?.call('presence: this device cannot serve as a juror; going');
+        _sayGone();
+      }
+      return;
+    }
+    _announced = true;
     _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'here', 'status': status}), tags: [
       ['t', topic],
     ]), everywhere: true);

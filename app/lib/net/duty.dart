@@ -1,5 +1,9 @@
 /// What every open app does for the tables it is not at: says it is
-/// online, and serves as a juror when drawn (docs/04-live-play.md).
+/// online, and serves as a juror when drawn (docs/04-live-play.md) —
+/// while it can deal. Every live table is sealed, so a device whose
+/// deal did not load, or whose worker has failed for good since, could
+/// serve none of them: it says nothing of itself, and still hears the
+/// others (presence_relay.dart, `canServe`).
 ///
 /// One presence connection per relay for the life of the app, made the
 /// first time a relay answers; a juror client per table summoned to, closed when
@@ -42,7 +46,12 @@ class Duty {
     // Presence prefers our own object, one per tag, and falls back to
     // the relays when it does not answer (net/relays.dart). Only
     // presence: a table's events go to the relays proper.
-    final presence = RelayPresence(relays: presenceRelays(relays), signer: signer, log: logger);
+    final presence = RelayPresence(
+      relays: presenceRelays(relays),
+      signer: signer,
+      canServe: () => crypto != null && dealWorker != null && !dealWorker.dead,
+      log: logger,
+    );
     final juror = JurorDuty(
       relays: relays,
       signer: signer,

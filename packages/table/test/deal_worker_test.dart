@@ -100,7 +100,9 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  test('a juror whose worker fails stops serving; the seat it held goes to the escrow, and the game goes on', () {
+  /// A one-hand game in which the worker of a juror holding a bot seat
+  /// fails once [when] says; what was raised, the table, the juror.
+  (List<Object>, SimTable, SimJuror) holderBroken(bool Function(SimJuror holder, SimDealWorker worker) when) {
     final raised = <Object>[];
     late SimTable t;
     late SimJuror broken;
@@ -111,12 +113,58 @@ void main() {
       t.clock.runUntil(() => c.botHolders(c.game.handNumber).isNotEmpty, limitMs: 60 * 1000);
       final holder = c.botHolders(c.game.handNumber).values.first;
       broken = t.jurors.firstWhere((j) => j.signer.publicKey == holder);
-      t.dealWorkers[holder]!.dead = true;
+      final worker = t.dealWorkers[holder]!;
+      t.clock.runUntil(() => when(broken, worker), limitMs: 60 * 1000);
+      worker.dead = true;
       t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 20 * 60 * 1000);
     }, (e, _) => raised.add(e));
+    return (raised, t, broken);
+  }
+
+  test('a juror whose worker fails while it serves stops serving; the seat it held goes to the escrow, and the game goes on', () {
+    final (raised, t, broken) = holderBroken((j, w) => j.client != null && w.made > 0);
     expect(raised, [isA<DealWorkFailed>()]);
     expect(broken.client?.cannotDeal, isNotNull);
     expect(t.clients.every((c) => c.done), isTrue, reason: 'the game was played out: ${t.people[0].client.describe()}');
+    checksOut(t);
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  test('a juror whose worker fails between its draw and its summons turns the summons down; the seat goes to the escrow', () {
+    // The summons is on its way when the worker goes: the juror is
+    // drawn, and holds a seat, but serves nothing — as the duty turns
+    // down a sealed table it cannot deal at (juror_duty.dart).
+    final (raised, t, broken) = holderBroken((j, w) => true);
+    expect(broken.client, isNull, reason: 'no client started for a table it could not deal at');
+    expect(raised, isEmpty, reason: 'nothing was asked of the broken worker');
+    expect(t.clients.every((c) => c.done), isTrue, reason: 'the game was played out: ${t.people[0].client.describe()}');
+    checksOut(t);
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  test('a device whose worker has failed is not online: no table draws it, and the jury comes from the others', () {
+    // Three of the strangers online broken before the game: every live
+    // table is sealed, so a device that cannot deal cannot serve one,
+    // and drawn it would hold a bot seat and a piece of every escrow
+    // it never answers for.
+    final raised = <Object>[];
+    late SimTable t;
+    late Set<String> broken;
+    runZonedGuarded(() {
+      t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 1, workers: true);
+      broken = {for (final j in t.jurors.take(3)) j.signer.publicKey};
+      for (final k in broken) {
+        t.dealWorkers[k]!.dead = true;
+      }
+      t.start();
+      t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 20 * 60 * 1000);
+    }, (e, _) => raised.add(e));
+    final c = t.people[0].client;
+    expect(c.done, isTrue, reason: 'the game was played out: ${c.describe()}');
+    final drawn = {for (final d in c.juries) ...d.event.jurors};
+    expect(drawn, isNotEmpty);
+    expect(drawn.intersection(broken), isEmpty, reason: 'drawn: $drawn');
+    expect(raised, isEmpty, reason: 'nothing was asked of a broken worker');
     checksOut(t);
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));

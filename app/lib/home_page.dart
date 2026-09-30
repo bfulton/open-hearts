@@ -269,12 +269,16 @@ class _HomePageState extends State<HomePage> {
 
   /// How many devices are online, this one included, once this device
   /// has listened long enough to have heard everyone; null before.
+  /// This one is counted whether or not it says it is here: one that
+  /// cannot deal says nothing of itself (net/duty.dart), and the
+  /// others around it are still the others.
   int? get _online {
     final since = _listeningSinceMs;
     final duty = Duty.current;
     if (since == null || duty == null) return null;
     if (DateTime.now().millisecondsSinceEpoch - since < duty.presence.everyMs + 1500) return null;
-    return duty.presence.online(withinMs: 15000).length;
+    final others = duty.presence.online(withinMs: 15000).difference({duty.presence.signer.publicKey});
+    return others.length + 1;
   }
 
   /// Ratings, from the relays that just answered — never from an

@@ -274,7 +274,11 @@ cards dealt and opened — for a couple of seconds on a desktop and a few
 on a phone, and the other people's cards are backs that nobody but
 their holder can turn. Every open app says it is online and serves
 as a juror when drawn (`app/lib/net/duty.dart`), at another table or
-at the front door, without the player noticing. The device's key is
+at the front door, without the player noticing — every app that can
+deal. One whose deal did not load, or whose worker has failed for
+good since, says nothing of itself: it could serve no sealed table,
+and drawn it would hold a bot seat and a piece of every escrow without
+ever answering. It still sees who else is online. The device's key is
 minted the first time it is needed and kept; on the web every
 signature goes through the wasm
 ([measurements/sign](../measurements/README.md)). A widget test seats
@@ -1755,6 +1759,11 @@ On the wire:
   them as before.
   A juror follows the table on its own relay list, so a table on
   relays a juror does not listen to has no jurors from that pool.
+  A device that cannot serve sealed tables announces nothing, and one
+  that stops being able to — its deal worker failed for good — says
+  it is going at its next beat (`RelayPresence.canServe`); the
+  simulator's presence does the same (`SimPresence`). The jurors of
+  last resort do not start without the deal (`service/bin/juror.dart`).
 - **The draw.** At each hand the lowest key among the participants
   heard lately proposes: a snapshot of who is online (nobody at this
   table), and the draw — six, foreman first — as a deterministic

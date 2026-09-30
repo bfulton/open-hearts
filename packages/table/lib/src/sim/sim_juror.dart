@@ -26,6 +26,12 @@ class SimJuror {
   /// Where this juror's deal work is made, if not in its client.
   final DealWorker? dealWorker;
 
+  /// Whether this juror can serve: not while its deal worker has
+  /// failed for good. One that cannot is not online ([SimPresence]),
+  /// as a device's presence says nothing of it then
+  /// (presence_relay.dart, [RelayPresence.canServe]).
+  bool get canServe => !(dealWorker?.dead ?? false);
+
   /// The client following the table, from the first summons on.
   TableClient? client;
 
@@ -76,6 +82,10 @@ class SimJuror {
       return;
     }
     if (c == null || c.spec.id != spec.id) {
+      // As the duty refuses one (juror_duty.dart): a summons that
+      // reached a juror that cannot deal before it stopped saying it
+      // was here.
+      if (spec.sealed && !canServe) return;
       c?.close();
       // A client of its own draws, as a new process's are: one seeded
       // like the last would draw the secrets that one drew, and the

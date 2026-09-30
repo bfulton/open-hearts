@@ -51,15 +51,20 @@ Future<void> main(List<String> args) async {
         SchnorrSigner.generate(),
   ];
   // The deal's cryptography, to serve sealed tables: the cdylib built
-  // by crypto/deal/build.sh, found from here or named by DEAL_LIB.
-  DealCrypto? crypto;
+  // by crypto/deal/build.sh, found beside the repository's own build.
+  // Every live table is sealed, so a bench without it could serve none
+  // of them: it would come online when called, be drawn, hold bot
+  // seats and pieces of escrow, and turn every summons down. It does
+  // not start.
+  final DealCrypto crypto;
   try {
     crypto = await DealCrypto.load();
   } catch (e) {
-    print('juror: no deal cryptography ($e); sealed tables cannot be served');
+    print('juror: no deal cryptography ($e); every live table is sealed, so there is nothing to serve');
+    exit(1);
   }
   final bench = LastResortBench(signers: signers, relays: relays, log: print, crypto: crypto);
   bench.start();
   final keys = [for (final s in signers) s.publicKey.substring(0, 8)].join(' ');
-  print('jurors of last resort $keys listening on ${Relays.format(relays)}${crypto == null ? '' : ', sealed tables too'}');
+  print('jurors of last resort $keys listening on ${Relays.format(relays)}');
 }
