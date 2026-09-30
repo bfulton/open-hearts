@@ -40,12 +40,17 @@ void main() {
 
     // It keeps being heard — this is the whole point of the case, and
     // without it the seat would go for silence as it always could.
-    t.clock.advance(TableClient.botActsWithinMs * 3);
+    // Past the seat's allowance, and not so far past it that the hand
+    // is over before anything is looked at: three allowances of
+    // fifteen seconds outlasted the rest of this one, and what was
+    // looked at was the next hand's deal.
+    t.clock.advance(TableClient.botActsWithinMs + 6000);
     expect(c.jury.live, greaterThan(0), reason: 'the jury is still being heard');
 
     // And the hand goes on rather than sitting at that seat's turn.
     expect(t.clock.runUntil(() => c.game.tricksPlayed > at + 1, limitMs: 2 * 60 * 1000), isTrue,
         reason: 'the table played past the seat its holder had stopped playing:\n${c.describe()}');
+    expect(c.game.handNumber, hand, reason: 'still the hand the seat was taken in');
     expect(c.deal!.gone, contains(seat), reason: 'the seat went to the escrow');
     expect(t.clock.runUntil(() => c.game.handNumber > hand, limitMs: 5 * 60 * 1000), isTrue,
         reason: 'and the hand was played out: ${c.describe()}');
@@ -80,7 +85,7 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // The same juror in the deal. A play or a pass has three seconds; a
+  // The same juror in the deal. A play or a pass has fifteen seconds; a
   // deal step had no allowance at all, so a juror heard and idle with
   // its seat's keys owed held the deal for good — only silence was
   // ever caught there, and it was never silent.

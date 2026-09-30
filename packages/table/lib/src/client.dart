@@ -3794,19 +3794,25 @@ class TableClient {
     }
   }
 
-  /// How long a bot seat's holder has to take the seat's turn. A
-  /// bot's move is worked out rather than thought about, so this is a
-  /// deadline on a computation and not on a person: there is no grace
-  /// in it and no bank behind it, which is what a person's seat gets
-  /// instead (time_bank.dart).
+  /// How long a bot seat's holder has to take the seat's turn, a card
+  /// or the pass. A bot's move is worked out rather than thought
+  /// about, so this is a deadline on a computation and not on a
+  /// person: there is no grace in it and no bank behind it, which is
+  /// what a person's seat gets instead (time_bank.dart).
   ///
-  /// Measured rather than picked. Over six seeded hands a held bot
-  /// seat answers its turn in 69 ms at the middle and 155 ms at the
-  /// worst over a data channel, and 365 ms and 787 ms with a relay's
-  /// latency under it — so three seconds is about four times the
-  /// worst of it, and a holder that misses it is not slow, it is not
-  /// working.
-  static const botActsWithinMs = 3000;
+  /// Fifteen seconds, measured on a slow machine rather than a fast
+  /// one. It was three: over six seeded hands a held bot seat answered
+  /// in 69 ms at the middle and 155 ms at the worst over a data
+  /// channel, 365 ms and 787 ms with a relay's latency under it, and
+  /// three was about four times the worst. On two cores shared by four
+  /// browsers — a hosted runner, nearer a cheap phone than a desk is —
+  /// a held pass took 4.3 s at the ninety-fifth percentile and a held
+  /// card 8.7 at the worst, and a juror that was working missed the
+  /// three in five runs of six there: its seat went to the escrow and
+  /// it was left out of the next draw. Fifteen is three and a half
+  /// times that 4.3, as a deal step's allowance is of its own, and 1.7
+  /// times the worst card.
+  static const botActsWithinMs = 15000;
 
   /// And its deal steps. A deal step is slower and waits on more — a
   /// held seat's keys wait for the record to say which draw the hand is

@@ -101,7 +101,7 @@ async function main() {
     // Either way of being gone. A juror taken off the air stops
     // speaking and stops playing at the same instant, and which of
     // the two the table notices first is a race the deadline usually
-    // wins: three seconds with the turn in front of it against thirty
+    // wins: fifteen seconds with the turn in front of it against thirty
     // without a heartbeat (packages/table, client.dart
     // botActsWithinMs, docs/04-live-play.md). Both are the same
     // judgement and both say so in the same line, so this watches for

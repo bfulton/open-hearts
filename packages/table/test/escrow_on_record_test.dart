@@ -474,8 +474,10 @@ void main() {
     t.net.steer = (from, to, message) {
       final kind = message['kind'];
       final body = message['body'] as Map<String, Object?>;
+      // The juror's card lands three seconds after the seat's
+      // allowance is up and the escrow claimed for it.
       if (kind == 'play' && message['author'] == at.holder && body['hand'] == at.hand && body['seat'] == at.seat) {
-        cardAt ??= t.clock.nowMs + 6000;
+        cardAt ??= t.clock.nowMs + TableClient.botActsWithinMs + 3000;
         return t.clock.nowMs < cardAt! ? cardAt! - t.clock.nowMs : null;
       }
       if (kind == 'escrow') {

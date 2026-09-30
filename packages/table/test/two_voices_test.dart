@@ -44,11 +44,12 @@ void main() {
     final seat = [for (var i = 0; i < seatCount; i++) (a.game.currentSeat! + i) % seatCount].firstWhere(held.containsKey);
     final holder = held[seat]!;
 
-    // The juror says its card on time, and nobody hears it for twenty
-    // seconds: long enough for the people to give the seat to the
-    // escrow and a custodian to say the card for it. Then b hears the
-    // juror's card first and a the custodian's, every copy of the
-    // custodian's to b held until well after.
+    // The juror says its card on time, and nobody hears it until
+    // seventeen seconds past a card's allowance: long enough for the
+    // people to give the seat to the escrow and a custodian to say the
+    // card for it. Then b hears the juror's card first and a the
+    // custodian's, every copy of the custodian's to b held until well
+    // after.
     String? custodian;
     int? released;
     int? until;
@@ -59,7 +60,7 @@ void main() {
       final author = message['author'] as String;
       if (author == holder) {
         if (custodian == null) {
-          released ??= t.clock.nowMs + 20000;
+          released ??= t.clock.nowMs + TableClient.botActsWithinMs + 17000;
           return released! - t.clock.nowMs;
         }
         return null;

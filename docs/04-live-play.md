@@ -625,9 +625,9 @@ give their pieces up; a hand then sits at one turn for minutes with
 the seat's own device apparently present. Four headless browsers
 sharing four cores reproduced it about half the time.
 
-So a bot seat's holder has three seconds to take the seat's turn, and
-a seat whose turn has been in front of it for longer goes to the
-escrow like a silent one's. Three seconds from when the turn became
+So a bot seat's holder has fifteen seconds to take the seat's turn,
+and a seat whose turn has been in front of it for longer goes to the
+escrow like a silent one's. Fifteen seconds from when the turn became
 that holder's, which is not the same as when the turn opened: a turn
 can open while its seat is still being handed over — a person leaving
 it, the seat turning into a bot, a juror picking it up from the
@@ -637,10 +637,16 @@ open and nothing is stalled; a seat that changes hands starts the new
 holder's clock afresh. A bot's move is worked out rather than
 thought about, which is why the number is a deadline on a computation
 and has no grace in it and no bank behind it — what a person's seat
-gets instead. Three seconds is roughly four times the worst a held
-bot seat was measured taking: over six seeded hands it answers in 69
-ms at the middle and 155 ms at the worst over a data channel, 365 ms
-and 787 ms with a relay's latency under it.
+gets instead. It was three seconds, roughly four times the worst a
+held bot seat was measured taking: over six seeded hands it answers
+in 69 ms at the middle and 155 ms at the worst over a data channel,
+365 ms and 787 ms with a relay's latency under it. That was a machine
+with room to spare. On two cores shared by four browsers a held pass
+took 4.3 s at the ninety-fifth percentile and a held card 8.7 at the
+worst, and a working juror missed the three in five runs of six: its
+seat went to the escrow and it was left out of the next draw. Fifteen
+is three and a half times that 4.3, as a deal step's forty is of its
+own (below), and 1.7 times the worst card.
 
 A deal step has forty seconds. A deal step is checked against things
 that may not have arrived, and a juror holds its keys back for a
