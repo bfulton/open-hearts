@@ -15,6 +15,7 @@ import 'dart:typed_data';
 import 'src/deal_binding.dart' if (dart.library.js_interop) 'src/deal_web.dart' as platform;
 
 export 'src/session.dart';
+export 'src/work.dart';
 
 
 const deckSize = 52;

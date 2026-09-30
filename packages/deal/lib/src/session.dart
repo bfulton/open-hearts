@@ -617,11 +617,21 @@ class DealSession {
         final shareCustody = [for (final c in (m['shareCustody'] as List? ?? const [])) _unb64(c)];
         if (shareCustody.length != custodianKeys.length || shareCustody.any((c) => c.length != scalarBytes)) return false;
       }
-      return pk.length == pointBytes && crypto.verifyKey(pk, _name(seat), proof);
+      if (pk.length != pointBytes || !crypto.verifyKey(pk, _name(seat), proof)) return false;
+      _checkedPks[seat] = pk;
+      return true;
     } catch (_) {
       return false;
     }
   }
+
+  /// Keys this side has checked and not yet taken, by seat: what the
+  /// first deck is about to be built from, so that [workToTake] can
+  /// describe it while the keys are still being witnessed. A table
+  /// checks every seat's keys as they arrive and takes them only as
+  /// each settles, and the deck is built at the last to settle.
+  /// Nothing else reads it.
+  final Map<int, Uint8List> _checkedPks = {};
 
   /// Another seat's keys: kept when the proof holds, and whatever was
   /// escrowed to this side opened. False for a bot's, which everyone
@@ -760,12 +770,16 @@ class DealSession {
   Map<String, Object?>? myShuffle() {
     final me = mySeat;
     if (me == null || nextShuffler != me) return null;
-    final r = crypto.shuffle(_joint!, _decks.last, _draw());
+    final r = crypto.shuffle(_joint!, _decks.last, _myShuffleSeed ??= _draw());
     _decks.add(r.deck);
     _shuffleProofs[me] = r.proof;
     _computeWhatCan();
     return {'seat': me, 'deck': _b64(r.deck), 'proof': _b64(r.proof)};
   }
+
+  /// Drawn once, when the shuffle is first asked for or first
+  /// described ([workToMake]): the shuffle made is the one described.
+  Uint8List? _myShuffleSeed;
 
   /// Whether a seat's shuffle is its to make now and its argument
   /// verifies against the deck before it. Changes nothing.
@@ -798,6 +812,73 @@ class DealSession {
     } catch (_) {
       return false;
     }
+  }
+
+  // ---- work elsewhere ----------------------------------------------------
+
+  /// The slow calls checking and taking [m], a step of [round] by
+  /// another seat, will make here: what a side with a worker has made
+  /// there first ([DealWorker], [PreparedDeal]). Empty for a step that
+  /// fails before any of them, or that makes none. Changes nothing.
+  ///
+  /// Each is the call [verifyShuffle] or [verifyTokens] makes, or for
+  /// keys the deck [acceptKeys] builds once the last of them is taken,
+  /// on the same inputs, so that the answer made elsewhere is
+  /// the one found here. A description that drifted from the call
+  /// would cost the time, never the answer: a call with no answer
+  /// waiting is made here ([PreparedDeal.madeHere]).
+  List<DealJob> workToTake(int round, Map<String, Object?> m) {
+    try {
+      final seat = m['seat'] as int;
+      switch (round) {
+        case 0:
+          // The deck the keys are about to make, once every seat's are
+          // taken or checked — these among them.
+          if (_joint != null || !_keyed(seat)) return const [];
+          final pk = _unb64(m['pk']);
+          if (pk.length != pointBytes) return const [];
+          final pks = [for (var s = 0; s < _seats; s++) _pks[s] ?? (s == seat ? pk : _checkedPks[s])];
+          if (pks.contains(null)) return const [];
+          return [InitialDeckJob(crypto.aggregate([for (final k in pks) k!]))];
+        case 1:
+          if (_joint == null || nextShuffler != seat || !_keyed(seat) || _public(seat)) return const [];
+          final next = _unb64(m['deck']);
+          if (next.length != deckBytes) return const [];
+          return [VerifyShuffleJob(_joint!, _decks.last, next, _unb64(m['proof']))];
+        case 2:
+          final pk = _pks[seat];
+          if (!_keyed(seat) || deck == null || _public(seat) || pk == null) return const [];
+          final owed = _owed(seat);
+          final batch = _unb64(m['tokens']);
+          if (batch.length != tokensBytes(owed.length)) return const [];
+          return [VerifyTokensJob(pk, _cardsAt(owed), batch)];
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  /// The slow calls this side's own step of [round] will make: its
+  /// shuffle ([myShuffle]), or its tokens and then its own thirteen
+  /// ([myTokens]). Empty when the step is not this side's to make yet.
+  List<DealJob> workToMake(int round) {
+    final me = mySeat;
+    if (me == null) return const [];
+    switch (round) {
+      case 1:
+        if (nextShuffler != me || _joint == null) return const [];
+        return [ShuffleJob(_joint!, _decks.last, _myShuffleSeed ??= _draw())];
+      case 2:
+        if (deck == null) return const [];
+        final secret = _secrets[me]!;
+        final owed = _owed(me);
+        final had = _tokens[me] ?? const <int, Uint8List>{};
+        final own = [for (var p = 0; p < deckSize; p++) if (p ~/ _handSize == me && had[p] == null) p];
+        return [
+          if (_myTokens == null) RevealTokensJob(secret, _cardsAt(owed), _seed('tokens ${owed.length}', me)),
+          if (own.isNotEmpty) RevealTokensJob(secret, _cardsAt(own), _seed('tokens ${own.length}', me)),
+        ];
+    }
+    return const [];
   }
 
   // ---- tokens ----------------------------------------------------------

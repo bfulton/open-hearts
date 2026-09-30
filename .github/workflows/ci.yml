@@ -157,6 +157,8 @@ jobs:
         run: cd app && flutter pub get && cd .. && ./e2e/build.sh
       - name: Handlers (the Pages worker, in node's test runner)
         run: node --test service/functions/worker.test.mjs
+      - name: The page's deal worker (in node's test runner, against the committed wasm)
+        run: node --test e2e/deal_worker.test.mjs
       - name: Relay dependencies
         run: cd service && dart pub get
       - name: Four browsers, one table
