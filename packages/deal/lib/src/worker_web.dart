@@ -3,15 +3,60 @@
 /// making jobs one at a time in the order they were sent.
 library;
 
+import 'dart:async';
 import 'dart:js_interop';
 
 import '../deal.dart';
 
-/// [libraryPath] names the wasm, relative to the worker's script, as
-/// [DealCrypto.load]'s does relative to the page.
-DealWorker start({String? libraryPath}) {
-  final query = libraryPath == null ? '' : '?wasm=${Uri.encodeQueryComponent(libraryPath)}';
-  return _WebWorker(_Worker('deal_worker.js$query'.toJS));
+/// Fetches the worker's script and the wasm, once, now — [libraryPath]
+/// names the wasm as [DealCrypto.load]'s does — and gives back a way to
+/// start workers from them: the script as a blob, the wasm handed over
+/// in a message. A worker started later, to replace one that failed,
+/// fetches nothing. An error, saying why, if either is not served.
+Future<Future<DealWorker> Function()> spawner({String? libraryPath}) async {
+  final script = await _fetched('deal_worker.js');
+  final wasm = await _fetched(libraryPath ?? 'deal.wasm');
+  final source = (await script.text().toDart).toDart;
+  final bytes = (await wasm.arrayBuffer().toDart).toDart.asUint8List();
+  final url = _objectUrl(_Blob([source.toJS].toJS, _BlobType(type: 'text/javascript'.toJS)));
+  return () {
+    final w = _WebWorker(_Worker(url));
+    // Copied across, not transferred: kept here for the next worker.
+    w._worker.postMessage(_Init(wasm: bytes.toJS));
+    return w._ready.future;
+  };
+}
+
+Future<_Response> _fetched(String url) async {
+  final r = await _fetch(url.toJS).toDart;
+  if (!r.ok) throw StateError('$url is not served (${r.status})');
+  return r;
+}
+
+@JS('fetch')
+external JSPromise<_Response> _fetch(JSString url);
+
+extension type _Response._(JSObject _) implements JSObject {
+  external bool get ok;
+  external int get status;
+  external JSPromise<JSString> text();
+  external JSPromise<JSArrayBuffer> arrayBuffer();
+}
+
+@JS('Blob')
+extension type _Blob._(JSObject _) implements JSObject {
+  external factory _Blob(JSArray<JSAny> parts, _BlobType options);
+}
+
+extension type _BlobType._(JSObject _) implements JSObject {
+  external factory _BlobType({JSString type});
+}
+
+@JS('URL.createObjectURL')
+external JSString _objectUrl(_Blob blob);
+
+extension type _Init._(JSObject _) implements JSObject {
+  external factory _Init({JSUint8Array wasm});
 }
 
 @JS('Worker')
@@ -37,7 +82,9 @@ extension type _Job._(JSObject _) implements JSObject {
 }
 
 extension type _Reply._(JSObject _) implements JSObject {
-  external JSNumber get id;
+  external JSBoolean? get ready;
+  external JSString? get unloaded;
+  external JSNumber? get id;
   external JSArray<JSUint8Array>? get out;
   external JSString? get error;
 }
@@ -48,7 +95,7 @@ class _WebWorker implements DealWorker {
   _WebWorker(this._worker) {
     _worker.onmessage = ((_Event e) => _onReply(e.data)).toJS;
     // A script that is not there, or does not parse, is an error on
-    // the worker and nothing else: every job waiting is made at home.
+    // the worker and nothing else.
     _worker.onerror = ((_ErrorEvent e) {
       e.preventDefault();
       _dead('the deal worker failed: ${e.message?.toDart ?? 'no reason given'}');
@@ -56,6 +103,10 @@ class _WebWorker implements DealWorker {
   }
 
   final _Worker _worker;
+  final _ready = Completer<DealWorker>();
+
+  @override
+  bool get dead => _death != null;
   final Map<int, _Waiting> _waiting = {};
   Object? _death;
   int _next = 0;
@@ -72,7 +123,15 @@ class _WebWorker implements DealWorker {
   }
 
   void _onReply(_Reply r) {
-    final w = _waiting.remove(r.id.toDartInt);
+    if (r.ready?.toDart ?? false) {
+      if (!_ready.isCompleted) _ready.complete(this);
+      return;
+    }
+    final unloaded = r.unloaded;
+    if (unloaded != null) return _dead(unloaded.toDart);
+    final id = r.id;
+    if (id == null) return;
+    final w = _waiting.remove(id.toDartInt);
     if (w == null) return;
     final error = r.error;
     final out = r.out;
@@ -88,6 +147,10 @@ class _WebWorker implements DealWorker {
 
   void _dead(Object why) {
     _death = why;
+    if (!_ready.isCompleted) {
+      _ready.completeError(why);
+      _worker.terminate();
+    }
     final waiting = List.of(_waiting.values);
     _waiting.clear();
     for (final w in waiting) {

@@ -403,7 +403,7 @@ class _HomePageState extends State<HomePage> {
   /// here, at the door, rather than connecting to find out; true when
   /// it has.
   bool _withoutDeal() {
-    if (dealCrypto != null) return false;
+    if (dealReady) return false;
     setState(() => _error = Room.noDeal);
     return true;
   }

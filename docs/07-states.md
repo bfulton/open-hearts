@@ -155,10 +155,11 @@ check is being made in the worker (docs/03-fair-deal.md, "Off the
 page's thread") is kept the way a step early for its jury is kept, and
 this side's own shuffle or tokens are said once they have been made
 there. Either wait ends by itself: the answer comes back, or the
-worker fails and the work is made here, or a job has not come back in
-twenty seconds and the worker is given up on
-(`TableClient.workerPatienceMs`). The table sees only a step that came
-a little later.
+worker fails for good — it failed or stalled, and so did the one
+started to replace it — and the side can no longer deal
+(`TableClient.cannotDeal`). Then it leaves the table, and a juror
+stops following it. The table sees a step that came a little later,
+or a seat that left.
 
 ## Stuck
 

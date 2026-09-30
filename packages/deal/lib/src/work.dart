@@ -14,12 +14,21 @@
 /// by a [DealWorker] — a Web Worker in the browser, an isolate on the
 /// VM — and handed back to the session through a [PreparedDeal], which
 /// answers the call when it comes from what the worker made. The
-/// session itself stays what it was: synchronous, and making any call
-/// it was not handed the answer to itself. What it would have made is
-/// what it is handed, bit for bit, since the worker runs the same
-/// primitives on the same inputs.
+/// session itself stays synchronous: what it comes to that it has no
+/// answer for yet, it stops at and asks for ([DealSession.wanted]).
+/// What it would have made is what it is handed, bit for bit, since
+/// the worker runs the same primitives on the same inputs.
+///
+/// Nothing slow is made where the session runs, ever. A worker has
+/// nothing to fail on but a bug: it is started, and waited for, as part
+/// of loading the deal, and touches nothing outside itself after that.
+/// So a job it fails, or a slow call nobody described, is a bug, and
+/// is raised as one rather than made here instead: a device quietly
+/// back to holding its page still for half a second at a time is a
+/// failure nobody would ever hear of.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -162,11 +171,16 @@ final class VerifyTokensJob extends DealJob {
 }
 
 /// The primitives, with the slow ones answered from jobs made
-/// elsewhere when they were ([put]), and made here when they were not.
+/// elsewhere ([put]) and never made here.
 ///
 /// Nothing is taken on trust that was not made by the same primitives
 /// on the same inputs: an answer is found by the hash of the call it
 /// answers, and only this side's own worker puts one here.
+///
+/// A slow call with no answer put by is a step whose cost the table
+/// did not describe: a bug. It is refused — raised as an uncaught
+/// error, where the session's own catching cannot swallow it, and then
+/// thrown ([UndescribedDealCall]).
 class PreparedDeal implements DealCrypto {
   PreparedDeal(this.inner, {this.capacity = 64});
 
@@ -178,9 +192,8 @@ class PreparedDeal implements DealCrypto {
 
   final Map<String, Object> _answers = {};
 
-  /// The slow calls made here for want of an answer: what the thread
-  /// this runs on paid for itself. The table's tests hold it to none.
-  int madeHere = 0;
+  /// The slow calls refused for want of an answer. Every one is a bug.
+  int refused = 0;
 
   bool has(DealJob job) => _answers.containsKey(job.key);
 
@@ -204,8 +217,10 @@ class PreparedDeal implements DealCrypto {
         _ => a,
       };
     }
-    madeHere++;
-    return job.run(inner);
+    refused++;
+    final e = UndescribedDealCall(job);
+    Zone.current.handleUncaughtError(e, StackTrace.current);
+    throw e;
   }
 
   @override
@@ -281,6 +296,16 @@ class PreparedDeal implements DealCrypto {
   Uint8List sharedSecret(Uint8List secret, Uint8List pk) => inner.sharedSecret(secret, pk);
 }
 
+/// A slow call the deal asked for with no answer made for it.
+class UndescribedDealCall extends StateError {
+  UndescribedDealCall(DealJob job) : super('the deal asked for ${job.op} with nothing made for it: a step whose cost was not described');
+}
+
+/// A job the worker could not make: a bug, there or in what was sent.
+class DealWorkFailed extends StateError {
+  DealWorkFailed(DealJob job, Object why) : super('the deal worker could not make ${job.op}: $why');
+}
+
 /// Somewhere to make [DealJob]s other than here.
 ///
 /// Answers come back through callbacks rather than a future, so that
@@ -288,14 +313,157 @@ class PreparedDeal implements DealCrypto {
 /// event loop turning ([DealWorker] implementations in packages/table).
 abstract class DealWorker {
   /// The platform's: a Web Worker running `deal_worker.js` beside the
-  /// app in the browser, an isolate with the cdylib open on the VM.
-  /// Ready at once; jobs sent before the worker has its primitives
-  /// loaded wait for them, and fail if they never load.
-  static DealWorker start({String? libraryPath}) => platform.start(libraryPath: libraryPath);
+  /// app in the browser, an isolate with the cdylib open on the VM —
+  /// kept going by [ResilientDealWorker]. Done once the worker has its
+  /// primitives running; an error, saying why, if it never will, which
+  /// is the deal not loading. Everything a worker needs is fetched
+  /// here, once, so that one started later to replace a worker that
+  /// failed needs nothing from the network.
+  static Future<DealWorker> start({String? libraryPath}) async =>
+      ResilientDealWorker.start(await platform.spawner(libraryPath: libraryPath));
+
+  /// A worker that has had work waiting this long, with the page awake
+  /// and no job finished, has stopped. A job is two seconds at the
+  /// most on a slow phone, even queued behind other tables' work.
+  static const stallTick = Duration(seconds: 5);
+  static const stallTicks = 6;
 
   /// Makes [job], then calls [done] with its answer — or [failed],
-  /// once, if it cannot be made there at all.
+  /// once, if it cannot be made there at all, which is a bug.
   void run(DealJob job, {required void Function(Object answer) done, required void Function(Object error) failed});
 
+  /// Whether it has failed for good: every job fails, from now on.
+  bool get dead;
+
   void close();
+}
+
+/// A worker kept going: when it fails, or stalls — work waiting for
+/// [DealWorker.stallTicks] ticks of [DealWorker.stallTick] and no job
+/// finished — it is replaced, once, and everything it had been sent
+/// goes to the replacement, which is held to the same count from the
+/// moment it is asked for. A failure it did not cause goes away with
+/// the worker that had it: a browser that dropped the thread, an
+/// instance left half done. A bug does not, and the replacement fails
+/// the same way; then the worker is [dead], and every job waiting on
+/// it and every one sent after fails, with why.
+///
+/// Stalling is counted in ticks, not by the wall: a page the browser
+/// has put to sleep does not tick, so a phone asleep in a pocket
+/// wakes with its worker's count where it left it.
+class ResilientDealWorker implements DealWorker {
+  ResilientDealWorker._(this._spawn, this._every, this._stallTicks);
+
+  /// [spawn] makes a worker ready to take jobs. [every] runs its
+  /// callback every [tick] until the function it returns is called; a
+  /// periodic timer unless a test says otherwise.
+  static Future<DealWorker> start(Future<DealWorker> Function() spawn,
+      {Duration tick = DealWorker.stallTick,
+      int stallTicks = DealWorker.stallTicks,
+      void Function() Function(Duration tick, void Function() f)? every}) async {
+    final w = ResilientDealWorker._(spawn, every ?? _periodic, stallTicks);
+    w._current = await spawn();
+    w._stopTicking = w._every(tick, w._tick);
+    return w;
+  }
+
+  static void Function() _periodic(Duration tick, void Function() f) {
+    final t = Timer.periodic(tick, (_) => f());
+    return t.cancel;
+  }
+
+  final Future<DealWorker> Function() _spawn;
+  final void Function() Function(Duration tick, void Function() f) _every;
+  final int _stallTicks;
+  void Function()? _stopTicking;
+
+  DealWorker? _current;
+  final Map<int, ({DealJob job, void Function(Object) done, void Function(Object) failed})> _waiting = {};
+  int _next = 0;
+  int _generation = 0;
+  bool _replaced = false;
+  Object? _death;
+  bool _closed = false;
+  bool _moved = false;
+  int _still = 0;
+
+  /// Workers started to replace one that failed or stalled: none or one.
+  int get replaced => _replaced ? 1 : 0;
+
+  @override
+  bool get dead => _death != null;
+
+  @override
+  void run(DealJob job, {required void Function(Object answer) done, required void Function(Object error) failed}) {
+    final death = _death;
+    if (death != null || _closed) return failed(death ?? 'closed');
+    final id = _next++;
+    _waiting[id] = (job: job, done: done, failed: failed);
+    _send(id);
+  }
+
+  void _send(int id) {
+    final w = _current;
+    final waiting = _waiting[id];
+    if (w == null || waiting == null) return; // sent once the replacement is up
+    final generation = _generation;
+    w.run(waiting.job, done: (answer) {
+      if (generation != _generation || _waiting.remove(id) == null) return;
+      _moved = true;
+      waiting.done(answer);
+    }, failed: (why) {
+      if (generation == _generation) _failed(why);
+    });
+  }
+
+  /// Work waiting and none of it finished, tick after tick, is a
+  /// stall whether a worker is there to make it or is still starting:
+  /// a replacement that never says it is ready is stalled too.
+  void _tick() {
+    if (_death != null || _closed) return;
+    if (_waiting.isEmpty || _moved) {
+      _moved = false;
+      _still = 0;
+      return;
+    }
+    if (++_still >= _stallTicks) _failed('it had work and finished none in $_stallTicks ticks of the page awake');
+  }
+
+  void _failed(Object why) {
+    if (_death != null || _closed) return;
+    if (_replaced) return _die('$why, and so did the worker started to replace one that had failed');
+    _replaced = true;
+    _generation++;
+    _still = 0;
+    _current?.close();
+    _current = null;
+    _spawn().then((w) {
+      if (_death != null || _closed) return w.close();
+      _current = w;
+      for (final id in List.of(_waiting.keys)) {
+        _send(id);
+      }
+    }, onError: (Object e) => _die('$why, and a worker started to replace it did not start: $e'));
+  }
+
+  void _die(Object why) {
+    _death = why;
+    _stopTicking?.call();
+    _current?.close();
+    _current = null;
+    final waiting = List.of(_waiting.values);
+    _waiting.clear();
+    for (final w in waiting) {
+      w.failed(why);
+    }
+  }
+
+  @override
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    _stopTicking?.call();
+    _current?.close();
+    _waiting.clear();
+  }
 }

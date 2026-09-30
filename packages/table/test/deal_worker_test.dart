@@ -9,6 +9,8 @@
 /// nothing else.
 library;
 
+import 'dart:async';
+
 import 'package:deal/deal.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
@@ -30,6 +32,8 @@ void main() {
   }
 
   test('a game with a worker at every device makes none of the deal\'s slow calls where the table runs', () {
+    // Any call made where the table runs would have been refused, and
+    // raised in this test's zone, which fails it.
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 30, workers: true);
     t.start();
     expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 60 * 60 * 1000), isTrue,
@@ -40,7 +44,7 @@ void main() {
     final clients = everyClient(t);
     expect(clients.length, greaterThan(t.clients.length), reason: 'jurors served, and are held to it too');
     for (final c in clients) {
-      expect(c.dealCallsMadeHere, 0, reason: '${c.signer.publicKey.substring(0, 6)} made a slow call itself');
+      expect(c.dealCallsRefused, 0, reason: '${c.signer.publicKey.substring(0, 6)} asked for a slow call nobody described');
     }
     // A person makes a shuffle and two batches of tokens, and checks
     // the other three shuffles and batches and the first deck, each
@@ -50,39 +54,70 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 20)));
 
-  test('a device whose worker fails makes its work itself, and the table deals as before', () {
-    final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 1, workers: true);
-    final failing = t.people[1].client;
-    t.dealWorkers[failing.signer.publicKey]!.dead = true;
-    final said = <String>[];
-    failing.log = said.add;
-    t.start();
-    expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 20 * 60 * 1000), isTrue,
-        reason: 'the game was played out: ${failing.describe()}');
-    checksOut(t);
-    expect(failing.dealCallsMadeHere, greaterThanOrEqualTo(10), reason: 'every slow call of the deal, made at home');
-    expect(said.where((l) => l.contains('deal worker:') && l.contains('failed there')), isNotEmpty, reason: 'and said why');
-    expect(t.clients.first.dealCallsMadeHere, 0, reason: 'the others\' workers were fine');
+  /// A one-hand game with [broken] done to the second person's worker
+  /// before it starts; what was raised, and the table.
+  (List<Object>, SimTable) oneHandWith(void Function(SimDealWorker w) broken) {
+    final raised = <Object>[];
+    late SimTable t;
+    runZonedGuarded(() {
+      t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 1, workers: true);
+      broken(t.dealWorkers[t.people[1].client.signer.publicKey]!);
+      t.start();
+      final first = t.people[0].client;
+      t.clock.runUntil(() => first.done, limitMs: 20 * 60 * 1000);
+    }, (e, _) => raised.add(e));
+    return (raised, t);
+  }
+
+  void playedOnWithout(SimTable t, int seat) {
+    final first = t.people[0].client;
+    expect(first.done, isTrue, reason: 'the game was played out without it: ${first.describe()}');
+    expect(first.record.any((d) => d.removal && d.event.seat == seat), isTrue, reason: 'the seat that could not deal was removed');
+    final v = verifyRecord(t.spec, first.record, juries: first.juries, crypto: crypto, releases: first.releases);
+    expect(v.ok && v.complete, isTrue, reason: v.reason);
+    for (final c in everyClient(t)) {
+      expect(c.dealCallsRefused, 0);
+    }
+  }
+
+  test('a worker that fails for good is a bug said out loud; its device leaves at once, and the table plays on', () {
+    final (raised, t) = oneHandWith((w) => w.dead = true);
+    final broken = t.people[1].client;
+    expect(raised, [isA<DealWorkFailed>()], reason: 'the failure raised, once, and nothing else');
+    expect(broken.cannotDeal, isNotNull, reason: 'and the device knows it cannot deal');
+    expect(t.dealWorkers[broken.signer.publicKey]!.made, 0, reason: 'nothing was made anywhere for it');
+    playedOnWithout(t, 1);
+    expect(t.people[0].client.record.any((d) => d.removal && d.event.seat == 1 && d.event.kind == EventKind.leave), isTrue,
+        reason: 'it left, rather than wait at a table of two to be booted at a turn that would never come');
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  test('a worker that stops answering is waited on once, and then the work is made at home', () {
-    final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 1, workers: true);
-    final stuck = t.people[1].client;
-    t.dealWorkers[stuck.signer.publicKey]!.hung = true;
-    final said = <String>[];
-    stuck.log = said.add;
-    t.start();
-    expect(t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 20 * 60 * 1000), isTrue,
-        reason: 'the game was played out: ${stuck.describe()}');
+  test('a worker that stops answering is noticed stalling, replaced, given up on when that stalls too, and its device leaves', () {
+    final (raised, t) = oneHandWith((w) => w.hung = true);
+    expect(raised, [isA<DealWorkFailed>()]);
+    expect(t.people[1].client.cannotDeal, contains('stalled'));
+    playedOnWithout(t, 1);
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  test('a juror whose worker fails stops serving; the seat it held goes to the escrow, and the game goes on', () {
+    final raised = <Object>[];
+    late SimTable t;
+    late SimJuror broken;
+    runZonedGuarded(() {
+      t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 1, workers: true);
+      t.start();
+      final c = t.people[0].client;
+      t.clock.runUntil(() => c.botHolders(c.game.handNumber).isNotEmpty, limitMs: 60 * 1000);
+      final holder = c.botHolders(c.game.handNumber).values.first;
+      broken = t.jurors.firstWhere((j) => j.signer.publicKey == holder);
+      t.dealWorkers[holder]!.dead = true;
+      t.clock.runUntil(() => t.clients.every((c) => c.done), limitMs: 20 * 60 * 1000);
+    }, (e, _) => raised.add(e));
+    expect(raised, [isA<DealWorkFailed>()]);
+    expect(broken.client?.cannotDeal, isNotNull);
+    expect(t.clients.every((c) => c.done), isTrue, reason: 'the game was played out: ${t.people[0].client.describe()}');
     checksOut(t);
-    expect(stuck.dealCallsMadeHere, greaterThanOrEqualTo(10), reason: 'every slow call of the deal, made at home in the end');
-    expect(said.where((l) => l.contains('not back in ${TableClient.workerPatienceMs ~/ 1000} s')), hasLength(1),
-        reason: 'given up on once, not a job at a time');
-    // A stopped worker costs the seat one patience, which is half a
-    // deal step's allowance, so it does not cost the seat.
-    expect(TableClient.workerPatienceMs, lessThanOrEqualTo(TimeBank.standard.fixedMs ~/ 2));
-    expect(t.clients.first.record.where((d) => d.removal), isEmpty, reason: 'nobody was booted for it');
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 

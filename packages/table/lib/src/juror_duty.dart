@@ -101,6 +101,10 @@ class JurorDuty {
         log?.call('duty: summoned to a sealed table without the deal\'s cryptography; cannot serve');
         return;
       }
+      if (s.spec.sealed && (dealWorker?.dead ?? false)) {
+        log?.call('duty: summoned to a sealed table with the deal\'s worker failed for good; cannot serve');
+        return;
+      }
       final client =
           TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, silenceAfterMs: silenceAfterMs, crypto: crypto, dealWorker: dealWorker);
       client.log = log;

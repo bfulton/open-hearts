@@ -293,31 +293,35 @@ class TableClient {
   /// a step waits for anything else it is checked against. The table
   /// sees nothing different but the time the work took, which it
   /// spent before anyway — only now with the screen still drawing.
+  ///
+  /// Nothing slow is made here instead, ever. A worker that fails is
+  /// replaced once ([ResilientDealWorker]); one that fails again is a
+  /// bug, raised as one ([DealWorkFailed]), and this device can no
+  /// longer deal ([cannotDeal]). A slow call nobody described is
+  /// refused and raised the same way ([PreparedDeal]).
   final DealWorker? dealWorker;
+
+  /// Why this device cannot deal, once its worker has failed for good;
+  /// null while it can.
+  ///
+  /// A seat at the table leaves it at once. A device that cannot check
+  /// the others' deal steps can never witness them, and at a table of
+  /// two people a step needs both: waiting to be booted at its own turn
+  /// would be waiting for a turn that never comes, with the other
+  /// player's shuffle stopped in front of it. Leaving, the seat goes
+  /// to a bot and the table plays on. A juror stops following the
+  /// table; the seat it holds goes to the escrow at its deadline, as a
+  /// quiet juror's does.
+  String? get cannotDeal => _cannotDeal;
+  String? _cannotDeal;
 
   /// The session's primitives, answering the slow calls from what
   /// [dealWorker] made.
   late final PreparedDeal? _prepared = dealWorker == null || crypto == null ? null : PreparedDeal(crypto!);
 
-  /// The slow calls this side made itself for want of an answer from
-  /// its worker: none, unless a step was described wrongly or the
-  /// worker failed. The simulator's tests hold it to none.
-  int get dealCallsMadeHere => _prepared?.madeHere ?? 0;
-
-  /// Jobs the worker could not make: made here.
-  final Set<String> _makeHere = {};
-
-  /// How long a job may be at the worker before the worker is taken
-  /// to have stopped, and this side makes its work itself from then
-  /// on. A shuffle is a second or so on a phone, and a worker a few
-  /// tables share may have a few in line; a job not back in twenty is
-  /// a worker that has stopped. Once, not a job at a time: a step can
-  /// wait on two jobs, and twenty seconds each would be the whole of a
-  /// deal step's forty, and the seat.
-  static const workerPatienceMs = 20000;
-
-  /// Whether this side has given up on [dealWorker] ([workerPatienceMs]).
-  bool _workerStopped = false;
+  /// The slow calls refused for want of an answer from the worker:
+  /// steps whose cost was not described. Every one is a bug.
+  int get dealCallsRefused => _prepared?.refused ?? 0;
 
   /// Where the deal's secrets and seeds come from: secure by default;
   /// the simulator seeds it, so a table replays.
@@ -1923,16 +1927,10 @@ class TableClient {
       if (held != null && event.author != held && !_isEscrowed(turn.hand, seat)) return _defer(event);
       return;
     }
-    final d = _deal;
-    if (event.kind == EventKind.deal &&
-        d != null &&
-        _prepared != null &&
-        event.author != signer.publicKey &&
-        !_workedOut(d.workToTake(event.round, Map<String, Object?>.from(event.body)))) {
+    if (!_checkable(event)) {
       // Checked once the check has been made elsewhere, and kept for
       // the drain that follows it back, like any step waiting on
-      // something this side does not have yet (below). This side's
-      // own steps are not checked here at all ([_valid]).
+      // something this side does not have yet (below).
       return _defer(event, quietly: true);
     }
     if (!_valid(event, seat)) {
@@ -3486,68 +3484,105 @@ class TableClient {
   void _emitDeal(TurnId turn, int round, int seat, Map<String, Object?> m) =>
       _emit(EventKind.deal, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'round': round, ...m});
 
+  /// Whether [event] can be checked here now: for a deal step another
+  /// seat sent, whether its checks have been made at the worker
+  /// ([DealSession.workToTake]); if not, they are on their way, and
+  /// the caller keeps the event for the drain that follows them back.
+  /// This side's own steps are not checked ([_valid]).
+  bool _checkable(TableEvent event) {
+    final d = _deal;
+    if (event.kind != EventKind.deal || d == null || _prepared == null || event.author == signer.publicKey) return true;
+    return _workedOut(d.workToTake(event.round, Map<String, Object?>.from(event.body)));
+  }
+
+  /// What the deals here came to on their own and are waiting on
+  /// ([DealSession.wanted]): the first deck, a departed seat's work.
+  /// Sent at every change, since any change can be what set it off.
+  void _sendWanted() {
+    if (_prepared == null) return;
+    for (final d in _dealsByHand.values) {
+      final wanted = d.wanted;
+      if (wanted.isNotEmpty) _workedOut(wanted);
+    }
+  }
+
   /// Whether the slow calls in [jobs] have their answers here, so the
   /// session can make them without holding the screen. Any that do
   /// not are sent to [dealWorker], and when an answer comes back the
   /// steps waiting on it are looked at again: deferred ones drained,
   /// this side's own acted on. Always true without a worker.
   ///
-  /// A job the worker fails is made here after all, and a worker that
-  /// has not answered one within [workerPatienceMs] is given up on and
-  /// everything made here from then — which is what happened to every
-  /// job before there was a worker: slower on the screen, never
-  /// different.
+  /// A job the worker cannot make is a worker failed for good, and a
+  /// device that can no longer deal ([_cannotWork]); nothing is sent
+  /// to it after that, and what waits on it waits for good. There is
+  /// no timeout here. A worker that is slow — a phone, a queue of other
+  /// tables' work, a device asleep in a pocket — is slow, and the
+  /// table's deadlines are what judge a device too slow to play; one
+  /// that has stopped is the worker's to notice ([ResilientDealWorker]).
   bool _workedOut(List<DealJob> jobs) {
     final p = _prepared;
     final w = dealWorker;
-    if (p == null || w == null || _workerStopped) return true;
-    bool answered(DealJob job) => p.has(job) || _makeHere.contains(job.key);
+    if (p == null || w == null) return true;
+    if (_cannotDeal != null) return jobs.every(p.has);
     for (final job in jobs) {
-      if (answered(job) || _working.containsKey(job.key)) continue;
-      final sent = _workSent++;
-      _working[job.key] = sent;
-      // Back for this sending, not an earlier one of the same job.
-      void back() {
-        if (_working[job.key] != sent) return;
-        _working.remove(job.key);
-        _lookAgainAfterWork();
-      }
-
-      clock.schedule(workerPatienceMs, () {
-        if (_working[job.key] != sent || _workerStopped) return;
-        _trace('deal worker: ${job.op} not back in ${workerPatienceMs ~/ 1000} s; the deal\'s work is made here from now on');
-        _workerStopped = true;
-        _working.clear();
-        _lookAgainAfterWork();
-      });
+      if (p.has(job) || !_working.add(job.key)) continue;
       w.run(job, done: (answer) {
+        _working.remove(job.key);
         p.put(job, answer);
-        back();
-      }, failed: (why) {
-        _trace('deal worker: ${job.op} failed there ($why); made here');
-        _makeHere.add(job.key);
-        back();
-      });
+        _lookAgainAfterWork();
+      }, failed: (why) => _cannotWork(job, why));
     }
-    // A worker that has already failed answers inside [DealWorker.run],
-    // so what is ready is read after sending, not before.
-    return jobs.every(answered);
+    return jobs.every(p.has);
   }
 
-  final Map<String, int> _working = {};
-  int _workSent = 0;
+  /// Jobs sent to the worker and not answered, by key. A job that
+  /// failed stays here: never sent again, never made here.
+  final Set<String> _working = {};
+
+  /// The worker has failed for good ([ResilientDealWorker]), and this
+  /// device with it ([cannotDeal]).
+  ///
+  /// Said once, at the first job to fail — every job after would fail
+  /// the same way, and none is sent — and acted on a moment later,
+  /// from outside whatever this side was in the middle of: a worker
+  /// that has failed for good fails a job inside [DealWorker.run],
+  /// which can be anywhere.
+  void _cannotWork(DealJob job, Object why) {
+    if (_cannotDeal != null || _closed) return;
+    Zone.current.handleUncaughtError(DealWorkFailed(job, why), StackTrace.current);
+    _cannotDeal = '$why';
+    _trace('cannot deal: $why');
+    clock.schedule(0, () {
+      if (_closed) return;
+      if (amSeated) {
+        leave();
+        _notify();
+      } else {
+        _notify();
+        close();
+      }
+    });
+  }
   bool _lookAgainDue = false;
 
-  /// Work back from the worker: the steps waiting on it looked at
-  /// again — once however many answers came together, and never from
-  /// inside the look that sent the work, which has yet to put its own
-  /// step aside to wait.
+  /// Work back from the worker: the deals go on from where they
+  /// stopped for it ([DealSession.resume]) — a first deck, a departed
+  /// seat's cards opened — and the table moves with them as it does
+  /// when a step settles or a secret is rebuilt; the steps waiting on
+  /// it are looked at again. Once however many answers came together,
+  /// and never from inside the look that sent the work, which has yet
+  /// to put its own step aside to wait.
   void _lookAgainAfterWork() {
     if (_lookAgainDue || _closed) return;
     _lookAgainDue = true;
     clock.schedule(0, () {
       _lookAgainDue = false;
       if (_closed) return;
+      for (final d in List.of(_dealsByHand.values)) {
+        d.resume();
+      }
+      _advanceDeal();
+      _resumeStalled();
       _drainFuture();
       _actOnDeal();
       _notify();
@@ -5828,6 +5863,7 @@ class TableClient {
       if (ruled.kind != EventKind.pass && ruled.kind != EventKind.play && ruled.kind != EventKind.deal) return;
       if (_isEscrowedAudit(turn, seat)) return;
       if (race.action?.id != ruled.id) {
+        if (!_checkable(ruled)) return _defer(event, quietly: true);
         if (!_valid(ruled, seat)) return;
         race.rivals.putIfAbsent(ruled.id, () => ruled);
         race.forRival.putIfAbsent(ruled.id, () => {ruled.author});
@@ -5840,6 +5876,7 @@ class TableClient {
     if (event.side == 'action') {
       if (ruled.author != holder.key) return;
       if (ruled.kind != EventKind.pass && ruled.kind != EventKind.play && ruled.kind != EventKind.deal) return;
+      if (!_checkable(ruled)) return _defer(event, quietly: true);
       if (!_valid(ruled, seat)) return;
       race.action = ruled;
       race.forAction.add(ruled.author);
@@ -5871,6 +5908,7 @@ class TableClient {
 
   void _notify() {
     if (_closed) return;
+    _sendWanted();
     if (_notifying) {
       _notifyAgain = true;
       return;

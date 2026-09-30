@@ -4,6 +4,7 @@
 /// rotated — the same screen as solo play, from a different chair.
 library;
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
@@ -447,8 +448,45 @@ void main() {
     }
     expect(live.controller.game.tricksPlayed, greaterThanOrEqualTo(2), reason: 'and the hand plays');
     expect(live.myWorker!.made, greaterThanOrEqualTo(10), reason: 'a shuffle, two batches of tokens and seven checks, at the worker');
-    expect(live.controller.client.dealCallsMadeHere, 0, reason: 'none of the deal\'s slow calls made where the screen is drawn');
+    expect(live.controller.client.dealCallsRefused, 0, reason: 'none of the deal\'s slow calls asked for where the screen is drawn');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a device whose deal worker fails for good says so, leaves the table, and the others play on', (tester) async {
+    final crypto = await DealCrypto.load();
+    // What is raised where nothing catches it — the worker's failure —
+    // is kept here. The body's own failures come back out as a value:
+    // an error does not cross from a zone with a handler of its own
+    // into the test's, and an expectation that failed in there would
+    // leave the test waiting for ever rather than failing it.
+    final raised = <Object>[];
+    final zone = Zone.current.fork(specification: ZoneSpecification(handleUncaughtError: (self, parent, z, e, st) => raised.add(e)));
+    final failed = await zone.run(() async {
+      try {
+        final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: 4, workers: true);
+        live.myWorker!.dead = true;
+        for (var guard = 0; guard < 200 && live.controller.client.cannotDeal == null; guard++) {
+          await live.advance(tester, 500);
+        }
+        expect(live.controller.client.cannotDeal, isNotNull, reason: 'the device learned it cannot deal');
+        await live.advance(tester, 500);
+        expect(find.text('This device can\'t deal'), findsOneWidget);
+        expect(find.text('A bot took your seat'), findsNothing, reason: 'the table heard it; its deal is what broke');
+        expect(find.widgetWithText(FilledButton, 'Home'), findsOneWidget);
+        expect(find.byType(TableView), findsNothing, reason: 'nothing at the table left for this device to do');
+        final other = live.people.values.first.client;
+        for (var guard = 0; guard < 200 && !other.record.any((d) => d.removal && d.event.seat == _me); guard++) {
+          await live.advance(tester, 500);
+        }
+        expect(other.record.any((d) => d.removal && d.event.seat == _me && d.event.kind == EventKind.leave), isTrue,
+            reason: 'it left, and the table carried the leave: ${other.describe()}');
+        return null;
+      } catch (e, st) {
+        return (e, st);
+      }
+    });
+    if (failed != null) Error.throwWithStackTrace(failed.$1, failed.$2);
+    expect(raised, [isA<DealWorkFailed>()], reason: 'the failure raised, once, and nothing else');
   });
 
   testWidgets('a hand nobody left can open ends the game: a connection failure, juror quorum lost', (tester) async {

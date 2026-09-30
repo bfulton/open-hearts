@@ -2,11 +2,16 @@
 /// at a time in the order they were sent.
 library;
 
+import 'dart:async';
 import 'dart:isolate';
 
 import '../deal.dart';
 
-DealWorker start({String? libraryPath}) => _IsolateWorker(libraryPath);
+/// Each worker opens the cdylib itself: there is nothing to fetch.
+/// A worker is done starting once its isolate has the cdylib open; an
+/// error if it cannot.
+Future<Future<DealWorker> Function()> spawner({String? libraryPath}) async =>
+    () => _IsolateWorker(libraryPath)._ready.future;
 
 typedef _Waiting = ({void Function(Object answer) done, void Function(Object error) failed});
 
@@ -20,6 +25,10 @@ class _IsolateWorker implements DealWorker {
   }
 
   final _replies = ReceivePort();
+  final _ready = Completer<DealWorker>();
+
+  @override
+  bool get dead => _death != null;
   final Map<int, _Waiting> _waiting = {};
   final List<(int, DealJob)> _unsent = [];
   SendPort? _jobs;
@@ -46,6 +55,7 @@ class _IsolateWorker implements DealWorker {
     switch (m) {
       case SendPort jobs:
         _jobs = jobs;
+        if (!_ready.isCompleted) _ready.complete(this);
         for (final u in _unsent) {
           jobs.send(u);
         }
@@ -61,6 +71,10 @@ class _IsolateWorker implements DealWorker {
 
   void _dead(Object why) {
     _death = why;
+    if (!_ready.isCompleted) {
+      _ready.completeError(why);
+      close();
+    }
     _unsent.clear();
     final waiting = List.of(_waiting.values);
     _waiting.clear();

@@ -206,6 +206,29 @@ class _LivePageState extends State<LivePage> {
 
   @override
   Widget build(BuildContext context) {
+    // This device, not the game: its worker for the deal failed for
+    // good, and it left the table rather than hold it up. The others
+    // play on, a bot in this seat. Before the seat that is no longer
+    // this player's, below: the leave lands at once, and what that
+    // screen says — the table could not hear from you — is not what
+    // happened.
+    final cannotDeal = _c.client.cannotDeal;
+    if (cannotDeal != null) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(gradient: Felt.gradient),
+          child: SafeArea(
+            child: _Failed(
+              title: 'This device can\'t deal',
+              label: 'The deal stopped working here',
+              why: 'So you have left the table, and the others play on with a bot in your seat. '
+                  'Reloading the page starts the deal afresh. ($cannotDeal)',
+              onHome: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ),
+      );
+    }
     // A seat that is no longer this player's — booted, or ruled absent
     // by a jury — shows no table at all: watching a bot play your cards
     // is not a thing to look at. Just what happened, and the way back.
@@ -224,7 +247,17 @@ class _LivePageState extends State<LivePage> {
       return Scaffold(
         body: Container(
           decoration: const BoxDecoration(gradient: Felt.gradient),
-          child: SafeArea(child: _Failed(failure: failure, onHome: () => Navigator.of(context).pop())),
+          child: SafeArea(
+            child: _Failed(
+              title: 'Connection failure',
+              label: failure.label[0].toUpperCase() + failure.label.substring(1),
+              why: switch (failure) {
+                Failure.jurorQuorumLost => 'Too few of the jurors keeping the bot seats are still online, '
+                    'so the hand cannot go on. The game ends here, unscored.',
+              },
+              onHome: () => Navigator.of(context).pop(),
+            ),
+          ),
         ),
       );
     }
@@ -342,17 +375,15 @@ class _Presence extends StatelessWidget {
 }
 
 /// The table went on without you.
-/// A game ended for a connection failure: which one, and the way home.
+/// A game this device can go no further in — a connection failure, or
+/// a deal it can no longer run: what, why, and the way home.
 class _Failed extends StatelessWidget {
-  const _Failed({required this.failure, required this.onHome});
+  const _Failed({required this.title, required this.label, required this.why, required this.onHome});
 
-  final Failure failure;
+  final String title;
+  final String label;
+  final String why;
   final VoidCallback onHome;
-
-  String get _why => switch (failure) {
-        Failure.jurorQuorumLost => 'Too few of the jurors keeping the bot seats are still online, '
-            'so the hand cannot go on. The game ends here, unscored.',
-      };
 
   @override
   Widget build(BuildContext context) {
@@ -369,13 +400,11 @@ class _Failed extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Connection failure',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
+            Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
             const SizedBox(height: 4),
-            Text(failure.label[0].toUpperCase() + failure.label.substring(1),
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Palette.chrome)),
+            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Palette.chrome)),
             const SizedBox(height: 8),
-            Text(_why, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
+            Text(why, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: onHome,

@@ -511,19 +511,46 @@ own build — so until they do, they play alone.
 
   So the page makes them in a Web Worker, `app/web/deal_worker.js`,
   with an instance of its own of the same wasm (`packages/deal`,
-  `work.dart`; on the VM, an isolate). The session is untouched and
-  still synchronous. The table describes the slow calls a step is
-  about to cost — the check of a step that has arrived, this side's
-  own shuffle or tokens, and the first deck once every seat's keys
-  are checked — sends them to the worker, and keeps the step where it
-  keeps any step that is waiting on something (`TableClient._workedOut`).
-  When the answers are back it looks again, and the session's calls
-  are answered from them, found by a hash of the call, so the answer
-  is the one the session would have made itself. A call nobody
-  described is made on the page as before, and the simulator's tests
-  hold those to none across whole games and sealed chaos walks. A
-  worker that fails hands its jobs back to be made on the page; one
-  that has not answered a job in twenty seconds is given up on.
+  `work.dart`; on the VM, an isolate). The session is still
+  synchronous. The table describes the slow calls a step is about to
+  cost — the check of a step that has arrived, this side's own shuffle
+  or tokens — sends them to the worker, and keeps the step where it
+  keeps any step that is waiting on something
+  (`TableClient._workedOut`). What the session comes to by itself —
+  the first deck once every seat's keys are in, the shuffle of a seat
+  whose secret is public, the tokens of any seat whose secret it holds
+  — it asks for rather than makes: it stops there, says what it wants
+  (`DealSession.wanted`), and goes on when the answers are back
+  (`resume`). Its calls are answered from what came back, found by a
+  hash of the call, so each answer is the one it would have made
+  itself.
+
+  Nothing slow is made on the page, ever. The worker is started as
+  part of loading the deal, from a script and wasm fetched once, and a
+  page whose worker does not start has no deal and plays no live
+  table. After that the worker touches nothing outside itself, so it
+  has nothing to fail on but a bug — and a bug quieted by making the
+  work on the page instead is a device back to holding its page still
+  for half a second at a time, with nobody ever hearing of it. So:
+
+  - a slow call nobody sent to the worker is refused, and raised where
+    nothing catches it (`PreparedDeal`). The simulator's tests hold
+    those to none across whole games and sealed chaos walks;
+  - a worker that fails a job, or stalls — work waiting through six
+    ticks of five seconds and none of it finished — is replaced, once,
+    and what it had goes to the new one (`ResilientDealWorker`). The
+    ticks are the page's own timer, which a browser slows or stops for
+    a page out of sight, so a phone put to sleep mid-deal does not wake
+    to a worker judged stalled;
+  - a replacement that fails or stalls too is a worker failed for
+    good: raised, and the device can no longer deal
+    (`TableClient.cannotDeal`). Seated, it leaves the table at once and
+    says so. A device that cannot check the others' steps can never
+    witness them, and at a table of two people, waiting to be booted
+    at its own turn is waiting for a turn that never comes. A juror
+    stops following the table, and the seat it held goes to the
+    escrow at its deadline, as a quiet juror's does; the device takes
+    no more summonses to sealed tables. The others play on.
 
   On a page doing nothing else, the five calls made on the page were
   five long tasks, the longest 600 ms, and a frame that took 583; made

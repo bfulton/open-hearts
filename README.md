@@ -219,7 +219,9 @@ wasm the browser loads, committed at `app/web/deal.wasm` so the web
 build needs no Rust. The page loads it twice: once for the quick
 calls, and once in a Web Worker, `app/web/deal_worker.js`, for the
 slow ones — a shuffle, its check, a seat's tokens — so that the screen
-keeps drawing while they are made (`packages/deal`, `work.dart`).
+keeps drawing while they are made (`packages/deal`, `work.dart`). None
+of those is ever made on the page instead: a page whose worker does not
+start plays no live table.
 Building needs a stable Rust with the
 `wasm32-unknown-unknown` target; the reference crate is a git
 dependency pinned by revision. `crypto/schnorr` is the browser's

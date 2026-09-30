@@ -2,9 +2,9 @@
 // runner: node --test e2e/deal_worker.test.mjs
 //
 // Run in a thread of its own, as a browser runs it, with only what a
-// worker has and node does not put in: `self`, its `postMessage`, and
-// a fetch that reads files. What goes in and out is structured-cloned
-// across the thread, as a browser's is. Its answers are held to the
+// worker has and node does not put in: `self` and its `postMessage`.
+// It is handed its wasm the way the page hands it, and what goes in
+// and out is structured-cloned across the thread, as a browser's is. Its answers are held to the
 // same wasm called directly on this thread — which is what the page's
 // own binding, deal_web.dart, does — including for inputs tampered
 // with, where a check that said yes would be the whole deal gone.
@@ -21,36 +21,33 @@ const script = `${here}../app/web/deal_worker.js`;
 // What a browser gives a worker and node does not.
 const shim = `
 const { parentPort, workerData } = require('node:worker_threads');
-const { readFile } = require('node:fs/promises');
-const { fileURLToPath } = require('node:url');
 const vm = require('node:vm');
 globalThis.self = globalThis;
-self.location = { href: workerData.href };
 self.postMessage = (m, transfer) => parentPort.postMessage(m, transfer);
-globalThis.fetch = async (url) => {
-  try {
-    const bytes = await readFile(fileURLToPath(String(url)));
-    return { ok: true, status: 200, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length) };
-  } catch {
-    return { ok: false, status: 404 };
-  }
-};
 parentPort.on('message', (data) => self.onmessage({ data }));
 vm.runInThisContext(workerData.source, { filename: workerData.href });
 `;
 
-function startWorker(query = '') {
+const dealWasm = new Uint8Array(readFileSync(`${here}../app/web/deal.wasm`));
+
+function startWorker(wasm = dealWasm) {
   const w = new Worker(shim, {
     eval: true,
-    workerData: { href: pathToFileURL(script).href + query, source: readFileSync(script, 'utf8') },
+    workerData: { href: pathToFileURL(script).href, source: readFileSync(script, 'utf8') },
   });
+  w.postMessage({ wasm });
   const waiting = new Map();
   let next = 0;
-  w.on('message', (m) => {
-    waiting.get(m.id)?.(m);
-    waiting.delete(m.id);
+  // What it says before any job: that it is ready, or why it is not.
+  const first = new Promise((resolve) => {
+    w.on('message', (m) => {
+      if (m.id === undefined) return resolve(m);
+      waiting.get(m.id)?.(m);
+      waiting.delete(m.id);
+    });
   });
   return {
+    first,
     job: (op, args) =>
       new Promise((resolve) => {
         const id = next++;
@@ -62,7 +59,7 @@ function startWorker(query = '') {
 }
 
 // The same module on this thread, called the way deal_web.dart calls it.
-const { instance } = await WebAssembly.instantiate(readFileSync(`${here}../app/web/deal.wasm`), {});
+const { instance } = await WebAssembly.instantiate(dealWasm, {});
 const e = instance.exports;
 e.deal_setup();
 function direct(inputs, outLen, f) {
@@ -113,6 +110,10 @@ const joint = aggregate(pks);
 const w = startWorker();
 after(() => w.close());
 
+test('it says it is ready before anything is asked of it', async () => {
+  assert.deepEqual(await w.first, { ready: true });
+});
+
 test('the deck before anyone shuffles is the one the page would make', async () => {
   const a = await w.job('initialDeck', [joint]);
   assert.equal(a.error, undefined, a.error);
@@ -154,11 +155,54 @@ test('what is not the shape of a job is an error, not an answer', async () => {
   assert.match((await w.job('toString', [])).error, /no such job/);
 });
 
-test('a wasm that is not there fails every job, and says why', async () => {
-  const lost = startWorker('?wasm=nothing-here.wasm');
+// A stand-in for deal.wasm, a few hand-assembled functions: its
+// shuffle check marks its instance and traps; its tokens check holds
+// only in an instance nothing has marked.
+function trappingWasm() {
+  const section = (id, bytes) => [id, bytes.length, ...bytes];
+  const str = (t) => [t.length, ...Buffer.from(t)];
+  const body = (...code) => [code.length + 1, 0, ...code];
+  const exp = (name, kind, i) => [...str(name), kind, i];
+  const types = [5,
+    0x60, 0, 0, // () -> ()
+    0x60, 1, 0x7f, 1, 0x7f, // (i32) -> i32
+    0x60, 2, 0x7f, 0x7f, 0, // (i32, i32) -> ()
+    0x60, 5, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 1, 0x7f, // five i32 -> i32
+    0x60, 4, 0x7f, 0x7f, 0x7f, 0x7f, 1, 0x7f]; // four i32 -> i32
+  const mark = [0x23, 0, 0x41, 1, 0x6a, 0x24, 0]; // marked += 1
+  return new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0,
+    ...section(1, types),
+    ...section(3, [5, 0, 1, 2, 3, 4]),
+    ...section(5, [1, 0, 1]),
+    ...section(6, [1, 0x7f, 1, 0x41, 0, 0x0b]),
+    ...section(7, [6, ...exp('memory', 2, 0), ...exp('deal_setup', 0, 0), ...exp('deal_alloc', 0, 1),
+      ...exp('deal_free', 0, 2), ...exp('deal_verify_shuffle', 0, 3), ...exp('deal_verify_tokens', 0, 4)]),
+    ...section(10, [5,
+      ...body(0x0b), // deal_setup
+      ...body(0x41, 0x80, 0x08, 0x0b), // deal_alloc: 1024
+      ...body(0x0b), // deal_free
+      ...body(...mark, 0x00, 0x0b), // deal_verify_shuffle: mark, then unreachable
+      ...body(0x23, 0, 0x45, 0x0b)]), // deal_verify_tokens: holds while unmarked
+  ]);
+}
+
+test('a check that traps does not hold, and the next job has a fresh instance', async () => {
+  const t = startWorker(trappingWasm());
   try {
-    assert.match((await lost.job('initialDeck', [joint])).error, /nothing-here\.wasm is not served/);
-    assert.match((await lost.job('verifyTokens', [pks[0], bytes(64), bytes(128)])).error, /not served/);
+    assert.deepEqual(await t.first, { ready: true });
+    const deck = new Uint8Array(52 * 64);
+    assert.equal(holds(await t.job('verifyShuffle', [joint, deck, deck, bytes(16)])), false, 'a trap is a no, not an error');
+    assert.equal(holds(await t.job('verifyTokens', [pks[0], bytes(64), bytes(128)])), true, 'made in an instance the trap did not touch');
+  } finally {
+    await t.close();
+  }
+});
+
+test('bytes that are not a wasm: it says so first, and fails any job', async () => {
+  const lost = startWorker(new Uint8Array([1, 2, 3]));
+  try {
+    assert.match((await lost.first).unloaded, /WebAssembly/);
+    assert.match((await lost.job('initialDeck', [joint])).error, /WebAssembly/);
   } finally {
     await lost.close();
   }

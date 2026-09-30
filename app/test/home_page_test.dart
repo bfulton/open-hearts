@@ -75,8 +75,13 @@ Widget still(Widget home) => MaterialApp(
 
 void main() {
   // A device that can run the deal, as every device that plays live
-  // is: the one that cannot is a test of its own (below).
-  setUpAll(() async => dealCrypto = await DealCrypto.load());
+  // is — the primitives and the worker that makes the slow ones: the
+  // one that cannot is a test of its own (below).
+  setUpAll(() async {
+    dealCrypto = await DealCrypto.load();
+    dealWorker = await DealWorker.start();
+  });
+  tearDownAll(() => dealWorker?.close());
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -272,6 +277,22 @@ void main() {
     }
   });
 
+  testWidgets('a device whose deal worker failed for good is told to start afresh, and opens no table', (tester) async {
+    final kept = dealWorker;
+    dealWorker = _DeadWorker();
+    addTearDown(() => dealWorker = kept);
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
+    await pumpHome(tester);
+    for (final way in ['Play friends', 'Play live']) {
+      await tester.tap(find.text(way));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('The deal that keeps the cards honest stopped working. Restart the app to start afresh.'), findsOneWidget,
+          reason: '$way: not that the build cannot run it — it did, and will again');
+      expect(find.byType(CircularProgressIndicator), findsNothing, reason: '$way: and nothing is being opened');
+    }
+  });
+
   testWidgets('a licence run out is no licence, and one for another device is none either', (tester) async {
     await licenceThisDevice(days: -1);
     expect(Entitlement.current.live, isFalse, reason: 'yesterday is not a date you can play on');
@@ -353,4 +374,14 @@ void main() {
     expect(find.textContaining('No server sees a hand'), findsOneWidget);
     expect(find.text(r'$2.99 a year'), findsOneWidget);
   });
+}
+
+/// A worker failed for good (packages/deal, ResilientDealWorker).
+class _DeadWorker implements DealWorker {
+  @override
+  bool get dead => true;
+  @override
+  void run(DealJob job, {required void Function(Object answer) done, required void Function(Object error) failed}) => failed('dead');
+  @override
+  void close() {}
 }
