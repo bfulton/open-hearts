@@ -91,7 +91,7 @@ class Room extends ChangeNotifier {
     bool? canDeal,
   })  : _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch),
         seed = (random ?? Random.secure()).nextInt(1 << 31),
-        canDeal = canDeal ?? dealCrypto != null {
+        canDeal = canDeal ?? dealReady {
     since = _nowMs();
     for (final e in List.of(channel.lobbySoFar)) {
       _onLobby(e);
@@ -407,10 +407,15 @@ class Room extends ChangeNotifier {
   static const _mismatch = "Someone's app is on another build than yours — one of you is older. Update, and try again.";
 
   /// What a device that cannot run the deal is told, wherever it tries
-  /// to sit at a live table.
-  static String get noDeal => kIsWeb
-      ? "This browser can't run the deal that keeps the cards honest. Try a current Chrome, Firefox or Safari."
-      : "This build can't run the deal that keeps the cards honest, so it can't sit at a live table.";
+  /// to sit at a live table. One whose deal loaded and then stopped —
+  /// its worker failed for good (crypto/deal.dart) — can run it again
+  /// from the start, and is told so.
+  static String get noDeal => switch ((kIsWeb, dealWorker?.dead ?? false)) {
+        (true, true) => "The deal that keeps the cards honest stopped working on this page. Reload it to start afresh.",
+        (false, true) => "The deal that keeps the cards honest stopped working. Restart the app to start afresh.",
+        (true, false) => "This browser can't run the deal that keeps the cards honest. Try a current Chrome, Firefox or Safari.",
+        (false, false) => "This build can't run the deal that keeps the cards honest, so it can't sit at a live table.",
+      };
 
   void _applyStart(Map<String, Object?> c) {
     final seed = c['seed'] as int;

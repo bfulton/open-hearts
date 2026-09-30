@@ -16,12 +16,15 @@ import 'sim_network.dart';
 import 'virtual_clock.dart';
 
 class SimJuror {
-  SimJuror(this.signer, this.net, this.clock, {this.crypto});
+  SimJuror(this.signer, this.net, this.clock, {this.crypto, this.dealWorker});
 
   final FakeSigner signer;
   final SimNetwork net;
   final VirtualClock clock;
   final DealCrypto? crypto;
+
+  /// Where this juror's deal work is made, if not in its client.
+  final DealWorker? dealWorker;
 
   /// The client following the table, from the first summons on.
   TableClient? client;
@@ -83,6 +86,7 @@ class SimJuror {
           transport: net.attach(signer.publicKey),
           clock: clock,
           crypto: crypto,
+          dealWorker: dealWorker,
           random: Random(signer.publicKey.hashCode + startedFor.length));
       c.log = log;
       client = c;

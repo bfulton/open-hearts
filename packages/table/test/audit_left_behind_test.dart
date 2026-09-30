@@ -78,11 +78,12 @@ void main() {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize, target: 1);
     final a = t.clients.first;
     final b = t.clients.last;
-    // The first held seat's juror's moves, kept from everyone but b for
-    // four seconds from its first card: a claims the escrow at three,
-    // and b has the move. Set from the start, and found by that card: a
-    // juror can play a moment before a person has the turn open, and a
-    // steer set once a person does was too late for it.
+    // The first held seat's juror's moves, kept from everyone but b
+    // until a second past a card's allowance from its first card: a
+    // claims the escrow as the allowance runs out, and b has the
+    // move. Set from the start, and found by that card: a juror can
+    // play a moment before a person has the turn open, and a steer
+    // set once a person does was too late for it.
     final jurors = {for (final j in t.jurors) j.signer.publicKey};
     PublicKey? holder;
     TurnId? turn;
@@ -93,7 +94,7 @@ void main() {
         final body = message['body'] as Map<String, Object?>;
         holder = from;
         turn = TurnId(body['hand'] as int, body['turn'] as int);
-        until = t.clock.nowMs + 4000;
+        until = t.clock.nowMs + TableClient.botActsWithinMs + 1000;
       }
       return from == holder && to != b.signer.publicKey && t.clock.nowMs < until ? -1 : null;
     };

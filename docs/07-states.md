@@ -84,7 +84,7 @@ step it was decided **here** (below, "The leave on the record").
 holding a piece of it. **On the record.** A person at the table claims
 the seat for the escrow at the seat's own turn when the juror has not
 been heard from for half a minute, or has had the turn in front of it
-for too long: 3 s for a play or a pass, 10 s for a deal step or its
+for too long: 15 s for a play or a pass, 40 s for a deal step or its
 audit. The clock starts once the juror is heard at the hand, and does
 not run while this side is behind the table. The claim is carried as a
 boot is, by a majority of the people or by the jury; the clocks only
@@ -149,6 +149,17 @@ A side that is waiting names what for, and who can end it
 A bot seat nobody holds is never waited on. Every side works its move
 out. The move waits only if the seat's cards are not open here yet,
 and then it is waiting for the seat's secret.
+
+Nor is a side's own deal worker a wait of the table's. A step whose
+check is being made in the worker (docs/03-fair-deal.md, "Off the
+page's thread") is kept the way a step early for its jury is kept, and
+this side's own shuffle or tokens are said once they have been made
+there. Either wait ends by itself: the answer comes back, or the
+worker fails for good — it failed or stalled, and so did the one
+started to replace it — and the side can no longer deal
+(`TableClient.cannotDeal`). Then it leaves the table, and a juror
+stops following it. The table sees a step that came a little later,
+or a seat that left.
 
 ## Stuck
 
@@ -285,7 +296,7 @@ are of three kinds:
   minute from a juror, and "heard lately" for who is here. Nothing but
   time tells gone from slow.
 - **Deadlines on someone present:** a person's grace and bank, and a
-  held seat's 3 s and 10 s. These are rules of the game, like a chess
+  held seat's 15 s and 40 s. These are rules of the game, like a chess
   clock.
 
 Each of these *proposes* a transition, and the table settles it on

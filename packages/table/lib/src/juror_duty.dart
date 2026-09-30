@@ -29,7 +29,8 @@ class JurorDuty {
       this.silenceAfterMs = 120000,
       this.pinned = 0,
       this.dial,
-      this.crypto})
+      this.crypto,
+      this.dealWorker})
       : clock = clock ?? WallClock();
 
   /// The relays a summoned client follows a table on; every one of
@@ -46,6 +47,10 @@ class JurorDuty {
 
   /// The deal's primitives, to serve at sealed tables.
   final DealCrypto? crypto;
+
+  /// Where the deal's slow calls are made for the tables served
+  /// ([TableClient.dealWorker]); one for all of them, as a device has.
+  final DealWorker? dealWorker;
 
   /// Relays at the front of [relays] kept primary — ours to run.
   final int pinned;
@@ -96,8 +101,12 @@ class JurorDuty {
         log?.call('duty: summoned to a sealed table without the deal\'s cryptography; cannot serve');
         return;
       }
+      if (s.spec.sealed && (dealWorker?.dead ?? false)) {
+        log?.call('duty: summoned to a sealed table with the deal\'s worker failed for good; cannot serve');
+        return;
+      }
       final client =
-          TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, silenceAfterMs: silenceAfterMs, crypto: crypto);
+          TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, silenceAfterMs: silenceAfterMs, crypto: crypto, dealWorker: dealWorker);
       client.log = log;
       t = _tables[s.spec.id] = (client: client, transport: transport);
       client.changes.listen((_) {

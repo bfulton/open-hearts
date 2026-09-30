@@ -4,6 +4,7 @@ library;
 export 'chaos_walk.dart';
 export 'scenarios.dart';
 export 'scripted_human.dart';
+export 'sim_deal_worker.dart';
 export 'sim_juror.dart';
 export 'sim_presence.dart';
 export 'sim_network.dart';

@@ -710,10 +710,14 @@ class DealSession {
         HumanDealSeat() => false,
       };
 
+  /// Every key in: the joint key, and the deck before anyone shuffles
+  /// — once there is an answer for it, when the slow calls are made
+  /// elsewhere ([wanted]).
   void _afterKeys() {
-    if (_pks.length < _seats || _joint != null) return;
-    _joint = crypto.aggregate([for (var s = 0; s < _seats; s++) _pks[s]!]);
-    _decks.add(crypto.initialDeck(_joint!));
+    if (_pks.length < _seats || _decks.isNotEmpty) return;
+    final joint = _joint ??= crypto.aggregate([for (var s = 0; s < _seats; s++) _pks[s]!]);
+    if (!_ready(InitialDeckJob(joint))) return;
+    _decks.add(crypto.initialDeck(joint));
     _computeWhatCan();
   }
 
@@ -726,9 +730,12 @@ class DealSession {
   /// Every step of a seat whose secret is public here is public work:
   /// shuffles as far as they are next; and with the deck done, tokens
   /// for every seat whose secret this side holds, to open its cards.
+  /// As far as there are answers, when the slow calls are made
+  /// elsewhere: the rest is [wanted], and [resume] goes on from there.
   void _computeWhatCan() {
     while (nextShuffler != null && _public(nextShuffler!)) {
       final s = nextShuffler!;
+      if (!_ready(ShuffleJob(_joint!, _decks.last, _seed('shuffle', s)))) return;
       final r = crypto.shuffle(_joint!, _decks.last, _seed('shuffle', s));
       _decks.add(r.deck);
       _shuffleProofs[s] = r.proof;
@@ -760,12 +767,16 @@ class DealSession {
   Map<String, Object?>? myShuffle() {
     final me = mySeat;
     if (me == null || nextShuffler != me) return null;
-    final r = crypto.shuffle(_joint!, _decks.last, _draw());
+    final r = crypto.shuffle(_joint!, _decks.last, _myShuffleSeed ??= _draw());
     _decks.add(r.deck);
     _shuffleProofs[me] = r.proof;
     _computeWhatCan();
     return {'seat': me, 'deck': _b64(r.deck), 'proof': _b64(r.proof)};
   }
+
+  /// Drawn once, when the shuffle is first asked for or first
+  /// described ([workToMake]): the shuffle made is the one described.
+  Uint8List? _myShuffleSeed;
 
   /// Whether a seat's shuffle is its to make now and its argument
   /// verifies against the deck before it. Changes nothing.
@@ -800,6 +811,98 @@ class DealSession {
     }
   }
 
+  // ---- work elsewhere ----------------------------------------------------
+
+  /// The slow calls checking [m], a step of [round] by another seat,
+  /// will make: what a side with a worker has made there first
+  /// ([DealWorker], [PreparedDeal]). Empty for a step that fails
+  /// before any of them, or that makes none. Changes nothing.
+  ///
+  /// Each is the call [verifyShuffle] or [verifyTokens] makes, on the
+  /// same inputs, so that the answer made elsewhere is the one found
+  /// here. A description that drifted from the call would be a call
+  /// with no answer, which is refused and raised
+  /// ([UndescribedDealCall]). What taking a step goes on to cost — the
+  /// first deck, a departed seat's shuffle or tokens — is not a check
+  /// and is not described here: the session asks for it as it gets
+  /// there ([wanted]).
+  List<DealJob> workToTake(int round, Map<String, Object?> m) {
+    try {
+      final seat = m['seat'] as int;
+      switch (round) {
+        case 1:
+          if (_joint == null || nextShuffler != seat || !_keyed(seat) || _public(seat)) return const [];
+          final next = _unb64(m['deck']);
+          if (next.length != deckBytes) return const [];
+          return [VerifyShuffleJob(_joint!, _decks.last, next, _unb64(m['proof']))];
+        case 2:
+          final pk = _pks[seat];
+          if (!_keyed(seat) || deck == null || _public(seat) || pk == null) return const [];
+          final owed = _owed(seat);
+          final batch = _unb64(m['tokens']);
+          if (batch.length != tokensBytes(owed.length)) return const [];
+          return [VerifyTokensJob(pk, _cardsAt(owed), batch)];
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  /// The slow calls this side's own step of [round] will make: its
+  /// shuffle ([myShuffle]), or its tokens and then its own thirteen
+  /// ([myTokens]). Empty when the step is not this side's to make yet.
+  List<DealJob> workToMake(int round) {
+    final me = mySeat;
+    if (me == null) return const [];
+    switch (round) {
+      case 1:
+        if (nextShuffler != me || _joint == null) return const [];
+        return [ShuffleJob(_joint!, _decks.last, _myShuffleSeed ??= _draw())];
+      case 2:
+        if (deck == null) return const [];
+        final secret = _secrets[me]!;
+        final owed = _owed(me);
+        final had = _tokens[me] ?? const <int, Uint8List>{};
+        final own = [for (var p = 0; p < deckSize; p++) if (p ~/ _handSize == me && had[p] == null) p];
+        return [
+          if (_myTokens == null) RevealTokensJob(secret, _cardsAt(owed), _seed('tokens ${owed.length}', me)),
+          if (own.isNotEmpty) RevealTokensJob(secret, _cardsAt(own), _seed('tokens ${own.length}', me)),
+        ];
+    }
+    return const [];
+  }
+
+  /// The slow calls the session came to on its own and had no answer
+  /// for: the first deck once the keys are in, and the public work of a
+  /// seat whose secret is known here — a bot nobody holds, a departed
+  /// person's rebuilt from the escrow. These are not a step anybody
+  /// sent and cannot be described ahead of the step that sets them
+  /// off, so the session asks for them as it gets there, stops, and
+  /// goes on from where it stopped when [resume] is called with the
+  /// answers put by. Never made here: with no [PreparedDeal] behind
+  /// the session there is nothing to wait for and this stays empty.
+  List<DealJob> get wanted => List.of(_wanted.values);
+  final Map<String, DealJob> _wanted = {};
+
+  /// Whether [job]'s answer is at hand; if not, it is [wanted].
+  bool _ready(DealJob job) {
+    final c = crypto;
+    if (c is! PreparedDeal || c.has(job)) return true;
+    _wanted[job.key] = job;
+    return false;
+  }
+
+  /// Goes on with what was [wanted], as far as its answers go: from
+  /// each place the session stops to ask — the first deck, public work,
+  /// and this side's own thirteen tokens once it has said its batch.
+  void resume() {
+    if (_wanted.isEmpty) return;
+    _wanted.clear();
+    _afterKeys();
+    final me = mySeat;
+    if (me != null && _myTokens != null) _tokensBy(me, everyPosition: true);
+    _computeWhatCan();
+  }
+
   // ---- tokens ----------------------------------------------------------
 
   /// Tokens by [seat] — whose secret this side holds — for every
@@ -815,7 +918,9 @@ class DealSession {
         if ((everyPosition || p ~/ _handSize != seat) && t[p] == null) p,
     ];
     if (want.isEmpty) return;
-    _spread(t, want, crypto.revealTokens(_secrets[seat]!, _cardsAt(want), _seed('tokens ${want.length}', seat)));
+    final job = RevealTokensJob(_secrets[seat]!, _cardsAt(want), _seed('tokens ${want.length}', seat));
+    if (!_ready(job)) return;
+    _spread(t, want, crypto.revealTokens(job.secret, job.cards, job.seed));
   }
 
   /// The bare tokens out of a batch, position by position.

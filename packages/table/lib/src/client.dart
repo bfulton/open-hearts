@@ -255,6 +255,7 @@ class TableClient {
     this.heartbeatMs = 5000,
     this.presence,
     this.crypto,
+    this.dealWorker,
     Random? random,
   })  : _random = random,
         game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target),
@@ -280,6 +281,47 @@ class TableClient {
 
   /// The deal's primitives, at a sealed table.
   final DealCrypto? crypto;
+
+  /// Where the deal's slow calls are made, when not on the thread this
+  /// runs on: a Web Worker in the browser, an isolate on the VM
+  /// (packages/deal, work.dart). Null makes them here, as the
+  /// simulator does unless it is asked not to.
+  ///
+  /// With one, a deal step is taken up once its checking has been
+  /// worked out there, and this side's own step is said once it has
+  /// been made there ([_workedOut]); until then the step waits where
+  /// a step waits for anything else it is checked against. The table
+  /// sees nothing different but the time the work took, which it
+  /// spent before anyway — only now with the screen still drawing.
+  ///
+  /// Nothing slow is made here instead, ever. A worker that fails is
+  /// replaced once ([ResilientDealWorker]); one that fails again is a
+  /// bug, raised as one ([DealWorkFailed]), and this device can no
+  /// longer deal ([cannotDeal]). A slow call nobody described is
+  /// refused and raised the same way ([PreparedDeal]).
+  final DealWorker? dealWorker;
+
+  /// Why this device cannot deal, once its worker has failed for good;
+  /// null while it can.
+  ///
+  /// A seat at the table leaves it at once. A device that cannot check
+  /// the others' deal steps can never witness them, and at a table of
+  /// two people a step needs both: waiting to be booted at its own turn
+  /// would be waiting for a turn that never comes, with the other
+  /// player's shuffle stopped in front of it. Leaving, the seat goes
+  /// to a bot and the table plays on. A juror stops following the
+  /// table; the seat it holds goes to the escrow at its deadline, as a
+  /// quiet juror's does.
+  String? get cannotDeal => _cannotDeal;
+  String? _cannotDeal;
+
+  /// The session's primitives, answering the slow calls from what
+  /// [dealWorker] made.
+  late final PreparedDeal? _prepared = dealWorker == null || crypto == null ? null : PreparedDeal(crypto!);
+
+  /// The slow calls refused for want of an answer from the worker:
+  /// steps whose cost was not described. Every one is a bug.
+  int get dealCallsRefused => _prepared?.refused ?? 0;
 
   /// Where the deal's secrets and seeds come from: secure by default;
   /// the simulator seeds it, so a table replays.
@@ -1503,13 +1545,15 @@ class TableClient {
     }
   }
 
-  void _defer(TableEvent event) {
+  /// [quietly] for a step waiting on nothing but this side's own deal
+  /// worker, which every step of every deal does for a moment.
+  void _defer(TableEvent event, {bool quietly = false}) {
     // Once each: a peer far behind is repeated at for minutes, and a
     // list that grew by every repeat was drained, and grown, at every
     // turn it closed.
     if (!_futureIds.add(event.id)) return;
     _future.add(event);
-    if (event.kind != EventKind.witness && event.kind != EventKind.release && event.kind != EventKind.topup) {
+    if (!quietly && event.kind != EventKind.witness && event.kind != EventKind.release && event.kind != EventKind.topup) {
       _trace('defer ${event.kind.name}@${event.turn} from ${event.author.substring(0, 4)}');
     }
   }
@@ -1882,6 +1926,12 @@ class TableClient {
       final held = botHolders(turn.hand)[seat];
       if (held != null && event.author != held && !_isEscrowed(turn.hand, seat)) return _defer(event);
       return;
+    }
+    if (!_checkable(event)) {
+      // Checked once the check has been made elsewhere, and kept for
+      // the drain that follows it back, like any step waiting on
+      // something this side does not have yet (below).
+      return _defer(event, quietly: true);
     }
     if (!_valid(event, seat)) {
       // Not valid *here, now*, which is not the same as wrong. A deal
@@ -2691,7 +2741,7 @@ class TableClient {
   bool get _hasBotSeats => holders.any((h) => h is BotSeat);
 
   void _startDeal({bool drain = true}) {
-    final c = crypto!;
+    final c = _prepared ?? crypto!;
     final held = botHolders(game.handNumber);
     _heldByHand[game.handNumber] = held;
     final from = _sealedTo.containsKey(game.handNumber) ? _sealedTo[game.handNumber] : _provisionalDraw(game.handNumber).id;
@@ -3409,9 +3459,10 @@ class TableClient {
       }
     }
     final shuffle = open(TurnId.deal(h, 1, me));
-    if (shuffle != null && d.nextShuffler == me) _emitDeal(shuffle, 1, me, d.myShuffle()!);
+    bool made(int round) => _prepared == null || _workedOut(d.workToMake(round));
+    if (shuffle != null && d.nextShuffler == me && made(1)) _emitDeal(shuffle, 1, me, d.myShuffle()!);
     final tokens = open(TurnId.deal(h, 2, me));
-    if (tokens != null && d.deck != null) _emitDeal(tokens, 2, me, d.myTokens()!);
+    if (tokens != null && d.deck != null && made(2)) _emitDeal(tokens, 2, me, d.myTokens()!);
     final declare = open(TurnId.deal(h, 3, me));
     if (declare != null) {
       final m = d.myDeclaration();
@@ -3432,6 +3483,111 @@ class TableClient {
   /// the table because a juror has none.
   void _emitDeal(TurnId turn, int round, int seat, Map<String, Object?> m) =>
       _emit(EventKind.deal, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'round': round, ...m});
+
+  /// Whether [event] can be checked here now: for a deal step another
+  /// seat sent, whether its checks have been made at the worker
+  /// ([DealSession.workToTake]); if not, they are on their way, and
+  /// the caller keeps the event for the drain that follows them back.
+  /// This side's own steps are not checked ([_valid]).
+  bool _checkable(TableEvent event) {
+    final d = _deal;
+    if (event.kind != EventKind.deal || d == null || _prepared == null || event.author == signer.publicKey) return true;
+    return _workedOut(d.workToTake(event.round, Map<String, Object?>.from(event.body)));
+  }
+
+  /// What the deals here came to on their own and are waiting on
+  /// ([DealSession.wanted]): the first deck, a departed seat's work.
+  /// Sent at every change, since any change can be what set it off.
+  void _sendWanted() {
+    if (_prepared == null) return;
+    for (final d in _dealsByHand.values) {
+      final wanted = d.wanted;
+      if (wanted.isNotEmpty) _workedOut(wanted);
+    }
+  }
+
+  /// Whether the slow calls in [jobs] have their answers here, so the
+  /// session can make them without holding the screen. Any that do
+  /// not are sent to [dealWorker], and when an answer comes back the
+  /// steps waiting on it are looked at again: deferred ones drained,
+  /// this side's own acted on. Always true without a worker.
+  ///
+  /// A job the worker cannot make is a worker failed for good, and a
+  /// device that can no longer deal ([_cannotWork]); nothing is sent
+  /// to it after that, and what waits on it waits for good. There is
+  /// no timeout here. A worker that is slow — a phone, a queue of other
+  /// tables' work, a device asleep in a pocket — is slow, and the
+  /// table's deadlines are what judge a device too slow to play; one
+  /// that has stopped is the worker's to notice ([ResilientDealWorker]).
+  bool _workedOut(List<DealJob> jobs) {
+    final p = _prepared;
+    final w = dealWorker;
+    if (p == null || w == null) return true;
+    if (_cannotDeal != null) return jobs.every(p.has);
+    for (final job in jobs) {
+      if (p.has(job) || !_working.add(job.key)) continue;
+      w.run(job, done: (answer) {
+        _working.remove(job.key);
+        p.put(job, answer);
+        _lookAgainAfterWork();
+      }, failed: (why) => _cannotWork(job, why));
+    }
+    return jobs.every(p.has);
+  }
+
+  /// Jobs sent to the worker and not answered, by key. A job that
+  /// failed stays here: never sent again, never made here.
+  final Set<String> _working = {};
+
+  /// The worker has failed for good ([ResilientDealWorker]), and this
+  /// device with it ([cannotDeal]).
+  ///
+  /// Said once, at the first job to fail — every job after would fail
+  /// the same way, and none is sent — and acted on a moment later,
+  /// from outside whatever this side was in the middle of: a worker
+  /// that has failed for good fails a job inside [DealWorker.run],
+  /// which can be anywhere.
+  void _cannotWork(DealJob job, Object why) {
+    if (_cannotDeal != null || _closed) return;
+    Zone.current.handleUncaughtError(DealWorkFailed(job, why), StackTrace.current);
+    _cannotDeal = '$why';
+    _trace('cannot deal: $why');
+    clock.schedule(0, () {
+      if (_closed) return;
+      if (amSeated) {
+        leave();
+        _notify();
+      } else {
+        _notify();
+        close();
+      }
+    });
+  }
+  bool _lookAgainDue = false;
+
+  /// Work back from the worker: the deals go on from where they
+  /// stopped for it ([DealSession.resume]) — a first deck, a departed
+  /// seat's cards opened — and the table moves with them as it does
+  /// when a step settles or a secret is rebuilt; the steps waiting on
+  /// it are looked at again. Once however many answers came together,
+  /// and never from inside the look that sent the work, which has yet
+  /// to put its own step aside to wait.
+  void _lookAgainAfterWork() {
+    if (_lookAgainDue || _closed) return;
+    _lookAgainDue = true;
+    clock.schedule(0, () {
+      _lookAgainDue = false;
+      if (_closed) return;
+      for (final d in List.of(_dealsByHand.values)) {
+        d.resume();
+      }
+      _advanceDeal();
+      _resumeStalled();
+      _drainFuture();
+      _actOnDeal();
+      _notify();
+    });
+  }
 
   /// A settled deal step, applied. Verified on arrival; this side's
   /// own were made here.
@@ -3794,34 +3950,52 @@ class TableClient {
     }
   }
 
-  /// How long a bot seat's holder has to take the seat's turn. A
-  /// bot's move is worked out rather than thought about, so this is a
-  /// deadline on a computation and not on a person: there is no grace
-  /// in it and no bank behind it, which is what a person's seat gets
-  /// instead (time_bank.dart).
+  /// How long a bot seat's holder has to take the seat's turn, a card
+  /// or the pass. A bot's move is worked out rather than thought
+  /// about, so this is a deadline on a computation and not on a
+  /// person: there is no grace in it and no bank behind it, which is
+  /// what a person's seat gets instead (time_bank.dart).
   ///
-  /// Measured rather than picked. Over six seeded hands a held bot
-  /// seat answers its turn in 69 ms at the middle and 155 ms at the
-  /// worst over a data channel, and 365 ms and 787 ms with a relay's
-  /// latency under it — so three seconds is about four times the
-  /// worst of it, and a holder that misses it is not slow, it is not
-  /// working.
-  static const botActsWithinMs = 3000;
+  /// Fifteen seconds, measured on a slow machine rather than a fast
+  /// one. It was three: over six seeded hands a held bot seat answered
+  /// in 69 ms at the middle and 155 ms at the worst over a data
+  /// channel, 365 ms and 787 ms with a relay's latency under it, and
+  /// three was about four times the worst. On two cores shared by four
+  /// browsers — a hosted runner, nearer a cheap phone than a desk is —
+  /// a held pass took 4.3 s at the ninety-fifth percentile and a held
+  /// card 8.7 at the worst, and a juror that was working missed the
+  /// three in five runs of six there: its seat went to the escrow and
+  /// it was left out of the next draw. Fifteen is three and a half
+  /// times that 4.3, as a deal step's allowance is of its own, and 1.7
+  /// times the worst card.
+  static const botActsWithinMs = 15000;
 
   /// And its deal steps. A deal step is slower and waits on more — a
   /// held seat's keys wait for the record to say which draw the hand is
   /// sealed to ([_checkSealed]), and a step is checked against things
   /// that may not have arrived — and it answers at 2.9 s at the ninety-fifth
-  /// percentile against a play's 0.16. Ten seconds is three and a half
-  /// times that. A held seat that misses it goes to the escrow like one
-  /// that misses a card, and a seat given up with deal steps still to
-  /// take gives the hand up undealt ([_carryEscrow]).
+  /// percentile against a play's 0.16 on a machine with room to spare.
+  /// A held seat that misses it goes to the escrow like one that misses
+  /// a card, and a seat given up with deal steps still to take gives
+  /// the hand up undealt ([_carryEscrow]).
+  ///
+  /// Forty seconds, measured on a slow machine rather than a fast one.
+  /// It was ten, three and a half times that 2.9 s. On two cores
+  /// shared by four browsers — a hosted runner, nearer a cheap phone
+  /// than a desk is — held seats' deal steps took 3.9 s at the middle,
+  /// 11.7 at the ninety-fifth percentile and 24.9 at the worst of 187,
+  /// one in eleven of them past ten; and a working juror that missed
+  /// the ten cost its table the whole hand, twice in four runs. Forty
+  /// is the same three and a half times, now of the slow machine's
+  /// 11.7, and 1.6 times the worst it did. A juror gone quiet is still
+  /// let go at half a minute's silence ([_liveJurors]); this is only
+  /// how long one still heard from may sit on a step.
   ///
   /// There was no allowance here at all before: a deal that could not
   /// finish was caught by silence alone, and a juror heard from and
   /// doing nothing — a tab starved of a processor, a phone in a pocket
   /// — is never silent, so the deal waited on its keys for good.
-  static const botDealsWithinMs = 10000;
+  static const botDealsWithinMs = 40000;
 
   /// Whether the seat's holder has had the seat's turn in front of it
   /// for longer than that, and said nothing.
@@ -4942,14 +5116,26 @@ class TableClient {
   /// against: halfway to the turn's own allowance, which leaves as long
   /// again for the carried copy to arrive and be witnessed before
   /// anybody can call the seat silent. Three seconds for a play whose
-  /// bank is spent, seven and a half for a deal turn, more for a pass
-  /// or a seat with time in hand.
+  /// bank is spent, more for a pass or a seat with time in hand.
+  ///
+  /// Except a deal turn or an audit, which is [_dealCarryMs]. Their
+  /// allowance is how long a slow device may take to work a step out,
+  /// forty seconds, and half of that is twenty seconds of a table cut
+  /// in two sitting on a step that was said in the first second. A
+  /// copy needs no longer to arrive because its author was slow.
   bool _carryDue(TurnId turn) {
     final opened = _openedAt[turn];
     final seat = _turnSeat[turn];
     if (opened == null || seat == null) return true;
-    return clock.nowMs - opened >= _allowanceMs(turn, seat) ~/ 2;
+    final wait = timeBank.banks(turn) ? _allowanceMs(turn, seat) ~/ 2 : _dealCarryMs;
+    return clock.nowMs - opened >= wait;
   }
+
+  /// When a deal turn's or an audit's action may be said again by
+  /// someone other than its author: seven and a half seconds, half the
+  /// fifteen those turns were allowed when the wait was first set, and
+  /// still well inside the forty they have now.
+  static const _dealCarryMs = 7500;
 
   /// [ownOnly] leaves out the carrying — somebody else's action said
   /// again for a peer that may not have heard it. That is a seat's
@@ -5677,6 +5863,7 @@ class TableClient {
       if (ruled.kind != EventKind.pass && ruled.kind != EventKind.play && ruled.kind != EventKind.deal) return;
       if (_isEscrowedAudit(turn, seat)) return;
       if (race.action?.id != ruled.id) {
+        if (!_checkable(ruled)) return _defer(event, quietly: true);
         if (!_valid(ruled, seat)) return;
         race.rivals.putIfAbsent(ruled.id, () => ruled);
         race.forRival.putIfAbsent(ruled.id, () => {ruled.author});
@@ -5689,6 +5876,7 @@ class TableClient {
     if (event.side == 'action') {
       if (ruled.author != holder.key) return;
       if (ruled.kind != EventKind.pass && ruled.kind != EventKind.play && ruled.kind != EventKind.deal) return;
+      if (!_checkable(ruled)) return _defer(event, quietly: true);
       if (!_valid(ruled, seat)) return;
       race.action = ruled;
       race.forAction.add(ruled.author);
@@ -5720,6 +5908,7 @@ class TableClient {
 
   void _notify() {
     if (_closed) return;
+    _sendWanted();
     if (_notifying) {
       _notifyAgain = true;
       return;

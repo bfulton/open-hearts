@@ -12,6 +12,7 @@ import '../signing.dart';
 import '../spec.dart';
 import '../time_bank.dart';
 import 'scripted_human.dart';
+import 'sim_deal_worker.dart';
 import 'sim_juror.dart';
 import 'sim_network.dart';
 import 'sim_presence.dart';
@@ -20,7 +21,10 @@ import 'virtual_clock.dart';
 /// A simulated table: [humans] scripted people in the first seats,
 /// bots in the rest — or the bots first, with [botsFirst]. With
 /// [crypto] the table is sealed: the cards come from the verifiable
-/// deal, run for real on the virtual clock. With [sweepJurors] a
+/// deal, run for real on the virtual clock; with [workers] as well,
+/// each device makes the deal's slow calls in a worker of its own
+/// that takes a browser's time over them ([SimDealWorker]), where
+/// otherwise they take none. With [sweepJurors] a
 /// juror lets go of the table once it has served, as the duty does,
 /// and a later summons starts it again from the first hand.
 class SimTable {
@@ -37,13 +41,21 @@ class SimTable {
     TimeBank timeBank = TimeBank.standard,
     bool botsFirst = false,
     bool sweepJurors = false,
+    bool workers = false,
   })  : clock = VirtualClock(),
         signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
+    SimDealWorker? workerFor(PublicKey key) {
+      final c = crypto;
+      if (!workers || c == null) return null;
+      return dealWorkers[key] = SimDealWorker(c, clock);
+    }
+
     if (jurors > 0 || lastResort || (lastResorts ?? 0) > 0 || withPresence) {
       final p = presence = SimPresence(net, clock);
       for (var j = 0; j < jurors; j++) {
-        final juror = SimJuror(FakeSigner('juror$j-$seed'), net, clock, crypto: crypto)..sweeps = sweepJurors;
+        final signer = FakeSigner('juror$j-$seed');
+        final juror = SimJuror(signer, net, clock, crypto: crypto, dealWorker: workerFor(signer.publicKey))..sweeps = sweepJurors;
         this.jurors.add(juror);
         p.register(juror);
       }
@@ -52,7 +64,8 @@ class SimTable {
       // else to make that up (docs/04-live-play.md).
       final bench = lastResorts ?? (lastResort ? juryToHoldBots : 0);
       for (var b = 0; b < bench; b++) {
-        final juror = SimJuror(FakeSigner('last-resort$b-$seed'), net, clock, crypto: crypto)..sweeps = sweepJurors;
+        final signer = FakeSigner('last-resort$b-$seed');
+        final juror = SimJuror(signer, net, clock, crypto: crypto, dealWorker: workerFor(signer.publicKey))..sweeps = sweepJurors;
         this.jurors.add(juror);
         p.register(juror);
         p.lastResorts.add(juror);
@@ -79,6 +92,7 @@ class SimTable {
           clock: clock,
           presence: presence,
           crypto: crypto,
+          dealWorker: workerFor(signers[i].publicKey),
           timeBank: timeBank,
           random: Random(seed * 1000 + i));
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
@@ -89,6 +103,9 @@ class SimTable {
 
   /// The deal's primitives, at a sealed table.
   final DealCrypto? crypto;
+
+  /// Each device's deal worker, by its key, when the table has them.
+  final Map<PublicKey, SimDealWorker> dealWorkers = {};
   final VirtualClock clock;
   final List<FakeSigner> signers;
   late final SimNetwork net;

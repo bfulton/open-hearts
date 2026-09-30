@@ -26,10 +26,9 @@ void main() {
     // to watch. A top-up is a mid-hand thing — a juror brought on
     // while a hand is running — and seeing one needs the hand still
     // running thirty seconds after a jury has been judged short. Over
-    // a data channel a bot seat reaches the escrow three seconds
-    // after its holder stops playing (client.dart, botActsWithinMs)
-    // and the rest of the jury plays it out before there is anything
-    // to see.
+    // a data channel a bot seat reaches the escrow soon after its
+    // holder stops playing (client.dart, botActsWithinMs) and the rest
+    // of the jury plays it out before there is anything to see.
     t.net.minLatencyMs = 200;
     t.net.maxLatencyMs = 400;
     t.start();

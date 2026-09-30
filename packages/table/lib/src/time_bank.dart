@@ -17,7 +17,7 @@ class TimeBank {
     this.graceMs = 6000,
     this.passGraceMs = 20000,
     this.bankMs = 45000,
-    this.fixedMs = 15000,
+    this.fixedMs = 40000,
   });
 
   /// The one clock every table plays against.
@@ -33,6 +33,10 @@ class TimeBank {
   final int bankMs;
 
   /// The deal's and the audit's turns: a device answers them by itself.
+  /// Forty seconds, as a juror has for the same steps of a bot seat
+  /// (TableClient.botDealsWithinMs): on a slow machine a person's
+  /// device takes as long over them, and a person's came within a tenth
+  /// of a second of the fifteen this was.
   final int fixedMs;
 
   /// The grace for [turn], before the bank is touched.

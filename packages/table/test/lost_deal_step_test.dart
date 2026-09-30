@@ -71,8 +71,11 @@ void main() {
     final a = t.signers.first.publicKey;
     final seated = {for (final s in t.signers) s.publicKey};
     var kept = 0;
+    // Kept until well past the deal step's allowance, so that timing
+    // the holder by its own open turn would give the hand up.
+    const keptFor = TableClient.botDealsWithinMs + 15000;
     t.net.steer = (from, to, message) {
-      if (to != a || message['kind'] != 'deal' || t.clock.nowMs >= 25000) return null;
+      if (to != a || message['kind'] != 'deal' || t.clock.nowMs >= keptFor) return null;
       final body = message['body'] as Map<String, Object?>?;
       if (body == null || body['round'] != 0 || seated.contains(message['author'])) return null;
       kept++;

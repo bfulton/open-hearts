@@ -496,6 +496,70 @@ own build — so until they do, they play alone.
   drowned in the catch-up. `crypto/schnorr` is the browser's signature
   wasm built for the VM, two hundred times faster, and an event seen
   before is taken by its id without a second check.
+- **Off the page's thread.** Five of the calls take long enough to be
+  seen. In V8, the engine Chromium runs the wasm in, on one idle core
+  of a 2.8 GHz Xeon: the first deck 74 ms, a shuffle with its argument
+  566, checking one 468, a seat's thirty-nine tokens with their
+  argument 199, checking those 190. No other call takes fifteen. A
+  person makes the first deck, a shuffle and two batches of tokens a
+  hand and checks three shuffles and three batches: about three
+  seconds, in pieces of up to half of one, and a phone takes two or
+  three times as long. Made on the page, each piece was that long of a
+  page that did not move and a tap that did not land, and a device's
+  jury duty checks the deals of tables it is not sitting at, so they
+  came at moments nobody at its own table had reason to expect.
+
+  So the page makes them in a Web Worker, `app/web/deal_worker.js`,
+  with an instance of its own of the same wasm (`packages/deal`,
+  `work.dart`; on the VM, an isolate). The session is still
+  synchronous. The table describes the slow calls a step is about to
+  cost — the check of a step that has arrived, this side's own shuffle
+  or tokens — sends them to the worker, and keeps the step where it
+  keeps any step that is waiting on something
+  (`TableClient._workedOut`). What the session comes to by itself —
+  the first deck once every seat's keys are in, the shuffle of a seat
+  whose secret is public, the tokens of any seat whose secret it holds
+  — it asks for rather than makes: it stops there, says what it wants
+  (`DealSession.wanted`), and goes on when the answers are back
+  (`resume`). Its calls are answered from what came back, found by a
+  hash of the call, so each answer is the one it would have made
+  itself.
+
+  Nothing slow is made on the page, ever. The worker is started as
+  part of loading the deal, from a script and wasm fetched once, and a
+  page whose worker does not start has no deal and plays no live
+  table. After that the worker touches nothing outside itself, so it
+  has nothing to fail on but a bug — and a bug quieted by making the
+  work on the page instead is a device back to holding its page still
+  for half a second at a time, with nobody ever hearing of it. So:
+
+  - a slow call nobody sent to the worker is refused, and raised where
+    nothing catches it (`PreparedDeal`). The simulator's tests hold
+    those to none across whole games and sealed chaos walks;
+  - a worker that fails a job, or stalls — work waiting through six
+    ticks of five seconds and none of it finished — is replaced, once,
+    and what it had goes to the new one (`ResilientDealWorker`). The
+    ticks are the page's own timer, which a browser slows or stops for
+    a page out of sight, so a phone put to sleep mid-deal does not wake
+    to a worker judged stalled;
+  - a replacement that fails or stalls too is a worker failed for
+    good: raised, and the device can no longer deal
+    (`TableClient.cannotDeal`). Seated, it leaves the table at once and
+    says so. A device that cannot check the others' steps can never
+    witness them, and at a table of two people, waiting to be booted
+    at its own turn is waiting for a turn that never comes. A juror
+    stops following the table, and the seat it held goes to the
+    escrow at its deadline, as a quiet juror's does; the device takes
+    no more summonses to sealed tables. The others play on.
+
+  On a page doing nothing else, the five calls made on the page were
+  five long tasks, the longest 600 ms, and a frame that took 583; made
+  in the worker, no task of 50 ms at all and no frame over 17, in
+  three runs of three. The four-browser suite on two cores is busy
+  drawing four pages in software whatever the deal does, and there the
+  worker took the tasks of 800 ms or more across the four pages from
+  151 to 65, and the ninety-ninth percentile of their tasks of 50 ms
+  or more from 1461 ms to 878.
 
 ### A sealed token, and the argument that it is the right one
 

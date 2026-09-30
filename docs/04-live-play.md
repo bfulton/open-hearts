@@ -410,8 +410,10 @@ a Boot button appears next to that seat. The first person to press it
 removes the player. A player who thinks hard over three cards is never
 bothered; one who takes fourteen seconds over every card is bootable on
 their sixth. The bank refills every hand. The deal's own turns and the
-audit, which a present device answers by itself, keep a fixed fifteen
-seconds.
+audit, which a present device answers by itself, keep a fixed forty
+seconds, the same as a juror has for a bot seat's (below): on a slow
+machine a person's device takes as long over a deal step, and one
+came within a tenth of a second of the fifteen these once had.
 
 Nothing shows while a seat is within its grace. Past it, that seat's
 remaining clock shows on its badge, and on your own score line when it
@@ -625,9 +627,9 @@ give their pieces up; a hand then sits at one turn for minutes with
 the seat's own device apparently present. Four headless browsers
 sharing four cores reproduced it about half the time.
 
-So a bot seat's holder has three seconds to take the seat's turn, and
-a seat whose turn has been in front of it for longer goes to the
-escrow like a silent one's. Three seconds from when the turn became
+So a bot seat's holder has fifteen seconds to take the seat's turn,
+and a seat whose turn has been in front of it for longer goes to the
+escrow like a silent one's. Fifteen seconds from when the turn became
 that holder's, which is not the same as when the turn opened: a turn
 can open while its seat is still being handed over — a person leaving
 it, the seat turning into a bot, a juror picking it up from the
@@ -637,20 +639,36 @@ open and nothing is stalled; a seat that changes hands starts the new
 holder's clock afresh. A bot's move is worked out rather than
 thought about, which is why the number is a deadline on a computation
 and has no grace in it and no bank behind it — what a person's seat
-gets instead. Three seconds is roughly four times the worst a held
-bot seat was measured taking: over six seeded hands it answers in 69
-ms at the middle and 155 ms at the worst over a data channel, 365 ms
-and 787 ms with a relay's latency under it.
+gets instead. It was three seconds, roughly four times the worst a
+held bot seat was measured taking: over six seeded hands it answers
+in 69 ms at the middle and 155 ms at the worst over a data channel,
+365 ms and 787 ms with a relay's latency under it. That was a machine
+with room to spare. On two cores shared by four browsers a held pass
+took 4.3 s at the ninety-fifth percentile and a held card 8.7 at the
+worst, and a working juror missed the three in five runs of six: its
+seat went to the escrow and it was left out of the next draw. Fifteen
+is three and a half times that 4.3, as a deal step's forty is of its
+own (below), and 1.7 times the worst card.
 
-A deal step has ten seconds. A deal step is checked against things
+A deal step has forty seconds. A deal step is checked against things
 that may not have arrived, and a juror holds its keys back for a
 moment on purpose so a late draw can still be read, so deal steps
-answer at 2.9 s at the ninety-fifth percentile against a play's 0.16;
-ten is three and a half times that. A held seat that misses it goes to
-the escrow like one that misses a card, and since a deal step given up
-takes the whole hand with it rather than one seat (below, "When quorum
-is lost anyway"), the hand is given up undealt. There was no allowance
-here at all at first, a deal that could not finish being caught by
+answer at 2.9 s at the ninety-fifth percentile against a play's 0.16
+on a machine with room to spare. The allowance was ten seconds, three
+and a half times that, and a slow machine blew through it: on two
+cores shared by four browsers — a hosted runner, nearer a cheap phone
+than a desk is — held seats' deal steps took 3.9 s at the middle, 11.7
+at the ninety-fifth percentile and 24.9 at the worst of 187, one in
+eleven past ten, and a juror that was working, only slowly, cost its
+table the hand twice in four runs. Forty is the same three and a half
+times, of the slow machine's 11.7, and 1.6 times the worst it did. A
+held seat that misses it goes to the escrow like one that misses a
+card, and since a deal step given up takes the whole hand with it
+rather than one seat (below, "When quorum is lost anyway"), the hand
+is given up undealt. A juror gone quiet is let go at half a minute's
+silence whatever step it is on; the forty seconds are only how long
+one still heard from may sit on a step. There was no allowance here
+at all at first, a deal that could not finish being caught by
 silence alone — and a juror heard from and doing nothing is never
 silent, so the deal waited on its keys for good.
 
@@ -708,7 +726,8 @@ starts when the holder is heard at the hand. One not heard since it
 was drawn is left to silence, half a minute from the draw; one heard
 at an earlier hand is arriving while its heartbeats move — one really
 catching up moves, every event it applies another step — and one that
-has said the same earlier place for ten seconds has stopped. A juror the table did take a seat off for
+has said the same earlier place for as long as a deal step may take,
+forty seconds, has stopped. A juror the table did take a seat off for
 sitting on it is left out of the next draw: heard from is not the same
 as playing (`packages/table/test/idle_holder_test.dart`).
 

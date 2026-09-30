@@ -20,8 +20,8 @@ void main() {
     expect(bank.allowanceMs(const TurnId.play(0, 7), 45000), 51000);
     expect(bank.allowanceMs(const TurnId.play(0, 7), 0), 6000, reason: 'the grace stays when the bank is gone');
     expect(bank.allowanceMs(const TurnId.pass(0, 2), 45000), 65000);
-    expect(bank.allowanceMs(const TurnId.deal(0, 1, 2), 45000), 15000);
-    expect(bank.allowanceMs(const TurnId.audit(0, 2), 0), 15000);
+    expect(bank.allowanceMs(const TurnId.deal(0, 1, 2), 45000), 40000);
+    expect(bank.allowanceMs(const TurnId.audit(0, 2), 0), 40000);
   });
 
   test('fourteen seconds over every card is booted on the sixth', () {

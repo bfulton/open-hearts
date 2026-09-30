@@ -193,6 +193,7 @@ cd service && dart test             # the local relay, and a hand played over it
 cd service && OH_RELAY=js dart test # the same suite, against the object's relay
 node --test service/do/*.test.mjs   # that relay's own tests, and the sockets under it
 node --test service/functions/*.test.mjs  # the site's handlers: TURN, licences, the shop
+node --test e2e/deal_worker.test.mjs      # the page's deal worker, against the committed wasm
 cd app && flutter test              # the widgets
 cd app && flutter run -d chrome
 cd app && flutter build apk --release  # needs app/android/key.properties (below)
@@ -215,7 +216,13 @@ twice by `crypto/deal/build.sh`: a cdylib the Dart VM loads over FFI —
 the table and app tests, the verifier and the service's juror find it
 at `crypto/deal/target/release/` — and a
 wasm the browser loads, committed at `app/web/deal.wasm` so the web
-build needs no Rust. Building needs a stable Rust with the
+build needs no Rust. The page loads it twice: once for the quick
+calls, and once in a Web Worker, `app/web/deal_worker.js`, for the
+slow ones — a shuffle, its check, a seat's tokens — so that the screen
+keeps drawing while they are made (`packages/deal`, `work.dart`). None
+of those is ever made on the page instead: a page whose worker does not
+start plays no live table.
+Building needs a stable Rust with the
 `wasm32-unknown-unknown` target; the reference crate is a git
 dependency pinned by revision. `crypto/schnorr` is the browser's
 signature wasm built for the VM instead: without it the relay, the

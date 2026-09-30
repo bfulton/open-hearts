@@ -38,7 +38,7 @@ dependencies:
   engine:
     path: ../packages/engine
   shared_preferences: ^2.5.5
-  flutter_webrtc: ^1.6.2+hotfix.1
+  flutter_webrtc: ^1.6.2+hotfix.3
   web_socket_channel: ^3.0.3
   table:
     path: ../packages/table

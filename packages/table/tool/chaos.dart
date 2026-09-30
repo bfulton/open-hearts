@@ -5,13 +5,17 @@
 ///     dart run tool/chaos.dart --seeds 0 --sealed-only 1,2,3
 ///     dart run tool/chaos.dart --seeds 250 --sealed 14 --structure
 ///     dart run tool/chaos.dart --seeds 100 --sealed 14 --jurors 9 --sweep
+///     dart run tool/chaos.dart --seeds 0 --sealed 14 --jurors 9 --workers
 ///
 /// The second walks just the sealed seeds named — the ones a longer
 /// walk said broke, again after a fix, without the hour in between.
 /// The third also reads every side against the state machines as it
 /// walks (docs/07-states.md, "Measured"). The fourth draws from more
 /// strangers than a jury, each letting go of the table once it has
-/// served, as the duty does, and summoned again later.
+/// served, as the duty does, and summoned again later. The fifth has
+/// every device make the deal's slow calls in a worker that takes a
+/// browser's time over them, as the app does (packages/deal,
+/// work.dart), where otherwise they take none.
 ///
 /// Prints every broken invariant with the faults that led there, and
 /// exits non-zero if there was one.
@@ -53,6 +57,7 @@ Future<void> main(List<String> args) async {
   // from before its summons, by kind.
   final jurors = _intArg(args, 'jurors', 4);
   final sweep = args.contains('--sweep');
+  final workers = args.contains('--workers');
   final saidBefore = <String, int>{};
   void jurorLog(String line) {
     final at = line.indexOf('over before this side was summoned: ');
@@ -100,7 +105,7 @@ Future<void> main(List<String> args) async {
   }
   for (final seed in sealedSeeds) {
     final s = log();
-    final why = walkChaos(seed, crypto: crypto, structure: s, jurors: jurors, sweep: sweep, jurorLog: sweep ? jurorLog : null);
+    final why = walkChaos(seed, crypto: crypto, structure: s, jurors: jurors, sweep: sweep, workers: workers, jurorLog: sweep ? jurorLog : null);
     report('sealed seed $seed', s);
     print(why == null ? 'sealed seed $seed held' : 'sealed seed $seed: $why');
     if (why != null) failed++;
