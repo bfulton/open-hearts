@@ -34,7 +34,7 @@ class Duty {
   /// The duty on [relays], started if need be; a new list replaces it.
   /// With [crypto] the juror can serve sealed tables, holding a piece
   /// of every person's deal secret there.
-  static Duty on(List<Uri> relays, Signer signer, {bool log = false, DealCrypto? crypto}) {
+  static Duty on(List<Uri> relays, Signer signer, {bool log = false, DealCrypto? crypto, DealWorker? dealWorker}) {
     final d = _current;
     if (d != null && listEquals(d.relays, relays)) return d;
     d?.close();
@@ -49,6 +49,7 @@ class Duty {
       presence: presence,
       log: logger,
       crypto: crypto,
+      dealWorker: dealWorker,
       pinned: pinnedRelays(relays),
       // A juror here is a device like any other: it takes the table's
       // seats as peers and is dialled by them, so the play reaches it

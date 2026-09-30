@@ -255,6 +255,7 @@ class TableClient {
     this.heartbeatMs = 5000,
     this.presence,
     this.crypto,
+    this.dealWorker,
     Random? random,
   })  : _random = random,
         game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target),
@@ -280,6 +281,43 @@ class TableClient {
 
   /// The deal's primitives, at a sealed table.
   final DealCrypto? crypto;
+
+  /// Where the deal's slow calls are made, when not on the thread this
+  /// runs on: a Web Worker in the browser, an isolate on the VM
+  /// (packages/deal, work.dart). Null makes them here, as the
+  /// simulator does unless it is asked not to.
+  ///
+  /// With one, a deal step is taken up once its checking has been
+  /// worked out there, and this side's own step is said once it has
+  /// been made there ([_workedOut]); until then the step waits where
+  /// a step waits for anything else it is checked against. The table
+  /// sees nothing different but the time the work took, which it
+  /// spent before anyway — only now with the screen still drawing.
+  final DealWorker? dealWorker;
+
+  /// The session's primitives, answering the slow calls from what
+  /// [dealWorker] made.
+  late final PreparedDeal? _prepared = dealWorker == null || crypto == null ? null : PreparedDeal(crypto!);
+
+  /// The slow calls this side made itself for want of an answer from
+  /// its worker: none, unless a step was described wrongly or the
+  /// worker failed. The simulator's tests hold it to none.
+  int get dealCallsMadeHere => _prepared?.madeHere ?? 0;
+
+  /// Jobs the worker could not make: made here.
+  final Set<String> _makeHere = {};
+
+  /// How long a job may be at the worker before the worker is taken
+  /// to have stopped, and this side makes its work itself from then
+  /// on. A shuffle is a second or so on a phone, and a worker a few
+  /// tables share may have a few in line; a job not back in twenty is
+  /// a worker that has stopped. Once, not a job at a time: a step can
+  /// wait on two jobs, and twenty seconds each would be the whole of a
+  /// deal step's forty, and the seat.
+  static const workerPatienceMs = 20000;
+
+  /// Whether this side has given up on [dealWorker] ([workerPatienceMs]).
+  bool _workerStopped = false;
 
   /// Where the deal's secrets and seeds come from: secure by default;
   /// the simulator seeds it, so a table replays.
@@ -1503,13 +1541,15 @@ class TableClient {
     }
   }
 
-  void _defer(TableEvent event) {
+  /// [quietly] for a step waiting on nothing but this side's own deal
+  /// worker, which every step of every deal does for a moment.
+  void _defer(TableEvent event, {bool quietly = false}) {
     // Once each: a peer far behind is repeated at for minutes, and a
     // list that grew by every repeat was drained, and grown, at every
     // turn it closed.
     if (!_futureIds.add(event.id)) return;
     _future.add(event);
-    if (event.kind != EventKind.witness && event.kind != EventKind.release && event.kind != EventKind.topup) {
+    if (!quietly && event.kind != EventKind.witness && event.kind != EventKind.release && event.kind != EventKind.topup) {
       _trace('defer ${event.kind.name}@${event.turn} from ${event.author.substring(0, 4)}');
     }
   }
@@ -1882,6 +1922,18 @@ class TableClient {
       final held = botHolders(turn.hand)[seat];
       if (held != null && event.author != held && !_isEscrowed(turn.hand, seat)) return _defer(event);
       return;
+    }
+    final d = _deal;
+    if (event.kind == EventKind.deal &&
+        d != null &&
+        _prepared != null &&
+        event.author != signer.publicKey &&
+        !_workedOut(d.workToTake(event.round, Map<String, Object?>.from(event.body)))) {
+      // Checked once the check has been made elsewhere, and kept for
+      // the drain that follows it back, like any step waiting on
+      // something this side does not have yet (below). This side's
+      // own steps are not checked here at all ([_valid]).
+      return _defer(event, quietly: true);
     }
     if (!_valid(event, seat)) {
       // Not valid *here, now*, which is not the same as wrong. A deal
@@ -2691,7 +2743,7 @@ class TableClient {
   bool get _hasBotSeats => holders.any((h) => h is BotSeat);
 
   void _startDeal({bool drain = true}) {
-    final c = crypto!;
+    final c = _prepared ?? crypto!;
     final held = botHolders(game.handNumber);
     _heldByHand[game.handNumber] = held;
     final from = _sealedTo.containsKey(game.handNumber) ? _sealedTo[game.handNumber] : _provisionalDraw(game.handNumber).id;
@@ -3409,9 +3461,10 @@ class TableClient {
       }
     }
     final shuffle = open(TurnId.deal(h, 1, me));
-    if (shuffle != null && d.nextShuffler == me) _emitDeal(shuffle, 1, me, d.myShuffle()!);
+    bool made(int round) => _prepared == null || _workedOut(d.workToMake(round));
+    if (shuffle != null && d.nextShuffler == me && made(1)) _emitDeal(shuffle, 1, me, d.myShuffle()!);
     final tokens = open(TurnId.deal(h, 2, me));
-    if (tokens != null && d.deck != null) _emitDeal(tokens, 2, me, d.myTokens()!);
+    if (tokens != null && d.deck != null && made(2)) _emitDeal(tokens, 2, me, d.myTokens()!);
     final declare = open(TurnId.deal(h, 3, me));
     if (declare != null) {
       final m = d.myDeclaration();
@@ -3432,6 +3485,74 @@ class TableClient {
   /// the table because a juror has none.
   void _emitDeal(TurnId turn, int round, int seat, Map<String, Object?> m) =>
       _emit(EventKind.deal, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'round': round, ...m});
+
+  /// Whether the slow calls in [jobs] have their answers here, so the
+  /// session can make them without holding the screen. Any that do
+  /// not are sent to [dealWorker], and when an answer comes back the
+  /// steps waiting on it are looked at again: deferred ones drained,
+  /// this side's own acted on. Always true without a worker.
+  ///
+  /// A job the worker fails is made here after all, and a worker that
+  /// has not answered one within [workerPatienceMs] is given up on and
+  /// everything made here from then — which is what happened to every
+  /// job before there was a worker: slower on the screen, never
+  /// different.
+  bool _workedOut(List<DealJob> jobs) {
+    final p = _prepared;
+    final w = dealWorker;
+    if (p == null || w == null || _workerStopped) return true;
+    bool answered(DealJob job) => p.has(job) || _makeHere.contains(job.key);
+    for (final job in jobs) {
+      if (answered(job) || _working.containsKey(job.key)) continue;
+      final sent = _workSent++;
+      _working[job.key] = sent;
+      // Back for this sending, not an earlier one of the same job.
+      void back() {
+        if (_working[job.key] != sent) return;
+        _working.remove(job.key);
+        _lookAgainAfterWork();
+      }
+
+      clock.schedule(workerPatienceMs, () {
+        if (_working[job.key] != sent || _workerStopped) return;
+        _trace('deal worker: ${job.op} not back in ${workerPatienceMs ~/ 1000} s; the deal\'s work is made here from now on');
+        _workerStopped = true;
+        _working.clear();
+        _lookAgainAfterWork();
+      });
+      w.run(job, done: (answer) {
+        p.put(job, answer);
+        back();
+      }, failed: (why) {
+        _trace('deal worker: ${job.op} failed there ($why); made here');
+        _makeHere.add(job.key);
+        back();
+      });
+    }
+    // A worker that has already failed answers inside [DealWorker.run],
+    // so what is ready is read after sending, not before.
+    return jobs.every(answered);
+  }
+
+  final Map<String, int> _working = {};
+  int _workSent = 0;
+  bool _lookAgainDue = false;
+
+  /// Work back from the worker: the steps waiting on it looked at
+  /// again — once however many answers came together, and never from
+  /// inside the look that sent the work, which has yet to put its own
+  /// step aside to wait.
+  void _lookAgainAfterWork() {
+    if (_lookAgainDue || _closed) return;
+    _lookAgainDue = true;
+    clock.schedule(0, () {
+      _lookAgainDue = false;
+      if (_closed) return;
+      _drainFuture();
+      _actOnDeal();
+      _notify();
+    });
+  }
 
   /// A settled deal step, applied. Verified on arrival; this side's
   /// own were made here.

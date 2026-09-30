@@ -35,7 +35,11 @@ class LiveHarness {
     bool rated = false,
     Set<int> botSeats = const {},
     int jurors = 0,
+    bool workers = false,
   }) {
+    // Each device's deal work in a worker of its own, taking a
+    // browser's time over each job, as the app's does.
+    SimDealWorker? worker() => workers && crypto != null ? SimDealWorker(crypto, clock) : null;
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
     spec = TableSpec(
         id: 'widget',
@@ -53,7 +57,7 @@ class LiveHarness {
     if (jurors > 0) {
       final p = presence = SimPresence(net, clock);
       for (var j = 0; j < jurors; j++) {
-        final juror = SimJuror(FakeSigner('juror$j'), net, clock, crypto: crypto);
+        final juror = SimJuror(FakeSigner('juror$j'), net, clock, crypto: crypto, dealWorker: worker());
         this.jurors.add(juror);
         p.register(juror);
       }
@@ -71,6 +75,7 @@ class LiveHarness {
           transport: net.attach(signers[s].publicKey),
           clock: clock,
           crypto: crypto,
+          dealWorker: myWorker = worker(),
           presence: presence,
           // A rated table reads its ratings from this device's own
           // ledger and folds the finished game into it, as the front
@@ -85,6 +90,7 @@ class LiveHarness {
             transport: net.attach(signers[s].publicKey),
             clock: clock,
             crypto: crypto,
+            dealWorker: worker(),
             presence: presence);
         final person = ScriptedHuman(client, net, clock, persona: engine.Persona.westley, thinkMs: 300);
         people[s] = person;
@@ -96,6 +102,9 @@ class LiveHarness {
   /// What this device does with the others' pictures, where a test
   /// cares.
   final Pictures? pictures;
+
+  /// This device's deal worker, when the harness has them.
+  SimDealWorker? myWorker;
 
   /// The ratings this device knows, at a rated table: empty, so
   /// everyone starts fresh.
@@ -140,13 +149,15 @@ Future<LiveHarness> pumpLive(WidgetTester tester,
     int target = engine.gameOverScore,
     bool rated = false,
     Set<int> botSeats = const {},
-    int jurors = 0}) async {
+    int jurors = 0,
+    bool workers = false}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   final live =
-      LiveHarness(crypto: crypto, pictures: pictures, avatars: avatars, target: target, rated: rated, botSeats: botSeats, jurors: jurors);
+      LiveHarness(
+          crypto: crypto, pictures: pictures, avatars: avatars, target: target, rated: rated, botSeats: botSeats, jurors: jurors, workers: workers);
   await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: LivePage(controller: live.controller)));
   await tester.pumpAndSettle();
   return live;
@@ -412,6 +423,31 @@ void main() {
     }
     expect(live.controller.game.tricksPlayed, greaterThanOrEqualTo(2), reason: 'tricks are played on the screen');
     expect(live.controller.game.knowsHand(1), isFalse, reason: 'and the bot\'s hand was never opened to do it');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('with the deal\'s work at a worker, the screen deals and plays and makes none of it itself', (tester) async {
+    // The app's own arrangement: every device's shuffles and checks
+    // made in a worker, here one taking a browser's time over each on
+    // the virtual clock. The screen's table waits for them, and the
+    // deal it shows is the one it would have shown making them itself.
+    final crypto = await DealCrypto.load();
+    final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: 4, workers: true);
+    var sawShuffling = false;
+    for (var guard = 0; guard < 200 && live.controller.game.phase == engine.Phase.dealing; guard++) {
+      await live.advance(tester, 500);
+      if (find.textContaining('Shuffling').evaluate().isNotEmpty) sawShuffling = true;
+    }
+    expect(sawShuffling, isTrue, reason: 'the rail showed the shuffles while the worker made them');
+    expect(live.controller.game.phase, engine.Phase.passing, reason: 'the deal completed');
+    expect(live.controller.game.knowsHand(_me), isTrue);
+    for (var guard = 0; guard < 200 && live.controller.game.tricksPlayed < 2; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(live.controller.game.tricksPlayed, greaterThanOrEqualTo(2), reason: 'and the hand plays');
+    expect(live.myWorker!.made, greaterThanOrEqualTo(10), reason: 'a shuffle, two batches of tokens and seven checks, at the worker');
+    expect(live.controller.client.dealCallsMadeHere, 0, reason: 'none of the deal\'s slow calls made where the screen is drawn');
     expect(tester.takeException(), isNull);
   });
 

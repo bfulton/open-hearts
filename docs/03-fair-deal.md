@@ -496,6 +496,43 @@ own build — so until they do, they play alone.
   drowned in the catch-up. `crypto/schnorr` is the browser's signature
   wasm built for the VM, two hundred times faster, and an event seen
   before is taken by its id without a second check.
+- **Off the page's thread.** Five of the calls take long enough to be
+  seen. In V8, the engine Chromium runs the wasm in, on one idle core
+  of a 2.8 GHz Xeon: the first deck 74 ms, a shuffle with its argument
+  566, checking one 468, a seat's thirty-nine tokens with their
+  argument 199, checking those 190. No other call takes fifteen. A
+  person makes the first deck, a shuffle and two batches of tokens a
+  hand and checks three shuffles and three batches: about three
+  seconds, in pieces of up to half of one, and a phone takes two or
+  three times as long. Made on the page, each piece was that long of a
+  page that did not move and a tap that did not land, and a device's
+  jury duty checks the deals of tables it is not sitting at, so they
+  came at moments nobody at its own table had reason to expect.
+
+  So the page makes them in a Web Worker, `app/web/deal_worker.js`,
+  with an instance of its own of the same wasm (`packages/deal`,
+  `work.dart`; on the VM, an isolate). The session is untouched and
+  still synchronous. The table describes the slow calls a step is
+  about to cost — the check of a step that has arrived, this side's
+  own shuffle or tokens, and the first deck once every seat's keys
+  are checked — sends them to the worker, and keeps the step where it
+  keeps any step that is waiting on something (`TableClient._workedOut`).
+  When the answers are back it looks again, and the session's calls
+  are answered from them, found by a hash of the call, so the answer
+  is the one the session would have made itself. A call nobody
+  described is made on the page as before, and the simulator's tests
+  hold those to none across whole games and sealed chaos walks. A
+  worker that fails hands its jobs back to be made on the page; one
+  that has not answered a job in twenty seconds is given up on.
+
+  On a page doing nothing else, the five calls made on the page were
+  five long tasks, the longest 600 ms, and a frame that took 583; made
+  in the worker, no task of 50 ms at all and no frame over 17, in
+  three runs of three. The four-browser suite on two cores is busy
+  drawing four pages in software whatever the deal does, and there the
+  worker took the tasks of 800 ms or more across the four pages from
+  151 to 65, and the ninety-ninth percentile of their tasks of 50 ms
+  or more from 1461 ms to 878.
 
 ### A sealed token, and the argument that it is the right one
 

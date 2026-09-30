@@ -150,6 +150,16 @@ A bot seat nobody holds is never waited on. Every side works its move
 out. The move waits only if the seat's cards are not open here yet,
 and then it is waiting for the seat's secret.
 
+Nor is a side's own deal worker a wait of the table's. A step whose
+check is being made in the worker (docs/03-fair-deal.md, "Off the
+page's thread") is kept the way a step early for its jury is kept, and
+this side's own shuffle or tokens are said once they have been made
+there. Either wait ends by itself: the answer comes back, or the
+worker fails and the work is made here, or a job has not come back in
+twenty seconds and the worker is given up on
+(`TableClient.workerPatienceMs`). The table sees only a step that came
+a little later.
+
 ## Stuck
 
 A wait is **covered** when someone who can end it is up, and either

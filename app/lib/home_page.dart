@@ -259,7 +259,7 @@ class _HomePageState extends State<HomePage> {
     final signer = await Identity.signer();
     if (!mounted) return;
     setState(() => _signer = signer);
-    Duty.on(_relays, signer, log: _debugging, crypto: dealCrypto).presence.ready.then((_) {
+    Duty.on(_relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
       if (mounted) setState(() => _listeningSinceMs = DateTime.now().millisecondsSinceEpoch);
     });
     _onlineClock = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -355,7 +355,7 @@ class _HomePageState extends State<HomePage> {
       }
       // A relay answered: from here on this device is online to
       // everyone, and a juror when drawn.
-      Duty.on(relays, signer, log: _debugging, crypto: dealCrypto);
+      Duty.on(relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker);
       _iceServers ??= const [];
       iceServersFor(signer).then((servers) {
         _iceServers = servers;
@@ -475,8 +475,9 @@ class _HomePageState extends State<HomePage> {
         log: _debugging ? (l) => debugPrint('mesh: $l') : null,
       ),
       relay: relay,
-      presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto).presence,
+      presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence,
       crypto: dealCrypto,
+      dealWorker: dealWorker,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
       onResult: (result) {
         // The fold that turns results into ratings is arithmetic this

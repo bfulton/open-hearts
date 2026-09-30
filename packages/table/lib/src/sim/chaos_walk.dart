@@ -141,10 +141,16 @@ String? disagreed(SimTable t) {
 
 /// [jurors] strangers to draw from, and with [sweep] each lets go of
 /// the table once it has served, as the duty does ([SimTable]); its
-/// clients' traces go to [jurorLog].
+/// clients' traces go to [jurorLog]. With [workers], every device
+/// makes the deal's slow calls in a worker taking a browser's time.
 String? walkChaos(int seed,
-    {DealCrypto? crypto, StructureLog? structure, int jurors = 4, bool sweep = false, void Function(String line)? jurorLog}) {
-  final sc = ChaosScenario(seed, crypto: crypto, jurors: jurors, sweepJurors: sweep);
+    {DealCrypto? crypto,
+    StructureLog? structure,
+    int jurors = 4,
+    bool sweep = false,
+    bool workers = false,
+    void Function(String line)? jurorLog}) {
+  final sc = ChaosScenario(seed, crypto: crypto, jurors: jurors, sweepJurors: sweep, workers: workers);
   final t = sc.table;
   for (final j in t.jurors) {
     j.log = jurorLog;
