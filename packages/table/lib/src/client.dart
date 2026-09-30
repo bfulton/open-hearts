@@ -4960,14 +4960,26 @@ class TableClient {
   /// against: halfway to the turn's own allowance, which leaves as long
   /// again for the carried copy to arrive and be witnessed before
   /// anybody can call the seat silent. Three seconds for a play whose
-  /// bank is spent, seven and a half for a deal turn, more for a pass
-  /// or a seat with time in hand.
+  /// bank is spent, more for a pass or a seat with time in hand.
+  ///
+  /// Except a deal turn or an audit, which is [_dealCarryMs]. Their
+  /// allowance is how long a slow device may take to work a step out,
+  /// forty seconds, and half of that is twenty seconds of a table cut
+  /// in two sitting on a step that was said in the first second. A
+  /// copy needs no longer to arrive because its author was slow.
   bool _carryDue(TurnId turn) {
     final opened = _openedAt[turn];
     final seat = _turnSeat[turn];
     if (opened == null || seat == null) return true;
-    return clock.nowMs - opened >= _allowanceMs(turn, seat) ~/ 2;
+    final wait = timeBank.banks(turn) ? _allowanceMs(turn, seat) ~/ 2 : _dealCarryMs;
+    return clock.nowMs - opened >= wait;
   }
+
+  /// When a deal turn's or an audit's action may be said again by
+  /// someone other than its author: seven and a half seconds, half the
+  /// fifteen those turns were allowed when the wait was first set, and
+  /// still well inside the forty they have now.
+  static const _dealCarryMs = 7500;
 
   /// [ownOnly] leaves out the carrying — somebody else's action said
   /// again for a peer that may not have heard it. That is a seat's

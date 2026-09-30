@@ -410,8 +410,10 @@ a Boot button appears next to that seat. The first person to press it
 removes the player. A player who thinks hard over three cards is never
 bothered; one who takes fourteen seconds over every card is bootable on
 their sixth. The bank refills every hand. The deal's own turns and the
-audit, which a present device answers by itself, keep a fixed fifteen
-seconds.
+audit, which a present device answers by itself, keep a fixed forty
+seconds, the same as a juror has for a bot seat's (below): on a slow
+machine a person's device takes as long over a deal step, and one
+came within a tenth of a second of the fifteen these once had.
 
 Nothing shows while a seat is within its grace. Past it, that seat's
 remaining clock shows on its badge, and on your own score line when it
