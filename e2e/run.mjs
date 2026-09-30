@@ -80,10 +80,27 @@ async function main() {
   // bounded, and printed for whoever is still stuck when something
   // times out.
   const traces = [];
+  // How long each device's page was held at a time while it played:
+  // every task of 50 ms or more on its thread, by the browser's own
+  // count, from the front door on — loading the app is one long task
+  // and says nothing about the table. A frame is 16; a tap waits out
+  // whatever task is running when it lands.
+  const held = [];
+  let playing = false;
   let failed = false;
   try {
     for (let i = 0; i < 4; i++) {
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' });
+      const tasks = [];
+      held.push(tasks);
+      await ctx.exposeBinding('ohLongTask', (_, ms) => playing && tasks.push(ms));
+      await ctx.addInitScript(() => {
+        try {
+          new PerformanceObserver((list) => {
+            for (const e of list.getEntries()) window.ohLongTask(Math.round(e.duration));
+          }).observe({ type: 'longtask', buffered: true });
+        } catch (_) {}
+      });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => log(`page ${names[i]} error: ${e.message}\n${(e.stack || '').slice(0, 600)}`));
       // A device's table and its jury duty are two clients in one tab
@@ -144,6 +161,7 @@ async function main() {
     // down, counted on the button itself.
     for (const page of pages) await waitFor(page, /^Play live, 4 online$/, { what: 'everyone online', timeout: 40000 });
     log('four online at the front door');
+    playing = true;
 
     // Cell 0: matchmaking. Three ask for an unrated game — the options
     // are rated until someone says otherwise, so they say so — and are
@@ -299,6 +317,13 @@ async function main() {
       }
     }
   } finally {
+    for (const [i, tasks] of held.entries()) {
+      const total = tasks.reduce((a, b) => a + b, 0);
+      const worst = tasks.length ? Math.max(...tasks) : 0;
+      const over = (ms) => tasks.filter((t) => t >= ms).length;
+      log(`${names[i]}'s page, playing, held 50 ms or more ${tasks.length} times, ${(total / 1000).toFixed(1)} s in all; ` +
+        `200 ms or more ${over(200)} times, 500 or more ${over(500)}; the longest ${worst} ms`);
+    }
     await browser.close();
     app.stop();
     relay.stop();
