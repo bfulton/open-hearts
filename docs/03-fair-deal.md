@@ -189,10 +189,12 @@ The deal is built — `crypto/deal` and `crypto/vendor`, `packages/deal`,
 and "the deal" section of `packages/table/lib/src/client.dart` — and
 every live table is sealed: the room's start event and the matchmaking
 offer say so, and a build that cannot run the deal does not sit down.
-It says so at the door and opens no room and joins no pool, and a
-device that can refuses any start that is not sealed. (It used to be
-otherwise, found in review: a device whose deal had not loaded started
-its room unsealed, and the others sat down at it.) The web build ships
+It says so at the door and opens no room and joins no pool, nor says
+it is online, so no table draws it as a juror it could not be
+([doc 04](04-live-play.md)); and a device that can refuses any start
+that is not sealed. (It used to be otherwise, found in review: a device
+whose deal had not loaded started its room unsealed, and the others sat
+down at it.) The web build ships
 the deal as wasm beside the page; the phone and desktop builds do not
 bundle the native library yet — it is found beside the repository's
 own build — so until they do, they play alone.
@@ -549,8 +551,8 @@ own build — so until they do, they play alone.
     witness them, and at a table of two people, waiting to be booted
     at its own turn is waiting for a turn that never comes. A juror
     stops following the table, and the seat it held goes to the
-    escrow at its deadline, as a quiet juror's does; the device takes
-    no more summonses to sealed tables. The others play on.
+    escrow at its deadline, as a quiet juror's does; the device says
+    it is going, and is drawn by no table after. The others play on.
 
   On a page doing nothing else, the five calls made on the page were
   five long tasks, the longest 600 ms, and a frame that took 583; made

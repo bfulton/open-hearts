@@ -19,6 +19,8 @@ library;
 // A server's output is its log.
 // ignore_for_file: avoid_print
 
+import 'dart:io';
+
 import 'package:service/service.dart';
 import 'package:deal/deal.dart';
 import 'package:table/table.dart';
@@ -42,11 +44,16 @@ Future<void> main(List<String> args) async {
   print('relay ${relay.url}');
   if (juror) {
     // Its few lines are worth having even when the relay is quiet.
-    DealCrypto? crypto;
+    // Every live table is sealed, so a bench without the deal could
+    // serve none of them, and drawn it would hold bot seats and pieces
+    // of escrow it never answers for (bin/juror.dart).
+    final DealCrypto crypto;
     try {
       crypto = await DealCrypto.load();
     } catch (e) {
-      print('juror: no deal cryptography ($e); sealed tables cannot be served');
+      print('juror: no deal cryptography ($e); every live table is sealed, so there is nothing to serve');
+      await relay.close();
+      exit(1);
     }
     // A bench of them, because a table with bot seats needs
     // juryToHoldBots online before a juror can hold one at all, and

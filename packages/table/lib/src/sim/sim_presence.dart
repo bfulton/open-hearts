@@ -47,6 +47,13 @@ class SimPresence implements Presence {
   void _tick() {
     for (final j in _jurors.values) {
       final k = j.signer.publicKey;
+      if (!j.canServe) {
+        // Says it is going, and nothing more of itself, as a device's
+        // presence does once it cannot serve (RelayPresence.canServe).
+        _lastUp.remove(k);
+        _firstUp.remove(k);
+        continue;
+      }
       if (!j.gone && net.isUp(k) && (!lastResorts.contains(j) || j.called)) {
         // A gap longer than the heartbeat starts the run again: a
         // juror that went and came back is newly here, not settled.
@@ -103,6 +110,7 @@ class SimPresence implements Presence {
     for (final j in lastResorts) {
       if (j.called) continue;
       j.called = true;
+      if (!j.canServe) continue;
       _firstUp[j.signer.publicKey] = clock.nowMs;
       _lastUp[j.signer.publicKey] = clock.nowMs;
     }

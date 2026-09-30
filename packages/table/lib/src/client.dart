@@ -311,7 +311,9 @@ class TableClient {
   /// player's shuffle stopped in front of it. Leaving, the seat goes
   /// to a bot and the table plays on. A juror stops following the
   /// table; the seat it holds goes to the escrow at its deadline, as a
-  /// quiet juror's does.
+  /// quiet juror's does. Either way the device stops saying it is
+  /// online, and no table draws it after (presence_relay.dart,
+  /// [RelayPresence.canServe]).
   String? get cannotDeal => _cannotDeal;
   String? _cannotDeal;
 
