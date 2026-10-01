@@ -234,11 +234,11 @@ identifier.
 
 No analytics, crash reporting, advertising identifiers, fingerprinting,
 cookies from our pages (Stripe sets its own, on its own domain),
-location (but see the metadata bug), contacts, device model, chat, or
+location (the metadata bug below is fixed), contacts, device model, chat, or
 email address held by us. The worker and the relay object log nothing.
 The counters doc 06 describes (`COUNTER#…`) are not built.
 
-## A bug to fix before phones publish pictures
+## A bug that was fixed before phones publish pictures
 
 **A photo's location can ride along in the avatar.** On Android,
 `image_picker`'s `ExifDataCopier` copies the GPS tags into the resized
@@ -258,13 +258,12 @@ JPEG carrying GPS latitude and longitude gave an 827-byte avatar that
 still carried all four GPS tags, and none once `exif` was cleared
 (`image` 4.10.0, Dart 3.13.2). The picker half — that Android's and
 iOS's pickers hand the tags over in the first place — is read from
-their source, not run on a device. The fix is small: clear the metadata
-in `shrinkPicture` before encoding (`square.exif = ExifData()`), with a
-test that shrinks a JPEG carrying GPS tags and checks the output has
-none. A large EXIF
-block — a phone's embedded thumbnail — may also push a picture over the
-12,000-byte cap, which would show up as "That did not read as a
-picture."
+their source, not run on a device. **Fixed:** `shrinkPicture` now
+clears the metadata before encoding (`square.exif = ExifData()`), and
+`app/test/avatar_test.dart` shrinks a JPEG tagged with a position, both
+whole and cropped, and checks that nothing of its EXIF comes out the
+other side. The same clearing keeps a phone's embedded thumbnail from
+pushing a picture over the 12,000-byte cap.
 
 ## Retention and deletion
 
@@ -319,7 +318,7 @@ track:
 | User Content → **Photos or Videos** | App Functionality | the avatar picture, when the player chooses one, published as a stored event |
 | User Content → **Gameplay Content** | App Functionality | results (stored, public) and seatings — "multiplayer matching" |
 | Purchases → **Purchase History** | App Functionality | the service keeps the subscription against the device key (doc 06, entitle). Not needed if store entitlements are checked on the device only (conflict 5) |
-| Location → **Precise Location** | — | only if the metadata bug ships. Fix it rather than declare it |
+| Location → **Precise Location** | — | not collected: the metadata bug is fixed (avatar_test.dart) |
 
 Not declared, and why:
 
@@ -380,7 +379,7 @@ required data type.** The privacy policy URL is still required.
 | App activity → **Other actions** (gameplay: results, seatings, the rating and pace stated in matching) | yes | yes | no | yes | App functionality |
 | Financial info → **Purchase history** | yes, once Play Billing lands and the service records it | no — Google is the processor, Cloudflare our service provider | no | yes | App functionality, Account management |
 
-Not declared: Location (unless the metadata bug ships), App info and
+Not declared: Location (the metadata bug is fixed), App info and
 performance (no crash logs), Messages (no chat), Email address. As with
 Apple, the key could also go under Device or other IDs.
 
