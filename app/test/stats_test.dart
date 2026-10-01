@@ -95,11 +95,27 @@ void main() {
     ledger.apply(game('t2', [80, 30, 40, 50]));
 
     final stats = fromStanding(const PlayerStats(), net.Standing(ledger, me), me);
+    expect(stats.asking, isFalse, reason: 'an answer is not a question still out');
     expect(stats.reached, isTrue);
     expect(stats.ratedGames, 2);
     expect(stats.live.games, 2);
     expect(stats.live.won, 1);
     expect(stats.live.average, 50);
     expect(stats.rating!.shown, greaterThan(0));
+  });
+
+  test('the relays are said to be asked while they are, and to have failed only once they have', () async {
+    SharedPreferences.setMockInitialValues({});
+    final me = FakeSigner('me');
+    // Nothing listens here: the relay never answers, which is what a
+    // device with no network sees too.
+    final said = await playerStats(store: PrefsRecordStore(), signer: me, relays: [Uri.parse('ws://127.0.0.1:9')]).toList();
+    expect(said.first.asking, isTrue, reason: 'the device\'s own games at once, the relays still to answer');
+    expect(said.last.asking, isFalse, reason: 'and the wait ends, in a word rather than a count still under way');
+    expect(said.last.reached, isFalse);
+
+    // A door that asks nobody has nothing coming.
+    final asked = await playerStats(store: PrefsRecordStore(), signer: me).toList();
+    expect(asked.single.asking, isFalse);
   });
 }

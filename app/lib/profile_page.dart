@@ -444,7 +444,7 @@ class _Record extends StatelessWidget {
               ),
               const SizedBox(height: 7),
               Text(
-                stats == null
+                stats == null || stats.asking
                     ? 'Counting up your games…'
                     : !stats.reached
                     ? 'The relays did not answer, so it cannot be shown just now'
