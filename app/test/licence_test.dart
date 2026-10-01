@@ -108,6 +108,22 @@ void main() {
     }
   });
 
+  test('a request is signed over the statement the worker checks, by the key it names', () {
+    // The same figure is pinned in service/functions/worker.test.mjs:
+    // BIP-340's first key asking for a code at 1700000000.
+    const first = 'f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9';
+    expect(requestDigest('ticket', first, 1700000000), '2c77f32dd54af71c904ab632f9d33a5c9fe47242fb2525ced9a01a0988629761');
+    final me = SchnorrSigner.fromSecret('${'0' * 63}3');
+    expect(me.publicKey, first);
+    final asked = signedAsk(me, 'claim', what: 'ab12', now: DateTime.fromMillisecondsSinceEpoch(1700000000 * 1000));
+    expect(asked['key'], first);
+    expect(asked['at'], 1700000000);
+    final sig = asked['sig'] as String;
+    expect(schnorrVerifier(first, requestDigest('claim', first, 1700000000, 'ab12'), sig), isTrue);
+    expect(schnorrVerifier(first, requestDigest('claim', first, 1700000000, 'cd34'), sig), isFalse, reason: 'another code');
+    expect(schnorrVerifier(first, requestDigest('ticket', first, 1700000000, 'ab12'), sig), isFalse, reason: 'another handler');
+  });
+
   test('where the handlers are: the origin the app was served by, or nobody', () {
     expect(handlerFor('licence', Uri.parse('https://open-hearts.pages.dev/play/')).toString(),
         'https://open-hearts.pages.dev/api/licence');

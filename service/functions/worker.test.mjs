@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import worker, {
   allowedOrigin,
+  askedBy,
   attest,
   checkout,
   claimWith,
@@ -19,6 +20,7 @@ import worker, {
   memoryStore,
   mint,
   record,
+  requestStatement,
   sameSite,
   serversOf,
   signerOn,
@@ -27,6 +29,7 @@ import worker, {
   webhookSigned,
   whoSignedIn,
 } from './worker.mjs';
+import { keys } from '../do/sign.mjs';
 
 const KEY = 'ab'.repeat(32);
 const answer = {
@@ -48,6 +51,34 @@ const signer = await signerOn(wasm);
 // derived here: the wasm signs and verifies and does not derive.
 const SERVICE_SECRET = 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef';
 const SERVICE_KEY = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
+
+/// Devices that can sign: BIP-340's published pairs again, since a
+/// handler acts for a key only on a request that key signed. A
+/// device's key is on every event it has said at a table, so anybody
+/// can name one; these are the ones a test can also sign for. The
+/// second pair is the service's own, above, so it is skipped.
+const [ADA, , BAO, CY] = keys;
+
+const sha = async (text) =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+/// A request as a device makes one (app/lib/net/licence.dart): its
+/// key, the second it was made, and its signature over the handler,
+/// the key, the second and what it asks for — written out again here
+/// rather than borrowed, so that the statement itself is pinned.
+const asking = async (pair, handler, { what = '', at = Math.floor(Date.now() / 1000), ...more } = {}) => ({
+  key: pair.public,
+  at,
+  sig: signer.sign(pair.secret, await sha(`oh-request/1\n${handler}\n${pair.public}\n${at}\n${what}`)),
+  ...more,
+});
+
+/// The hash of BIP-340's first key asking for a code at 1700000000:
+/// the same figure is pinned on the app's side, so the two cannot
+/// drift apart without both suites saying so.
+const REQUEST_VECTOR = '2c77f32dd54af71c904ab632f9d33a5c9fe47242fb2525ced9a01a0988629761';
 
 const assets = {
   fetch: async (url) =>
@@ -137,17 +168,19 @@ test('the worker: a key is required, then credentials come back, no-store', asyn
   assert.equal(bad.status, 400);
   const none = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'POST', body: 'not json' }), env);
   assert.equal(none.status, 400);
+  // A subscribed device, asking for itself (who is asking, below).
+  const held = { ...env, OH_STORE: kvOf(await household(Date.now(), ADA.public)) };
   const realFetch = globalThis.fetch;
   globalThis.fetch = okUpstream;
   try {
-    const res = await worker.fetch(post({ key: KEY }, 'https://dev.open-hearts.pages.dev'), env);
+    const res = await worker.fetch(post(await asking(ADA, 'turn'), 'https://dev.open-hearts.pages.dev'), held);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('cache-control'), 'no-store');
     assert.equal(res.headers.get('access-control-allow-origin'), 'https://dev.open-hearts.pages.dev');
     const body = await res.json();
     assert.deepEqual(body.iceServers, answer.iceServers);
     assert.equal(body.ttl, 4 * 3600);
-    const unconfigured = await worker.fetch(post({ key: KEY }), { ...env, OH_TURN_API_TOKEN: undefined });
+    const unconfigured = await worker.fetch(post(await asking(ADA, 'turn')), { ...held, OH_TURN_API_TOKEN: undefined });
     assert.equal(unconfigured.status, 503);
   } finally {
     globalThis.fetch = realFetch;
@@ -167,14 +200,16 @@ const subscribed = (key, { renews_at, licensed_until = renews_at, cancelled_at =
 const licensing = () => ({ ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY });
 
 /// storeOf speaks to a KV binding; a Map behind the same two calls is
-/// the adapter local mode and these tests use.
-const kvOf = (store) => ({
+/// the adapter local mode and these tests use. What each write asked
+/// KV for besides the value — an expiry — is kept in [puts].
+const kvOf = (store, puts = []) => ({
   get: async (at, kind) => {
     const [pk, sk] = at.split('|');
     const row = await store.get(pk, sk);
     return kind === 'json' ? row : row === null ? null : JSON.stringify(row);
   },
-  put: async (at, raw) => {
+  put: async (at, raw, options) => {
+    puts.push({ at, options });
     const [pk, sk] = at.split('|');
     await store.put(pk, sk, JSON.parse(raw));
   },
@@ -186,6 +221,12 @@ const kvOf = (store) => ({
     keys: [...store.rows.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })),
     list_complete: true,
   }),
+});
+
+/// The worker, configured, over [store]; and a way to ask it.
+const serving = (store, puts) => ({
+  held: { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store, puts) },
+  send: (what, body) => new Request(`https://dev.open-hearts.pages.dev/api/${what}`, { method: 'POST', body: JSON.stringify(body) }),
 });
 
 test('days: an ISO date in UTC, and a month on from one', () => {
@@ -272,18 +313,18 @@ test('the licence: no subscription is 402, and a service half-configured is 503'
 
 test('the licence route: a key is required, and what comes back verifies', async () => {
   const at = 'https://dev.open-hearts.pages.dev/api/licence';
-  const withStore = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(subscribed(KEY, { renews_at: '2027-01-01' })) };
+  const withStore = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(subscribed(ADA.public, { renews_at: '2027-01-01' })) };
   const bad = await worker.fetch(new Request(at, { method: 'POST', body: JSON.stringify({ key: 'short' }) }), withStore);
   assert.equal(bad.status, 400);
   const res = await worker.fetch(
-    new Request(at, { method: 'POST', headers: { origin: 'http://127.0.0.1:9000' }, body: JSON.stringify({ key: KEY }) }),
+    new Request(at, { method: 'POST', headers: { origin: 'http://127.0.0.1:9000' }, body: JSON.stringify(await asking(ADA, 'licence')) }),
     withStore,
   );
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('cache-control'), 'no-store');
   assert.equal(res.headers.get('access-control-allow-origin'), 'http://127.0.0.1:9000');
   const { licence: signed } = await res.json();
-  assert.equal(signed.key, KEY);
+  assert.equal(signed.key, ADA.public);
   assert.equal(signed.plan, 'year');
   const canonical = `oh-licence/1\n${signed.key}\n${signed.until}\n${signed.plan}`;
   const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical)))]
@@ -425,12 +466,12 @@ test('the checkout route: the key, and somewhere on this site to come back to', 
   const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1' };
   const send = (body) => new Request(at, { method: 'POST', body: JSON.stringify(body) });
   assert.equal((await worker.fetch(send({ key: 'short', back: '/play/', cancelled: '/play/' }), shop)).status, 400);
-  const away = await worker.fetch(send({ key: KEY, back: 'https://evil.example/', cancelled: '/play/' }), shop);
+  const away = await worker.fetch(send(await asking(ADA, 'checkout', { back: 'https://evil.example/', cancelled: '/play/' })), shop);
   assert.equal(away.status, 400, 'a payment does not land where the caller says');
   const realFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 });
   try {
-    const res = await worker.fetch(send({ key: KEY, back: '/play/?bought=1', cancelled: '/play/' }), shop);
+    const res = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/' })), shop);
     assert.equal(res.status, 200);
     assert.equal((await res.json()).url, 'https://checkout.stripe.com/c/pay/cs_1');
   } finally {
@@ -474,10 +515,10 @@ test('cancelling is not ending: the year paid for still runs, and dunning giving
 const OTHER = 'cd'.repeat(32);
 const THIRD = 'ef'.repeat(32);
 
-/// A store with KEY subscribed and its subscription running a year out.
-const household = async (now) => {
+/// A store with [key] subscribed and its subscription running a year out.
+const household = async (now, key = KEY) => {
   const store = memoryStore();
-  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store, { now });
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_9', metadata: { key } } } }, store, { now });
   await record({ type: 'customer.subscription.created', data: { object: { id: 'sub_9', current_period_end: Math.floor(Date.UTC(2027, 8, 16) / 1000) } } }, store, { now });
   return store;
 };
@@ -583,29 +624,27 @@ test('a device moving to another subscription leaves the one it was on', async (
 
 test('the routes: a code, a claim that answers with the licence, and the devices list', async () => {
   const now = Date.UTC(2026, 8, 16);
-  const store = await household(now);
-  const held = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store) };
-  const at = (what) => `https://dev.open-hearts.pages.dev/api/${what}`;
-  const send = (what, body) => new Request(at(what), { method: 'POST', body: JSON.stringify(body) });
+  const store = await household(now, ADA.public);
+  const { held, send } = serving(store);
 
-  const made = await worker.fetch(send('ticket', { key: KEY }), held);
+  const made = await worker.fetch(send('ticket', await asking(ADA, 'ticket')), held);
   assert.equal(made.status, 200);
   const { ticket } = await made.json();
 
-  const claimed = await worker.fetch(send('claim', { key: OTHER, ticket }), held);
+  const claimed = await worker.fetch(send('claim', await asking(BAO, 'claim', { what: ticket, ticket })), held);
   assert.equal(claimed.status, 200);
   const { licence: signed } = await claimed.json();
-  assert.equal(signed.key, OTHER, 'the device that scanned it is playing, not waiting to be told');
+  assert.equal(signed.key, BAO.public, 'the device that scanned it is playing, not waiting to be told');
 
-  const listed = await worker.fetch(send('devices', { key: OTHER }), held);
+  const listed = await worker.fetch(send('devices', await asking(BAO, 'devices')), held);
   const { devices, most } = await listed.json();
-  assert.deepEqual(devices.map((d) => d.key), [KEY, OTHER]);
+  assert.deepEqual(devices.map((d) => d.key), [ADA.public, BAO.public]);
   assert.equal(most, 5);
 
-  const after = await worker.fetch(send('devices', { key: OTHER, drop: KEY }), held);
-  assert.deepEqual((await after.json()).devices.map((d) => d.key), [OTHER]);
+  const after = await worker.fetch(send('devices', await asking(BAO, 'devices', { what: ADA.public, drop: ADA.public })), held);
+  assert.deepEqual((await after.json()).devices.map((d) => d.key), [BAO.public]);
 
-  const unknown = await worker.fetch(send('ticket', { key: THIRD }), held);
+  const unknown = await worker.fetch(send('ticket', await asking(CY, 'ticket')), held);
   assert.equal(unknown.status, 402);
 });
 
@@ -620,6 +659,103 @@ test('a dropped device does not come back on its next ask', async () => {
   assert.equal((await store.get('SUB#sub_9', 'META')).renews_at, '2027-09-16');
   for (const day of [Date.UTC(2026, 8, 16), Date.UTC(2026, 8, 17), Date.UTC(2027, 0, 1)]) {
     assert.equal(await entitlementOf(store, OTHER, { now: day }), null, new Date(day).toISOString().slice(0, 10));
+  }
+});
+
+// ---- who is asking ------------------------------------------------------
+// A key is public: it signs every event a device says at a table, and
+// the relays hand those to anybody. So a request that only names one
+// is anybody's, and each of these was answered for anybody before.
+
+test('a key alone is nobody: a household is not listed, dropped from or joined by whoever can read a key', async () => {
+  const now = Date.now();
+  const store = await household(now, ADA.public);
+  const { held, send } = serving(store);
+
+  // Ada's key, as a stranger read it off the relay.
+  assert.equal((await worker.fetch(send('devices', { key: ADA.public }), held)).status, 401, 'her devices are not listed to him');
+  assert.equal((await worker.fetch(send('devices', { key: ADA.public, drop: ADA.public }), held)).status, 401);
+  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [ADA.public], 'nor is she dropped off what she paid for');
+  assert.equal((await worker.fetch(send('ticket', { key: ADA.public }), held)).status, 401, 'nor is a code made against it');
+  assert.equal((await worker.fetch(send('licence', { key: ADA.public }), held)).status, 401, 'nor is he told whether she pays');
+
+  // Signed, but by his own key; or for another handler; or what it
+  // asks for is not what was signed; or signed an hour ago.
+  const second = Math.floor(now / 1000);
+  for (const [why, what, body] of [
+    ['his signature', 'devices', { ...(await asking(BAO, 'devices')), key: ADA.public }],
+    ['a licence request is not a code request', 'ticket', await asking(ADA, 'licence')],
+    ['the device to drop is part of what is signed', 'devices', await asking(ADA, 'devices', { drop: BAO.public })],
+    ['an old request is not a new one', 'ticket', await asking(ADA, 'ticket', { at: second - 3600 })],
+    ['nor one from the future', 'ticket', await asking(ADA, 'ticket', { at: second + 3600 })],
+  ]) {
+    assert.equal((await worker.fetch(send(what, body), held)).status, 401, why);
+  }
+
+  // Her own, signed: answered, and a code made by her is spent by a
+  // device that signs for itself.
+  const made = await worker.fetch(send('ticket', await asking(ADA, 'ticket')), held);
+  assert.equal(made.status, 200);
+  const { ticket } = await made.json();
+  assert.equal((await worker.fetch(send('claim', { key: BAO.public, ticket }), held)).status, 401, 'a claim names the device it binds');
+  assert.equal((await worker.fetch(send('claim', await asking(BAO, 'claim', { ticket: 'ab'.repeat(16) })), held)).status, 401, 'and the code it spends');
+  const claimed = await worker.fetch(send('claim', await asking(BAO, 'claim', { what: ticket, ticket })), held);
+  assert.equal(claimed.status, 200);
+  assert.equal((await claimed.json()).licence.key, BAO.public);
+  const listed = await worker.fetch(send('devices', await asking(BAO, 'devices')), held);
+  assert.deepEqual((await listed.json()).devices.map((d) => d.key).sort(), [ADA.public, BAO.public].sort());
+});
+
+test('what a request signs is pinned, here and in the app (app/test/licence_test.dart)', async () => {
+  const statement = requestStatement('ticket', ADA.public, 1700000000);
+  assert.equal(statement, `oh-request/1\nticket\n${ADA.public}\n1700000000\n`);
+  assert.equal(await sha(statement), REQUEST_VECTOR);
+  // And a signature over it is taken from the key it names, then, and
+  // from nobody else or any other time.
+  const body = await asking(ADA, 'ticket', { at: 1700000000 });
+  const then = 1700000000 * 1000;
+  assert.deepEqual(await askedBy(body, 'ticket', '', signer, { now: then }), { key: ADA.public });
+  assert.equal((await askedBy(body, 'ticket', '', signer, { now: then + 301000 })).status, 401);
+  assert.equal((await askedBy({ ...body, key: BAO.public }, 'ticket', '', signer, { now: then })).status, 401);
+  assert.equal((await askedBy({ ...body, sig: 'zz' }, 'ticket', '', signer, { now: then })).status, 401);
+  assert.equal((await askedBy({ ...body, at: '1700000000' }, 'ticket', '', signer, { now: then })).status, 401);
+  assert.equal((await askedBy({ key: 'short' }, 'ticket', '', signer, { now: then })).status, 400);
+});
+
+test('TURN is for a device that holds a licence, and asks for it itself', async () => {
+  // Credentials are a relay anybody can push anything through, billed
+  // to the project by the gigabyte: they were minted for any 64 hex.
+  const store = await household(Date.now(), ADA.public);
+  const held = { ...env, OH_STORE: kvOf(store) };
+  const send = (body) => new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'POST', body: JSON.stringify(body) });
+  const realFetch = globalThis.fetch;
+  okUpstream.calls.length = 0;
+  globalThis.fetch = okUpstream;
+  try {
+    assert.equal((await worker.fetch(send({ key: ADA.public }), held)).status, 401, 'a key read off a relay');
+    assert.equal((await worker.fetch(send(await asking(CY, 'turn')), held)).status, 402, 'a device with no subscription');
+    assert.equal(okUpstream.calls.length, 0, 'and neither of them cost an upstream call');
+    const ok = await worker.fetch(send(await asking(ADA, 'turn')), held);
+    assert.equal(ok.status, 200);
+    assert.deepEqual((await ok.json()).iceServers, answer.iceServers);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('a checkout is opened only by the device it is for', async () => {
+  // Paying for somebody else's key moved their device onto a
+  // subscription the payer could then end.
+  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1' };
+  const send = (body) => new Request('https://dev.open-hearts.pages.dev/api/checkout', { method: 'POST', body: JSON.stringify(body) });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 });
+  try {
+    assert.equal((await worker.fetch(send({ key: ADA.public, back: '/play/?bought=1', cancelled: '/play/' }), shop)).status, 401);
+    const ok = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/' })), shop);
+    assert.equal(ok.status, 200);
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });
 
@@ -759,31 +895,56 @@ test('supersede has nothing to move for an account nobody has signed in with', a
 test('the sign-in route: a token that does not check out is 401, and one that does comes back with the licence', async () => {
   forgetProviderKeys();
   const now = Date.UTC(2026, 8, 16);
-  const store = await household(now);
+  const store = await household(now, ADA.public);
   const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
   const realFetch = globalThis.fetch;
   globalThis.fetch = p.fetch;
   try {
-    const held = { ...env, ...signedInAs, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(store) };
-    const at = (what) => `https://dev.open-hearts.pages.dev/api/${what}`;
-    const send = (what, body) => new Request(at(what), { method: 'POST', body: JSON.stringify(body) });
+    const { held: base, send } = serving(store);
+    const held = { ...base, ...signedInAs };
 
-    const nonsense = await worker.fetch(send('attest', { key: KEY, provider: 'google', token: 'not.a.token' }), held);
+    const nonsense = await worker.fetch(send('attest', await asking(ADA, 'attest', { provider: 'google', token: 'not.a.token' })), held);
     assert.equal(nonsense.status, 401);
 
-    const token = await p.token({ sub: 'sub-1', nonce: await nonceFor(KEY) });
-    const ok = await worker.fetch(send('attest', { key: KEY, provider: 'google', token }), held);
+    const token = await p.token({ sub: 'sub-1', nonce: await nonceFor(ADA.public) });
+    const ok = await worker.fetch(send('attest', await asking(ADA, 'attest', { provider: 'google', token })), held);
     assert.equal(ok.status, 200);
     const said = await ok.json();
     assert.equal(said.attested, dayOf(Date.now()));
-    assert.equal(said.licence.key, KEY, 'a device that has just proved who it is does not ask twice');
+    assert.equal(said.licence.key, ADA.public, 'a device that has just proved who it is does not ask twice');
 
     // The same account on a new phone: attest refuses, supersede moves.
-    const theirs = await p.token({ sub: 'sub-1', nonce: await nonceFor(OTHER) });
-    assert.equal((await worker.fetch(send('attest', { key: OTHER, provider: 'google', token: theirs }), held)).status, 409);
-    const moved = await worker.fetch(send('supersede', { key: OTHER, provider: 'google', token: theirs }), held);
+    const theirs = await p.token({ sub: 'sub-1', nonce: await nonceFor(BAO.public) });
+    assert.equal((await worker.fetch(send('attest', await asking(BAO, 'attest', { provider: 'google', token: theirs })), held)).status, 409);
+    const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'google', token: theirs })), held);
     assert.equal(moved.status, 200);
-    assert.equal((await moved.json()).licence.key, OTHER);
+    assert.equal((await moved.json()).licence.key, BAO.public);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('a sign-in binds only a key that asked to be bound, so nobody\'s account is put on somebody else\'s device', async () => {
+  // The nonce is the caller's to choose, so a stranger can have the
+  // provider sign his own account over Ada's key. Bound to her key, his
+  // account would then supersede it — and carry her subscription to his.
+  forgetProviderKeys();
+  const now = Date.now();
+  const store = await household(now, ADA.public);
+  const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = p.fetch;
+  try {
+    const { held: base, send } = serving(store);
+    const held = { ...base, ...signedInAs };
+    const overHers = await p.token({ sub: 'mallory', nonce: await nonceFor(ADA.public) });
+    const bound = await worker.fetch(send('attest', { key: ADA.public, provider: 'google', token: overHers }), held);
+    assert.equal(bound.status, 401, 'her key did not ask');
+    const overMine = await p.token({ sub: 'mallory', nonce: await nonceFor(BAO.public) });
+    const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'google', token: overMine })), held);
+    assert.equal(moved.status, 404, 'his account is on no device, so there is nothing to carry');
+    assert.equal(await entitlementOf(store, BAO.public, { now }), null);
+    assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [ADA.public]);
   } finally {
     globalThis.fetch = realFetch;
   }

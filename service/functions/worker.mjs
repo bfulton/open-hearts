@@ -4,19 +4,23 @@
 // the published directory, where Pages runs it for every request;
 // whatever is not a handler is handed to the static assets.
 //
-// turn-creds: POST /api/turn with {"key": <the caller's table key>}
-// answers {"iceServers": [...], "ttl": seconds} — Cloudflare Realtime
-// TURN credentials good for a few hours, minted from a TURN key that
-// lives in the project's secrets (OH_TURN_KEY_ID, OH_TURN_API_TOKEN) and
-// never here. Without them the handler says so (503) and the app falls
-// back to STUN alone. The key is taken as given: attesting it is the
-// sign-in handler's job, which is not built yet.
+// Every handler but Stripe's is asked with the caller's table key, and
+// signed by it: {"key", "at", "sig", ...} — see "who is asking" below.
+// A key is public, so a request that only names one is anybody's.
 //
-// licence: POST /api/licence with the same key answers {"licence":
-// {key, until, plan, sig}} — a month, signed by the service key
-// (OH_SERVICE_SECRET, with OH_SERVICE_KEY beside it as the public half
-// the app has baked in), or 402 when no subscription stands behind the
-// key. What is read is one row, and the second only around a renewal.
+// turn-creds: POST /api/turn answers {"iceServers": [...], "ttl":
+// seconds} — Cloudflare Realtime TURN credentials good for a few hours,
+// minted from a TURN key that lives in the project's secrets
+// (OH_TURN_KEY_ID, OH_TURN_API_TOKEN) and never here, for a device
+// whose subscription stands: TURN is what the subscription pays for.
+// Without the secrets the handler says so (503) and the app falls back
+// to STUN alone.
+//
+// licence: POST /api/licence answers {"licence": {key, until, plan,
+// sig}} — a month, signed by the service key (OH_SERVICE_SECRET, with
+// OH_SERVICE_KEY beside it as the public half the app has baked in), or
+// 402 when no subscription stands behind the key. What is read is one
+// row, and the second only around a renewal.
 //
 // No imports, so nothing is bundled: the file is the worker. The curve
 // is the one the whole project signs on, so the signing is the app's
@@ -290,6 +294,54 @@ export async function licence(key, env, { signer, now = Date.now() } = {}) {
   return { status: 200, body: { licence: signed } };
 }
 
+// ---- who is asking -----------------------------------------------------
+// A handler asked with a key acts for that key: it licenses it, mints
+// it TURN, makes a code against what it paid for, binds it, lists its
+// household and drops devices off it. And a key is public — it signs
+// every event a device says at a table, and the relays hand those to
+// anybody — so naming one proves nothing. The device signs what it
+// asks for, with the key it names (app/lib/net/licence.dart):
+//
+//     oh-request/1 \n <handler> \n <key> \n <at> \n <what>
+//
+// hashed and signed BIP-340, where [at] is the second it was made and
+// [what] is what it asks for beyond itself — the code it spends, the
+// device it drops — or nothing. None of the first four can hold a
+// newline and [what] is last, so there is one way to read it; the
+// handler is in it, so a licence request cannot be spent as a code
+// request; and the statement begins with its own tag, so no event a
+// table signs is ever one of these.
+// A request a few minutes old is refused, which is as long as a
+// captured one is worth anything: there is no nonce to remember, so
+// nothing is written to check one.
+
+const REQUEST = 'oh-request/1';
+
+/// How far a request's second may be from ours. Clocks drift; a phone
+/// whose clock is out by more than this is told so.
+const REQUEST_TOLERANCE_S = 300;
+
+/// The text a request's signature is over.
+export const requestStatement = (handler, key, at, what = '') => `${REQUEST}\n${handler}\n${key}\n${at}\n${what}`;
+
+/// The key [body] was signed by for [handler] and [what], as {key}; or
+/// the refusal to answer with, as {status, body}.
+export async function askedBy(body, handler, what, signer, { now = Date.now() } = {}) {
+  const key = keyOf(body);
+  if (!key) return { status: 400, body: { error: 'a table key, 64 hex' } };
+  const { at, sig } = body;
+  if (!Number.isSafeInteger(at) || typeof sig !== 'string' || !/^[0-9a-f]{128}$/.test(sig)) {
+    return { status: 401, body: { error: 'a request is signed by the key it names' } };
+  }
+  if (!signer.verify(key, await digestOf(requestStatement(handler, key, at, what)), sig)) {
+    return { status: 401, body: { error: 'not signed by that key' } };
+  }
+  if (Math.abs(now / 1000 - at) > REQUEST_TOLERANCE_S) {
+    return { status: 401, body: { error: "this device's clock is out by more than five minutes" } };
+  }
+  return { key };
+}
+
 // ---- buying, on the web ------------------------------------------------
 // Stripe Checkout in subscription mode, with the device's key in the
 // session. Nobody is asked to make an account: the key the buyer had
@@ -549,12 +601,11 @@ async function ticketRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
-  const body = await bodyOf(request);
-  const key = keyOf(body);
-  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
+  const asked = await signedFor(request, env, 'ticket');
+  if (asked instanceof Response) return asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const { status, body: out } = await ticketFor(key, store);
+  const { status, body: out } = await ticketFor(asked.key, store);
   return json(request, status, out);
 }
 
@@ -562,21 +613,17 @@ async function claimRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
-  const body = await bodyOf(request);
-  const key = keyOf(body);
-  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
+  // The code is part of what is signed: a device binds itself with the
+  // code it was shown, and nobody binds it with another.
+  const asked = await signedFor(request, env, 'claim', (body) => (typeof body.ticket === 'string' ? body.ticket : ''));
+  if (asked instanceof Response) return asked;
+  const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const claimed = await claimWith(key, body?.ticket, store);
+  const claimed = await claimWith(key, body.ticket, store);
   if (claimed.status !== 200) return json(request, claimed.status, claimed.body);
   // Straight back with the licence it was claimed for, so the device
   // that scanned a code is playing rather than waiting to be told.
-  let signer;
-  try {
-    signer = await signerFor(request, env);
-  } catch {
-    return json(request, 503, { error: 'licensing not configured' });
-  }
   const { status, body: out } = await licence(key, env, { signer });
   return json(request, status, out);
 }
@@ -585,12 +632,12 @@ async function devicesRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
-  const body = await bodyOf(request);
-  const key = keyOf(body);
-  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
+  const asked = await signedFor(request, env, 'devices', (body) => (typeof body.drop === 'string' ? body.drop : ''));
+  if (asked instanceof Response) return asked;
+  const { key, body } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const drop = body?.drop;
+  const drop = body.drop;
   if (typeof drop === 'string') {
     if (!/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
     const { status, body: out } = await dropDevice(key, drop, store);
@@ -779,23 +826,21 @@ async function signInRoute(request, env, move) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
-  const body = await bodyOf(request);
-  const key = keyOf(body);
-  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
+  // The token names the key its nonce was made for, and the nonce is
+  // whoever asked the provider's to choose: a stranger can have his
+  // own account signed over somebody else's key. The key signing the
+  // request is what says it wanted that account.
+  const asked = await signedFor(request, env, move ? 'supersede' : 'attest');
+  if (asked instanceof Response) return asked;
+  const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const who = await whoSignedIn(body?.provider, body?.token, key, env);
+  const who = await whoSignedIn(body.provider, body.token, key, env);
   if (!who) return json(request, 401, { error: 'that sign-in does not check out' });
   const { status, body: out } = await (move ? supersede : attest)(who, key, store, env);
   if (status !== 200) return json(request, status, out);
   // Straight back with the licence it is owed, if any: a device that
   // has just proved who it is should not have to ask twice.
-  let signer;
-  try {
-    signer = await signerFor(request, env);
-  } catch {
-    return json(request, 200, out);
-  }
   const licensed = await licence(key, env, { signer });
   return json(request, 200, { ...out, ...(licensed.status === 200 ? licensed.body : {}) });
 }
@@ -804,11 +849,13 @@ async function checkoutRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
-  const body = await bodyOf(request);
-  const key = keyOf(body);
-  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
-  const back = sameSite(body?.back, request.url);
-  const cancelled = sameSite(body?.cancelled, request.url);
+  // The device buys for itself: a checkout paid for somebody else's
+  // key would move their device onto a subscription the payer can end.
+  const asked = await signedFor(request, env, 'checkout');
+  if (asked instanceof Response) return asked;
+  const { key, body } = asked;
+  const back = sameSite(body.back, request.url);
+  const cancelled = sameSite(body.cancelled, request.url);
   if (!back || !cancelled) return json(request, 400, { error: 'somewhere on this site to come back to' });
   const { status, body: out } = await checkout(key, back, cancelled, env);
   return json(request, status, out);
@@ -849,6 +896,23 @@ async function bodyOf(request) {
   }
 }
 
+/// The request read and its signature checked (who is asking, above):
+/// {key, body, signer}, or the response to answer with instead.
+/// [whatOf] reads what the request asks for out of its body.
+async function signedFor(request, env, handler, whatOf = () => '') {
+  const body = await bodyOf(request);
+  if (!keyOf(body)) return json(request, 400, { error: 'a table key, 64 hex' });
+  let signer;
+  try {
+    signer = await signerFor(request, env);
+  } catch {
+    return json(request, 503, { error: 'the service cannot check signatures yet' });
+  }
+  const asked = await askedBy(body, handler, whatOf(body), signer);
+  if (!asked.key) return json(request, asked.status, asked.body);
+  return { key: asked.key, body, signer };
+}
+
 /// A preflight, or null when the request is not one; [methods] is what
 /// the handler takes.
 function preflight(request, methods) {
@@ -867,15 +931,11 @@ async function licenceRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
-  const key = keyOf(await bodyOf(request));
-  if (!key) return json(request, 400, { error: 'a table key, 64 hex' });
-  let signer;
-  try {
-    signer = await signerFor(request, env);
-  } catch {
-    return json(request, 503, { error: 'licensing not configured' });
-  }
-  const { status, body } = await licence(key, env, { signer });
+  // Signed, though a licence is for its own key and no use to anybody
+  // else: whether a key pays, and until when, is the key's business.
+  const asked = await signedFor(request, env, 'licence');
+  if (asked instanceof Response) return asked;
+  const { status, body } = await licence(asked.key, env, { signer: asked.signer });
   return json(request, status, body);
 }
 
@@ -883,7 +943,14 @@ async function turn(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
-  if (!keyOf(await bodyOf(request))) return json(request, 400, { error: 'a table key, 64 hex' });
+  // Credentials are a relay anybody holding them can send anything
+  // through for four hours, and it is billed by the gigabyte. So they
+  // are a subscribed device's, as live play is, and nobody else's.
+  const asked = await signedFor(request, env, 'turn');
+  if (asked instanceof Response) return asked;
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!(await entitlementOf(store, asked.key, { openHouse: !!env.OH_OPEN_HOUSE }))) return json(request, 402, { error: 'no subscription' });
   const { status, body: out } = await mint(env);
   return json(request, status, out);
 }

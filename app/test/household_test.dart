@@ -103,7 +103,13 @@ void main() {
     final made = await askForCode(me);
     expect(made.answer!.code, 'ab12');
     expect(made.refusal, isNull);
-    expect(stand.seen.single, '/api/ticket {"key":"${me.publicKey}"}');
+    final [path, body] = stand.seen.single.split(' ');
+    expect(path, '/api/ticket');
+    // Signed by the key it names: anybody can read a key off a relay,
+    // and a code is made against what that key paid for.
+    final asked = jsonDecode(body) as Map<String, Object?>;
+    expect(asked['key'], me.publicKey);
+    expect(asked['sig'], me.sign(requestDigest('ticket', me.publicKey, asked['at'] as int)));
 
     stand.says('ticket', {'error': 'five devices already'}, status: 409);
     final refused = await askForCode(me);
@@ -191,6 +197,10 @@ void main() {
     await tester.tap(find.text('Drop'));
     await tester.pumpAndSettle();
     expect(stand.seen.last, contains('"drop":"$other"'));
+    final dropping = jsonDecode(stand.seen.last.split(' ').last) as Map<String, Object?>;
+    expect(schnorrVerifier(me.publicKey, requestDigest('devices', me.publicKey, dropping['at'] as int, other), dropping['sig'] as String),
+        isTrue,
+        reason: 'the device dropped is part of what is signed');
     expect(find.text('1 of 5'), findsOneWidget);
     expect(find.text(other.substring(0, 6)), findsNothing);
     expect(tester.takeException(), isNull);

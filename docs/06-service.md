@@ -33,6 +33,22 @@ runs it against a stand-in upstream. Built so far: **turn-creds**,
 **devices**, **attest** and **supersede**; **last-resort** is not, and
 the last two are built on this side only — see below.
 
+**Every request is signed by the key it names.** A device's key is
+public — it signs every event the device says at a table, and the
+relays hand those to anybody — so a handler that acted on a key named
+in a body acted for whoever had read it: listed a stranger's
+household, dropped their device, made a code against what they paid
+for and spent it on another key. Every handler but Stripe's takes
+`{key, at, sig}`: the second the request was made, and a BIP-340
+signature by that key over `oh-request/1`, the handler, the key, that
+second and what the request asks for beyond itself — the code being
+spent, the device being dropped — a line each (`signedAsk`,
+`app/lib/net/licence.dart`; "who is asking", `worker.mjs`). The handler
+is in it, so the request that renews a licence is never spent as one
+for a code; a request more than five minutes from the service's clock
+is refused and says so; and nothing is written to remember one, which
+is why the window is short. See [the security review](security-review.md).
+
 **licence**, `POST /api/licence` with the caller's key, answers the
 signed statement below or 402 when no subscription stands behind it.
 The signing is the app's own BIP-340 wasm — one curve in this project
@@ -66,7 +82,12 @@ its first ask after.
 provider's own sign-in token, checked against that provider's published
 keys — issuer, audience, expiry, and a nonce that has to be the hash of
 the device's key, so a token lifted from somewhere else cannot bind
-somebody's account to the lifter. What is stored of the account is an
+somebody's account to the lifter. The nonce is whoever asked the
+provider's to choose, though, so it says which key a token was made
+for and not that the key wanted it: the request is signed by the key
+as well, or a stranger could have his own account signed over
+somebody else's key, attest it there, and supersede it onto his own —
+carrying their subscription with it. What is stored of the account is an
 HMAC of the provider's subject identifier (`OH_ID_HMAC`), never the
 identifier; nothing on the `KEY#` side leads back to the provider.
 attest binds an account to one device and refuses a second; supersede
@@ -89,10 +110,13 @@ credentials good for four hours, minted from a TURN key that lives in
 the project's secrets (`OH_TURN_KEY_ID`, `OH_TURN_API_TOKEN`) and never in
 the repo. Without them it says so, and the app falls back to STUN
 alone; on localhost the app asks nothing and peers connect directly.
-The key is taken as given for now — attesting it is the sign-in
-handler's, not built — so the credentials' short life is the only
-limit on their use. The app fetches them when a device connects to the
-relays (`app/lib/net/turn.dart`) and hands them to every peer
+They are minted for a device whose subscription stands and nobody
+else: credentials are a relay their holder can push anything through
+for four hours, billed by the gigabyte, and TURN is what the
+subscription pays for. A subscriber can still mint as many as it
+likes, which is what Cloudflare's rate rules and a usage alert are for
+(the security review). The app fetches them when a device connects to
+the relays (`app/lib/net/turn.dart`) and hands them to every peer
 connection at its next table.
 
 ## Storage

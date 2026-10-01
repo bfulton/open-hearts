@@ -18,6 +18,7 @@ import 'dart:convert';
 
 import 'package:table/table.dart';
 
+import 'licence.dart' show signedAsk;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 
 /// Where credentials come from: the app's origin over https — the site
@@ -43,7 +44,7 @@ Future<List<Map<String, Object?>>> iceServersFor(Signer signer,
   final url = endpoint ?? turnEndpoint();
   if (url == null) return const [];
   try {
-    final body = await http.postJson(url, jsonEncode({'key': signer.publicKey})).timeout(timeout);
+    final body = await http.postJson(url, jsonEncode(signedAsk(signer, 'turn'))).timeout(timeout);
     if (body == null) return stunOnly;
     return parseIceServers(body) ?? stunOnly;
   } catch (_) {
