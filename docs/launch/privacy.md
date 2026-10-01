@@ -61,7 +61,7 @@ The other three claims:
 | **Cloudflare** | hosting for the site, the app and the worker; KV; STUN (`stun.cloudflare.com`); TURN (Cloudflare Realtime) | always on the web |
 | **Stripe** | Checkout and subscriptions | buying on the web |
 | **Google** | `fonts.gstatic.com`, fetched by the Flutter web engine for characters its bundled Roboto lacks | on the web, when such a character is drawn (§2) |
-| **Apple, Google (stores)** | not yet | — |
+| **Apple, Google (stores)** | the App Store and Google Play: the subscription itself, and Google's Play Developer API, which the service asks about a purchase (§4a) | buying on a phone |
 
 ## Inventory
 
@@ -213,6 +213,34 @@ subscription to an email address. With §3, the owner can connect a
 paying web player's email to their public name and game history. Nobody
 else can.
 
+### 4a. Subscribing — the App Store and Google Play
+
+- **The purchase** is the store's: Apple or Google takes the payment
+  under its own account and privacy policy. The app sets the store's
+  account field for the purchase to a hash of the device key —
+  Apple's `appAccountToken` (a UUID) and Play's obfuscated account id
+  (`sha256("oh-store/1\n" + key)`) — so the store's record names the
+  device without naming the key.
+- **`POST /api/store {key, store, proof}`** brings the store's proof
+  to the service: an App Store signed transaction, checked offline
+  against Apple's root certificate; or a Play purchase token, which the
+  service looks up with the Play Developer API (and acknowledges).
+  What it keeps is what §4 keeps, with `apple:<original transaction
+  id>` or `google:<hash of the purchase token>` as the subscription id:
+  - `SUB#<id>|META` — source, the latest transaction or order id,
+    renewal day, cancellation day
+  - `SUB#<id>|DEVICE#<key>` and `KEY#<key>|ENTITLEMENT`, as in §4
+- **The purchase token itself is not stored.** Neither is the
+  transaction JWS, the Apple ID, the Google account, or anything the
+  store knows about the buyer. The service learns no email address
+  from a store purchase.
+- **Renewals and refunds** arrive at `/api/apple` (App Store Server
+  Notifications V2, signed by Apple) and `/api/play` (Pub/Sub, with a
+  Google-signed token), and change only the rows above.
+
+So for a store purchase, KV joins a device key to a store transaction
+id, and only Apple or Google can join that to a person.
+
 ### 5. Other devices on one subscription
 
 - `/api/ticket {key}` writes `TICKET#<code>|META` — subscription,
@@ -220,8 +248,8 @@ else can.
 - `/api/claim {key, ticket}` adds `used_by` and binds the new device as
   in §4. The code travels in a link (`?claim=`), by camera or by share
   sheet.
-- Ticket rows are never deleted, though a spent or expired code is
-  worth nothing.
+- Ticket rows expire from KV an hour after the code is made, spent or
+  not.
 - `/api/devices {key, drop?}` lists the keys on the subscription and the
   days they were bound, to any device on it; `drop` removes a device's
   binding and entitlement rows.

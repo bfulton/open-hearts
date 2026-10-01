@@ -603,47 +603,65 @@ export async function record(event, store, { now = Date.now() } = {}) {
   if (event?.type?.startsWith('customer.subscription.')) {
     const subscription = object.id;
     if (!subscription) return null;
+    await keepCustomer(store, subscription, object.customer);
     const period = object.current_period_end ?? object.items?.data?.[0]?.current_period_end;
     // Ended: Stripe deleted it, or dunning gave up, or it was refunded
     // out. A subscription that is merely *cancelling* is not this — it
     // runs to the end of what was paid for, which is what renews_at
     // already says.
     const final = event.type.endsWith('.deleted') || FINAL.has(object.status);
-    const gone = final || ENDED.has(object.status);
-    // Stripe does not promise to deliver in order, and a delivery that
-    // failed is tried again for days: an update from before the end
-    // can arrive after it. An event older than the one that wrote the
-    // row is not news, and nothing is news after the end.
-    const created = Number.isSafeInteger(event.created) ? event.created : null;
-    const known = await store.get(`SUB#${subscription}`, 'META');
-    await keepCustomer(store, subscription, object.customer);
-    if (known?.final) return null;
-    if (created !== null && known?.event_at != null && created < known.event_at) return null;
-    const renews_at = gone ? today : period ? dayOf(period * 1000) : null;
-    await store.put(`SUB#${subscription}`, 'META', {
+    return dateSubscription(store, subscription, {
       source: 'stripe',
       txn_ref: object.latest_invoice ?? null,
-      renews_at,
-      cancelled_at: object.canceled_at ? dayOf(object.canceled_at * 1000) : gone ? today : null,
-      event_at: created ?? known?.event_at ?? null,
-      ...(final ? { final: true } : {}),
+      until: period ? period * 1000 : null,
+      gone: final || ENDED.has(object.status),
+      final,
+      cancelledAt: object.canceled_at ? object.canceled_at * 1000 : null,
+      created: Number.isSafeInteger(event.created) ? event.created : null,
+      now,
     });
-    // The devices under it hold a copy of the date so that a licence is
-    // one read (doc 06). A renewal may leave those copies stale — they
-    // catch up by themselves, later is harmless. An ending may not: a
-    // copy that outlived its subscription would go on licensing a
-    // refunded device for as long as a year. Five rows, once.
-    if (gone) {
-      for (const sk of await store.under(`SUB#${subscription}`, 'DEVICE#')) {
-        const key = sk.slice('DEVICE#'.length);
-        const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-        if (row?.subscription !== subscription) continue;
-        await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...row, licensed_until: today, at: today });
-      }
-    }
-    return { subscription, renews_at };
   }
   return null;
+}
+
+/// What a store says of a subscription, written down — Stripe, the App
+/// Store or Google Play alike. [until] is when what was paid for runs
+/// out, in ms; [gone] that it has ended now (refunded, revoked, given
+/// up on); [final] that nothing after this is news. [created] is when
+/// the store said it, in seconds, or null. Returns what was recorded,
+/// or null when it was not news.
+export async function dateSubscription(store, subscription, { source, txn_ref = null, until, gone = false, final = false, cancelledAt = null, created = null, now = Date.now() }) {
+  const today = dayOf(now);
+  // Stores do not promise to deliver in order, and a delivery that
+  // failed is tried again for days: an update from before the end can
+  // arrive after it. An event older than the one that wrote the row is
+  // not news, and nothing is news after the end.
+  const known = await store.get(`SUB#${subscription}`, 'META');
+  if (known?.final) return null;
+  if (created !== null && known?.event_at != null && created < known.event_at) return null;
+  const renews_at = gone ? today : until ? dayOf(until) : null;
+  await store.put(`SUB#${subscription}`, 'META', {
+    source,
+    txn_ref,
+    renews_at,
+    cancelled_at: cancelledAt ? dayOf(cancelledAt) : gone ? today : null,
+    event_at: created ?? known?.event_at ?? null,
+    ...(final ? { final: true } : {}),
+  });
+  // The devices under it hold a copy of the date so that a licence is
+  // one read (doc 06). A renewal may leave those copies stale — they
+  // catch up by themselves, later is harmless. An ending may not: a
+  // copy that outlived its subscription would go on licensing a
+  // refunded device for as long as a year. Five rows, once.
+  if (gone) {
+    for (const sk of await store.under(`SUB#${subscription}`, 'DEVICE#')) {
+      const key = sk.slice('DEVICE#'.length);
+      const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+      if (row?.subscription !== subscription) continue;
+      await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...row, licensed_until: today, at: today });
+    }
+  }
+  return { subscription, renews_at };
 }
 
 /// The Stripe customer behind [subscription], kept so a device on it can
@@ -790,39 +808,53 @@ export async function claimWith(key, code, store, { now = Date.now() } = {}) {
   if (!ticket) return { status: 404, body: { error: 'no such code' } };
   if (ticket.used_at) return { status: 409, body: { error: 'that code has been used' } };
   if (Date.parse(ticket.expires_at) <= now) return { status: 410, body: { error: 'that code has run out' } };
-  const devices = await devicesOn(store, ticket.subscription);
+  const today = dayOf(now);
+  return joinSubscription(key, ticket.subscription, store, {
+    now,
+    spend: () => store.put(`TICKET#${code}`, 'META', { ...ticket, used_at: today, used_by: key }, { ttl: TICKET_KEPT_S }),
+  });
+}
+
+/// [key] onto [subscription], by the household's rules: no more devices
+/// than it carries, and not off another subscription that is still paid
+/// up unless [moving] — which only the device that paid for this one
+/// is. [spend] runs once those are met and before anything is written:
+/// a code is used up then, and not by a join that was refused.
+export async function joinSubscription(key, subscription, store, { now = Date.now(), moving = false, spend = null } = {}) {
+  const devices = await devicesOn(store, subscription);
   const already = devices.some((d) => d.key === key);
   if (!already && devices.length >= S().mostDevices) {
     return { status: 409, body: { error: 'five devices already', devices: devices.length, most: S().mostDevices } };
   }
   const today = dayOf(now);
   // A device on another subscription that is still paid up stays on
-  // it. A code arrives in a link and is spent the moment the app opens
-  // it, so a link from a stranger with a subscription of his own would
-  // otherwise take a device off the one its owner paid for, onto one
-  // where he can drop it. Leaving is the device's own to do, by
-  // dropping itself first. A subscription that has ended holds
-  // nothing, and neither does local mode's open house, which licenses
-  // every device that asks and was never anybody's purchase.
+  // it. A code arrives in a link, so a link from a stranger with a
+  // subscription of his own would otherwise take a device off the one
+  // its owner paid for, onto one where he can drop it. Leaving is the
+  // device's own to do, by dropping itself first — or by buying a
+  // subscription of its own, which is as plain a word as it can say. A
+  // subscription that has ended holds nothing, and neither does local
+  // mode's open house, which licenses every device that asks and was
+  // never anybody's purchase.
   const was = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (was && was.subscription !== ticket.subscription) {
+  if (was && was.subscription !== subscription && !moving) {
     const theirs = await store.get(`SUB#${was.subscription}`, 'META');
     if (theirs && theirs.source !== 'local' && theirs.renews_at && theirs.renews_at >= today) {
       return { status: 409, body: { error: 'this device is on another subscription: drop it there first' } };
     }
   }
-  await store.put(`TICKET#${code}`, 'META', { ...ticket, used_at: today, used_by: key }, { ttl: TICKET_KEPT_S });
+  if (spend) await spend();
   // A device that was on another subscription leaves it rather than
   // counting against both.
-  if (was && was.subscription !== ticket.subscription) await store.del(`SUB#${was.subscription}`, `DEVICE#${key}`);
-  const sub = await store.get(`SUB#${ticket.subscription}`, 'META');
-  if (!already) await store.put(`SUB#${ticket.subscription}`, `DEVICE#${key}`, { bound_at: today });
+  if (was && was.subscription !== subscription) await store.del(`SUB#${was.subscription}`, `DEVICE#${key}`);
+  const sub = await store.get(`SUB#${subscription}`, 'META');
+  if (!already) await store.put(`SUB#${subscription}`, `DEVICE#${key}`, { bound_at: today });
   await store.put(`KEY#${key}`, 'ENTITLEMENT', {
-    subscription: ticket.subscription,
+    subscription,
     licensed_until: sub?.renews_at ?? null,
     at: today,
   });
-  return { status: 200, body: { subscription: ticket.subscription } };
+  return { status: 200, body: { subscription } };
 }
 
 /// Dropping a device: any device on the subscription can drop any
@@ -888,6 +920,8 @@ export async function householdOp(op, store, { now = Date.now() } = {}) {
       return ticketFor(op.key, store, { now });
     case 'claim':
       return claimWith(op.key, op.code, store, { now });
+    case 'bind':
+      return bindPurchase(op, store, { now });
     case 'drop':
       return dropDevice(op.key, op.device, store, { now });
     case 'list': {
@@ -1068,6 +1102,21 @@ export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, 
   const known = PROVIDERS[provider];
   const audience = known && env[known.audience];
   if (!known || !audience) return null;
+  const claims = await jwtOf(provider, token, fetchImpl, { now });
+  if (!claims) return null;
+  if (claims.iss !== known.iss) return null;
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!aud.includes(audience)) return null;
+  if (!(typeof claims.exp === 'number') || claims.exp * 1000 <= now) return null;
+  if (typeof claims.sub !== 'string' || !claims.sub) return null;
+  if (claims.nonce !== (await digestOf(`oh-signin/1\n${key}`))) return null;
+  return { provider, sub: claims.sub };
+}
+
+/// The claims of a JWT signed by one of [provider]'s published keys;
+/// null when it is not. What the claims must say is the caller's to
+/// check.
+export async function jwtOf(provider, token, fetchImpl = fetch, { now = Date.now() } = {}) {
   const parts = String(token ?? '').split('.');
   if (parts.length !== 3) return null;
   let header;
@@ -1104,14 +1153,7 @@ export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, 
       // A key that will not import is a key that did not sign this.
     }
   }
-  if (!ok) return null;
-  if (claims.iss !== known.iss) return null;
-  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!aud.includes(audience)) return null;
-  if (!(typeof claims.exp === 'number') || claims.exp * 1000 <= now) return null;
-  if (typeof claims.sub !== 'string' || !claims.sub) return null;
-  if (claims.nonce !== (await digestOf(`oh-signin/1\n${key}`))) return null;
-  return { provider, sub: claims.sub };
+  return ok ? claims : null;
 }
 
 /// The identifier as it is stored: an HMAC, so a leaked table joins to
@@ -1492,6 +1534,509 @@ async function configRoute(request, env) {
 // ---- Watching it run -------------------------------------------------
 
 /// The handlers by name, as /api/<name> asks for them.
+// ---- buying in a store -------------------------------------------------
+// On a phone, live play is the store's own subscription (doc 06, "Where
+// the money comes in"). The device buys, the store hands it a proof,
+// and the device brings the proof here, signed as every request is:
+//
+//   App Store    a StoreKit 2 signed transaction: a JWS whose
+//                certificate chain ends at Apple's own root, pinned
+//                below. Checked here, offline; nothing is asked of Apple.
+//   Google Play  a purchase token, which proves nothing by itself: the
+//                Play Developer API is asked what it is, with the
+//                project's service account, and the purchase is
+//                acknowledged — Play refunds one that is not, in three
+//                days.
+//
+// A subscription bought in a store is `apple:<original transaction>` or
+// `google:<hash of the purchase token>`, with its devices, its date and
+// its household like any other. Renewals, lapses and refunds arrive the
+// way Stripe's do, pushed: App Store Server Notifications V2 at
+// /api/apple, Play's Real-time Developer Notifications at /api/play.
+//
+// The store's own record names the device a purchase was made for: the
+// app sets Apple's appAccountToken, and Play's obfuscated account id,
+// from its key (storeAccountOf). The device that paid may move onto
+// what it paid for from wherever it was. Any other device bringing the
+// same proof — the same Apple or Google account restoring it on a new
+// phone — joins as a code would let it, within the household's count
+// and not off another paid-up subscription.
+
+/// What the store's record holds for the device with [key]: Play's
+/// obfuscated account id (64 hex) and Apple's appAccountToken (a UUID
+/// cut from the same hash). The app makes the same two
+/// (app/lib/net/store_buying.dart); a test pins both.
+export async function storeAccountOf(key) {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`oh-store/1\n${key}`)));
+  const hex = [...h].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const u = h.slice(0, 16);
+  u[6] = (u[6] & 0x0f) | 0x40;
+  u[8] = (u[8] & 0x3f) | 0x80;
+  const x = [...u].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return { google: hex, apple: `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}` };
+}
+
+// ---- certificates, as little of X.509 as a store's chain needs ----------
+
+/// One DER element at [at]: its tag, where its content starts and ends.
+function derAt(b, at) {
+  if (at + 2 > b.length) throw new Error('short');
+  const tag = b[at];
+  let len = b[at + 1];
+  let body = at + 2;
+  if (len & 0x80) {
+    const n = len & 0x7f;
+    if (n < 1 || n > 4) throw new Error('length');
+    len = 0;
+    for (let i = 0; i < n; i++) len = len * 256 + b[body++];
+  }
+  const end = body + len;
+  if (end > b.length) throw new Error('overrun');
+  return { tag, start: at, body, end };
+}
+
+function derKids(b, node) {
+  const out = [];
+  for (let at = node.body; at < node.end; ) {
+    const kid = derAt(b, at);
+    out.push(kid);
+    at = kid.end;
+  }
+  return out;
+}
+
+function oidOf(b, node) {
+  if (node.tag !== 0x06) throw new Error('not an oid');
+  const parts = [Math.floor(b[node.body] / 40), b[node.body] % 40];
+  let v = 0;
+  for (let i = node.body + 1; i < node.end; i++) {
+    v = v * 128 + (b[i] & 0x7f);
+    if (!(b[i] & 0x80)) {
+      parts.push(v);
+      v = 0;
+    }
+  }
+  return parts.join('.');
+}
+
+function timeOf(b, node) {
+  const t = new TextDecoder().decode(b.subarray(node.body, node.end));
+  const m = node.tag === 0x17 ? /^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/.exec(t) : /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/.exec(t);
+  if (!m) throw new Error('time');
+  let y = Number(m[1]);
+  if (node.tag === 0x17) y += y < 50 ? 2000 : 1900;
+  return Date.UTC(y, Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+}
+
+const CURVES = { '1.2.840.10045.3.1.7': { namedCurve: 'P-256', size: 32 }, '1.3.132.0.34': { namedCurve: 'P-384', size: 48 } };
+const ECDSA_WITH = { '1.2.840.10045.4.3.2': 'SHA-256', '1.2.840.10045.4.3.3': 'SHA-384' };
+
+/// A certificate, read for what a chain check needs; throws on anything
+/// it cannot read, which is a certificate that is not taken.
+export function certOf(der) {
+  const b = der instanceof Uint8Array ? der : new Uint8Array(der);
+  const cert = derAt(b, 0);
+  if (cert.end !== b.length) throw new Error('trailing');
+  const [tbs, sigAlg, sigVal] = derKids(b, cert);
+  const t = derKids(b, tbs);
+  let i = t[0].tag === 0xa0 ? 1 : 0;
+  i++; // serial
+  i++; // the signature algorithm again
+  const issuer = t[i++];
+  const validity = derKids(b, t[i++]);
+  const subject = t[i++];
+  const spki = t[i++];
+  const [keyAlg] = derKids(b, spki);
+  const [, curveOid] = derKids(b, keyAlg);
+  const extensions = new Map();
+  const ext = t.find((n) => n.tag === 0xa3);
+  if (ext) {
+    for (const e of derKids(b, derKids(b, ext)[0])) {
+      const parts = derKids(b, e);
+      extensions.set(oidOf(b, parts[0]), b.subarray(parts.at(-1).body, parts.at(-1).end));
+    }
+  }
+  // basicConstraints: SEQUENCE { cA BOOLEAN DEFAULT FALSE, ... }
+  let ca = false;
+  const bc = extensions.get('2.5.29.19');
+  if (bc && bc.length > 2) {
+    const seq = derAt(bc, 0);
+    const first = derKids(bc, seq)[0];
+    ca = !!first && first.tag === 0x01 && bc[first.body] !== 0;
+  }
+  return {
+    tbs: b.subarray(tbs.start, tbs.end),
+    sigHash: ECDSA_WITH[oidOf(b, derKids(b, sigAlg)[0])] ?? null,
+    signature: b.subarray(sigVal.body + 1, sigVal.end),
+    spki: b.subarray(spki.start, spki.end),
+    curve: CURVES[oidOf(b, curveOid)] ?? null,
+    issuer: b.subarray(issuer.start, issuer.end),
+    subject: b.subarray(subject.start, subject.end),
+    notBefore: timeOf(b, validity[0]),
+    notAfter: timeOf(b, validity[1]),
+    extensions,
+    ca,
+  };
+}
+
+/// An ECDSA signature as DER (SEQUENCE of r and s) to the r‖s WebCrypto
+/// verifies, each padded to the curve's [size].
+function rawSignature(der, size) {
+  const seq = derAt(der, 0);
+  const out = new Uint8Array(size * 2);
+  derKids(der, seq).forEach((n, k) => {
+    let v = der.subarray(n.body, n.end);
+    while (v.length > size && v[0] === 0) v = v.subarray(1);
+    if (v.length > size) throw new Error('integer');
+    out.set(v, k * size + size - v.length);
+  });
+  return out;
+}
+
+const sameBytes = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/// Whether [child] was signed by [parent]'s key, and names it as issuer.
+export async function signedBy(child, parent) {
+  if (!child.sigHash || !parent.curve || !sameBytes(child.issuer, parent.subject)) return false;
+  try {
+    const key = await crypto.subtle.importKey('spki', parent.spki, { name: 'ECDSA', namedCurve: parent.curve.namedCurve }, false, ['verify']);
+    return await crypto.subtle.verify({ name: 'ECDSA', hash: child.sigHash }, key, rawSignature(child.signature, parent.curve.size), child.tbs);
+  } catch {
+    return false;
+  }
+}
+
+/// Apple Root CA - G3, as Apple publishes it
+/// (apple.com/certificateauthority/AppleRootCA-G3.cer; SHA-256
+/// 63:34:3A:BF:B8:9A:6A:03:EB:B5:7E:9B:3F:5F:A7:BE:7C:4F:5C:75:6F:30:17:B3:A8:C4:88:C3:65:3E:91:79).
+export const APPLE_ROOT_G3 = Uint8Array.from(atob('MIICQzCCAcmgAwIBAgIILcX8iNLFS5UwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMTQwNDMwMTgxOTA2WhcNMzkwNDMwMTgxOTA2WjBnMRswGQYDVQQDDBJBcHBsZSBSb290IENBIC0gRzMxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABJjpLz1AcqTtkyJygRMc3RCV8cWjTnHcFBbZDuWmBSp3ZHtfTjjTuxxEtX/1H7YyYl3J6YRbTzBPEVoA/VhYDKX1DyxNB0cTddqXl5dvMVztK517IDvYuVTZXpmkOlEKMaNCMEAwHQYDVR0OBBYEFLuw3qFYM4iapIqZ3r6966/ayySrMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMDA2gAMGUCMQCD6cHEFl4aXTQY2e3v9GwOAEZLuN+yRhHFD/3meoyhpmvOwgPUnPWTxnS4at+qIxUCMG1mihDK1A3UT82NQz60imOlM27jbdoXt2QfyFMm+YhidDkLF1vLUagM6BgD56KyKA=='), (c) => c.charCodeAt(0));
+
+/// The roots an App Store chain may end at: Apple's, unless a test says
+/// otherwise — no test can make a certificate Apple signed.
+let appleRoots = [APPLE_ROOT_G3];
+export const trustAppleRoots = (roots) => (appleRoots = roots);
+export const forgetAppleRoots = () => (appleRoots = [APPLE_ROOT_G3]);
+
+/// Apple marks the certificates it signs the App Store's data with:
+/// the WWDR intermediate, and the leaf that signs.
+const APPLE_INTERMEDIATE = '1.2.840.113635.100.6.2.1';
+const APPLE_STORE_LEAF = '1.2.840.113635.100.6.11.1';
+
+/// What an App Store JWS says, once its chain ends at one of [roots] and
+/// its signature is the leaf's; null when it does not check out. The
+/// certificates are checked at the moment the payload says it was
+/// signed, which is how Apple's own library checks them: what Apple
+/// signed while a certificate was good stays signed after it expires.
+export async function appleSigned(jws, { roots = appleRoots, now = Date.now() } = {}) {
+  try {
+    const parts = String(jws ?? '').split('.');
+    if (parts.length !== 3) return null;
+    const header = JSON.parse(new TextDecoder().decode(un64(parts[0])));
+    if (header.alg !== 'ES256' || !Array.isArray(header.x5c) || header.x5c.length !== 3) return null;
+    const ders = header.x5c.map((c) => Uint8Array.from(atob(c), (ch) => ch.charCodeAt(0)));
+    if (!roots.some((r) => sameBytes(r, ders[2]))) return null;
+    const [leaf, middle, root] = ders.map(certOf);
+    const payload = JSON.parse(new TextDecoder().decode(un64(parts[1])));
+    const at = Number.isFinite(payload.signedDate) ? payload.signedDate : now;
+    // Not signed in the future, whatever the payload claims.
+    if (at > now + 5 * 60000) return null;
+    for (const c of [leaf, middle, root]) if (at < c.notBefore || at > c.notAfter) return null;
+    if (!middle.ca || !middle.extensions.has(APPLE_INTERMEDIATE) || !leaf.extensions.has(APPLE_STORE_LEAF)) return null;
+    if (!(await signedBy(middle, root)) || !(await signedBy(leaf, middle))) return null;
+    if (leaf.curve?.namedCurve !== 'P-256') return null;
+    const key = await crypto.subtle.importKey('spki', leaf.spki, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    const ok = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, un64(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+    return ok ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+/// A checked App Store transaction, as this service reads it: the
+/// subscription, when it runs to, whether it has ended, and whom it
+/// was bought for. {status, body} when it is not one of ours.
+export async function appleTransaction(jws, env, { roots, now = Date.now() } = {}) {
+  const bundle = env.OH_APPLE_BUNDLE_ID;
+  const product = env.OH_APPLE_PRODUCT;
+  if (!bundle || !product) return { status: 503, body: { error: 'the store is not set up yet' } };
+  const t = await appleSigned(jws, { roots, now });
+  if (!t) return { status: 401, body: { error: 'not from the store' } };
+  // Another app's, another product's, or not a subscription at all.
+  if (t.bundleId !== bundle || t.productId !== product || t.type !== 'Auto-Renewable Subscription') {
+    return { status: 401, body: { error: 'not from the store' } };
+  }
+  if (typeof t.originalTransactionId !== 'string' || !/^\d{1,32}$/.test(t.originalTransactionId) || !Number.isFinite(t.expiresDate)) {
+    return { status: 401, body: { error: 'not from the store' } };
+  }
+  return {
+    subscription: `apple:${t.originalTransactionId}`,
+    until: t.expiresDate,
+    gone: t.revocationDate != null,
+    account: typeof t.appAccountToken === 'string' ? t.appAccountToken.toLowerCase() : null,
+    created: Number.isFinite(t.signedDate) ? Math.floor(t.signedDate / 1000) : null,
+    txn_ref: typeof t.transactionId === 'string' ? t.transactionId : null,
+  };
+}
+
+// ---- Google Play ---------------------------------------------------------
+
+const PLAY = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications';
+const GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token';
+
+let playAccess = null;
+
+/// Forgets the cached Play access token, for a test.
+export const forgetPlayAccess = () => (playAccess = null);
+
+const pemBytes = (pem) => Uint8Array.from(atob(String(pem).replace(/-----[^-]+-----/g, '').replace(/\s+/g, '')), (c) => c.charCodeAt(0));
+const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64urlText = (text) => b64url(new TextEncoder().encode(text));
+
+/// An access token for the Play Developer API, from the service
+/// account in OH_PLAY_SERVICE_ACCOUNT (its JSON key), kept until a
+/// minute before it runs out.
+export async function playToken(env, fetchImpl = fetch, { now = Date.now() } = {}) {
+  if (playAccess && playAccess.until > now) return playAccess.token;
+  const account = JSON.parse(env.OH_PLAY_SERVICE_ACCOUNT);
+  const iat = Math.floor(now / 1000);
+  const head = b64urlText(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claims = b64urlText(
+    JSON.stringify({ iss: account.client_email, scope: 'https://www.googleapis.com/auth/androidpublisher', aud: GOOGLE_TOKEN, iat, exp: iat + 3600 }),
+  );
+  const key = await crypto.subtle.importKey('pkcs8', pemBytes(account.private_key), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(`${head}.${claims}`)));
+  const res = await fetchImpl(GOOGLE_TOKEN, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${head}.${claims}.${b64url(sig)}` }).toString(),
+  });
+  if (!res.ok) throw new Error(`google token ${res.status}`);
+  const { access_token: token, expires_in: lasts } = await res.json();
+  if (typeof token !== 'string') throw new Error('google token');
+  playAccess = { token, until: now + Math.max(0, (Number(lasts) || 3600) - 60) * 1000 };
+  return token;
+}
+
+/// Subscription ids for Play: the purchase token, hashed, since the
+/// token itself is a bearer's and is kept by no row.
+const playSubscriptionOf = async (token) => `google:${await digestOf(`oh-play/1\n${token}`)}`;
+
+/// The states a Play subscription is paid up in. CANCELED is paid up
+/// too, to the end of what was paid for: cancelling stops the renewal.
+const PLAY_PAID = new Set(['SUBSCRIPTION_STATE_ACTIVE', 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD', 'SUBSCRIPTION_STATE_CANCELED']);
+
+/// What Play says of the purchase [token], as this service reads it —
+/// and acknowledged, if it was not yet. {status, body} when it is not
+/// one of ours or Play cannot be asked.
+export async function playPurchase(token, env, fetchImpl = fetch, { now = Date.now(), store = null } = {}) {
+  const pkg = env.OH_PLAY_PACKAGE;
+  const product = env.OH_PLAY_PRODUCT;
+  if (!pkg || !product || !env.OH_PLAY_SERVICE_ACCOUNT) return { status: 503, body: { error: 'the store is not set up yet' } };
+  if (typeof token !== 'string' || !/^[A-Za-z0-9._:-]{10,1024}$/.test(token)) return { status: 401, body: { error: 'not from the store' } };
+  let access;
+  let res;
+  try {
+    access = await playToken(env, fetchImpl, { now });
+    res = await fetchImpl(`${PLAY}/${encodeURIComponent(pkg)}/purchases/subscriptionsv2/tokens/${encodeURIComponent(token)}`, {
+      headers: { authorization: `Bearer ${access}` },
+    });
+  } catch {
+    return { status: 502, body: { error: 'the store is not answering' } };
+  }
+  // A token Play has never heard of, or not this app's.
+  if (res.status === 400 || res.status === 404 || res.status === 410) return { status: 401, body: { error: 'not from the store' } };
+  if (!res.ok) return { status: 502, body: { error: 'the store is not answering' } };
+  let p;
+  try {
+    p = await res.json();
+  } catch {
+    return { status: 502, body: { error: 'the store is not answering' } };
+  }
+  const line = Array.isArray(p.lineItems) ? p.lineItems.find((l) => l?.productId === product) : null;
+  if (!line) return { status: 401, body: { error: 'not from the store' } };
+  const until = Date.parse(line.expiryTime);
+  // Play refunds a purchase nobody acknowledged within three days; this
+  // is where it is taken, so this is where it is acknowledged.
+  if (p.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING' && PLAY_PAID.has(p.subscriptionState)) {
+    try {
+      await fetchImpl(`${PLAY}/${encodeURIComponent(pkg)}/purchases/subscriptions/${encodeURIComponent(product)}/tokens/${encodeURIComponent(token)}:acknowledge`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' },
+        body: '{}',
+      });
+    } catch {
+      // Asked again on the next notification or the next device to bring it.
+    }
+  }
+  // A token that replaced another — a resubscription, a plan change — is
+  // the same subscription as the one it replaced, if that one is known.
+  let subscription = await playSubscriptionOf(token);
+  if (typeof p.linkedPurchaseToken === 'string' && store) {
+    const before = await playSubscriptionOf(p.linkedPurchaseToken);
+    if (await store.get(`SUB#${before}`, 'META')) subscription = before;
+  }
+  return {
+    subscription,
+    until: Number.isFinite(until) ? until : null,
+    paid: PLAY_PAID.has(p.subscriptionState),
+    gone: p.subscriptionState === 'SUBSCRIPTION_STATE_EXPIRED',
+    account: p.externalAccountIdentifiers?.obfuscatedExternalAccountId ?? null,
+    txn_ref: typeof p.latestOrderId === 'string' ? p.latestOrderId : null,
+  };
+}
+
+/// Whether [token] is Pub/Sub's push of Play's notifications: a Google
+/// ID token for the push subscription's own service account
+/// (OH_PLAY_PUSH_EMAIL), made out to this endpoint (OH_PLAY_PUSH_AUDIENCE).
+export async function pushedByPlay(token, env, fetchImpl = fetch, { now = Date.now() } = {}) {
+  if (!env.OH_PLAY_PUSH_AUDIENCE || !env.OH_PLAY_PUSH_EMAIL) return false;
+  const claims = await jwtOf('google', token, fetchImpl, { now });
+  if (!claims) return false;
+  if (claims.iss !== 'https://accounts.google.com' && claims.iss !== 'accounts.google.com') return false;
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!aud.includes(env.OH_PLAY_PUSH_AUDIENCE)) return false;
+  if (typeof claims.exp !== 'number' || claims.exp * 1000 <= now) return false;
+  return claims.email === env.OH_PLAY_PUSH_EMAIL && claims.email_verified === true;
+}
+
+/// A checked purchase written down and [op.key] put on it, in its
+/// household's turn: dated first, whatever it says, and joined only if
+/// it is paid up. {status, body}.
+export async function bindPurchase(op, store, { now = Date.now() } = {}) {
+  await dateSubscription(store, op.subscription, {
+    source: op.source,
+    txn_ref: op.txn_ref ?? null,
+    until: op.until,
+    gone: op.gone,
+    created: op.created ?? null,
+    now,
+  });
+  if (op.gone || !op.paid || !(op.until > now)) return { status: 402, body: { error: 'not paid' } };
+  return joinSubscription(op.key, op.subscription, store, { now, moving: op.buyer === true });
+}
+
+async function storeRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  // The proof is what is signed: a device brings its own purchase, and
+  // nobody brings one for it.
+  const asked = await signedFor(request, env, 'store', (body) => (typeof body.proof === 'string' ? body.proof : ''));
+  if (asked instanceof Response) return asked;
+  const { key, body, signer } = asked;
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (body.store !== 'apple' && body.store !== 'google') return json(request, 400, { error: 'not a store' });
+  if (typeof body.proof !== 'string' || !body.proof) return json(request, 400, { error: 'no proof' });
+  const now = Date.now();
+  const mine = await storeAccountOf(key);
+  let bought;
+  if (body.store === 'apple') {
+    const t = await appleTransaction(body.proof, env, { now });
+    if (t.status) return json(request, t.status, t.body);
+    bought = { source: 'apple', ...t, paid: !t.gone && t.until > now, buyer: t.account === mine.apple };
+  } else {
+    const p = await playPurchase(body.proof, env, fetch, { now, store });
+    if (p.status) return json(request, p.status, p.body);
+    bought = { source: 'google', ...p, created: null, buyer: p.account === mine.google };
+  }
+  const { account: _, ...op } = bought;
+  const bound = await inHousehold(env, bought.subscription, { op: 'bind', key, ...op });
+  if (bound.status !== 200) return json(request, bound.status, bound.body);
+  const { status, body: out } = await licence(key, env, { signer, now });
+  return json(request, status, out);
+}
+
+/// Apple's notification types after which nothing is paid for.
+const APPLE_ENDED = new Set(['REFUND', 'REVOKE', 'EXPIRED', 'GRACE_PERIOD_EXPIRED']);
+
+/// App Store Server Notifications V2: what Apple says of a
+/// subscription, signed by the App Store as a transaction is. Answered
+/// 200 once it has been read, ours or not, so Apple does not send it
+/// again; 400 when it is not Apple's.
+async function appleRoute(request, env) {
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
+  // A notification carries three JWS, each with its chain: past what an
+  // ordinary request is allowed, well inside a webhook's.
+  const raw = await textOf(request, MOST_EVENT);
+  if (raw === null) return json(request, 413, { error: 'too big' });
+  if (!env.OH_APPLE_BUNDLE_ID || !env.OH_APPLE_PRODUCT) return json(request, 503, { error: 'the store is not set up yet' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  let signedPayload;
+  try {
+    ({ signedPayload } = JSON.parse(raw));
+  } catch {
+    return json(request, 400, { error: 'not signed' });
+  }
+  const now = Date.now();
+  const n = await appleSigned(signedPayload, { now });
+  if (!n) return json(request, 400, { error: 'not signed' });
+  if (n.data?.bundleId !== env.OH_APPLE_BUNDLE_ID || !n.data?.signedTransactionInfo) return json(request, 200, { recorded: null });
+  const t = await appleTransaction(n.data.signedTransactionInfo, env, { now });
+  if (t.status) return json(request, 200, { recorded: null });
+  // A renewal that failed but is in its grace period is still paid for,
+  // to the end of the grace.
+  const renewal = n.data.signedRenewalInfo ? await appleSigned(n.data.signedRenewalInfo, { now }) : null;
+  const grace = renewal?.gracePeriodExpiresDate;
+  const until = Number.isFinite(grace) && grace > t.until ? grace : t.until;
+  // Never final: a subscription that lapsed or was refunded keeps its
+  // original transaction when it is bought again, and comes back.
+  const recorded = await dateSubscription(store, t.subscription, {
+    source: 'apple',
+    txn_ref: t.txn_ref,
+    until,
+    gone: t.gone || APPLE_ENDED.has(n.notificationType),
+    created: Number.isFinite(n.signedDate) ? Math.floor(n.signedDate / 1000) : t.created,
+    now,
+  });
+  return json(request, 200, { recorded });
+}
+
+/// Google Play's Real-time Developer Notifications, pushed by Pub/Sub.
+/// The notification names a purchase and says little else, so Play is
+/// asked what the purchase is now. Answered 200 once handled, ours or
+/// not; 502 when Play could not be asked, so Pub/Sub tries again.
+async function playRoute(request, env) {
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
+  const bearer = /^Bearer (.+)$/.exec(request.headers.get('authorization') ?? '')?.[1];
+  if (!(await pushedByPlay(bearer, env))) return json(request, 401, { error: 'not Play' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  let note;
+  try {
+    const pushed = JSON.parse((await textOf(request, MOST_BODY)) ?? '');
+    note = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(pushed.message.data), (c) => c.charCodeAt(0))));
+  } catch {
+    return json(request, 400, { error: 'not a notification' });
+  }
+  if (note?.packageName !== env.OH_PLAY_PACKAGE) return json(request, 200, { recorded: null });
+  const now = Date.now();
+  const created = Number.isFinite(Number(note.eventTimeMillis)) ? Math.floor(Number(note.eventTimeMillis) / 1000) : null;
+  // Voided: refunded or charged back. Nothing more to ask.
+  const voided = note.voidedPurchaseNotification?.purchaseToken;
+  if (typeof voided === 'string') {
+    const recorded = await dateSubscription(store, await playSubscriptionOf(voided), { source: 'google', until: null, gone: true, created, now });
+    return json(request, 200, { recorded });
+  }
+  const token = note.subscriptionNotification?.purchaseToken;
+  if (typeof token !== 'string') return json(request, 200, { recorded: null });
+  const p = await playPurchase(token, env, fetch, { now, store });
+  if (p.status === 502) return json(request, 502, p.body);
+  if (p.status) return json(request, 200, { recorded: null });
+  const recorded = await dateSubscription(store, p.subscription, {
+    source: 'google',
+    txn_ref: p.txn_ref,
+    until: p.until,
+    // On hold or paused is not paid for now; it comes back with the
+    // notification that says it recovered.
+    gone: p.gone || !p.paid,
+    created,
+    now,
+  });
+  return json(request, 200, { recorded });
+}
+
 const ROUTES = {
   config: (request, env) => configRoute(request, env),
   turn: (request, env) => turn(request, env),
@@ -1499,6 +2044,9 @@ const ROUTES = {
   checkout: (request, env) => checkoutRoute(request, env),
   stripe: (request, env) => stripeRoute(request, env),
   manage: (request, env) => manageRoute(request, env),
+  store: (request, env) => storeRoute(request, env),
+  apple: (request, env) => appleRoute(request, env),
+  play: (request, env) => playRoute(request, env),
   ticket: (request, env) => ticketRoute(request, env),
   claim: (request, env) => claimRoute(request, env),
   devices: (request, env) => devicesRoute(request, env),

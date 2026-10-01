@@ -26,15 +26,32 @@ the bottom with the day.
 - **A contact email address.** Outreach, the Play Console listing and
   the support page still lack one (`docs/launch/outreach.md`,
   `store-listing.md`).
-- **Apple Developer account and App Store Connect**: the app's bundle
-  id, the auto-renewable subscription's product id (a yearly
-  subscription in its own group), an App Store Server API key (issuer
-  id, key id, `.p8`), and App Store Server Notifications V2 pointed at
-  the service. Unblocks buying on iPhone.
-- **Google Play Console**: the package name, the subscription's product
-  id and base plan, a service account with access to the Play Developer
-  API, and Real-time Developer Notifications (a Pub/Sub topic with a
-  push subscription to the service). Unblocks buying on Android.
+- **Apple Developer account and App Store Connect** — unblocks buying
+  on iPhone (the code is built and tested against a stand-in chain):
+  - the app's bundle id → `OH_APPLE_BUNDLE_ID` on the Pages project;
+  - an auto-renewable subscription, a year, $5.99, in its own group →
+    its product id as `OH_APPLE_PRODUCT` (and in the app build,
+    `--dart-define=OH_APPLE_PRODUCT=…`; the placeholder is
+    `live_play_yearly`);
+  - App Store Server Notifications **V2**, production and sandbox
+    URLs both `https://<site>/api/apple`;
+  - a sandbox tester, to buy once end to end before review.
+- **Google Play Console** — unblocks buying on Android:
+  - the package name → `OH_PLAY_PACKAGE`; the subscription's product id
+    with a yearly base plan → `OH_PLAY_PRODUCT` (and
+    `--dart-define=OH_PLAY_PRODUCT=…`);
+  - a Google Cloud service account invited in Play Console (Users and
+    permissions) with "View financial data" and "Manage orders and
+    subscriptions"; its JSON key as the secret
+    `OH_PLAY_SERVICE_ACCOUNT`;
+  - Real-time Developer Notifications: a Pub/Sub topic (grant
+    `google-play-developer-notifications@system.gserviceaccount.com`
+    Publisher on it), named in Play Console's Monetization setup, and a
+    **push** subscription to `https://<site>/api/play` with
+    authentication on, using a service account of its own: that
+    account's email → `OH_PLAY_PUSH_EMAIL`, and the audience (default:
+    the push URL) → `OH_PLAY_PUSH_AUDIENCE`;
+  - a license tester, to buy once end to end.
 - **A Mac with Xcode**, to build, sign and submit the iPhone app — and
   to build the deal's native library for iOS.
 - **Provider sign-in**: a Google OAuth client id and an Apple Services

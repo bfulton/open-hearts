@@ -136,7 +136,7 @@ LOGIN#apple#<hmac(sub)>    IDENTITY       key, created_at
 LOGIN#google#<hmac(sub)>   IDENTITY       key, created_at
 KEY#<key>                  META           provider, attested_at, attestation
 KEY#<key>                  SUPERSEDES     predecessor, link, at
-SUB#<subscription>         META           source, txn_ref, renews_at, cancelled_at
+SUB#<subscription>         META           source, txn_ref, renews_at, cancelled_at   (subscription: sub_… Stripe, apple:…, google:…)
 SUB#<subscription>         DEVICE#<key>   bound_at
 SUB#<subscription>         CUSTOMER       customer (Stripe's, for the billing portal)
 KEY#<key>                  ENTITLEMENT    subscription, licensed_until, at
@@ -272,9 +272,54 @@ reads once and then takes out: the webhook is usually there before the
 browser is, and when it is not the app asks again for a few seconds
 rather than telling the buyer nothing happened.
 
-The store half is not built, and cannot be until the app is in a store
-(README, roadmap 8). Until then `canBuyHere` is false off the web and
-says so rather than opening a checkout a phone should not be using.
+**The store half, as built.** The phone buys in its own store and
+brings the store's proof to **store** (`/api/store`), signed as every
+request is, with the proof as what it signs:
+
+- **App Store**: a StoreKit 2 signed transaction, a JWS whose `x5c`
+  chain must end at Apple Root CA - G3 — pinned in the worker, byte for
+  byte — through an intermediate carrying Apple's WWDR mark
+  (`1.2.840.113635.100.6.2.1`) to a leaf carrying the App Store's
+  (`1.2.840.113635.100.6.11.1`), each signature checked and each
+  certificate good at the moment the payload says it was signed. Then
+  it must be this app's bundle, this product, an auto-renewable
+  subscription. Nothing is asked of Apple. Sandbox transactions are
+  taken too — App Review buys in the sandbox — and only testers the
+  developer made can make one.
+- **Google Play**: a purchase token, which proves nothing alone: the
+  service asks the Play Developer API (`subscriptionsv2`) with the
+  project's service account what it is, checks the product, and
+  acknowledges it if it was not — Play refunds a purchase nobody
+  acknowledged within three days.
+
+The subscription is `apple:<original transaction id>` or
+`google:<hash of the token>` (a token replacing another, as a
+resubscription's does, is the subscription it replaced), dated from
+what the store said, and the device joins it in its household's turn
+(`bind`). The store's record names the device a purchase was for: the
+app sets Apple's `appAccountToken` and Play's obfuscated account id
+from a hash of its key. The device that paid moves onto what it paid
+for from wherever it was; any other device bringing the same proof —
+the same Apple or Google account restoring it on a new phone — joins
+as a code would let it, within the household's count and not off
+another paid-up subscription. A lapsed or refunded purchase is written
+down and licenses nobody (402).
+
+Renewals, lapses and refunds are pushed, as Stripe's are: App Store
+Server Notifications V2 at **apple** (`/api/apple`; the notification
+and the transaction inside it checked as above, a renewal in its grace
+period paid to the end of the grace), and Play's Real-time Developer
+Notifications at **play** (`/api/play`; Pub/Sub's push, its Google ID
+token checked for the push subscription's own service account and this
+endpoint as audience, and then Play asked what the purchase is now).
+Neither is ever final: a lapsed App Store subscription keeps its
+original transaction when it is bought again.
+
+The variables: `OH_APPLE_BUNDLE_ID`, `OH_APPLE_PRODUCT`;
+`OH_PLAY_PACKAGE`, `OH_PLAY_PRODUCT`, `OH_PLAY_SERVICE_ACCOUNT` (the
+service account's JSON key, as a secret), `OH_PLAY_PUSH_AUDIENCE` and
+`OH_PLAY_PUSH_EMAIL` (the push subscription's). Without them each store
+answers that it is not set up yet (503).
 
 Three things have to be set on the project for any of it to work:
 `OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` (a yearly recurring price) and
