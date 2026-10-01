@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy — Open Hearts</title>
+<meta name="description" content="What Open Hearts does with your data: what stays on your device, what live play makes public, and what we keep.">
+<link rel="canonical" href="https://openhearts.game/privacy">
+<meta property="og:title" content="Privacy — Open Hearts">
+<meta property="og:description" content="What Open Hearts does with your data: what stays on your device, what live play makes public, and what we keep.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://openhearts.game/privacy">
+<meta name="theme-color" content="#06231A">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>♥</text></svg>">
+<style>
+  :root {
+    --felt-dark: #06231A;
+    --felt: #0E3B2E;
+    --felt-light: #14513C;
+    --gold: #E4B363;
+    --chrome: #E8EFEA;
+    --chrome-dim: #9FB3A9;
+    --red: #C1352B;
+    --edge: rgba(232,239,234,.12);
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--felt-dark);
+    color: var(--chrome);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--gold); overflow-wrap: anywhere; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 22px; }
+
+  header {
+    background: radial-gradient(120% 100% at 50% 0%,
+      var(--felt-light) 0%, var(--felt) 45%, var(--felt-dark) 100%);
+    border-bottom: 1px solid var(--edge);
+    padding: 48px 0 40px;
+    text-align: center;
+  }
+  .home { display: inline-block; font-size: 14px; text-decoration: none; margin-bottom: 18px; }
+  .suits { font-size: 22px; letter-spacing: 7px; margin-bottom: 12px; }
+  .suits .r { color: var(--red); }
+  .suits .b { color: var(--chrome); opacity: .55; }
+  h1 {
+    margin: 0 0 10px;
+    font-size: clamp(34px, 9vw, 48px);
+    line-height: 1.05;
+    letter-spacing: -.03em;
+    font-weight: 800;
+  }
+  .tagline {
+    margin: 0 auto;
+    max-width: 34ch;
+    font-size: clamp(16px, 4.2vw, 19px);
+    color: var(--chrome-dim);
+  }
+  .updated { margin: 14px 0 0; font-size: 13.5px; color: var(--chrome-dim); }
+
+  main { padding: 48px 0 24px; }
+  section + section { margin-top: 46px; }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .13em;
+    color: var(--gold);
+    margin: 0 0 14px;
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 16.5px;
+    font-weight: 650;
+    margin: 26px 0 8px;
+    color: var(--chrome);
+  }
+  p { margin: 0 0 14px; color: #CFDCD5; }
+  code {
+    font: 13.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--chrome);
+    overflow-wrap: anywhere;
+  }
+
+  ul.points { list-style: none; margin: 0; padding: 0; }
+  ul.points li {
+    padding: 15px 0;
+    border-top: 1px solid var(--edge);
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 13px;
+    align-items: start;
+  }
+  ul.points li:last-child { border-bottom: 1px solid var(--edge); }
+  ul.points b { display: block; font-weight: 650; margin-bottom: 2px; }
+  ul.points span { color: var(--chrome-dim); font-size: 14.5px; }
+  .pip { font-size: 19px; line-height: 1.35; }
+  .pip.r { color: var(--red); }
+  .pip.g { color: var(--gold); }
+
+  ul.plain { margin: 0 0 14px; padding-left: 20px; color: #CFDCD5; }
+  ul.plain li { margin-bottom: 8px; }
+  ul.plain b { color: var(--chrome); font-weight: 650; }
+
+  footer {
+    margin-top: 60px;
+    border-top: 1px solid var(--edge);
+    padding: 26px 0 40px;
+    font-size: 13.5px;
+    color: var(--chrome-dim);
+    text-align: center;
+  }
+  footer a { text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="home" href="/">← Open Hearts</a>
+    <div class="suits">
+      <span class="b">♣</span><span class="r">♦</span><span class="b">♠</span><span class="r">♥</span>
+    </div>
+    <h1>Privacy</h1>
+    <p class="tagline">What Open Hearts does with what you give it, in plain words.</p>
+    <p class="updated">Last updated 1 October 2026</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>The short version</h2>
+    <ul class="points">
+      <li>
+        <span class="pip g">♠</span>
+        <div>
+          <b>Playing alone stays on your device</b>
+          <span>Your name, your picture and your games against the bots are
+          kept on the device you play on, and not sent anywhere.</span>
+        </div>
+      </li>
+      <li>
+        <span class="pip r">♥</span>
+        <div>
+          <b>Live play is public, on purpose</b>
+          <span>To play people, your name, your picture and your results go
+          to relays — public servers, most of them run by other people — where
+          anyone can read them and where they may be kept for good.</span>
+        </div>
+      </li>
+      <li>
+        <span class="pip g">♣</span>
+        <div>
+          <b>No ads, no analytics, no accounts</b>
+          <span>Nothing is sold, rented or used for advertising. There are no
+          trackers in the app or on this site, and no account to make.</span>
+        </div>
+      </li>
+      <li>
+        <span class="pip r">♦</span>
+        <div>
+          <b>Paying is Stripe's job</b>
+          <span>On the web a subscription is bought through Stripe, which has
+          your email address and card. We keep a note that your device is paid
+          up. We never see your card number.</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Who we are</h2>
+    <p>
+      Open Hearts is an open-source project. "We" are the people who maintain
+      it, at <a href="https://github.com/bfulton/open-hearts">github.com/bfulton/open-hearts</a>.
+      The code is public, so everything on this page can be checked against
+      what the app actually does.
+    </p>
+    <p>
+      This page covers this site, the game at
+      <a href="/play">openhearts.game/play</a>, and the Open Hearts apps for
+      phones.
+    </p>
+  </section>
+
+  <section>
+    <h2>On your device</h2>
+    <p>
+      The app keeps these on the device you play on — in the browser's storage
+      for this site, or in the app's own storage on a phone:
+    </p>
+    <ul class="plain">
+      <li><b>A key your device makes for itself.</b> It is a long random
+      number with a public half and a secret half. The public half is who you
+      are at a live table. The secret half never leaves the device.</li>
+      <li><b>Your name and how you look</b>: an icon and a colour, or a
+      picture of your own. The picture is cut down to 64 by 64 pixels on your
+      device, and only that small copy is kept. The photo you picked it from
+      is not stored or sent.</li>
+      <li><b>Your last thirty games against the bots</b>, which your profile
+      counts up. They leave the device only if you tap <i>Copy record</i>.</li>
+      <li><b>How quickly you play</b>, your game options, your licence if you
+      subscribe, and the players whose pictures you chose to hide.</li>
+    </ul>
+    <p>
+      To remove all of it, clear this site's data in your browser, or delete
+      the app. That also removes your key, so you come back as a new player,
+      and it removes the licence a subscription gave that device.
+    </p>
+  </section>
+
+  <section>
+    <h2>Playing alone</h2>
+    <p>
+      A game against the bots is played entirely on your device. Nothing
+      about it is sent anywhere.
+    </p>
+    <p>
+      In the phone apps, live play is not available yet, and until it is the
+      apps make no network connections of their own. When live play comes to
+      them it will work as described below, and this page will say so.
+    </p>
+  </section>
+
+  <section>
+    <h2>Opening the game on the web</h2>
+    <ul class="plain">
+      <li><b>Cloudflare</b> hosts this site and the game, so it sees each
+      request your browser makes: your IP address, your browser, and the
+      address you asked for. We add no logging of our own.</li>
+      <li><b>Google's font servers, sometimes.</b> The game carries its own
+      font, but when it has to draw a character that font lacks — an emoji,
+      an arrow, or a name written in a script such as Chinese or Arabic — the
+      toolkit it is built with fetches the extra font from
+      <code>fonts.gstatic.com</code>. When that happens, Google receives your
+      IP address and the fact that you are visiting this site.</li>
+      <li><b>A licence check.</b> Each time the game starts it sends your
+      device's public key to our service to ask whether it holds a
+      subscription. If it does not, nothing is kept.</li>
+      <li><b>Your profile page</b> asks the relays for game results so it can
+      show your rating. That connects your browser to them, so they see your
+      IP address. Nothing about you is published by it.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Live play</h2>
+
+    <h3>What everyone can see</h3>
+    <p>
+      A live game is played between devices, through relays. A relay is a
+      public server that passes messages between apps. Anything on a relay
+      can be read by anyone who asks it, and some of it is kept. In live play:
+    </p>
+    <ul class="plain">
+      <li><b>Kept on relays and readable by anyone:</b> your name, icon and
+      colour, and your public key, each time you are seated at a table; your
+      picture, if you chose one; and the result of every live game you play,
+      rated or not — the table, each seat's key and final score, and who
+      left. Ratings are worked out from these results by anyone who cares to,
+      which is the point: nobody has to take our word for a rating.</li>
+      <li><b>Passed on but not kept:</b> while you wait for a game, your name,
+      rating, icon and colour and how many seconds you usually take over a
+      card, every couple of seconds; and while the app is open, that your
+      device is online or at a table. Relays forward these to whoever is
+      listening at that moment and keep nothing — but anyone listening could
+      record them.</li>
+    </ul>
+    <p>
+      A friends' table is private in one sense only: strangers cannot sit
+      down at it. What it publishes is as public as any other table.
+    </p>
+    <p>
+      So choose a name you are happy for strangers to see, and do not use a
+      photo you would not put on a public notice board. You can play live with
+      no picture at all. On your own device you can hide anyone else's
+      picture.
+    </p>
+
+    <h3>Where it goes</h3>
+    <p>The game uses these relays today:</p>
+    <ul class="plain">
+      <li><code>relay.openhearts.game</code> and <code>nostr.openhearts.game</code>,
+      ours. The first keeps nothing it is sent. The second is not running
+      yet; when it is, this page will say what it keeps.</li>
+      <li><code>relay.damus.io</code>, <code>relay.primal.net</code> and
+      <code>nos.lol</code>, run by other people under their own policies. They
+      may keep what is stored on them indefinitely, and anything signed can be
+      copied from one relay to another by anyone.</li>
+    </ul>
+    <p>
+      We cannot delete anything from relays we do not run.
+    </p>
+
+    <h3>What only your table sees</h3>
+    <p>
+      The cards are dealt between the devices at the table so that each
+      player's hand can be read by that player alone, and no server of ours
+      ever sees a hand. Plays go directly from device to device wherever a
+      direct connection can be made.
+    </p>
+    <p>
+      A direct connection means the devices at your table learn each other's
+      IP addresses. So do the <b>jurors</b>: the apps of other players, drawn
+      at random, that help settle a table and play the bots' seats. While your
+      app is open and subscribed it serves as a juror at other people's tables
+      too, so their devices learn your IP address.
+    </p>
+    <p>
+      To make those connections the app uses Cloudflare's connection services
+      (STUN and TURN), which see your IP address. When two devices cannot
+      reach each other directly, Cloudflare passes the traffic between them,
+      encrypted so that it cannot read it.
+    </p>
+  </section>
+
+  <section>
+    <h2>Subscribing</h2>
+    <p>
+      Live play is a subscription. On the web it is bought through
+      <a href="https://stripe.com/privacy">Stripe</a>, on Stripe's own page:
+      Stripe asks for your email address, your card and the billing details it
+      needs, under its own privacy policy.
+    </p>
+    <p>
+      We give Stripe your device's public key so the payment can be matched to
+      your device. In return our service keeps a short record: which key is on
+      which subscription, when it was added, and the dates the subscription
+      runs to. In Stripe we can see your email address, name, country, card
+      brand, the last four digits of your card and your payments.
+    </p>
+    <p>
+      That means we could connect a subscriber's email address with their key,
+      and so with the name and results it has published. We do not publish
+      that connection, and we use it only to run your subscription.
+    </p>
+    <p>
+      If you add another device to your subscription, our service keeps a
+      record of the one-use code you made and which devices made and used it.
+      Any device on a subscription can see the others' keys and remove them.
+    </p>
+  </section>
+
+  <section>
+    <h2>What we don't do</h2>
+    <ul class="plain">
+      <li>No ads, and nothing sold or shared for advertising.</li>
+      <li>No analytics, no crash reports, no advertising identifiers.</li>
+      <li>No cookies from our pages. Stripe sets its own, on its own site,
+      when you buy.</li>
+      <li>No location, no contacts, no microphone, no camera.</li>
+      <li>No accounts, and no email address held by us.</li>
+      <li>No chat.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>How long things are kept</h2>
+    <ul class="plain">
+      <li><b>On your device:</b> until you remove them.</li>
+      <li><b>On relays:</b> whatever is passed on is not kept. Whatever is
+      stored is kept as long as each relay's operator chooses, which may be
+      for good.</li>
+      <li><b>Our service's subscription records:</b> while the subscription
+      runs, and afterwards until you ask us to delete them.</li>
+      <li><b>Stripe:</b> as long as Stripe's policy and the law on payment
+      records require.</li>
+      <li><b>Cloudflare and Google:</b> under their own policies.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Your choices</h2>
+    <ul class="plain">
+      <li>Play alone, and nothing about you leaves your device.</li>
+      <li>Play live with a name that is not your real one, and with no
+      picture.</li>
+      <li>Change your name or picture at any time. What was already published
+      stays where it is.</li>
+      <li>Ask us for a copy of what our service keeps about your device, or
+      ask us to delete it. We will also ask the relays we do not run to delete
+      what your device published there, but we cannot make them.</li>
+    </ul>
+    <p>
+      Where data protection law gives you rights — to see, correct or delete
+      what is held about you, to object, or to complain to your data
+      protection authority — you have them here too.
+    </p>
+  </section>
+
+  <section>
+    <h2>Children</h2>
+    <p>
+      Open Hearts is not made for children under 13, and they should not play
+      live, since it shows a name and picture to strangers. If you think a
+      child has published something through it, tell us and we will do what we
+      can to remove it.
+    </p>
+  </section>
+
+  <section>
+    <h2>Changes</h2>
+    <p>
+      If what the app does with data changes, this page changes with it, and
+      the date at the top moves. Its history, and the code's, is
+      <a href="https://github.com/bfulton/open-hearts">on GitHub</a>.
+    </p>
+  </section>
+
+  <section>
+    <h2>Contact</h2>
+    <p>
+      Open an issue at
+      <a href="https://github.com/bfulton/open-hearts/issues">github.com/bfulton/open-hearts/issues</a>.
+      Issues are public, so put nothing private in one: say that you have a
+      privacy request, and we will arrange a private way to deal with it.
+    </p>
+  </section>
+</main>
+
+<footer class="wrap">
+  <a href="https://github.com/bfulton/open-hearts">Source on GitHub</a>
+  &nbsp;·&nbsp; MIT licensed
+  &nbsp;·&nbsp; <a href="/play">Play</a>
+  &nbsp;·&nbsp; <a href="/privacy">Privacy</a>
+</footer>
+
+</body>
+</html>
