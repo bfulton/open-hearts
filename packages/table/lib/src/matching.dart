@@ -29,6 +29,7 @@ import 'pace.dart';
 import 'relay_transport.dart';
 import 'signing.dart';
 import 'spec.dart';
+import 'timing.dart';
 
 /// Someone waiting, as the others see them.
 class Waiter {
@@ -173,6 +174,7 @@ class WaitingRoom {
     this.avatar,
     this.picture,
     this.target = gameOverScore,
+    this.timing = TableTiming.standard,
   }) : since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
     _random = random ?? Random.secure();
     for (final e in List.of(relay.lobbySoFar)) {
@@ -193,6 +195,11 @@ class WaitingRoom {
   /// The score the tables this player sits at run to: it seats nobody
   /// who asked for another, and the tables it hosts say so.
   final int target;
+
+  /// The clocks of the tables this player hosts (timing.dart), from
+  /// its remote config. Only the host's counts: it rides in the
+  /// seating, and every seat takes it from there.
+  final TableTiming timing;
 
   /// Whether this device deals sealed tables (docs/03): the tables it
   /// seats are sealed, and it sits only at sealed ones.
@@ -324,6 +331,7 @@ class WaitingRoom {
         'rated': pool == 'rated',
         'sealed': sealed,
         'target': target,
+        'timing': timing.toJson(),
         'seats': seats,
         'policy': botPolicyVersion,
       });
@@ -420,7 +428,10 @@ class WaitingRoom {
             seats: seats,
             rated: c['rated'] == true,
             sealed: c['sealed'] == true,
-            target: target),
+            target: target,
+            // The host's clocks, not this device's; a host on an older
+            // build says none, which is the standard table.
+            timing: TableTiming.parse(c['timing'])),
         names,
         avatars,
       ));
