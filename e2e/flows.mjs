@@ -205,7 +205,7 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
   // and the page says which rather than showing the number everyone
   // starts at.
   if (record0.some((t) => /^1500$/.test(t))) throw new Error('the profile shows the rating nobody earned');
-  if (!record0.some((t) => /Play a rated live game|No relay answered/.test(t))) {
+  if (!record0.some((t) => /Play a rated live game|The relays did not answer/.test(t))) {
     throw new Error(`the profile says nothing about why there is no rating\nsaw: ${record0.join(' | ')}`);
   }
 });
