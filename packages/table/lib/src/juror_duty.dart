@@ -26,7 +26,7 @@ class JurorDuty {
       required this.presence,
       this.log,
       Clock? clock,
-      this.silenceAfterMs = 120000,
+      this.silenceAfterMs,
       this.pinned = 0,
       this.dial,
       this.crypto,
@@ -41,9 +41,9 @@ class JurorDuty {
   final void Function(String line)? log;
   final Clock clock;
 
-  /// The silence a juror's clients count as absence; the protocol's
-  /// two minutes, shorter in a test.
-  final int silenceAfterMs;
+  /// The silence a juror's clients count as absence: null for each
+  /// table's own ([TableTiming.silenceMs]), shorter in a test.
+  final int? silenceAfterMs;
 
   /// The deal's primitives, to serve at sealed tables.
   final DealCrypto? crypto;
@@ -188,7 +188,7 @@ class LastResortBench {
     required List<Uri> relays,
     void Function(String line)? log,
     int idleMs = 10 * 60 * 1000,
-    int silenceAfterMs = 120000,
+    int? silenceAfterMs,
     DealCrypto? crypto,
   }) : jurors = [
           for (final s in signers)
@@ -219,7 +219,7 @@ class LastResortBench {
 /// a while.
 class LastResortJuror {
   LastResortJuror(
-      {required this.relays, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int silenceAfterMs = 120000, DealCrypto? crypto}) {
+      {required this.relays, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int? silenceAfterMs, DealCrypto? crypto}) {
     presence = RelayPresence(relays: relays, signer: signer, status: 'last-resort', log: log)..silent = true;
     duty = JurorDuty(relays: relays, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs, crypto: crypto);
   }

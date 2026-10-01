@@ -18,8 +18,8 @@
 ///    a little over a tenth of a second more to the first card, 6.77 s
 ///    against 6.60 at a jury of ten over twenty seeds;
 ///  - a hand with bot seats waits for a jury big enough to hold them
-///    (`_jurorsWaitMs`), which on a table with jurors about is over as
-///    soon as the draw carries.
+///    (`TableTiming.jurorsWaitMs`), which on a table with jurors about
+///    is over as soon as the draw carries.
 ///
 /// The simulator's clock is virtual, so these are the protocol's own
 /// waits and latencies with no machine speed in them: the same seed

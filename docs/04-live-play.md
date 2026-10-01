@@ -423,6 +423,16 @@ Nothing shows while a seat is within its grace. Past it, that seat's
 remaining clock shows on its badge, and on your own score line when it
 is yours, so you know you are spending it; at empty, the button.
 
+These are the standard table's numbers. A table's clocks — the grace,
+the bank, the fixed clock, and the deadlines, silences and waits
+below — are whatever the device that starts it has in its remote
+config ([doc 06](06-service.md), "Remote config"), and ride in the
+start event everyone signs, as the score the game runs to does
+(`TableTiming`, `packages/table/lib/src/timing.dart`). Seats that
+disagreed about when a boot was due would back different sides of it.
+A start that says none, or one outside the bounds, is the standard
+table at every seat alike.
+
 The button is a **trigger, not a vote.** The condition is objective — the
 turns opened at known game states and took what they took — and every
 peer keeps its own account of each seat's bank from the turn timings
@@ -823,7 +833,7 @@ answers is a **bench** of jurors of last resort rather than one
 which is the bend above and not a new one; what they are not is
 another player.
 
-The wait is bounded (`_jurorsWaitMs`, forty seconds). Past the point
+The wait is bounded (`TableTiming.jurorsWaitMs`, forty seconds). Past the point
 where nobody is coming, a table frozen for good is worse than one
 whose bots are public, so the hand goes ahead in the open — which now
 means nobody else online *and* our own bench unreachable, rather than
@@ -1582,7 +1592,7 @@ turned down for it.
 
 As built, once the cards are out. Each side judges it for itself, as it
 judges a juror's silence. It must be stopped at one turn for twenty
-seconds (`TableClient.quorumLostAfterMs`), and the turn must be one of
+seconds (`TableTiming.quorumLostMs`), and the turn must be one of
 these:
 - a held seat's play or pass, or a seat's hand stalled unopened (a
   departed person's, or a held seat's at its audit), with nobody it

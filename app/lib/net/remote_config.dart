@@ -1,7 +1,8 @@
 /// What the app may be told without a new build (docs/06-service.md,
 /// "Remote config"): whether live play is open to anyone at all,
 /// whether the paid tier is offered, which relays the tables meet on, a
-/// line across the front door, and that this build is too old.
+/// line across the front door, that this build is too old, and the
+/// clocks of the tables this device starts.
 ///
 /// Read the way the licence is (entitlement.dart): what the device kept
 /// last time, before the first frame, and the service asked behind it.
@@ -19,6 +20,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table/table.dart' show TableTiming;
 
 import 'licence.dart' show handlerAt;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
@@ -58,7 +60,7 @@ class Notice {
 }
 
 class RemoteConfig {
-  const RemoteConfig({this.live = true, this.offer = true, this.relays, this.banner, this.updateBefore, this.updateText, this.feedback, this.privacy, this.terms});
+  const RemoteConfig({this.live = true, this.offer = true, this.relays, this.banner, this.updateBefore, this.updateText, this.feedback, this.privacy, this.terms, this.table = TableTiming.standard});
 
   /// No config at all: the build as it was made.
   static const none = RemoteConfig();
@@ -97,6 +99,12 @@ class RemoteConfig {
   /// for the site's own (subscribe_page.dart, legalPage).
   final Uri? privacy;
   final Uri? terms;
+  /// The clocks of a table this device starts — a person's grace and
+  /// bank, a held bot seat's deadlines, the waits on a jury — carried
+  /// in the start event, so every seat plays by the starter's
+  /// (packages/table, timing.dart). A table someone else starts keeps
+  /// theirs.
+  final TableTiming table;
 
   /// Whether [published] — this build's day, or "dev" — is a build the
   /// operator asks to be updated. A local build has no day and never is.
@@ -144,6 +152,7 @@ class RemoteConfig {
       feedback: feedback != null && _goesSomewhere(feedback) ? feedback : null,
       privacy: _page(json['privacy']),
       terms: _page(json['terms']),
+      table: TableTiming.parse(json['table']),
     );
   }
 

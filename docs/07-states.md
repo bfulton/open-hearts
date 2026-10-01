@@ -299,6 +299,12 @@ are of three kinds:
   held seat's 15 s and 40 s. These are rules of the game, like a chess
   clock.
 
+The deadlines, the silences that count as absence, and the wait for a
+jury that can hold the bot seats are the table's, not each side's: the
+starter's remote config chooses them and the signed start event
+carries them (`TableTiming`), so every side and every juror times the
+same table by the same clocks. Pacing stays each device's own.
+
 Each of these *proposes* a transition, and the table settles it on
 the record — as a boot has always worked. So now do the twenty
 seconds of a lost quorum, wherever a majority of the people can carry

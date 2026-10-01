@@ -399,7 +399,12 @@ npx wrangler kv key put --binding OH_STORE 'config|app' \
 | `banner` | A line across the front door: `id` (letters, digits, `.` `_` `-`), `level` `info` or `warn`, and `text` by language, English required — a device is told it in its own language where the row has it and in English where it does not. | nothing |
 | `feedback` | Where "Tell us what's broken" sends a report: an `https://` page or a `mailto:` address. GitHub's new-issue page and mail take the report in the address; another page is opened with the report on the clipboard. | the project's GitHub issues |
 | `privacy`, `terms` | Where the privacy policy and the terms of use are, `https://` only, for the links under Subscribe. | the site's `/privacy` and `/terms` |
+| `table` | The clocks of a table this device starts, in milliseconds: `graceMs` (2–60 s), `passGraceMs` (2–120 s), `bankMs` (10–300 s), `fixedMs` (15–120 s), `botActsMs` (5–60 s), `botDealsMs` (15–120 s), `quorumLostMs` (10–120 s), `silenceMs` (30–600 s), `jurorSilenceMs` (10–120 s), `jurorsWaitMs` (20–180 s), `jurorsWaitAgainMs` (10–60 s, and no longer than `jurorsWaitMs`). Any left out are the standard's. They ride in the signed start event, so every seat and juror plays by the starter's, and a table someone else starts keeps theirs ([doc 04](04-live-play.md), "Boot"). All or nothing: one field out of bounds or not a whole number and the worker serves none of it, and a seat that reads such a start plays the standard table. | the standard: 6, 20, 45, 40, 15, 40, 20, 120, 30, 40 and 10 s |
 | `update` | `before`: a day, `YYYY-MM-DD`; a build published before it is asked to update, in `text` if given and the app's own words if not, with a Reload button on the web. A local build has no day and is never asked. | nothing |
+
+A build from before `table` reads a start that carries one as the
+standard table, and would time the others' table by other clocks than
+theirs; so set it only once such builds are asked to update (`update`).
 
 The worker checks every field before it serves the row (`configOf`), and
 the app checks them again (`app/lib/net/remote_config.dart`): a field

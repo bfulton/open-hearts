@@ -73,7 +73,7 @@ void main() {
     var kept = 0;
     // Kept until well past the deal step's allowance, so that timing
     // the holder by its own open turn would give the hand up.
-    const keptFor = TableClient.botDealsWithinMs + 15000;
+    final keptFor = TableClient.botDealsWithinMs + 15000;
     t.net.steer = (from, to, message) {
       if (to != a || message['kind'] != 'deal' || t.clock.nowMs >= keptFor) return null;
       final body = message['body'] as Map<String, Object?>?;
