@@ -463,6 +463,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'onAnotherSubscription':
           'Este dispositivo está en otra suscripción. Quítalo de allí primero.',
       'clockOff': 'El reloj de este dispositivo va desfasado. Ajústalo y vuelve a intentarlo.',
+      'notAStore': 'Esa no es una tienda que el servicio conozca.',
+      'noProof': 'La tienda no dio ningún comprobante de la compra.',
+      'notFromStore': 'Esa compra no viene de la tienda.',
+      'notPaid': 'La tienda dice que esa compra no está pagada.',
+      'storeNotAnswering':
+          'La tienda no responde. Vuelve a intentarlo en un momento.',
+      'storeNotSetUp': 'La compra en la tienda aún no está abierta.',
       'other': 'El servicio lo rechazó.',
     });
     return '$_temp0';
@@ -988,4 +995,45 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get managedWhereBought =>
       'Esta suscripción se gestiona donde se compró.';
+
+  @override
+  String get licenceNotForThisDevice =>
+      'La respuesta del servicio no era una licencia para este dispositivo.';
+
+  @override
+  String get storeFailed =>
+      'La tienda no completó la compra. Vuelve a intentarlo en un momento.';
+
+  @override
+  String get nothingToRestore =>
+      'No se encontró ninguna suscripción que restaurar en esta cuenta de la tienda.';
+
+  @override
+  String get restorePurchases => 'Restaurar compras';
+
+  @override
+  String get storePending =>
+      'La tienda está esperando para aprobar el pago. El juego en vivo se abrirá aquí en cuanto lo haga.';
+
+  @override
+  String storeRenewal(String price, String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'apple': 'cuenta de Apple',
+      'other': 'cuenta de Google',
+    });
+    String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'App Store',
+      'other': 'Google Play',
+    });
+    return '$price al año, cobrado a tu $_temp0 al confirmar. Se renueva sola cada año hasta que la canceles, cuando quieras, en los ajustes de suscripciones de $_temp1, al menos un día antes de la renovación.';
+  }
+
+  @override
+  String manageInStore(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'apple': 'App Store',
+      'other': 'Google Play',
+    });
+    return 'Cancélala o cámbiala en $_temp0.';
+  }
 }

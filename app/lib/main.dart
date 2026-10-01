@@ -14,6 +14,7 @@ import 'net/duty.dart';
 import 'net/household.dart';
 import 'net/remote_config.dart';
 import 'net/room.dart';
+import 'net/store_buying.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -31,6 +32,11 @@ Future<void> main() async {
   final signer = await Identity.signer();
   await Entitlement.current.load(signer.publicKey);
   unawaited(Entitlement.current.refresh(signer));
+  // In a store build, the store: what the product costs, and anything
+  // it is holding for this app — a renewal, or a purchase the service
+  // did not take last time — handed over as soon as it is listened for
+  // (net/store_buying.dart). Nothing on the web.
+  unawaited(StoreShop.current.open(signer));
   // What the operator last said (net/remote_config.dart): kept from the
   // last start before the first frame, so the relays this start meets
   // on are settled before anything connects, and asked again behind it

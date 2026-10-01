@@ -635,7 +635,7 @@ abstract class AppLocalizations {
   /// Why the server turned down a request about a subscription's devices.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device\'s clock is out. Set it right and try again.} other{The service turned that down.}}'**
+  /// **'{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device\'s clock is out. Set it right and try again.} notAStore{That is not a store the service knows.} noProof{The store gave nothing to show for the purchase.} notFromStore{That purchase did not come from the store.} notPaid{The store says that purchase is not paid for.} storeNotAnswering{The store is not answering. Try again in a moment.} storeNotSetUp{Buying in the store is not open yet.} other{The service turned that down.}}'**
   String serviceRefusal(String reason);
 
   /// Shown when live play cannot be bought on this device.
@@ -1345,6 +1345,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This subscription is managed where it was bought.'**
   String get managedWhereBought;
+
+  /// Shown when the server took a store purchase but what it gave back was not a licence for this device.
+  ///
+  /// In en, this message translates to:
+  /// **'The service\'s answer was not a licence for this device.'**
+  String get licenceNotForThisDevice;
+
+  /// Shown when the App Store or Google Play could not open or finish a purchase.
+  ///
+  /// In en, this message translates to:
+  /// **'The store did not finish the purchase. Try again in a moment.'**
+  String get storeFailed;
+
+  /// Shown after Restore purchases when the store account has no subscription to bring back.
+  ///
+  /// In en, this message translates to:
+  /// **'No subscription to restore was found in this store account.'**
+  String get nothingToRestore;
+
+  /// Button on the Live play page in the App Store and Google Play builds: brings back a subscription this store account already has.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore purchases'**
+  String get restorePurchases;
+
+  /// On the Live play page while the App Store or Google Play holds a purchase for approval (a parent's, or a slow payment method).
+  ///
+  /// In en, this message translates to:
+  /// **'The store is waiting to approve the payment. Live play opens here as soon as it does.'**
+  String get storePending;
+
+  /// Under the Subscribe button in the App Store and Google Play builds: the price, that it is a year, that it renews by itself, and how to cancel. The stores require all four. 'store' is apple or google.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} a year, charged to your {store, select, apple{Apple Account} other{Google account}} when you confirm. It renews by itself every year until you cancel, which you can do whenever you like in {store, select, apple{the App Store\'s} other{Google Play\'s}} subscription settings, at least a day before it renews.'**
+  String storeRenewal(String price, String store);
+
+  /// Above the Manage subscription button for a subscription bought in the App Store or Google Play. 'store' is apple or google.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel or change it in {store, select, apple{the App Store} other{Google Play}}.'**
+  String manageInStore(String store);
 }
 
 class _AppLocalizationsDelegate

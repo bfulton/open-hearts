@@ -88,7 +88,7 @@
   "noDealBuild": "Diese Version kann das Austeilen, das die Karten ehrlich hält, nicht ausführen und darum an keinem Live-Tisch sitzen.",
   "serviceUnreachable": "Der Dienst ist nicht erreichbar. Versuch es gleich noch einmal.",
   "codeNotForThisDevice": "Dieser Code ist nicht für dieses Gerät.",
-  "serviceRefusal": "{reason, select, noSubscription{Kein Abo.} fiveDevices{Dieses Abo hat schon so viele Geräte, wie es tragen kann.} notACode{Das ist kein Code.} noSuchCode{Diesen Code gibt es nicht.} codeUsed{Dieser Code wurde schon benutzt.} codeRunOut{Dieser Code ist abgelaufen.} notADevice{Dieses Gerät gehört nicht zu diesem Abo.} onAnotherSubscription{Dieses Gerät gehört zu einem anderen Abo. Entferne es dort zuerst.} clockOff{Die Uhr dieses Geräts geht falsch. Stell sie richtig und versuch es noch einmal.} other{Der Dienst hat abgelehnt.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Kein Abo.} fiveDevices{Dieses Abo hat schon so viele Geräte, wie es tragen kann.} notACode{Das ist kein Code.} noSuchCode{Diesen Code gibt es nicht.} codeUsed{Dieser Code wurde schon benutzt.} codeRunOut{Dieser Code ist abgelaufen.} notADevice{Dieses Gerät gehört nicht zu diesem Abo.} onAnotherSubscription{Dieses Gerät gehört zu einem anderen Abo. Entferne es dort zuerst.} clockOff{Die Uhr dieses Geräts geht falsch. Stell sie richtig und versuch es noch einmal.} notAStore{Diesen Store kennt der Dienst nicht.} noProof{Der Store hat keinen Beleg für den Kauf geliefert.} notFromStore{Dieser Kauf kommt nicht aus dem Store.} notPaid{Laut Store ist dieser Kauf nicht bezahlt.} storeNotAnswering{Der Store antwortet nicht. Versuch es gleich noch einmal.} storeNotSetUp{Kaufen im Store ist noch nicht geöffnet.} other{Der Dienst hat abgelehnt.}}",
   "buyingNotOpen": "Auf diesem Gerät kann man noch nicht kaufen.",
   "shopUnreachable": "Der Shop ist nicht erreichbar. Versuch es gleich noch einmal.",
   "shopNotOpen": "Der Shop ist noch nicht geöffnet.",
@@ -206,5 +206,12 @@
   "termsOfUse": "Nutzungsbedingungen",
   "manageSubscription": "Abo verwalten",
   "manageSubscriptionHint": "Kündigen, Karte ändern oder Belege ansehen.",
-  "managedWhereBought": "Dieses Abo wird dort verwaltet, wo es gekauft wurde."
+  "managedWhereBought": "Dieses Abo wird dort verwaltet, wo es gekauft wurde.",
+  "licenceNotForThisDevice": "Die Antwort des Dienstes war keine Lizenz für dieses Gerät.",
+  "storeFailed": "Der Store hat den Kauf nicht abgeschlossen. Versuch es gleich noch einmal.",
+  "nothingToRestore": "In diesem Store-Konto wurde kein Abo zum Wiederherstellen gefunden.",
+  "restorePurchases": "Käufe wiederherstellen",
+  "storePending": "Der Store wartet noch auf die Freigabe der Zahlung. Sobald sie da ist, ist Live-Spiel hier offen.",
+  "storeRenewal": "{price} im Jahr, abgebucht über dein {store, select, apple{Apple-Konto} other{Google-Konto}}, wenn du bestätigst. Das Abo verlängert sich jedes Jahr von selbst, bis du kündigst – jederzeit, in den Abo-Einstellungen {store, select, apple{des App Store} other{von Google Play}}, spätestens einen Tag vor der Verlängerung.",
+  "manageInStore": "Kündigen oder ändern {store, select, apple{im App Store} other{bei Google Play}}."
 }

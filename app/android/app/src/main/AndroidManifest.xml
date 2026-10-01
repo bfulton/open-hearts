@@ -6,6 +6,11 @@
          reads the network's state as well. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Live play is bought as a Google Play subscription
+         (lib/net/store_buying.dart). The Play Billing Library's own
+         manifest declares this too; said here so the release manifest
+         says it whatever the library does. -->
+    <uses-permission android:name="com.android.vending.BILLING"/>
     <application
         android:label="open_hearts"
         android:name="${applicationName}"

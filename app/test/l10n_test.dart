@@ -30,6 +30,7 @@ import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/live/options_sheet.dart';
 import 'package:open_hearts/net/remote_config.dart';
+import 'package:open_hearts/net/store_buying.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/stats.dart';
 import 'package:open_hearts/subscribe_page.dart';
@@ -40,6 +41,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart' show Pace, Tally;
 
 import 'home_page_test.dart' show licenceThisDevice;
+import 'store_buying_test.dart' show FakeStore, paid, shopWith;
 
 const _service = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
 
@@ -363,6 +365,25 @@ void main() {
           await tester.pumpWidget(_inLanguage(locale, const SubscribePage()));
           await tester.pumpAndSettle();
           cut.addAll(_cut(tester, 'live play, to buy'));
+
+          // A store build's: the store's price and the terms the stores
+          // require beside the button, a purchase waiting for approval,
+          // and the page of a subscriber who bought it there.
+          final words = lookupAppLocalizations(locale);
+          final store = FakeStore(kind: name == 'small' ? StoreKind.google : StoreKind.apple, price: r'R$ 32,90');
+          await (await SharedPreferences.getInstance()).setBool('store_bought', true);
+          await shopWith(store);
+          store.says([paid('', status: StoreStatus.pending)]);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpWidget(_inLanguage(locale, const SubscribePage()));
+          await tester.pumpAndSettle();
+          cut.addAll(_cut(tester, 'live play, in a store'));
+          expect(find.text(words.storePending), findsOneWidget);
+          expect(find.text(words.restorePurchases), findsOneWidget);
+          await licenceThisDevice();
+          await tester.pumpAndSettle();
+          cut.addAll(_cut(tester, 'live play, bought in a store'));
+          expect(find.text(words.manageInStore(store.kind.name)), findsOneWidget);
           expect(cut, isEmpty);
         });
       }
