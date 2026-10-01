@@ -195,17 +195,17 @@ it yet.
 
 ## What is paid for, and how
 
-Live play is a subscription: **$2.99 a year**. Everything else is free
+Live play is a subscription: **$5.99 a year, paid up front**. Everything else is free
 and stays free — the bots, the records, the verifiable deal, the engine
 itself. What the money is for is the part that costs us money to run:
 relaying people to each other, TURN when a direct path will not form,
 and jurors when a table is left alone.
 
-A year rather than a month, for an unglamorous reason. At three dollars
-a month the fixed part of a card fee — thirty cents on Stripe — is ten
-per cent of the price, and a store's cut is taken on top; at three
-dollars a year the same fee is paid once. $2.99 nets about $2.60 through
-Stripe after 2.9% + 30¢, and about $2.54 on a store at the small
+A year rather than a month, for an unglamorous reason. The same price
+by the month is fifty cents, and the fixed part of a card fee — thirty
+cents on Stripe — would be more than half of it, with a store's cut on
+top; by the year that fee is paid once. $5.99 nets about $5.52 through
+Stripe after 2.9% + 30¢, and about $5.09 on a store at the small
 business rate. The shape of the price is chosen by the fees, not the
 other way round.
 

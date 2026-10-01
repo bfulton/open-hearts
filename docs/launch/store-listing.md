@@ -56,7 +56,7 @@ Three more rules the copy keeps:
 
 Found while writing this; none is a copy change.
 
-- **The live area on a phone.** A store build shows "Live play · $2.99 a
+- **The live area on a phone.** A store build shows "Live play · $5.99 a
   year · Subscribe", and the subscribe page says that until the app is
   in the stores "live play is bought on the web". Outside the US
   storefront, pointing iOS users at a web purchase is steering under App

@@ -147,7 +147,7 @@ rigged. Roughly in order:
    with height to spare, and what is left over is a rail showing what
    has gone — the fifty-two with the played ones struck through. A turn
    mid-hand keeps the game, and so does a fold.
-8. **Live play is a subscription** — $2.99 a year
+8. **Live play is a subscription** — $5.99 a year, paid up front
    ([doc 06](docs/06-service.md)). The licence, the gate, and buying on
    the web through Stripe are built, and so is sharing a subscription
    across your devices: five to a household, brought in by a code one

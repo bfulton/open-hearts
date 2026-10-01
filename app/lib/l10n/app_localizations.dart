@@ -500,7 +500,7 @@ abstract class AppLocalizations {
   /// **'A new table, and a link to send. A link from a friend opens theirs.'**
   String get playFriendsDetail;
 
-  /// What live play costs. amount is the price with its currency, e.g. $2.99.
+  /// What live play costs. amount is the price with its currency, e.g. $5.99.
   ///
   /// In en, this message translates to:
   /// **'{amount} a year'**

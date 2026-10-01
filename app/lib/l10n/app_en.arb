@@ -451,7 +451,7 @@
   },
   "pricePerYear": "{amount} a year",
   "@pricePerYear": {
-    "description": "What live play costs. amount is the price with its currency, e.g. $2.99.",
+    "description": "What live play costs. amount is the price with its currency, e.g. $5.99.",
     "placeholders": {
       "amount": {
         "type": "String"

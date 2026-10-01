@@ -107,7 +107,7 @@ the web. Every piece below says which one it means.
 | Bots rated like people, seated near your rating | live play only | no | doc 04, "Ratings" |
 | A deal nobody at the table can rig | live tables only | no | doc 03, "As built" |
 | A solo game replays from one line of text | yes | yes | doc 03, "Where the randomness comes from" |
-| Live play, $2.99 a year | yes, through Stripe | no: store billing is not built | doc 06 |
+| Live play, $5.99 a year | yes, through Stripe | no: store billing is not built | doc 06 |
 | Five languages: English, Spanish, Brazilian Portuguese, German, French | yes | yes, once `CFBundleLocalizations` is added on iOS | README, "Languages". The translations are a first pass |
 | Screen readers | yes: names, seats, announcements. After "Enable accessibility" | probably, untested | doc 05, "Read aloud" |
 | Bigger text | browser zoom and the browser's text size | the system text size | doc 05; the Flutter web engine |
@@ -215,7 +215,7 @@ For your readers:
 - Words get bigger with the browser's zoom or, in the apps, the phone's text size, and on a tablet the cards are bigger too.
 - It's in English, Spanish, Portuguese, German and French.
 
-An optional $2.99-a-year subscription lets people play each other online. Nobody needs it.
+An optional $5.99-a-year subscription lets people play each other online. Nobody needs it.
 
 I'm the developer and glad to answer questions or send screenshots: [CONTACT EMAIL].
 
@@ -282,7 +282,7 @@ Live tables have no dealer. The four devices shuffle in turn, each publishing a 
 
 The bots are readable heuristics, not a model: forty named characters at nine strengths, calibrated over 20,000 simulated tables and rated alongside people.
 
-Playing alone is free; live play is $2.99 a year, which pays for relays and TURN. The crypto crate is unaudited research code, and scrutiny is welcome.
+Playing alone is free; live play is $5.99 a year, which pays for relays and TURN. The crypto crate is unaudited research code, and scrutiny is welcome.
 
 [YOUR NAME]
 ```
@@ -443,7 +443,7 @@ In live play the bots are rated like people, from real results, and you're seate
 
 **Rules:** the standard ones. Pass left, right, across, then hold; the 2♣ leads; no points on the first trick; hearts can't be led until broken; the Q♠ is 13; shoot the moon and everyone else takes 26. Solo games go to 50; live games to 50 or 100.
 
-**Money:** playing alone is free for good. Live play against people is $2.99 a year, on the web for now, and pays for the relays and for connections that can't go direct.
+**Money:** playing alone is free for good. Live play against people is $5.99 a year, on the web for now, and pays for the relays and for connections that can't go direct.
 
 **What I'd like from you:** hands where the bots play badly ("Tell us what's broken" in the table's menu can attach the game's record, which I can replay trick by trick), rules or options you expect and can't find, and whether a deal you can check is something you'd care about at a table of strangers.
 
@@ -476,6 +476,6 @@ The bots are forty named characters on one set of rules of thumb, each with a te
 
 What I'd like from Hearts players: where do the bots make plays you never would? "Tell us what's broken" in the table's menu can attach the game, so I can replay it. And which rule options do you miss?
 
-Live play against people is optional, $2.99 a year on the web. None of the above needs it.
+Live play against people is optional, $5.99 a year on the web. None of the above needs it.
 ```
 Count: 195 of 200 words

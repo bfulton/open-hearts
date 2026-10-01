@@ -152,7 +152,7 @@ paid for*, *a device leaves a subscription by dropping itself*.
 
 **Fixed.** `worker.mjs:803–815`, `:398–412`. Anybody could open a
 checkout naming any key. Paid, `record` rewrites that key's entitlement
-to the new subscription, so for $2.99 a stranger moves a subscriber's
+to the new subscription, so for the price of a year a stranger moves a subscriber's
 device onto a subscription he controls, then ends it (cancelling in
 Stripe's portal, or asking for a refund) and the device is written down
 with it — while her own subscription goes on being charged with no

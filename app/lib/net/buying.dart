@@ -25,7 +25,7 @@ import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' a
 /// (`pricePerYear`, l10n). The shape of the price is chosen by the fees
 /// — a year rather than a month, since a card's fixed thirty cents is
 /// paid once (doc 06).
-const priceAmount = r'$2.99';
+const priceAmount = r'$5.99';
 
 /// Whether this build can take money at all: the web can, over Stripe;
 /// a phone will over its store, and does not yet.

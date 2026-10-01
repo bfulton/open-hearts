@@ -277,7 +277,7 @@ void main() {
     expect(find.text('Play live'), findsNothing);
     expect(find.text('Play friends'), findsNothing);
     expect(find.text('Share the link'), findsNothing, reason: 'the link did not open a room either');
-    expect(find.text(r'$2.99 a year'), findsOneWidget, reason: 'what it costs, said on the door');
+    expect(find.text(r'$5.99 a year'), findsOneWidget, reason: 'what it costs, said on the door');
     expect(find.text('Subscribe'), findsOneWidget);
   });
 
@@ -392,7 +392,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Playing alone is free'), findsOneWidget);
     expect(find.textContaining('No server sees a hand'), findsOneWidget);
-    expect(find.text(r'$2.99 a year'), findsOneWidget);
+    expect(find.text(r'$5.99 a year'), findsOneWidget);
   });
 }
 

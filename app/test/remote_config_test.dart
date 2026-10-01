@@ -177,7 +177,7 @@ void main() {
     await _door(tester, live: false);
     expect(find.text('Play solo'), findsOneWidget);
     expect(find.text('Subscribe'), findsNothing);
-    expect(find.textContaining(r'$2.99'), findsNothing);
+    expect(find.textContaining(r'$5.99'), findsNothing);
 
     await licenceThisDevice();
     await tester.pumpAndSettle();
