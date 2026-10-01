@@ -141,6 +141,14 @@ class _HomePageState extends State<HomePage> {
   String? _relayNote;
   StreamSubscription<String?>? _refusalSub;
 
+  /// Why a wait or a room has gone quiet, when that is known: every
+  /// relay refused this device, or the device says it has no network.
+  /// Unsaid, a room reads as though the others had left it — they drop
+  /// off the list once they have not been heard for a few seconds — and
+  /// a wait as one with nobody else in it. Gone again once the network
+  /// is back.
+  String? get _cutOff => _relayNote ?? (deviceOffline() ? _noRelay : null);
+
   /// The ICE servers for this device's next table, fetched once the
   /// relays answer (turn.dart); none until then, and none at all on
   /// localhost.
@@ -708,9 +716,9 @@ class _HomePageState extends State<HomePage> {
                                       onLeave: () => setState(_closeLobby),
                                       onShare: () => _share(room.code),
                                     ),
-                          if (_relayNote != null && (queue != null || room != null)) ...[
+                          if (_cutOff != null && (queue != null || room != null)) ...[
                             const SizedBox(height: 14),
-                            Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
+                            Text(_cutOff!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
                           ],
                         ],
                       ),
