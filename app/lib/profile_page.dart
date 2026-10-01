@@ -448,7 +448,7 @@ class _Record extends StatelessWidget {
               ),
               const SizedBox(height: 7),
               Text(
-                stats == null
+                stats == null || stats.asking
                     ? l10n.countingGames
                     : !stats.reached
                     ? l10n.relaysSilent

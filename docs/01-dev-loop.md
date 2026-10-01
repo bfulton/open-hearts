@@ -61,6 +61,30 @@ floats over the widget tests and eats their taps.
 A build stamped `abc1234+` was deployed from a dirty tree: it contains
 work newer than the commit it names.
 
+## With no network
+
+None of the above may cost a phone the game when it has no signal.
+Solo play needs nothing but the device, yet with every entry point
+`no-store` and Flutter's own service worker now a stub that
+unregisters itself, nothing kept the app: opened again in airplane
+mode, a tab or a home-screen icon was the browser's "no internet"
+page. So the page registers a service worker of its own,
+`app/web/offline_worker.js`, once its first frame is up, and tells it
+what that load fetched. It goes to the network first, always, and
+keeps a copy of each file as it comes; only when the network fails
+does it answer from the copy. Online nothing above changes — every
+file is asked for afresh, a new deploy is what loads, and a cached
+bootstrap still cannot lie about the build. Offline, the last build
+that loaded is the one that opens. `build-info.json` is never kept,
+so the pill says nothing rather than something stale, and nor are the
+service's handlers. The registration is in `app/web/flutter_bootstrap.js`,
+which also stops Flutter's loader registering its stub over it.
+
+`node e2e/offline.mjs` holds all of this to account in a browser:
+opened offline from what was kept and a hand played, and, with the
+network, the relays or the site's worker taken away or left never
+answering, every wait ending in words within a time it writes down.
+
 ## Credentials
 
 `deploy.sh` needs `CLOUDFLARE_TOKEN` (Pages: Edit) and

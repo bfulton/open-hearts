@@ -45,6 +45,7 @@ import 'net/buying.dart';
 import 'net/duty.dart';
 import 'net/household.dart';
 import 'net/mesh_transport.dart';
+import 'net/network.dart';
 import 'net/remote_config.dart';
 import 'net/relays.dart';
 import 'net/room.dart';
@@ -148,6 +149,14 @@ class _HomePageState extends State<HomePage> {
   /// takes them.
   String? _relayNote;
   StreamSubscription<String?>? _refusalSub;
+
+  /// Why a wait or a room has gone quiet, when that is known: every
+  /// relay refused this device, or the device says it has no network.
+  /// Unsaid, a room reads as though the others had left it — they drop
+  /// off the list once they have not been heard for a few seconds — and
+  /// a wait as one with nobody else in it. Gone again once the network
+  /// is back.
+  String? get _cutOff => _relayNote ?? (deviceOffline() ? context.l10n.noRelayAnswered : null);
 
   /// The ICE servers for this device's next table, fetched once the
   /// relays answer (turn.dart); none until then, and none at all on
@@ -294,10 +303,13 @@ class _HomePageState extends State<HomePage> {
   /// This one is counted whether or not it says it is here: one that
   /// cannot deal says nothing of itself (net/duty.dart), and the
   /// others around it are still the others.
+  ///
+  /// And null while the device says it has no network: the beats it
+  /// heard before are not who is here now, and it hears nobody new.
   int? get _online {
     final since = _listeningSinceMs;
     final duty = Duty.current;
-    if (since == null || duty == null) return null;
+    if (since == null || duty == null || deviceOffline()) return null;
     if (DateTime.now().millisecondsSinceEpoch - since < duty.presence.everyMs + 1500) return null;
     final others = duty.presence.online(withinMs: 15000).difference({duty.presence.signer.publicKey});
     return others.length + 1;
@@ -358,6 +370,13 @@ class _HomePageState extends State<HomePage> {
   /// Connects to the relays on [tag], or explains why not. Nothing
   /// goes near a relay without a name on it.
   Future<RelayTransport?> _connect(String tag, _Opening opening) async {
+    // A device that says it has no network will not find a relay by
+    // waiting forty seconds for one (net/network.dart): it is told now,
+    // before a name is asked for or anything is opened.
+    if (deviceOffline()) {
+      setState(() => _error = context.l10n.noRelayAnswered);
+      return null;
+    }
     if (await _named() == null || !mounted) return null;
     final relays = _relays;
     setState(() {
@@ -473,7 +492,22 @@ class _HomePageState extends State<HomePage> {
       }
       _toTable(spec, queue.seatNames, avatars);
     });
-    _waitClock = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _waitClock = Timer.periodic(const Duration(seconds: 1), (_) {
+      // Bots take every seat still empty at ten seconds, so a device
+      // the relays can hear is seated a round or two after that. One
+      // still waiting at the far deadline is one nobody hears — it
+      // went offline, or its relays did — and even the seating it
+      // hosts itself has to come back to it off a relay: the spinner
+      // would turn for ever. So back to the door, saying why.
+      if (DateTime.now().millisecondsSinceEpoch - queue.since >= stopWaiting.inMilliseconds) {
+        setState(() {
+          _closeLobby();
+          _error = context.l10n.noRelayAnswered;
+        });
+        return;
+      }
+      setState(() {});
+    });
     setState(() => _queue = queue);
   }
 
@@ -601,14 +635,15 @@ class _HomePageState extends State<HomePage> {
   /// say, and the standing this door already loaded when it connected
   /// is the same answer, so it is handed over rather than asked for
   /// again. A door told to stay off the relays asks them nothing here
-  /// either.
+  /// either, and nor does a device that says it has no network: it
+  /// would only say so eight seconds later (net/network.dart).
   Stream<PlayerStats> _statsOnThisDevice() async* {
     final signer = _signer ??= await Identity.signer();
     yield* playerStats(
       store: PrefsRecordStore(),
       signer: signer,
       standing: _standing,
-      relays: widget.online ? _relays : null,
+      relays: widget.online && !deviceOffline() ? _relays : null,
     );
   }
 
@@ -703,9 +738,9 @@ class _HomePageState extends State<HomePage> {
                                       onLeave: () => setState(_closeLobby),
                                       onShare: () => _share(room.code),
                                     ),
-                          if (_relayNote != null && (queue != null || room != null)) ...[
+                          if (_cutOff != null && (queue != null || room != null)) ...[
                             const SizedBox(height: 14),
-                            Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
+                            Text(_cutOff!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
                           ],
                         ],
                       ),

@@ -9,6 +9,7 @@
 /// `node --test service/functions`.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
 
@@ -203,6 +204,32 @@ void main() {
         reason: 'the device dropped is part of what is signed');
     expect(find.text('1 of 5'), findsOneWidget);
     expect(find.text(other.substring(0, 6)), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a list the service cannot give is said to be missing, not left coming for ever', (tester) async {
+    final stand = standUp();
+    stand.reachable = false;
+    await licenceThisDevice();
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpAndSettle();
+    expect(find.text('…'), findsNothing, reason: 'nothing is still coming');
+    expect(find.text('Could not reach the service. Try again in a moment.'), findsOneWidget);
+    expect(find.text('Add a device'), findsOneWidget, reason: 'and the way to try again is still there');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a service that never answers is waited for ten seconds, and then said to be out of reach', (tester) async {
+    standUp();
+    askService = (url, body) => Completer<({int status, String body})>().future;
+    await licenceThisDevice();
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('…'), findsOneWidget, reason: 'asked, and not answered yet');
+    await tester.pump(const Duration(seconds: 11));
+    expect(find.text('…'), findsNothing);
+    expect(find.text('Could not reach the service. Try again in a moment.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

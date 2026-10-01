@@ -24,6 +24,18 @@ single one can be silenced.
 cd .. && node e2e/escrow.mjs
 ```
 
+And one device with the network taken away a piece at a time: all of
+it (airplane mode, mid-session and from a cold start off the copy the
+app's service worker kept), the relays (gone, or open and silent), and
+the site's worker (refusing, failing, or never answering). Playing
+alone has to go on working throughout, and every wait has to end in
+words on the screen; the suite writes down how long each took, and
+leaves a screenshot of where each flow ended in `app/build/offline/`.
+
+```bash
+cd .. && node e2e/offline.mjs
+```
+
 Needs Dart on the path (for the relay) and a global Playwright install
 with Chromium (`npm i -g playwright && npx playwright install chromium`).
 The relay is started on port 7447, which is where a build served from

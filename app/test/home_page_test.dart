@@ -18,6 +18,7 @@ import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/net/licence.dart';
+import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
@@ -157,6 +158,25 @@ void main() {
     // Let the wait run out, so the relay it opened is closed behind it.
     await tester.pump(stopWaiting + const Duration(seconds: 2));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('a device that says it has no network is told so at once, and plays alone all the same', (tester) async {
+    final was = deviceOffline;
+    deviceOffline = () => true;
+    addTearDown(() => deviceOffline = was);
+    // No name on purpose: a game that cannot be had does not ask for one.
+    await pumpHome(tester);
+    for (final way in ['Play live', 'Play friends']) {
+      await tester.tap(find.text(way));
+      await tester.pump();
+      expect(find.text('No relay answered. Check the connection and try again.'), findsOneWidget,
+          reason: '$way: said now, not forty seconds from now');
+      expect(find.byType(CircularProgressIndicator), findsNothing, reason: '$way: and nothing is being opened');
+      expect(find.text('My initials'), findsNothing, reason: '$way: nor a name asked for');
+    }
+    await tester.tap(find.text('Play solo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TablePage), findsOneWidget, reason: 'the bots need no network');
   });
 
   testWidgets('one screen: the three ways in, and who you are in the corner', (tester) async {

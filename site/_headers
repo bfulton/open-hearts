@@ -24,6 +24,8 @@
   Cache-Control: no-store
 /play/flutter_service_worker.js
   Cache-Control: no-store
+/play/offline_worker.js
+  Cache-Control: no-store
 /play/build-info.json
   Cache-Control: no-store
 

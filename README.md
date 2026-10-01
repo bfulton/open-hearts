@@ -198,6 +198,7 @@ cd service && OH_RELAY=js dart test # the same suite, against the object's relay
 node --test service/do/*.test.mjs   # that relay's own tests, and the sockets under it
 node --test service/functions/*.test.mjs  # the site's handlers: TURN, licences, the shop
 node --test e2e/deal_worker.test.mjs      # the page's deal worker, against the committed wasm
+node --test e2e/offline_worker.test.mjs   # the service worker that keeps the app for a load with no network
 cd app && flutter test              # the widgets
 cd app && flutter run -d chrome
 cd app && flutter build apk --release  # needs app/android/key.properties (below)
@@ -206,6 +207,7 @@ cd app && flutter build apk --release  # needs app/android/key.properties (below
 node e2e/flows.mjs                  # every flow one device can drive, in a browser
 node e2e/run.mjs                    # four browsers at one table, over the local relay
 node e2e/escrow.mjs                 # a bot seat's juror goes, and the escrow opens the seat
+node e2e/offline.mjs                # no network, no relays, no worker: solo still plays, every wait ends in words
 ```
 
 An Android release is signed with the release key named in

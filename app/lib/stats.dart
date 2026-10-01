@@ -28,6 +28,7 @@ class PlayerStats {
     this.reached = false,
     this.pace = Pace.fresh,
     this.history = const SoloHistory(),
+    this.asking = false,
   });
 
   /// This device's rating, or null when no relay has said yet.
@@ -56,14 +57,29 @@ class PlayerStats {
   /// queen and the moon did (soloGames).
   final SoloHistory history;
 
+  /// Whether the relays are still being asked. Not having heard yet is
+  /// not their not having answered, and a page that said the second
+  /// while it meant the first would be giving an error nobody had.
+  final bool asking;
+
   PlayerStats withLive({required Rating rating, required int ratedGames, required Tally live}) =>
       PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: true, pace: pace, history: history);
 
   PlayerStats withAlone(Tally alone, [SoloHistory? history]) => PlayerStats(
-      rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached, pace: pace, history: history ?? this.history);
+      rating: rating,
+      ratedGames: ratedGames,
+      live: live,
+      alone: alone,
+      reached: reached,
+      pace: pace,
+      history: history ?? this.history,
+      asking: asking);
 
   PlayerStats withPace(Pace pace) =>
-      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached, pace: pace, history: history);
+      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached, pace: pace, history: history, asking: asking);
+
+  PlayerStats withAsking(bool asking) =>
+      PlayerStats(rating: rating, ratedGames: ratedGames, live: live, alone: alone, reached: reached, pace: pace, history: history, asking: asking);
 }
 
 /// The games alone looked at hand by hand, for the profile's chart and
@@ -179,7 +195,7 @@ Stream<PlayerStats> playerStats({required RecordStore store, required Signer sig
   var stats = const PlayerStats().withPace(await PaceStore.load());
   final alone = soloGames(await store.load());
   stats = stats.withAlone(alone.tally, alone.history);
-  yield stats;
+  yield stats.withAsking(standing == null && relays != null);
   if (standing != null) {
     yield fromStanding(stats, standing, signer.publicKey);
     return;
@@ -189,6 +205,8 @@ Stream<PlayerStats> playerStats({required RecordStore store, required Signer sig
     final loaded = await net.Standing.load(relays, signer);
     yield fromStanding(stats, loaded, signer.publicKey);
   } catch (_) {
-    // No relay answered. The games played alone still stand.
+    // No relay answered. The games played alone still stand, and the
+    // rest is said to be missing rather than still coming.
+    yield stats;
   }
 }

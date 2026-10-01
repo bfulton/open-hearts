@@ -205,11 +205,14 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
   }
   // Nothing rated has been played here, so there is no rating to show
   // and the page says which rather than showing the number everyone
-  // starts at.
+  // starts at — once the relays have answered, or the wait for them
+  // has ended: this flow starts none, and until then the page says it
+  // is still counting.
   if (record0.some((t) => /^1500$/.test(t))) throw new Error('the profile shows the rating nobody earned');
-  if (!record0.some((t) => /Play a rated live game|The relays did not answer/.test(t))) {
-    throw new Error(`the profile says nothing about why there is no rating\nsaw: ${record0.join(' | ')}`);
-  }
+  await waitFor(page, /Play a rated live game|relays did not answer/, {
+    what: 'the profile to say why there is no rating',
+    timeout: 20000,
+  });
 });
 
 flow('the about page', async ({ open }) => {

@@ -1,0 +1,31 @@
+{{flutter_js}}
+{{flutter_build_config}}
+
+// Flutter's own loader, without Flutter's service worker: that one is
+// a stub now, which unregisters whatever is registered where it is —
+// ours included.
+_flutter.loader.load();
+
+// The app kept for a load with no network (offline_worker.js): once
+// the first frame is up, so that it never competes with the app for a
+// slow connection, and with the list of what this load fetched, which
+// a service worker registered now did not see go by. Not for `flutter
+// run`, whose every reload is served afresh by the tool anyway, and
+// whose thousands of modules kept on every load would only slow it.
+const developing = _flutter.buildConfig.builds.some((build) => build.compileTarget === 'dartdevc');
+if ('serviceWorker' in navigator && !developing) {
+  window.addEventListener(
+    'flutter-first-frame',
+    () => {
+      navigator.serviceWorker
+        .register('offline_worker.js')
+        .then(() => navigator.serviceWorker.ready)
+        .then((registration) => {
+          const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
+          registration.active?.postMessage({ loaded });
+        })
+        .catch((e) => console.warn(`offline: the app is not kept for a load with no network (${e})`));
+    },
+    { once: true },
+  );
+}

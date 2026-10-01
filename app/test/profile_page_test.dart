@@ -99,6 +99,15 @@ void main() {
     expect(find.text('2'), findsOneWidget, reason: 'what the device itself knows is still known');
   });
 
+  testWidgets('relays still being asked are not said to have failed', (tester) async {
+    // The device's own games at once, and the relays still to answer:
+    // a count under way, not an error nobody has had yet.
+    await pumpProfile(tester, Stream.value(const PlayerStats(alone: Tally(games: 2, won: 0, points: 80), asking: true)));
+    expect(find.text('Counting up your games…'), findsOneWidget);
+    expect(find.textContaining('relays did not answer'), findsNothing);
+    expect(find.text('2'), findsOneWidget, reason: 'what the device itself knows is shown while the relays are asked');
+  });
+
   testWidgets('each column of figures lines up under its name', (tester) async {
     await pumpProfile(
       tester,
