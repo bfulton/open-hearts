@@ -26,12 +26,15 @@
 
 import wasm from '../../app/web/schnorr.wasm';
 
-import { objectRelay, schnorrVerifier, tagOf } from './relay.mjs';
+import { objectRelay, schnorrVerifier, tagOf, tally } from './relay.mjs';
 
 export class TagRelay {
-  constructor(state) {
+  constructor(state, env = {}) {
     this.state = state;
     this.relay = null;
+    // What the operator watches, if the dataset is bound (wrangler.toml,
+    // OH_METRICS): a line of counts a minute, nothing about anyone.
+    this.tally = tally(env.OH_METRICS ?? null);
   }
 
   /// The relay for this object, built on first use — which is the
@@ -50,7 +53,7 @@ export class TagRelay {
   /// tag is open to anybody, and every device on it shares this one
   /// thread.
   async build() {
-    const relay = objectRelay(await schnorrVerifier(wasm));
+    const relay = objectRelay(await schnorrVerifier(wasm), { count: (what, n) => this.tally.count(what, n) });
     for (const socket of this.state.getWebSockets()) relay.open(socket, socket.deserializeAttachment());
     return relay;
   }
@@ -64,6 +67,7 @@ export class TagRelay {
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server);
     relay.open(server);
+    this.tally.count('opened');
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -80,10 +84,12 @@ export class TagRelay {
 
   async webSocketClose(socket) {
     (await this.ready()).close(socket);
+    this.tally.count('closed');
   }
 
   async webSocketError(socket) {
     (await this.ready()).close(socket);
+    this.tally.count('closed');
   }
 }
 

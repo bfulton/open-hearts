@@ -22,3 +22,12 @@ class_name = "TagRelay"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TagRelay"]
+
+# What the operator watches (docs/06-service.md, "Watching it run"): a
+# line of counts a minute from each object in use — connections,
+# events, deliveries, refusals — and nothing about who. Uncomment once
+# Workers Analytics Engine is on for the account; without the binding
+# the object counts nothing and writes nothing.
+# [[analytics_engine_datasets]]
+# binding = "OH_METRICS"
+# dataset = "open_hearts_relay"

@@ -253,7 +253,11 @@ not linked unless the player signs it.
 No analytics, crash reporting, advertising identifiers, fingerprinting,
 cookies from our pages (Stripe sets its own, on its own domain),
 location (the metadata bug below is fixed), contacts, device model, chat, or
-email address held by us. The worker and the relay object log nothing.
+email address held by us. The worker and the relay object log nothing;
+with the operator's metrics turned on (doc 06, "Watching it run") they
+write counts — a handler's name, its status and how long it took; a
+minute's connections and events per relay object — and nothing about
+who: no key, no address, no tag, no location.
 The counters doc 06 describes (`COUNTER#…`) are not built.
 
 ## A bug that was fixed before phones publish pictures

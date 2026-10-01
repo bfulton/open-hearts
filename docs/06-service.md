@@ -390,6 +390,64 @@ the ladder and moved by rated games like anyone's ([doc
 04](04-live-play.md)), and a table is seated with bots near its own
 rating. There is nothing to tune that the ratings do not already say.
 
+## Watching it run
+
+What the operator can see of the service, and nothing about anybody:
+counts, written to Workers Analytics Engine when the project binds a
+dataset as `OH_METRICS`, and nothing at all when it does not.
+
+- **The handlers** (`service/functions/worker.mjs`, `measure`) write one
+  line a request: the handler's name, the status it answered and the
+  milliseconds it took, and how many requests the line stands for. The
+  config is asked for by every open app each quarter of an hour, so one
+  request in ten of it is written, with a weight of ten; every other
+  handler is a person doing something, and each is written. A path no
+  handler serves is written as `unknown`, never as what was asked for.
+- **The relay object** (`service/do`, `tally`) counts what became of its
+  messages — connections opened and closed, events taken and the
+  deliveries they made, subscriptions, and each kind of refusal — and
+  writes them as one line a minute from each object in use. A line a
+  message would be a line every two seconds for every device online.
+
+Neither writes a key, an address, a tag or a location. To turn it on:
+in the Pages project's settings, bind an Analytics Engine dataset named
+`open_hearts_api` as `OH_METRICS`; for the relay, uncomment the dataset in
+`service/do/wrangler.toml` and deploy it. Then, with the account's SQL
+API:
+
+```sql
+-- Errors and slow answers, by handler, over the last day.
+SELECT blob1 AS handler, blob2 AS status,
+       SUM(_sample_interval * double2) AS requests,
+       quantileWeighted(0.95, double1, _sample_interval) AS p95_ms
+FROM open_hearts_api
+WHERE timestamp > NOW() - INTERVAL '1' DAY
+GROUP BY handler, status ORDER BY requests DESC;
+
+-- The relay object's traffic and refusals, by hour.
+SELECT toStartOfHour(timestamp) AS hour,
+       SUM(double1) AS opened, SUM(double3) AS events, SUM(double4) AS delivered,
+       SUM(double6) AS rate_limited, SUM(double10) AS too_big
+FROM open_hearts_relay
+WHERE timestamp > NOW() - INTERVAL '7' DAY
+GROUP BY hour ORDER BY hour;
+```
+
+The relay's columns are in the order `tallied` lists them
+(`service/do/relay.mjs`), with the seconds the line covers last.
+
+**What it costs to keep.** The relay object stores nothing: it is
+SQLite-backed because new classes on the free plan must be, and it
+carries only ephemeral kinds, never written to its storage, so the
+object's storage bill is nothing however many tags are in use. What it
+costs is requests and duration, which the lines above count. KV holds
+the subscriptions, the codes (each gone an hour after it was made) and
+the config row; its writes are the thing to watch on the free plan
+(docs/security-review.md, finding 10).
+
+For a live look, `npx wrangler tail` on either worker shows its
+requests as they come; neither writes anything of its own to the log.
+
 ## Local mode
 
 The service runs entirely locally for end-to-end tests, with the same

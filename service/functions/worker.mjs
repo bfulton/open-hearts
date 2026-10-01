@@ -1084,20 +1084,54 @@ async function configRoute(request, env) {
   return json(request, 200, configOf(raw), { 'cache-control': 'public, max-age=60' });
 }
 
+// ---- Watching it run -------------------------------------------------
+
+/// The handlers by name, as /api/<name> asks for them.
+const ROUTES = {
+  config: (request, env) => configRoute(request, env),
+  turn: (request, env) => turn(request, env),
+  licence: (request, env) => licenceRoute(request, env),
+  checkout: (request, env) => checkoutRoute(request, env),
+  stripe: (request, env) => stripeRoute(request, env),
+  ticket: (request, env) => ticketRoute(request, env),
+  claim: (request, env) => claimRoute(request, env),
+  devices: (request, env) => devicesRoute(request, env),
+  attest: (request, env) => signInRoute(request, env, false),
+  supersede: (request, env) => signInRoute(request, env, true),
+};
+
+/// A request out of how many is written down, by handler: one in ten
+/// for the config, which every open app asks for each quarter of an
+/// hour; every one of the rest, which are a person doing something.
+const SAMPLED = { config: 10 };
+
+/// One line of numbers a request, for the operator (doc 06, "Watching
+/// it run"): which handler, what it answered and how long it took — and
+/// how many requests the line stands for, when only some are written.
+/// Never a key, an address or anything else about who asked. Written to
+/// the OH_METRICS dataset when the project binds one, and nowhere when
+/// it does not.
+export function measure(env, handler, status, ms, { random = Math.random } = {}) {
+  const sink = env.OH_METRICS;
+  if (!sink) return;
+  const weight = SAMPLED[handler] ?? 1;
+  if (weight > 1 && random() >= 1 / weight) return;
+  try {
+    sink.writeDataPoint({ indexes: [handler], blobs: [handler, String(status)], doubles: [ms, weight] });
+  } catch {
+    // What is watched never stops what is watched.
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === '/api/config') return configRoute(request, env);
-    if (url.pathname === '/api/turn') return turn(request, env);
-    if (url.pathname === '/api/licence') return licenceRoute(request, env);
-    if (url.pathname === '/api/checkout') return checkoutRoute(request, env);
-    if (url.pathname === '/api/stripe') return stripeRoute(request, env);
-    if (url.pathname === '/api/ticket') return ticketRoute(request, env);
-    if (url.pathname === '/api/claim') return claimRoute(request, env);
-    if (url.pathname === '/api/devices') return devicesRoute(request, env);
-    if (url.pathname === '/api/attest') return signInRoute(request, env, false);
-    if (url.pathname === '/api/supersede') return signInRoute(request, env, true);
-    if (url.pathname.startsWith('/api/')) return json(request, 404, { error: 'no such handler' });
-    return env.ASSETS.fetch(request);
+    const name = url.pathname.startsWith('/api/') ? url.pathname.slice('/api/'.length) : null;
+    if (name === null) return env.ASSETS.fetch(request);
+    const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
+    const started = Date.now();
+    const response = route ? await route(request, env) : json(request, 404, { error: 'no such handler' });
+    measure(env, route ? name : 'unknown', response.status, Date.now() - started);
+    return response;
   },
 };

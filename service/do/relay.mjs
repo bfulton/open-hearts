@@ -234,8 +234,10 @@ export function memoryStore(keep = 10000) {
 /// the node host asks the Dart test that installed the policy.
 ///
 /// [limits] is [objectLimits], or null for none; [now] is the clock
-/// the rate is measured by.
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now }) {
+/// the rate is measured by. [count], if given, is told what became of
+/// each message — `count('events')`, `count('delivered', n)` — and
+/// nothing about who sent it: what the operator watches (worker.mjs).
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -276,21 +278,28 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
   async function publish(from, json) {
     // Before the signature, which is the expensive part of an event.
     if (!spend(from)) {
+      count?.('rateLimited');
       const id = json && typeof json === 'object' && typeof json.id === 'string' ? json.id : '';
       return send(from, ['OK', id, false, 'rate-limited: slow down']);
     }
     const event = await checkEvent(json, verify);
     if (!event) {
+      count?.('invalid');
       const id = json && typeof json === 'object' ? json.id : null;
       log?.(`rejected ${typeof id === 'string' ? id.slice(0, 6) : '?'}`);
       return send(from, ['OK', typeof id === 'string' ? id : '', false, 'invalid: bad id or signature']);
     }
     const why = await refuse?.(event);
     if (why) {
+      count?.('refused');
       log?.(`refused ${event.id.slice(0, 6)}: ${why}`);
       return send(from, ['OK', event.id, false, why]);
     }
-    if (seen.has(event.id)) return send(from, ['OK', event.id, true, 'duplicate: already have this event']);
+    if (seen.has(event.id)) {
+      count?.('duplicate');
+      return send(from, ['OK', event.id, true, 'duplicate: already have this event']);
+    }
+    count?.('events');
     seen.add(event.id);
     if (!ephemeral(event.kind)) {
       const gone = store?.add(event);
@@ -306,14 +315,17 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     send(from, ['OK', event.id, true, '']);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);
+    let delivered = 0;
     for (const [socket, subscriptions] of sockets) {
       for (const [id, sub] of subscriptions) {
         if (sub.filters.some((f) => matches(f, event))) {
           sendText(socket, `["EVENT",${JSON.stringify(id)},${wire}]`);
+          delivered++;
           break;
         }
       }
     }
+    if (delivered) count?.('delivered', delivered);
   }
 
   function request(socket, message) {
@@ -339,23 +351,38 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 
   async function handle(socket, raw) {
     // Not read at all past the limit: parsing it is the cost.
-    if (limits && raw.length > limits.message) return send(socket, ['NOTICE', 'too big: this relay carries presence']);
+    if (limits && raw.length > limits.message) {
+      count?.('tooBig');
+      return send(socket, ['NOTICE', 'too big: this relay carries presence']);
+    }
     let message;
     try {
       message = JSON.parse(raw);
     } catch {
+      count?.('malformed');
       return send(socket, ['NOTICE', 'not JSON']);
     }
     if (!Array.isArray(message) || !message.length || typeof message[0] !== 'string') {
+      count?.('malformed');
       return send(socket, ['NOTICE', 'not a message']);
     }
     switch (message[0]) {
       case 'EVENT':
-        if (message.length !== 2) return send(socket, ['NOTICE', 'EVENT takes one event']);
+        if (message.length !== 2) {
+          count?.('malformed');
+          return send(socket, ['NOTICE', 'EVENT takes one event']);
+        }
         return publish(socket, message[1]);
       case 'REQ':
-        if (message.length < 3 || typeof message[1] !== 'string') return send(socket, ['NOTICE', 'REQ takes an id and filters']);
-        if (limits && raw.length > limits.request) return send(socket, ['NOTICE', 'too big: a subscription is carried through hibernation']);
+        if (message.length < 3 || typeof message[1] !== 'string') {
+          count?.('malformed');
+          return send(socket, ['NOTICE', 'REQ takes an id and filters']);
+        }
+        if (limits && raw.length > limits.request) {
+          count?.('tooBig');
+          return send(socket, ['NOTICE', 'too big: a subscription is carried through hibernation']);
+        }
+        count?.('subscriptions');
         return request(socket, message);
       case 'CLOSE':
         if (message.length === 2 && typeof message[1] === 'string') sockets.get(socket)?.delete(message[1]);
@@ -421,7 +448,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// tests build is that relay and not one set up to look like it:
 /// nothing written down, nothing but the ephemeral kinds, and every
 /// socket held to [objectLimits].
-export function objectRelay(verify, { now = Date.now } = {}) {
+export function objectRelay(verify, { now = Date.now, count = null } = {}) {
   return createRelay({
     verify,
     store: null,
@@ -429,5 +456,43 @@ export function objectRelay(verify, { now = Date.now } = {}) {
       ephemeral(event.kind) ? null : 'blocked: this relay carries ephemeral kinds; the stored ones live on the relays',
     limits: objectLimits,
     now,
+    count,
   });
+}
+
+/// What one object has seen since it last said so, in the order the
+/// operator's query reads the numbers (doc 06, "Watching it run"):
+/// counts, never who.
+export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed'];
+
+/// A tally kept in memory and written as one line of numbers a minute
+/// at most, to [sink] — an Analytics Engine dataset, or nothing. A line
+/// a message would be a line every two seconds for every device online,
+/// for presence alone; a line a minute is one per tag that is in use.
+export function tally(sink, { every = 60000, now = Date.now } = {}) {
+  let counts = Object.fromEntries(tallied.map((k) => [k, 0]));
+  let since = now();
+  const flush = () => {
+    const t = now();
+    if (sink && tallied.some((k) => counts[k] > 0)) {
+      try {
+        sink.writeDataPoint({ indexes: ['relay'], blobs: ['relay'], doubles: [...tallied.map((k) => counts[k]), (t - since) / 1000] });
+      } catch {
+        // What is watched never stops what is watched.
+      }
+    }
+    counts = Object.fromEntries(tallied.map((k) => [k, 0]));
+    since = t;
+  };
+  return {
+    count(what, n = 1) {
+      if (!(what in counts)) return;
+      counts[what] += n;
+      if (now() - since >= every) flush();
+    },
+    flush,
+    get counts() {
+      return { ...counts };
+    },
+  };
 }
