@@ -1013,5 +1013,21 @@
         "type": "String"
       }
     }
+  },
+  "livePaused": "Live play is paused for now. Playing alone is not.",
+  "@livePaused": {
+    "description": "In place of the live play buttons, while the operator has paused live play for everyone."
+  },
+  "updateDueWeb": "This version is out of date. Reload to get the new one.",
+  "@updateDueWeb": {
+    "description": "Across the top of the front door, in a browser, when a newer version is required."
+  },
+  "updateDueApp": "This version is out of date. Update the app to get the new one.",
+  "@updateDueApp": {
+    "description": "Across the top of the front door, in the app, when a newer version is required."
+  },
+  "reload": "Reload",
+  "@reload": {
+    "description": "Button beside updateDueWeb: reloads the page onto the new version."
   }
 }

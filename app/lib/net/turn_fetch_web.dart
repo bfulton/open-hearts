@@ -31,3 +31,12 @@ Future<String?> postJson(Uri url, String body) async {
   final answer = await post(url, body);
   return answer.status == 200 ? answer.body : null;
 }
+
+/// The body of a GET that was answered 200, or null. The browser's own
+/// cache is let in: an answer that says how long it keeps is kept that
+/// long.
+Future<String?> getText(Uri url) async {
+  final response = await _fetch(url.toString().toJS, <String, Object?>{'method': 'GET'}.jsify() as JSObject).toDart;
+  if (response.status != 200) return null;
+  return (await response.text().toDart).toDart;
+}

@@ -28,6 +28,7 @@ import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/live/options_sheet.dart';
+import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/stats.dart';
 import 'package:open_hearts/subscribe_page.dart';
@@ -191,7 +192,10 @@ void main() {
       SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
       Entitlement.current = Entitlement(service: _service);
     });
-    tearDown(() => Entitlement.current = Entitlement());
+    tearDown(() {
+      Entitlement.current = Entitlement();
+      RemoteSettings.current = RemoteSettings();
+    });
 
     for (final locale in _locales) {
       for (final MapEntry(key: name, value: size) in _sizes.entries) {
@@ -209,6 +213,20 @@ void main() {
           await tester.pumpAndSettle();
           cut.addAll(_cut(tester, 'open'));
           expect(find.text(lookupAppLocalizations(locale).playFriends), findsOneWidget);
+
+          // Paused by the operator, with a notice across the top.
+          RemoteSettings.current.adopt(RemoteConfig.parse({
+            'live': false,
+            'banner': {'id': 'b', 'text': {'en': 'The relays are down until six this evening, UTC.'}},
+          }));
+          await tester.pumpAndSettle();
+          cut.addAll(_cut(tester, 'paused'));
+          expect(find.text(lookupAppLocalizations(locale).livePaused), findsOneWidget);
+          RemoteSettings.current.adopt(RemoteConfig.parse({'update': {'before': '2026-10-01'}}));
+          await tester.pumpWidget(_inLanguage(locale, const Scaffold(body: OperatorNotes(published: '2026-09-01'))));
+          await tester.pumpAndSettle();
+          cut.addAll(_cut(tester, 'please update'));
+          expect(find.text(lookupAppLocalizations(locale).updateDueApp), findsOneWidget);
           expect(cut, isEmpty);
         });
 

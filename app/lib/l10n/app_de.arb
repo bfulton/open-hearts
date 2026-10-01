@@ -173,5 +173,9 @@
   "aboutBlurb": "Hearts, Open Source. Spiel allein gegen das Haus oder live: Ihr vier teilt die Karten untereinander aus, und kein Server sieht eine Hand.",
   "build": "Version",
   "published": "Veröffentlicht",
-  "buildIsUp": "{build} ist da"
+  "buildIsUp": "{build} ist da",
+  "livePaused": "Live-Spiel ist gerade pausiert. Allein spielen geht weiter.",
+  "updateDueWeb": "Diese Version ist veraltet. Lade neu, um die neue zu bekommen.",
+  "updateDueApp": "Diese Version ist veraltet. Aktualisiere die App, um die neue zu bekommen.",
+  "reload": "Neu laden"
 }

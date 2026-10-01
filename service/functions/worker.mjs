@@ -888,9 +888,90 @@ async function turn(request, env) {
   return json(request, status, out);
 }
 
+// ---- Remote config ----------------------------------------------------
+
+/// What the app may be told without a new build (doc 06, "Remote
+/// config"): one row in the store, which the operator writes and every
+/// device reads at its start. What is here when there is no row — or a
+/// row this worker cannot read — is what the app does with no config at
+/// all, so a bad row is never worse than none.
+export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null });
+
+/// Where the row lives: `config|app` in OH_STORE.
+const CONFIG_ROW = ['config', 'app'];
+
+const MOST_RELAYS = 8;
+const LONGEST_SAY = 280;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/// A sentence in each language it is given in, English required: the
+/// app shows the device's language where it is there and English where
+/// it is not. Anything else is no sentence at all.
+function sayingOf(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  for (const [lang, text] of Object.entries(raw)) {
+    if (!/^[a-z]{2}$/.test(lang) || typeof text !== 'string') continue;
+    const t = text.trim();
+    if (t && t.length <= LONGEST_SAY) out[lang] = t;
+  }
+  return out.en ? out : null;
+}
+
+/// The row as the app may be given it: every field checked, and any
+/// that does not check out left at its default rather than passed on.
+export function configOf(raw) {
+  const c = { ...CONFIG_DEFAULTS };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return c;
+  // The doors to live play: a kill switch, and whether the paid tier is
+  // offered at all to a device that has not bought it.
+  if (typeof raw.live === 'boolean') c.live = raw.live;
+  if (typeof raw.offer === 'boolean') c.offer = raw.offer;
+  // Which relays the tables meet on, in place of the build's. wss only:
+  // these carry every live game, and a relay over plain ws would carry
+  // them in the open.
+  if (Array.isArray(raw.relays) && raw.relays.length > 0 && raw.relays.length <= MOST_RELAYS) {
+    const relays = [];
+    for (const r of raw.relays) {
+      try {
+        const u = new URL(r);
+        if (u.protocol === 'wss:' && !u.username && !u.password) relays.push(u.toString());
+      } catch {}
+    }
+    if (relays.length === raw.relays.length) c.relays = relays;
+  }
+  // A line across the front door: a maintenance window, an outage.
+  if (raw.banner && typeof raw.banner === 'object') {
+    const text = sayingOf(raw.banner.text);
+    const id = typeof raw.banner.id === 'string' && /^[\w.-]{1,64}$/.test(raw.banner.id) ? raw.banner.id : null;
+    if (text && id) c.banner = { id, level: raw.banner.level === 'warn' ? 'warn' : 'info', text };
+  }
+  // Please update: a build published before this day is asked to.
+  if (raw.update && typeof raw.update === 'object' && typeof raw.update.before === 'string' && DAY.test(raw.update.before)) {
+    c.update = { before: raw.update.before, text: sayingOf(raw.update.text) };
+  }
+  return c;
+}
+
+async function configRoute(request, env) {
+  const pre = preflight(request, 'GET');
+  if (pre) return pre;
+  if (request.method !== 'GET') return json(request, 405, { error: 'GET' }, { allow: 'GET, OPTIONS' });
+  let raw = null;
+  try {
+    raw = (await storeOf(env)?.get(...CONFIG_ROW)) ?? null;
+  } catch {
+    // Unreadable is the same as absent: the defaults.
+  }
+  // A minute in the browser's cache: a kill switch thrown reaches every
+  // device opening the app within one.
+  return json(request, 200, configOf(raw), { 'cache-control': 'public, max-age=60' });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === '/api/config') return configRoute(request, env);
     if (url.pathname === '/api/turn') return turn(request, env);
     if (url.pathname === '/api/licence') return licenceRoute(request, env);
     if (url.pathname === '/api/checkout') return checkoutRoute(request, env);

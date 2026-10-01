@@ -828,4 +828,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String buildIsUp(String build) {
     return '$build ya está disponible';
   }
+
+  @override
+  String get livePaused =>
+      'El juego en vivo está en pausa por ahora. Jugar solo sigue abierto.';
+
+  @override
+  String get updateDueWeb =>
+      'Esta versión está desactualizada. Recarga para obtener la nueva.';
+
+  @override
+  String get updateDueApp =>
+      'Esta versión está desactualizada. Actualiza la app para obtener la nueva.';
+
+  @override
+  String get reload => 'Recargar';
 }

@@ -15,6 +15,8 @@ library;
 
 import 'package:table/table.dart';
 
+import 'remote_config.dart';
+
 /// Our own relay, run for the game: the one a deployed build prefers
 /// to write a table's events to while it is up, so the play rides
 /// infrastructure we control and the volunteer relays are reach and
@@ -74,10 +76,15 @@ const localRelay = 'ws://127.0.0.1:7447';
 /// (a comma list) talks to those instead. Unset in a normal build.
 const devRelay = String.fromEnvironment('OH_RELAYS');
 
-/// The relays for this build, where it is served from.
-List<Uri> appRelays({Uri? base}) {
+/// The relays for this build, where it is served from: the operator's,
+/// when the remote config names some (net/remote_config.dart), and the
+/// build's own otherwise. A local build and the rig keep theirs whatever
+/// the config says — they are not on anyone's relays but their own.
+List<Uri> appRelays({Uri? base, RemoteConfig? config}) {
   if (devRelay.isNotEmpty) return Relays.parse(devRelay);
   final host = (base ?? Uri.base).host;
   if (host == 'localhost' || host == '127.0.0.1' || host.isEmpty) return [Uri.parse(localRelay)];
+  final named = (config ?? RemoteSettings.current.config).relays;
+  if (named != null) return named;
   return [for (final r in publicRelays) Uri.parse(r)];
 }

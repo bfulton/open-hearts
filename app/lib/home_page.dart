@@ -20,12 +20,14 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:table/table.dart';
 
 import 'about_page.dart';
 import 'avatar.dart';
+import 'build_info.dart' show buildDate, reloadPage;
 import 'crypto/deal.dart';
 import 'entitlement.dart';
 import 'game_options.dart';
@@ -42,6 +44,7 @@ import 'net/buying.dart';
 import 'net/duty.dart';
 import 'net/household.dart';
 import 'net/mesh_transport.dart';
+import 'net/remote_config.dart';
 import 'net/relays.dart';
 import 'net/room.dart';
 import 'net/share.dart';
@@ -62,6 +65,10 @@ import 'ui/update_pill.dart';
 /// licence the service signed and the date on it has not passed
 /// (entitlement.dart, docs/06-service.md). Solo play never asks.
 bool get liveOpen => Entitlement.current.live;
+
+/// Whether the operator has shut live play's doors for everyone, for
+/// now: the remote config's kill switch (net/remote_config.dart).
+bool get livePaused => !RemoteSettings.current.config.live;
 
 /// What the relays say back — a refusal, a notice, a drop — goes to
 /// the console, where a person debugging a table can read it. Which
@@ -172,9 +179,11 @@ class _HomePageState extends State<HomePage> {
     // the way back from a checkout, a licence the service was slow to
     // answer for — and when it does the door opens with it.
     Entitlement.current.addListener(_licensed);
+    RemoteSettings.current.addListener(_configured);
     // A device that cannot play live has no business in the count of
-    // who is here, or in a jury.
-    if (widget.online && liveOpen) _goOnline();
+    // who is here, or in a jury — nor one whose live play the operator
+    // has paused.
+    if (widget.online && liveOpen && !livePaused) _goOnline();
     // Neither of these is the relays, which is what `online` is about:
     // they are one call to the service each, and a test stands its own
     // behind that (net/household.dart).
@@ -215,7 +224,18 @@ class _HomePageState extends State<HomePage> {
   void _licensed() {
     if (!mounted) return;
     setState(() {});
-    if (widget.online && liveOpen && Duty.current == null) _goOnline();
+    if (widget.online && liveOpen && !livePaused && Duty.current == null) _goOnline();
+  }
+
+  /// The operator said something new. A pause shuts the doors from here
+  /// on and leaves whatever is already under way alone: a device that is
+  /// online stays a juror to the tables that drew it until the app is
+  /// next started, since a game it holds a bot's hand in would end
+  /// without it. A pause lifted opens them again.
+  void _configured() {
+    if (!mounted) return;
+    setState(() {});
+    if (widget.online && liveOpen && !livePaused && Duty.current == null) _goOnline();
   }
 
   /// Back from a checkout. The licence is behind a webhook Stripe sends
@@ -250,7 +270,7 @@ class _HomePageState extends State<HomePage> {
     // Here by a link: straight into the room — unless live play is
     // locked, which a link does not open. A device with no name yet is
     // asked for one on the way in.
-    if (liveOpen && widget.openRoom != null) await _enter();
+    if (liveOpen && !livePaused && widget.openRoom != null) await _enter();
   }
 
   /// Online from the front door, not only from a table: this device is
@@ -296,6 +316,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     Entitlement.current.removeListener(_licensed);
+    RemoteSettings.current.removeListener(_configured);
     _closeLobby();
     _onlineClock?.cancel();
     _refusalSub?.cancel();
@@ -414,7 +435,7 @@ class _HomePageState extends State<HomePage> {
   /// included. Everyone in a pool wants the same game, so the score it
   /// plays to is part of the pool's own name.
   Future<void> _play() async {
-    if (_withoutDeal()) return;
+    if (livePaused || _withoutDeal()) return;
     final options = _options;
     final transport = await _connect(poolTag(options.pool, target: options.target), _Opening.live);
     if (transport == null) return;
@@ -520,7 +541,7 @@ class _HomePageState extends State<HomePage> {
   /// opened from a link someone sent. Whoever is there is the table,
   /// and the first to arrive is nobody special.
   Future<void> _enter() async {
-    if (_withoutDeal()) return;
+    if (livePaused || _withoutDeal()) return;
     final code = widget.openRoom ?? Room.newCode();
     final transport = await _connect(code, _Opening.friends);
     if (transport == null) return;
@@ -660,6 +681,7 @@ class _HomePageState extends State<HomePage> {
               Column(
                 children: [
                   _chrome(),
+                  const OperatorNotes(),
                   Expanded(
                     child: Doorway(
                       heart: FoldingHeart(key: _heart, size: 46, color: Palette.mark),
@@ -755,8 +777,19 @@ class _HomePageState extends State<HomePage> {
           style: _primary(),
           child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),
-        const SizedBox(height: 16),
-        liveOpen ? _live() : _LiveLocked(onTap: () => showSubscribe(context)),
+        // Live play, as the operator has it now: paused for everyone, open
+        // here, or offered — unless the paid tier is not being offered,
+        // and then a device without it is not shown it.
+        if (livePaused) ...[
+          const SizedBox(height: 16),
+          const _LivePaused(),
+        ] else if (liveOpen) ...[
+          const SizedBox(height: 16),
+          _live(),
+        ] else if (RemoteSettings.current.config.offer) ...[
+          const SizedBox(height: 16),
+          _LiveLocked(onTap: () => showSubscribe(context)),
+        ],
         if (_slow) ...[
           const SizedBox(height: 14),
           Text(l10n.stillLookingForRelay, textAlign: TextAlign.center, style: const TextStyle(color: Palette.chromeDim, fontSize: 13)),
@@ -990,6 +1023,82 @@ class _LiveLocked extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Live play, paused by the operator for everyone (the remote config's
+/// kill switch): said where the buttons were, with what is still open.
+class _LivePaused extends StatelessWidget {
+  const _LivePaused();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l10n.livePlay,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+          const SizedBox(height: 4),
+          Text(l10n.livePaused, style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
+        ],
+      ),
+    );
+  }
+}
+
+/// What the operator has to say across the top of the front door
+/// (net/remote_config.dart): a notice — an outage, a maintenance
+/// window — and, to a build older than the one asked for, that it is.
+/// Nothing at all when there is nothing to say.
+class OperatorNotes extends StatelessWidget {
+  const OperatorNotes({super.key, this.published = buildDate});
+
+  /// The day this build was published: the build's own, unless a test
+  /// says.
+  final String published;
+
+  // Listening for itself: it is a const widget in the door's tree, which
+  // a rebuild of the door passes over as unchanged.
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(listenable: RemoteSettings.current, builder: (context, _) => _notes(context));
+
+  Widget _notes(BuildContext context) {
+    final l10n = context.l10n;
+    final config = RemoteSettings.current.config;
+    final notice = config.banner;
+    final lines = <Widget>[
+      if (notice != null) _line(notice.text.inLanguage(l10n.localeName), notice.warning ? Palette.danger : Palette.gold),
+      if (config.updateDue(published))
+        _line(config.updateText?.inLanguage(l10n.localeName) ?? (kIsWeb ? l10n.updateDueWeb : l10n.updateDueApp), Palette.gold,
+            action: kIsWeb ? TextButton(onPressed: reloadPage, child: Text(l10n.reload)) : null),
+    ];
+    if (lines.isEmpty) return const SizedBox.shrink();
+    return Column(children: lines);
+  }
+
+  static Widget _line(String text, Color tone, {Widget? action}) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: tone.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: tone.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5, color: Palette.chrome))),
+            ?action,
+          ],
+        ),
+      );
 }
 
 /// Waiting to be seated. Nothing to do but wait, and it is not long:

@@ -173,5 +173,9 @@
   "aboutBlurb": "Corazones, de código abierto. Juega solo contra la casa, o en vivo: los cuatro se reparten las cartas entre ellos, y ningún servidor ve una mano.",
   "build": "Versión",
   "published": "Publicada",
-  "buildIsUp": "{build} ya está disponible"
+  "buildIsUp": "{build} ya está disponible",
+  "livePaused": "El juego en vivo está en pausa por ahora. Jugar solo sigue abierto.",
+  "updateDueWeb": "Esta versión está desactualizada. Recarga para obtener la nueva.",
+  "updateDueApp": "Esta versión está desactualizada. Actualiza la app para obtener la nueva.",
+  "reload": "Recargar"
 }

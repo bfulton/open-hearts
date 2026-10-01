@@ -12,6 +12,7 @@ import 'l10n/l10n.dart';
 import 'net/buying.dart';
 import 'net/duty.dart';
 import 'net/household.dart';
+import 'net/remote_config.dart';
 import 'net/room.dart';
 import 'theme.dart';
 
@@ -30,6 +31,14 @@ Future<void> main() async {
   final signer = await Identity.signer();
   await Entitlement.current.load(signer.publicKey);
   unawaited(Entitlement.current.refresh(signer));
+  // What the operator last said (net/remote_config.dart): kept from the
+  // last start before the first frame, so the relays this start meets
+  // on are settled before anything connects, and asked again behind it
+  // and every quarter of an hour after, so a door shut reaches a tab
+  // left open all evening.
+  await RemoteSettings.current.load();
+  unawaited(RemoteSettings.current.refresh());
+  Timer.periodic(const Duration(minutes: 15), (_) => RemoteSettings.current.refresh());
   runApp(const OpenHeartsApp());
 }
 

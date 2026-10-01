@@ -18,6 +18,7 @@ left is identity, entitlement, and jurors when the room is empty.
 | **ticket** | key | a one-use code another device can arrive with |
 | **claim** | key, code | the code spent, the device bound, and its licence |
 | **devices** | key, a device to drop | the devices on this subscription |
+| **config** | — (a GET) | what the operator has said: the remote config, below |
 | **turn-creds** | attested key | short-lived TURN credentials |
 | **last-resort** | table id, hand | the bench comes online for that hand |
 
@@ -308,6 +309,45 @@ next ask. The one it holds runs out on its own within the month, which
 is what a licence with no revocation list can promise and all it can.
 
 TURN is Cloudflare's.
+
+## Remote config
+
+Some things have to change for every device at once, sooner than a
+build reaches them: live play shut while the relays are down, a line on
+the front door saying so, the tables moved to other relays, a build too
+old to sit with the others told to update. The **config** handler serves
+them, from one row the operator writes:
+
+```bash
+npx wrangler kv key put --binding OH_STORE 'config|app' \
+  '{"live": false, "banner": {"id": "relays-down-1", "level": "warn",
+    "text": {"en": "Live play is down until 18:00 UTC.", "de": "Live-Spiel bis 18 Uhr UTC aus."}}}'
+```
+
+| Field | What it does | With none |
+|---|---|---|
+| `live` | `false` shuts the doors to live play — the buttons, a link to a table, going online as a juror at the start — and says so where the buttons were. A game already at a table plays on, and a device already online stays a juror to the tables that drew it until it is next started. | open |
+| `offer` | `false` hides the paid tier from a device that has not bought it: no price, no Subscribe. One with a licence keeps live play. For a store build that may not show a web price. | offered |
+| `relays` | The relays the tables meet on, in place of the build's: one to eight, `wss://` only, every one good or none taken. Read at the app's start, so the devices that started since the change meet on the new ones and those before it finish where they are. A local build and the rig keep their own. | the build's |
+| `banner` | A line across the front door: `id` (letters, digits, `.` `_` `-`), `level` `info` or `warn`, and `text` by language, English required — a device is told it in its own language where the row has it and in English where it does not. | nothing |
+| `update` | `before`: a day, `YYYY-MM-DD`; a build published before it is asked to update, in `text` if given and the app's own words if not, with a Reload button on the web. A local build has no day and is never asked. | nothing |
+
+The worker checks every field before it serves the row (`configOf`), and
+the app checks them again (`app/lib/net/remote_config.dart`): a field
+that does not check out is left as the build has it, so a typo in the
+row is never worse than no row. A row that cannot be read at all, or a
+store that is down, serves the defaults. The answer is cached for a
+minute; the app keeps the last one on the device and goes by it at the
+next start before it asks again, and asks every quarter of an hour
+while it is open — so a door shut reaches every device that opens the
+app within a minute, and a tab left open within fifteen. A device that
+never reaches the worker — offline, or a phone build, which has no
+service address yet — has the build as it was made.
+
+Bot strength is not here: the bots have ratings of their own, fitted on
+the ladder and moved by rated games like anyone's ([doc
+04](04-live-play.md)), and a table is seated with bots near its own
+rating. There is nothing to tune that the ratings do not already say.
 
 ## Local mode
 

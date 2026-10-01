@@ -173,5 +173,9 @@
   "aboutBlurb": "Hearts, en open source. Jouez seul contre la maison, ou en direct : vous distribuez les cartes entre vous quatre, et aucun serveur ne voit une main.",
   "build": "Version",
   "published": "Publiée",
-  "buildIsUp": "{build} est disponible"
+  "buildIsUp": "{build} est disponible",
+  "livePaused": "Le jeu en direct est en pause pour l'instant. Le jeu en solo reste ouvert.",
+  "updateDueWeb": "Cette version n'est plus à jour. Rechargez pour avoir la nouvelle.",
+  "updateDueApp": "Cette version n'est plus à jour. Mettez l'application à jour pour avoir la nouvelle.",
+  "reload": "Recharger"
 }

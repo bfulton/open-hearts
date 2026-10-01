@@ -25,3 +25,15 @@ Future<String?> postJson(Uri url, String body) async {
   final answer = await post(url, body);
   return answer.status == 200 ? answer.body : null;
 }
+
+/// The body of a GET that was answered 200, or null.
+Future<String?> getText(Uri url) async {
+  final client = HttpClient();
+  try {
+    final response = await (await client.getUrl(url)).close();
+    final body = await response.transform(utf8.decoder).join();
+    return response.statusCode == 200 ? body : null;
+  } finally {
+    client.close(force: true);
+  }
+}

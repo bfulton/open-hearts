@@ -1147,6 +1147,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{build} is up'**
   String buildIsUp(String build);
+
+  /// In place of the live play buttons, while the operator has paused live play for everyone.
+  ///
+  /// In en, this message translates to:
+  /// **'Live play is paused for now. Playing alone is not.'**
+  String get livePaused;
+
+  /// Across the top of the front door, in a browser, when a newer version is required.
+  ///
+  /// In en, this message translates to:
+  /// **'This version is out of date. Reload to get the new one.'**
+  String get updateDueWeb;
+
+  /// Across the top of the front door, in the app, when a newer version is required.
+  ///
+  /// In en, this message translates to:
+  /// **'This version is out of date. Update the app to get the new one.'**
+  String get updateDueApp;
+
+  /// Button beside updateDueWeb: reloads the page onto the new version.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get reload;
 }
 
 class _AppLocalizationsDelegate
