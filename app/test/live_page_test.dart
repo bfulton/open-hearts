@@ -375,7 +375,7 @@ void main() {
       await live.advance(tester, 1000);
     }
     expect(live.controller.clockMs(0), isNotNull, reason: 'Ada is on turn and past her grace');
-    expect(find.bySemanticsLabel(RegExp(r'^Ada: .*, on turn, \d+ s on the clock$')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Ada: .*, on turn, \d+ s on the clock, (on your left|across from you|on your right)$')), findsOneWidget);
     expect(drawn(find.byType(ClockText)), findsOneWidget);
     expect(find.text('Boot Ada'), findsNothing, reason: 'the bank is not spent');
     expect(find.textContaining(' has '), findsNothing, reason: 'the old note is gone');

@@ -1128,5 +1128,41 @@
         "type": "int"
       }
     }
+  },
+  "seatWhere": ", {where, select, left{on your left} across{across from you} other{on your right}}",
+  "@seatWhere": {
+    "description": "Added to seatScores: where that player sits from the player's own seat. where is left, across or right.",
+    "placeholders": {
+      "where": {
+        "type": "String"
+      }
+    }
+  },
+  "takesPoints": "{who}, {points, plural, =1{1 point} other{{points} points}}",
+  "@takesPoints": {
+    "description": "Said aloud when a trick with points in it is taken. who is youTakeIt or takesIt.",
+    "placeholders": {
+      "who": {
+        "type": "String"
+      },
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "sheetRow": "{name}: {delta} this hand, {total} in the game",
+  "@sheetRow": {
+    "description": "Read by a screen reader for each row of the scores after a hand or a game.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "delta": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
   }
 }

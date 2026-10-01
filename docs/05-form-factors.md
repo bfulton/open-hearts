@@ -346,6 +346,45 @@ what it is: this is what happened, and here is the way on.
 `app/test/palette_test.dart` is where that is checked rather than
 believed.
 
+## Read aloud
+
+The table is also a screen a reader moves through and a voice says, and
+the way to know it works is to play it that way: a hand of solo played
+with nothing but the browser's accessibility tree, every decision made
+from what the tree said (done for the launch, in a headless Chromium,
+by reading the tree and activating nodes by name as a screen reader
+does). What it found, and what came of it:
+
+- **The cards are there, by name.** "queen of spades", one node each,
+  the unplayable ones disabled; the cards passed and received named on
+  their line; who led and who played what on the felt. This was so.
+- **Where everyone sits was not.** Pass left — to whom? A sighted player
+  reads it off the felt; a listener had to work it out from who led and
+  who passed. Each seat now says it: "Mark Antony: 0 in the game, 0 this
+  hand, on your left", at the end of the line so that what a suite reads
+  at its start is unchanged.
+- **Who took the trick was gone in under a second.** The pill that says
+  so is on the felt for the trick's hold, and nobody moving through the
+  screen would find it in time. It is now said as it appears — "Mumtaz
+  Mahal takes it, 1 point" — and so is "Your turn", through the
+  platform's announcements (`Announced`, ui/table_view.dart), which a
+  browser puts in an aria-live region.
+- **The scores after a hand read as numbers without names:** "Psyche +11
+  11", and a dash read as a dash. Each row is now one line: "Psyche: 11
+  this hand, 11 in the game".
+- **The profile button held a second button with no name in it**, the
+  ink under the label. It does not any more, nor does the options
+  button; `test/accessibility_test.dart` walks the front door's tree for
+  anything tappable without a name.
+
+Two things it found are not fixed. A card chosen to pass is marked
+`aria-current`, which the web engine makes of a selected button and
+which a screen reader says as "current" rather than "selected"; the line
+under the felt counts down how many are left to choose, which is what
+makes it playable. And the felt's cards are read in the order they are
+drawn, not the order they were played — "led" says which came first, and
+the order of play is now the order of the seats round from it.
+
 ## How the layout decides
 
 One rule, applied everywhere: **size from the constraints you are given,

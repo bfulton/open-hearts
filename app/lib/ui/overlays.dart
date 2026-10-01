@@ -343,50 +343,57 @@ class _ScoreRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          PlayerIcon(name: row.name, seed: row.seed, avatar: row.avatar, size: 28),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              row.name,
-              style: TextStyle(
-                fontSize: 14.5,
-                // Your own row is the weight, not the colour: which
-                // row is yours is a fact about the sheet.
-                fontWeight: row.you ? FontWeight.w700 : FontWeight.w500,
-                color: Palette.chrome,
+    // One line for a screen reader, the numbers said as what they are:
+    // drawn, they are two columns a sighted reader takes in at a glance.
+    return Semantics(
+      label: context.l10n.sheetRow(row.name, row.delta, row.total),
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Row(
+            children: [
+              PlayerIcon(name: row.name, seed: row.seed, avatar: row.avatar, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  row.name,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    // Your own row is the weight, not the colour: which
+                    // row is yours is a fact about the sheet.
+                    fontWeight: row.you ? FontWeight.w700 : FontWeight.w500,
+                    color: Palette.chrome,
+                  ),
+                ),
               ),
-            ),
-          ),
-          SizedBox(
-            width: 48,
-            child: Text(
-              row.delta == 0 ? '—' : '+${row.delta}',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 13,
-                fontFeatures: const [FontFeature.tabularFigures()],
-                color: row.delta == 0 ? Palette.chromeDim : Palette.danger,
+              SizedBox(
+                width: 48,
+                child: Text(
+                  row.delta == 0 ? '—' : '+${row.delta}',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: row.delta == 0 ? Palette.chromeDim : Palette.danger,
+                  ),
+                ),
               ),
-            ),
-          ),
-          SizedBox(
-            width: 52,
-            child: Text(
-              '${row.total}',
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                fontFeatures: [FontFeature.tabularFigures()],
-                color: Palette.chrome,
+              SizedBox(
+                width: 52,
+                child: Text(
+                  '${row.total}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                    color: Palette.chrome,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

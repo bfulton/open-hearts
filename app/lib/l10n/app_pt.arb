@@ -194,5 +194,8 @@
   "statsQueens": "Dama de espadas pega",
   "statsMoonsShot": "Luas atiradas",
   "statsMoonsBlocked": "Luas bloqueadas",
-  "statsOverHands": "{hands, plural, =1{Em 1 mão sozinho} other{Em {hands} mãos sozinho}}"
+  "statsOverHands": "{hands, plural, =1{Em 1 mão sozinho} other{Em {hands} mãos sozinho}}",
+  "seatWhere": ", {where, select, left{à sua esquerda} across{à sua frente} other{à sua direita}}",
+  "takesPoints": "{who}, {points, plural, =1{1 ponto} other{{points} pontos}}",
+  "sheetRow": "{name}: {delta} nesta mão, {total} na partida"
 }

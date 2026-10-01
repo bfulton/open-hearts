@@ -194,5 +194,8 @@
   "statsQueens": "Dame de pique prise",
   "statsMoonsShot": "Grands chelems",
   "statsMoonsBlocked": "Grands chelems bloqués",
-  "statsOverHands": "{hands, plural, =1{Sur 1 donne en solo} other{Sur {hands} donnes en solo}}"
+  "statsOverHands": "{hands, plural, =1{Sur 1 donne en solo} other{Sur {hands} donnes en solo}}",
+  "seatWhere": ", {where, select, left{à votre gauche} across{en face de vous} other{à votre droite}}",
+  "takesPoints": "{who}, {points, plural, =1{1 point} other{{points} points}}",
+  "sheetRow": "{name} : {delta} dans cette donne, {total} dans la partie"
 }

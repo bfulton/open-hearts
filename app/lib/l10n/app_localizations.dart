@@ -1273,6 +1273,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{hands, plural, =1{Over 1 hand alone} other{Over {hands} hands alone}}'**
   String statsOverHands(int hands);
+
+  /// Added to seatScores: where that player sits from the player's own seat. where is left, across or right.
+  ///
+  /// In en, this message translates to:
+  /// **', {where, select, left{on your left} across{across from you} other{on your right}}'**
+  String seatWhere(String where);
+
+  /// Said aloud when a trick with points in it is taken. who is youTakeIt or takesIt.
+  ///
+  /// In en, this message translates to:
+  /// **'{who}, {points, plural, =1{1 point} other{{points} points}}'**
+  String takesPoints(String who, int points);
+
+  /// Read by a screen reader for each row of the scores after a hand or a game.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: {delta} this hand, {total} in the game'**
+  String sheetRow(String name, int delta, int total);
 }
 
 class _AppLocalizationsDelegate

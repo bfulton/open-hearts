@@ -618,8 +618,11 @@ void main() {
   testWidgets('everyone\'s standing: on their badges, yours among them, no card counts', (tester) async {
     await pumpTable(tester);
     final model = tester.widget<TableView>(find.byType(TableView)).controller;
+    // And where each sits, which a sighted player reads off the felt:
+    // seat 1 plays after you and is drawn on your left.
+    const where = ['', 'on your left', 'across from you', 'on your right'];
     for (var seat = 1; seat < engine.seatCount; seat++) {
-      expect(find.bySemanticsLabel('${model.names[seat]}: 0 in the game, 0 this hand'), findsOneWidget);
+      expect(find.bySemanticsLabel('${model.names[seat]}: 0 in the game, 0 this hand, ${where[model.positionOf(seat)]}'), findsOneWidget);
     }
     expect(find.bySemanticsLabel(RegExp(r'\d+ cards')), findsNothing);
     expect(find.bySemanticsLabel('You: 0 in the game, 0 this hand'), findsOneWidget);

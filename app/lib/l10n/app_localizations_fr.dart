@@ -932,4 +932,30 @@ class AppLocalizationsFr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String seatWhere(String where) {
+    String _temp0 = intl.Intl.selectLogic(where, {
+      'left': 'à votre gauche',
+      'across': 'en face de vous',
+      'other': 'à votre droite',
+    });
+    return ', $_temp0';
+  }
+
+  @override
+  String takesPoints(String who, int points) {
+    String _temp0 = intl.Intl.pluralLogic(
+      points,
+      locale: localeName,
+      other: '$points points',
+      one: '1 point',
+    );
+    return '$who, $_temp0';
+  }
+
+  @override
+  String sheetRow(String name, int delta, int total) {
+    return '$name : $delta dans cette donne, $total dans la partie';
+  }
 }

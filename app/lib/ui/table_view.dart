@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
@@ -159,6 +160,7 @@ class TableView extends StatelessWidget {
         Widget badge(int position) => SeatBadge(
               onHold: onHold == null ? null : () => onHold!(controller.seatAt(position)),
               seat: controller.seatAt(position),
+              position: position,
               name: controller.names[controller.seatAt(position)],
               game: game,
               onTurn: game.currentSeat == controller.seatAt(position),
@@ -581,12 +583,18 @@ class SeatBadge extends StatelessWidget {
     this.height,
     this.onHold,
     required this.iconSize,
+    this.position = 0,
   });
 
   /// What a long press on the badge offers, if anything.
   final VoidCallback? onHold;
 
   final int seat;
+
+  /// Where the seat is drawn from the player's: 0 their own, 1 on their
+  /// left — the seat that plays after them — 2 across, 3 on their right.
+  /// A sighted player reads it off the felt; a screen reader says it.
+  final int position;
   final String name;
 
   /// What the seat's icon is coloured from.
@@ -654,7 +662,8 @@ class SeatBadge extends StatelessWidget {
     final clock = clockMs;
     return Semantics(
       label: '${context.l10n.seatScores(name, total, taken)}'
-          '${onTurn ? context.l10n.seatOnTurn : ''}${clock == null ? '' : context.l10n.seatClock(clockSeconds(clock))}',
+          '${onTurn ? context.l10n.seatOnTurn : ''}${clock == null ? '' : context.l10n.seatClock(clockSeconds(clock))}'
+          '${position == 0 ? '' : context.l10n.seatWhere(switch (position) { 1 => 'left', 2 => 'across', _ => 'right' })}',
       onLongPress: onHold,
       child: ExcludeSemantics(
         child: height == null ? _held(context, total, taken) : SizedBox(height: height, child: _held(context, total, taken)),
@@ -807,6 +816,42 @@ class SeatBadge extends StatelessWidget {
   }
 }
 
+/// Says [message] aloud to a screen reader when it appears and when it
+/// changes, and draws [child]: what the felt shows for a moment — who
+/// took the trick, that it is your turn — is gone before anyone could
+/// find it by moving through the screen, so it is said as it happens.
+class Announced extends StatefulWidget {
+  const Announced({super.key, required this.message, required this.child});
+
+  final String message;
+  final Widget child;
+
+  @override
+  State<Announced> createState() => _AnnouncedState();
+}
+
+class _AnnouncedState extends State<Announced> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _say());
+  }
+
+  @override
+  void didUpdateWidget(Announced old) {
+    super.didUpdateWidget(old);
+    if (old.message != widget.message) _say();
+  }
+
+  void _say() {
+    if (!mounted) return;
+    SemanticsService.sendAnnouncement(View.of(context), widget.message, Directionality.of(context));
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class _TrickResult extends StatelessWidget {
   const _TrickResult({required this.you, required this.name, required this.points});
 
@@ -817,11 +862,14 @@ class _TrickResult extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final who = you ? context.l10n.youTakeIt : context.l10n.takesIt(name);
-    return _Pill(
-      text: points == 0 ? who : '$who  ·  $points',
-      // A trick that has been taken is news, not a turn to take: gold
-      // is kept for the seat it is the turn of (theme.dart).
-      tone: points == 0 ? Palette.chrome : Palette.danger,
+    return Announced(
+      message: points == 0 ? who : context.l10n.takesPoints(who, points),
+      child: _Pill(
+        text: points == 0 ? who : '$who  ·  $points',
+        // A trick that has been taken is news, not a turn to take: gold
+        // is kept for the seat it is the turn of (theme.dart).
+        tone: points == 0 ? Palette.chrome : Palette.danger,
+      ),
     );
   }
 }
@@ -838,7 +886,7 @@ class _TurnHint extends StatelessWidget {
     if (seat == null) return const SizedBox.shrink();
     // "Your turn" whether leading or following: "your lead" reads as
     // a standing in the game, and in Hearts leading is no prize.
-    if (seat == mySeat) return _Pill(text: context.l10n.yourTurn, tone: Palette.gold);
+    if (seat == mySeat) return Announced(message: context.l10n.yourTurn, child: _Pill(text: context.l10n.yourTurn, tone: Palette.gold));
     return const SizedBox.shrink();
   }
 }

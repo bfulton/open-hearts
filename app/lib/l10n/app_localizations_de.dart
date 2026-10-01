@@ -938,4 +938,30 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String seatWhere(String where) {
+    String _temp0 = intl.Intl.selectLogic(where, {
+      'left': 'links von dir',
+      'across': 'dir gegenüber',
+      'other': 'rechts von dir',
+    });
+    return ', $_temp0';
+  }
+
+  @override
+  String takesPoints(String who, int points) {
+    String _temp0 = intl.Intl.pluralLogic(
+      points,
+      locale: localeName,
+      other: '$points Punkte',
+      one: '1 Punkt',
+    );
+    return '$who, $_temp0';
+  }
+
+  @override
+  String sheetRow(String name, int delta, int total) {
+    return '$name: $delta in dieser Runde, $total im Spiel';
+  }
 }

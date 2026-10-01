@@ -194,5 +194,8 @@
   "statsQueens": "Pik-Dame genommen",
   "statsMoonsShot": "Durchmärsche",
   "statsMoonsBlocked": "Durchmärsche verhindert",
-  "statsOverHands": "{hands, plural, =1{In 1 Runde allein} other{In {hands} Runden allein}}"
+  "statsOverHands": "{hands, plural, =1{In 1 Runde allein} other{In {hands} Runden allein}}",
+  "seatWhere": ", {where, select, left{links von dir} across{dir gegenüber} other{rechts von dir}}",
+  "takesPoints": "{who}, {points, plural, =1{1 Punkt} other{{points} Punkte}}",
+  "sheetRow": "{name}: {delta} in dieser Runde, {total} im Spiel"
 }

@@ -747,10 +747,13 @@ class _HomePageState extends State<HomePage> {
           button: true,
           label: l10n.yourProfile,
           onTap: _editProfile,
-          child: InkWell(
-            onTap: _editProfile,
-            customBorder: const CircleBorder(),
-            child: ExcludeSemantics(
+          // The ink is the tap a finger makes; the Semantics above is the
+          // one a screen reader does, so the ink says nothing of its own —
+          // it was a second, nameless button inside the first.
+          child: ExcludeSemantics(
+            child: InkWell(
+              onTap: _editProfile,
+              customBorder: const CircleBorder(),
               child: SizedBox(
                 width: 48,
                 height: _chromeHeight,
@@ -829,11 +832,13 @@ class _HomePageState extends State<HomePage> {
                 button: true,
                 label: l10n.gameOptions,
                 onTap: _changeOptions,
-                child: InkWell(
-                  onTap: _changeOptions,
-                  customBorder: const CircleBorder(),
-                  child: const ExcludeSemantics(
-                    child: SizedBox(
+                // As the profile's: the Semantics is the button, the ink
+                // only the finger's.
+                child: ExcludeSemantics(
+                  child: InkWell(
+                    onTap: _changeOptions,
+                    customBorder: const CircleBorder(),
+                    child: const SizedBox(
                       width: 38,
                       height: 38,
                       child: Icon(Icons.tune, size: 19, color: Palette.gold),
