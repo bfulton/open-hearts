@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Support — Open Hearts</title>
+<meta name="description" content="Help with Open Hearts: how to play, how live play and the subscription work, how to cancel, adding a device, privacy and accessibility, and how to reach us.">
+<link rel="canonical" href="https://openhearts.game/support">
+<meta property="og:title" content="Support — Open Hearts">
+<meta property="og:description" content="Help with Open Hearts, and how to reach us.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://openhearts.game/support">
+<meta property="og:image" content="https://openhearts.game/og.png">
+<meta property="og:site_name" content="Open Hearts">
+<meta name="theme-color" content="#06231A">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>♥</text></svg>">
+<style>
+  :root {
+    --felt-dark: #06231A;
+    --felt: #0E3B2E;
+    --felt-light: #14513C;
+    --gold: #E4B363;
+    --chrome: #E8EFEA;
+    --chrome-dim: #9FB3A9;
+    --red: #C1352B;
+    --edge: rgba(232,239,234,.12);
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--felt-dark);
+    color: var(--chrome);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--gold); overflow-wrap: anywhere; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 22px; }
+
+  header {
+    background: radial-gradient(120% 100% at 50% 0%,
+      var(--felt-light) 0%, var(--felt) 45%, var(--felt-dark) 100%);
+    border-bottom: 1px solid var(--edge);
+    padding: 48px 0 40px;
+    text-align: center;
+  }
+  .home { display: inline-block; font-size: 14px; text-decoration: none; margin-bottom: 18px; }
+  .suits { font-size: 22px; letter-spacing: 7px; margin-bottom: 12px; }
+  .suits .r { color: var(--red); }
+  .suits .b { color: var(--chrome); opacity: .55; }
+  h1 {
+    margin: 0 0 10px;
+    font-size: clamp(34px, 9vw, 48px);
+    line-height: 1.05;
+    letter-spacing: -.03em;
+    font-weight: 800;
+  }
+  .tagline {
+    margin: 0 auto;
+    max-width: 34ch;
+    font-size: clamp(16px, 4.2vw, 19px);
+    color: var(--chrome-dim);
+  }
+  .updated { margin: 14px 0 0; font-size: 13.5px; color: var(--chrome-dim); }
+
+  main.wrap { padding-top: 48px; padding-bottom: 24px; }
+  section + section { margin-top: 46px; }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .13em;
+    color: var(--gold);
+    margin: 0 0 14px;
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 16.5px;
+    font-weight: 650;
+    margin: 26px 0 8px;
+    color: var(--chrome);
+  }
+  p { margin: 0 0 14px; color: #CFDCD5; }
+  code {
+    font: 13.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--chrome);
+    overflow-wrap: anywhere;
+  }
+
+  ul.points { list-style: none; margin: 0; padding: 0; }
+  ul.points li {
+    padding: 15px 0;
+    border-top: 1px solid var(--edge);
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 13px;
+    align-items: start;
+  }
+  ul.points li:last-child { border-bottom: 1px solid var(--edge); }
+  ul.points b { display: block; font-weight: 650; margin-bottom: 2px; }
+  ul.points span { color: var(--chrome-dim); font-size: 14.5px; }
+  .pip { font-size: 19px; line-height: 1.35; }
+  .pip.r { color: var(--red); }
+  .pip.g { color: var(--gold); }
+
+  ul.plain { margin: 0 0 14px; padding-left: 20px; color: #CFDCD5; }
+  ul.plain li { margin-bottom: 8px; }
+  ul.plain b { color: var(--chrome); font-weight: 650; }
+
+  footer.wrap {
+    margin-top: 60px;
+    border-top: 1px solid var(--edge);
+    padding-top: 26px; padding-bottom: 40px;
+    font-size: 13.5px;
+    color: var(--chrome-dim);
+    text-align: center;
+  }
+  footer ul { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; }
+  footer a { text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  footer p { color: var(--chrome-dim); margin: 0; }
+
+  address { font-style: normal; color: #CFDCD5; margin: 0 0 14px; }
+  a:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+  .skip {
+    position: absolute; left: 12px; top: -60px;
+    background: var(--gold); color: var(--felt-dark);
+    padding: 8px 14px; border-radius: 8px; font-weight: 700; z-index: 2;
+  }
+  .skip:focus { top: 12px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+  @media print {
+    body, header { background: #fff !important; color: #000; }
+    header { padding: 12px 0; border: 0; }
+    .suits .r { color: #9b1c13; }
+    .suits .b { color: #000; }
+    h1, h2, h3, p, li, b, code, a, address, .tagline, .updated, ul.points span, footer, footer p { color: #000 !important; }
+    .skip, .home { display: none; }
+    main a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 90%; }
+  }
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header>
+  <div class="wrap">
+    <a class="home" href="/">← Open Hearts</a>
+    <div class="suits" aria-hidden="true">
+      <span class="b">♣</span><span class="r">♦</span><span class="b">♠</span><span class="r">♥</span>
+    </div>
+    <h1>Support</h1>
+    <p class="tagline">How to get help, and answers to what people ask.</p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section>
+    <h2 id="help">Getting help</h2>
+    <ul class="points">
+      <li>
+        <span aria-hidden="true" class="pip g">♠</span>
+        <div>
+          <b>Something is broken</b>
+          <span>Open the game's menu and choose <i>Tell us what's broken</i>.
+          It shows you everything it would send before you send it, and opens
+          an issue on
+          <a href="https://github.com/bfulton/open-hearts/issues">GitHub</a>,
+          where you can also report a problem directly. Issues are public, so
+          put nothing private in one.</span>
+        </div>
+      </li>
+      <li>
+        <span aria-hidden="true" class="pip r">♥</span>
+        <div>
+          <b>Anything private</b>
+          <span>A subscription, a refund, a privacy request, or a player to
+          report: write or call us.</span>
+        </div>
+      </li>
+    </ul>
+    <address style="margin-top:16px">
+      Open Hearts<br>
+      6650 Rivers Ave, Ste 105, PMB #804106<br>
+      North Charleston, SC 29406<br>
+      USA<br>
+      Phone: <a href="tel:+18438270686">+1 (843) 827-0686</a>
+    </address>
+    <p>
+      There is no email address yet. When there is, it will be here.
+    </p>
+  </section>
+
+  <section>
+    <h2 id="faq">Questions</h2>
+
+    <h3 id="play">How do I play?</h3>
+    <p>
+      Open <a href="/play">openhearts.game/play</a> in any up-to-date
+      browser and tap <i>Play solo</i>. The rules are short and are
+      <a href="/#rules">on the front page</a>. If you tap a card you are not
+      allowed to play, the game tells you which rule stopped you. Each game
+      runs to fifty points, or a hundred if you choose the longer game; the
+      lowest score wins.
+    </p>
+
+    <h3 id="stores">Is it in the App Store or Google Play?</h3>
+    <p>
+      Not yet. Until it is, it plays in the browser on any phone, tablet or
+      computer. Add the page to your home screen or bookmark it to find it
+      again. Once the page has loaded, playing alone works without a
+      connection.
+    </p>
+
+    <h3 id="free">Is it really free?</h3>
+    <p>
+      Playing alone against the bots is free and always will be: no ads, no
+      account, nothing to buy. Only live play, against people, costs money.
+    </p>
+
+    <h3 id="live">How does live play work?</h3>
+    <p>
+      Live play is a subscription: $5.99 a year, paid up front. Tap
+      <i>Play live</i> and you are seated in seconds with whoever is waiting,
+      near your rating and your pace; seats nobody takes go to bots, which
+      always say they are bots. Or tap <i>Play friends</i> for a table of
+      your own and a link to send to three friends. Choose fifty points or a
+      hundred, rated or unrated, before you start. The cards are dealt
+      between the four devices, so no server, ours included, ever sees your
+      hand.
+    </p>
+    <p>
+      Today live play is bought and played in the browser. The phone apps
+      will offer it through the stores once they are there.
+    </p>
+
+    <h3 id="subscribe">How do I subscribe?</h3>
+    <p>
+      In the browser, tap <i>Subscribe</i> under <i>Play live</i> on the
+      game's first screen. Payment is taken on Stripe's own page, which asks
+      for your email address and card. There is no account to make: the
+      subscription belongs to the device you bought it on, and to any you
+      add.
+    </p>
+
+    <h3 id="cancel">How do I cancel?</h3>
+    <p>
+      Live play keeps working until the end of the year you paid for, and
+      the subscription renews each year until you cancel.
+    </p>
+    <ul class="plain">
+      <li><b>Bought on the web:</b> write to us or call, with the email
+      address you paid with, and we will cancel it and confirm.</li>
+      <li><b>Bought in the App Store</b> (once it is there): Settings, then
+      your name, then Subscriptions.</li>
+      <li><b>Bought on Google Play</b> (once it is there): the Play Store,
+      your profile picture, then Payments &amp; subscriptions.</li>
+    </ul>
+    <p>Refunds are covered in the <a href="/terms">terms</a>.</p>
+
+    <h3 id="devices">How do I add another device?</h3>
+    <p>
+      On a subscribed device, open the live-play page and tap
+      <i>Add a device</i>. It shows a code. Point the other device's camera
+      at it, and the link it reads brings that device in; or tap <i>Send the
+      link instead</i> and open the link on the other device. A code works
+      once, for ten minutes. Up to five devices can share a subscription,
+      and any of them can drop another.
+    </p>
+
+    <h3 id="lost">I lost my phone, or cleared my browser.</h3>
+    <p>
+      The subscription is kept on each device, not in an account. If
+      another of your devices is still on it, use that one to add the new
+      device, and drop the lost one. If none is, contact us with the email
+      address you paid with and we will help.
+    </p>
+
+    <h3 id="bots">Who are the bots?</h3>
+    <p>
+      Characters named after famous lovers — Romeo, Juliet, Cyrano and more —
+      each with its own temperament, at nine strengths. At a live table the
+      bots near your rating take the empty seats, and their ratings move
+      with real results like everyone else's.
+    </p>
+
+    <h3 id="privacy">What happens to my data?</h3>
+    <p>
+      Playing alone, nothing leaves your device. There are no ads, no
+      analytics and no account. Live play is public on purpose: your name,
+      picture and results are published where anyone can read them, so pick
+      a name and picture you are happy for strangers to see. You can play
+      live with no picture, and hide anyone else's on your own device. The
+      details are in the <a href="/privacy">privacy policy</a>.
+    </p>
+
+    <h3 id="accessibility">Can I play with a screen reader, or bigger text?</h3>
+    <p>
+      Yes. Every card, seat, trick and score has a name, and who took a
+      trick and whose turn it is are said aloud. In a browser, a screen
+      reader first finds a button called <i>Enable accessibility</i>; press
+      it once. We have played whole hands this way in a browser, but not
+      yet with VoiceOver or TalkBack on a phone, so please tell us how it
+      goes.
+    </p>
+    <p>
+      To make everything bigger, use the browser's zoom: Ctrl and + on a
+      computer, ⌘ and + on a Mac. A tablet shows bigger cards than a phone.
+    </p>
+
+    <h3 id="languages">Which languages does it speak?</h3>
+    <p>
+      English, <span lang="es">español</span>,
+      <span lang="pt-BR">português (Brasil)</span>,
+      <span lang="de">Deutsch</span> and <span lang="fr">français</span>,
+      chosen from your device's language. To pick one yourself, add
+      <code>?lang=es</code> (or <code>pt</code>, <code>de</code>,
+      <code>fr</code>, <code>en</code>) to the game's address. The
+      translations are new; corrections are welcome.
+    </p>
+
+    <h3 id="fair">How do I know the deal is fair?</h3>
+    <p>
+      At a live table every device shuffles in turn and proves it did, and
+      one honest shuffle makes the deal fair; anyone can check the whole
+      game afterwards. Alone, each deal comes from 256 bits of your device's
+      secure random generator, and <i>Copy record</i> at the end of a game
+      gives you everything needed to replay it. How it all works is written
+      up in the
+      <a href="https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md">project's
+      documentation</a>.
+    </p>
+  </section>
+</main>
+
+<footer class="wrap">
+  <nav aria-label="Site">
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/play">Play</a></li>
+      <li><a href="/support" aria-current="page">Support</a></li>
+      <li><a href="/privacy">Privacy</a></li>
+      <li><a href="/terms">Terms</a></li>
+      <li><a href="https://github.com/bfulton/open-hearts">Source on GitHub</a></li>
+    </ul>
+  </nav>
+  <p>Open Hearts · MIT licensed · North Charleston, SC, USA</p>
+</footer>
+
+</body>
+</html>

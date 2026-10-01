@@ -30,8 +30,8 @@ that name is filled. Values are as found on 1 October 2026.
 | `[COUNTRIES]` | Three-letter ISO codes for the nomination | Not decided; store-listing.md plans the United States first |
 | `[PRESS KIT URL]` | Screenshots and the icon, in one place | None. store-listing.md lists the screenshots to take |
 | `[TESTFLIGHT LINK]` | A public TestFlight link, optional | None |
-| `[CONTACT EMAIL]` | An address the press can write to | None exists; privacy.md leaves it to the owner |
-| `[HELP CONTACT]` | Where a player gets help in private: an email address or a phone number | None. In the app, "Tell us what's broken" opens a new GitHub issue, which is public, on a repository that is private |
+| `[CONTACT EMAIL]` | An address the press can write to | **Still missing**: no email address exists. Until one does, a pitch can give the phone, +1 (843) 827-0686 |
+| `[HELP CONTACT]` | Where a player gets help in private: an email address or a phone number | Filled below with the phone, +1 (843) 827-0686; the postal address is Open Hearts, 6650 Rivers Ave, Ste 105, PMB #804106, North Charleston, SC 29406, USA (`site/support.html`). In the app, "Tell us what's broken" still opens a public GitHub issue, on a repository that is private |
 | `[YOUR NAME]` | Who signs | The owner's to decide (privacy.md: the controller's name is undecided) |
 | `[ACTIVITY DIRECTOR NAME]` | Mail merge, one letter each | — |
 
@@ -56,10 +56,11 @@ blocks some of the copy.
    the live-play line of the senior pitch and the forum post. The
    handout and the cover letter keep theirs, since the front door
    shows the price whether or not the shop is open.
-4. **There is no private way to ask for help.** The handout and the
-   cover letter need `[HELP CONTACT]`. An older person who gets stuck
-   will not open a GitHub issue, and should not post private details
-   in one.
+4. **The private way to ask for help is a phone and a postbox.** The
+   handout and the cover letter now give the phone number. An older
+   person who gets stuck will not open a GitHub issue, and should not
+   post private details in one. Someone has to answer that phone; there
+   is still no email address.
 5. **Screen readers have not been tried on a device.** The Read aloud
    pass (doc 05) was a hand played through headless Chromium's
    accessibility tree, not VoiceOver on an iPhone, TalkBack on Android
@@ -304,7 +305,8 @@ takes 930 of the 973 pixels there are. It also fits with the
 placeholders filled by longer real values. On a phone's screen it
 becomes one column with no sideways scrolling.
 
-Fill `[PLAY URL]`, `[HELP CONTACT]` and `[SITE URL]` in that file
+Fill `[PLAY URL]` and `[SITE URL]` in that file (`[HELP CONTACT]` is
+filled with the phone number)
 before printing. The placeholders are highlighted in yellow, so a
 missed one is obvious on paper. The "Ask:" line is left blank on
 purpose, for the centre to write in a name.
@@ -342,7 +344,7 @@ The text, kept the same as the HTML:
 > - A tablet shows bigger cards than a phone.
 >
 > **Need help?**
-> Ask: ______________________ or `[HELP CONTACT]`
+> Ask: ______________________ or call +1 (843) 827-0686
 >
 > Also in Español, Português, Deutsch and Français, set by your device.
 > Free, open-source software: `[SITE URL]`
@@ -377,14 +379,14 @@ What may matter to you:
 
 The first screen also shows "Live play" and a yearly price. That is an optional subscription for playing with other people online, and nobody needs it to play alone.
 
-I've enclosed a one-page handout you are welcome to copy. If anything doesn't work, or residents find something hard to read or confusing, I would like to hear about it: [HELP CONTACT].
+I've enclosed a one-page handout you are welcome to copy. If anything doesn't work, or residents find something hard to read or confusing, I would like to hear about it: +1 (843) 827-0686, or by post to Open Hearts, 6650 Rivers Ave, Ste 105, PMB #804106, North Charleston, SC 29406.
 
 With thanks,
 
 [YOUR NAME]
 Open Hearts · [SITE URL]
 ```
-Count: 228 of 250 words
+Count: 246 of 250 words
 
 ## 4. Community posts
 

@@ -4,13 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Open Hearts — the card game, done properly</title>
-<meta name="description" content="A free, open-source Hearts you can play in a browser or on your phone. No ads, no tracking.">
+<meta name="description" content="A free, open-source Hearts card game. Play alone against bots for free, with no ads, no tracking and no sign-up — or play live with people on a deal nobody can rig.">
 <link rel="canonical" href="https://openhearts.game/">
-<meta property="og:title" content="Open Hearts">
-<meta property="og:description" content="A free, open-source Hearts you can play in a browser or on your phone. No ads, no tracking.">
+<link rel="alternate" hreflang="en" href="https://openhearts.game/">
+<link rel="alternate" hreflang="x-default" href="https://openhearts.game/">
+<meta property="og:site_name" content="Open Hearts">
+<meta property="og:title" content="Open Hearts — the card game, done properly">
+<meta property="og:description" content="Free, open-source Hearts. Play alone for free with no ads and no sign-up, or play live with people on a deal nobody can rig.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://openhearts.game/">
+<meta property="og:image" content="https://openhearts.game/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Open Hearts: the four suits over green felt">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#06231A">
+<meta name="color-scheme" content="dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>♥</text></svg>">
 <style>
   :root {
@@ -20,11 +30,13 @@
     --gold: #E4B363;
     --chrome: #E8EFEA;
     --chrome-dim: #9FB3A9;
+    --body: #CFDCD5;
     --red: #C1352B;
+    --red-text: #EF7468; /* the red, lifted to 3:1 on the lightest felt */
     --edge: rgba(232,239,234,.12);
   }
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
   body {
     margin: 0;
     background: var(--felt-dark);
@@ -33,14 +45,25 @@
           "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  a { color: var(--gold); }
+  a { color: var(--gold); overflow-wrap: anywhere; }
+  a:focus-visible, .cta:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
   .wrap { max-width: 720px; margin: 0 auto; padding: 0 22px; }
+  .skip {
+    position: absolute; left: 12px; top: -60px;
+    background: var(--gold); color: var(--felt-dark);
+    padding: 8px 14px; border-radius: 8px; font-weight: 700; z-index: 2;
+  }
+  .skip:focus { top: 12px; }
 
   header {
     background: radial-gradient(120% 100% at 50% 0%,
       var(--felt-light) 0%, var(--felt) 45%, var(--felt-dark) 100%);
     border-bottom: 1px solid var(--edge);
-    padding: 72px 0 64px;
+    padding: 72px 0 60px;
     text-align: center;
   }
   .suits { font-size: 30px; letter-spacing: 8px; margin-bottom: 18px; }
@@ -53,7 +76,7 @@
     letter-spacing: -.03em;
     font-weight: 800;
   }
-  h1 .hearts { color: var(--red); }
+  h1 .hearts { color: var(--red-text); }
   .tagline {
     margin: 0 auto 30px;
     max-width: 30ch;
@@ -67,15 +90,17 @@
     font-weight: 800;
     font-size: 18px;
     text-decoration: none;
-    padding: 15px 42px;
+    padding: 15px 34px;
     border-radius: 13px;
     box-shadow: 0 10px 28px rgba(0,0,0,.42);
+    max-width: 100%;
   }
   .cta:hover { filter: brightness(1.07); }
-  .cta-note { margin-top: 13px; font-size: 13.5px; color: var(--chrome-dim); }
+  .cta-note { margin: 13px 0 0; font-size: 14px; color: var(--chrome-dim); }
+  .stores { margin: 6px auto 0; max-width: 34ch; font-size: 13.5px; color: var(--chrome-dim); }
 
-  main { padding: 56px 0 24px; }
-  section + section { margin-top: 46px; }
+  main.wrap { padding-top: 56px; padding-bottom: 24px; }
+  section + section { margin-top: 50px; }
   h2 {
     font-size: 13px;
     text-transform: uppercase;
@@ -84,7 +109,9 @@
     margin: 0 0 14px;
     font-weight: 700;
   }
-  p { margin: 0 0 14px; color: #CFDCD5; }
+  h3 { font-size: 17px; margin: 22px 0 6px; color: var(--chrome); }
+  p { margin: 0 0 14px; color: var(--body); }
+  .small { font-size: 14.5px; color: var(--chrome-dim); }
 
   ul.points { list-style: none; margin: 0; padding: 0; }
   ul.points li {
@@ -97,43 +124,87 @@
   }
   ul.points li:last-child { border-bottom: 1px solid var(--edge); }
   ul.points b { display: block; font-weight: 650; margin-bottom: 2px; }
-  ul.points span { color: var(--chrome-dim); font-size: 14.5px; }
+  ul.points .d { color: var(--chrome-dim); font-size: 14.5px; }
   .pip { font-size: 19px; line-height: 1.35; }
   .pip.r { color: var(--red); }
   .pip.g { color: var(--gold); }
 
-  ol.rules { margin: 0; padding-left: 20px; color: #CFDCD5; }
-  ol.rules li { margin-bottom: 8px; }
+  .ways { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 640px) { .ways { grid-template-columns: 1fr 1fr; } }
+  .way {
+    border: 1px solid var(--edge);
+    border-radius: 14px;
+    padding: 18px 20px 6px;
+    background: rgba(14,59,46,.45);
+  }
+  .way h3 { margin-top: 0; }
+  .price { color: var(--gold); font-weight: 700; }
+  .way ul { margin: 0 0 14px; padding-left: 18px; color: var(--body); font-size: 15px; }
+  .way li { margin-bottom: 6px; }
 
-  footer {
+  ol.rules, ul.plain { margin: 0 0 14px; padding-left: 20px; color: var(--body); }
+  ol.rules li, ul.plain li { margin-bottom: 8px; }
+
+  .langs { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .langs li {
+    border: 1px solid var(--edge); border-radius: 999px;
+    padding: 3px 12px; font-size: 14.5px; color: var(--chrome);
+  }
+
+  address { font-style: normal; color: var(--body); margin: 0 0 14px; }
+
+  footer.wrap {
     margin-top: 60px;
     border-top: 1px solid var(--edge);
-    padding: 26px 0 40px;
+    padding-top: 26px; padding-bottom: 40px;
     font-size: 13.5px;
     color: var(--chrome-dim);
     text-align: center;
   }
+  footer ul { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; }
   footer a { text-decoration: none; }
   footer a:hover { text-decoration: underline; }
+  footer p { color: var(--chrome-dim); margin: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; animation: none !important; }
+  }
+  @media print {
+    body, header, .way { background: #fff !important; color: #000; }
+    header { padding: 16px 0; border: 0; }
+    h1 .hearts, .suits .r, .pip.r { color: #9b1c13; }
+    .suits .b { color: #000; }
+    h2, h3, b, .price, a, p, li, .tagline, .cta-note, .stores, ul.points .d, address, footer, footer p { color: #000 !important; }
+    .cta { box-shadow: none; border: 2px solid #000; background: #fff; }
+    .way { border-color: #999; }
+    .langs li { border-color: #999; color: #000; }
+    .skip { display: none; }
+    main a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 90%; }
+    section { break-inside: avoid-page; }
+  }
 </style>
 </head>
 <body>
 
+<a class="skip" href="#main">Skip to content</a>
+
 <header>
   <div class="wrap">
-    <div class="suits">
+    <div class="suits" aria-hidden="true">
       <span class="b">♣</span><span class="r">♦</span><span class="b">♠</span><span class="r">♥</span>
     </div>
     <h1>Open <span class="hearts">Hearts</span></h1>
     <p class="tagline">The card game you already know, built the way it deserves.</p>
-    <a class="cta" href="/play">Play now</a>
-    <p class="cta-note">Free. No install, no ads.</p>
+    <a class="cta" href="/play">Play in your browser</a>
+    <p class="cta-note">Free to play alone. No install, no ads, no sign-up.</p>
+    <p class="stores">Not in the App Store or Google Play yet. The phone apps are on their way; until then it plays in the browser on any phone, tablet or computer.</p>
   </div>
 </header>
 
-<main class="wrap">
-  <section>
-    <h2>What this is</h2>
+<main id="main" class="wrap">
+  <section aria-labelledby="what">
+    <h2 id="what">What this is</h2>
     <p>
       Hearts is a trick-taking game for four players where every heart costs you
       a point, the queen of spades costs you thirteen, and the winner is whoever
@@ -141,78 +212,213 @@
       still no version of it on a phone that is simply good.
     </p>
     <p>
-      Open Hearts is an attempt at one: fast, quiet, honest about its rules, and
-      open source from the first commit.
+      Open Hearts is an attempt at one: fast, quiet, honest about its rules and
+      its opponents, and open source from the first commit.
     </p>
   </section>
 
-  <section>
-    <h2>What makes it different</h2>
+  <section aria-labelledby="ways">
+    <h2 id="ways">Two ways to play</h2>
+    <div class="ways">
+      <div class="way">
+        <h3>Alone, against three bots</h3>
+        <p class="price">Free, for good</p>
+        <ul>
+          <li>No ads, no account, nothing to buy.</li>
+          <li>The bots have names and temperaments, and come at nine
+          strengths.</li>
+          <li>Once the page has loaded, it plays without a connection.</li>
+          <li>Nothing about a game alone leaves your device.</li>
+        </ul>
+      </div>
+      <div class="way">
+        <h3>Live, with people</h3>
+        <p class="price">$5.99 a year, paid up front</p>
+        <ul>
+          <li><b>Play live</b> and you are seated in seconds with whoever is
+          waiting, or <b>Play friends</b> and send three friends a link.</li>
+          <li>A seat nobody takes goes to a bot, and a bot always says it is
+          one.</li>
+          <li>You are seated near your rating, and near your pace, so quick
+          players and careful ones each find their own.</li>
+          <li>Bots have real ratings too. Rated games move them, yours and
+          theirs, from results everyone at the table signs.</li>
+          <li>One subscription covers up to five of your devices.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="small" style="margin-top:14px">
+      Live play is bought and played in the browser today. The phone apps
+      will get it through the stores' own subscriptions once they are in
+      the stores.
+    </p>
+  </section>
+
+  <section aria-labelledby="different">
+    <h2 id="different">What makes it different</h2>
     <ul class="points">
       <li>
-        <span class="pip g">♠</span>
+        <span class="pip g" aria-hidden="true">♠</span>
         <div>
           <b>It respects your attention</b>
-          <span>No ads, no daily streaks, no chips to buy. You open
+          <span class="d">No ads, no daily streaks, no chips to buy. You open
           it, you play a hand, you close it.</span>
         </div>
       </li>
       <li>
-        <span class="pip r">♥</span>
+        <span class="pip r" aria-hidden="true">♥</span>
         <div>
           <b>It teaches while you play</b>
-          <span>Tap a card you cannot play and it tells you which rule stopped
-          you, instead of just refusing.</span>
+          <span class="d">Tap a card you cannot play and it tells you which
+          rule stopped you, instead of just refusing.</span>
         </div>
       </li>
       <li>
-        <span class="pip g">♣</span>
+        <span class="pip g" aria-hidden="true">♣</span>
         <div>
-          <b>The rules are the code</b>
-          <span>A single, readable rules engine every player runs — no hidden
-          server deciding what is legal.</span>
+          <b>It does not pretend</b>
+          <span class="d">An empty seat is filled by a bot that says so, where
+          a name would go. No made-up usernames, ever.</span>
         </div>
       </li>
       <li>
-        <span class="pip r">♦</span>
+        <span class="pip r" aria-hidden="true">♦</span>
         <div>
           <b>Yours to read and fork</b>
-          <span>MIT licensed, developed in the open, and it will stay that
-          way.</span>
+          <span class="d">One readable rules engine every player runs, MIT
+          licensed, developed in the open, and it will stay that way.</span>
         </div>
       </li>
     </ul>
   </section>
 
-  <section>
-    <h2>How Hearts works</h2>
+  <section aria-labelledby="deal">
+    <h2 id="deal">A deal nobody can rig</h2>
+    <p>
+      At a live table there is no dealer to trust. Every device at the table
+      shuffles the deck in turn and proves it did so honestly, and one honest
+      shuffle is enough for a fair deal. The cards are dealt so that each hand
+      can be read by its player alone: no other player sees it, and no server
+      sees it, ours included. After the hand, anyone can check the whole game
+      against the deal. This is a technique called mental poker, built on a
+      published protocol and on research code that has not had a security
+      audit.
+    </p>
+    <p>
+      What it cannot stop is two players sharing their hands over the phone.
+      No card game can.
+    </p>
+    <p>
+      Alone, every deal comes from 256 bits of your device's secure random
+      generator, shuffled without bias, so every deal of the cards can come up
+      and none follows from the one before. Each game alone is kept as a
+      record you can copy and replay, trick by trick.
+    </p>
+  </section>
+
+  <section aria-labelledby="everywhere">
+    <h2 id="everywhere">Every screen, five languages</h2>
+    <p>
+      The same game on a phone held either way, a tablet, a foldable, and a
+      desktop browser. The table is laid out from the space it is given, so
+      bigger screens get bigger cards, and a turn or a fold mid-hand keeps the
+      game.
+    </p>
+    <ul class="langs" aria-label="Languages">
+      <li lang="en">English</li>
+      <li lang="es">Español</li>
+      <li lang="pt-BR">Português (Brasil)</li>
+      <li lang="de">Deutsch</li>
+      <li lang="fr">Français</li>
+    </ul>
+    <p>
+      It speaks your device's language, and English otherwise. The
+      translations are a first pass, and corrections are welcome.
+    </p>
+    <p>
+      It works with a screen reader: every card, seat, trick and score has a
+      name, and who took a trick is said aloud. We have played whole hands
+      that way in a browser, through its accessibility tree. It has not yet
+      been tried with VoiceOver or TalkBack on a phone, and we would like to
+      hear from anyone who plays that way. In a browser, press the
+      <i>Enable accessibility</i> button that a screen reader finds first on
+      the page.
+    </p>
+  </section>
+
+  <section aria-labelledby="privacy">
+    <h2 id="privacy">Privacy, briefly</h2>
+    <ul class="plain">
+      <li>Playing alone stays on your device. There is no account to make.</li>
+      <li>No ads, no analytics, no trackers, no cookies from our pages. This
+      page loads nothing from anywhere else.</li>
+      <li>Live play is public on purpose: your name, picture and results go to
+      public servers where anyone can read them.</li>
+      <li>In the browser, the game fetches an extra font from Google when it
+      has to draw an emoji or a name in a script it does not carry.</li>
+    </ul>
+    <p>The whole of it, in plain words: <a href="/privacy">the privacy policy</a>.</p>
+  </section>
+
+  <section aria-labelledby="rules">
+    <h2 id="rules">How Hearts works</h2>
     <ol class="rules">
       <li>Four players, thirteen cards each.</li>
       <li>Pass three cards — left, then right, then across, then no pass at all.</li>
       <li>The two of clubs leads. Follow the suit that was led whenever you can.</li>
+      <li>No hearts and no queen of spades on the first trick, unless you have nothing else.</li>
       <li>Hearts cannot be led until one has been played on some earlier trick.</li>
       <li>Every heart is one point; the queen of spades is thirteen. Points are bad.</li>
       <li>Take all twenty-six and you shoot the moon: everyone else takes them instead.</li>
-      <li>First to fifty ends it, or a hundred for a longer game. Lowest score wins.</li>
+      <li>The game ends after the hand in which someone reaches fifty points, or a
+      hundred if you choose the longer game. Lowest score wins.</li>
     </ol>
   </section>
 
-  <section>
-    <h2>Where it is going</h2>
+  <section aria-labelledby="next">
+    <h2 id="next">Where it is going</h2>
     <p>
-      Today it is you against three bots, in a browser. Next comes playing with
-      actual people — and the plan is to do it peer to peer, with no game server
-      in the middle, so that there is nothing to pay for and nothing to shut
-      down. Then the app stores.
+      Today you can play alone, or live with people, in a browser. Next come
+      the App Store and Google Play: playing alone first, then live play
+      with the stores' own subscriptions. After that, trying the game with
+      VoiceOver and TalkBack on real phones, and signing in with Apple or
+      Google so a lost phone brings its subscription back with it.
     </p>
+  </section>
+
+  <section aria-labelledby="contact">
+    <h2 id="contact">Help and contact</h2>
+    <p>
+      Something broken? Use <i>Tell us what's broken</i> in the game's menu,
+      or open an issue on
+      <a href="https://github.com/bfulton/open-hearts/issues">GitHub</a>.
+      Issues are public, so put nothing private in one.
+    </p>
+    <p>
+      For anything private — a privacy request, a subscription, a refund —
+      write or call:
+    </p>
+    <address>
+      Open Hearts<br>
+      6650 Rivers Ave, Ste 105, PMB #804106<br>
+      North Charleston, SC 29406, USA<br>
+      <a href="tel:+18438270686">+1 (843) 827-0686</a>
+    </address>
+    <p>More answers on the <a href="/support">support page</a>.</p>
   </section>
 </main>
 
 <footer class="wrap">
-  <a href="https://github.com/bfulton/open-hearts">Source on GitHub</a>
-  &nbsp;·&nbsp; MIT licensed
-  &nbsp;·&nbsp; <a href="/play">Play</a>
-  &nbsp;·&nbsp; <a href="/privacy">Privacy</a>
+  <nav aria-label="Site">
+    <ul>
+      <li><a href="/play">Play</a></li>
+      <li><a href="/support">Support</a></li>
+      <li><a href="/privacy">Privacy</a></li>
+      <li><a href="/terms">Terms</a></li>
+      <li><a href="https://github.com/bfulton/open-hearts">Source on GitHub</a></li>
+    </ul>
+  </nav>
+  <p>Open Hearts · MIT licensed · North Charleston, SC, USA</p>
 </footer>
 
 </body>

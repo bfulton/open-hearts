@@ -64,9 +64,14 @@ Found while writing this; none is a copy change.
   cannot sell invites a rejection on both stores. Decide whether store
   builds hide the live area until store billing exists.
 - **The domain.** The privacy policy URL, the support URL and the
-  marketing URL are required fields. `openhearts.game` is not attached
-  yet (README). Until it is, the policy is at
-  `https://open-hearts.pages.dev/privacy`.
+  marketing URL are required fields, and a subscription needs the terms
+  (EULA) URL too. `openhearts.game` is not attached yet (README). Until
+  it is, the pages are at `https://open-hearts.pages.dev/privacy`,
+  `/terms` and `/support` — Pages serves `privacy.html` at `/privacy`,
+  and the same for the others.
+- **The subscription page in the app** has to link the privacy policy
+  and the terms (Apple guideline 3.1.2(c)) before live play is sold in
+  a store. It links neither today.
 - **The Android launcher label** reads `open_hearts`
   (`AndroidManifest.xml`).
 - **iOS purpose strings** for camera and microphone may be demanded
@@ -156,9 +161,11 @@ Count: 1780 of 4000 characters
 | Primary category | Games — subcategories Card, Strategy |
 | Age rating | answer the questionnaire for a solo build: no user-generated content, no chat, no gambling or simulated gambling. Expect the lowest rating. Live play changes the user-generated-content answers |
 | Price | free; no in-app purchases in the first release |
-| Support URL | <https://github.com/bfulton/open-hearts/issues> (or a contact page, once there is a contact address) |
+| Support URL | <https://openhearts.game/support> once attached (`site/support.html`: help by GitHub issue, mail or phone, and a FAQ) |
 | Marketing URL | <https://openhearts.game/> once attached |
-| Privacy policy URL | <https://openhearts.game/privacy> once attached |
+| Privacy policy URL | <https://openhearts.game/privacy> once attached (`site/privacy.html`) |
+| Terms of Use (EULA) | <https://openhearts.game/terms> once attached (`site/terms.html`). It defers to Apple's Standard EULA, so App Store Connect's License Agreement can stay Apple's standard one; link the terms in the description (or in the EULA field) once the subscription is sold in the store, as 3.1.2(c) asks. Not reviewed by a lawyer yet |
+| Contact (App Review) | Open Hearts, 6650 Rivers Ave, Ste 105, PMB #804106, North Charleston, SC 29406, USA; +1 (843) 827-0686. Email: **still missing** |
 | Copyright | the owner's legal name — owner to decide (privacy.md) |
 | App Privacy | Data Not Collected, for the solo build (privacy.md) |
 
@@ -188,8 +195,10 @@ description's.
 **Other fields**: category Card; tags as Play Console offers them
 (card, classic, offline, single player); target audience 13 and over
 (privacy.md, children); Data safety "no data collected or shared" for
-the solo build; contact email required by Play Console — owner to
-decide.
+the solo build; contact email required by Play Console — **still
+missing**, owner to decide; contact phone +1 (843) 827-0686 and the
+address above may be given too; privacy policy
+<https://openhearts.game/privacy>, website <https://openhearts.game/>.
 
 ### Live play add-on (not for the first release)
 

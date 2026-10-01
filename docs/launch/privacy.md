@@ -514,19 +514,26 @@ costs.
 - **No self-service deletion.** A `/api/forget` signed by the device key
   could delete that key's KV rows, and the app could send NIP-09
   deletion requests for its own stored events, which relays may honour.
-- **No contact address.** See below.
+- **No contact email.** A postal address and a phone number are
+  published (`site/privacy.html`, Contact; `site/support.html`); there is
+  still no email address, which Play Console requires. See below.
 
 ## For the owner and a lawyer to check
 
 - **Who the controller is.** A person or a company; legal name; postal
   address. The page says "the people who maintain the Open Hearts
   project", which will not satisfy GDPR Article 13.
-- **A contact address — owner to decide.** There is no published email.
-  The page points to GitHub issues
-  (<https://github.com/bfulton/open-hearts/issues>), which are public,
-  and tells people not to post anything private there. Privacy requests
-  need a private channel, and a requester needs a way to show which key
-  is theirs.
+- **A contact address — partly decided.** The page now gives a postal
+  address and a phone number for privacy requests: Open Hearts, 6650
+  Rivers Ave, Ste 105, PMB #804106, North Charleston, SC 29406, USA;
+  +1 (843) 827-0686. That is a mailbox service's address, which may not
+  do as the controller's establishment for GDPR Article 13. There is
+  still **no email address** (`[CONTACT EMAIL]` in outreach.md stays
+  open). GitHub issues (<https://github.com/bfulton/open-hearts/issues>)
+  stay the place for bugs, and the page says to put nothing private in
+  one. A requester still has no way to show which key is theirs: the
+  page asks for the name they play under and, for a web subscriber, the
+  email they paid with, and the app does not show the key.
 - **Jurisdiction and governing law**, where the controller is
   established, and whether an EU or UK representative (GDPR Art. 27) is
   needed.
@@ -548,10 +555,17 @@ costs.
   The page says the game is not made for under-13s. Check COPPA (general
   audience?), the GDPR's age of digital consent (13–16 by member state),
   and make the stores' target-audience and age-rating answers match.
-- **Terms of service**: none exist, and a subscription needs them —
-  automatic-renewal disclosures (California and others), the EU 14-day
-  withdrawal right for digital content and its waiver at checkout,
-  refunds.
+- **Terms of service**: drafted at `site/terms.html` (served at
+  `/terms`), not yet reviewed by a lawyer. It defers to Apple's Standard
+  EULA for App Store purchases and covers web purchases: a year at
+  $5.99, automatic renewal, cancelling (on the web, by mail or phone —
+  there is no self-service portal), refunds, conduct, MIT against the
+  service, no warranty, a liability cap, South Carolina law. To check:
+  automatic-renewal disclosures (California and others) at checkout and
+  a reminder before renewal, which we cannot send without an email
+  address; the EU 14-day withdrawal right for digital content and its
+  waiver at checkout; the refund promises it makes (unused part refunded
+  if we stop renewing a device without good reason).
 - **CCPA/CPRA**: probably under the thresholds. CalOPPA requires a posted
   policy, which this is once published.
 - **ePrivacy**: browser storage used only for what the player asked for

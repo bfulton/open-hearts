@@ -10,6 +10,8 @@
 <meta property="og:description" content="What Open Hearts does with your data: what stays on your device, what live play makes public, and what we keep.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://openhearts.game/privacy">
+<meta property="og:image" content="https://openhearts.game/og.png">
+<meta property="og:site_name" content="Open Hearts">
 <meta name="theme-color" content="#06231A">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>♥</text></svg>">
 <style>
@@ -62,7 +64,7 @@
   }
   .updated { margin: 14px 0 0; font-size: 13.5px; color: var(--chrome-dim); }
 
-  main { padding: 48px 0 24px; }
+  main.wrap { padding-top: 48px; padding-bottom: 24px; }
   section + section { margin-top: 46px; }
   h2 {
     font-size: 13px;
@@ -105,24 +107,50 @@
   ul.plain li { margin-bottom: 8px; }
   ul.plain b { color: var(--chrome); font-weight: 650; }
 
-  footer {
+  footer.wrap {
     margin-top: 60px;
     border-top: 1px solid var(--edge);
-    padding: 26px 0 40px;
+    padding-top: 26px; padding-bottom: 40px;
     font-size: 13.5px;
     color: var(--chrome-dim);
     text-align: center;
   }
+  footer ul { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; }
   footer a { text-decoration: none; }
   footer a:hover { text-decoration: underline; }
+  footer p { color: var(--chrome-dim); margin: 0; }
+
+  address { font-style: normal; color: #CFDCD5; margin: 0 0 14px; }
+  a:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+  .skip {
+    position: absolute; left: 12px; top: -60px;
+    background: var(--gold); color: var(--felt-dark);
+    padding: 8px 14px; border-radius: 8px; font-weight: 700; z-index: 2;
+  }
+  .skip:focus { top: 12px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+  @media print {
+    body, header { background: #fff !important; color: #000; }
+    header { padding: 12px 0; border: 0; }
+    .suits .r { color: #9b1c13; }
+    .suits .b { color: #000; }
+    h1, h2, h3, p, li, b, code, a, address, .tagline, .updated, ul.points span, footer, footer p { color: #000 !important; }
+    .skip, .home { display: none; }
+    main a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 90%; }
+  }
 </style>
 </head>
 <body>
 
+<a class="skip" href="#main">Skip to content</a>
+
 <header>
   <div class="wrap">
     <a class="home" href="/">← Open Hearts</a>
-    <div class="suits">
+    <div class="suits" aria-hidden="true">
       <span class="b">♣</span><span class="r">♦</span><span class="b">♠</span><span class="r">♥</span>
     </div>
     <h1>Privacy</h1>
@@ -131,12 +159,12 @@
   </div>
 </header>
 
-<main class="wrap">
+<main id="main" class="wrap">
   <section>
     <h2>The short version</h2>
     <ul class="points">
       <li>
-        <span class="pip g">♠</span>
+        <span aria-hidden="true" class="pip g">♠</span>
         <div>
           <b>Playing alone stays on your device</b>
           <span>Your name, your picture and your games against the bots are
@@ -144,7 +172,7 @@
         </div>
       </li>
       <li>
-        <span class="pip r">♥</span>
+        <span aria-hidden="true" class="pip r">♥</span>
         <div>
           <b>Live play is public, on purpose</b>
           <span>To play people, your name, your picture and your results go
@@ -153,7 +181,7 @@
         </div>
       </li>
       <li>
-        <span class="pip g">♣</span>
+        <span aria-hidden="true" class="pip g">♣</span>
         <div>
           <b>No ads, no analytics, no accounts</b>
           <span>Nothing is sold, rented or used for advertising. There are no
@@ -161,7 +189,7 @@
         </div>
       </li>
       <li>
-        <span class="pip r">♦</span>
+        <span aria-hidden="true" class="pip r">♦</span>
         <div>
           <b>Paying is Stripe's job</b>
           <span>On the web a subscription is bought through Stripe, which has
@@ -178,7 +206,8 @@
       Open Hearts is an open-source project. "We" are the people who maintain
       it, at <a href="https://github.com/bfulton/open-hearts">github.com/bfulton/open-hearts</a>.
       The code is public, so everything on this page can be checked against
-      what the app actually does.
+      what the app actually does. Our postal address and phone number are
+      under <a href="#contact">Contact</a>, at the end of this page.
     </p>
     <p>
       This page covers this site, the game at
@@ -426,21 +455,43 @@
   </section>
 
   <section>
-    <h2>Contact</h2>
+    <h2 id="contact">Contact</h2>
     <p>
-      Open an issue at
+      For a privacy request — a copy of what our service keeps about your
+      device, or deleting it — or any other question about this page, write
+      to us or call:
+    </p>
+    <address>
+      Open Hearts<br>
+      6650 Rivers Ave, Ste 105, PMB #804106<br>
+      North Charleston, SC 29406<br>
+      USA<br>
+      Phone: <a href="tel:+18438270686">+1 (843) 827-0686</a>
+    </address>
+    <p>
+      So that we can find what is yours, tell us the name you play under
+      and, if you subscribed on the web, the email address you paid with.
+    </p>
+    <p>
+      For bugs and anything that is not private, open an issue at
       <a href="https://github.com/bfulton/open-hearts/issues">github.com/bfulton/open-hearts/issues</a>.
-      Issues are public, so put nothing private in one: say that you have a
-      privacy request, and we will arrange a private way to deal with it.
+      Issues are public, so put nothing private in one.
     </p>
   </section>
 </main>
 
 <footer class="wrap">
-  <a href="https://github.com/bfulton/open-hearts">Source on GitHub</a>
-  &nbsp;·&nbsp; MIT licensed
-  &nbsp;·&nbsp; <a href="/play">Play</a>
-  &nbsp;·&nbsp; <a href="/privacy">Privacy</a>
+  <nav aria-label="Site">
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/play">Play</a></li>
+      <li><a href="/support">Support</a></li>
+      <li><a href="/privacy" aria-current="page">Privacy</a></li>
+      <li><a href="/terms">Terms</a></li>
+      <li><a href="https://github.com/bfulton/open-hearts">Source on GitHub</a></li>
+    </ul>
+  </nav>
+  <p>Open Hearts · MIT licensed · North Charleston, SC, USA</p>
 </footer>
 
 </body>
