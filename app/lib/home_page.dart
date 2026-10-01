@@ -454,7 +454,22 @@ class _HomePageState extends State<HomePage> {
       }
       _toTable(spec, queue.seatNames, avatars);
     });
-    _waitClock = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _waitClock = Timer.periodic(const Duration(seconds: 1), (_) {
+      // Bots take every seat still empty at ten seconds, so a device
+      // the relays can hear is seated a round or two after that. One
+      // still waiting at the far deadline is one nobody hears — it
+      // went offline, or its relays did — and even the seating it
+      // hosts itself has to come back to it off a relay: the spinner
+      // would turn for ever. So back to the door, saying why.
+      if (DateTime.now().millisecondsSinceEpoch - queue.since >= stopWaiting.inMilliseconds) {
+        setState(() {
+          _closeLobby();
+          _error = _noRelay;
+        });
+        return;
+      }
+      setState(() {});
+    });
     setState(() => _queue = queue);
   }
 
