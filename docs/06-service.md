@@ -324,7 +324,18 @@ the wire, which a photograph of somebody's screen would otherwise
 carry away.
 
 The count is read where a code is spent rather than where it is made,
-so a code made while there was room cannot let a sixth device in.
+so a code made while there was room cannot let a sixth device in. A
+code's row is let go by the store an hour after it is made, spent or
+not, so codes do not pile up for ever.
+
+A code does not take a device off another subscription that is still
+paid up. A code arrives in a link and is spent the moment the app
+opens it, so a stranger with a subscription of his own could
+otherwise send one to somebody else's phone, take it off the
+subscription its owner paid for, and drop it from his. A device
+moves on by dropping itself first; one whose subscription has ended
+is free to go, and so is one licensed by local mode's open house,
+which was never anybody's purchase.
 Dropping a device takes away its binding **and** its entitlement row —
 not merely the date on it: the subscription is still paid up, so a row
 that had only run out would be dated forward again on that device's

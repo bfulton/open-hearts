@@ -138,8 +138,10 @@ export function storeOf(env) {
     async get(pk, sk) {
       return kv.get(at(pk, sk), 'json');
     },
-    async put(pk, sk, value) {
-      await kv.put(at(pk, sk), JSON.stringify(value));
+    /// [ttl], in seconds, is how long KV keeps the row before letting
+    /// it go by itself; without one it is kept until it is deleted.
+    async put(pk, sk, value, { ttl } = {}) {
+      await kv.put(at(pk, sk), JSON.stringify(value), ...(ttl ? [{ expirationTtl: ttl }] : []));
     },
     async del(pk, sk) {
       await kv.delete(at(pk, sk));
@@ -169,6 +171,7 @@ export function memoryStore(seed = {}) {
       const raw = rows.get(at(pk, sk));
       return raw === undefined ? null : JSON.parse(raw);
     },
+    /// An expiry is KV's to keep: a Map lives no longer than a test.
     async put(pk, sk, value) {
       rows.set(at(pk, sk), JSON.stringify(value));
     },
@@ -519,6 +522,12 @@ const MOST_DEVICES = 5;
 /// short enough that a photograph of the screen is not a key.
 const TICKET_MINUTES = 10;
 
+/// How long a code's row is kept, spent or not, before the store lets
+/// it go by itself: an hour, so that a late scan is told the code ran
+/// out rather than that it never was. Without it every code ever made
+/// would be a row for ever.
+const TICKET_KEPT_S = 60 * 60;
+
 const TICKET_BYTES = 16;
 
 const nonce = () => hex(crypto.getRandomValues(new Uint8Array(TICKET_BYTES)));
@@ -544,7 +553,7 @@ export async function ticketFor(key, store, { now = Date.now() } = {}) {
   }
   const code = nonce();
   const expires_at = new Date(now + TICKET_MINUTES * 60000).toISOString();
-  await store.put(`TICKET#${code}`, 'META', { subscription: held.subscription, expires_at, used_at: null, made_by: key });
+  await store.put(`TICKET#${code}`, 'META', { subscription: held.subscription, expires_at, used_at: null, made_by: key }, { ttl: TICKET_KEPT_S });
   return { status: 200, body: { ticket: code, expires_at, devices: devices.length, most: MOST_DEVICES } };
 }
 
@@ -563,10 +572,24 @@ export async function claimWith(key, code, store, { now = Date.now() } = {}) {
     return { status: 409, body: { error: 'five devices already', devices: devices.length, most: MOST_DEVICES } };
   }
   const today = dayOf(now);
-  await store.put(`TICKET#${code}`, 'META', { ...ticket, used_at: today, used_by: key });
+  // A device on another subscription that is still paid up stays on
+  // it. A code arrives in a link and is spent the moment the app opens
+  // it, so a link from a stranger with a subscription of his own would
+  // otherwise take a device off the one its owner paid for, onto one
+  // where he can drop it. Leaving is the device's own to do, by
+  // dropping itself first. A subscription that has ended holds
+  // nothing, and neither does local mode's open house, which licenses
+  // every device that asks and was never anybody's purchase.
+  const was = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  if (was && was.subscription !== ticket.subscription) {
+    const theirs = await store.get(`SUB#${was.subscription}`, 'META');
+    if (theirs && theirs.source !== 'local' && theirs.renews_at && theirs.renews_at >= today) {
+      return { status: 409, body: { error: 'this device is on another subscription: drop it there first' } };
+    }
+  }
+  await store.put(`TICKET#${code}`, 'META', { ...ticket, used_at: today, used_by: key }, { ttl: TICKET_KEPT_S });
   // A device that was on another subscription leaves it rather than
   // counting against both.
-  const was = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (was && was.subscription !== ticket.subscription) await store.del(`SUB#${was.subscription}`, `DEVICE#${key}`);
   const sub = await store.get(`SUB#${ticket.subscription}`, 'META');
   if (!already) await store.put(`SUB#${ticket.subscription}`, `DEVICE#${key}`, { bound_at: today });
