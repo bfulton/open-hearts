@@ -52,8 +52,29 @@ the bottom with the day.
     account's email → `OH_PLAY_PUSH_EMAIL`, and the audience (default:
     the push URL) → `OH_PLAY_PUSH_AUDIENCE`;
   - a license tester, to buy once end to end.
+- **Store business setup**: Apple's Paid Apps agreement, tax and
+  banking forms, and In-App Purchase enabled on the App ID; a Play
+  merchant account. Neither store sells a subscription without them.
+  Play billing works only for a build uploaded to a testing track.
+- **The app's ids.** Android's `applicationId` is still the template's
+  `com.openhearts.open_hearts` (`app/android/app/build.gradle.kts`, a
+  TODO), and the app's Manage link assumes it (`OH_PLAY_PACKAGE`). Pick
+  the final Android package and iOS bundle id before the first upload:
+  neither can change after.
+- **Android release signing**: an upload keystore, with
+  `app/android/key.properties` written from it wherever a release is
+  built (a release refuses to build without it).
+- **Try it on a real Android phone**: install a build made after
+  `crypto/build_android.sh` and play a live table. The native deal
+  library is built, exports everything the app calls, and is packed
+  into the APK, but there was no emulator here to run it.
 - **A Mac with Xcode**, to build, sign and submit the iPhone app — and
-  to build the deal's native library for iOS.
+  to build the deal's and Schnorr's native libraries for iOS (an
+  xcframework linked into Runner, opened with
+  `DynamicLibrary.process()`): until then an iPhone build plays alone.
+- **App Store metadata**: the privacy policy and terms URLs
+  (`/privacy`, `/terms`) in App Store Connect, and the terms named as
+  the EULA or Apple's standard one chosen.
 - **Provider sign-in**: a Google OAuth client id and an Apple Services
   id, so a lost phone is recovered by signing in (README, roadmap 8).
 

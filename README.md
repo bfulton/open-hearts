@@ -152,14 +152,20 @@ rigged. Roughly in order:
    the web through Stripe are built, and so is sharing a subscription
    across your devices: five to a household, brought in by a code one
    of them shows and the next one's camera reads. Buying on a phone is
-   the store's own subscription: the app's half is built, and waits on
-   the products being made in the stores and the next item. Provider
+   the store's own subscription, and both halves are built — the app's
+   store sheet and restore, and the service's checks of an App Store
+   signed transaction and a Play purchase token, with each store's
+   renewal notifications — waiting on the products being made in the
+   stores and the next item. Web subscribers cancel in Stripe's billing
+   portal. Provider
    sign-in, so a lost phone is recovered by signing in, is built on the
    service's side and waits on a Google client id and an Apple service
    id for the app's.
 9. **The stores.** And with them the deal's native library bundled
    into the phone builds, as the web build ships its wasm: every live
-   table is sealed, so a build without it plays alone.
+   table is sealed, so a build without it plays alone. Android's is
+   built (`crypto/build_android.sh`, packed into the APK, and a release
+   refuses to build without it); iOS's needs a Mac to build and link.
 
 ### Backlog
 
