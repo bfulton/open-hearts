@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { createRelay, maxSubscriptions, memoryStore, schnorrVerifier, tagOf } from './relay.mjs';
+import { createRelay, maxSubscriptions, memoryStore, objectLimits, objectRelay, schnorrVerifier, tagOf } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
 
@@ -313,4 +313,120 @@ test('the tag in the path is what names an object, and only a tag does', () => {
   // And this is the mark the app's relay list carries while nobody has
   // put a tag in it: it names no object, on purpose.
   assert.equal(tagOf('/%7Btag%7D'), null);
+});
+
+// ---- the object, open to anybody ---------------------------------------
+// The object carries presence for everyone on one tag, and anybody who
+// can open a socket can say anything on it. What the object itself
+// runs is built in relay.mjs (objectRelay) so that these are tests of
+// it rather than of a relay configured to look like it.
+
+const listening = async (relay, n) => {
+  const all = [];
+  for (let i = 0; i < n; i++) {
+    const s = socket();
+    relay.open(s);
+    await relay.message(s, JSON.stringify(['REQ', 'online', { kinds: [24246], '#t': ['online'] }]));
+    all.push(s);
+  }
+  return all;
+};
+
+test('the object carries ephemeral kinds and refuses the rest, with the reason', async () => {
+  const relay = objectRelay(verify);
+  const a = socket();
+  relay.open(a);
+  const stored = await note(keys[0], 1000);
+  await relay.message(a, JSON.stringify(['EVENT', stored]));
+  assert.equal(a.of('OK')[0][2], false);
+  assert.match(a.of('OK')[0][3], /^blocked: /);
+  await relay.message(a, JSON.stringify(['EVENT', await beat(keys[0])]));
+  assert.equal(a.of('OK')[1][2], true);
+  assert.equal(relay.stored, 0);
+});
+
+test('the object reads nothing bigger than presence ever says, and sends nothing on for it', async () => {
+  // Cloudflare hands an object messages of up to 32 MiB, and an event
+  // that matches presence goes to every device listening: one message
+  // of a few megabytes was hundreds of megabytes out, and seconds of
+  // the one thread every device on the tag shares.
+  const relay = objectRelay(verify);
+  const [listener] = await listening(relay, 1);
+  const a = socket();
+  relay.open(a);
+  const big = await sign.event(keys[0], { kind: 24246, content: 'x'.repeat(objectLimits.message), tags: [['t', 'online']] });
+  await relay.message(a, JSON.stringify(['EVENT', big]));
+  assert.equal(listener.of('EVENT').length, 0);
+  assert.match(a.said.at(-1)[1], /too big/);
+
+  // A summons is the largest thing presence says — a table, its jury
+  // and the draws it has carried — and is taken whole.
+  const summons = await sign.event(keys[0], {
+    kind: 24246,
+    content: JSON.stringify({ kind: 'summons', draws: 'd'.repeat(24 * 1024) }),
+    tags: [['t', 'online'], ['p', keys[1].public]],
+  });
+  await relay.message(a, JSON.stringify(['EVENT', summons]));
+  assert.equal(a.of('OK').at(-1)[2], true);
+  assert.equal(listener.of('EVENT').length, 1);
+});
+
+test('the object holds a socket to a burst of events, and then a few a second', async () => {
+  let clock = 1_000_000;
+  const relay = objectRelay(verify, { now: () => clock });
+  const [listener] = await listening(relay, 1);
+  const a = socket();
+  relay.open(a);
+  const { burst } = objectLimits;
+  const events = [];
+  for (let i = 0; i < burst + 5; i++) events.push(await beat(keys[0], 2000 + i));
+  // A beat every five seconds, a summons to each juror of a draw at
+  // once: far inside the burst. A flood is not.
+  await Promise.all(events.map((e) => relay.message(a, JSON.stringify(['EVENT', e]))));
+  const oks = a.of('OK');
+  assert.equal(oks.filter((m) => m[2]).length, burst);
+  assert.match(oks.at(-1)[3], /^rate-limited: /);
+  assert.equal(listener.of('EVENT').length, burst, 'and what was refused went nowhere');
+  // The bucket fills again with time, and another socket has its own.
+  clock += 1000;
+  await relay.message(a, JSON.stringify(['EVENT', await beat(keys[0], 3000)]));
+  assert.equal(a.of('OK').at(-1)[2], true);
+  const b = socket();
+  relay.open(b);
+  await relay.message(b, JSON.stringify(['EVENT', await beat(keys[1], 3001)]));
+  assert.equal(b.of('OK')[0][2], true);
+});
+
+test('what a socket carries through hibernation stays under what an attachment may hold', async () => {
+  // serializeAttachment takes 16 KiB; past that it throws, and the
+  // socket would wake from hibernation having lost what it asked for.
+  const relay = objectRelay(verify);
+  const a = socket();
+  relay.open(a);
+  const filters = Array.from({ length: 200 }, (_, i) => ({ authors: [`${i}`.padStart(64, 'f')] }));
+  await relay.message(a, JSON.stringify(['REQ', 'x'.repeat(1000), ...filters]));
+  assert.match(a.said.at(-1)[1], /too big/);
+  assert.deepEqual(relay.subscriptionsOf(a), {});
+  // A client asking for as much as it may, each as large as it may be.
+  for (let i = 0; i < maxSubscriptions + 2; i++) {
+    const head = JSON.stringify(['REQ', `s${i}`, { '#t': [''] }]).length;
+    await relay.message(a, JSON.stringify(['REQ', `s${i}`, { '#t': ['t'.repeat(objectLimits.request - head)] }]));
+  }
+  assert.equal(Object.keys(relay.subscriptionsOf(a)).length, maxSubscriptions);
+  assert.ok(JSON.stringify(relay.subscriptionsOf(a)).length <= 16384);
+  // And presence's own subscription is nowhere near it.
+  const b = socket();
+  relay.open(b);
+  await relay.message(b, JSON.stringify(['REQ', 'online', { kinds: [24246], '#t': ['online'] }]));
+  assert.deepEqual(b.said, [['EOSE', 'online']]);
+});
+
+test('an event goes out to every listener as the same text, made once', async () => {
+  const relay = createRelay({ verify });
+  const listeners = await listening(relay, 3);
+  const a = socket();
+  relay.open(a);
+  const mine = await beat(keys[0]);
+  await relay.message(a, JSON.stringify(['EVENT', mine]));
+  for (const l of listeners) assert.deepEqual(l.of('EVENT'), [['EVENT', 'online', mine]]);
 });

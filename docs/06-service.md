@@ -508,6 +508,19 @@ size limit, so a socket is held to a few subscriptions and the oldest
 goes as a new one arrives — bounded as it is written, which is the
 rule for everything here.
 
+**Bounded per socket.** The tag is open to anybody who can open a
+socket, Cloudflare hands an object messages of up to 32 MiB, and an
+event that matches presence goes on to every device listening, on the
+one thread they share — one message of four megabytes was 800 MB out
+to two hundred listeners and three seconds of that thread. So the
+object (`objectRelay`, `objectLimits` in `relay.mjs`) reads no message
+longer than 64 K characters, which is several times a summons, the
+largest thing presence says; takes a REQ of a kilobyte at most, so
+eight of them ride in the 16 KiB a socket's attachment may carry; and
+holds each socket to a burst of thirty events and two a second after,
+refused before their signatures are checked. The node host under the
+suites carries whole tables and is held to none of it.
+
 **Nothing is written down.** Presence is ephemeral by definition,
 forwarded to whoever is listening and forgotten, so the object has no
 storage to pay for, none to read on the way back from hibernation, and
