@@ -376,3 +376,19 @@ suites were not run.
   BIP-340's published test vectors; the service key is minted with a
   CSPRNG; `deploy.sh` reads only environment variables and pins
   `wrangler`; the app's page loads no third-party script.
+
+## Open-source readiness: the whole history
+
+Every line ever added, on every branch (`git log -p --all`, 94,744
+added lines), was scanned with `detect-secrets` (all default plugins):
+525 hits, every one read. None is a credential. They are the published
+NIP-44 vectors (`packages/table/test/nip44.vectors.json`), the published
+BIP-340 test pair the suites and `service/do/sign.mjs`'s self-check use
+on purpose, digests and lockfile hashes, Xcode identifiers, and test
+placeholders (`sk_test`, `whsec_other`, `wss://user:pw@ok.example`). No
+key, keystore, `.env`, certificate or `key.properties` file has ever
+been committed, and the files that would hold one are ignored
+(`app/android/.gitignore`, and the service secret since this review).
+Nothing in the published code is anti-cheat that depends on being
+secret: the deal's fairness is the protocol (doc 03), and the protocol
+is meant to be read.
