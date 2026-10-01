@@ -40,6 +40,11 @@ class _SubscribePageState extends State<SubscribePage> {
 
   Signer? _me;
   Household? _household;
+
+  /// Why there is no list of devices, once the service has been asked
+  /// for one and has not given it: said where the list would be,
+  /// rather than leaving the "…" of a list still coming there for good.
+  String? _unlisted;
   Ticket? _code;
   bool _working = false;
 
@@ -67,7 +72,10 @@ class _SubscribePageState extends State<SubscribePage> {
     if (!Entitlement.current.live) return;
     final said = await devicesOn(me);
     if (!mounted) return;
-    setState(() => _household = said.answer);
+    setState(() {
+      _household = said.answer;
+      _unlisted = said.refusal;
+    });
   }
 
   Future<void> _buy() async {
@@ -220,7 +228,9 @@ class _SubscribePageState extends State<SubscribePage> {
       const SizedBox(height: 22),
       const _Heading('Your devices'),
       const SizedBox(height: 8),
-      if (house == null)
+      if (house == null && _unlisted != null)
+        Text(_unlisted!, style: const TextStyle(fontSize: 13, color: Palette.danger))
+      else if (house == null)
         const Text('…', style: TextStyle(fontSize: 13, color: Palette.chromeDim))
       else ...[
         for (final device in house.devices)
