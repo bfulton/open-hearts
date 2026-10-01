@@ -80,6 +80,11 @@ so the pill says nothing rather than something stale, and nor are the
 service's handlers. The registration is in `app/web/flutter_bootstrap.js`,
 which also stops Flutter's loader registering its stub over it.
 
+`node e2e/offline.mjs` holds all of this to account in a browser:
+opened offline from what was kept and a hand played, and, with the
+network, the relays or the site's worker taken away or left never
+answering, every wait ending in words within a time it writes down.
+
 ## Credentials
 
 `deploy.sh` needs `CLOUDFLARE_TOKEN` (Pages: Edit) and

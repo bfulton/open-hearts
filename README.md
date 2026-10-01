@@ -203,6 +203,7 @@ cd app && flutter build apk --release  # needs app/android/key.properties (below
 node e2e/flows.mjs                  # every flow one device can drive, in a browser
 node e2e/run.mjs                    # four browsers at one table, over the local relay
 node e2e/escrow.mjs                 # a bot seat's juror goes, and the escrow opens the seat
+node e2e/offline.mjs                # no network, no relays, no worker: solo still plays, every wait ends in words
 ```
 
 An Android release is signed with the release key named in
