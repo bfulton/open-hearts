@@ -843,4 +843,36 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get reload => 'Recarregar';
+
+  @override
+  String get tellUsWhatsBroken => 'Conte o que está quebrado';
+
+  @override
+  String get feedbackIntro =>
+      'O que aconteceu, e o que você esperava? Uma ou duas frases bastam.';
+
+  @override
+  String get feedbackHint => 'O que aconteceu';
+
+  @override
+  String get feedbackWithRecord =>
+      'Enviar também o registro desta partida, para a mão poder ser repetida';
+
+  @override
+  String get feedbackSentWithIt => 'Vai junto';
+
+  @override
+  String get feedbackSend => 'Enviar';
+
+  @override
+  String get feedbackIsPublic =>
+      'Isto abre uma issue no GitHub, que qualquer pessoa pode ler. Não inclua nada privado.';
+
+  @override
+  String get feedbackCopied => 'Copiado. Cole na página que abriu.';
+
+  @override
+  String feedbackCopiedTo(String to) {
+    return 'Copiado. Cole em $to';
+  }
 }

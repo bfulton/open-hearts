@@ -1029,5 +1029,46 @@
   "reload": "Reload",
   "@reload": {
     "description": "Button beside updateDueWeb: reloads the page onto the new version."
+  },
+  "tellUsWhatsBroken": "Tell us what's broken",
+  "@tellUsWhatsBroken": {
+    "description": "Menu item and page title: report a problem."
+  },
+  "feedbackIntro": "What happened, and what did you expect? A sentence or two is plenty.",
+  "@feedbackIntro": {
+    "description": "At the top of the report page."
+  },
+  "feedbackHint": "What happened",
+  "@feedbackHint": {
+    "description": "Hint in the empty box the player writes the report in."
+  },
+  "feedbackWithRecord": "Send this game's record too, so the hand can be replayed",
+  "@feedbackWithRecord": {
+    "description": "Checkbox on the report page, opened from a solo game."
+  },
+  "feedbackSentWithIt": "Sent with it",
+  "@feedbackSentWithIt": {
+    "description": "Heading above the build and device details that go with the report."
+  },
+  "feedbackSend": "Send",
+  "@feedbackSend": {
+    "description": "Button: send the report."
+  },
+  "feedbackIsPublic": "This opens an issue on GitHub, which anyone can read. Leave out anything private.",
+  "@feedbackIsPublic": {
+    "description": "Under the Send button when reports go to GitHub."
+  },
+  "feedbackCopied": "Copied. Paste it into the page that opened.",
+  "@feedbackCopied": {
+    "description": "Shown after sending, when the report goes by the clipboard."
+  },
+  "feedbackCopiedTo": "Copied. Paste it at {to}",
+  "@feedbackCopiedTo": {
+    "description": "Shown after sending, on a device that cannot open the page: to is the address.",
+    "placeholders": {
+      "to": {
+        "type": "String"
+      }
+    }
   }
 }

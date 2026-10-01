@@ -58,7 +58,7 @@ class Notice {
 }
 
 class RemoteConfig {
-  const RemoteConfig({this.live = true, this.offer = true, this.relays, this.banner, this.updateBefore, this.updateText});
+  const RemoteConfig({this.live = true, this.offer = true, this.relays, this.banner, this.updateBefore, this.updateText, this.feedback});
 
   /// No config at all: the build as it was made.
   static const none = RemoteConfig();
@@ -87,6 +87,10 @@ class RemoteConfig {
   /// What it is told, when the operator wrote something; the app's own
   /// words otherwise.
   final Saying? updateText;
+
+  /// Where "Tell us what's broken" goes (feedback_page.dart): an https
+  /// page or a mailto address; null for the project's issues.
+  final Uri? feedback;
 
   /// Whether [published] — this build's day, or "dev" — is a build the
   /// operator asks to be updated. A local build has no day and never is.
@@ -119,6 +123,8 @@ class RemoteConfig {
         banner = Notice(id: id, text: text, warning: b['level'] == 'warn');
       }
     }
+    final f = json['feedback'];
+    final feedback = f is String ? Uri.tryParse(f) : null;
     final u = json['update'];
     final before = u is Map ? u['before'] : null;
     final due = before is String && _day.hasMatch(before);
@@ -129,7 +135,14 @@ class RemoteConfig {
       banner: banner,
       updateBefore: due ? before : null,
       updateText: due ? Saying.parse((u as Map)['text']) : null,
+      feedback: feedback != null && _goesSomewhere(feedback) ? feedback : null,
     );
+  }
+
+  /// An address a report may be sent to: a page over https, or mail.
+  static bool _goesSomewhere(Uri u) {
+    if (u.scheme == 'https') return u.host.isNotEmpty && u.userInfo.isEmpty;
+    return u.scheme == 'mailto' && RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(u.path);
   }
 }
 

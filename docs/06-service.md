@@ -330,6 +330,7 @@ npx wrangler kv key put --binding OH_STORE 'config|app' \
 | `offer` | `false` hides the paid tier from a device that has not bought it: no price, no Subscribe. One with a licence keeps live play. For a store build that may not show a web price. | offered |
 | `relays` | The relays the tables meet on, in place of the build's: one to eight, `wss://` only, every one good or none taken. Read at the app's start, so the devices that started since the change meet on the new ones and those before it finish where they are. A local build and the rig keep their own. | the build's |
 | `banner` | A line across the front door: `id` (letters, digits, `.` `_` `-`), `level` `info` or `warn`, and `text` by language, English required — a device is told it in its own language where the row has it and in English where it does not. | nothing |
+| `feedback` | Where "Tell us what's broken" sends a report: an `https://` page or a `mailto:` address. GitHub's new-issue page and mail take the report in the address; another page is opened with the report on the clipboard. | the project's GitHub issues |
 | `update` | `before`: a day, `YYYY-MM-DD`; a build published before it is asked to update, in `text` if given and the app's own words if not, with a Reload button on the web. A local build has no day and is never asked. | nothing |
 
 The worker checks every field before it serves the row (`configOf`), and

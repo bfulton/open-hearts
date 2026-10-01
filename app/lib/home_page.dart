@@ -30,6 +30,7 @@ import 'avatar.dart';
 import 'build_info.dart' show buildDate, reloadPage;
 import 'crypto/deal.dart';
 import 'entitlement.dart';
+import 'feedback_page.dart';
 import 'game_options.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
@@ -737,6 +738,7 @@ class _HomePageState extends State<HomePage> {
             // to the one page.
             if (liveOpen)
               MenuAction(l10n.livePlay, icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
+            MenuAction(l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
             MenuAction(l10n.about, icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
           ],
         ),

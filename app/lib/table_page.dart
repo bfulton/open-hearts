@@ -14,6 +14,7 @@ import 'about_page.dart';
 import 'avatar.dart';
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
+import 'feedback_page.dart';
 import 'game_controller.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
@@ -128,6 +129,8 @@ class _TablePageState extends State<TablePage> {
                   game: game,
                   menu: [
                     MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: () => Navigator.of(context).maybePop()),
+                    MenuAction(context.l10n.tellUsWhatsBroken,
+                        icon: Icons.feedback_outlined, onSelected: () => showFeedback(context, record: _controller.recordText)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
                       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
                     }),

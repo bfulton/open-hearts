@@ -177,5 +177,14 @@
   "livePaused": "El juego en vivo está en pausa por ahora. Jugar solo sigue abierto.",
   "updateDueWeb": "Esta versión está desactualizada. Recarga para obtener la nueva.",
   "updateDueApp": "Esta versión está desactualizada. Actualiza la app para obtener la nueva.",
-  "reload": "Recargar"
+  "reload": "Recargar",
+  "tellUsWhatsBroken": "Dinos qué falla",
+  "feedbackIntro": "¿Qué pasó y qué esperabas? Con una o dos frases basta.",
+  "feedbackHint": "Qué pasó",
+  "feedbackWithRecord": "Enviar también el registro de esta partida, para poder repetir la mano",
+  "feedbackSentWithIt": "Se envía con ello",
+  "feedbackSend": "Enviar",
+  "feedbackIsPublic": "Esto abre una incidencia en GitHub, que cualquiera puede leer. No incluyas nada privado.",
+  "feedbackCopied": "Copiado. Pégalo en la página que se abrió.",
+  "feedbackCopiedTo": "Copiado. Pégalo en {to}"
 }

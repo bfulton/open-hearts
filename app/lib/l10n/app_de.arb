@@ -177,5 +177,14 @@
   "livePaused": "Live-Spiel ist gerade pausiert. Allein spielen geht weiter.",
   "updateDueWeb": "Diese Version ist veraltet. Lade neu, um die neue zu bekommen.",
   "updateDueApp": "Diese Version ist veraltet. Aktualisiere die App, um die neue zu bekommen.",
-  "reload": "Neu laden"
+  "reload": "Neu laden",
+  "tellUsWhatsBroken": "Sag uns, was kaputt ist",
+  "feedbackIntro": "Was ist passiert, und was hast du erwartet? Ein, zwei Sätze reichen.",
+  "feedbackHint": "Was ist passiert",
+  "feedbackWithRecord": "Auch das Protokoll dieses Spiels senden, damit die Runde nachgespielt werden kann",
+  "feedbackSentWithIt": "Wird mitgeschickt",
+  "feedbackSend": "Senden",
+  "feedbackIsPublic": "Das öffnet ein Issue auf GitHub, das jeder lesen kann. Lass alles Private weg.",
+  "feedbackCopied": "Kopiert. Füge es auf der geöffneten Seite ein.",
+  "feedbackCopiedTo": "Kopiert. Füge es hier ein: {to}"
 }

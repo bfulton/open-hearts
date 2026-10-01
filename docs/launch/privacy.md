@@ -230,7 +230,25 @@ flow. When it ships, Apple or Google learns that the person signed in
 to Open Hearts, and we store an HMAC of their identifier, never the
 identifier.
 
-### 7. Not collected anywhere
+### 7. Telling us what's broken — only when the player sends it
+
+The menu's "Tell us what's broken" (`app/lib/feedback_page.dart`) sends
+nothing by itself. What would go is on the page before it goes: the
+player's own words, the build tag and day, the platform, the app's
+language, the screen's size in points, and — from a solo table, only if
+the player ticks it — the game's record (seed and their own passes and
+plays). Send opens the destination with the report filled in: by
+default a new issue on the project's public GitHub, which the page says
+anyone can read; the operator can point it at a form or a mail address
+instead with the remote config's `feedback` (doc 06). Off the web the
+report is copied for the player to paste. So it is user-initiated,
+optional, and shown in full — but if it goes to GitHub it is public,
+and if it goes to a form or mail we hold what was sent: the store
+answers should then add **User Content → Customer Support** (Apple) and
+**App activity → Other user-generated content** (Google), optional and
+not linked unless the player signs it.
+
+### 8. Not collected anywhere
 
 No analytics, crash reporting, advertising identifiers, fingerprinting,
 cookies from our pages (Stripe sets its own, on its own domain),

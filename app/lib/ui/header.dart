@@ -115,7 +115,10 @@ class MenuButton extends StatelessWidget {
               children: [
                 Icon(action.icon, size: 18, color: Palette.chromeDim),
                 const SizedBox(width: 12),
-                Text(action.label, style: const TextStyle(fontSize: 14, color: Palette.chrome)),
+                // A label longer than the menu is wide — a long one in a
+                // long language — goes onto a second line rather than off
+                // the side.
+                Flexible(child: Text(action.label, style: const TextStyle(fontSize: 14, color: Palette.chrome))),
               ],
             ),
           ),

@@ -177,5 +177,14 @@
   "livePaused": "Le jeu en direct est en pause pour l'instant. Le jeu en solo reste ouvert.",
   "updateDueWeb": "Cette version n'est plus à jour. Rechargez pour avoir la nouvelle.",
   "updateDueApp": "Cette version n'est plus à jour. Mettez l'application à jour pour avoir la nouvelle.",
-  "reload": "Recharger"
+  "reload": "Recharger",
+  "tellUsWhatsBroken": "Signaler un problème",
+  "feedbackIntro": "Que s'est-il passé, et qu'attendiez-vous ? Une phrase ou deux suffisent.",
+  "feedbackHint": "Ce qui s'est passé",
+  "feedbackWithRecord": "Envoyer aussi le relevé de cette partie, pour pouvoir rejouer la donne",
+  "feedbackSentWithIt": "Envoyé avec",
+  "feedbackSend": "Envoyer",
+  "feedbackIsPublic": "Ceci ouvre un ticket sur GitHub, que tout le monde peut lire. N'y mettez rien de privé.",
+  "feedbackCopied": "Copié. Collez-le dans la page qui s'est ouverte.",
+  "feedbackCopiedTo": "Copié. Collez-le ici : {to}"
 }

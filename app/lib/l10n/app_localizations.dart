@@ -1171,6 +1171,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reload'**
   String get reload;
+
+  /// Menu item and page title: report a problem.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us what\'s broken'**
+  String get tellUsWhatsBroken;
+
+  /// At the top of the report page.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened, and what did you expect? A sentence or two is plenty.'**
+  String get feedbackIntro;
+
+  /// Hint in the empty box the player writes the report in.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened'**
+  String get feedbackHint;
+
+  /// Checkbox on the report page, opened from a solo game.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this game\'s record too, so the hand can be replayed'**
+  String get feedbackWithRecord;
+
+  /// Heading above the build and device details that go with the report.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent with it'**
+  String get feedbackSentWithIt;
+
+  /// Button: send the report.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get feedbackSend;
+
+  /// Under the Send button when reports go to GitHub.
+  ///
+  /// In en, this message translates to:
+  /// **'This opens an issue on GitHub, which anyone can read. Leave out anything private.'**
+  String get feedbackIsPublic;
+
+  /// Shown after sending, when the report goes by the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied. Paste it into the page that opened.'**
+  String get feedbackCopied;
+
+  /// Shown after sending, on a device that cannot open the page: to is the address.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied. Paste it at {to}'**
+  String feedbackCopiedTo(String to);
 }
 
 class _AppLocalizationsDelegate

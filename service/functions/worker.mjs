@@ -895,7 +895,7 @@ async function turn(request, env) {
 /// device reads at its start. What is here when there is no row — or a
 /// row this worker cannot read — is what the app does with no config at
 /// all, so a bad row is never worse than none.
-export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null });
+export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null });
 
 /// Where the row lives: `config|app` in OH_STORE.
 const CONFIG_ROW = ['config', 'app'];
@@ -949,6 +949,15 @@ export function configOf(raw) {
   // Please update: a build published before this day is asked to.
   if (raw.update && typeof raw.update === 'object' && typeof raw.update.before === 'string' && DAY.test(raw.update.before)) {
     c.update = { before: raw.update.before, text: sayingOf(raw.update.text) };
+  }
+  // Where a player's "tell us what's broken" goes: a page, or mail.
+  if (typeof raw.feedback === 'string') {
+    try {
+      const u = new URL(raw.feedback);
+      const page = u.protocol === 'https:' && !u.username && !u.password;
+      const mail = u.protocol === 'mailto:' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.pathname);
+      if (page || mail) c.feedback = u.toString();
+    } catch {}
   }
   return c;
 }

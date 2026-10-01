@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/about_page.dart';
 import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/entitlement.dart';
+import 'package:open_hearts/feedback_page.dart';
 import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
@@ -343,6 +344,10 @@ void main() {
           await tester.pumpWidget(_inLanguage(locale, const AboutPage()));
           await tester.pumpAndSettle();
           cut.addAll(_cut(tester, 'about'));
+
+          await tester.pumpWidget(_inLanguage(locale, const FeedbackPage(record: 'oh1:4:Ada,Bao,Cy::')));
+          await tester.pumpAndSettle();
+          cut.addAll(_cut(tester, 'feedback'));
 
           await Entitlement.current.load((await Identity.signer()).publicKey);
           await tester.pumpWidget(_inLanguage(locale, const SubscribePage()));

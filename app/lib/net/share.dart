@@ -11,3 +11,7 @@ Uri roomLink(String code) => Uri.base.removeFragment().replace(queryParameters: 
 /// offered (taken or not); false where there is no sheet, so the
 /// caller falls back to the clipboard.
 Future<bool> shareLink(Uri url) => platform.shareLink(url.toString());
+
+/// Opens [url] beside the app — a new tab on the web. False where
+/// nothing can be opened, so the caller copies it instead.
+bool openBeside(Uri url) => platform.openBeside(url.toString());

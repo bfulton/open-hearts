@@ -21,7 +21,7 @@ test('no row, or no store, is the defaults: everything open, nothing said', asyn
     assert.deepEqual(await answer.json(), CONFIG_DEFAULTS);
     assert.equal(answer.headers.get('cache-control'), 'public, max-age=60');
   }
-  assert.deepEqual(CONFIG_DEFAULTS, { v: 1, live: true, offer: true, relays: null, banner: null, update: null });
+  assert.deepEqual(CONFIG_DEFAULTS, { v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null });
 });
 
 test('the row is served, checked', async () => {
@@ -31,6 +31,7 @@ test('the row is served, checked', async () => {
     relays: ['wss://relay.one.example', 'wss://relay.two.example/'],
     banner: { id: 'maint-1', level: 'warn', text: { en: 'Live play is down until noon UTC.', de: 'Live-Spiel bis 12 Uhr UTC aus.' } },
     update: { before: '2026-10-01', text: { en: 'This version is too old for live play.' } },
+    feedback: 'mailto:help@openhearts.example',
   };
   const answer = await ask({ OH_STORE: kvWith({ 'config|app': JSON.stringify(row) }) });
   assert.deepEqual(await answer.json(), {
@@ -40,6 +41,7 @@ test('the row is served, checked', async () => {
     relays: ['wss://relay.one.example/', 'wss://relay.two.example/'],
     banner: row.banner,
     update: row.update,
+    feedback: 'mailto:help@openhearts.example',
   });
 });
 
@@ -70,6 +72,12 @@ test('a field that does not check out is left at its default, and the rest still
   assert.equal(configOf({ update: { before: 'yesterday' } }).update, null);
   assert.equal(configOf({ update: { before: '2026-10-01T00:00:00Z' } }).update, null);
   assert.deepEqual(configOf({ update: { before: '2026-10-01' } }).update, { before: '2026-10-01', text: null });
+  // Feedback: a page over https, or mail; nothing that runs.
+  assert.equal(configOf({ feedback: 'https://forms.example/hearts' }).feedback, 'https://forms.example/hearts');
+  assert.equal(configOf({ feedback: 'javascript:alert(1)' }).feedback, null);
+  assert.equal(configOf({ feedback: 'http://plain.example' }).feedback, null);
+  assert.equal(configOf({ feedback: 'mailto:not-an-address' }).feedback, null);
+  assert.equal(configOf({ feedback: 42 }).feedback, null);
 });
 
 test('a store that throws is a store with nothing in it', async () => {
