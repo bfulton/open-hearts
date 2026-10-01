@@ -1,5 +1,6 @@
-/// The page the app is served in, and the manifest it is installed
-/// from. The page is hand-written rather than Flutter's template, so
+/// The page the app is served in, the manifest it is installed from,
+/// and the bootstrap that keeps it for a load with no network
+/// (offline_worker.js). The page is hand-written rather than Flutter's template, so
 /// the one line the template has for a reason — the viewport — is
 /// checked here: without it a phone lays the page out at its default
 /// 980 points and scales it down, which is desktop mode.
@@ -24,6 +25,26 @@ void main() {
     expect(content, isNot(contains('maximum-scale=1')), reason: 'nor one that can be zoomed no further than itself');
     expect(content, isNot(contains('viewport-fit=cover')),
         reason: 'Flutter web does not read the safe-area insets, so the browser keeps the page clear of the notch');
+  });
+
+  test('the page keeps the app for a load with no network, and Flutter\'s stub does not undo it', () {
+    // The bootstrap is ours (docs/01-dev-loop.md, "With no network"):
+    // it registers the worker that keeps the app, and it starts
+    // Flutter's loader without the service worker settings that would
+    // register Flutter's own — a stub that unregisters whatever is
+    // registered where it is, ours included.
+    final bootstrap = File('web/flutter_bootstrap.js').readAsStringSync();
+    expect(bootstrap, contains('{{flutter_js}}'));
+    expect(bootstrap, contains('{{flutter_build_config}}'));
+    expect(bootstrap, contains("register('offline_worker.js')"));
+    expect(bootstrap, contains('_flutter.loader.load()'));
+    expect(bootstrap, isNot(contains('serviceWorkerSettings')));
+    expect(bootstrap, isNot(contains('{{flutter_service_worker_version}}')));
+    expect(File('web/offline_worker.js').existsSync(), isTrue);
+    // And the worker never keeps what has to be fresh or nothing.
+    final worker = File('web/offline_worker.js').readAsStringSync();
+    expect(worker, contains('/build-info.json'));
+    expect(worker, contains('/api/'));
   });
 
   test('installed, the app turns with the device, as it does in a tab', () {

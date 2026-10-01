@@ -159,6 +159,8 @@ jobs:
         run: node --test service/functions/worker.test.mjs
       - name: The page's deal worker (in node's test runner, against the committed wasm)
         run: node --test e2e/deal_worker.test.mjs
+      - name: The service worker that keeps the app for a load with no network (in node's test runner)
+        run: node --test e2e/offline_worker.test.mjs
       - name: Relay dependencies
         run: cd service && dart pub get
       - name: Four browsers, one table
