@@ -28,7 +28,8 @@ Pages deployment.
   peer over WebRTC, what it costs (nothing), and where the latency goes
 - [03 — A deal nobody can rig](docs/03-fair-deal.md): mental poker — a
   shuffle no player controls and hands nobody else can read, with no
-  dealer to trust
+  dealer to trust; and where every deal's randomness comes from, a solo
+  game's included
 - [04 — Live play](docs/04-live-play.md): tap Play, be in a game in
   seconds; bots fill the empty seats and say so; who is allowed to know
   what
@@ -93,7 +94,10 @@ rigged. Roughly in order:
    record** on the game-over sheet hands it over as a line of text that
    `packages/engine/tool/replay.dart` turns back into every trick.
    Bot moves are recomputed from it, which is why the bots are
-   deterministic.
+   deterministic. The deal in it is a seed of 256 bits from the
+   platform's secure generator, through HMAC-SHA-256 and a Fisher–Yates
+   shuffle with no bias, so no deal is out of reach and none follows
+   from the ones before it ([doc 03](docs/03-fair-deal.md#where-the-randomness-comes-from)).
 5. **The verifiable deal.** Built ([doc 03](docs/03-fair-deal.md),
    "As built"): Barnett–Smart with the Bayer–Groth argument, the
    reference Rust crate compiled once for the browser's wasm and once
