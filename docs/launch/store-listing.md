@@ -384,7 +384,8 @@ keyword, which the first week does not need.
 
 ## Translations
 
-The app itself is in English only, and each description says so.
+The app itself speaks English, Spanish, Brazilian Portuguese, German and
+French, chosen from the device's language, and each description says so.
 The game's established local names are used where there is one:
 
 | Language | Name used | Why |
@@ -472,9 +473,9 @@ Tus partidas recientes se guardan en tu teléfono y tu perfil las cuenta: partid
 CÓDIGO ABIERTO
 Open Hearts tiene licencia MIT y se desarrolla en abierto. Lee el motor de reglas, lee los bots, abre una incidencia: github.com/bfulton/open-hearts
 
-La aplicación está en inglés.
+La aplicación está en español, inglés, portugués, alemán y francés.
 ```
-Count: 1947 of 4000 characters
+Count: 1985 of 4000 characters
 
 **Google Play — Title**
 <!-- limit=30 unit=chars -->
@@ -597,9 +598,9 @@ Suas partidas recentes ficam guardadas no celular, e o seu perfil faz as contas:
 CÓDIGO ABERTO
 Open Hearts tem licença MIT e é desenvolvido abertamente. Leia o motor de regras, leia os bots, abra uma issue: github.com/bfulton/open-hearts
 
-O aplicativo está em inglês.
+O aplicativo está em português, inglês, espanhol, alemão e francês.
 ```
-Count: 1889 of 4000 characters
+Count: 1928 of 4000 characters
 
 **Google Play — Title**
 <!-- limit=30 unit=chars -->
@@ -722,9 +723,9 @@ Deine letzten Spiele werden auf deinem Handy gespeichert, und dein Profil zählt
 OPEN SOURCE
 Open Hearts steht unter der MIT-Lizenz und wird offen entwickelt. Lies die Regel-Engine, lies die Bots, eröffne ein Issue: github.com/bfulton/open-hearts
 
-Die App ist auf Englisch.
+Die App gibt es auf Deutsch, Englisch, Spanisch, Portugiesisch und Französisch.
 ```
-Count: 2103 of 4000 characters
+Count: 2157 of 4000 characters
 
 **Google Play — Title**
 <!-- limit=30 unit=chars -->
@@ -847,9 +848,9 @@ Vos parties récentes sont gardées sur votre téléphone, et votre profil en fa
 OPEN SOURCE
 Open Hearts est sous licence MIT et développé au grand jour. Lisez le moteur de règles, lisez les bots, ouvrez un ticket : github.com/bfulton/open-hearts
 
-L'application est en anglais.
+L'application est en français, anglais, espagnol, portugais et allemand.
 ```
-Count: 2169 of 4000 characters
+Count: 2212 of 4000 characters
 
 **Google Play — Title**
 <!-- limit=30 unit=chars -->

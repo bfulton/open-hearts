@@ -377,6 +377,17 @@ does). What it found, and what came of it:
   button; `test/accessibility_test.dart` walks the front door's tree for
   anything tappable without a name.
 
+On the web the tree is there once it is asked for: Flutter builds it
+when a screen reader activates the page's first, hidden button, "Enable
+accessibility", and not before, which spares every other visitor the
+cost. A listener meets that button first and presses it once; the
+suites skip it with `?e2e`, which builds the tree from the start. Making
+it always built is one line in main.dart (`ensureSemantics`) and a
+measurable cost on a slow phone, so it is left as Flutter ships it until
+somebody who plays this way says the button is in the way. The phone
+builds have no such step: VoiceOver and TalkBack find the tree as they
+find any app's — though neither has been tried on a device yet.
+
 Two things it found are not fixed. A card chosen to pass is marked
 `aria-current`, which the web engine makes of a selected button and
 which a screen reader says as "current" rather than "selected"; the line
