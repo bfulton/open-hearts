@@ -176,11 +176,13 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
   await click(page, /^Copy record$/);
   await sleep(500);
   const record = await page.evaluate('navigator.clipboard.readText()');
-  if (!/^oh1:/.test(record ?? '')) throw new Error(`the record does not look like one: ${JSON.stringify((record ?? '').slice(0, 40))}`);
+  // A game dealt from 256 bits of the secure generator, which the record
+  // names (docs/03-fair-deal.md, "Where the randomness comes from").
+  if (!/^oh2:[0-9a-f]{64}:/.test(record ?? '')) throw new Error(`the record does not look like one: ${JSON.stringify((record ?? '').slice(0, 80))}`);
   // And it is a record the tool can read: every trick, from the seed
   // and the player's own choices.
   const out = execFileSync('dart', ['run', 'tool/replay.dart', record], { cwd: join(root, 'packages', 'engine'), encoding: 'utf8' });
-  if (!/^seed \d+: /m.test(out) || !/^hand 1: scores/m.test(out) || !/^final: /m.test(out)) {
+  if (!/^seed [0-9a-f]{64}: /m.test(out) || !/^hand 1: scores/m.test(out) || !/^final: /m.test(out)) {
     throw new Error(`replay did not read it back:\n${out.slice(0, 300)}`);
   }
   log(`      the record replays: ${out.split('\n').length} lines`);
