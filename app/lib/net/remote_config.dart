@@ -59,8 +59,162 @@ class Notice {
   final bool warning;
 }
 
+/// How long this device waits on the service and the relays: the
+/// `waits` of the remote config, in milliseconds (minutes for
+/// [configEvery]). Each is taken if it is a whole number within its
+/// bounds and left at the build's own if not; the bounds keep a typo
+/// from making a device give up at once or hang for ever.
+@immutable
+class AppWaits {
+  const AppWaits({
+    this.licence = const Duration(seconds: 6),
+    this.household = const Duration(seconds: 10),
+    this.buy = const Duration(seconds: 12),
+    this.turn = const Duration(seconds: 5),
+    this.config = const Duration(seconds: 8),
+    this.configEvery = const Duration(minutes: 15),
+    this.relaySlow = const Duration(seconds: 8),
+    this.relayGiveUp = const Duration(seconds: 40),
+    this.standing = const Duration(seconds: 8),
+    this.standingAll = const Duration(seconds: 4),
+    this.roomStart = const Duration(seconds: 10),
+    this.meshAnswer = const Duration(seconds: 20),
+  });
+
+  /// The build's own, which are what every device waited before.
+  static const standard = AppWaits();
+
+  /// Asking the service for this device's licence.
+  final Duration licence;
+
+  /// A household's code, claim, drop or list.
+  final Duration household;
+
+  /// Opening a checkout.
+  final Duration buy;
+
+  /// TURN credentials, before a table goes on with STUN alone.
+  final Duration turn;
+
+  /// This config itself.
+  final Duration config;
+
+  /// How often an open app asks for this config again.
+  final Duration configEvery;
+
+  /// A relay slow to answer: when the screen says so, and when it is
+  /// given up on (home_page.dart, waitForRelay).
+  final Duration relaySlow;
+  final Duration relayGiveUp;
+
+  /// Loading the standings: the first relay, then the rest.
+  final Duration standing;
+  final Duration standingAll;
+
+  /// A friends' room starts this long after the last arrival, once two
+  /// are in.
+  final Duration roomStart;
+
+  /// A direct connection to a peer not up by now is left to the relay.
+  final Duration meshAnswer;
+
+  /// Least and most, in milliseconds (minutes for configEvery).
+  static const bounds = <String, (int, int)>{
+    'licenceMs': (2000, 30000),
+    'householdMs': (3000, 30000),
+    'buyMs': (3000, 60000),
+    'turnMs': (2000, 30000),
+    'configMs': (2000, 30000),
+    'configEveryMin': (5, 240),
+    'relaySlowMs': (3000, 30000),
+    'relayGiveUpMs': (15000, 180000),
+    'standingMs': (3000, 30000),
+    'standingAllMs': (1000, 20000),
+    'roomStartMs': (3000, 60000),
+    'meshAnswerMs': (5000, 60000),
+  };
+
+  static AppWaits parse(Object? json) {
+    if (json is! Map) return standard;
+    Duration take(String name, Duration standard) {
+      final v = json[name];
+      final (least, most) = bounds[name]!;
+      if (v is! int || v < least || v > most) return standard;
+      return name.endsWith('Min') ? Duration(minutes: v) : Duration(milliseconds: v);
+    }
+
+    const s = standard;
+    var slow = take('relaySlowMs', s.relaySlow);
+    var giveUp = take('relayGiveUpMs', s.relayGiveUp);
+    // Saying it is slow comes before giving up, or it is never said.
+    if (slow >= giveUp) (slow, giveUp) = (s.relaySlow, s.relayGiveUp);
+    return AppWaits(
+      licence: take('licenceMs', s.licence),
+      household: take('householdMs', s.household),
+      buy: take('buyMs', s.buy),
+      turn: take('turnMs', s.turn),
+      config: take('configMs', s.config),
+      configEvery: take('configEveryMin', s.configEvery),
+      relaySlow: slow,
+      relayGiveUp: giveUp,
+      standing: take('standingMs', s.standing),
+      standingAll: take('standingAllMs', s.standingAll),
+      roomStart: take('roomStartMs', s.roomStart),
+      meshAnswer: take('meshAnswerMs', s.meshAnswer),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is AppWaits &&
+      other.licence == licence &&
+      other.household == household &&
+      other.buy == buy &&
+      other.turn == turn &&
+      other.config == config &&
+      other.configEvery == configEvery &&
+      other.relaySlow == relaySlow &&
+      other.relayGiveUp == relayGiveUp &&
+      other.standing == standing &&
+      other.standingAll == standingAll &&
+      other.roomStart == roomStart &&
+      other.meshAnswer == meshAnswer;
+
+  @override
+  int get hashCode => Object.hash(
+    licence,
+    household,
+    buy,
+    turn,
+    config,
+    configEvery,
+    relaySlow,
+    relayGiveUp,
+    standing,
+    standingAll,
+    roomStart,
+    meshAnswer,
+  );
+}
+
+/// The waits as the operator last set them.
+AppWaits get waits => RemoteSettings.current.config.waits;
+
 class RemoteConfig {
-  const RemoteConfig({this.live = true, this.offer = true, this.relays, this.banner, this.updateBefore, this.updateText, this.feedback, this.privacy, this.terms, this.table = TableTiming.standard});
+  const RemoteConfig({
+    this.live = true,
+    this.offer = true,
+    this.relays,
+    this.banner,
+    this.updateBefore,
+    this.updateText,
+    this.feedback,
+    this.privacy,
+    this.terms,
+    this.price,
+    this.table = TableTiming.standard,
+    this.waits = AppWaits.standard,
+  });
 
   /// No config at all: the build as it was made.
   static const none = RemoteConfig();
@@ -99,12 +253,23 @@ class RemoteConfig {
   /// for the site's own (subscribe_page.dart, legalPage).
   final Uri? privacy;
   final Uri? terms;
+
+  /// What a year of live play costs, as shown on the web beside
+  /// Subscribe ("\$5.99"), when it is not the build's: changed with the
+  /// Stripe price it describes. A store build shows the store's own.
+  final String? price;
+
   /// The clocks of a table this device starts — a person's grace and
   /// bank, a held bot seat's deadlines, the waits on a jury — carried
   /// in the start event, so every seat plays by the starter's
   /// (packages/table, timing.dart). A table someone else starts keeps
   /// theirs.
   final TableTiming table;
+
+  /// How long this device waits on the network before it says so or
+  /// gives up: its own patience, not a table's, so each is taken or
+  /// left on its own ([AppWaits]).
+  final AppWaits waits;
 
   /// Whether [published] — this build's day, or "dev" — is a build the
   /// operator asks to be updated. A local build has no day and never is.
@@ -123,8 +288,12 @@ class RemoteConfig {
     List<Uri>? relays;
     final r = json['relays'];
     if (r is List && r.isNotEmpty && r.length <= 8) {
-      final parsed = [for (final e in r) if (e is String) Uri.tryParse(e)];
-      if (parsed.length == r.length && parsed.every((u) => u != null && u.scheme == 'wss' && u.host.isNotEmpty && u.userInfo.isEmpty)) {
+      final parsed = [
+        for (final e in r)
+          if (e is String) Uri.tryParse(e),
+      ];
+      if (parsed.length == r.length &&
+          parsed.every((u) => u != null && u.scheme == 'wss' && u.host.isNotEmpty && u.userInfo.isEmpty)) {
         relays = [for (final u in parsed) u!];
       }
     }
@@ -152,9 +321,15 @@ class RemoteConfig {
       feedback: feedback != null && _goesSomewhere(feedback) ? feedback : null,
       privacy: _page(json['privacy']),
       terms: _page(json['terms']),
+      price: _price(json['price']),
       table: TableTiming.parse(json['table']),
+      waits: AppWaits.parse(json['waits']),
     );
   }
+
+  /// A short price with a digit in it and nothing that could be markup.
+  static String? _price(Object? raw) =>
+      raw is String && RegExp(r'^[^\s<>{}]{1,12}$').hasMatch(raw) && RegExp(r'\d').hasMatch(raw) ? raw : null;
 
   /// A page over https, or nothing.
   static Uri? _page(Object? raw) {
@@ -200,7 +375,8 @@ class RemoteSettings extends ChangeNotifier {
   /// The service's config, kept for next time. One that cannot be had —
   /// no service behind this build, offline, slow, nonsense — changes
   /// nothing: the device goes on with what it has.
-  Future<void> refresh({Uri? endpoint, Duration timeout = const Duration(seconds: 8)}) async {
+  Future<void> refresh({Uri? endpoint, Duration? timeout}) async {
+    timeout ??= waits.config;
     final url = endpoint ?? handlerAt('config');
     if (url == null) return;
     String? body;

@@ -613,7 +613,7 @@ class _HomePageState extends State<HomePage> {
         timing: RemoteSettings.current.config.table,
         // Ten seconds, unless the address asks for longer and is
         // allowed to (net/address.dart).
-        startAfter: roomWait(Uri.base, standard: Room.startAfter),
+        startAfter: roomWait(Uri.base, standard: waits.roomStart),
       );
       room.addListener(_onRoom);
       setState(() => _room = room);
@@ -958,8 +958,9 @@ enum _Opening { live, friends }
 
 /// When a slow relay is worth a word, and when there is nothing left
 /// to wait for.
-const sayItIsSlow = Duration(seconds: 8);
-const stopWaiting = Duration(seconds: 40);
+/// (Remote config, `waits`: the build's are eight seconds and forty.)
+Duration get sayItIsSlow => waits.relaySlow;
+Duration get stopWaiting => waits.relayGiveUp;
 
 /// Waits for a relay to answer, and calls [slow] once if it is taking
 /// its time.
@@ -974,12 +975,15 @@ const stopWaiting = Duration(seconds: 40);
 Future<void> waitForRelay(
   Future<void> ready, {
   required void Function() slow,
-  Duration sayIt = sayItIsSlow,
-  Duration stopAt = stopWaiting,
+  Duration? sayIt,
+  Duration? stopAt,
 }) {
+  sayIt ??= sayItIsSlow;
+  stopAt ??= stopWaiting;
+  final then = stopAt - sayIt;
   return ready.timeout(sayIt, onTimeout: () {
     slow();
-    return ready.timeout(stopAt - sayIt);
+    return ready.timeout(then);
   });
 }
 
@@ -1064,7 +1068,7 @@ class _LiveLocked extends StatelessWidget {
                 child: Text(l10n.livePlay,
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
               ),
-              Text(l10n.pricePerYear(priceAmount),
+              Text(l10n.pricePerYear(priceShown),
                   style: const TextStyle(fontSize: 13, color: Palette.chrome, fontWeight: FontWeight.w600)),
             ],
           ),

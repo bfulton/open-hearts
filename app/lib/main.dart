@@ -34,13 +34,18 @@ Future<void> main() async {
   // What the operator last said (net/remote_config.dart): kept from the
   // last start before the first frame, so the relays this start meets
   // on are settled before anything connects, and asked again behind it
-  // and every quarter of an hour after, so a door shut reaches a tab
-  // left open all evening.
+  // and every quarter of an hour after (or as `waits.configEvery`
+  // says), so a door shut reaches a tab left open all evening.
   await RemoteSettings.current.load();
   unawaited(RemoteSettings.current.refresh());
-  Timer.periodic(const Duration(minutes: 15), (_) => RemoteSettings.current.refresh());
+  _askAgain();
   runApp(const OpenHeartsApp());
 }
+
+/// Asks for the config again after as long as it last said to wait.
+void _askAgain() => Timer(waits.configEvery, () {
+  unawaited(RemoteSettings.current.refresh().whenComplete(_askAgain));
+});
 
 /// The app, and the one thing the app as a whole has to say for
 /// itself: whether it is here.

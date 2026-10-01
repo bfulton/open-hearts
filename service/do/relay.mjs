@@ -38,7 +38,7 @@ export const rememberedIds = 40000;
 /// takes a socket from anybody. Cloudflare hands an object messages of
 /// up to 32 MiB, and an event that matches presence is sent on to
 /// every device listening, on the one thread they all share.
-export const objectLimits = {
+export const objectLimits = Object.freeze({
   /// The longest message read at all, in characters.
   message: 64 * 1024,
   /// The longest REQ: its id and its filters are what the socket
@@ -50,7 +50,46 @@ export const objectLimits = {
   /// together; a flood is refused before its signature is checked.
   burst: 30,
   perSecond: 2,
-};
+});
+
+/// How far the operator may move each of [objectLimits], from the row
+/// `config|relay` (doc 06, "The service's settings"). The edges are
+/// where a limit stops being a tuning: a REQ past 1,536 characters
+/// times eight no longer fits the 16 KiB a socket carries through
+/// hibernation, and a message past 256 KiB is a socket holding the
+/// shared thread for anybody.
+export const objectLimitBounds = Object.freeze({
+  message: [8 * 1024, 256 * 1024],
+  request: [256, 1536],
+  burst: [5, 200],
+  perSecond: [1, 20],
+});
+
+/// The row, checked: each limit that is a whole number within its
+/// bounds, and [objectLimits]' own for the rest.
+export function objectLimitsOf(raw) {
+  const limits = { ...objectLimits };
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    for (const [name, [least, most]] of Object.entries(objectLimitBounds)) {
+      const v = raw[name];
+      if (Number.isInteger(v) && v >= least && v <= most) limits[name] = v;
+    }
+  }
+  return Object.freeze(limits);
+}
+
+/// The relay's limits as the operator last set them: the row
+/// `config|relay` in OH_STORE, checked ([objectLimitsOf]); the
+/// defaults with no store, no row, or a store that is down. Read when
+/// the relay is built, which is after every wake, so a change reaches
+/// an object the next time it is evicted and woken.
+export async function limitsFrom(env) {
+  try {
+    return objectLimitsOf(await env.OH_STORE?.get('config|relay', 'json'));
+  } catch {
+    return objectLimitsOf(null);
+  }
+}
 
 /// What may name an object: one path segment, and the characters a
 /// table id, a pool or a topic are made of. A tag is a name in a
@@ -448,13 +487,13 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// tests build is that relay and not one set up to look like it:
 /// nothing written down, nothing but the ephemeral kinds, and every
 /// socket held to [objectLimits].
-export function objectRelay(verify, { now = Date.now, count = null } = {}) {
+export function objectRelay(verify, { now = Date.now, count = null, limits = objectLimits } = {}) {
   return createRelay({
     verify,
     store: null,
     refuse: (event) =>
       ephemeral(event.kind) ? null : 'blocked: this relay carries ephemeral kinds; the stored ones live on the relays',
-    limits: objectLimits,
+    limits,
     now,
     count,
   });

@@ -20,6 +20,7 @@ import 'package:table/table.dart';
 
 import 'licence.dart' show signedAsk;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
+import 'remote_config.dart' show waits;
 
 /// Where credentials come from: the app's origin over https — the site
 /// the worker runs beside — else nowhere.
@@ -40,7 +41,8 @@ const stunOnly = <Map<String, Object?>>[
 /// [endpoint] (by default [turnEndpoint]), [stunOnly] when it has none
 /// or cannot be reached, none when there is no endpoint.
 Future<List<Map<String, Object?>>> iceServersFor(Signer signer,
-    {Uri? endpoint, Duration timeout = const Duration(seconds: 5)}) async {
+    {Uri? endpoint, Duration? timeout}) async {
+  timeout ??= waits.turn;
   final url = endpoint ?? turnEndpoint();
   if (url == null) return const [];
   try {

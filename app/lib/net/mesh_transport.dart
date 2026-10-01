@@ -40,6 +40,7 @@ import 'dart:convert';
 
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:table/table.dart';
+import 'remote_config.dart' show waits;
 
 class MeshTransport implements Transport {
   MeshTransport({
@@ -182,9 +183,9 @@ class MeshTransport implements Transport {
     // connection open, and its candidates are sealed and published one
     // by one. Some peers never answer — a juror of last resort runs in
     // the service's VM with no WebRTC in it at all — so a dial that has
-    // not come up in [_answerMs] is let go of, and the relay lane
+    // not come up in time (remote config, waits.meshAnswer) is let go of, and the relay lane
     // carries that peer, which is what the lane is for.
-    link.giveUp = Timer(const Duration(milliseconds: _answerMs), () => _unanswered(peer));
+    link.giveUp = Timer(waits.meshAnswer, () => _unanswered(peer));
     final pc = await _connection(peer);
     if (_closed || _links[peer] != link) {
       await pc.close();
@@ -197,9 +198,6 @@ class MeshTransport implements Transport {
     await pc.setLocalDescription(offer);
     relay.signal(peer, Signal(from: '', type: 'offer', payload: {'sdp': offer.sdp}));
   }
-
-  /// How long to wait for an answer before letting a dial go.
-  static const _answerMs = 20000;
 
   /// A dial that never came up. The connection goes, the peer stays
   /// in [peers] so the relay lane keeps carrying it, and the next

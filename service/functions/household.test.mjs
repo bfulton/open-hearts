@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import worker, {
-  HOUSEHOLD_CHANGES_PER_HOUR,
+  SERVICE_DEFAULTS,
   Household,
   claimWith,
   devicesOn,
@@ -118,8 +118,8 @@ test('a household is held to so many changes an hour', async () => {
   let t = now;
   const next = sequencer({ now: () => t });
   const said = [];
-  for (let i = 0; i < HOUSEHOLD_CHANGES_PER_HOUR + 3; i++) said.push((await next('change', async () => ({ status: 200 }))).status);
-  assert.equal(said.filter((s) => s === 200).length, HOUSEHOLD_CHANGES_PER_HOUR);
+  for (let i = 0; i < SERVICE_DEFAULTS.householdChangesPerHour + 3; i++) said.push((await next('change', async () => ({ status: 200 }))).status);
+  assert.equal(said.filter((s) => s === 200).length, SERVICE_DEFAULTS.householdChangesPerHour);
   assert.equal(said.at(-1), 429);
   assert.equal((await next('read', async () => ({ status: 200 }))).status, 200, 'reading has its own allowance');
   t += 3600000;

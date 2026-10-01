@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { createRelay, maxSubscriptions, memoryStore, objectLimits, objectRelay, schnorrVerifier, tagOf } from './relay.mjs';
+import { createRelay, limitsFrom, maxSubscriptions, memoryStore, objectLimitBounds, objectLimits, objectLimitsOf, objectRelay, schnorrVerifier, tagOf } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
 
@@ -429,4 +429,33 @@ test('an event goes out to every listener as the same text, made once', async ()
   const mine = await beat(keys[0]);
   await relay.message(a, JSON.stringify(['EVENT', mine]));
   for (const l of listeners) assert.deepEqual(l.of('EVENT'), [['EVENT', 'online', mine]]);
+});
+
+test('the operator moves the object\'s limits within their bounds, and no further', () => {
+  assert.deepEqual(objectLimitsOf(null), objectLimits);
+  for (const [name, [least, most]] of Object.entries(objectLimitBounds)) {
+    assert.equal(objectLimitsOf({ [name]: least })[name], least);
+    assert.equal(objectLimitsOf({ [name]: most })[name], most);
+    for (const bad of [least - 1, most + 1, 1.5, String(most), null]) {
+      assert.equal(objectLimitsOf({ [name]: bad })[name], objectLimits[name], `${name} at ${bad}`);
+    }
+  }
+  // Eight REQs of the longest a row may allow still fit the 16 KiB a
+  // socket carries through hibernation.
+  assert.ok(maxSubscriptions * objectLimitBounds.request[1] <= 16 * 1024 - 2048);
+});
+
+test('the row is read from the store, and a store that is down or absent is the defaults', async () => {
+  const kv = (row) => ({ get: async (at, kind) => (at === 'config|relay' && kind === 'json' ? row : null) });
+  assert.equal((await limitsFrom({ OH_STORE: kv({ burst: 10 }) })).burst, 10);
+  assert.deepEqual(await limitsFrom({}), objectLimits);
+  assert.deepEqual(await limitsFrom({ OH_STORE: { get: async () => { throw new Error('down'); } } }), objectLimits);
+});
+
+test('an object built with the row\'s burst holds a socket to it', async () => {
+  const relay = objectRelay(verify, { now: () => 1_000_000, limits: objectLimitsOf({ burst: 5 }) });
+  const a = socket();
+  relay.open(a);
+  for (let i = 0; i < 8; i++) await relay.message(a, JSON.stringify(['EVENT', await beat(keys[0], 2000 + i)]));
+  assert.equal(a.of('OK').filter((m) => m[2]).length, 5);
 });

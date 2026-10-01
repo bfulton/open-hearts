@@ -27,6 +27,8 @@ import worker, {
   signerOn,
   supersede,
   ticketFor,
+  useSettings,
+  forgetSettings,
   webhookSigned,
   whoSignedIn,
 } from './worker.mjs';
@@ -288,6 +290,14 @@ test('entitlement: a subscription that stopped being renewed runs out, and nothi
   assert.equal(before.licensed_until, '2026-06-01');
 });
 
+test('a licence lasts as many days as the service\'s setting, and never past the subscription', async (t) => {
+  t.after(forgetSettings);
+  useSettings({ licenceDays: 7 });
+  const store = memoryStore();
+  const open = await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 16), openHouse: true });
+  assert.equal(open.licensed_until, '2026-09-23');
+});
+
 test('entitlement: a key nobody has heard of gets nothing, unless it is local mode', async () => {
   const store = memoryStore();
   assert.equal(await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 16) }), null);
@@ -398,6 +408,10 @@ test('the webhook is read only when Stripe signed it, and not from last week', a
   assert.equal(await webhookSigned(await signHook(raw, { secret: 'whsec_other' }), raw, SIGNING), false);
   assert.equal(await webhookSigned(await signHook(raw, { at: Date.now() - 86400000 }), raw, SIGNING), false, 'a replay is not a payment');
   assert.equal(await webhookSigned(null, raw, SIGNING), false);
+  useSettings({ webhookToleranceS: 60 });
+  assert.equal(await webhookSigned(await signHook(raw, { at: Date.now() - 120000 }), raw, SIGNING), false, 'two minutes late, by a one-minute setting');
+  forgetSettings();
+  assert.equal(await webhookSigned(await signHook(raw, { at: Date.now() - 120000 }), raw, SIGNING), true, 'and in time by the default five');
   assert.equal(await webhookSigned('t=1,v1=nope', raw, SIGNING), false);
   assert.equal(await webhookSigned(await signHook(raw), raw, undefined), false, 'unconfigured takes nothing');
 });
@@ -756,6 +770,15 @@ test('what a request signs is pinned, here and in the app (app/test/licence_test
   assert.equal((await askedBy({ ...body, sig: 'zz' }, 'ticket', '', signer, { now: then })).status, 401);
   assert.equal((await askedBy({ ...body, at: '1700000000' }, 'ticket', '', signer, { now: then })).status, 401);
   assert.equal((await askedBy({ key: 'short' }, 'ticket', '', signer, { now: then })).status, 400);
+});
+
+test('how far a request\'s clock may be from ours is the service\'s setting', async (t) => {
+  t.after(forgetSettings);
+  const body = await asking(ADA, 'ticket', { at: 1700000000 });
+  const then = 1700000000 * 1000;
+  useSettings({ requestToleranceS: 60 });
+  assert.equal((await askedBy(body, 'ticket', '', signer, { now: then + 61000 })).status, 401);
+  assert.deepEqual(await askedBy(body, 'ticket', '', signer, { now: then + 59000 }), { key: ADA.public });
 });
 
 test('TURN is for a device that holds a licence, and asks for it itself', async () => {

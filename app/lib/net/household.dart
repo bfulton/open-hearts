@@ -19,6 +19,7 @@ import 'package:table/table.dart';
 import '../l10n/l10n.dart';
 import 'licence.dart';
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
+import 'remote_config.dart' show waits;
 
 /// A device on a subscription, as the service lists them.
 class Device {
@@ -163,7 +164,7 @@ Future<({int status, String body})?> _ask(String handler, Signer signer, Map<Str
   if (url == null) return null;
   try {
     return await askService(url, jsonEncode({...signedAsk(signer, handler, what: what), ...more}))
-        .timeout(const Duration(seconds: 10));
+        .timeout(waits.household);
   } catch (_) {
     return null;
   }

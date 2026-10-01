@@ -88,7 +88,7 @@
   "noDealBuild": "Esta versão não consegue rodar a distribuição que mantém as cartas honestas, então não pode sentar a uma mesa ao vivo.",
   "serviceUnreachable": "Não foi possível falar com o serviço. Tente de novo daqui a pouco.",
   "codeNotForThisDevice": "Esse código não é para este aparelho.",
-  "serviceRefusal": "{reason, select, noSubscription{Nenhuma assinatura.} fiveDevices{Já são cinco aparelhos.} notACode{Isso não é um código.} noSuchCode{Esse código não existe.} codeUsed{Esse código já foi usado.} codeRunOut{Esse código expirou.} notADevice{Esse aparelho não está nesta assinatura.} onAnotherSubscription{Este aparelho está em outra assinatura. Remova-o de lá primeiro.} clockOff{O relógio deste aparelho está mais de cinco minutos errado. Acerte-o e tente de novo.} other{O serviço recusou.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Nenhuma assinatura.} fiveDevices{Esta assinatura já tem todos os aparelhos que pode ter.} notACode{Isso não é um código.} noSuchCode{Esse código não existe.} codeUsed{Esse código já foi usado.} codeRunOut{Esse código expirou.} notADevice{Esse aparelho não está nesta assinatura.} onAnotherSubscription{Este aparelho está em outra assinatura. Remova-o de lá primeiro.} clockOff{O relógio deste aparelho está errado. Acerte-o e tente de novo.} other{O serviço recusou.}}",
   "buyingNotOpen": "Ainda não dá para comprar neste aparelho.",
   "shopUnreachable": "Não foi possível falar com a loja. Tente de novo daqui a pouco.",
   "shopNotOpen": "A loja ainda não abriu.",

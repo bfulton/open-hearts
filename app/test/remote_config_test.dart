@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/net/buying.dart' show priceShown;
 import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/relays.dart';
 import 'package:open_hearts/net/remote_config.dart';
@@ -109,6 +110,52 @@ void main() {
     expect(RemoteConfig.parse({'table': {'graceMs': 3000, 'bankMs': 1}}).table, TableTiming.standard, reason: 'all or nothing');
     expect(RemoteConfig.parse({'table': 'fast'}).table, TableTiming.standard);
     expect(RemoteConfig.parse({'live': false, 'table': {'graceMs': 1}}).live, isFalse, reason: 'and the rest of the row stands');
+  });
+
+  test('how long this device waits: each the operator\'s where it is in bounds, the build\'s where not', () {
+    expect(RemoteConfig.parse({}).waits, AppWaits.standard);
+    expect(AppWaits.standard.relaySlow, const Duration(seconds: 8));
+    expect(AppWaits.standard.relayGiveUp, const Duration(seconds: 40));
+    expect(AppWaits.standard.configEvery, const Duration(minutes: 15));
+    final w = AppWaits.parse({'licenceMs': 9000, 'householdMs': 1, 'configEveryMin': 60, 'meshAnswerMs': '30000'});
+    expect(w.licence, const Duration(seconds: 9));
+    expect(w.household, AppWaits.standard.household, reason: 'under its least');
+    expect(w.configEvery, const Duration(hours: 1));
+    expect(w.meshAnswer, AppWaits.standard.meshAnswer, reason: 'not a number');
+    for (final MapEntry(key: name, value: (least, most)) in AppWaits.bounds.entries) {
+      expect(AppWaits.parse({name: least}), isNot(AppWaits.standard), reason: '$name at its least');
+      expect(AppWaits.parse({name: most}), isNot(AppWaits.standard), reason: '$name at its most');
+      expect(AppWaits.parse({name: least - 1}), AppWaits.standard, reason: '$name under');
+      expect(AppWaits.parse({name: most + 1}), AppWaits.standard, reason: '$name over');
+    }
+    // Saying a relay is slow comes before giving up on it, or neither is
+    // the operator's.
+    final upside = AppWaits.parse({'relaySlowMs': 20000, 'relayGiveUpMs': 15000});
+    expect((upside.relaySlow, upside.relayGiveUp), (AppWaits.standard.relaySlow, AppWaits.standard.relayGiveUp));
+  });
+
+  testWidgets('a relay is called slow, and given up on, when the operator\'s waits say', (tester) async {
+    RemoteSettings.current.adopt(RemoteConfig.parse({'waits': {'relaySlowMs': 3000, 'relayGiveUpMs': 15000}}));
+    var slow = false;
+    Object? ended;
+    unawaited(waitForRelay(Completer<void>().future, slow: () => slow = true).catchError((Object e) => ended = e));
+    await tester.pump(const Duration(milliseconds: 2990));
+    expect(slow, isFalse);
+    await tester.pump(const Duration(milliseconds: 20));
+    expect(slow, isTrue);
+    await tester.pump(const Duration(seconds: 11));
+    expect(ended, isNull);
+    await tester.pump(const Duration(seconds: 1));
+    expect(ended, isA<TimeoutException>());
+  });
+
+  test('the price shown beside Subscribe: the operator\'s, with a new Stripe price, or the build\'s', () {
+    expect(priceShown, r'$5.99');
+    RemoteSettings.current.adopt(RemoteConfig.parse({'price': '€6,49'}));
+    expect(priceShown, '€6,49');
+    for (final bad in ['', 'free', '<b>1</b>', r'$ 5.99', 42]) {
+      expect(RemoteConfig.parse({'price': bad}).price, isNull, reason: '$bad');
+    }
   });
 
   test('please update: a build older than the day asked for, and never a local one', () {

@@ -125,7 +125,7 @@ void main() {
     stand.says('ticket', {'error': 'five devices already'}, status: 409);
     final refused = await askForCode(me);
     expect(refused.answer, isNull);
-    expect(refused.refusal?.say(), 'Five devices already.');
+    expect(refused.refusal?.say(), 'This subscription has all the devices it can take.');
   });
 
   test('a claim brings back a licence, and only one this device can hold', () async {

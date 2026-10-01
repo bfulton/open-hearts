@@ -26,7 +26,7 @@
 
 import wasm from '../../app/web/schnorr.wasm';
 
-import { objectRelay, schnorrVerifier, tagOf, tally } from './relay.mjs';
+import { limitsFrom, objectRelay, schnorrVerifier, tagOf, tally } from './relay.mjs';
 
 // One object per subscription, through which a household's codes,
 // claims and drops run one at a time (service/functions/worker.mjs,
@@ -37,6 +37,7 @@ export { Household } from '../functions/worker.mjs';
 export class TagRelay {
   constructor(state, env = {}) {
     this.state = state;
+    this.env = env;
     this.relay = null;
     // What the operator watches, if the dataset is bound (wrangler.toml,
     // OH_METRICS): a line of counts a minute, nothing about anyone.
@@ -59,7 +60,8 @@ export class TagRelay {
   /// tag is open to anybody, and every device on it shares this one
   /// thread.
   async build() {
-    const relay = objectRelay(await schnorrVerifier(wasm), { count: (what, n) => this.tally.count(what, n) });
+    const [verify, limits] = await Promise.all([schnorrVerifier(wasm), limitsFrom(this.env)]);
+    const relay = objectRelay(verify, { count: (what, n) => this.tally.count(what, n), limits });
     for (const socket of this.state.getWebSockets()) relay.open(socket, socket.deserializeAttachment());
     return relay;
   }

@@ -160,7 +160,7 @@ class _SubscribePageState extends State<SubscribePage> {
                   Text(l10n.livePlay, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
                   const SizedBox(height: 6),
                   Text(
-                    licence == null ? l10n.pricePerYear(priceAmount) : l10n.openUntil(Licence.dayOf(licence.until)),
+                    licence == null ? l10n.pricePerYear(priceShown) : l10n.openUntil(Licence.dayOf(licence.until)),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2),
                   ),
                   const SizedBox(height: 22),

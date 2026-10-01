@@ -26,7 +26,6 @@
 // is the one the whole project signs on, so the signing is the app's
 // own wasm, fetched from the static assets this worker serves.
 
-const DEFAULT_TTL = 4 * 60 * 60;
 const UPSTREAM = 'https://rtc.live.cloudflare.com/v1/turn/keys';
 
 /// Whether [url] is this machine: local mode, `wrangler pages dev` and
@@ -47,6 +46,102 @@ export function isLocal(url) {
 /// machine: set in a production project by mistake, it would license
 /// everyone and let anybody sign in as anybody.
 export const openHouse = (env, request) => !!env.OH_OPEN_HOUSE && isLocal(request.url);
+
+// ---- The service's own settings ---------------------------------------
+//
+// The numbers the service runs by — how long a licence lasts, how many
+// devices a subscription carries, how long a code is good for, which
+// Stripe price a checkout sells — read from one row the operator
+// writes, `config|service` in OH_STORE (doc 06, "The service's
+// settings"). Not the app's row: nothing here is served to anybody.
+// Each is checked against bounds before it is taken, and one that does
+// not check out is left at its default, so a typo in the row is never
+// worse than no row.
+
+/// The defaults, which are what the service ran by before the row.
+export const SERVICE_DEFAULTS = Object.freeze({
+  licenceDays: 31,
+  mostDevices: 5,
+  ticketMinutes: 10,
+  ticketReuseMinutes: 2,
+  turnTtlS: 4 * 60 * 60,
+  requestToleranceS: 300,
+  webhookToleranceS: 300,
+  householdChangesPerHour: 20,
+  householdReadsPerHour: 60,
+  stripePrice: null,
+});
+
+/// Least and most for each number, whole numbers only. The edges are
+/// where a setting stops being a tuning and becomes a hole: a licence
+/// past a year outlives the subscription, a clock skew past fifteen
+/// minutes makes a captured request good for longer than any device
+/// needs.
+export const SERVICE_BOUNDS = Object.freeze({
+  licenceDays: [1, 62],
+  mostDevices: [1, 10],
+  ticketMinutes: [1, 60],
+  ticketReuseMinutes: [0, 30],
+  turnTtlS: [600, 24 * 60 * 60],
+  requestToleranceS: [30, 900],
+  webhookToleranceS: [60, 900],
+  householdChangesPerHour: [5, 500],
+  householdReadsPerHour: [10, 2000],
+});
+
+/// The row, checked: every field that checks out, the default for the
+/// rest.
+export function serviceSettingsOf(raw) {
+  const c = { ...SERVICE_DEFAULTS };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return c;
+  for (const [name, [least, most]] of Object.entries(SERVICE_BOUNDS)) {
+    const v = raw[name];
+    if (Number.isInteger(v) && v >= least && v <= most) c[name] = v;
+  }
+  // A code handed back again has to have the time left to be used.
+  if (c.ticketReuseMinutes >= c.ticketMinutes) c.ticketReuseMinutes = Math.min(SERVICE_DEFAULTS.ticketReuseMinutes, c.ticketMinutes - 1);
+  if (typeof raw.stripePrice === 'string' && /^price_[A-Za-z0-9]{1,64}$/.test(raw.stripePrice)) c.stripePrice = raw.stripePrice;
+  return c;
+}
+
+/// Where the row lives: `config|service` in OH_STORE.
+const SERVICE_ROW = ['config', 'service'];
+
+/// How long an isolate goes by the row before it reads it again.
+const SETTINGS_KEPT_MS = 60 * 1000;
+
+let settings = SERVICE_DEFAULTS;
+let settledAt = -Infinity;
+
+/// What the service runs by now.
+export const S = () => settings;
+
+/// Reads the row if this isolate has not lately; a store that is down,
+/// or no store, is the defaults. Called at the top of every request.
+export async function settle(env, { now = Date.now() } = {}) {
+  if (now - settledAt < SETTINGS_KEPT_MS) return settings;
+  settledAt = now;
+  let raw = null;
+  try {
+    raw = (await storeOf(env)?.get(...SERVICE_ROW)) ?? null;
+  } catch {
+    // Unreadable is the same as absent: the defaults.
+  }
+  settings = Object.freeze(serviceSettingsOf(raw));
+  return settings;
+}
+
+/// For a test: these settings, until the next [settle] that reads.
+export function useSettings(next = {}) {
+  settings = Object.freeze({ ...SERVICE_DEFAULTS, ...next });
+  settledAt = Infinity;
+}
+
+/// For a test: back to the defaults, and the next request reads the row.
+export function forgetSettings() {
+  settings = SERVICE_DEFAULTS;
+  settledAt = -Infinity;
+}
 
 /// The origin a browser may call the handlers from, echoed back, or
 /// null: the site's own hosts, and — on a dev machine only — the dev
@@ -99,7 +194,7 @@ export async function mint(env, fetchImpl = fetch) {
   const keyId = env.OH_TURN_KEY_ID;
   const token = env.OH_TURN_API_TOKEN;
   if (!keyId || !token) return { status: 503, body: { error: 'turn not configured' } };
-  const ttl = DEFAULT_TTL;
+  const ttl = S().turnTtlS;
   const upstream = `${UPSTREAM}/${keyId}/credentials/generate-ice-servers`;
   let res;
   try {
@@ -131,7 +226,6 @@ export async function mint(env, fetchImpl = fetch) {
 // the last licence simply runs out.
 
 /// A licence's days. A month, and never past what has been paid for.
-const LICENCE_DAYS = 31;
 const STATEMENT = 'oh-licence/1';
 const PLAN = 'year';
 
@@ -281,7 +375,7 @@ export async function entitlementOf(store, key, { now = Date.now(), openHouse = 
   if (!row) {
     if (!openHouse) return null;
     const subscription = `local-${key.slice(0, 16)}`;
-    const renews_at = dayAfter(now, LICENCE_DAYS);
+    const renews_at = dayAfter(now, S().licenceDays);
     await store.put(`SUB#${subscription}`, 'META', { source: 'local', txn_ref: null, renews_at, cancelled_at: null });
     await store.put(`SUB#${subscription}`, `DEVICE#${key}`, { bound_at: today });
     const made = { subscription, licensed_until: renews_at, at: today };
@@ -311,7 +405,7 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
   if (!store) return { status: 503, body: { error: 'licensing not configured' } };
   const held = await entitlementOf(store, key, { now, openHouse: open });
   if (!held) return { status: 402, body: { error: 'no subscription' } };
-  const until = earlier(dayAfter(now, LICENCE_DAYS), held.licensed_until);
+  const until = earlier(dayAfter(now, S().licenceDays), held.licensed_until);
   const signed = await licenceFor(key, until, { signer, secret, service });
   if (!signed) return { status: 503, body: { error: 'the service key does not match its secret' } };
   return { status: 200, body: { licence: signed } };
@@ -342,7 +436,6 @@ const REQUEST = 'oh-request/1';
 
 /// How far a request's second may be from ours. Clocks drift; a phone
 /// whose clock is out by more than this is told so.
-const REQUEST_TOLERANCE_S = 300;
 
 /// The text a request's signature is over.
 export const requestStatement = (handler, key, at, what = '') => `${REQUEST}\n${handler}\n${key}\n${at}\n${what}`;
@@ -359,7 +452,7 @@ export async function askedBy(body, handler, what, signer, { now = Date.now() } 
   if (!signer.verify(key, await digestOf(requestStatement(handler, key, at, what)), sig)) {
     return { status: 401, body: { error: 'not signed by that key' } };
   }
-  if (Math.abs(now / 1000 - at) > REQUEST_TOLERANCE_S) {
+  if (Math.abs(now / 1000 - at) > S().requestToleranceS) {
     return { status: 401, body: { error: "this device's clock is out by more than five minutes" } };
   }
   return { key };
@@ -386,7 +479,6 @@ const FINAL = new Set(['canceled', 'incomplete_expired']);
 
 /// How far out of date a webhook's own timestamp may be. Stripe signs
 /// the moment it sends; a replay from last week is not a payment.
-const WEBHOOK_TOLERANCE_S = 300;
 
 /// Where a buyer may be sent back to: this site, and nowhere else. The
 /// address rides in from the app, and an app is not what decides where
@@ -405,7 +497,7 @@ export function sameSite(candidate, requestUrl) {
 /// A checkout session for [key], as Stripe answers: {status, body}.
 export async function checkout(key, back, cancelled, env, fetchImpl = fetch) {
   const secret = env.OH_STRIPE_SECRET;
-  const price = env.OH_STRIPE_PRICE;
+  const price = S().stripePrice ?? env.OH_STRIPE_PRICE;
   if (!secret || !price) return { status: 503, body: { error: 'the shop is not open yet' } };
   const form = new URLSearchParams({
     mode: 'subscription',
@@ -460,7 +552,7 @@ export async function webhookSigned(header, raw, secret, { now = Date.now() } = 
   }
   const t = Number(parts.t);
   if (!Number.isFinite(t) || !v1.length) return false;
-  if (Math.abs(now / 1000 - t) > WEBHOOK_TOLERANCE_S) return false;
+  if (Math.abs(now / 1000 - t) > S().webhookToleranceS) return false;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
     'verify',
   ]);
@@ -568,11 +660,9 @@ export async function record(event, store, { now = Date.now() } = {}) {
 // quite still. Keeping it here also keeps the subscription off the
 // wire, which a photograph of a screen would otherwise carry away.
 
-const MOST_DEVICES = 5;
 
 /// How long a code is worth anything. Long enough to walk a phone over,
 /// short enough that a photograph of the screen is not a key.
-const TICKET_MINUTES = 10;
 
 /// How long a code's row is kept, spent or not, before the store lets
 /// it go by itself: an hour, so that a late scan is told the code ran
@@ -597,7 +687,6 @@ export async function devicesOn(store, subscription) {
 
 /// How long an outstanding code must still have to be handed out again
 /// rather than replaced: enough to walk a phone over.
-const TICKET_REUSE_MS = 2 * 60000;
 
 /// A code for a new device to arrive with: {status, body}. The one
 /// already outstanding, while it is unspent and has time left: asking
@@ -608,21 +697,21 @@ export async function ticketFor(key, store, { now = Date.now() } = {}) {
   const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (!held) return { status: 402, body: { error: 'no subscription' } };
   const out = await store.get(`SUB#${held.subscription}`, 'TICKET');
-  if (out && Date.parse(out.expires_at) - now >= TICKET_REUSE_MS) {
+  if (out && Date.parse(out.expires_at) - now >= S().ticketReuseMinutes * 60000) {
     const ticket = await store.get(`TICKET#${out.code}`, 'META');
     if (ticket && !ticket.used_at) {
-      return { status: 200, body: { ticket: out.code, expires_at: out.expires_at, devices: out.devices, most: MOST_DEVICES } };
+      return { status: 200, body: { ticket: out.code, expires_at: out.expires_at, devices: out.devices, most: S().mostDevices } };
     }
   }
   const devices = await devicesOn(store, held.subscription);
-  if (devices.length >= MOST_DEVICES) {
-    return { status: 409, body: { error: 'five devices already', devices: devices.length, most: MOST_DEVICES } };
+  if (devices.length >= S().mostDevices) {
+    return { status: 409, body: { error: 'five devices already', devices: devices.length, most: S().mostDevices } };
   }
   const code = nonce();
-  const expires_at = new Date(now + TICKET_MINUTES * 60000).toISOString();
+  const expires_at = new Date(now + S().ticketMinutes * 60000).toISOString();
   await store.put(`TICKET#${code}`, 'META', { subscription: held.subscription, expires_at, used_at: null, made_by: key }, { ttl: TICKET_KEPT_S });
   await store.put(`SUB#${held.subscription}`, 'TICKET', { code, expires_at, devices: devices.length }, { ttl: TICKET_KEPT_S });
-  return { status: 200, body: { ticket: code, expires_at, devices: devices.length, most: MOST_DEVICES } };
+  return { status: 200, body: { ticket: code, expires_at, devices: devices.length, most: S().mostDevices } };
 }
 
 /// A device arriving with a code. The code is spent whether or not the
@@ -636,8 +725,8 @@ export async function claimWith(key, code, store, { now = Date.now() } = {}) {
   if (Date.parse(ticket.expires_at) <= now) return { status: 410, body: { error: 'that code has run out' } };
   const devices = await devicesOn(store, ticket.subscription);
   const already = devices.some((d) => d.key === key);
-  if (!already && devices.length >= MOST_DEVICES) {
-    return { status: 409, body: { error: 'five devices already', devices: devices.length, most: MOST_DEVICES } };
+  if (!already && devices.length >= S().mostDevices) {
+    return { status: 409, body: { error: 'five devices already', devices: devices.length, most: S().mostDevices } };
   }
   const today = dayOf(now);
   // A device on another subscription that is still paid up stays on
@@ -685,7 +774,7 @@ export async function dropDevice(key, device, store, { now = Date.now() } = {}) 
   // paid up. It is the binding that ended, so the binding is what goes.
   const theirs = await store.get(`KEY#${device}`, 'ENTITLEMENT');
   if (theirs?.subscription === held.subscription) await store.del(`KEY#${device}`, 'ENTITLEMENT');
-  return { status: 200, body: { devices: (await devicesOn(store, held.subscription)).length, most: MOST_DEVICES } };
+  return { status: 200, body: { devices: (await devicesOn(store, held.subscription)).length, most: S().mostDevices } };
 }
 
 // ---- one household at a time ------------------------------------------
@@ -704,8 +793,6 @@ export async function dropDevice(key, device, store, { now = Date.now() } = {}) 
 /// What one household may do in an hour: changes (a code, a claim, a
 /// drop) and readings of its list. A person adding a phone does a
 /// handful of each.
-export const HOUSEHOLD_CHANGES_PER_HOUR = 20;
-export const HOUSEHOLD_READS_PER_HOUR = 60;
 
 /// One household's queue and its hour: everything asked of it runs in
 /// order, and what is over the hour's allowance is refused before it
@@ -713,12 +800,12 @@ export const HOUSEHOLD_READS_PER_HOUR = 60;
 export function sequencer({ now = Date.now } = {}) {
   let queue = Promise.resolve();
   const done = { change: [], read: [] };
-  const most = { change: HOUSEHOLD_CHANGES_PER_HOUR, read: HOUSEHOLD_READS_PER_HOUR };
   return (kind, work) => {
     const run = queue.then(async () => {
       const t = now();
       const recent = (done[kind] = done[kind].filter((at) => t - at < 3600000));
-      if (recent.length >= most[kind]) return { status: 429, body: { error: 'too many at once: try again in a while' } };
+      const most = kind === 'read' ? S().householdReadsPerHour : S().householdChangesPerHour;
+      if (recent.length >= most) return { status: 429, body: { error: 'too many at once: try again in a while' } };
       recent.push(t);
       return work();
     });
@@ -739,7 +826,7 @@ export async function householdOp(op, store, { now = Date.now() } = {}) {
     case 'list': {
       const held = await store.get(`KEY#${op.key}`, 'ENTITLEMENT');
       if (!held) return { status: 402, body: { error: 'no subscription' } };
-      return { status: 200, body: { devices: await devicesOn(store, held.subscription), most: MOST_DEVICES } };
+      return { status: 200, body: { devices: await devicesOn(store, held.subscription), most: S().mostDevices } };
     }
     default:
       return { status: 400, body: { error: 'not a household operation' } };
@@ -760,6 +847,7 @@ export class Household {
 
   async fetch(request) {
     const op = await request.json();
+    await settle(this.env);
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: { error: 'licensing not configured' } });
     return Response.json(await this.next(kindOf(op), () => householdOp(op, store)));
@@ -1010,7 +1098,7 @@ export async function supersede(who, key, store, env, { now = Date.now() } = {})
   if (theirs) {
     const devices = await devicesOn(store, theirs.subscription);
     if (!devices.some((d) => d.key === key)) {
-      if (devices.length >= MOST_DEVICES) await store.del(`SUB#${theirs.subscription}`, `DEVICE#${was}`);
+      if (devices.length >= S().mostDevices) await store.del(`SUB#${theirs.subscription}`, `DEVICE#${was}`);
       await store.put(`SUB#${theirs.subscription}`, `DEVICE#${key}`, { bound_at: today });
     }
     await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...theirs, at: today });
@@ -1186,7 +1274,7 @@ async function turn(request, env) {
 /// device reads at its start. What is here when there is no row — or a
 /// row this worker cannot read — is what the app does with no config at
 /// all, so a bad row is never worse than none.
-export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null });
+export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null, price: null });
 
 /// Where the row lives: `config|app` in OH_STORE.
 const CONFIG_ROW = ['config', 'app'];
@@ -1250,6 +1338,9 @@ export function configOf(raw) {
       if (page || mail) c.feedback = u.toString();
     } catch {}
   }
+  // What a year costs, as the web shows it beside Subscribe: changed
+  // with the Stripe price (`config|service`, stripePrice) it describes.
+  if (typeof raw.price === 'string' && /^[^\s<>{}]{1,12}$/.test(raw.price) && /\d/.test(raw.price)) c.price = raw.price;
   // Where the privacy policy and the terms are, when not on this site.
   for (const name of ['privacy', 'terms']) {
     if (typeof raw[name] !== 'string') continue;
@@ -1363,6 +1454,7 @@ export default {
     if (name === null) return env.ASSETS.fetch(request);
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
+    if (route) await settle(env);
     const response = route ? await route(request, env) : json(request, 404, { error: 'no such handler' });
     measure(env, route ? name : 'unknown', response.status, Date.now() - started);
     return response;

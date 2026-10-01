@@ -9,6 +9,7 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 import 'relays.dart';
+import 'remote_config.dart' show waits;
 
 class Standing {
   Standing(this.ledger, this.me);
@@ -25,8 +26,8 @@ class Standing {
   static Future<Standing> load(List<Uri> relays, Signer signer) async {
     final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
     try {
-      await t.ready.timeout(const Duration(seconds: 8));
-      await t.allReady.timeout(const Duration(seconds: 4)).catchError((_) {});
+      await t.ready.timeout(waits.standing);
+      await t.allReady.timeout(waits.standingAll).catchError((_) {});
       return Standing(Ledger.from(t.lobbySoFar, prior: prior), signer.publicKey);
     } finally {
       t.close();
@@ -50,7 +51,7 @@ class Standing {
     for (var attempt = 0;; attempt++) {
       final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
       try {
-        await t.ready.timeout(const Duration(seconds: 8));
+        await t.ready.timeout(waits.standing);
         if (await t.announceTaken(result.toJson())) return true;
       } on TimeoutException {
         // No relay answered at all: the same as none taking it.

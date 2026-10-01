@@ -568,7 +568,7 @@
   "@codeNotForThisDevice": {
     "description": "Shown when a code from another device's screen was made for a different device."
   },
-  "serviceRefusal": "{reason, select, noSubscription{No subscription.} fiveDevices{Five devices already.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device's clock is more than five minutes out. Set it right and try again.} other{The service turned that down.}}",
+  "serviceRefusal": "{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device's clock is out. Set it right and try again.} other{The service turned that down.}}",
   "@serviceRefusal": {
     "description": "Why the server turned down a request about a subscription's devices.",
     "placeholders": {

@@ -21,7 +21,7 @@ test('no row, or no store, is the defaults: everything open, nothing said', asyn
     assert.deepEqual(await answer.json(), CONFIG_DEFAULTS);
     assert.equal(answer.headers.get('cache-control'), 'public, max-age=60');
   }
-  assert.deepEqual(CONFIG_DEFAULTS, { v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null });
+  assert.deepEqual(CONFIG_DEFAULTS, { v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null, price: null });
 });
 
 test('the row is served, checked', async () => {
@@ -44,6 +44,7 @@ test('the row is served, checked', async () => {
     feedback: 'mailto:help@openhearts.example',
     privacy: null,
     terms: null,
+    price: null,
   });
 });
 
@@ -82,6 +83,8 @@ test('a field that does not check out is left at its default, and the rest still
   assert.equal(configOf({ feedback: 42 }).feedback, null);
   assert.equal(configOf({ terms: 'https://legal.example/terms' }).terms, 'https://legal.example/terms');
   assert.equal(configOf({ privacy: 'javascript:alert(1)' }).privacy, null);
+  assert.equal(configOf({ price: '€6,49' }).price, '€6,49');
+  for (const bad of ['', 'free', '<b>$1</b>', '$ 5.99', 'a price far too long 9']) assert.equal(configOf({ price: bad }).price, null, bad);
 });
 
 test('a store that throws is a store with nothing in it', async () => {

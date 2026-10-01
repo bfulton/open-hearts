@@ -453,7 +453,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String serviceRefusal(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'noSubscription': 'No subscription.',
-      'fiveDevices': 'Five devices already.',
+      'fiveDevices': 'This subscription has all the devices it can take.',
       'notACode': 'Not a code.',
       'noSuchCode': 'No such code.',
       'codeUsed': 'That code has been used.',
@@ -461,7 +461,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'notADevice': 'Not a device on this subscription.',
       'onAnotherSubscription':
           'This device is on another subscription. Drop it there first.',
-      'clockOff': 'This device\'s clock is more than five minutes out. Set it right and try again.',
+      'clockOff': 'This device\'s clock is out. Set it right and try again.',
       'other': 'The service turned that down.',
     });
     return '$_temp0';

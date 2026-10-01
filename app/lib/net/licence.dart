@@ -23,6 +23,7 @@ import 'dart:convert';
 import 'package:table/table.dart';
 
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
+import 'remote_config.dart' show waits;
 
 /// The service this build will take a licence from, and no other. A
 /// licence signed by anything else is not a licence, which is the whole
@@ -186,7 +187,8 @@ String requestDigest(String handler, PublicKey key, int at, [String what = '']) 
 /// would be worse than one that waits for the date on the licence it
 /// already has.
 Future<Licence?> fetchLicence(Signer signer,
-    {Uri? endpoint, String service = serviceKey, Duration timeout = const Duration(seconds: 6)}) async {
+    {Uri? endpoint, String service = serviceKey, Duration? timeout}) async {
+  timeout ??= waits.licence;
   final url = endpoint ?? handlerAt('licence');
   if (url == null) return null;
   try {

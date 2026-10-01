@@ -18,6 +18,7 @@ import 'package:table/table.dart';
 
 import '../l10n/l10n.dart';
 import 'licence.dart';
+import 'remote_config.dart';
 import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 
@@ -26,6 +27,10 @@ import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' a
 /// — a year rather than a month, since a card's fixed thirty cents is
 /// paid once (doc 06).
 const priceAmount = r'$5.99';
+
+/// The price as shown: the operator's, when remote config gives one
+/// with a new Stripe price, and the build's otherwise.
+String get priceShown => RemoteSettings.current.config.price ?? priceAmount;
 
 /// Whether this build can take money at all: the web can, over Stripe;
 /// a phone will over its store, and does not yet.
@@ -75,7 +80,8 @@ enum BuyRefusal {
 /// reason when it could not, which the screen says rather than sitting
 /// there having apparently done nothing; null when the browser is on
 /// its way there.
-Future<BuyRefusal?> buy(Signer signer, {Uri? endpoint, Uri? from, Duration timeout = const Duration(seconds: 12)}) async {
+Future<BuyRefusal?> buy(Signer signer, {Uri? endpoint, Uri? from, Duration? timeout}) async {
+  timeout ??= waits.buy;
   if (!canBuyHere) return BuyRefusal.notHere;
   final url = endpoint ?? handlerAt('checkout');
   if (url == null) return BuyRefusal.notHere;

@@ -370,7 +370,7 @@ object lives in the relay's worker (`service/do`, which exports it)
 and is bound to the Pages project as `HOUSEHOLD`; without the binding,
 as in the suites and on a single isolate, the same sequencing is a
 queue in memory. A household is also held to twenty changes and sixty
-reads an hour, which is far past what a family does and short of what
+reads an hour (by default: "The service's settings"), which is far past what a family does and short of what
 a loop does to KV's daily writes. Asking for a code again while one is
 outstanding, unspent and good for two more minutes is a read: the same
 code comes back.
@@ -400,6 +400,8 @@ npx wrangler kv key put --binding OH_STORE 'config|app' \
 | `feedback` | Where "Tell us what's broken" sends a report: an `https://` page or a `mailto:` address. GitHub's new-issue page and mail take the report in the address; another page is opened with the report on the clipboard. | the project's GitHub issues |
 | `privacy`, `terms` | Where the privacy policy and the terms of use are, `https://` only, for the links under Subscribe. | the site's `/privacy` and `/terms` |
 | `table` | The clocks of a table this device starts, in milliseconds: `graceMs` (2–60 s), `passGraceMs` (2–120 s), `bankMs` (10–300 s), `fixedMs` (15–120 s), `botActsMs` (5–60 s), `botDealsMs` (15–120 s), `quorumLostMs` (10–120 s), `silenceMs` (30–600 s), `jurorSilenceMs` (10–120 s), `jurorsWaitMs` (20–180 s), `jurorsWaitAgainMs` (10–60 s, and no longer than `jurorsWaitMs`). Any left out are the standard's. They ride in the signed start event, so every seat and juror plays by the starter's, and a table someone else starts keeps theirs ([doc 04](04-live-play.md), "Boot"). All or nothing: one field out of bounds or not a whole number and the worker serves none of it, and a seat that reads such a start plays the standard table. | the standard: 6, 20, 45, 40, 15, 40, 20, 120, 30, 40 and 10 s |
+| `price` | What a year costs as the web shows it beside Subscribe (`$5.99`, `€6,49`): up to twelve characters with a digit, no spaces or markup. Change it with the Stripe price it describes (`stripePrice`, below). A store build shows the store's own. | the build's, `$5.99` |
+| `waits` | How long a device waits on the network, each in milliseconds and each taken or left on its own: `licenceMs` (2–30 s), `householdMs` (3–30 s), `buyMs` (3–60 s), `turnMs` (2–30 s), `configMs` (2–30 s), `relaySlowMs` (3–30 s) before "taking a while" and `relayGiveUpMs` (15–180 s) before giving up, the slow one first or neither taken, `standingMs` (3–30 s) and `standingAllMs` (1–20 s) for the standings, `roomStartMs` (3–60 s) a friends' room waits after its last arrival, `meshAnswerMs` (5–60 s) before a direct connection is left to the relay; and `configEveryMin` (5–240), how often an open app asks for this row again. | 6, 10, 12, 5, 8, 8, 40, 8, 4, 10 and 20 s; every 15 minutes |
 | `update` | `before`: a day, `YYYY-MM-DD`; a build published before it is asked to update, in `text` if given and the app's own words if not, with a Reload button on the web. A local build has no day and is never asked. | nothing |
 
 A build from before `table` reads a start that carries one as the
@@ -422,6 +424,50 @@ Bot strength is not here: the bots have ratings of their own, fitted on
 the ladder and moved by rated games like anyone's ([doc
 04](04-live-play.md)), and a table is seated with bots near its own
 rating. There is nothing to tune that the ratings do not already say.
+
+## The service's settings
+
+The numbers the service itself runs by are not in the app's row, which
+anybody can read, but in two of their own, written the same way:
+
+```bash
+npx wrangler kv key put --binding OH_STORE 'config|service' \
+  '{"stripePrice": "price_1Q…", "mostDevices": 5, "licenceDays": 31}'
+npx wrangler kv key put --binding OH_STORE 'config|relay' '{"burst": 30, "perSecond": 2}'
+```
+
+`config|service`, read by the Pages worker and the Household object:
+
+| Field | What it is | Bounds | With none |
+|---|---|---|---|
+| `stripePrice` | The Stripe price a checkout sells (`price_…`), in place of `OH_STRIPE_PRICE`. Change `price` in the app's row with it. | a price id | `OH_STRIPE_PRICE` |
+| `licenceDays` | How long a licence lasts before the device asks again; never past the subscription's own end. | 1–62 | 31 |
+| `mostDevices` | Devices on one subscription. | 1–10 | 5 |
+| `ticketMinutes` | How long a household code is good for. | 1–60 | 10 |
+| `ticketReuseMinutes` | A code asked for again while this much of it is left is the same code. Less than `ticketMinutes`. | 0–30 | 2 |
+| `turnTtlS` | How long TURN credentials last. | 600–86,400 | 14,400 |
+| `requestToleranceS` | How far a signed request's clock may be from ours. | 30–900 | 300 |
+| `webhookToleranceS` | How old a Stripe event may be. | 60–900 | 300 |
+| `householdChangesPerHour`, `householdReadsPerHour` | What one household may do in an hour. | 5–500, 10–2,000 | 20, 60 |
+
+`config|relay`, read by each relay object when it wakes (it needs the
+relay worker's own `OH_STORE` binding, `service/do/wrangler.toml`):
+
+| Field | What it is | Bounds | With none |
+|---|---|---|---|
+| `message` | The longest message read, in characters. | 8–256 KiB | 64 KiB |
+| `request` | The longest REQ. | 256–1,536 | 1,024 |
+| `burst`, `perSecond` | Events one socket may publish at once, then each second. | 5–200, 1–20 | 30, 2 |
+
+Every number is checked against its bounds and one that is not a whole
+number inside them is left at its default, so a typo is never worse
+than no row; the bounds stop where a setting would become a hole (a
+licence outliving its subscription, a captured request good for an
+hour). The worker reads its row at most once a minute per isolate; a
+relay object reads its row when it is built, which is after every wake.
+What stays in the code is what is protocol rather than tuning: the
+statements devices sign, the 16-byte codes, the body limits, and the
+bounds themselves.
 
 ## Watching it run
 
