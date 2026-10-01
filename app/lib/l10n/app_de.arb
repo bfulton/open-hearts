@@ -186,5 +186,13 @@
   "feedbackSend": "Senden",
   "feedbackIsPublic": "Das öffnet ein Issue auf GitHub, das jeder lesen kann. Lass alles Private weg.",
   "feedbackCopied": "Kopiert. Füge es auf der geöffneten Seite ein.",
-  "feedbackCopiedTo": "Kopiert. Füge es hier ein: {to}"
+  "feedbackCopiedTo": "Kopiert. Füge es hier ein: {to}",
+  "statsRecent": "{count, plural, =1{Dein letztes Spiel allein} other{Deine letzten {count} Spiele allein}}",
+  "statsRecentSpoken": "{count, plural, =1{Endstand deines letzten Spiels allein: {scores}. Schnitt {average}.} other{Endstände deiner letzten {count} Spiele allein, ältestes zuerst: {scores}. Schnitt {average}.}}",
+  "statsAverage": "Schnitt {average}",
+  "statsLowerIsBetter": "Endstände, ältestes zuerst. Weniger ist besser.",
+  "statsQueens": "Pik-Dame genommen",
+  "statsMoonsShot": "Durchmärsche",
+  "statsMoonsBlocked": "Durchmärsche verhindert",
+  "statsOverHands": "{hands, plural, =1{In 1 Runde allein} other{In {hands} Runden allein}}"
 }

@@ -1225,6 +1225,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copied. Paste it at {to}'**
   String feedbackCopiedTo(String to);
+
+  /// Heading above the chart of recent solo games' final scores.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Your last game alone} other{Your last {count} games alone}}'**
+  String statsRecent(int count);
+
+  /// Read by a screen reader for the chart. scores is the scores separated by commas.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Final score of your last game alone: {scores}. Average {average}.} other{Final scores of your last {count} games alone, oldest first: {scores}. Average {average}.}}'**
+  String statsRecentSpoken(int count, String scores, int average);
+
+  /// Label on the chart's average line.
+  ///
+  /// In en, this message translates to:
+  /// **'average {average}'**
+  String statsAverage(int average);
+
+  /// Under the chart.
+  ///
+  /// In en, this message translates to:
+  /// **'Final scores, oldest first. Lower is better.'**
+  String get statsLowerIsBetter;
+
+  /// Under a number: hands in which the player took the queen of spades.
+  ///
+  /// In en, this message translates to:
+  /// **'Queen of spades taken'**
+  String get statsQueens;
+
+  /// Under a number: hands in which the player took all 26 points.
+  ///
+  /// In en, this message translates to:
+  /// **'Moons shot'**
+  String get statsMoonsShot;
+
+  /// Under a number: hands in which the player stopped someone else taking all 26.
+  ///
+  /// In en, this message translates to:
+  /// **'Moons blocked'**
+  String get statsMoonsBlocked;
+
+  /// Under the three numbers: how many solo hands they count.
+  ///
+  /// In en, this message translates to:
+  /// **'{hands, plural, =1{Over 1 hand alone} other{Over {hands} hands alone}}'**
+  String statsOverHands(int hands);
 }
 
 class _AppLocalizationsDelegate

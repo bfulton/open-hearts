@@ -18,6 +18,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
@@ -468,9 +469,136 @@ class _Record extends StatelessWidget {
         _Heading(l10n.yourGames),
         const SizedBox(height: 10),
         _Games(live: stats?.live, alone: stats?.alone, liveMissing: stats != null && !stats.reached),
+        if (stats != null && stats.history.recent.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          _Heading(l10n.statsRecent(stats.history.recent.length)),
+          const SizedBox(height: 10),
+          _Lately(history: stats.history),
+        ],
       ],
     );
   }
+}
+
+/// The games alone, lately: each one's final score as a column, oldest
+/// on the left, with their average across them — and under it what the
+/// queen and the moon did over every hand kept. One series, so no
+/// legend; the numbers are said aloud in one line, which is the chart's
+/// table for a screen reader.
+class _Lately extends StatelessWidget {
+  const _Lately({required this.history});
+
+  final SoloHistory history;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final average = history.average!.round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          label: l10n.statsRecentSpoken(history.recent.length, history.recent.join(', '), average),
+          child: ExcludeSemantics(
+            child: SizedBox(height: 92, child: CustomPaint(painter: _ScoresPainter(history.recent, average: average, label: l10n.statsAverage(average)))),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(l10n.statsLowerIsBetter, style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            _Tile(value: history.queens, label: l10n.statsQueens),
+            const SizedBox(width: 8),
+            _Tile(value: history.moonsShot, label: l10n.statsMoonsShot),
+            const SizedBox(width: 8),
+            _Tile(value: history.moonsBlocked, label: l10n.statsMoonsBlocked),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(l10n.statsOverHands(history.hands), textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
+      ],
+    );
+  }
+}
+
+/// One number and what it counts.
+class _Tile extends StatelessWidget {
+  const _Tile({required this.value, required this.label});
+
+  final int value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.13),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            children: [
+              Text('$value',
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w700, color: Palette.chrome, fontFeatures: [FontFeature.tabularFigures()])),
+              const SizedBox(height: 2),
+              Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, height: 1.25, color: Palette.chromeDim)),
+            ],
+          ),
+        ),
+      );
+}
+
+/// The columns: thin, a gap of the ground between them, rounded at the
+/// end away from the baseline; a hairline for the baseline; the average
+/// a gold rule across them with its number above it, in the text's own
+/// colour.
+class _ScoresPainter extends CustomPainter {
+  _ScoresPainter(this.scores, {required this.average, required this.label});
+
+  final List<int> scores;
+  final int average;
+  final String label;
+
+  static const _gap = 2.0;
+  static const _labelRoom = 16.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final top = scores.fold<int>(average, max).clamp(26, 1 << 20).toDouble();
+    final plot = size.height - _labelRoom;
+    double y(num v) => size.height - v / top * plot;
+    // Never wider than a column in a full chart, so a short history does
+    // not draw a few slabs.
+    final step = size.width / SoloHistory.shown;
+    final width = step - _gap;
+    final bar = Paint()..color = Palette.chromeDim.withValues(alpha: 0.55);
+    for (var i = 0; i < scores.length; i++) {
+      final left = i * step + _gap / 2;
+      final rect = Rect.fromLTRB(left, y(scores[i]), left + width, size.height);
+      final r = Radius.circular(min(4, width / 2));
+      canvas.drawRRect(RRect.fromRectAndCorners(rect, topLeft: r, topRight: r), bar);
+    }
+    canvas.drawLine(Offset(0, size.height - 0.5), Offset(size.width, size.height - 0.5),
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.18)
+          ..strokeWidth = 1);
+    final at = y(average);
+    canvas.drawLine(Offset(0, at), Offset(size.width, at),
+        Paint()
+          ..color = Palette.gold
+          ..strokeWidth = 2);
+    final text = TextPainter(
+      text: TextSpan(text: label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Palette.chrome)),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: size.width);
+    text.paint(canvas, Offset(size.width - text.width, max(0, at - text.height - 2)));
+  }
+
+  @override
+  bool shouldRepaint(_ScoresPainter old) => old.average != average || old.label != label || !listEquals(old.scores, scores);
 }
 
 /// The two halves of the game side by side: what each line is, once,

@@ -164,4 +164,28 @@ void main() {
       }
     }
   });
+
+  testWidgets('the games alone, lately: a column a game, their average, and what the queen and the moon did', (tester) async {
+    await pumpProfile(
+        tester,
+        Stream.value(const PlayerStats(
+          reached: true,
+          alone: Tally(games: 3, won: 1, points: 150, best: 30),
+          history: SoloHistory(recent: [70, 30, 50], hands: 14, queens: 4, moonsShot: 1, moonsBlocked: 2),
+        )));
+    await tester.scrollUntilVisible(find.text('Moons blocked'), 200, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Your last 3 games alone'), findsOneWidget);
+    expect(find.bySemanticsLabel('Final scores of your last 3 games alone, oldest first: 70, 30, 50. Average 50.'), findsOneWidget,
+        reason: 'the chart, said aloud: its table');
+    expect(find.text('Over 14 hands alone'), findsOneWidget);
+    for (final (label, value) in [('Queen of spades taken', '4'), ('Moons shot', '1'), ('Moons blocked', '2')]) {
+      final tile = find.ancestor(of: find.text(label), matching: find.byType(Column)).first;
+      expect(find.descendant(of: tile, matching: find.text(value)), findsOneWidget, reason: label);
+    }
+  });
+
+  testWidgets('no games alone finished, no chart', (tester) async {
+    await pumpProfile(tester, Stream.value(const PlayerStats(reached: true)));
+    expect(find.textContaining('alone'), findsNothing);
+  });
 }

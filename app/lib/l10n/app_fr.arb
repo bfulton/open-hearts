@@ -186,5 +186,13 @@
   "feedbackSend": "Envoyer",
   "feedbackIsPublic": "Ceci ouvre un ticket sur GitHub, que tout le monde peut lire. N'y mettez rien de privé.",
   "feedbackCopied": "Copié. Collez-le dans la page qui s'est ouverte.",
-  "feedbackCopiedTo": "Copié. Collez-le ici : {to}"
+  "feedbackCopiedTo": "Copié. Collez-le ici : {to}",
+  "statsRecent": "{count, plural, =1{Votre dernière partie en solo} other{Vos {count} dernières parties en solo}}",
+  "statsRecentSpoken": "{count, plural, =1{Score final de votre dernière partie en solo : {scores}. Moyenne {average}.} other{Scores finaux de vos {count} dernières parties en solo, de la plus ancienne à la plus récente : {scores}. Moyenne {average}.}}",
+  "statsAverage": "moyenne {average}",
+  "statsLowerIsBetter": "Scores finaux, du plus ancien au plus récent. Plus c'est bas, mieux c'est.",
+  "statsQueens": "Dame de pique prise",
+  "statsMoonsShot": "Grands chelems",
+  "statsMoonsBlocked": "Grands chelems bloqués",
+  "statsOverHands": "{hands, plural, =1{Sur 1 donne en solo} other{Sur {hands} donnes en solo}}"
 }

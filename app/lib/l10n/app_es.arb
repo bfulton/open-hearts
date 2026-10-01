@@ -186,5 +186,13 @@
   "feedbackSend": "Enviar",
   "feedbackIsPublic": "Esto abre una incidencia en GitHub, que cualquiera puede leer. No incluyas nada privado.",
   "feedbackCopied": "Copiado. Pégalo en la página que se abrió.",
-  "feedbackCopiedTo": "Copiado. Pégalo en {to}"
+  "feedbackCopiedTo": "Copiado. Pégalo en {to}",
+  "statsRecent": "{count, plural, =1{Tu última partida en solitario} other{Tus últimas {count} partidas en solitario}}",
+  "statsRecentSpoken": "{count, plural, =1{Puntuación final de tu última partida en solitario: {scores}. Media {average}.} other{Puntuaciones finales de tus últimas {count} partidas en solitario, de la más antigua a la más reciente: {scores}. Media {average}.}}",
+  "statsAverage": "media {average}",
+  "statsLowerIsBetter": "Puntuaciones finales, de la más antigua a la más reciente. Cuanto más bajo, mejor.",
+  "statsQueens": "Reina de picas tomada",
+  "statsMoonsShot": "Lunas disparadas",
+  "statsMoonsBlocked": "Lunas bloqueadas",
+  "statsOverHands": "{hands, plural, =1{En 1 mano en solitario} other{En {hands} manos en solitario}}"
 }

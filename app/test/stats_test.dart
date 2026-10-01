@@ -66,6 +66,89 @@ void main() {
     final twice = soloTally([...kept, ...kept]);
     expect(twice.games, 2);
     expect(twice.average, tally.average);
+
+    // Hand by hand: the game's own score on the chart, and every hand
+    // played counted once.
+    final history = soloGames(kept).history;
+    expect(history.recent, [game.totals[controller.mySeat]]);
+    expect(history.hands, game.handNumber + 1);
+    expect(history.average, game.totals[controller.mySeat].toDouble());
+    expect(soloGames([...kept, ...kept]).history.hands, 2 * history.hands);
+  });
+
+  testWidgets('the chart is the last twenty finished games, oldest first', (tester) async {
+    // Twenty-two games played to the end through the controller, each
+    // kept as the app keeps them — newest first — and one left half way.
+    final store = MemoryRecordStore();
+    final finals = <int>[];
+    for (var seed = 1; seed <= 22; seed++) {
+      final c = GameController(seed: seed, paced: false, store: store);
+      while (c.game.phase != engine.Phase.gameOver) {
+        if (c.awaitingPass) {
+          for (final card in c.game.handOf(c.mySeat).take(engine.passSize)) {
+            c.toggleSelected(card);
+          }
+          c.confirmPass();
+        } else if (c.awaitingPlay) {
+          c.playCard(c.legalNow.first);
+        } else if (c.game.phase == engine.Phase.handOver) {
+          c.nextHand();
+        }
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.pump(const Duration(seconds: 1));
+      finals.add(c.game.totals[c.mySeat]);
+      c.dispose();
+    }
+    final kept = await store.load();
+    expect(kept, hasLength(22));
+    final history = soloGames(['oh1:5:Cyrano,Juliet,Sid:-:2C', ...kept]).history;
+    expect(history.recent, finals.sublist(2), reason: 'the newest twenty, the oldest of them first');
+  });
+
+  group('what one hand says', () {
+    final c = engine.Card.parse;
+    // A trick its winner leads with the highest of the suit; the rest
+    // follow lower or throw off.
+    List<engine.Play> trick(int winner, String lead, List<String> rest) => [
+          engine.Play(winner, c(lead)),
+          for (var i = 0; i < 3; i++) engine.Play((winner + 1 + i) % 4, c(rest[i])),
+        ];
+
+    test('the queen is whoever took the trick she fell in', () {
+      final hand = [trick(2, 'KS', ['QS', '2C', '3C'])];
+      expect(handFacts(hand, moonShooter: null, me: 2).queen, isTrue);
+      expect(handFacts(hand, moonShooter: null, me: 3).queen, isFalse, reason: 'she was thrown, not won');
+    });
+
+    test('a run broken up: the queen and ten hearts to one, a heart of theirs to me', () {
+      final run = [
+        trick(1, 'AS', ['QS', '2C', '3C']),
+        trick(1, 'AH', ['KH', 'QH', 'JH']),
+        trick(1, '10H', ['9H', '8H', '7H']),
+        trick(1, '6H', ['5H', '4H', '2D']),
+        // The one that got away: the 3 of hearts to seat 0.
+        trick(0, 'AC', ['3H', '4C', '5C']),
+      ];
+      final facts = handFacts(run, moonShooter: null, me: 0);
+      expect(facts.blocked, isTrue);
+      expect(facts.queen, isFalse);
+      expect(handFacts(run, moonShooter: null, me: 2).blocked, isFalse, reason: 'seat 2 took no heart');
+      expect(handFacts(run, moonShooter: null, me: 1).blocked, isFalse, reason: 'nobody blocks their own run');
+    });
+
+    test('nine hearts is not a run; a moon shot is a moon, not one blocked', () {
+      final nine = [
+        trick(1, 'AS', ['QS', '2C', '3C']),
+        trick(1, 'AH', ['KH', 'QH', 'JH']),
+        trick(1, '10H', ['9H', '8H', '7H']),
+        trick(1, '6H', ['2D', '3D', '4D']),
+        trick(0, 'AC', ['5H', '4C', '5C']),
+      ];
+      expect(handFacts(nine, moonShooter: null, me: 0).blocked, isFalse);
+      expect(handFacts(nine, moonShooter: 1, me: 0).blocked, isFalse);
+      expect(handFacts(nine, moonShooter: 0, me: 0).shot, isTrue);
+    });
   });
 
   test('a record that stops short is not a game anyone finished', () {

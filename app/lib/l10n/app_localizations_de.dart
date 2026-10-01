@@ -886,4 +886,56 @@ class AppLocalizationsDe extends AppLocalizations {
   String feedbackCopiedTo(String to) {
     return 'Kopiert. Füge es hier ein: $to';
   }
+
+  @override
+  String statsRecent(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deine letzten $count Spiele allein',
+      one: 'Dein letztes Spiel allein',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String statsRecentSpoken(int count, String scores, int average) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Endstände deiner letzten $count Spiele allein, ältestes zuerst: $scores. Schnitt $average.',
+      one: 'Endstand deines letzten Spiels allein: $scores. Schnitt $average.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String statsAverage(int average) {
+    return 'Schnitt $average';
+  }
+
+  @override
+  String get statsLowerIsBetter =>
+      'Endstände, ältestes zuerst. Weniger ist besser.';
+
+  @override
+  String get statsQueens => 'Pik-Dame genommen';
+
+  @override
+  String get statsMoonsShot => 'Durchmärsche';
+
+  @override
+  String get statsMoonsBlocked => 'Durchmärsche verhindert';
+
+  @override
+  String statsOverHands(int hands) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hands,
+      locale: localeName,
+      other: 'In $hands Runden allein',
+      one: 'In 1 Runde allein',
+    );
+    return '$_temp0';
+  }
 }

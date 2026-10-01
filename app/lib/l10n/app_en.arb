@@ -1070,5 +1070,63 @@
         "type": "String"
       }
     }
+  },
+  "statsRecent": "{count, plural, =1{Your last game alone} other{Your last {count} games alone}}",
+  "@statsRecent": {
+    "description": "Heading above the chart of recent solo games' final scores.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statsRecentSpoken": "{count, plural, =1{Final score of your last game alone: {scores}. Average {average}.} other{Final scores of your last {count} games alone, oldest first: {scores}. Average {average}.}}",
+  "@statsRecentSpoken": {
+    "description": "Read by a screen reader for the chart. scores is the scores separated by commas.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "scores": {
+        "type": "String"
+      },
+      "average": {
+        "type": "int"
+      }
+    }
+  },
+  "statsAverage": "average {average}",
+  "@statsAverage": {
+    "description": "Label on the chart's average line.",
+    "placeholders": {
+      "average": {
+        "type": "int"
+      }
+    }
+  },
+  "statsLowerIsBetter": "Final scores, oldest first. Lower is better.",
+  "@statsLowerIsBetter": {
+    "description": "Under the chart."
+  },
+  "statsQueens": "Queen of spades taken",
+  "@statsQueens": {
+    "description": "Under a number: hands in which the player took the queen of spades."
+  },
+  "statsMoonsShot": "Moons shot",
+  "@statsMoonsShot": {
+    "description": "Under a number: hands in which the player took all 26 points."
+  },
+  "statsMoonsBlocked": "Moons blocked",
+  "@statsMoonsBlocked": {
+    "description": "Under a number: hands in which the player stopped someone else taking all 26."
+  },
+  "statsOverHands": "{hands, plural, =1{Over 1 hand alone} other{Over {hands} hands alone}}",
+  "@statsOverHands": {
+    "description": "Under the three numbers: how many solo hands they count.",
+    "placeholders": {
+      "hands": {
+        "type": "int"
+      }
+    }
   }
 }

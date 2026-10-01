@@ -329,10 +329,17 @@ void main() {
             live: Tally(games: 3, won: 1, points: 210, best: 40),
             alone: Tally(games: 12, won: 4, points: 800, best: 22),
             pace: Pace(secondsPerCard: 6, cards: 40),
+            history: SoloHistory(
+                recent: [62, 41, 88, 30, 57, 44, 73, 25, 66, 52, 39, 91, 48, 35, 70, 55, 61, 28, 47, 59],
+                hands: 113,
+                queens: 21,
+                moonsShot: 2,
+                moonsBlocked: 5),
           ));
           await tester.pumpWidget(_inLanguage(
               locale, ProfilePage(current: (name: 'Ada', avatar: Avatar.none), seed: 'k1', stats: stats)));
           await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(find.text(lookupAppLocalizations(locale).statsMoonsBlocked), 200, scrollable: find.byType(Scrollable).first);
           cut.addAll(_cut(tester, 'profile'));
 
           await tester.pumpWidget(_inLanguage(
