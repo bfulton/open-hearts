@@ -30,6 +30,7 @@ import 'crypto/deal.dart';
 import 'entitlement.dart';
 import 'game_options.dart';
 import 'identity.dart';
+import 'l10n/l10n.dart';
 import 'profile_page.dart';
 import 'record_store.dart';
 import 'stats.dart';
@@ -194,7 +195,7 @@ class _HomePageState extends State<HomePage> {
     if (said.answer != null) {
       await Entitlement.current.adopt(said.answer!);
     } else {
-      setState(() => _error = said.refusal);
+      setState(() => _error = said.refusal!.say(context.l10n));
     }
     // The code is spent, so the address lets it go. Afterwards, not
     // before: a refresh while it was still in the air should try again,
@@ -348,7 +349,7 @@ class _HomePageState extends State<HomePage> {
       transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
       _refusalSub?.cancel();
       _refusalSub = transport.refusals.listen((r) {
-        if (mounted) setState(() => _relayNote = r == null ? null : 'No relay will take this device\'s events: $r');
+        if (mounted) setState(() => _relayNote = r == null ? null : context.l10n.noRelayTakesEvents(r));
       });
       await waitForRelay(transport.ready, slow: () {
         if (mounted) setState(() => _slow = true);
@@ -375,16 +376,18 @@ class _HomePageState extends State<HomePage> {
       });
       return transport;
     } on TimeoutException {
-      _fell(transport, _noRelay);
+      // Nothing the player can change but the connection: the relays
+      // are the build's.
+      _fell(transport, (l10n) => l10n.noRelayAnswered);
     } catch (e) {
-      _fell(transport, 'Could not connect: $e');
+      _fell(transport, (l10n) => l10n.couldNotConnect('$e'));
     }
     return null;
   }
 
   /// The connection did not come off: the sockets go, and the screen
   /// says why rather than sitting on a spinner.
-  void _fell(RelayTransport? transport, String why) {
+  void _fell(RelayTransport? transport, String Function(AppLocalizations l10n) why) {
     _refusalSub?.cancel();
     _refusalSub = null;
     transport?.close();
@@ -392,15 +395,9 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _opening = null;
       _slow = false;
-      _error = why;
+      _error = why(context.l10n);
     });
   }
-
-  /// Nothing the player can change but the connection: the relays are
-  /// the build's.
-  static const _noRelay = 'No relay answered. Check the connection and try again.';
-
-
 
   /// Every live table is sealed, and a device that cannot run the deal
   /// does not sit down (docs/03-fair-deal.md, "As built"). It says so
@@ -408,7 +405,7 @@ class _HomePageState extends State<HomePage> {
   /// it has.
   bool _withoutDeal() {
     if (dealReady) return false;
-    setState(() => _error = Room.noDeal);
+    setState(() => _error = Room.noDeal(context.l10n));
     return true;
   }
 
@@ -544,14 +541,16 @@ class _HomePageState extends State<HomePage> {
       // this device is in it (net/address.dart).
       showRoom(code);
     } on TimeoutException {
+      if (!mounted) return;
       setState(() {
         _opening = null;
-        _error = _noRelay;
+        _error = context.l10n.noRelayAnswered;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _opening = null;
-        _error = 'Could not connect: $e';
+        _error = context.l10n.couldNotConnect('$e');
       });
     }
   }
@@ -617,7 +616,7 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Link copied', textAlign: TextAlign.center), duration: Duration(milliseconds: 1600), width: 200));
+      ..showSnackBar(SnackBar(content: Text(context.l10n.linkCopied, textAlign: TextAlign.center), duration: const Duration(milliseconds: 1600), width: 200));
   }
 
   void _onRoom() {
@@ -627,7 +626,7 @@ class _HomePageState extends State<HomePage> {
     if (room.refusal != null) {
       setState(() {
         _dropRoom();
-        _error = room.refusal;
+        _error = Room.said(room.refusal!, context.l10n);
       });
       return;
     }
@@ -637,7 +636,7 @@ class _HomePageState extends State<HomePage> {
         // device: back to the front door, where the line can be read.
         setState(() {
           _dropRoom();
-          _error = 'That table filled up without you';
+          _error = context.l10n.tableFilledWithoutYou;
         });
         return;
       }
@@ -704,6 +703,7 @@ class _HomePageState extends State<HomePage> {
   /// game; and on the right how you look to the others, which is the
   /// way into your profile.
   Widget _chrome() {
+    final l10n = context.l10n;
     return Row(
       children: [
         MenuButton(
@@ -714,14 +714,14 @@ class _HomePageState extends State<HomePage> {
             // the way to it, and the menu saying it again was a second way
             // to the one page.
             if (liveOpen)
-              MenuAction('Live play', icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
-            MenuAction('About', icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
+              MenuAction(l10n.livePlay, icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
+            MenuAction(l10n.about, icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
           ],
         ),
         const Spacer(),
         Semantics(
           button: true,
-          label: 'Your profile',
+          label: l10n.yourProfile,
           onTap: _editProfile,
           child: InkWell(
             onTap: _editProfile,
@@ -744,23 +744,22 @@ class _HomePageState extends State<HomePage> {
   static const _chromeHeight = 44.0;
 
   Widget _entry() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Open source, no ads. Play alone or live.',
-            textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
+        Text(l10n.tagline, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
         const SizedBox(height: 22),
         FilledButton(
           onPressed: () => _go(TablePage(target: _options.target)),
           style: _primary(),
-          child: const Text('Play solo', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+          child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(height: 16),
         liveOpen ? _live() : _LiveLocked(onTap: () => showSubscribe(context)),
         if (_slow) ...[
           const SizedBox(height: 14),
-          const Text('Still looking for a relay…',
-              textAlign: TextAlign.center, style: TextStyle(color: Palette.chromeDim, fontSize: 13)),
+          Text(l10n.stillLookingForRelay, textAlign: TextAlign.center, style: const TextStyle(color: Palette.chromeDim, fontSize: 13)),
         ],
         if (_error != null) ...[
           const SizedBox(height: 14),
@@ -773,6 +772,8 @@ class _HomePageState extends State<HomePage> {
   /// Live play: the game being asked for, and the two ways into one —
   /// whoever is waiting, or the people you send the link to.
   Widget _live() {
+    final l10n = context.l10n;
+    final standing = _standing;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       decoration: BoxDecoration(
@@ -786,12 +787,12 @@ class _HomePageState extends State<HomePage> {
           Row(
             children: [
               Expanded(
-                child: Text(_options.line,
+                child: Text(l10n.gameLine(_options.target, _options.pool),
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2)),
               ),
               Semantics(
                 button: true,
-                label: 'Game options',
+                label: l10n.gameOptions,
                 onTap: _changeOptions,
                 child: InkWell(
                   onTap: _changeOptions,
@@ -808,10 +809,9 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           Text(
-            _standing == null
-                ? 'Four seats, filled with whoever is waiting.'
-                : 'You are rated ${_standing!.mine.shown}${_standing!.mine.provisional ? ', provisionally' : ''}, '
-                    'from ${_standing!.ledger.gamesOf(_standing!.me)} rated game${_standing!.ledger.gamesOf(_standing!.me) == 1 ? '' : 's'}.',
+            standing == null
+                ? l10n.fourSeatsWaiting
+                : l10n.youAreRated(standing.mine.shown, flag(standing.mine.provisional), standing.ledger.gamesOf(standing.me)),
             style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
           ),
           const SizedBox(height: 12),
@@ -822,13 +822,13 @@ class _HomePageState extends State<HomePage> {
           FilledButton(
             onPressed: _busy ? null : _enter,
             style: _primary(),
-            child: _Trying(busy: _opening == _Opening.friends, label: 'Play friends', weight: FontWeight.w700, size: 15.5),
+            child: _Trying(busy: _opening == _Opening.friends, label: l10n.playFriends, weight: FontWeight.w700, size: 15.5),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'A new table, and a link to send. A link from a friend opens theirs.',
+          Text(
+            l10n.playFriendsDetail,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11.5, color: Palette.chromeDim),
+            style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
           ),
         ],
       ),
@@ -903,11 +903,12 @@ class _PlayLive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final n = online;
-    final count = n == null ? null : (n <= 1 ? 'Nobody else online' : '$n online');
+    final count = n == null ? null : l10n.onlineCount(n);
     // One spoken line, so a screen reader and the suite read the same
     // thing the button says.
-    final spoken = count == null ? 'Play live' : 'Play live, ${n! <= 1 ? 'nobody else online' : '$n online'}';
+    final spoken = n == null ? l10n.playLive : l10n.playLiveSpoken(n);
     return FilledButton(
       onPressed: disabled ? null : onTap,
       style: _HomePageState._primary(),
@@ -917,7 +918,7 @@ class _PlayLive extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _Trying(busy: busy, label: 'Play live', weight: FontWeight.w700, size: 15.5),
+              _Trying(busy: busy, label: l10n.playLive, weight: FontWeight.w700, size: 15.5),
               // Holds its line while there is nothing to say, so the
               // button does not grow when the count arrives.
               SizedBox(
@@ -947,6 +948,7 @@ class _LiveLocked extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
@@ -959,29 +961,30 @@ class _LiveLocked extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text('Live play',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+              Expanded(
+                child: Text(l10n.livePlay,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
               ),
-              const Text(price, style: TextStyle(fontSize: 13, color: Palette.chrome, fontWeight: FontWeight.w600)),
+              Text(l10n.pricePerYear(priceAmount),
+                  style: const TextStyle(fontSize: 13, color: Palette.chrome, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Four seats, filled with whoever is waiting — or a link you send to three friends.',
-            style: TextStyle(fontSize: 12, color: Palette.chromeDim),
+          Text(
+            l10n.seatsOrFriends,
+            style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
           ),
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: onTap,
             style: _HomePageState._secondary(),
-            child: const Text('Subscribe', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+            child: Text(l10n.subscribe, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Playing alone is free, and always will be.',
+          Text(
+            l10n.aloneIsFree,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11.5, color: Palette.chromeDim),
+            style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
           ),
         ],
       ),
@@ -999,25 +1002,26 @@ class _WaitingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final waited = (DateTime.now().millisecondsSinceEpoch - queue.since) ~/ 1000;
     final others = queue.present.length - 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('${queue.target} points · ${queue.pool}',
+        Text(l10n.gameLine(queue.target, queue.pool),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 14, color: Palette.chromeDim, letterSpacing: 0.4)),
         const SizedBox(height: 26),
         const Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Palette.gold, strokeWidth: 2.5))),
         const SizedBox(height: 22),
-        const Text('Finding players',
+        Text(l10n.findingPlayers,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.chrome)),
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.chrome)),
         const SizedBox(height: 6),
-        Text('$waited s${others > 0 ? ', $others other${others == 1 ? '' : 's'} waiting' : ''} — bots fill any seat still empty at ten',
+        Text(l10n.waitedLine(waited, others < 0 ? 0 : others),
             textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
         const SizedBox(height: 26),
-        TextButton(onPressed: onCancel, child: const Text('Cancel', style: TextStyle(color: Palette.chromeDim))),
+        TextButton(onPressed: onCancel, child: Text(l10n.cancel, style: const TextStyle(color: Palette.chromeDim))),
       ],
     );
   }
@@ -1042,15 +1046,14 @@ class RoomView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final seconds = room.secondsToStart;
     final members = room.members;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          seconds == null
-              ? 'Send the link. The table starts ten seconds after someone joins.'
-              : 'Starting in $seconds s — empty seats go to bots',
+          seconds == null ? l10n.roomSendLink : l10n.roomStartingIn(seconds),
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
         ),
@@ -1058,7 +1061,7 @@ class RoomView extends StatelessWidget {
         TextButton.icon(
           onPressed: onShare,
           icon: const Icon(Icons.ios_share, size: 17),
-          label: const Text('Share the link', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          label: Text(l10n.shareTheLink, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           style: TextButton.styleFrom(foregroundColor: Palette.gold),
         ),
         const SizedBox(height: 10),
@@ -1074,8 +1077,8 @@ class RoomView extends StatelessWidget {
                 Expanded(
                   child: Text(
                     i < members.length
-                        ? (members[i].key == room.me ? '${members[i].name} (you)' : members[i].name)
-                        : 'a bot, unless someone joins',
+                        ? (members[i].key == room.me ? l10n.nameIsYou(members[i].name) : members[i].name)
+                        : l10n.emptySeat,
                     style: TextStyle(
                       fontSize: 15,
                       color: i < members.length ? Palette.chrome : Palette.chromeDim,
@@ -1095,10 +1098,10 @@ class RoomView extends StatelessWidget {
           FilledButton(
             onPressed: members.length >= 2 ? room.start : null,
             style: _HomePageState._primary(),
-            child: const Text('Start now', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            child: Text(l10n.startNow, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
         const SizedBox(height: 8),
-        TextButton(onPressed: onLeave, child: const Text('Leave', style: TextStyle(color: Palette.chromeDim))),
+        TextButton(onPressed: onLeave, child: Text(l10n.leave, style: const TextStyle(color: Palette.chromeDim))),
       ],
     );
   }
@@ -1145,7 +1148,7 @@ class _Rated extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'rated ${rating.shown}${rating.provisional ? ', provisionally' : ''}',
+      label: context.l10n.ratedSpoken(rating.shown, flag(rating.provisional)),
       child: ExcludeSemantics(
         child: Text(
           '${rating.shown}${rating.provisional ? '?' : ''}',

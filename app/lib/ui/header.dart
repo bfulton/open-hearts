@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:engine/engine.dart';
 
 import '../theme.dart';
+import '../l10n/l10n.dart';
 
 /// One entry on the table's menu.
 class MenuAction {
@@ -44,7 +45,7 @@ class TableHeader extends StatelessWidget {
           Expanded(
             child: Center(
               child: Text(
-                'Hand ${game.handNumber + 1}  ·  ${game.passDirection.label}  ·  to ${game.target}',
+                context.l10n.handHeader(game.handNumber + 1, context.l10n.pass(game.passDirection), game.target),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim, letterSpacing: 0.3),
@@ -54,7 +55,7 @@ class TableHeader extends StatelessWidget {
           // Said in words for a screen reader, and for anything else that
           // reads the table through the accessibility tree.
           Semantics(
-            label: broken ? 'Hearts are broken' : 'Hearts not broken',
+            label: broken ? context.l10n.heartsBroken : context.l10n.heartsNotBroken,
             child: ExcludeSemantics(
               child: SizedBox(
                 width: 48,
@@ -127,7 +128,7 @@ class MenuButton extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         button: true,
-        label: 'Menu',
+        label: context.l10n.menu,
         onTap: () => _open(context),
         child: InkWell(
           onTap: () => _open(context),

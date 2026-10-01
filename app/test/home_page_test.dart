@@ -271,7 +271,7 @@ void main() {
       await tester.tap(find.text(way));
       await tester.pump();
       await tester.pump();
-      expect(find.text(Room.noDeal), findsOneWidget, reason: '$way: every live table is sealed');
+      expect(find.text(Room.noDeal()), findsOneWidget, reason: '$way: every live table is sealed');
       expect(find.byType(CircularProgressIndicator), findsNothing, reason: '$way: and nothing is being opened');
       expect(find.text('Share the link'), findsNothing, reason: '$way: no room either');
     }

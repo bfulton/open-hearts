@@ -16,6 +16,7 @@ import 'dart:convert';
 
 import 'package:table/table.dart';
 
+import '../l10n/l10n.dart';
 import 'licence.dart';
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 
@@ -95,8 +96,56 @@ String? claimInAddress([Uri? at]) {
   return code != null && RegExp(r'^[0-9a-f]{2,64}$').hasMatch(code) ? code : null;
 }
 
-/// What the service said, or a sentence about why it did not answer.
-typedef Said<T> = ({T? answer, String? refusal});
+/// What the service said, or why it did not answer.
+typedef Said<T> = ({T? answer, Refused? refusal});
+
+/// Why the service did not do what it was asked: one of the reasons
+/// the screen has words for, or else what the service said in its own.
+class Refused {
+  const Refused(this.reason, [this.said]);
+
+  /// What the service answered with an error it named, read off its
+  /// answer; one the app has no words for keeps the service's own.
+  factory Refused.from(String said) => Refused(_named[said] ?? 'other', said);
+
+  /// `unreachable`, `notForThisDevice`, one of the service's own named
+  /// in [_named], or `other`.
+  final String reason;
+
+  /// The service's own words, in English.
+  final String? said;
+
+  /// The service's errors the app has words for (worker.mjs).
+  static const _named = {
+    'no subscription': 'noSubscription',
+    'five devices already': 'fiveDevices',
+    'not a code': 'notACode',
+    'no such code': 'noSuchCode',
+    'that code has been used': 'codeUsed',
+    'that code has run out': 'codeRunOut',
+    'not a device on this subscription': 'notADevice',
+  };
+
+  /// The refusal as the player is told it.
+  String say([AppLocalizations? words]) {
+    final say = words ?? english;
+    return switch (reason) {
+      'unreachable' => say.serviceUnreachable,
+      'notForThisDevice' => say.codeNotForThisDevice,
+      'other' => '${said![0].toUpperCase()}${said!.substring(1)}.',
+      _ => say.serviceRefusal(reason),
+    };
+  }
+
+  @override
+  bool operator ==(Object other) => other is Refused && other.reason == reason && other.said == said;
+
+  @override
+  int get hashCode => Object.hash(reason, said);
+
+  @override
+  String toString() => say();
+}
 
 /// How a handler is asked: one JSON POST. Settable, like [handlerAt]
 /// and the signature verifier before it — a widget test cannot reach a
@@ -115,24 +164,24 @@ Future<({int status, String body})?> _ask(String handler, Signer signer, Map<Str
 }
 
 /// What a refusal said, in its own words where it gave any.
-String _why(({int status, String body})? answer, String otherwise) {
-  if (answer == null) return otherwise;
+Refused _why(({int status, String body})? answer) {
+  if (answer == null) return _unreachable;
   try {
     final json = jsonDecode(answer.body);
     if (json is Map && json['error'] is String) {
       final said = json['error'] as String;
-      return said.isEmpty ? otherwise : '${said[0].toUpperCase()}${said.substring(1)}.';
+      return said.isEmpty ? _unreachable : Refused.from(said);
     }
   } catch (_) {}
-  return otherwise;
+  return _unreachable;
 }
 
-const _unreachable = 'Could not reach the service. Try again in a moment.';
+const _unreachable = Refused('unreachable');
 
 /// A code for another device to arrive with.
 Future<Said<Ticket>> askForCode(Signer signer, {Uri? endpoint}) async {
   final answer = await _ask('ticket', signer, const {}, endpoint);
-  if (answer?.status != 200) return (answer: null, refusal: _why(answer, _unreachable));
+  if (answer?.status != 200) return (answer: null, refusal: _why(answer));
   final ticket = Ticket.parse(jsonDecode(answer!.body));
   return ticket == null ? (answer: null, refusal: _unreachable) : (answer: ticket, refusal: null);
 }
@@ -140,10 +189,10 @@ Future<Said<Ticket>> askForCode(Signer signer, {Uri? endpoint}) async {
 /// Arriving with a code: the licence it was claimed for, or why not.
 Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, String service = serviceKey}) async {
   final answer = await _ask('claim', signer, {'ticket': code}, endpoint);
-  if (answer?.status != 200) return (answer: null, refusal: _why(answer, _unreachable));
+  if (answer?.status != 200) return (answer: null, refusal: _why(answer));
   final licence = Licence.parse(jsonDecode(answer!.body)['licence']);
   if (licence == null || !licence.holdsFor(signer.publicKey, service: service)) {
-    return (answer: null, refusal: 'That code is not for this device.');
+    return (answer: null, refusal: const Refused('notForThisDevice'));
   }
   return (answer: licence, refusal: null);
 }
@@ -151,7 +200,7 @@ Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, Stri
 /// The devices on this subscription; with [drop], one fewer.
 Future<Said<Household>> devicesOn(Signer signer, {PublicKey? drop, Uri? endpoint}) async {
   final answer = await _ask('devices', signer, {'drop': ?drop}, endpoint);
-  if (answer?.status != 200) return (answer: null, refusal: _why(answer, _unreachable));
+  if (answer?.status != 200) return (answer: null, refusal: _why(answer));
   final household = Household.parse(jsonDecode(answer!.body));
   return household == null ? (answer: null, refusal: _unreachable) : (answer: household, refusal: null);
 }

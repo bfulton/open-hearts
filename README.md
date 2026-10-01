@@ -248,6 +248,26 @@ play shut and says what it costs — which is the right way round for a
 missing key, and is what the browser suites prove by supplying their
 own (`e2e/build.sh`).
 
+### Languages
+
+The app speaks English, Spanish, Brazilian Portuguese, German and
+French, chosen from the device's own language, with English where it
+speaks none of them; `?lang=de` in the address chooses instead. Every
+sentence on the screen, and every one a screen reader says, is a message
+in `app/lib/l10n/app_en.arb` with a description of where it appears,
+translated in the `.arb` beside it; `flutter pub get` generates the
+class the widgets read them through (`app/l10n.yaml`). The engine keeps
+its own English — a card's name, a way to pass — for logs and tests, and
+`app/lib/l10n/l10n.dart` says those in the player's language.
+
+A new language is one more `.arb`. `app/test/l10n_test.dart` holds every
+translation to the English's blanks, gives every card and rule a name
+of its own in it, and lays out every page in it on a 320-pixel phone and
+an ordinary one, in Roboto rather than the test font, failing on
+anything that overflows or is cut short. The English there is held to
+what it was, word for word: the browser suites find the table by it.
+The translations are a first pass and want a native speaker's read.
+
 ### The engine is the point
 
 `packages/engine/` has no Flutter imports and no notion of time. That is

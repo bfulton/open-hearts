@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 
 import 'avatar.dart';
+import 'l10n/l10n.dart';
 import 'record_store.dart';
 import 'table_model.dart';
 
@@ -87,10 +88,14 @@ class GameController extends ChangeNotifier implements TableModel {
   @override
   int seatAt(int position) => (position + mySeat) % seatCount;
 
+  /// The words the table speaks in: the page sets them from the app's
+  /// language (l10n/l10n.dart), and they are English until it does.
+  AppLocalizations words = english;
+
   /// The names around the table, seat order (0 is the player).
   @override
   List<String> get names =>
-      [for (var s = 0; s < seatCount; s++) s == humanSeat ? 'You' : _bots[s]!.persona.name];
+      [for (var s = 0; s < seatCount; s++) s == humanSeat ? words.you : _bots[s]!.persona.name];
 
   /// The persona at [seat], or null at the player's.
   @override
@@ -216,7 +221,7 @@ class GameController extends ChangeNotifier implements TableModel {
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
     final legal = _game.legalPlaysFor(humanSeat);
-    if (!legal.contains(card)) return refusalFor(_game, humanSeat, card);
+    if (!legal.contains(card)) return refusalFor(_game, humanSeat, card, words);
     _record.plays.add(card);
     _game.play(humanSeat, card);
     _played.add(card);

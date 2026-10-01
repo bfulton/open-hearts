@@ -1,0 +1,1017 @@
+{
+  "@@locale": "en",
+  "cardName": "{rank, select, jack{jack} queen{queen} king{king} ace{ace} other{{number}}} of {suit, select, clubs{clubs} diamonds{diamonds} spades{spades} other{hearts}}",
+  "@cardName": {
+    "description": "A card's name, as a screen reader says it on a card in the hand. rank is one of two..ten, jack, queen, king, ace; number is the numeral for two..ten; suit is clubs, diamonds, spades or hearts.",
+    "placeholders": {
+      "rank": {
+        "type": "String"
+      },
+      "number": {
+        "type": "String"
+      },
+      "suit": {
+        "type": "String"
+      }
+    }
+  },
+  "cardWithArticle": "the {rank, select, jack{jack} queen{queen} king{king} ace{ace} other{{number}}} of {suit, select, clubs{clubs} diamonds{diamonds} spades{spades} other{hearts}}",
+  "@cardWithArticle": {
+    "description": "A card's name with its article, as it goes in a sentence: 'Anna played {card}'. Use the case the sentences seatLed and seatPlayed need.",
+    "placeholders": {
+      "rank": {
+        "type": "String"
+      },
+      "number": {
+        "type": "String"
+      },
+      "suit": {
+        "type": "String"
+      }
+    }
+  },
+  "seatLed": "{name} led {card}",
+  "@seatLed": {
+    "description": "Read by a screen reader for the first card of a trick. card is cardWithArticle.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "card": {
+        "type": "String"
+      }
+    }
+  },
+  "seatPlayed": "{name} played {card}",
+  "@seatPlayed": {
+    "description": "Read by a screen reader for every later card of a trick. card is cardWithArticle.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "card": {
+        "type": "String"
+      }
+    }
+  },
+  "passDirection": "{direction, select, left{Pass left} right{Pass right} across{Pass across} other{No pass}}",
+  "@passDirection": {
+    "description": "Which way this hand's cards are passed. direction is left, right, across or hold.",
+    "placeholders": {
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "refuseFirstLead": "The 2 of clubs leads the first trick",
+  "@refuseFirstLead": {
+    "description": "Said when the player tries to lead anything but the two of clubs to the first trick."
+  },
+  "refuseFollowSuit": "{suit, select, clubs{You have to follow clubs} diamonds{You have to follow diamonds} spades{You have to follow spades} other{You have to follow hearts}}",
+  "@refuseFollowSuit": {
+    "description": "Said when the player tries to play off-suit while holding the suit that was led.",
+    "placeholders": {
+      "suit": {
+        "type": "String"
+      }
+    }
+  },
+  "refuseFirstTrickPoints": "No points on the first trick",
+  "@refuseFirstTrickPoints": {
+    "description": "Said when the player tries to play a heart or the queen of spades on the first trick."
+  },
+  "refuseHeartsUnbroken": "Hearts aren't broken yet",
+  "@refuseHeartsUnbroken": {
+    "description": "Said when the player tries to lead a heart before hearts are broken."
+  },
+  "refuseOther": "You cannot play that card",
+  "@refuseOther": {
+    "description": "Said when a card cannot be played for any other reason."
+  },
+  "you": "You",
+  "@you": {
+    "description": "The player's own name, wherever the table lists the players."
+  },
+  "seatNumber": "Seat {seat}",
+  "@seatNumber": {
+    "description": "A seat whose player's name is not known.",
+    "placeholders": {
+      "seat": {
+        "type": "int"
+      }
+    }
+  },
+  "handHeader": "Hand {hand}  ·  {pass}  ·  to {target}",
+  "@handHeader": {
+    "description": "The line along the top of the table: the hand number, which way the cards pass (passDirection), and the score the game is played to.",
+    "placeholders": {
+      "hand": {
+        "type": "int"
+      },
+      "pass": {
+        "type": "String"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  },
+  "heartsBroken": "Hearts are broken",
+  "@heartsBroken": {
+    "description": "Said by a screen reader about the heart at the top of the table."
+  },
+  "heartsNotBroken": "Hearts not broken",
+  "@heartsNotBroken": {
+    "description": "Said by a screen reader about the heart at the top of the table."
+  },
+  "menu": "Menu",
+  "@menu": {
+    "description": "Said by a screen reader for the menu button at the top left."
+  },
+  "leaveTheTable": "Leave the table",
+  "@leaveTheTable": {
+    "description": "Menu item that leaves the game."
+  },
+  "about": "About",
+  "@about": {
+    "description": "Menu item and page title: about the app."
+  },
+  "recordCopied": "Record copied",
+  "@recordCopied": {
+    "description": "Shown briefly after the game's record is put on the clipboard."
+  },
+  "choosePass": "{count, plural, =1{Choose 1 more to pass} other{Choose {count} more to pass}}",
+  "@choosePass": {
+    "description": "While picking the three cards to pass: how many are still to choose.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passButton": "Pass",
+  "@passButton": {
+    "description": "The button that passes the three chosen cards."
+  },
+  "passedYou": "{name} passed you",
+  "@passedYou": {
+    "description": "Beside the cards the player was passed, during the first trick.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "passedTo": "Passed to {name}",
+  "@passedTo": {
+    "description": "Beside the cards the player passed, while the others choose theirs.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "waitingForOthers": "Waiting for the others",
+  "@waitingForOthers": {
+    "description": "While the others choose the cards they pass."
+  },
+  "seatScores": "{name}: {total} in the game, {taken} this hand",
+  "@seatScores": {
+    "description": "Read by a screen reader for a player's badge at the table.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "total": {
+        "type": "int"
+      },
+      "taken": {
+        "type": "int"
+      }
+    }
+  },
+  "seatOnTurn": ", on turn",
+  "@seatOnTurn": {
+    "description": "Added to seatScores when it is that player's turn."
+  },
+  "seatClock": ", {seconds} s on the clock",
+  "@seatClock": {
+    "description": "Added to seatScores when that player's clock is running.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "youTakeIt": "You take it",
+  "@youTakeIt": {
+    "description": "On the table when the player wins the trick."
+  },
+  "takesIt": "{name} takes it",
+  "@takesIt": {
+    "description": "On the table when another player wins the trick.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "yourTurn": "Your turn",
+  "@yourTurn": {
+    "description": "On the table when it is the player's turn."
+  },
+  "whatHasGone": "What has gone",
+  "@whatHasGone": {
+    "description": "Heading of the column beside the table that lists the cards already played this hand."
+  },
+  "stillOut": "{hearts, plural, =0{No hearts} =1{1 heart} other{{hearts} hearts}}{queen, select, true{ and the queen} other{}} still out",
+  "@stillOut": {
+    "description": "Under the cards already played: how many hearts, and whether the queen of spades, have not been played yet. queen is true or false.",
+    "placeholders": {
+      "hearts": {
+        "type": "int"
+      },
+      "queen": {
+        "type": "String"
+      }
+    }
+  },
+  "nextHand": "Next hand",
+  "@nextHand": {
+    "description": "Button on the sheet after a hand."
+  },
+  "newGame": "New game",
+  "@newGame": {
+    "description": "Button on the sheet after a game."
+  },
+  "handNumber": "Hand {hand}",
+  "@handNumber": {
+    "description": "Title of the sheet after a hand.",
+    "placeholders": {
+      "hand": {
+        "type": "int"
+      }
+    }
+  },
+  "youShotTheMoon": "You shot the moon",
+  "@youShotTheMoon": {
+    "description": "Title of the sheet after a hand in which the player took every point."
+  },
+  "shotTheMoon": "{name} shot the moon",
+  "@shotTheMoon": {
+    "description": "Title of the sheet after a hand in which another player took every point.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shotTheMoonDetail": "All 26 — everyone else takes them",
+  "@shotTheMoonDetail": {
+    "description": "Under shotTheMoon: the 26 points go to everyone else instead."
+  },
+  "aShareOfIt": "A share of it",
+  "@aShareOfIt": {
+    "description": "Title of the sheet after a game the player won jointly."
+  },
+  "youWin": "You win",
+  "@youWin": {
+    "description": "Title of the sheet after a game the player won."
+  },
+  "namesTie": "{names} tie",
+  "@namesTie": {
+    "description": "Title of the sheet after a game others won jointly. names is the winners' names joined with listAnd.",
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "listAnd": "and",
+  "@listAnd": {
+    "description": "The word that joins the names of players who tie: 'Anna and Bao'."
+  },
+  "nameWins": "{name} wins",
+  "@nameWins": {
+    "description": "Title of the sheet after a game another player won.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lowestScoreAfter": "{hands, plural, =1{Lowest score after 1 hand} other{Lowest score after {hands} hands}}",
+  "@lowestScoreAfter": {
+    "description": "Under the title of the sheet after a game: the lowest score wins.",
+    "placeholders": {
+      "hands": {
+        "type": "int"
+      }
+    }
+  },
+  "copyRecord": "Copy record",
+  "@copyRecord": {
+    "description": "Button on the sheet after a solo game: puts a line of text that replays the game on the clipboard."
+  },
+  "ratingNow": "Rating {rating}",
+  "@ratingNow": {
+    "description": "On the sheet after a rated game that did not move the player's rating.",
+    "placeholders": {
+      "rating": {
+        "type": "String"
+      }
+    }
+  },
+  "ratingMoved": "Rating {before} → {after}",
+  "@ratingMoved": {
+    "description": "On the sheet after a rated game: the player's rating before and after.",
+    "placeholders": {
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "tagline": "Open source, no ads. Play alone or live.",
+  "@tagline": {
+    "description": "Under the app's name on the front door."
+  },
+  "playSolo": "Play solo",
+  "@playSolo": {
+    "description": "Button: a game against three bots."
+  },
+  "stillLookingForRelay": "Still looking for a relay…",
+  "@stillLookingForRelay": {
+    "description": "Shown while the app waits a long time to connect. A relay is a server that passes messages between players."
+  },
+  "noRelayTakesEvents": "No relay will take this device's events: {reason}",
+  "@noRelayTakesEvents": {
+    "description": "Shown when every relay refuses this device's messages. reason is the relay's own words, in English.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "couldNotConnect": "Could not connect: {error}",
+  "@couldNotConnect": {
+    "description": "Shown when connecting fails. error is a technical message, in English.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noRelayAnswered": "No relay answered. Check the connection and try again.",
+  "@noRelayAnswered": {
+    "description": "Shown when no relay could be reached at all."
+  },
+  "tableFilledWithoutYou": "That table filled up without you",
+  "@tableFilledWithoutYou": {
+    "description": "Shown when the table a link opened started without a seat for this player."
+  },
+  "linkCopied": "Link copied",
+  "@linkCopied": {
+    "description": "Shown briefly after a link is put on the clipboard."
+  },
+  "livePlay": "Live play",
+  "@livePlay": {
+    "description": "Live play with other people: the paid part of the app. A menu item, a heading and a page title."
+  },
+  "yourProfile": "Your profile",
+  "@yourProfile": {
+    "description": "The button in the top right corner, and the page it opens: the player's name and picture."
+  },
+  "gameOptions": "Game options",
+  "@gameOptions": {
+    "description": "The button that opens the game options, and their sheet's title."
+  },
+  "gameLine": "{target} points · {rated, select, rated{rated} other{unrated}}",
+  "@gameLine": {
+    "description": "The game the player is asking for: the score it ends at, and whether it is rated. rated is rated or unrated.",
+    "placeholders": {
+      "target": {
+        "type": "int"
+      },
+      "rated": {
+        "type": "String"
+      }
+    }
+  },
+  "fourSeatsWaiting": "Four seats, filled with whoever is waiting.",
+  "@fourSeatsWaiting": {
+    "description": "Under the game options on the front door, before the player's rating is known."
+  },
+  "youAreRated": "You are rated {rating}{provisional, select, true{, provisionally} other{}}, {games, plural, =1{from 1 rated game} other{from {games} rated games}}.",
+  "@youAreRated": {
+    "description": "Under the game options on the front door. provisional is true while too few games have settled the rating.",
+    "placeholders": {
+      "rating": {
+        "type": "int"
+      },
+      "provisional": {
+        "type": "String"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "playLive": "Play live",
+  "@playLive": {
+    "description": "Button: a game with whoever else is waiting online."
+  },
+  "playLiveSpoken": "{online, plural, =0{Play live, nobody else online} =1{Play live, nobody else online} other{Play live, {online} online}}",
+  "@playLiveSpoken": {
+    "description": "Read by a screen reader for the Play live button. online counts this device too.",
+    "placeholders": {
+      "online": {
+        "type": "int"
+      }
+    }
+  },
+  "onlineCount": "{online, plural, =0{Nobody else online} =1{Nobody else online} other{{online} online}}",
+  "@onlineCount": {
+    "description": "Under Play live: how many devices are online, this one included.",
+    "placeholders": {
+      "online": {
+        "type": "int"
+      }
+    }
+  },
+  "playFriends": "Play friends",
+  "@playFriends": {
+    "description": "Button: a new table of the player's own, and a link to send to friends."
+  },
+  "playFriendsDetail": "A new table, and a link to send. A link from a friend opens theirs.",
+  "@playFriendsDetail": {
+    "description": "Under the Play friends button."
+  },
+  "pricePerYear": "{amount} a year",
+  "@pricePerYear": {
+    "description": "What live play costs. amount is the price with its currency, e.g. $2.99.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "seatsOrFriends": "Four seats, filled with whoever is waiting — or a link you send to three friends.",
+  "@seatsOrFriends": {
+    "description": "What live play is, where it is offered."
+  },
+  "subscribe": "Subscribe",
+  "@subscribe": {
+    "description": "Button: buy live play."
+  },
+  "aloneIsFree": "Playing alone is free, and always will be.",
+  "@aloneIsFree": {
+    "description": "Under the Subscribe button on the front door."
+  },
+  "findingPlayers": "Finding players",
+  "@findingPlayers": {
+    "description": "Heading while waiting to be seated at a live table."
+  },
+  "waitedLine": "{seconds} s{others, plural, =0{} =1{, 1 other waiting} other{, {others} others waiting}} — bots fill any seat still empty at ten",
+  "@waitedLine": {
+    "description": "While waiting to be seated: seconds waited, how many others are waiting, and that bots fill the empty seats after ten seconds.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "others": {
+        "type": "int"
+      }
+    }
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Button: stop waiting."
+  },
+  "roomSendLink": "Send the link. The table starts ten seconds after someone joins.",
+  "@roomSendLink": {
+    "description": "In a table of the player's own, before anyone has joined."
+  },
+  "roomStartingIn": "Starting in {seconds} s — empty seats go to bots",
+  "@roomStartingIn": {
+    "description": "In a table of the player's own: the countdown to the start.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "shareTheLink": "Share the link",
+  "@shareTheLink": {
+    "description": "Button: send the link to the player's table."
+  },
+  "nameIsYou": "{name} (you)",
+  "@nameIsYou": {
+    "description": "The player's own line in the list of who is at the table.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emptySeat": "a bot, unless someone joins",
+  "@emptySeat": {
+    "description": "An empty line in the list of who is at the table."
+  },
+  "startNow": "Start now",
+  "@startNow": {
+    "description": "Button: start the table without waiting for the countdown."
+  },
+  "leave": "Leave",
+  "@leave": {
+    "description": "Button: leave the table before it starts."
+  },
+  "ratedSpoken": "rated {rating}{provisional, select, true{, provisionally} other{}}",
+  "@ratedSpoken": {
+    "description": "Read by a screen reader beside a player's rating. provisional is true while too few games have settled it.",
+    "placeholders": {
+      "rating": {
+        "type": "int"
+      },
+      "provisional": {
+        "type": "String"
+      }
+    }
+  },
+  "roomOtherBuild": "Someone's app is on another build than yours — one of you is older. Update, and try again.",
+  "@roomOtherBuild": {
+    "description": "Shown when players at one table have different versions of the app."
+  },
+  "noDealPageStopped": "The deal that keeps the cards honest stopped working on this page. Reload it to start afresh.",
+  "@noDealPageStopped": {
+    "description": "Shown in a browser when the code that deals the cards fairly has failed."
+  },
+  "noDealAppStopped": "The deal that keeps the cards honest stopped working. Restart the app to start afresh.",
+  "@noDealAppStopped": {
+    "description": "Shown in the app when the code that deals the cards fairly has failed."
+  },
+  "noDealBrowser": "This browser can't run the deal that keeps the cards honest. Try a current Chrome, Firefox or Safari.",
+  "@noDealBrowser": {
+    "description": "Shown in a browser that cannot run the code that deals the cards fairly."
+  },
+  "noDealBuild": "This build can't run the deal that keeps the cards honest, so it can't sit at a live table.",
+  "@noDealBuild": {
+    "description": "Shown in an app build that cannot run the code that deals the cards fairly."
+  },
+  "serviceUnreachable": "Could not reach the service. Try again in a moment.",
+  "@serviceUnreachable": {
+    "description": "Shown when the app's own server cannot be reached."
+  },
+  "codeNotForThisDevice": "That code is not for this device.",
+  "@codeNotForThisDevice": {
+    "description": "Shown when a code from another device's screen was made for a different device."
+  },
+  "serviceRefusal": "{reason, select, noSubscription{No subscription.} fiveDevices{Five devices already.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} other{The service turned that down.}}",
+  "@serviceRefusal": {
+    "description": "Why the server turned down a request about a subscription's devices.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "buyingNotOpen": "Buying is not open on this device yet.",
+  "@buyingNotOpen": {
+    "description": "Shown when live play cannot be bought on this device."
+  },
+  "shopUnreachable": "Could not reach the shop. Try again in a moment.",
+  "@shopUnreachable": {
+    "description": "Shown when the shop cannot be reached."
+  },
+  "shopNotOpen": "The shop is not open yet.",
+  "@shopNotOpen": {
+    "description": "Shown when the shop is not taking orders."
+  },
+  "openUntil": "Open on this device, to {day}",
+  "@openUntil": {
+    "description": "On the Live play page once it is bought: the day it runs to, written year-month-day.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "pointRating": "A rating of your own, from results the four of you sign.",
+  "@pointRating": {
+    "description": "One of the points on the Live play page."
+  },
+  "pointDeal": "The deal is dealt between the four of you. No server sees a hand, ours included.",
+  "@pointDeal": {
+    "description": "One of the points on the Live play page."
+  },
+  "whatMoneyPaysFor": "Playing alone is free and always will be, and so are the records, the engine and every line of this. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.",
+  "@whatMoneyPaysFor": {
+    "description": "On the Live play page, under the points."
+  },
+  "cancelWhenever": "Cancel whenever you like; the year you paid for runs out on its own.",
+  "@cancelWhenever": {
+    "description": "Under the Subscribe button."
+  },
+  "storeSubscriptionLater": "On a phone this will be the store's own subscription. Until the app is in the stores, live play is bought on the web.",
+  "@storeSubscriptionLater": {
+    "description": "Under the Subscribe button, on a device that cannot buy yet."
+  },
+  "subscriptionIsYours": "A subscription is yours, not a device's. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.",
+  "@subscriptionIsYours": {
+    "description": "On the Live play page once it is bought, above the list of devices."
+  },
+  "yourDevices": "Your devices",
+  "@yourDevices": {
+    "description": "Heading of the list of devices on the subscription."
+  },
+  "devicesOf": "{count} of {most}",
+  "@devicesOf": {
+    "description": "Beside Your devices: how many devices are on the subscription, of how many it allows.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "most": {
+        "type": "int"
+      }
+    }
+  },
+  "addDevice": "Add a device",
+  "@addDevice": {
+    "description": "Button: show a code another device can scan to join the subscription."
+  },
+  "pointTheCamera": "Point the other device's camera at this. It is good for ten minutes and for one device: a photograph of this screen tomorrow is worth nothing.",
+  "@pointTheCamera": {
+    "description": "Under the code to scan."
+  },
+  "sendLinkInstead": "Send the link instead",
+  "@sendLinkInstead": {
+    "description": "Button: send the code as a link rather than scanning it."
+  },
+  "thisDevice": "This device",
+  "@thisDevice": {
+    "description": "In the list of devices: the one in the player's hand."
+  },
+  "deviceSince": "since {day}",
+  "@deviceSince": {
+    "description": "In the list of devices: the day a device joined, written year-month-day.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "dropThisOne": "Drop this one",
+  "@dropThisOne": {
+    "description": "Button: take the device in the player's hand off the subscription."
+  },
+  "drop": "Drop",
+  "@drop": {
+    "description": "Button: take a device off the subscription."
+  },
+  "codeToScan": "A code to scan",
+  "@codeToScan": {
+    "description": "Read by a screen reader for the code another device scans."
+  },
+  "notAPicture": "That did not read as a picture.",
+  "@notAPicture": {
+    "description": "Shown when the chosen file is not a picture."
+  },
+  "couldNotOpen": "Could not open that: {error}",
+  "@couldNotOpen": {
+    "description": "Shown when the chosen file could not be opened. error is a technical message, in English.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "done": "Done",
+  "@done": {
+    "description": "Button: close the page or sheet, keeping what was chosen."
+  },
+  "yourName": "Your name",
+  "@yourName": {
+    "description": "The field for the player's name, which the others see."
+  },
+  "howYouLook": "How you look",
+  "@howYouLook": {
+    "description": "Heading above the icons and colours the player can choose."
+  },
+  "colourNumber": "Colour {number}",
+  "@colourNumber": {
+    "description": "Read by a screen reader for each colour the player can choose.",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "useAPhoto": "Use a photo",
+  "@useAPhoto": {
+    "description": "Button: choose a photo as the player's picture."
+  },
+  "myInitials": "My initials",
+  "@myInitials": {
+    "description": "Button: go back to the player's initials instead of an icon or photo."
+  },
+  "avatarIcon": "{icon, select, pets{Paw} rabbit{Rabbit} bug{Bug} sailing{Sailing boat} rocket{Rocket} anchor{Anchor} castle{Castle} diamond{Diamond} spa{Leaf} park{Tree} star{Star} bolt{Bolt} sun{Sun} moon{Moon} flower{Flower} cake{Cake} coffee{Coffee} music{Music note} game{Game controller} umbrella{Umbrella} bike{Bicycle} piano{Piano} palette{Palette} other{Snowflake}}",
+  "@avatarIcon": {
+    "description": "Read by a screen reader for each icon the player can choose.",
+    "placeholders": {
+      "icon": {
+        "type": "String"
+      }
+    }
+  },
+  "paceKnown": "You play at a {pace, select, brisk{brisk} steady{steady} unhurried{unhurried} slow{slow} other{not yet known}} pace, about {seconds, plural, =1{1 second} other{{seconds} seconds}} a card, and are seated with players at a similar pace",
+  "@paceKnown": {
+    "description": "On the profile: how fast the player plays. pace is brisk, steady, unhurried or slow.",
+    "placeholders": {
+      "pace": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "paceUnknown": "Your pace is not known yet. After a live game or two you will be seated with players at a similar pace",
+  "@paceUnknown": {
+    "description": "On the profile, before the player's pace is known."
+  },
+  "rating": "Rating",
+  "@rating": {
+    "description": "Heading on the profile."
+  },
+  "countingGames": "Counting up your games…",
+  "@countingGames": {
+    "description": "On the profile while the player's games are counted."
+  },
+  "relaysSilent": "The relays did not answer, so it cannot be shown just now",
+  "@relaysSilent": {
+    "description": "On the profile when the rating could not be fetched."
+  },
+  "playRatedForRating": "Play a rated live game and you will have one",
+  "@playRatedForRating": {
+    "description": "On the profile before the player has a rating."
+  },
+  "ratingProvisionalFrom": "{games, plural, =1{Provisional, from one game} other{Provisional, from {games} games}}",
+  "@ratingProvisionalFrom": {
+    "description": "Under the rating while too few games have settled it.",
+    "placeholders": {
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "ratingFrom": "{games, plural, =1{From one game} other{From {games} games}}",
+  "@ratingFrom": {
+    "description": "Under the rating.",
+    "placeholders": {
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "yourGames": "Your games",
+  "@yourGames": {
+    "description": "Heading of the table of the player's games."
+  },
+  "gamesLive": "Live",
+  "@gamesLive": {
+    "description": "Column heading: games played live."
+  },
+  "gamesAlone": "Alone",
+  "@gamesAlone": {
+    "description": "Column heading: games played against the bots."
+  },
+  "gamesPlayed": "played",
+  "@gamesPlayed": {
+    "description": "Row of the games table: how many were played."
+  },
+  "gamesWon": "won",
+  "@gamesWon": {
+    "description": "Row of the games table: how many were won."
+  },
+  "gamesAverage": "average",
+  "@gamesAverage": {
+    "description": "Row of the games table: the average final score."
+  },
+  "gamesBest": "best",
+  "@gamesBest": {
+    "description": "Row of the games table: the best (lowest) final score."
+  },
+  "yourPicture": "Your picture",
+  "@yourPicture": {
+    "description": "Title of the page that crops a photo."
+  },
+  "useIt": "Use it",
+  "@useIt": {
+    "description": "Button: use the photo as cropped."
+  },
+  "cropHelp": "Drag to move it, pinch to make it bigger.\nWhat is in the circle is your picture.",
+  "@cropHelp": {
+    "description": "How to crop the photo."
+  },
+  "pictureFlagged": "This device thought this picture was one you would not want at the table. It is a guess, made here, and it can be wrong.",
+  "@pictureFlagged": {
+    "description": "When another player's picture has been hidden automatically."
+  },
+  "showPicture": "Show {name}'s picture",
+  "@showPicture": {
+    "description": "Button: show another player's picture.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "hidePicture": "Hide {name}'s picture",
+  "@hidePicture": {
+    "description": "Button: hide another player's picture.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pictureChoiceNote": "On this device only, and only their picture: their name and their score stay.",
+  "@pictureChoiceNote": {
+    "description": "Under the show or hide picture button."
+  },
+  "waitingToReconnect": "Waiting for the others to reconnect",
+  "@waitingToReconnect": {
+    "description": "Under the table while the game is paused."
+  },
+  "askingTheJury": "Asking the jury",
+  "@askingTheJury": {
+    "description": "Under the table while other devices online settle a stuck turn."
+  },
+  "noJurorOnline": "Nobody online to draw a jury from — waiting for one",
+  "@noJurorOnline": {
+    "description": "Under the table while no other device is online to settle a stuck turn."
+  },
+  "waitingForTheJury": "Waiting for the jury",
+  "@waitingForTheJury": {
+    "description": "Under the table while other devices online settle a stuck turn."
+  },
+  "openingDepartedHand": "Opening a departed player's hand",
+  "@openingDepartedHand": {
+    "description": "Under the table while a player who left has their hand opened so a bot can play it."
+  },
+  "nobodyClaimsTwo": "Nobody claims the 2♣ — the deal is stuck",
+  "@nobodyClaimsTwo": {
+    "description": "Under the table when no player says they hold the two of clubs."
+  },
+  "bootPlayer": "Boot {name}",
+  "@bootPlayer": {
+    "description": "Button: remove a player who has run out of time; a bot takes their seat.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "cannotDealTitle": "This device can't deal",
+  "@cannotDealTitle": {
+    "description": "Title when this device can no longer run the fair deal."
+  },
+  "cannotDealLabel": "The deal stopped working here",
+  "@cannotDealLabel": {
+    "description": "Under cannotDealTitle."
+  },
+  "cannotDealWhy": "So you have left the table, and the others play on with a bot in your seat. Reloading the page starts the deal afresh. ({reason})",
+  "@cannotDealWhy": {
+    "description": "Explains cannotDealTitle. reason is a technical message, in English.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "connectionFailure": "Connection failure",
+  "@connectionFailure": {
+    "description": "Title when a live game cannot go on."
+  },
+  "jurorQuorumLost": "Juror quorum lost",
+  "@jurorQuorumLost": {
+    "description": "Under connectionFailure: too few of the devices keeping the bots' hands are still online."
+  },
+  "jurorQuorumLostWhy": "Too few of the jurors keeping the bot seats are still online, so the hand cannot go on. The game ends here, unscored.",
+  "@jurorQuorumLostWhy": {
+    "description": "Explains jurorQuorumLost."
+  },
+  "onWithIt": "On with it",
+  "@onWithIt": {
+    "description": "Button on the sheet after a hand at a live table, where the next hand is already under way."
+  },
+  "home": "Home",
+  "@home": {
+    "description": "Button: back to the front door."
+  },
+  "hereCount": "{here} of {humans} here  ·  {rated, select, rated{rated} other{unrated}}",
+  "@hereCount": {
+    "description": "At a live table: how many of the people are still connected, and whether the game is rated. rated is rated or unrated.",
+    "placeholders": {
+      "here": {
+        "type": "int"
+      },
+      "humans": {
+        "type": "int"
+      },
+      "rated": {
+        "type": "String"
+      }
+    }
+  },
+  "botTookYourSeat": "A bot took your seat",
+  "@botTookYourSeat": {
+    "description": "Title when the table went on without this player."
+  },
+  "tableCouldNotHear": "The table could not hear from you, and went on without you.",
+  "@tableCouldNotHear": {
+    "description": "Explains botTookYourSeat."
+  },
+  "back": "Back",
+  "@back": {
+    "description": "Button: go back."
+  },
+  "waitingForJurors": "Waiting for jurors to hold the bots' hands",
+  "@waitingForJurors": {
+    "description": "Under the table before a hand with bots can be dealt."
+  },
+  "dealing": "Dealing",
+  "@dealing": {
+    "description": "Under the table while the cards are dealt."
+  },
+  "dealingKeys": "Dealing — keys",
+  "@dealingKeys": {
+    "description": "Under the table during the first step of the fair deal."
+  },
+  "shuffling": "Shuffling ({turn} of 4)",
+  "@shuffling": {
+    "description": "Under the table while each player shuffles in turn.",
+    "placeholders": {
+      "turn": {
+        "type": "int"
+      }
+    }
+  },
+  "dealingTheCards": "Dealing the cards",
+  "@dealingTheCards": {
+    "description": "Under the table during the fair deal."
+  },
+  "openingTheCards": "Opening the cards",
+  "@openingTheCards": {
+    "description": "Under the table at the end of the fair deal."
+  },
+  "gameEndsAt": "The game ends when someone reaches",
+  "@gameEndsAt": {
+    "description": "In game options, above the choice of target score."
+  },
+  "targetPoints": "{target} points",
+  "@targetPoints": {
+    "description": "In game options: a target score.",
+    "placeholders": {
+      "target": {
+        "type": "int"
+      }
+    }
+  },
+  "ratedMovesRatings": "Rated games move your rating, and the bots'",
+  "@ratedMovesRatings": {
+    "description": "In game options, above the choice of rated or unrated."
+  },
+  "rated": "Rated",
+  "@rated": {
+    "description": "In game options: a rated game."
+  },
+  "unrated": "Unrated",
+  "@unrated": {
+    "description": "In game options: an unrated game."
+  },
+  "aboutBlurb": "Hearts, open source. Play alone against the house, or live: the four of you deal the cards between you, and no server sees a hand.",
+  "@aboutBlurb": {
+    "description": "On the About page."
+  },
+  "build": "Build",
+  "@build": {
+    "description": "On the About page: which build of the app this is."
+  },
+  "published": "Published",
+  "@published": {
+    "description": "On the About page: when this build was published."
+  },
+  "buildIsUp": "{build} is up",
+  "@buildIsUp": {
+    "description": "A small button that appears when a newer build of the web app has been published; tapping it reloads.",
+    "placeholders": {
+      "build": {
+        "type": "String"
+      }
+    }
+  }
+}

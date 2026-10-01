@@ -18,6 +18,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import '../l10n/l10n.dart';
 
 /// What a square window of [side] is looking at, over a picture of
 /// [picture] pixels.
@@ -125,12 +126,12 @@ class _PhotoCropState extends State<PhotoCrop> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Palette.chromeDim,
-        title: const Text('Your picture', style: TextStyle(fontSize: 16, color: Palette.chromeDim)),
+        title: Text(context.l10n.yourPicture, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(_window.looking),
             style: TextButton.styleFrom(foregroundColor: Palette.gold),
-            child: const Text('Use it', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            child: Text(context.l10n.useIt, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
           const SizedBox(width: 6),
         ],
@@ -164,10 +165,10 @@ class _PhotoCropState extends State<PhotoCrop> {
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
-              'Drag to move it, pinch to make it bigger.\nWhat is in the circle is your picture.',
+            Text(
+              context.l10n.cropHelp,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, height: 1.5, color: Palette.chromeDim),
+              style: const TextStyle(fontSize: 12.5, height: 1.5, color: Palette.chromeDim),
             ),
           ],
         ),

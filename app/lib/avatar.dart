@@ -139,34 +139,6 @@ abstract final class AvatarIcons {
     'snow': Icons.ac_unit,
   };
 
-  /// What each is called, for a screen reader and a test.
-  static const names = <String, String>{
-    'pets': 'Paw',
-    'rabbit': 'Rabbit',
-    'bug': 'Bug',
-    'sailing': 'Sailing boat',
-    'rocket': 'Rocket',
-    'anchor': 'Anchor',
-    'castle': 'Castle',
-    'diamond': 'Diamond',
-    'spa': 'Leaf',
-    'park': 'Tree',
-    'star': 'Star',
-    'bolt': 'Bolt',
-    'sun': 'Sun',
-    'moon': 'Moon',
-    'flower': 'Flower',
-    'cake': 'Cake',
-    'coffee': 'Coffee',
-    'music': 'Music note',
-    'game': 'Game controller',
-    'umbrella': 'Umbrella',
-    'bike': 'Bicycle',
-    'piano': 'Piano',
-    'palette': 'Palette',
-    'snow': 'Snowflake',
-  };
-
   /// How many colours the palette has (ui/player_icon.dart).
   static const paletteSize = 10;
 }

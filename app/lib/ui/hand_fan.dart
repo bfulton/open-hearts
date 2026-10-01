@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart' as engine;
 import 'card_view.dart';
+import '../l10n/l10n.dart';
 
 /// Extra space between two suits in the fan. Grouping is most of what
 /// makes a 13-card row scannable.
@@ -315,7 +316,7 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
               child: MergeSemantics(
                 child: Semantics(
                   button: true,
-                  label: card.spoken,
+                  label: context.l10n.card(card),
                   selected: isSelected,
                   enabled: !widget.dimUnplayable || isPlayable,
                   onTap: () => widget.onTap(card),

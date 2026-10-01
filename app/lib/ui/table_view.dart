@@ -12,6 +12,7 @@ import 'card_view.dart';
 import 'pip.dart';
 import 'player_icon.dart';
 import 'scaled.dart';
+import '../l10n/l10n.dart';
 
 /// More height than a table is ever going to use, at which point where
 /// it sits in the felt stops being a rounding error and starts being a
@@ -506,11 +507,12 @@ class _TrickSlot extends StatelessWidget {
     // Spoken as "Cyrano led the ace of clubs" / "Juliet played the 5 of
     // clubs": a screen reader hears the trick, and so does anything
     // else that reads the table through the accessibility tree.
+    final l10n = context.l10n;
     final label = card == null
         ? null
         : order == 0
-            ? '$name led the ${card!.spoken}'
-            : '$name played the ${card!.spoken}';
+            ? l10n.seatLed(name, l10n.cardInSentence(card!))
+            : l10n.seatPlayed(name, l10n.cardInSentence(card!));
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 240),
       // What leaves a slot is carried off by the sweep above, so there
@@ -651,8 +653,8 @@ class SeatBadge extends StatelessWidget {
     // this hand, whether it is their turn, and their clock once it runs.
     final clock = clockMs;
     return Semantics(
-      label: '$name: $total in the game, $taken this hand'
-          '${onTurn ? ', on turn' : ''}${clock == null ? '' : ', ${clockSeconds(clock)} s on the clock'}',
+      label: '${context.l10n.seatScores(name, total, taken)}'
+          '${onTurn ? context.l10n.seatOnTurn : ''}${clock == null ? '' : context.l10n.seatClock(clockSeconds(clock))}',
       onLongPress: onHold,
       child: ExcludeSemantics(
         child: height == null ? _held(context, total, taken) : SizedBox(height: height, child: _held(context, total, taken)),
@@ -814,7 +816,7 @@ class _TrickResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final who = you ? 'You take it' : '$name takes it';
+    final who = you ? context.l10n.youTakeIt : context.l10n.takesIt(name);
     return _Pill(
       text: points == 0 ? who : '$who  ·  $points',
       // A trick that has been taken is news, not a turn to take: gold
@@ -836,7 +838,7 @@ class _TurnHint extends StatelessWidget {
     if (seat == null) return const SizedBox.shrink();
     // "Your turn" whether leading or following: "your lead" reads as
     // a standing in the game, and in Hearts leading is no prize.
-    if (seat == mySeat) return const _Pill(text: 'Your turn', tone: Palette.gold);
+    if (seat == mySeat) return _Pill(text: context.l10n.yourTurn, tone: Palette.gold);
     return const SizedBox.shrink();
   }
 }

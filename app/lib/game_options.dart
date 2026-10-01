@@ -23,9 +23,6 @@ class GameOptions {
   /// Whether the result moves the players' ratings.
   final bool rated;
 
-  /// The choice on one line: "50 points · rated".
-  String get line => '$target points · ${rated ? 'rated' : 'unrated'}';
-
   /// The pool this asks for on the relay (packages/table, matching.dart).
   String get pool => rated ? 'rated' : 'unrated';
 

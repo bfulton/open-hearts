@@ -8,6 +8,7 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart' show Rating;
 
 import '../avatar.dart';
+import '../l10n/l10n.dart';
 import '../theme.dart';
 import 'player_icon.dart';
 
@@ -23,7 +24,7 @@ class HandOverSheet extends StatelessWidget {
     this.seeds,
     this.avatars,
     this.mySeat = humanSeat,
-    this.action = 'Next hand',
+    this.action,
   });
 
   /// Takes the numbers rather than the game: at a live table the game
@@ -55,21 +56,22 @@ class HandOverSheet extends StatelessWidget {
   final VoidCallback onNext;
   final int mySeat;
 
-  /// The button's label: at a live table the next hand is already
-  /// under way, so it only dismisses.
-  final String action;
+  /// The button's label, Next hand when null: at a live table the next
+  /// hand is already under way, so it only dismisses.
+  final String? action;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final shooter = moonShooter;
     return _Sheet(
       title: shooter == null
-          ? 'Hand ${handNumber + 1}'
+          ? l10n.handNumber(handNumber + 1)
           : shooter == mySeat
-              ? 'You shot the moon'
-              : '${names[shooter]} shot the moon',
+              ? l10n.youShotTheMoon
+              : l10n.shotTheMoon(names[shooter]),
       tone: shooter == null || shooter == mySeat ? Palette.chrome : Palette.danger,
-      subtitle: shooter == null ? null : 'All 26 — everyone else takes them',
+      subtitle: shooter == null ? null : l10n.shotTheMoonDetail,
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
@@ -81,7 +83,7 @@ class HandOverSheet extends StatelessWidget {
             you: seat == mySeat,
           ),
       ],
-      action: action,
+      action: action ?? l10n.nextHand,
       onAction: onNext,
     );
   }
@@ -102,7 +104,7 @@ class GameOverSheet extends StatelessWidget {
     this.avatars,
     this.rating,
     this.mySeat = humanSeat,
-    this.action = 'New game',
+    this.action,
   });
 
   final HeartsGame game;
@@ -123,7 +125,9 @@ class GameOverSheet extends StatelessWidget {
   final RatingChange? rating;
 
   final int mySeat;
-  final String action;
+
+  /// The button's label, New game when null.
+  final String? action;
 
   /// Puts the game's record on the clipboard: a line that replays the
   /// whole game, for looking at a hand afterwards.
@@ -131,18 +135,19 @@ class GameOverSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final won = game.winners;
     final youWon = won.contains(mySeat);
     final title = youWon
-        ? (won.length > 1 ? 'A share of it' : 'You win')
+        ? (won.length > 1 ? l10n.aShareOfIt : l10n.youWin)
         : won.length > 1
-            ? '${won.map((s) => names[s]).join(' and ')} tie'
-            : '${names[won.first]} wins';
+            ? l10n.namesTie(l10n.together(won.map((s) => names[s])))
+            : l10n.nameWins(names[won.first]);
 
     return _Sheet(
       title: title,
       tone: youWon ? Palette.chrome : Palette.danger,
-      subtitle: 'Lowest score after ${game.handNumber + 1} hands',
+      subtitle: l10n.lowestScoreAfter(game.handNumber + 1),
       rows: [
         for (var seat = 0; seat < seatCount; seat++)
           (
@@ -155,9 +160,9 @@ class GameOverSheet extends StatelessWidget {
           ),
       ],
       note: rating == null ? null : _RatingLine(change: rating!),
-      action: action,
+      action: action ?? l10n.newGame,
       onAction: onNewGame,
-      secondary: onCopyRecord == null ? null : 'Copy record',
+      secondary: onCopyRecord == null ? null : l10n.copyRecord,
       onSecondary: onCopyRecord,
     );
   }
@@ -303,7 +308,7 @@ class _RatingLine extends StatelessWidget {
     // Rounding can swallow a small move, and "+0" would read as a
     // number rather than as nothing happening.
     if (moved == 0) {
-      return Text('Rating ${_shown(change.after)}',
+      return Text(context.l10n.ratingNow(_shown(change.after)),
           textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim));
     }
     // A wrap rather than a row: the move drops under the numbers on a
@@ -313,7 +318,7 @@ class _RatingLine extends StatelessWidget {
       spacing: 8,
       children: [
         Text(
-          'Rating ${_shown(change.before)} → ${_shown(change.after)}',
+          context.l10n.ratingMoved(_shown(change.before), _shown(change.after)),
           style: const TextStyle(fontSize: 13, color: Palette.chromeDim, fontFeatures: [FontFeature.tabularFigures()]),
         ),
         Text(

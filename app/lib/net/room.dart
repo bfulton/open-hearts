@@ -27,6 +27,7 @@ import 'package:table/table.dart';
 
 import '../avatar.dart';
 import '../crypto/deal.dart';
+import '../l10n/l10n.dart';
 
 class RoomMember {
   const RoomMember(this.key, this.name, {this.since = 0, this.avatar = Avatar.none});
@@ -74,6 +75,16 @@ class _Present {
   /// countdown runs from the latest of these.
   final int arrivedHere;
   int lastHeard = 0;
+}
+
+/// Why a device will not sit at a room's table.
+enum RoomRefusal {
+  /// The leader's bots play by another version of the policy, or the
+  /// start was made by a build that does not seal its tables.
+  otherBuild,
+
+  /// This device cannot run the deal.
+  noDeal,
 }
 
 class Room extends ChangeNotifier {
@@ -183,8 +194,8 @@ class Room extends ChangeNotifier {
 
   /// Why this device will not sit at the table, if so: the leader's
   /// bots play by a different version of the policy, or this device
-  /// cannot run the deal.
-  String? refusal;
+  /// cannot run the deal. The screen says it ([Room.said]).
+  RoomRefusal? refusal;
 
   /// Whether this device can run the deal: whether it loaded
   /// (crypto/deal.dart), unless a test says. Every live table is
@@ -287,10 +298,10 @@ class Room extends ChangeNotifier {
     // The leader's policy is the table's: a mismatch is known before
     // the start, not at it.
     final lead = _others[leader];
-    if (lead != null && lead.policy != botPolicyVersion) refusal = _mismatch;
+    if (lead != null && lead.policy != botPolicyVersion) refusal = RoomRefusal.otherBuild;
     // Said before it is anyone's start rather than at one: the door
     // takes this device out of the room, and whoever is left leads.
-    if (!canDeal) refusal = noDeal;
+    if (!canDeal) refusal = RoomRefusal.noDeal;
     if (amLeader && !_started && canDeal) {
       final n = members.length;
       if (n >= seatCount || (n >= 2 && now - _lastArrival >= startAfterMs)) start();
@@ -404,18 +415,25 @@ class Room extends ChangeNotifier {
     });
   }
 
-  static const _mismatch = "Someone's app is on another build than yours — one of you is older. Update, and try again.";
+  /// A refusal as the player is told it.
+  static String said(RoomRefusal refusal, [AppLocalizations? words]) => switch (refusal) {
+        RoomRefusal.otherBuild => (words ?? english).roomOtherBuild,
+        RoomRefusal.noDeal => noDeal(words),
+      };
 
   /// What a device that cannot run the deal is told, wherever it tries
   /// to sit at a live table. One whose deal loaded and then stopped —
   /// its worker failed for good (crypto/deal.dart) — can run it again
   /// from the start, and is told so.
-  static String get noDeal => switch ((kIsWeb, dealWorker?.dead ?? false)) {
-        (true, true) => "The deal that keeps the cards honest stopped working on this page. Reload it to start afresh.",
-        (false, true) => "The deal that keeps the cards honest stopped working. Restart the app to start afresh.",
-        (true, false) => "This browser can't run the deal that keeps the cards honest. Try a current Chrome, Firefox or Safari.",
-        (false, false) => "This build can't run the deal that keeps the cards honest, so it can't sit at a live table.",
-      };
+  static String noDeal([AppLocalizations? words]) {
+    final say = words ?? english;
+    return switch ((kIsWeb, dealWorker?.dead ?? false)) {
+      (true, true) => say.noDealPageStopped,
+      (false, true) => say.noDealAppStopped,
+      (true, false) => say.noDealBrowser,
+      (false, false) => say.noDealBuild,
+    };
+  }
 
   void _applyStart(Map<String, Object?> c) {
     final seed = c['seed'] as int;
@@ -447,7 +465,7 @@ class Room extends ChangeNotifier {
     // that has no seat for this device is only news, whatever it runs.
     final mine = seats.any((h) => h is HumanSeat && h.key == me);
     if (mine && c['policy'] != botPolicyVersion) {
-      refusal = _mismatch;
+      refusal = RoomRefusal.otherBuild;
       return;
     }
     // Every live table is sealed: a start that is not was made by
@@ -456,11 +474,11 @@ class Room extends ChangeNotifier {
     // the table could read. One this device cannot deal it cannot sit
     // at either.
     if (mine && c['sealed'] != true) {
-      refusal = _mismatch;
+      refusal = RoomRefusal.otherBuild;
       return;
     }
     if (mine && !canDeal) {
-      refusal = noDeal;
+      refusal = RoomRefusal.noDeal;
       return;
     }
     // The table's own id, not the code: a code is reused, and two

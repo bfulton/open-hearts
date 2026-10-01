@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 
 import 'build_info.dart';
+import 'l10n/l10n.dart';
 import 'theme.dart';
 
 class AboutPage extends StatelessWidget {
@@ -16,7 +17,7 @@ class AboutPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Palette.chromeDim,
-        title: const Text('About', style: TextStyle(fontSize: 16, color: Palette.chromeDim)),
+        title: Text(context.l10n.about, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -30,16 +31,15 @@ class AboutPage extends StatelessWidget {
                 const SizedBox(height: 14),
                 const Text('Open Hearts', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
                 const SizedBox(height: 8),
-                const Text(
-                  'Hearts, open source. Play alone against the house, or live: '
-                  'the four of you deal the cards between you, and no server sees a hand.',
+                Text(
+                  context.l10n.aboutBlurb,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13.5, height: 1.45, color: Palette.chromeDim),
+                  style: const TextStyle(fontSize: 13.5, height: 1.45, color: Palette.chromeDim),
                 ),
                 const SizedBox(height: 30),
-                _Line(label: 'Build', value: buildTag),
+                _Line(label: context.l10n.build, value: buildTag),
                 const SizedBox(height: 8),
-                _Line(label: 'Published', value: buildDate),
+                _Line(label: context.l10n.published, value: buildDate),
                 const SizedBox(height: 8),
               ],
             ),

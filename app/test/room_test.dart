@@ -449,7 +449,7 @@ void main() {
       final lead = Room(canDeal: false, channel: bus.attach(signers[0]), code: 'ROOM', myName: 'Ada', nowMs: now);
       final other = Room(canDeal: true, channel: bus.attach(signers[1]), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 12));
-      expect(lead.refusal, Room.noDeal, reason: 'said before any start');
+      expect(lead.refusal, RoomRefusal.noDeal, reason: 'said before any start');
       expect(said.where((c) => (c['seats'] as List).any((s) => (s as Map)['key'] == lead.me)), isEmpty,
           reason: 'and it started no table for itself to sit at');
       lead.dispose();
@@ -468,7 +468,7 @@ void main() {
       }), tags: const [['t', 'ROOM']]), ephemeral: false);
       async.elapse(const Duration(seconds: 1));
       expect(c.spec, isNull);
-      expect(c.refusal, Room.noDeal);
+      expect(c.refusal, RoomRefusal.noDeal);
       c.dispose();
       other.dispose();
     });

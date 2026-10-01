@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 
 import 'avatar.dart';
+import 'l10n/l10n.dart';
 
 abstract class TableModel implements Listenable {
   HeartsGame get game;
@@ -82,21 +83,22 @@ extension TableModelHand on TableModel {
 
 /// Why a card cannot be played right now, phrased as the rule: a Hearts
 /// player learns these four sentences and then never needs them again.
-String refusalFor(HeartsGame game, int seat, Card card) {
+String refusalFor(HeartsGame game, int seat, Card card, [AppLocalizations? words]) {
+  final say = words ?? english;
   final trick = game.trick;
   if (game.isFirstTrick && trick.isEmpty) {
-    return 'The ${twoOfClubs.spoken} leads the first trick';
+    return say.refuseFirstLead;
   }
   if (trick.isNotEmpty) {
     final led = trick.first.card.suit;
     if (card.suit != led && game.handOf(seat).any((c) => c.suit == led)) {
-      return 'You have to follow ${led.name}';
+      return say.refuseFollowSuit(led.name);
     }
     if (game.isFirstTrick && cardPoints(card) > 0) {
-      return 'No points on the first trick';
+      return say.refuseFirstTrickPoints;
     }
   } else if (card.suit == Suit.hearts && !game.heartsBroken) {
-    return "Hearts aren't broken yet";
+    return say.refuseHeartsUnbroken;
   }
-  return 'You cannot play that card';
+  return say.refuseOther;
 }

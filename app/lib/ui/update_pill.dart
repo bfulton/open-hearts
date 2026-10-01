@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 import '../build_info.dart';
 import '../theme.dart';
+import '../l10n/l10n.dart';
 
 class UpdatePill extends StatefulWidget {
   const UpdatePill({super.key});
@@ -70,7 +71,7 @@ class _UpdatePillState extends State<UpdatePill> with WidgetsBindingObserver {
           children: [
             const Icon(Icons.refresh, size: 13, color: Felt.dark),
             const SizedBox(width: 5),
-            Text('$newBuild is up',
+            Text(context.l10n.buildIsUp(newBuild),
                 style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Felt.dark)),
           ],
         ),

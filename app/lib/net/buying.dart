@@ -16,14 +16,16 @@ import 'dart:convert';
 
 import 'package:table/table.dart';
 
+import '../l10n/l10n.dart';
 import 'licence.dart';
 import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 
-/// What live play costs, as it is written on the front door. The shape
-/// of the price is chosen by the fees — a year rather than a month,
-/// since a card's fixed thirty cents is paid once (doc 06).
-const price = r'$2.99 a year';
+/// What live play costs a year, as it is written on the front door
+/// (`pricePerYear`, l10n). The shape of the price is chosen by the fees
+/// — a year rather than a month, since a card's fixed thirty cents is
+/// paid once (doc 06).
+const priceAmount = r'$2.99';
 
 /// Whether this build can take money at all: the web can, over Stripe;
 /// a phone will over its store, and does not yet.
@@ -47,17 +49,36 @@ String returnAddress(Uri at, {required bool bought}) {
 /// Whether this load is the one coming back from a checkout.
 bool boughtJustNow([Uri? at]) => (at ?? Uri.base).queryParameters.containsKey('bought');
 
-/// Why a checkout could not be opened, phrased for the screen; null
-/// when one was and the browser is on its way there.
-typedef Refusal = String?;
+/// Why a checkout could not be opened.
+enum BuyRefusal {
+  /// This build has no way to take money.
+  notHere,
+
+  /// The shop's handler did not answer.
+  unreachable,
+
+  /// It answered, with no checkout to go to.
+  shut;
+
+  /// As the player is told it.
+  String say([AppLocalizations? words]) {
+    final say = words ?? english;
+    return switch (this) {
+      notHere => say.buyingNotOpen,
+      unreachable => say.shopUnreachable,
+      shut => say.shopNotOpen,
+    };
+  }
+}
 
 /// Opens a checkout for [signer]'s key and leaves for it. Returns a
 /// reason when it could not, which the screen says rather than sitting
-/// there having apparently done nothing.
-Future<Refusal> buy(Signer signer, {Uri? endpoint, Uri? from, Duration timeout = const Duration(seconds: 12)}) async {
-  if (!canBuyHere) return 'Buying is not open on this device yet.';
+/// there having apparently done nothing; null when the browser is on
+/// its way there.
+Future<BuyRefusal?> buy(Signer signer, {Uri? endpoint, Uri? from, Duration timeout = const Duration(seconds: 12)}) async {
+  if (!canBuyHere) return BuyRefusal.notHere;
   final url = endpoint ?? handlerAt('checkout');
-  if (url == null) return 'Buying is not open on this device yet.';
+  if (url == null) return BuyRefusal.notHere;
   final at = from ?? Uri.base;
   String? body;
   try {
@@ -71,11 +92,11 @@ Future<Refusal> buy(Signer signer, {Uri? endpoint, Uri? from, Duration timeout =
             }))
         .timeout(timeout);
   } catch (_) {
-    return 'Could not reach the shop. Try again in a moment.';
+    return BuyRefusal.unreachable;
   }
-  if (body == null) return 'The shop is not open yet.';
+  if (body == null) return BuyRefusal.shut;
   final to = _checkoutUrl(body);
-  if (to == null) return 'The shop is not open yet.';
+  if (to == null) return BuyRefusal.shut;
   platform.leaveFor(to);
   return null;
 }

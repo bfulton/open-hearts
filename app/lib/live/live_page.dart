@@ -11,6 +11,7 @@ import 'package:table/table.dart';
 
 import '../about_page.dart';
 import '../avatar.dart';
+import '../l10n/l10n.dart';
 import '../live_controller.dart';
 import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
@@ -38,6 +39,14 @@ class _LivePageState extends State<LivePage> {
   void initState() {
     super.initState();
     _c.addListener(_changed);
+  }
+
+  /// The controller names the player and says what the deal is doing
+  /// in the app's language, which is known once the page is in the tree.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _c.words = context.l10n;
   }
 
   void _changed() => setState(() {});
@@ -89,26 +98,25 @@ class _LivePageState extends State<LivePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (about.flagged)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    'This device thought this picture was one you would not want at the table. '
-                    'It is a guess, made here, and it can be wrong.',
-                    style: TextStyle(fontSize: 13, color: Palette.chromeDim),
+                    sheet.l10n.pictureFlagged,
+                    style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
                   ),
                 ),
               TextButton(
                 onPressed: () => Navigator.of(sheet).pop(showIt),
                 style: TextButton.styleFrom(foregroundColor: showIt ? Palette.gold : Palette.danger),
                 child: Text(
-                  showIt ? "Show ${about.name}'s picture" : "Hide ${about.name}'s picture",
+                  showIt ? sheet.l10n.showPicture(about.name) : sheet.l10n.hidePicture(about.name),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
-              const Text(
-                'On this device only, and only their picture: their name and their score stay.',
+              Text(
+                sheet.l10n.pictureChoiceNote,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Palette.chromeDim),
+                style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
               ),
             ],
           ),
@@ -156,18 +164,19 @@ class _LivePageState extends State<LivePage> {
   /// The line under the felt: a pause and why, or a boot clock on the
   /// seat holding everyone up, or nothing special.
   Widget? _liveNote() {
+    final l10n = context.l10n;
     // Cut off from every relay comes first: it is the cause of most of
     // what follows, and the one thing the player can act on.
     final refused = _c.relayRefusal;
-    if (refused != null) return _note('No relay will take this device\'s events: ${_short(refused)}');
-    if (_c.pause == Pause.waitingForPeers) return _note('Waiting for the others to reconnect');
+    if (refused != null) return _note(l10n.noRelayTakesEvents(_short(refused)));
+    if (_c.pause == Pause.waitingForPeers) return _note(l10n.waitingToReconnect);
     if (_c.pause == Pause.waitingForJury) {
-      if (_c.jury.live > 0) return _note('Asking the jury');
-      if (_c.needsJuror) return _note('Nobody online to draw a jury from — waiting for one');
-      return _note('Waiting for the jury');
+      if (_c.jury.live > 0) return _note(l10n.askingTheJury);
+      if (_c.needsJuror) return _note(l10n.noJurorOnline);
+      return _note(l10n.waitingForTheJury);
     }
-    if (_c.pause == Pause.openingHand) return _note("Opening a departed player's hand");
-    if (_c.pause == Pause.waitingForLead) return _note('Nobody claims the 2♣ — the deal is stuck');
+    if (_c.pause == Pause.openingHand) return _note(l10n.openingDepartedHand);
+    if (_c.pause == Pause.waitingForLead) return _note(l10n.nobodyClaimsTwo);
     // The seat everyone is waiting on, if it is a person other than me
     // and its clock has run out — during the deal as much as the play:
     // a seat that never sends its keys is the one thing that stalls a
@@ -181,7 +190,7 @@ class _LivePageState extends State<LivePage> {
         return TextButton.icon(
           onPressed: () => _c.boot(seat),
           icon: const Icon(Icons.timer_off_outlined, size: 15),
-          label: Text('Boot ${_c.names[seat]}', style: const TextStyle(fontSize: 12)),
+          label: Text(l10n.bootPlayer(_c.names[seat]), style: const TextStyle(fontSize: 12)),
           style: TextButton.styleFrom(
             foregroundColor: Palette.danger,
             visualDensity: VisualDensity.compact,
@@ -219,10 +228,9 @@ class _LivePageState extends State<LivePage> {
           decoration: const BoxDecoration(gradient: Felt.gradient),
           child: SafeArea(
             child: _Failed(
-              title: 'This device can\'t deal',
-              label: 'The deal stopped working here',
-              why: 'So you have left the table, and the others play on with a bot in your seat. '
-                  'Reloading the page starts the deal afresh. ($cannotDeal)',
+              title: context.l10n.cannotDealTitle,
+              label: context.l10n.cannotDealLabel,
+              why: context.l10n.cannotDealWhy(cannotDeal),
               onHome: () => Navigator.of(context).pop(),
             ),
           ),
@@ -249,11 +257,12 @@ class _LivePageState extends State<LivePage> {
           decoration: const BoxDecoration(gradient: Felt.gradient),
           child: SafeArea(
             child: _Failed(
-              title: 'Connection failure',
-              label: failure.label[0].toUpperCase() + failure.label.substring(1),
+              title: context.l10n.connectionFailure,
+              label: switch (failure) {
+                Failure.jurorQuorumLost => context.l10n.jurorQuorumLost,
+              },
               why: switch (failure) {
-                Failure.jurorQuorumLost => 'Too few of the jurors keeping the bot seats are still online, '
-                    'so the hand cannot go on. The game ends here, unscored.',
+                Failure.jurorQuorumLost => context.l10n.jurorQuorumLostWhy,
               },
               onHome: () => Navigator.of(context).pop(),
             ),
@@ -282,8 +291,8 @@ class _LivePageState extends State<LivePage> {
                 header: TableHeader(
                   game: game,
                   menu: [
-                    MenuAction('Leave the table', icon: Icons.logout, onSelected: _leave),
-                    MenuAction('About', icon: Icons.info_outline, onSelected: () {
+                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _leave),
+                    MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
                       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
                     }),
                   ],
@@ -328,7 +337,7 @@ class _LivePageState extends State<LivePage> {
                   seeds: _seeds,
                   avatars: _avatars,
                   mySeat: _c.mySeat,
-                  action: 'On with it',
+                  action: context.l10n.onWithIt,
                   onNext: _c.dismissHandSheet,
                 ),
               if (_c.done && _c.gameOverDue)
@@ -339,7 +348,7 @@ class _LivePageState extends State<LivePage> {
                   avatars: _avatars,
                   mySeat: _c.mySeat,
                   rating: _c.ratingChange,
-                  action: 'Home',
+                  action: context.l10n.home,
                   onNewGame: () => Navigator.of(context).pop(),
                 ),
             ],
@@ -367,7 +376,7 @@ class _Presence extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        '$here of ${humans.length} here  ·  ${controller.client.spec.rated ? 'rated' : 'unrated'}',
+        context.l10n.hereCount(here, humans.length, controller.client.spec.rated ? 'rated' : 'unrated'),
         style: TextStyle(fontSize: 10.5, color: here == humans.length ? Palette.chromeDim : Palette.danger),
       ),
     );
@@ -409,7 +418,7 @@ class _Failed extends StatelessWidget {
             FilledButton(
               onPressed: onHome,
               style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
-              child: const Text('Home'),
+              child: Text(context.l10n.home),
             ),
           ],
         ),
@@ -438,16 +447,16 @@ class _Replaced extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('A bot took your seat',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
+            Text(context.l10n.botTookYourSeat,
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
             const SizedBox(height: 6),
-            const Text('The table could not hear from you, and went on without you.',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Palette.chromeDim)),
+            Text(context.l10n.tableCouldNotHear,
+                textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: onBack,
               style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
-              child: const Text('Back'),
+              child: Text(context.l10n.back),
             ),
           ],
         ),

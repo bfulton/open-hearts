@@ -8,6 +8,7 @@ import 'crypto/schnorr.dart';
 import 'entitlement.dart';
 import 'home_page.dart';
 import 'identity.dart';
+import 'l10n/l10n.dart';
 import 'net/buying.dart';
 import 'net/duty.dart';
 import 'net/household.dart';
@@ -91,6 +92,12 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
       title: 'Open Hearts',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      // The device's language where the app speaks it, English where it
+      // does not; `?lang=` in the address chooses one instead, for a
+      // person on a borrowed browser and for the suites (l10n/l10n.dart).
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: languageInAddress(),
       home: HomePage(
         openRoom: room != null && Room.validCode(room) ? room : null,
         openClaim: claimInAddress(),

@@ -1,0 +1,12 @@
+# The app's words, one file per language (lib/l10n/app_*.arb), and the
+# class flutter generates from them. English is the template: every
+# message is written there first, with a description saying where it
+# appears, which is all a translator has to go on.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-dir: lib/l10n
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+preferred-supported-locales: [en]
+required-resource-attributes: true
+untranslated-messages-file: build/untranslated.json

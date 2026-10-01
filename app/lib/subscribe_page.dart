@@ -17,6 +17,7 @@ import 'package:table/table.dart';
 
 import 'entitlement.dart';
 import 'identity.dart';
+import 'l10n/l10n.dart';
 import 'net/buying.dart';
 import 'net/household.dart';
 import 'net/licence.dart';
@@ -82,7 +83,7 @@ class _SubscribePageState extends State<SubscribePage> {
     if (refusal != null) {
       setState(() {
         _leaving = false;
-        _refusal = refusal;
+        _refusal = refusal.say(context.l10n);
       });
     }
   }
@@ -99,7 +100,7 @@ class _SubscribePageState extends State<SubscribePage> {
     setState(() {
       _working = false;
       _code = said.answer;
-      _refusal = said.refusal;
+      _refusal = said.refusal?.say(context.l10n);
     });
   }
 
@@ -115,7 +116,7 @@ class _SubscribePageState extends State<SubscribePage> {
     setState(() {
       _working = false;
       _household = said.answer ?? _household;
-      _refusal = said.refusal;
+      _refusal = said.refusal?.say(context.l10n);
     });
     // Dropped this very device: its licence is not renewed, and there
     // is no reason to go on holding one it can no longer replace.
@@ -127,13 +128,14 @@ class _SubscribePageState extends State<SubscribePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final licence = Entitlement.current.licence;
     return Scaffold(
       backgroundColor: Felt.dark,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Palette.chromeDim,
-        title: const Text('Live play', style: TextStyle(fontSize: 16, color: Palette.chromeDim)),
+        title: Text(l10n.livePlay, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -145,33 +147,21 @@ class _SubscribePageState extends State<SubscribePage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Live play', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
+                  Text(l10n.livePlay, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
                   const SizedBox(height: 6),
                   Text(
-                    licence == null ? price : 'Open on this device, to ${Licence.dayOf(licence.until)}',
+                    licence == null ? l10n.pricePerYear(priceAmount) : l10n.openUntil(Licence.dayOf(licence.until)),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2),
                   ),
                   const SizedBox(height: 22),
                   if (licence == null) ...[
-                    const _Point(
-                      icon: Icons.groups_outlined,
-                      text: 'Four seats, filled with whoever is waiting — or a link you send to three friends.',
-                    ),
-                    const _Point(
-                      icon: Icons.military_tech_outlined,
-                      text: 'A rating of your own, from results the four of you sign.',
-                    ),
-                    const _Point(
-                      icon: Icons.lock_outline,
-                      text: 'The deal is dealt between the four of you. No server sees a hand, ours included.',
-                    ),
+                    _Point(icon: Icons.groups_outlined, text: l10n.seatsOrFriends),
+                    _Point(icon: Icons.military_tech_outlined, text: l10n.pointRating),
+                    _Point(icon: Icons.lock_outline, text: l10n.pointDeal),
                     const SizedBox(height: 18),
-                    const Text(
-                      'Playing alone is free and always will be, and so are the records, '
-                      'the engine and every line of this. What the money pays for is the part that '
-                      'costs us to run: putting you in touch with each other, a relay when your two '
-                      'devices cannot find a way through, and a juror when a table is left alone.',
-                      style: TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim),
+                    Text(
+                      l10n.whatMoneyPaysFor,
+                      style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim),
                     ),
                     const SizedBox(height: 26),
                     FilledButton(
@@ -180,14 +170,11 @@ class _SubscribePageState extends State<SubscribePage> {
                       child: _leaving
                           ? const SizedBox(
                               width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Felt.dark))
-                          : const Text('Subscribe', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+                          : Text(l10n.subscribe, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      canBuyHere
-                          ? 'Cancel whenever you like; the year you paid for runs out on its own.'
-                          : 'On a phone this will be the store\'s own subscription. Until the app is in the stores, '
-                              'live play is bought on the web.',
+                      canBuyHere ? l10n.cancelWhenever : l10n.storeSubscriptionLater,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
                     ),
@@ -209,16 +196,16 @@ class _SubscribePageState extends State<SubscribePage> {
   /// A subscription is a person's, not a device's: so the page a
   /// subscriber sees is about which of their devices it is on.
   List<Widget> _yours() {
+    final l10n = context.l10n;
     final house = _household;
     final code = _code;
     return [
-      const Text(
-        'A subscription is yours, not a device\'s. Bring another in by showing it this '
-        'code — its camera is all it needs — and drop one whenever you like.',
-        style: TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim),
+      Text(
+        l10n.subscriptionIsYours,
+        style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim),
       ),
       const SizedBox(height: 22),
-      const _Heading('Your devices'),
+      _Heading(l10n.yourDevices),
       const SizedBox(height: 8),
       if (house == null)
         const Text('…', style: TextStyle(fontSize: 13, color: Palette.chromeDim))
@@ -230,7 +217,7 @@ class _SubscribePageState extends State<SubscribePage> {
             onDrop: _working ? null : () => _drop(device.key),
           ),
         const SizedBox(height: 8),
-        Text('${house.devices.length} of ${house.most}',
+        Text(l10n.devicesOf(house.devices.length, house.most),
             style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
       ],
       const SizedBox(height: 20),
@@ -240,16 +227,15 @@ class _SubscribePageState extends State<SubscribePage> {
           style: _gold(),
           child: _working
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Felt.dark))
-              : const Text('Add a device', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+              : Text(l10n.addDevice, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         )
       else ...[
         Center(child: QrView(data: claimLink(code.code))),
         const SizedBox(height: 12),
-        const Text(
-          'Point the other device\'s camera at this. It is good for ten minutes and for one device: '
-          'a photograph of this screen tomorrow is worth nothing.',
+        Text(
+          l10n.pointTheCamera,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
+          style: const TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
         ),
         const SizedBox(height: 12),
         OutlinedButton(
@@ -259,7 +245,7 @@ class _SubscribePageState extends State<SubscribePage> {
             side: BorderSide(color: Palette.gold.withValues(alpha: 0.5)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          child: const Text('Send the link instead'),
+          child: Text(l10n.sendLinkInstead),
         ),
       ],
     ];
@@ -275,8 +261,8 @@ class _SubscribePageState extends State<SubscribePage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(
-          content: Text('Link copied', textAlign: TextAlign.center), duration: Duration(milliseconds: 1600), width: 200));
+      ..showSnackBar(SnackBar(
+          content: Text(context.l10n.linkCopied, textAlign: TextAlign.center), duration: const Duration(milliseconds: 1600), width: 200));
   }
 
   static ButtonStyle _gold() => FilledButton.styleFrom(
@@ -323,7 +309,7 @@ class _DeviceLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isThisOne ? 'This device' : device.shortened,
+                  isThisOne ? context.l10n.thisDevice : device.shortened,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13.5,
@@ -332,7 +318,7 @@ class _DeviceLine extends StatelessWidget {
                   ),
                 ),
                 if (device.boundAt != null)
-                  Text('since ${device.boundAt}', style: const TextStyle(fontSize: 11, color: Palette.chromeDim)),
+                  Text(context.l10n.deviceSince(device.boundAt!), style: const TextStyle(fontSize: 11, color: Palette.chromeDim)),
               ],
             ),
           ),
@@ -344,7 +330,7 @@ class _DeviceLine extends StatelessWidget {
               minimumSize: const Size(0, 32),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: Text(isThisOne ? 'Drop this one' : 'Drop', style: const TextStyle(fontSize: 12.5)),
+            child: Text(isThisOne ? context.l10n.dropThisOne : context.l10n.drop, style: const TextStyle(fontSize: 12.5)),
           ),
         ],
       ),

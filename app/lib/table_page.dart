@@ -16,6 +16,7 @@ import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
 import 'game_controller.dart';
 import 'identity.dart';
+import 'l10n/l10n.dart';
 import 'table_model.dart';
 import 'theme.dart';
 import 'ui/hand_fan.dart';
@@ -59,6 +60,14 @@ class _TablePageState extends State<TablePage> {
     });
   }
 
+  /// The controller names the player and turns down a card in the
+  /// app's language, which is known once the page is in the tree.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.words = context.l10n;
+  }
+
   void _onGameChanged() => setState(() {});
 
   List<String> get _seeds => [for (var s = 0; s < seatCount; s++) _controller.iconSeedOf(s)];
@@ -85,7 +94,7 @@ class _TablePageState extends State<TablePage> {
 
   Future<void> _copyRecord() async {
     await Clipboard.setData(ClipboardData(text: _controller.recordText));
-    if (mounted) _say('Record copied');
+    if (mounted) _say(context.l10n.recordCopied);
   }
 
   void _say(String message) {
@@ -118,8 +127,8 @@ class _TablePageState extends State<TablePage> {
                 header: TableHeader(
                   game: game,
                   menu: [
-                    MenuAction('Leave the table', icon: Icons.logout, onSelected: () => Navigator.of(context).maybePop()),
-                    MenuAction('About', icon: Icons.info_outline, onSelected: () {
+                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: () => Navigator.of(context).maybePop()),
+                    MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
                       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
                     }),
                   ],
@@ -192,6 +201,7 @@ class ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final game = controller.game;
 
     if (controller.awaitingPass) {
@@ -203,9 +213,7 @@ class ActionBar extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                ready
-                    ? game.passDirection.label
-                    : 'Choose ${passSize - chosen} more to pass',
+                ready ? l10n.pass(game.passDirection) : l10n.choosePass(passSize - chosen),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -224,8 +232,7 @@ class ActionBar extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(11)),
               ),
-              child: const Text('Pass',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(l10n.passButton, style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -246,7 +253,8 @@ class ActionBar extends StatelessWidget {
       final from = game.passerTo(controller.mySeat);
       return _cardsLine(
         position: controller.positionOf(from),
-        text: '${controller.names[from]} passed you',
+        text: l10n.passedYou(controller.names[from]),
+        l10n: l10n,
         cards: received,
       );
     }
@@ -258,7 +266,8 @@ class ActionBar extends StatelessWidget {
       final to = (controller.mySeat + game.passDirection.seatOffset) % seatCount;
       return _cardsLine(
         position: controller.positionOf(to),
-        text: 'Passed to ${controller.names[to]}',
+        text: l10n.passedTo(controller.names[to]),
+        l10n: l10n,
         cards: passed.toList()..sort(),
       );
     }
@@ -266,7 +275,7 @@ class ActionBar extends StatelessWidget {
     // Nothing to say through most of the play: the heart in the header
     // says whether hearts are broken, and the felt says whose turn.
     final note = switch (game.phase) {
-      Phase.passing => 'Waiting for the others',
+      Phase.passing => l10n.waitingForOthers,
       _ => '',
     };
 
@@ -285,7 +294,7 @@ class ActionBar extends StatelessWidget {
 /// Three cards and a line about them, with an arrow at the seat they
 /// came from or went to, so the direction is read off the table rather
 /// than out of the sentence.
-Widget _cardsLine({required int position, required String text, required List<engine.Card> cards}) {
+Widget _cardsLine({required int position, required String text, required List<engine.Card> cards, required AppLocalizations l10n}) {
   return SizedBox(
     height: 30,
     child: Row(
@@ -304,7 +313,7 @@ Widget _cardsLine({required int position, required String text, required List<en
           Padding(
             padding: const EdgeInsets.only(left: 9),
             child: Semantics(
-              label: card.spoken,
+              label: l10n.card(card),
               child: ExcludeSemantics(child: CardChip(card: card, size: 14, onFelt: true)),
             ),
           ),

@@ -28,6 +28,7 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 import 'avatar.dart';
+import 'l10n/l10n.dart';
 import 'pictures.dart';
 import 'table_model.dart';
 
@@ -578,11 +579,15 @@ class LiveController extends ChangeNotifier implements TableModel {
   @override
   List<String> get names => [for (var s = 0; s < seatCount; s++) ratingOf == null ? _plainName(s) : nameWithRating(s)];
 
+  /// The words the table speaks in: the page sets them from the app's
+  /// language (l10n/l10n.dart), and they are English until it does.
+  AppLocalizations words = english;
+
   String _plainName(int s) => s == client.mySeat
-      ? 'You'
+      ? words.you
       : switch (_shownHolders[s]) {
           BotSeat(:final persona) => persona.name,
-          _ => seatNames[s] ?? 'Seat ${s + 1}',
+          _ => seatNames[s] ?? words.seatNumber(s + 1),
         };
 
   @override
@@ -649,7 +654,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   @override
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
-    if (!_shown.legalPlaysFor(mySeat).contains(card)) return refusalFor(_shown, mySeat, card);
+    if (!_shown.legalPlaysFor(mySeat).contains(card)) return refusalFor(_shown, mySeat, card, words);
     // Pending before the client hears of it, for the same reason as the
     // pass: the settlement that clears it can come back synchronously.
     _pendingPlay = card;
@@ -744,14 +749,14 @@ class LiveController extends ChangeNotifier implements TableModel {
     // Before there is a deal at all: a hand with bot seats waits for
     // jurors enough to hold them, because a bot seat nobody holds is
     // a hand everyone can see (docs/04-live-play.md).
-    if (d == null && client.shortOfJurors) return 'Waiting for jurors to hold the bots\' hands';
-    if (d == null) return 'Dealing';
+    if (d == null && client.shortOfJurors) return words.waitingForJurors;
+    if (d == null) return words.dealing;
     return switch (d.phase) {
-      DealPhase.keys => 'Dealing — keys',
-      DealPhase.shuffles => 'Shuffling (${(d.nextShuffler ?? 3) + 1} of 4)',
-      DealPhase.tokens => 'Dealing the cards',
-      DealPhase.declare => 'Opening the cards',
-      _ => 'Dealing',
+      DealPhase.keys => words.dealingKeys,
+      DealPhase.shuffles => words.shuffling((d.nextShuffler ?? 3) + 1),
+      DealPhase.tokens => words.dealingTheCards,
+      DealPhase.declare => words.openingTheCards,
+      _ => words.dealing,
     };
   }
 

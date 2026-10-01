@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:open_hearts/avatar.dart';
+import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/ui/player_icon.dart';
 
@@ -41,8 +42,11 @@ void main() {
     expect(Avatar.forBot('Westley'), Avatar.forBot('Westley'));
     expect(Avatar.forBot('Westley').icon, isNotNull);
     expect(Avatar.forBot('Westley'), isNot(Avatar.forBot('Buttercup')));
-    for (final key in AvatarIcons.all.keys) {
-      expect(AvatarIcons.names[key], isNotNull, reason: '$key has a name');
+    // Named in every language the app speaks: an icon the message has
+    // no case for falls through to its last, and is called a snowflake.
+    for (final words in [for (final l in AppLocalizations.supportedLocales) lookupAppLocalizations(l)]) {
+      final names = {for (final key in AvatarIcons.all.keys) key: words.avatarIcon(key)};
+      expect(names.values.toSet(), hasLength(names.length), reason: '${words.localeName}: every icon has a name of its own');
     }
     expect(AvatarIcons.all.length, greaterThanOrEqualTo(20));
   });

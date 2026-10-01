@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import 'pip.dart';
+import '../l10n/l10n.dart';
 
 class Gone extends StatelessWidget {
   const Gone({super.key, required this.played, this.width = 300});
@@ -36,8 +37,8 @@ class Gone extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('What has gone',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Palette.chromeDim, letterSpacing: 0.6)),
+          Text(context.l10n.whatHasGone,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Palette.chromeDim, letterSpacing: 0.6)),
           const SizedBox(height: 10),
           for (final suit in order) ...[
             _SuitRow(suit: suit, played: played, width: width - 20),
@@ -125,11 +126,7 @@ class _Left extends StatelessWidget {
     final hearts = engine.Rank.values.where((r) => !played.contains(engine.Card.of(engine.Suit.hearts, r))).length;
     final queen = !played.contains(engine.Card.of(engine.Suit.spades, engine.Rank.queen));
     return Text(
-      [
-        hearts == 0 ? 'No hearts' : '$hearts heart${hearts == 1 ? '' : 's'}',
-        if (queen) 'and the queen',
-        'still out',
-      ].join(' '),
+      context.l10n.stillOut(hearts, flag(queen)),
       style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
     );
   }

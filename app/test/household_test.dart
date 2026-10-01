@@ -108,7 +108,7 @@ void main() {
     stand.says('ticket', {'error': 'five devices already'}, status: 409);
     final refused = await askForCode(me);
     expect(refused.answer, isNull);
-    expect(refused.refusal, 'Five devices already.');
+    expect(refused.refusal?.say(), 'Five devices already.');
   });
 
   test('a claim brings back a licence, and only one this device can hold', () async {
@@ -124,7 +124,7 @@ void main() {
     stand.says('claim', {'licence': signedFor(SchnorrSigner.generate().publicKey)});
     final theirs = await claimCode(me, 'ab12', service: _service);
     expect(theirs.answer, isNull);
-    expect(theirs.refusal, 'That code is not for this device.');
+    expect(theirs.refusal?.say(), 'That code is not for this device.');
   });
 
   test('a claim that was refused says why: used, run out, or never a code', () async {
@@ -138,7 +138,7 @@ void main() {
       stand.says('claim', {'error': said}, status: status);
       final refused = await claimCode(me, 'ab12', service: _service);
       expect(refused.answer, isNull);
-      expect(refused.refusal, shown);
+      expect(refused.refusal?.say(), shown);
     }
   });
 
@@ -146,7 +146,7 @@ void main() {
     final stand = standUp();
     stand.reachable = false;
     final said = await askForCode(FakeSigner('one'));
-    expect(said.refusal, 'Could not reach the service. Try again in a moment.');
+    expect(said.refusal?.say(), 'Could not reach the service. Try again in a moment.');
   });
 
   testWidgets('the page lists the devices, shows a code to scan, and drops one', (tester) async {

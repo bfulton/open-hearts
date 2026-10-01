@@ -23,6 +23,7 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import 'avatar.dart';
+import 'l10n/l10n.dart';
 import 'stats.dart';
 import 'theme.dart';
 import 'ui/photo_crop.dart';
@@ -171,7 +172,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final bytes = await picked.readAsBytes();
       final size = sizeOfPicture(bytes);
       if (size == null) {
-        setState(() => _note = 'That did not read as a picture.');
+        if (mounted) setState(() => _note = context.l10n.notAPicture);
         return;
       }
       if (!mounted) return;
@@ -183,12 +184,12 @@ class _ProfilePageState extends State<ProfilePage> {
       if (area == null || !mounted) return;
       final small = shrinkPicture(bytes, from: area);
       if (small == null) {
-        setState(() => _note = 'That did not read as a picture.');
+        setState(() => _note = context.l10n.notAPicture);
         return;
       }
       setState(() => _avatar = _avatar.copyWith(picture: small));
     } catch (e) {
-      setState(() => _note = 'Could not open that: $e');
+      if (mounted) setState(() => _note = context.l10n.couldNotOpen('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -209,12 +210,12 @@ class _ProfilePageState extends State<ProfilePage> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           foregroundColor: Palette.chromeDim,
-          title: const Text('Your profile', style: TextStyle(fontSize: 16, color: Palette.chromeDim)),
+          title: Text(context.l10n.yourProfile, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
           actions: [
             TextButton(
               onPressed: _done,
               style: TextButton.styleFrom(foregroundColor: Palette.gold),
-              child: const Text('Done', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              child: Text(context.l10n.done, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
             const SizedBox(width: 6),
           ],
@@ -246,7 +247,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   controller: _name,
                   textAlign: TextAlign.center,
                   textCapitalization: TextCapitalization.words,
-                  decoration: _field('Your name'),
+                  decoration: _field(context.l10n.yourName),
                   // The badge above it wears the initials of what is
                   // being typed, so a name with no avatar behind it
                   // is still a picture of something.
@@ -256,7 +257,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 20),
                 _Record(stats: _stats),
                 const SizedBox(height: 22),
-                const _Heading('How you look'),
+                _Heading(context.l10n.howYouLook),
                 const SizedBox(height: 12),
                 // The icons: a grid, the chosen one ringed.
                 Wrap(
@@ -265,7 +266,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     for (final key in icons)
                       _Choice(
-                        label: AvatarIcons.names[key]!,
+                        label: context.l10n.avatarIcon(key),
                         selected: _avatar.icon == key && _avatar.picture == null,
                         onTap: () => setState(() => _avatar = _avatar.copyWith(icon: key, clearPicture: true)),
                         color: PlayerIcon.palette[_avatar.color ?? _derivedIndex()],
@@ -281,7 +282,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     for (var i = 0; i < PlayerIcon.palette.length; i++)
                       _Choice(
-                        label: 'Colour ${i + 1}',
+                        label: context.l10n.colourNumber(i + 1),
                         selected: (_avatar.color ?? _derivedIndex()) == i,
                         onTap: () => setState(() => _avatar = _avatar.copyWith(color: i)),
                         color: PlayerIcon.palette[i],
@@ -296,7 +297,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: OutlinedButton.icon(
                         onPressed: _busy ? null : _pickPhoto,
                         icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                        label: const Text('Use a photo'),
+                        label: Text(context.l10n.useAPhoto),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Palette.chrome,
                           side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
@@ -313,7 +314,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('My initials'),
+                        child: Text(context.l10n.myInitials),
                       ),
                     ),
                   ],
@@ -394,10 +395,7 @@ class _PaceLine extends StatelessWidget {
         const SizedBox(width: 8),
         Flexible(
           child: Text(
-            pace.known
-                ? 'You play at a ${pace.word} pace, about ${pace.stated} second${pace.stated == 1 ? '' : 's'} a card, '
-                    'and are seated with players at a similar pace'
-                : 'Your pace is not known yet. After a live game or two you will be seated with players at a similar pace',
+            context.l10n.paceLine(pace),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 12, height: 1.4, color: Palette.chromeDim),
           ),
@@ -420,13 +418,14 @@ class _Record extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final stats = this.stats;
     final rating = stats?.rating;
     final rated = (stats?.ratedGames ?? 0) > 0 && rating != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _Heading('Rating'),
+        _Heading(l10n.rating),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -445,14 +444,14 @@ class _Record extends StatelessWidget {
               const SizedBox(height: 7),
               Text(
                 stats == null
-                    ? 'Counting up your games…'
+                    ? l10n.countingGames
                     : !stats.reached
-                    ? 'The relays did not answer, so it cannot be shown just now'
+                    ? l10n.relaysSilent
                     : !rated
-                    ? 'Play a rated live game and you will have one'
+                    ? l10n.playRatedForRating
                     : rating.provisional
-                    ? 'Provisional, from ${_games(stats.ratedGames)}'
-                    : 'From ${_games(stats.ratedGames)}',
+                    ? l10n.ratingProvisionalFrom(stats.ratedGames)
+                    : l10n.ratingFrom(stats.ratedGames),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
               ),
@@ -462,14 +461,12 @@ class _Record extends StatelessWidget {
         const SizedBox(height: 10),
         _PaceLine(pace: stats?.pace ?? Pace.fresh),
         const SizedBox(height: 18),
-        const _Heading('Your games'),
+        _Heading(l10n.yourGames),
         const SizedBox(height: 10),
         _Games(live: stats?.live, alone: stats?.alone, liveMissing: stats != null && !stats.reached),
       ],
     );
   }
-
-  static String _games(int n) => n == 1 ? 'one game' : '$n games';
 }
 
 /// The two halves of the game side by side: what each line is, once,
@@ -499,6 +496,7 @@ class _Games extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     String value(Tally? t, String Function(Tally t) of, {bool missing = false}) => t == null || missing ? '—' : of(t);
     TableRow line(String label, String Function(Tally t) of) => TableRow(children: [
           Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text(label, style: _label)),
@@ -510,17 +508,17 @@ class _Games extends StatelessWidget {
       defaultVerticalAlignment: TableCellVerticalAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        const TableRow(children: [
-          SizedBox.shrink(),
-          Padding(padding: EdgeInsets.only(bottom: 6), child: Text('Live', textAlign: TextAlign.right, style: _title)),
-          Padding(padding: EdgeInsets.only(bottom: 6), child: Text('Alone', textAlign: TextAlign.right, style: _title)),
+        TableRow(children: [
+          const SizedBox.shrink(),
+          Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(l10n.gamesLive, textAlign: TextAlign.right, style: _title)),
+          Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(l10n.gamesAlone, textAlign: TextAlign.right, style: _title)),
         ]),
-        line('played', (t) => '${t.games}'),
-        line('won', (t) => '${t.won}'),
-        line('average', (t) => t.average?.round().toString() ?? '—'),
+        line(l10n.gamesPlayed, (t) => '${t.games}'),
+        line(l10n.gamesWon, (t) => '${t.won}'),
+        line(l10n.gamesAverage, (t) => t.average?.round().toString() ?? '—'),
         // Low is good: the best game is the one you came out of with
         // the fewest.
-        line('best', (t) => t.best?.toString() ?? '—'),
+        line(l10n.gamesBest, (t) => t.best?.toString() ?? '—'),
       ],
     );
   }
