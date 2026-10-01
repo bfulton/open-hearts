@@ -60,6 +60,10 @@ Uint8List? shrinkPicture(Uint8List bytes, {Rect? from}) {
   final square = from == null
       ? img.copyResizeCropSquare(decoded, size: Avatar.side, interpolation: img.Interpolation.average)
       : _cut(decoded, from);
+  // Nothing the camera wrote goes with it: a crop and a resize carry a
+  // photograph's EXIF across, where it was taken included, and the
+  // picture is published to the relays for anyone to read.
+  square.exif = img.ExifData();
   // Quality down until it fits a relay, which it does at the first
   // step for any photograph this size.
   for (final quality in const [82, 70, 55, 40]) {

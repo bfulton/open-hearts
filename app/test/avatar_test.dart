@@ -68,6 +68,22 @@ void main() {
     expect(shrinkPicture(Uint8List.fromList([1, 2, 3])), isNull, reason: 'not a picture');
   });
 
+  test('a picture keeps none of what the camera wrote in it: not where it was taken', () {
+    // A phone's photograph carries its EXIF through the picker, and the
+    // picture goes to the relays for anyone to read (docs/launch/privacy.md).
+    final photo = img.Image(width: 200, height: 200);
+    img.fill(photo, color: img.ColorRgb8(200, 10, 10));
+    photo.exif.gpsIfd.setGpsLocation(latitude: 48.8584, longitude: 2.2945);
+    photo.exif.imageIfd.make = 'Phone';
+    final taken = Uint8List.fromList(img.encodeJpg(photo));
+    expect(img.decodeJpg(taken)!.exif.gpsIfd.gpsLatitude, isNotNull, reason: 'the photograph says where it was taken');
+    for (final small in [shrinkPicture(taken), shrinkPicture(taken, from: const Rect.fromLTWH(20, 20, 120, 120))]) {
+      final back = img.decodeJpg(small!)!;
+      expect(back.exif.gpsIfd.gpsLatitude, isNull, reason: 'the picture does not');
+      expect(back.exif.isEmpty, isTrue, reason: 'nor anything else the camera wrote');
+    }
+  });
+
   testWidgets('what shows: the picture over the icon, the icon over the initials', (tester) async {
     final square = img.Image(width: 8, height: 8);
     img.fill(square, color: img.ColorRgb8(10, 200, 10));
