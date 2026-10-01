@@ -26,6 +26,17 @@ void main() {
         reason: 'Flutter web does not read the safe-area insets, so the browser keeps the page clear of the notch');
   });
 
+  test('nobody else\'s page frames the app', () {
+    // Subscribe and Drop are a tap each; under another site's frame
+    // the taps are that site's to steer. The rule is the site's, which
+    // serves this page at /play (site/_headers).
+    final rules = File('../site/_headers').readAsStringSync();
+    final everything = RegExp(r'^/\*\n((?:[ \t]+\S.*\n)+)', multiLine: true).firstMatch(rules);
+    expect(everything, isNotNull, reason: 'a rule for every path');
+    expect(everything!.group(1), contains("Content-Security-Policy: frame-ancestors 'none'"));
+    expect(everything.group(1), contains('X-Frame-Options: DENY'));
+  });
+
   test('installed, the app turns with the device, as it does in a tab', () {
     // A phone on its side is the second composition, not a mistake
     // (docs/05-form-factors.md): an installed app locked upright would
