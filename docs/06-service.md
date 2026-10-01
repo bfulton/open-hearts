@@ -277,9 +277,19 @@ says so rather than opening a checkout a phone should not be using.
 Three things have to be set on the project for any of it to work:
 `OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` (a yearly recurring price) and
 `OH_STRIPE_WEBHOOK_SECRET`, with the webhook pointed at `/api/stripe`
-for `checkout.session.completed` and `customer.subscription.*`. Without
-them the shop says it is not open yet, which is what a deployment with
-no keys should say.
+for `checkout.session.completed`,
+`checkout.session.async_payment_succeeded` and
+`customer.subscription.*`. Without them the shop says it is not open
+yet, which is what a deployment with no keys should say.
+
+A checkout binds a key only if this service opened it: the key is read
+from the session's `metadata`, which only our checkout writes, and not
+from `client_reference_id`, which any Payment Link on the account takes
+from its URL. It binds only once paid — `payment_status` `paid` or
+`no_payment_required`, so a bank transfer still pending binds nothing
+until Stripe says it cleared. The webhook's signature is checked in
+constant time, and a body past half a megabyte is not read; every other
+handler stops at sixteen kilobytes, far past anything the app sends.
 
 ### A subscription is a person's, not a device's
 
@@ -335,9 +345,9 @@ code's row is let go by the store an hour after it is made, spent or
 not, so codes do not pile up for ever.
 
 A code does not take a device off another subscription that is still
-paid up. A code arrives in a link and is spent the moment the app
-opens it, so a stranger with a subscription of his own could
-otherwise send one to somebody else's phone, take it off the
+paid up. A code arrives in a link, and the app asks before it spends
+one — "Join this subscription?" — but a yes is easily given to a link
+from a stranger, who could otherwise send one to somebody else's phone, take it off the
 subscription its owner paid for, and drop it from his. A device
 moves on by dropping itself first; one whose subscription has ended
 is free to go, and so is one licensed by local mode's open house,
@@ -347,6 +357,23 @@ not merely the date on it: the subscription is still paid up, so a row
 that had only run out would be dated forward again on that device's
 next ask. The one it holds runs out on its own within the month, which
 is what a licence with no revocation list can promise and all it can.
+
+#### One household at a time
+
+KV has no compare-and-set: two devices spending one code at once both
+read it unspent, and both got in, so a household of four became six.
+So everything that changes a household — making a code, spending one,
+dropping a device — and the list of its devices goes through one
+**Household** Durable Object per subscription, which takes them one at
+a time; the rows stay in KV, where everything else reads them. The
+object lives in the relay's worker (`service/do`, which exports it)
+and is bound to the Pages project as `HOUSEHOLD`; without the binding,
+as in the suites and on a single isolate, the same sequencing is a
+queue in memory. A household is also held to twenty changes and sixty
+reads an hour, which is far past what a family does and short of what
+a loop does to KV's daily writes. Asking for a code again while one is
+outstanding, unspent and good for two more minutes is a read: the same
+code comes back.
 
 TURN is Cloudflare's.
 
@@ -371,6 +398,7 @@ npx wrangler kv key put --binding OH_STORE 'config|app' \
 | `relays` | The relays the tables meet on, in place of the build's: one to eight, `wss://` only, every one good or none taken. Read at the app's start, so the devices that started since the change meet on the new ones and those before it finish where they are. A local build and the rig keep their own. | the build's |
 | `banner` | A line across the front door: `id` (letters, digits, `.` `_` `-`), `level` `info` or `warn`, and `text` by language, English required — a device is told it in its own language where the row has it and in English where it does not. | nothing |
 | `feedback` | Where "Tell us what's broken" sends a report: an `https://` page or a `mailto:` address. GitHub's new-issue page and mail take the report in the address; another page is opened with the report on the clipboard. | the project's GitHub issues |
+| `privacy`, `terms` | Where the privacy policy and the terms of use are, `https://` only, for the links under Subscribe. | the site's `/privacy` and `/terms` |
 | `update` | `before`: a day, `YYYY-MM-DD`; a build published before it is asked to update, in `text` if given and the app's own words if not, with a Reload button on the web. A local build has no day and is never asked. | nothing |
 
 The worker checks every field before it serves the row (`configOf`), and
@@ -468,7 +496,11 @@ One process, one flag.
 over a `Map`, with `OH_OPEN_HOUSE` set: a key nobody has heard of is
 written a subscription and a device binding like any other and licensed
 for a month, which is one branch inside `entitlementOf` and is never on
-in production. The rig signs with BIP-340's published pair and
+in production — the worker honours it only for a request to
+`localhost` or `127.0.0.1`, so the flag set on a real deployment by
+mistake opens nothing. The same goes for CORS: a page served from a
+local origin is answered only by a worker that is itself local. The
+rig signs with BIP-340's published pair and
 `e2e/build.sh` compiles the app to expect it — a key that licenses one
 machine's rig and nothing else. So the suites exercise the real handler,
 the real signature and the real gate, rather than a door propped open

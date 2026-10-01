@@ -277,9 +277,41 @@ class RelayPresence implements Presence {
     ]), everywhere: true);
   }
 
+  /// The newest presence each key has said, by its own clock, in
+  /// seconds: anything older from that key is a replay.
+  final Map<PublicKey, int> _newest = {};
+
+  /// How old a presence event may be and still be news, in seconds: a
+  /// few beats. Every presence event is public and any relay will take
+  /// one again once it has forgotten its id, so an old `here` said again
+  /// would make a device that left look online — long enough to be
+  /// seated and booted — and an old `gone` would take a present one out
+  /// (docs/security-review.md, 14).
+  int get _freshS => (everyMs * 4 ~/ 1000).clamp(20, 120);
+
+  /// How far ahead of this device's clock an event may be dated: clocks
+  /// drift, and no further than that.
+  static const _aheadS = 60;
+
+  /// Whether [e] is news: no older than a few beats, not from the
+  /// future, and no older than what its key has already said.
+  bool _fresh(NostrEvent e) {
+    final nowS = _nowMs ~/ 1000;
+    if (e.createdAt < nowS - _freshS || e.createdAt > nowS + _aheadS) return false;
+    final newest = _newest[e.pubkey];
+    if (newest != null && e.createdAt < newest) return false;
+    _newest[e.pubkey] = e.createdAt;
+    return true;
+  }
+
+  /// An event as it came off a relay: what the relays hand [_onEvent],
+  /// for a test to hand it directly.
+  bool receive(Map<String, Object?> raw) => _onEvent(raw);
+
   bool _onEvent(Map<String, Object?> raw) {
     final e = NostrEvent.parse(raw);
     if (e == null || e.kind != TableKinds.presence || e.tag('t') != topic) return false;
+    if (!_fresh(e)) return true;
     Map<String, Object?> c;
     try {
       c = Map<String, Object?>.from(jsonDecode(e.content) as Map);

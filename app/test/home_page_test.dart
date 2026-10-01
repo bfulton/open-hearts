@@ -345,11 +345,25 @@ void main() {
     final me = await Identity.signer();
     stand.says('claim', {'licence': signedFor(me.publicKey)});
     await pumpHome(tester, openClaim: 'ab12cd34', live: false);
+    // Asked first: a link is anybody's to send.
+    expect(find.text('Join this subscription?'), findsOneWidget);
+    expect(stand.seen, isEmpty, reason: 'nothing spent before the answer');
+    await tester.tap(find.text('Join'));
     await tester.pumpAndSettle();
     expect(stand.seen.single, contains('"ticket":"ab12cd34"'));
     expect(Entitlement.current.licence?.key, (await Identity.signer()).publicKey, reason: 'what came back');
     expect(Entitlement.current.live, isTrue);
     expect(find.text('Play live'), findsOneWidget, reason: 'the door is open on the device that scanned it');
+  });
+
+  testWidgets('a link not joined spends nothing', (tester) async {
+    final stand = standUp();
+    await pumpHome(tester, openClaim: 'ab12cd34', live: false);
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(stand.seen, isEmpty);
+    expect(Entitlement.current.live, isFalse);
+    expect(find.text('Subscribe'), findsOneWidget);
   });
 
   testWidgets('a code already spent says so, and leaves the door where it was', (tester) async {
@@ -358,6 +372,7 @@ void main() {
     final stand = standUp();
     stand.says('claim', {'error': 'that code has been used'}, status: 409);
     await pumpHome(tester, openClaim: 'ab12cd34', live: false);
+    await tester.tap(find.text('Join'));
     await tester.pumpAndSettle();
     expect(Entitlement.current.live, isFalse);
     expect(find.text('That code has been used.'), findsOneWidget);

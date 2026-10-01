@@ -19,6 +19,7 @@ import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/net/household.dart';
 import 'package:open_hearts/net/licence.dart';
+import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/subscribe_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/qr_view.dart';
@@ -76,6 +77,15 @@ Map<String, Object?> signedFor(PublicKey device, {int days = 30}) {
 }
 
 void main() {
+  test('the privacy policy and the terms are the site\'s, beside the app, unless the config says', () {
+    expect(legalPage('privacy', base: Uri.parse('https://open-hearts.pages.dev/play/?e2e')).toString(), 'https://open-hearts.pages.dev/privacy');
+    expect(legalPage('terms', base: Uri.parse('http://127.0.0.1:8123/')).toString(), 'http://127.0.0.1:8123/terms');
+    expect(legalPage('terms', base: Uri()).toString(), 'https://openhearts.game/terms', reason: 'a phone build');
+    RemoteSettings.current.adopt(RemoteConfig.parse({'terms': 'https://legal.example/t'}));
+    addTearDown(() => RemoteSettings.current = RemoteSettings());
+    expect(legalPage('terms', base: Uri.parse('https://open-hearts.pages.dev/play/')).toString(), 'https://legal.example/t');
+  });
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     Entitlement.current = Entitlement(service: _service);

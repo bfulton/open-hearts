@@ -58,7 +58,7 @@ class Notice {
 }
 
 class RemoteConfig {
-  const RemoteConfig({this.live = true, this.offer = true, this.relays, this.banner, this.updateBefore, this.updateText, this.feedback});
+  const RemoteConfig({this.live = true, this.offer = true, this.relays, this.banner, this.updateBefore, this.updateText, this.feedback, this.privacy, this.terms});
 
   /// No config at all: the build as it was made.
   static const none = RemoteConfig();
@@ -91,6 +91,12 @@ class RemoteConfig {
   /// Where "Tell us what's broken" goes (feedback_page.dart): an https
   /// page or a mailto address; null for the project's issues.
   final Uri? feedback;
+
+  /// Where the privacy policy and the terms of use are, which the
+  /// subscription page links to (a store's review asks for both); null
+  /// for the site's own (subscribe_page.dart, legalPage).
+  final Uri? privacy;
+  final Uri? terms;
 
   /// Whether [published] — this build's day, or "dev" — is a build the
   /// operator asks to be updated. A local build has no day and never is.
@@ -136,7 +142,15 @@ class RemoteConfig {
       updateBefore: due ? before : null,
       updateText: due ? Saying.parse((u as Map)['text']) : null,
       feedback: feedback != null && _goesSomewhere(feedback) ? feedback : null,
+      privacy: _page(json['privacy']),
+      terms: _page(json['terms']),
     );
+  }
+
+  /// A page over https, or nothing.
+  static Uri? _page(Object? raw) {
+    final u = raw is String ? Uri.tryParse(raw) : null;
+    return u != null && u.scheme == 'https' && u.host.isNotEmpty && u.userInfo.isEmpty ? u : null;
   }
 
   /// An address a report may be sent to: a page over https, or mail.

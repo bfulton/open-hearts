@@ -206,6 +206,27 @@ class _HomePageState extends State<HomePage> {
   Future<void> _arriving() async {
     final code = widget.openClaim;
     if (code == null) return;
+    // Asked first. A link is anybody's to send, and a code spent on
+    // opening it would put this device in whatever household sent it,
+    // without a word to its owner (docs/security-review.md, 5).
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final join = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(dialog.l10n.joinHouseholdTitle),
+        content: Text(dialog.l10n.joinHouseholdBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: Text(dialog.l10n.notNow)),
+          FilledButton(onPressed: () => Navigator.of(dialog).pop(true), child: Text(dialog.l10n.join)),
+        ],
+      ),
+    );
+    if (join != true) {
+      _forget('claim');
+      return;
+    }
+    if (!mounted) return;
     // Checked against the service this app is standing behind, which
     // is the entitlement's to name and not a constant's: a test stands
     // its own there, and so does the browser suite's rig.

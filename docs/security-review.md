@@ -183,7 +183,7 @@ Test: *a code's row is let go by the store*.
 
 ### 9. Low — two devices spending one code at once both get in
 
-**Confirmed; needs the owner.** `worker.mjs:504–526`. A code is read,
+**Fixed; the binding needs the owner.** `worker.mjs:504–526`. A code is read,
 checked unspent, and written spent in separate calls, and KV has no
 compare-and-set (and is eventually consistent between locations for up
 to a minute). Two claims of one code at once both succeed, so a
@@ -196,9 +196,20 @@ is revenue, not anyone's account. Closing it needs the household's
 rows behind something transactional — a Durable Object per
 subscription, or D1.
 
+Now every change to a household, and its list, goes through one
+`Household` Durable Object per subscription, one at a time (doc 06,
+"One household at a time"); without the binding, on one isolate, an
+in-memory queue does the same. Tests (`household.test.mjs`, each run
+through the object and through the queue): *one code spent twice at
+once lets one device in*; *two codes spent at once into the last place
+let one device in* — the case this finding had left untested. Until
+`HOUSEHOLD` is bound on the Pages project, production's isolates each
+keep their own queue and the race stays open between them; see the
+owner's list.
+
 ### 10. Low — no rate limits anywhere, and the free plan's KV quotas
 
-**Needs the owner.** Nothing in the worker limits requests per client.
+**Partly fixed; the rest needs the owner.** Nothing in the worker limits requests per client.
 Since (1), an unsigned or wrongly signed request costs a JSON parse and
 one signature check and touches no storage; a validly signed one from a
 key nobody pays for costs one or two KV reads. Writes need a
@@ -207,6 +218,14 @@ and a list each). On the Workers free plan KV allows 1,000 writes and
 1,000 lists a day; one subscriber looping on `ticket` stops every
 write — Stripe's included — until midnight UTC. See the owner's list
 below.
+
+What code can do, it now does: a household is held to twenty changes
+and sixty reads an hour; asking for a code while one is outstanding
+hands back the same code from a read, not a new row; and no handler
+reads a body past 16 KB (the webhook, 512 KB). Tests: *a household is
+held to so many changes an hour*; *asking for a code again is a read*;
+*a body too big to be one of ours is not read*. Per-client limits on
+the unsigned paths are still Cloudflare's to set.
 
 ### 11. Low — the site could be framed
 
@@ -236,7 +255,7 @@ Test: *a token whose signature is not base64*.
 
 ### 14. Low — old presence events can be said again
 
-**Not fixed: the clients' side.** `packages/table/lib/src/presence_relay.dart:280–299`
+**Fixed.** `packages/table/lib/src/presence_relay.dart:280–299`
 takes a `here` or a `gone` whatever its `created_at`. Every presence
 event is public, and any relay will take it again once it has
 forgotten the id (ours forgets on eviction or past 40,000 ids). Said
@@ -247,40 +266,68 @@ protocol is not the service, and the public relays would carry the
 replay regardless of ours. Ignoring presence older than a few beats is
 the fix, in `packages/table`.
 
+A device now takes a `here` or `gone` only if it is no older than four
+beats (twenty seconds to two minutes) and no more than a minute ahead,
+and only if it is newer than the last it took from that key. Tests
+(`presence_replay_test.dart`): *an old here, said again, is nobody*;
+*a gone older than the here after it does not take them out*; *a here
+dated in the future is nobody*.
+
 ## Unconfirmed, and things only the owner can see
+
+Each of these is now closed in code where code could close it, marked
+**Fixed** with its test; what is left is the owner's.
 
 - **The webhook's MAC is compared with `===`** (`worker.mjs:389`), not
   in constant time. Not exploitable that anyone has shown over a network
   against a 256-bit HMAC; `crypto.subtle.verify('HMAC', …)` is the
-  three-line hardening. Unconfirmed.
+  three-line hardening. Unconfirmed. **Fixed**: it is
+  `crypto.subtle.verify` now.
 - **A checkout is taken as paid when `status` is `complete`** even if
   `payment_status` is `unpaid` (`worker.mjs:399`), which is what Stripe
   sends for delayed payment methods. Whether that matters depends on
   which methods the Stripe account allows. Card and wallets only: no
   issue. Otherwise, take `paid` and `no_payment_required` only and
   handle `checkout.session.async_payment_succeeded`. Unconfirmed.
+  **Fixed**: only `paid` and `no_payment_required` bind, and an
+  async payment binds when it succeeds. Test: *only a checkout this
+  service made, and paid for, binds a device*.
 - **Any checkout on the Stripe account binds a key.** `record` reads the
   key from `metadata.key` or `client_reference_id` without checking the
   price. Payment Links accept `client_reference_id` in their URL, so a
   cheaper subscription product on the same account, sold through a
   link, would buy live play. Keep the account (or at least the webhook
-  endpoint) to this one price. Unconfirmed.
+  endpoint) to this one price. Unconfirmed. **Fixed** for Payment
+  Links: the key is read from `metadata.key` alone, which only our
+  checkout sets, and the session has to be a subscription (same test).
+  Another product's checkout made through the API with our metadata is
+  still the account's to keep away.
 - **`OH_OPEN_HOUSE` on the Pages project** licenses every device that
   asks and takes `local:<subject>` as a sign-in for that subject — in
   production that is everyone licensed, and any account whose provider
   subject is known signed into by whoever names it. It is
   never set by the code; make sure it is set in neither the Production
-  nor the Preview environment.
+  nor the Preview environment. **Fixed in code** as well: it is honoured
+  only for a request to `localhost` or `127.0.0.1`. Tests: *entitlement:
+  a key nobody has heard of gets nothing, unless it is local mode*;
+  *local mode has a token of its own, and it is nothing anywhere else*.
 - **CORS** echoes any `localhost`/`127.0.0.1` origin (`worker.mjs:38`)
   in production. Nothing rides on ambient credentials, so this grants
-  nothing; noted only.
+  nothing; noted only. **Fixed** anyway: a local origin is answered
+  only by a local worker. Test: *origins: the site, its branches and a
+  dev machine; nobody else*.
 - **Request bodies** are parsed whole (`bodyOf`), bounded only by
   Cloudflare's own request limit. CPU-bound and cheap; noted only.
+  **Fixed**: 16 KB, and 512 KB for the webhook (see 10).
 - **The local relay, its node host and the juror** listen on loopback
   and are not deployed. Noted while reading: `ws.mjs:128` answers a ping
   of more than 125 bytes with a broken frame, and a connection may buffer
   up to 16 MiB before a frame completes. Neither matters on a test
-  machine.
+  machine. **Fixed**: a control frame past 125 bytes or in fragments,
+  or any unmasked frame, closes the connection with 1002; and a client
+  that hangs up is hung up on, where before node's half-open socket
+  kept the server from ever closing. The 16 MiB is the largest message
+  and stays. Tests: `service/do/ws.test.mjs`.
 
 ## What the owner has to do
 
@@ -299,19 +346,24 @@ the fix, in `packages/table`.
 4. **Environment**: `OH_OPEN_HOUSE` unset everywhere; `OH_SERVICE_SECRET`,
    `OH_STRIPE_*`, `OH_TURN_*`, `OH_ID_HMAC` set as encrypted secrets,
    not plain variables.
-5. **Stripe**: card and wallets only, or the async-payment handling
-   above; this price alone on the webhook's account; the webhook sending
-   only `checkout.session.completed` and `customer.subscription.*`.
+5. **Stripe**: the webhook sending `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded` and
+   `customer.subscription.*`; no other product checked out through the
+   API with a `key` in its metadata on this account.
 6. **After deploying**: `curl -sI https://<site>/play/` shows
    `content-security-policy: frame-ancestors 'none'`,
    `x-frame-options: DENY` and `strict-transport-security`; and a fuller
    CSP (`script-src`) once it has been tried against the Flutter build,
    which needs `wasm-unsafe-eval`.
-7. **The claim link** spends itself without asking (`home_page.dart:181`).
-   The service now protects a paid-up device; a "join this household?"
-   confirmation on the screen is the product's call.
-8. **Codes spent twice at once** (9): a Durable Object or D1 for the
-   household, if sharing past five turns out to matter.
+7. **Bind the household** (9): deploy `service/do` (it exports
+   `Household`, migration `v2`), bind the Pages project's `OH_STORE`
+   namespace in `service/do/wrangler.toml` (the id is in the
+   dashboard), then bind `HOUSEHOLD` on the Pages project to script
+   `open-hearts-relay`, class `Household`. In that order: a `HOUSEHOLD`
+   whose worker has no store answers 503.
+8. **The claim link** now asks "Join this subscription?" before it
+   spends a code (`home_page.dart`; test *a link not joined spends
+   nothing*). Nothing left to decide.
 9. **Deploy app and worker together**, which `deploy.sh` already does:
    a build from before this branch sends unsigned requests and is
    refused (it keeps its licence until its date, and the update pill

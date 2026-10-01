@@ -29,9 +29,29 @@
 const DEFAULT_TTL = 4 * 60 * 60;
 const UPSTREAM = 'https://rtc.live.cloudflare.com/v1/turn/keys';
 
+/// Whether [url] is this machine: local mode, `wrangler pages dev` and
+/// the browser suites' rig. What only a dev machine may do is decided
+/// by where the request went, not by a setting alone — a setting left
+/// on in production is then a setting that does nothing.
+export function isLocal(url) {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'localhost' || host === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+/// Local mode's open house (doc 06): every device that asks licensed,
+/// and `local:` sign-ins taken. Only where it is set and only on this
+/// machine: set in a production project by mistake, it would license
+/// everyone and let anybody sign in as anybody.
+export const openHouse = (env, request) => !!env.OH_OPEN_HOUSE && isLocal(request.url);
+
 /// The origin a browser may call the handlers from, echoed back, or
-/// null: the site's own hosts, and a dev machine.
-export function allowedOrigin(origin) {
+/// null: the site's own hosts, and — on a dev machine only — the dev
+/// machine's own pages.
+export function allowedOrigin(origin, requestUrl = null) {
   if (!origin) return null;
   let host;
   try {
@@ -39,13 +59,13 @@ export function allowedOrigin(origin) {
   } catch {
     return null;
   }
-  if (host === 'localhost' || host === '127.0.0.1') return origin;
+  if (host === 'localhost' || host === '127.0.0.1') return requestUrl && isLocal(requestUrl) ? origin : null;
   if (host === 'open-hearts.pages.dev' || host.endsWith('.open-hearts.pages.dev')) return origin;
   return null;
 }
 
 function cors(request, headers = {}) {
-  const origin = allowedOrigin(request.headers.get('origin'));
+  const origin = allowedOrigin(request.headers.get('origin'), request.url);
   const h = { ...headers };
   if (origin) {
     h['access-control-allow-origin'] = origin;
@@ -281,7 +301,7 @@ export async function entitlementOf(store, key, { now = Date.now(), openHouse = 
 }
 
 /// The licence handler's status and body.
-export async function licence(key, env, { signer, now = Date.now() } = {}) {
+export async function licence(key, env, { signer, now = Date.now(), open = false } = {}) {
   const secret = env.OH_SERVICE_SECRET;
   const service = env.OH_SERVICE_KEY;
   if (!/^[0-9a-f]{64}$/.test(secret ?? '') || !/^[0-9a-f]{64}$/.test(service ?? '')) {
@@ -289,7 +309,7 @@ export async function licence(key, env, { signer, now = Date.now() } = {}) {
   }
   const store = storeOf(env);
   if (!store) return { status: 503, body: { error: 'licensing not configured' } };
-  const held = await entitlementOf(store, key, { now, openHouse: !!env.OH_OPEN_HOUSE });
+  const held = await entitlementOf(store, key, { now, openHouse: open });
   if (!held) return { status: 402, body: { error: 'no subscription' } };
   const until = earlier(dayAfter(now, LICENCE_DAYS), held.licensed_until);
   const signed = await licenceFor(key, until, { signer, secret, service });
@@ -442,11 +462,19 @@ export async function webhookSigned(header, raw, secret, { now = Date.now() } = 
   if (!Number.isFinite(t) || !v1.length) return false;
   if (Math.abs(now / 1000 - t) > WEBHOOK_TOLERANCE_S) return false;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
-    'sign',
+    'verify',
   ]);
-  const mac = hex(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${t}.${raw}`))));
-  // Every v1 offered, since a secret being rotated signs with two.
-  return v1.some((offered) => offered.length === mac.length && offered === mac);
+  const signed = new TextEncoder().encode(`${t}.${raw}`);
+  // Every v1 offered, since a secret being rotated signs with two —
+  // each checked by the platform's own HMAC verify, which compares in
+  // constant time, rather than by comparing strings, which stops at the
+  // first character that differs.
+  for (const offered of v1) {
+    if (!/^[0-9a-f]{64}$/.test(offered)) continue;
+    const mac = Uint8Array.from(offered.match(/../g), (b) => parseInt(b, 16));
+    if (await crypto.subtle.verify('HMAC', key, mac, signed)) return true;
+  }
+  return false;
 }
 
 /// What a Stripe event means here, written down. Returns what was
@@ -455,9 +483,17 @@ export async function webhookSigned(header, raw, secret, { now = Date.now() } = 
 export async function record(event, store, { now = Date.now() } = {}) {
   const object = event?.data?.object ?? {};
   const today = dayOf(now);
-  if (event?.type === 'checkout.session.completed') {
-    if (object.payment_status !== 'paid' && object.status !== 'complete') return null;
-    const key = object.metadata?.key ?? object.client_reference_id;
+  // A checkout this service made, and paid for. Made here: only a
+  // session this worker created carries the key in its metadata — a
+  // Payment Link or a checkout for some other product on the account
+  // can carry a client_reference_id in its URL, and must not buy live
+  // play with it. Paid: `complete` with payment still to come is what a
+  // delayed method sends first, and its money arrives, or does not, in
+  // `async_payment_succeeded`.
+  if (event?.type === 'checkout.session.completed' || event?.type === 'checkout.session.async_payment_succeeded') {
+    if (object.mode !== undefined && object.mode !== 'subscription') return null;
+    if (object.payment_status !== 'paid' && object.payment_status !== 'no_payment_required') return null;
+    const key = object.metadata?.key;
     const subscription = typeof object.subscription === 'string' ? object.subscription : object.subscription?.id;
     if (!/^[0-9a-f]{64}$/.test(key ?? '') || !subscription) return null;
     // The date is the subscription's to say, and its own event may not
@@ -559,10 +595,25 @@ export async function devicesOn(store, subscription) {
   return found.sort((a, b) => String(a.bound_at).localeCompare(String(b.bound_at)) || a.key.localeCompare(b.key));
 }
 
-/// A code for a new device to arrive with: {status, body}.
+/// How long an outstanding code must still have to be handed out again
+/// rather than replaced: enough to walk a phone over.
+const TICKET_REUSE_MS = 2 * 60000;
+
+/// A code for a new device to arrive with: {status, body}. The one
+/// already outstanding, while it is unspent and has time left: asking
+/// again is a read, not a new row and a listing of the household — a
+/// subscriber asking in a loop would otherwise spend the store's writes
+/// for everyone, Stripe's included (docs/security-review.md, 10).
 export async function ticketFor(key, store, { now = Date.now() } = {}) {
   const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (!held) return { status: 402, body: { error: 'no subscription' } };
+  const out = await store.get(`SUB#${held.subscription}`, 'TICKET');
+  if (out && Date.parse(out.expires_at) - now >= TICKET_REUSE_MS) {
+    const ticket = await store.get(`TICKET#${out.code}`, 'META');
+    if (ticket && !ticket.used_at) {
+      return { status: 200, body: { ticket: out.code, expires_at: out.expires_at, devices: out.devices, most: MOST_DEVICES } };
+    }
+  }
   const devices = await devicesOn(store, held.subscription);
   if (devices.length >= MOST_DEVICES) {
     return { status: 409, body: { error: 'five devices already', devices: devices.length, most: MOST_DEVICES } };
@@ -570,6 +621,7 @@ export async function ticketFor(key, store, { now = Date.now() } = {}) {
   const code = nonce();
   const expires_at = new Date(now + TICKET_MINUTES * 60000).toISOString();
   await store.put(`TICKET#${code}`, 'META', { subscription: held.subscription, expires_at, used_at: null, made_by: key }, { ttl: TICKET_KEPT_S });
+  await store.put(`SUB#${held.subscription}`, 'TICKET', { code, expires_at, devices: devices.length }, { ttl: TICKET_KEPT_S });
   return { status: 200, body: { ticket: code, expires_at, devices: devices.length, most: MOST_DEVICES } };
 }
 
@@ -636,6 +688,104 @@ export async function dropDevice(key, device, store, { now = Date.now() } = {}) 
   return { status: 200, body: { devices: (await devicesOn(store, held.subscription)).length, most: MOST_DEVICES } };
 }
 
+// ---- one household at a time ------------------------------------------
+// A code made, a code spent, a device dropped, the list read: each reads
+// the household and writes it in separate calls, and KV has no
+// compare-and-set, so two at once could both find room for a fifth
+// device and make six (docs/security-review.md, 9). They run one after
+// another per subscription instead: in a Durable Object per
+// subscription where the project binds one as HOUSEHOLD (one object,
+// one thread, wherever in the world the requests come from), and in
+// this isolate's own queue where it does not — which covers requests
+// that land together on one isolate and no more. The same place keeps a
+// household to so many of them an hour, which is what keeps one
+// subscriber from spending the store's daily writes and lists.
+
+/// What one household may do in an hour: changes (a code, a claim, a
+/// drop) and readings of its list. A person adding a phone does a
+/// handful of each.
+export const HOUSEHOLD_CHANGES_PER_HOUR = 20;
+export const HOUSEHOLD_READS_PER_HOUR = 60;
+
+/// One household's queue and its hour: everything asked of it runs in
+/// order, and what is over the hour's allowance is refused before it
+/// touches the store.
+export function sequencer({ now = Date.now } = {}) {
+  let queue = Promise.resolve();
+  const done = { change: [], read: [] };
+  const most = { change: HOUSEHOLD_CHANGES_PER_HOUR, read: HOUSEHOLD_READS_PER_HOUR };
+  return (kind, work) => {
+    const run = queue.then(async () => {
+      const t = now();
+      const recent = (done[kind] = done[kind].filter((at) => t - at < 3600000));
+      if (recent.length >= most[kind]) return { status: 429, body: { error: 'too many at once: try again in a while' } };
+      recent.push(t);
+      return work();
+    });
+    queue = run.catch(() => {});
+    return run;
+  };
+}
+
+/// What a household is asked: {op: 'ticket' | 'claim' | 'drop' | 'list', ...}.
+export async function householdOp(op, store, { now = Date.now() } = {}) {
+  switch (op.op) {
+    case 'ticket':
+      return ticketFor(op.key, store, { now });
+    case 'claim':
+      return claimWith(op.key, op.code, store, { now });
+    case 'drop':
+      return dropDevice(op.key, op.device, store, { now });
+    case 'list': {
+      const held = await store.get(`KEY#${op.key}`, 'ENTITLEMENT');
+      if (!held) return { status: 402, body: { error: 'no subscription' } };
+      return { status: 200, body: { devices: await devicesOn(store, held.subscription), most: MOST_DEVICES } };
+    }
+    default:
+      return { status: 400, body: { error: 'not a household operation' } };
+  }
+}
+
+const kindOf = (op) => (op.op === 'list' ? 'read' : 'change');
+
+/// The Durable Object a household runs in, one per subscription, named
+/// by it. Exported from the relay's worker beside TagRelay
+/// (service/do/worker.mjs), bound to the Pages project as HOUSEHOLD;
+/// it reads and writes the same OH_STORE.
+export class Household {
+  constructor(state, env) {
+    this.env = env;
+    this.next = sequencer();
+  }
+
+  async fetch(request) {
+    const op = await request.json();
+    const store = storeOf(this.env);
+    if (!store) return Response.json({ status: 503, body: { error: 'licensing not configured' } });
+    return Response.json(await this.next(kindOf(op), () => householdOp(op, store)));
+  }
+}
+
+/// This isolate's queues, by subscription, for a project with no
+/// HOUSEHOLD bound.
+const households = new Map();
+
+/// [op] run in [subscription]'s household, in its turn: {status, body}.
+export async function inHousehold(env, subscription, op) {
+  if (env.HOUSEHOLD) {
+    const stub = env.HOUSEHOLD.get(env.HOUSEHOLD.idFromName(subscription));
+    const answer = await stub.fetch('https://household/', { method: 'POST', body: JSON.stringify(op) });
+    return answer.json();
+  }
+  const store = storeOf(env);
+  if (!store) return { status: 503, body: { error: 'licensing not configured' } };
+  if (!households.has(subscription)) households.set(subscription, sequencer());
+  return households.get(subscription)(kindOf(op), () => householdOp(op, store));
+}
+
+/// Forgets this isolate's queues, for a test that starts afresh.
+export const forgetHouseholds = () => households.clear();
+
 async function ticketRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -644,7 +794,9 @@ async function ticketRoute(request, env) {
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const { status, body: out } = await ticketFor(asked.key, store);
+  const held = await store.get(`KEY#${asked.key}`, 'ENTITLEMENT');
+  if (!held) return json(request, 402, { error: 'no subscription' });
+  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'ticket', key: asked.key });
   return json(request, status, out);
 }
 
@@ -659,11 +811,16 @@ async function claimRoute(request, env) {
   const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const claimed = await claimWith(key, body.ticket, store);
+  // In the household the code is for, which the code's row says; a code
+  // nobody made is said so here, without queueing anybody.
+  if (typeof body.ticket !== 'string' || !/^[0-9a-f]{2,64}$/.test(body.ticket)) return json(request, 400, { error: 'not a code' });
+  const ticket = await store.get(`TICKET#${body.ticket}`, 'META');
+  if (!ticket) return json(request, 404, { error: 'no such code' });
+  const claimed = await inHousehold(env, ticket.subscription, { op: 'claim', key, code: body.ticket });
   if (claimed.status !== 200) return json(request, claimed.status, claimed.body);
   // Straight back with the licence it was claimed for, so the device
   // that scanned a code is playing rather than waiting to be told.
-  const { status, body: out } = await licence(key, env, { signer });
+  const { status, body: out } = await licence(key, env, { signer, open: openHouse(env, request) });
   return json(request, status, out);
 }
 
@@ -677,14 +834,15 @@ async function devicesRoute(request, env) {
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
   const drop = body.drop;
-  if (typeof drop === 'string') {
-    if (!/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
-    const { status, body: out } = await dropDevice(key, drop, store);
-    if (status !== 200) return json(request, status, out);
-  }
+  if (typeof drop === 'string' && !/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
   const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (!held) return json(request, 402, { error: 'no subscription' });
-  return json(request, 200, { devices: await devicesOn(store, held.subscription), most: MOST_DEVICES });
+  if (typeof drop === 'string') {
+    const { status, body: out } = await inHousehold(env, held.subscription, { op: 'drop', key, device: drop });
+    if (status !== 200) return json(request, status, out);
+  }
+  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'list', key });
+  return json(request, status, out);
 }
 
 // ---- who this is, where a provider will say ----------------------------
@@ -744,11 +902,11 @@ const ALGS = {
 /// carries a caller's nonce through, so the app puts the hash of its
 /// key there — without it, a token lifted from one app's traffic would
 /// bind somebody else's account to the lifter's key.
-export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, { now = Date.now() } = {}) {
+export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, { now = Date.now(), open = false } = {}) {
   // Local mode's own token: a subject and nothing else, taken only
   // where the open house is (doc 06). One branch, never on in
   // production, and the rest of the path below is the same path.
-  if (env.OH_OPEN_HOUSE && typeof token === 'string' && token.startsWith('local:')) {
+  if (open && typeof token === 'string' && token.startsWith('local:')) {
     const sub = token.slice('local:'.length);
     return sub && PROVIDERS[provider] ? { provider, sub } : null;
   }
@@ -875,13 +1033,13 @@ async function signInRoute(request, env, move) {
   const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const who = await whoSignedIn(body.provider, body.token, key, env);
+  const who = await whoSignedIn(body.provider, body.token, key, env, fetch, { open: openHouse(env, request) });
   if (!who) return json(request, 401, { error: 'that sign-in does not check out' });
   const { status, body: out } = await (move ? supersede : attest)(who, key, store, env);
   if (status !== 200) return json(request, status, out);
   // Straight back with the licence it is owed, if any: a device that
   // has just proved who it is should not have to ask twice.
-  const licensed = await licence(key, env, { signer });
+  const licensed = await licence(key, env, { signer, open: openHouse(env, request) });
   return json(request, 200, { ...out, ...(licensed.status === 200 ? licensed.body : {}) });
 }
 
@@ -903,7 +1061,8 @@ async function checkoutRoute(request, env) {
 
 async function stripeRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
-  const raw = await request.text();
+  const raw = await textOf(request, MOST_EVENT);
+  if (raw === null) return json(request, 413, { error: 'too big' });
   if (!(await webhookSigned(request.headers.get('stripe-signature'), raw, env.OH_STRIPE_WEBHOOK_SECRET))) {
     // Nothing is read out of a body nobody signed.
     return json(request, 400, { error: 'not signed' });
@@ -928,9 +1087,34 @@ function keyOf(body) {
   return typeof key === 'string' && /^[0-9a-f]{64}$/.test(key) ? key : null;
 }
 
-async function bodyOf(request) {
+/// The most a handler's request may carry. Every one of them asks with
+/// a key, a signature and a word or two; a body past this is not one of
+/// ours, and is not parsed to find out.
+const MOST_BODY = 16 * 1024;
+
+/// Stripe's events are larger, and few: a checkout or a subscription,
+/// with its line items.
+const MOST_EVENT = 512 * 1024;
+
+/// The body as text, or null when it is longer than [most] — said by its
+/// length where the request says one, and counted where it does not.
+async function textOf(request, most) {
+  const said = Number(request.headers.get('content-length'));
+  if (Number.isFinite(said) && said > most) return null;
+  let text;
   try {
-    return await request.json();
+    text = await request.text();
+  } catch {
+    return null;
+  }
+  return text.length > most ? null : text;
+}
+
+async function bodyOf(request) {
+  const text = await textOf(request, MOST_BODY);
+  if (text === null) return null;
+  try {
+    return JSON.parse(text);
   } catch {
     return null;
   }
@@ -975,7 +1159,7 @@ async function licenceRoute(request, env) {
   // else: whether a key pays, and until when, is the key's business.
   const asked = await signedFor(request, env, 'licence');
   if (asked instanceof Response) return asked;
-  const { status, body } = await licence(asked.key, env, { signer: asked.signer });
+  const { status, body } = await licence(asked.key, env, { signer: asked.signer, open: openHouse(env, request) });
   return json(request, status, body);
 }
 
@@ -990,7 +1174,7 @@ async function turn(request, env) {
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  if (!(await entitlementOf(store, asked.key, { openHouse: !!env.OH_OPEN_HOUSE }))) return json(request, 402, { error: 'no subscription' });
+  if (!(await entitlementOf(store, asked.key, { openHouse: openHouse(env, request) }))) return json(request, 402, { error: 'no subscription' });
   const { status, body: out } = await mint(env);
   return json(request, status, out);
 }
@@ -1002,7 +1186,7 @@ async function turn(request, env) {
 /// device reads at its start. What is here when there is no row — or a
 /// row this worker cannot read — is what the app does with no config at
 /// all, so a bad row is never worse than none.
-export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null });
+export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null });
 
 /// Where the row lives: `config|app` in OH_STORE.
 const CONFIG_ROW = ['config', 'app'];
@@ -1064,6 +1248,14 @@ export function configOf(raw) {
       const page = u.protocol === 'https:' && !u.username && !u.password;
       const mail = u.protocol === 'mailto:' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.pathname);
       if (page || mail) c.feedback = u.toString();
+    } catch {}
+  }
+  // Where the privacy policy and the terms are, when not on this site.
+  for (const name of ['privacy', 'terms']) {
+    if (typeof raw[name] !== 'string') continue;
+    try {
+      const u = new URL(raw[name]);
+      if (u.protocol === 'https:' && !u.username && !u.password) c[name] = u.toString();
     } catch {}
   }
   return c;

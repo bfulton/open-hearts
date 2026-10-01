@@ -953,4 +953,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String sheetRow(String name, int delta, int total) {
     return '$name: $delta this hand, $total in the game';
   }
+
+  @override
+  String get joinHouseholdTitle => 'Join this subscription?';
+
+  @override
+  String get joinHouseholdBody =>
+      'This link adds this device to a live play subscription. Join only if it came from you, or from someone you share with.';
+
+  @override
+  String get join => 'Join';
+
+  @override
+  String get notNow => 'Not now';
+
+  @override
+  String get privacyPolicy => 'Privacy policy';
+
+  @override
+  String get termsOfUse => 'Terms of use';
 }

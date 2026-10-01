@@ -16,6 +16,7 @@ import worker, {
   forgetProviderKeys,
   licence,
   licenceFor,
+  openHouse,
   loginRow,
   memoryStore,
   mint,
@@ -95,8 +96,12 @@ const post = (body, origin) =>
 test('origins: the site, its branches and a dev machine; nobody else', () => {
   assert.equal(allowedOrigin('https://dev.open-hearts.pages.dev'), 'https://dev.open-hearts.pages.dev');
   assert.equal(allowedOrigin('https://open-hearts.pages.dev'), 'https://open-hearts.pages.dev');
-  assert.equal(allowedOrigin('http://localhost:8788'), 'http://localhost:8788');
-  assert.equal(allowedOrigin('http://127.0.0.1:8788'), 'http://127.0.0.1:8788');
+  // A dev machine's own pages, asking a dev machine; never the deployed
+  // site, which a page on somebody's localhost has no business calling.
+  assert.equal(allowedOrigin('http://localhost:8788', 'http://localhost:8788/api/turn'), 'http://localhost:8788');
+  assert.equal(allowedOrigin('http://127.0.0.1:8788', 'http://127.0.0.1:8788/api/turn'), 'http://127.0.0.1:8788');
+  assert.equal(allowedOrigin('http://localhost:8788', 'https://dev.open-hearts.pages.dev/api/turn'), null);
+  assert.equal(allowedOrigin('http://127.0.0.1:8788'), null);
   assert.equal(allowedOrigin('https://evil-open-hearts.pages.dev'), null);
   assert.equal(allowedOrigin('https://open-hearts.pages.dev.evil.com'), null);
   assert.equal(allowedOrigin('not a url'), null);
@@ -154,9 +159,13 @@ test('the worker: assets pass through, handlers answer, the rest is 404', async 
 });
 
 test('the worker: a preflight from an allowed origin, and none from another', async () => {
-  const ok = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:8788' } }), env);
+  const ok = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'OPTIONS', headers: { origin: 'https://dev.open-hearts.pages.dev' } }), env);
   assert.equal(ok.status, 204);
-  assert.equal(ok.headers.get('access-control-allow-origin'), 'http://127.0.0.1:8788');
+  assert.equal(ok.headers.get('access-control-allow-origin'), 'https://dev.open-hearts.pages.dev');
+  const local = await worker.fetch(new Request('http://127.0.0.1:8788/api/turn', { method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:8788' } }), env);
+  assert.equal(local.headers.get('access-control-allow-origin'), 'http://127.0.0.1:8788', 'a dev machine, asking itself');
+  const fromLocal = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:8788' } }), env);
+  assert.equal(fromLocal.headers.get('access-control-allow-origin'), null, 'a localhost page, asking the deployed site');
   assert.equal(ok.headers.get('access-control-allow-methods'), 'POST, OPTIONS');
   const no = await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'OPTIONS', headers: { origin: 'https://evil.example' } }), env);
   assert.equal(no.status, 204);
@@ -317,12 +326,12 @@ test('the licence route: a key is required, and what comes back verifies', async
   const bad = await worker.fetch(new Request(at, { method: 'POST', body: JSON.stringify({ key: 'short' }) }), withStore);
   assert.equal(bad.status, 400);
   const res = await worker.fetch(
-    new Request(at, { method: 'POST', headers: { origin: 'http://127.0.0.1:9000' }, body: JSON.stringify(await asking(ADA, 'licence')) }),
+    new Request(at, { method: 'POST', headers: { origin: 'https://dev.open-hearts.pages.dev' }, body: JSON.stringify(await asking(ADA, 'licence')) }),
     withStore,
   );
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('cache-control'), 'no-store');
-  assert.equal(res.headers.get('access-control-allow-origin'), 'http://127.0.0.1:9000');
+  assert.equal(res.headers.get('access-control-allow-origin'), 'https://dev.open-hearts.pages.dev');
   const { licence: signed } = await res.json();
   assert.equal(signed.key, ADA.public);
   assert.equal(signed.plan, 'year');
@@ -427,7 +436,7 @@ test('a paid checkout binds the device; the subscription says how long for', asy
 test('a subscription Stripe ends is over today, and nothing is issued after', async () => {
   const store = memoryStore();
   const now = Date.UTC(2026, 8, 16);
-  await record({ type: 'checkout.session.completed', data: { object: { status: 'complete', subscription: 'sub_9', client_reference_id: KEY } } }, store, { now });
+  await record({ type: 'checkout.session.completed', data: { object: { status: 'complete', payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store, { now });
   await record({ type: 'customer.subscription.created', data: { object: { id: 'sub_9', current_period_end: Math.floor(Date.UTC(2027, 8, 16) / 1000) } } }, store, { now });
   assert.equal((await entitlementOf(store, KEY, { now })).licensed_until, '2027-09-16');
   await record({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_9' } } }, store, { now: Date.UTC(2026, 9, 1) });
@@ -440,6 +449,21 @@ test('a webhook that is not ours is taken and not acted on', async () => {
   assert.equal(await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'unpaid', subscription: 'sub_9', metadata: { key: KEY } } } }, store), null);
   assert.equal(await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_9', metadata: { key: 'nope' } } } }, store), null);
   assert.equal(store.rows.size, 0);
+});
+
+test('only a checkout this service made, and paid for, binds a device', async () => {
+  const store = memoryStore();
+  // A Payment Link, or any other checkout on the account: a key in the
+  // URL's client_reference_id, none in the metadata only we write.
+  assert.equal(await record({ type: 'checkout.session.completed', data: { object: { status: 'complete', payment_status: 'paid', subscription: 'sub_x', client_reference_id: KEY } } }, store), null);
+  // Complete, with a delayed method's money still to come.
+  assert.equal(await record({ type: 'checkout.session.completed', data: { object: { status: 'complete', payment_status: 'unpaid', subscription: 'sub_9', metadata: { key: KEY } } } }, store), null);
+  // Not a subscription at all.
+  assert.equal(await record({ type: 'checkout.session.completed', data: { object: { mode: 'payment', payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store), null);
+  assert.equal(store.rows.size, 0);
+  // And the delayed money, when it comes.
+  const bound = await record({ type: 'checkout.session.async_payment_succeeded', data: { object: { mode: 'subscription', payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store);
+  assert.deepEqual(bound, { bound: KEY, subscription: 'sub_9' });
 });
 
 test('the webhook route: unsigned is refused, signed is recorded and acknowledged', async () => {
@@ -839,18 +863,6 @@ test('a code\'s row is let go by the store, spent or not, rather than kept for e
   assert.ok(ttl(spent[1]) > 0, 'a write without an expiry would keep the spent code for ever');
 });
 
-test('two devices spending one code at once both get in', { todo: 'KV has no compare-and-set: a code is read unspent by both before either writes (needs a Durable Object or D1 for the household; docs/security-review.md)' }, async () => {
-  const now = Date.UTC(2026, 8, 16);
-  const store = await household(now);
-  for (const key of ['11', '22', '33'].map((b) => b.repeat(32))) {
-    await claimWith(key, (await ticketFor(KEY, store, { now })).body.ticket, store, { now });
-  }
-  const last = await ticketFor(KEY, store, { now });
-  const both = await Promise.all([OTHER, THIRD].map((key) => claimWith(key, last.body.ticket, store, { now })));
-  assert.deepEqual(both.map((c) => c.status).sort(), [200, 409], 'one code, one device');
-  assert.equal((await devicesOn(store, 'sub_9')).length, 5);
-});
-
 // ---- who this is, where a provider will say ------------------------------
 
 /// A provider of this test's own: a key pair, the key set it publishes,
@@ -1052,8 +1064,15 @@ test('a token whose signature is not base64 is a sign-in that does not check out
 
 test('local mode has a token of its own, and it is nothing anywhere else', async () => {
   const local = { ...signedInAs, OH_OPEN_HOUSE: '1' };
-  assert.deepEqual(await whoSignedIn('google', 'local:sub-1', KEY, local), { provider: 'google', sub: 'sub-1' });
+  const open = { open: true };
+  assert.deepEqual(await whoSignedIn('google', 'local:sub-1', KEY, local, fetch, open), { provider: 'google', sub: 'sub-1' });
   assert.equal(await whoSignedIn('google', 'local:sub-1', KEY, signedInAs), null, 'not in production');
-  assert.equal(await whoSignedIn('nobody', 'local:sub-1', KEY, local), null);
-  assert.equal(await whoSignedIn('google', 'local:', KEY, local), null);
+  assert.equal(await whoSignedIn('nobody', 'local:sub-1', KEY, local, fetch, open), null);
+  assert.equal(await whoSignedIn('google', 'local:', KEY, local, fetch, open), null);
+  // The house is open only where it is set and only on this machine: set
+  // in a production project by mistake, it opens nothing.
+  assert.equal(openHouse(local, new Request('http://127.0.0.1:8788/api/attest')), true);
+  assert.equal(openHouse(local, new Request('http://localhost/api/licence')), true);
+  assert.equal(openHouse(local, new Request('https://open-hearts.pages.dev/api/attest')), false);
+  assert.equal(openHouse(signedInAs, new Request('http://127.0.0.1:8788/api/attest')), false);
 });

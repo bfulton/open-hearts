@@ -28,6 +28,12 @@ import wasm from '../../app/web/schnorr.wasm';
 
 import { objectRelay, schnorrVerifier, tagOf, tally } from './relay.mjs';
 
+// One object per subscription, through which a household's codes,
+// claims and drops run one at a time (service/functions/worker.mjs,
+// "one household at a time"). It lives here because a Pages project
+// cannot define a Durable Object of its own, only bind one.
+export { Household } from '../functions/worker.mjs';
+
 export class TagRelay {
   constructor(state, env = {}) {
     this.state = state;

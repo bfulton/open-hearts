@@ -1291,6 +1291,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{name}: {delta} this hand, {total} in the game'**
   String sheetRow(String name, int delta, int total);
+
+  /// Title of the question asked when the app is opened from a link that adds this device to someone's live play subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Join this subscription?'**
+  String get joinHouseholdTitle;
+
+  /// Under joinHouseholdTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This link adds this device to a live play subscription. Join only if it came from you, or from someone you share with.'**
+  String get joinHouseholdBody;
+
+  /// Button: join the subscription the link is for.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get join;
+
+  /// Button: do not join; the link is put aside.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get notNow;
+
+  /// Link on the Live play page to the privacy policy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get privacyPolicy;
+
+  /// Link on the Live play page to the terms of use.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of use'**
+  String get termsOfUse;
 }
 
 class _AppLocalizationsDelegate

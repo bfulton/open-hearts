@@ -296,7 +296,10 @@ flow('a second device, brought in by the code the first one shows', async ({ ope
   if (!/[?&]claim=[0-9a-f]+/.test(link)) throw new Error(`no code in the link: ${link}`);
 
   // A second device, opening it.
-  const second = await open({ url: link });
+  // Asked before anything is spent, since a link is anybody's to send:
+  // the question is the first thing it shows, over the front door.
+  const second = await open({ url: link, ready: /^Join this subscription\?$/ });
+  await click(second, /^Join$/);
   await waitFor(second, /^Play live/, { what: 'live play open on the second device', timeout: 40000 });
   // The code is spent, so it leaves the address — after it has been
   // spent, which is a moment later than the door opening: the rig's
@@ -353,7 +356,7 @@ async function main() {
   // two processes, so it is started when something asks for one.
   let relayOnce = null;
   const relay = () => (relayOnce ??= startRelay());
-  const open = async ({ viewport = portrait, pointer = false, url = null } = {}) => {
+  const open = async ({ viewport = portrait, pointer = false, url = null, ready = /^Open Hearts$|^Play solo$/ } = {}) => {
     const ctx = await browser.newContext({
       viewport,
       locale: 'en-US',
@@ -374,7 +377,7 @@ async function main() {
     if (pointer) {
       await page.addStyleTag({ content: 'flt-semantics, flt-semantics * { pointer-events: none !important; }' });
     }
-    await waitFor(page, /^Open Hearts$|^Play solo$/, { what: 'the app', timeout: 60000 });
+    await waitFor(page, ready, { what: 'the app', timeout: 60000 });
     return page;
   };
   for (const { name, run } of flows) {

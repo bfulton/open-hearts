@@ -1164,5 +1164,29 @@
         "type": "int"
       }
     }
+  },
+  "joinHouseholdTitle": "Join this subscription?",
+  "@joinHouseholdTitle": {
+    "description": "Title of the question asked when the app is opened from a link that adds this device to someone's live play subscription."
+  },
+  "joinHouseholdBody": "This link adds this device to a live play subscription. Join only if it came from you, or from someone you share with.",
+  "@joinHouseholdBody": {
+    "description": "Under joinHouseholdTitle."
+  },
+  "join": "Join",
+  "@join": {
+    "description": "Button: join the subscription the link is for."
+  },
+  "notNow": "Not now",
+  "@notNow": {
+    "description": "Button: do not join; the link is put aside."
+  },
+  "privacyPolicy": "Privacy policy",
+  "@privacyPolicy": {
+    "description": "Link on the Live play page to the privacy policy."
+  },
+  "termsOfUse": "Terms of use",
+  "@termsOfUse": {
+    "description": "Link on the Live play page to the terms of use."
   }
 }

@@ -52,6 +52,9 @@ dependencies:
   image_picker: ^1.2.3
   image: ^4.10.0
   qr: ^4.0.0
+  # Pages opened from the app — the privacy policy and the terms a
+  # store's review taps on the subscription page.
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

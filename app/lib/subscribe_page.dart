@@ -13,6 +13,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:table/table.dart';
 
 import 'entitlement.dart';
@@ -21,6 +22,7 @@ import 'l10n/l10n.dart';
 import 'net/buying.dart';
 import 'net/household.dart';
 import 'net/licence.dart';
+import 'net/remote_config.dart';
 import 'net/share.dart';
 import 'theme.dart';
 import 'ui/qr_view.dart';
@@ -188,6 +190,16 @@ class _SubscribePageState extends State<SubscribePage> {
                     ),
                   ] else
                     ..._yours(),
+                  const SizedBox(height: 14),
+                  // What a subscription is bought under, a tap from where it
+                  // is bought (a store's review asks for both).
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    children: [
+                      TextButton(onPressed: () => openLink(legalPage('privacy')), child: Text(l10n.privacyPolicy)),
+                      TextButton(onPressed: () => openLink(legalPage('terms')), child: Text(l10n.termsOfUse)),
+                    ],
+                  ),
                   if (_refusal != null) ...[
                     const SizedBox(height: 14),
                     Text(_refusal!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
@@ -371,3 +383,27 @@ class _Point extends StatelessWidget {
     );
   }
 }
+
+/// The site's page [name] — `privacy` or `terms` — or where the remote
+/// config says it is. The site is the app's own origin on the web, the
+/// app being served beside it at /play; a phone's build has no origin
+/// and goes to the site's home.
+Uri legalPage(String name, {Uri? base}) {
+  final config = RemoteSettings.current.config;
+  final set = name == 'privacy' ? config.privacy : config.terms;
+  if (set != null) return set;
+  final at = base ?? Uri.base;
+  if ((at.scheme == 'https' || at.scheme == 'http') && at.host.isNotEmpty) {
+    return Uri(scheme: at.scheme, host: at.host, port: at.hasPort ? at.port : null, path: '/$name');
+  }
+  return Uri.parse('https://openhearts.game/$name');
+}
+
+/// Opens [url] in the browser or the phone's own, and says nothing when
+/// it cannot: a link that does not open is a link tapped again.
+Future<void> openLink(Uri url) async {
+  try {
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  } catch (_) {}
+}
+

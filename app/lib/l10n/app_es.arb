@@ -197,5 +197,11 @@
   "statsOverHands": "{hands, plural, =1{En 1 mano en solitario} other{En {hands} manos en solitario}}",
   "seatWhere": ", {where, select, left{a tu izquierda} across{enfrente} other{a tu derecha}}",
   "takesPoints": "{who}, {points, plural, =1{1 punto} other{{points} puntos}}",
-  "sheetRow": "{name}: {delta} en esta mano, {total} en la partida"
+  "sheetRow": "{name}: {delta} en esta mano, {total} en la partida",
+  "joinHouseholdTitle": "¿Unirse a esta suscripción?",
+  "joinHouseholdBody": "Este enlace añade este dispositivo a una suscripción de juego en vivo. Únete solo si viene de ti o de alguien con quien la compartes.",
+  "join": "Unirse",
+  "notNow": "Ahora no",
+  "privacyPolicy": "Política de privacidad",
+  "termsOfUse": "Condiciones de uso"
 }

@@ -197,5 +197,11 @@
   "statsOverHands": "{hands, plural, =1{In 1 Runde allein} other{In {hands} Runden allein}}",
   "seatWhere": ", {where, select, left{links von dir} across{dir gegenüber} other{rechts von dir}}",
   "takesPoints": "{who}, {points, plural, =1{1 Punkt} other{{points} Punkte}}",
-  "sheetRow": "{name}: {delta} in dieser Runde, {total} im Spiel"
+  "sheetRow": "{name}: {delta} in dieser Runde, {total} im Spiel",
+  "joinHouseholdTitle": "Diesem Abo beitreten?",
+  "joinHouseholdBody": "Dieser Link fügt dieses Gerät einem Live-Spiel-Abo hinzu. Tritt nur bei, wenn er von dir stammt oder von jemandem, mit dem du teilst.",
+  "join": "Beitreten",
+  "notNow": "Nicht jetzt",
+  "privacyPolicy": "Datenschutzerklärung",
+  "termsOfUse": "Nutzungsbedingungen"
 }

@@ -21,7 +21,7 @@ test('no row, or no store, is the defaults: everything open, nothing said', asyn
     assert.deepEqual(await answer.json(), CONFIG_DEFAULTS);
     assert.equal(answer.headers.get('cache-control'), 'public, max-age=60');
   }
-  assert.deepEqual(CONFIG_DEFAULTS, { v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null });
+  assert.deepEqual(CONFIG_DEFAULTS, { v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null });
 });
 
 test('the row is served, checked', async () => {
@@ -42,6 +42,8 @@ test('the row is served, checked', async () => {
     banner: row.banner,
     update: row.update,
     feedback: 'mailto:help@openhearts.example',
+    privacy: null,
+    terms: null,
   });
 });
 
@@ -78,6 +80,8 @@ test('a field that does not check out is left at its default, and the rest still
   assert.equal(configOf({ feedback: 'http://plain.example' }).feedback, null);
   assert.equal(configOf({ feedback: 'mailto:not-an-address' }).feedback, null);
   assert.equal(configOf({ feedback: 42 }).feedback, null);
+  assert.equal(configOf({ terms: 'https://legal.example/terms' }).terms, 'https://legal.example/terms');
+  assert.equal(configOf({ privacy: 'javascript:alert(1)' }).privacy, null);
 });
 
 test('a store that throws is a store with nothing in it', async () => {
@@ -91,9 +95,9 @@ test('read with GET, from the site and a dev machine', async () => {
   const post = await ask(env, { method: 'POST', body: '{}' });
   assert.equal(post.status, 405);
   assert.equal(post.headers.get('allow'), 'GET, OPTIONS');
-  const pre = await ask(env, { method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:8788' } });
+  const pre = await ask(env, { method: 'OPTIONS', headers: { origin: 'https://dev.open-hearts.pages.dev' } });
   assert.equal(pre.status, 204);
-  assert.equal(pre.headers.get('access-control-allow-origin'), 'http://127.0.0.1:8788');
+  assert.equal(pre.headers.get('access-control-allow-origin'), 'https://dev.open-hearts.pages.dev');
   assert.equal(pre.headers.get('access-control-allow-methods'), 'GET, OPTIONS');
   const elsewhere = await ask(env, { headers: { origin: 'https://evil.example' } });
   assert.equal(elsewhere.headers.get('access-control-allow-origin'), null);
