@@ -759,9 +759,11 @@ export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, 
   if (parts.length !== 3) return null;
   let header;
   let claims;
+  let sig;
   try {
     header = JSON.parse(new TextDecoder().decode(un64(parts[0])));
     claims = JSON.parse(new TextDecoder().decode(un64(parts[1])));
+    sig = un64(parts[2]);
   } catch {
     return null;
   }
@@ -777,7 +779,6 @@ export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, 
   // is at most a handful and is what a rotation looks like from here.
   const candidates = keys.filter((k) => (header.kid ? k.kid === header.kid : true) && (k.alg ?? header.alg) === header.alg);
   const signed = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
-  const sig = un64(parts[2]);
   let ok = false;
   for (const jwk of candidates) {
     try {

@@ -1042,6 +1042,14 @@ test('a sign-in binds only a key that asked to be bound, so nobody\'s account is
   }
 });
 
+test('a token whose signature is not base64 is a sign-in that does not check out, not a fall', async () => {
+  forgetProviderKeys();
+  const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
+  const good = await p.token({ sub: 'sub-1', nonce: await nonceFor(KEY) });
+  const [head, body] = good.split('.');
+  assert.equal(await whoSignedIn('google', `${head}.${body}.not*base64`, KEY, signedInAs, p.fetch), null);
+});
+
 test('local mode has a token of its own, and it is nothing anywhere else', async () => {
   const local = { ...signedInAs, OH_OPEN_HOUSE: '1' };
   assert.deepEqual(await whoSignedIn('google', 'local:sub-1', KEY, local), { provider: 'google', sub: 'sub-1' });
