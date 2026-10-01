@@ -634,6 +634,131 @@ verifies. The jury over real sockets
 plays a sealed hand from seat 2; and the browser suite's four headless
 browsers deal every hand this way.
 
+## Where the randomness comes from
+
+Every deal a player sees starts from bits drawn by `Random.secure()`:
+the operating system's generator on a phone or a desktop,
+`crypto.getRandomValues` in a browser. What is done with them depends
+on whether anybody else is at the table.
+
+**At a live table, from every seat.** Each person's device draws its
+deal secret and the seed of its own shuffle, 32 bytes each, and the
+juror holding a bot seat draws that seat's the same way. In the deal
+(`crypto/deal`) a seed drives ChaCha20, which makes the permutation and
+the remasking; the wasm has no entropy of its own and takes nothing it
+is not given. One honest shuffler is enough, so one device with a sound
+generator makes the order uniform whatever the others drew. The table's
+own seed — 31 bits, in the start event everyone signs — picks the bots
+and draws the jury, and is where the secret of a seat nobody drew for
+comes from: a secret anybody can compute, whose shuffle hides nothing
+and is not relied on to.
+
+**Alone, from one seed.** A solo game has nobody to shuffle against —
+the bots are the device's own — so there is nothing to prove to anyone,
+and the only question is whether the shuffle is a good one. It used not
+to be: a 31-bit seed for `dart:math`'s `Random`, which is not a
+cryptographic generator, so no more than 2³¹, about two billion, of the
+5.4 × 10²⁸ ways to deal four hands could ever open a game; and a
+player's own thirteen cards were enough to find the seed, by trying
+all 2³¹ — half an hour of one core — and to read every other hand from
+it. Now (`packages/engine/lib/src/deal_seed.dart`):
+
+- **The seed** is 256 bits from `Random.secure()`, drawn when the game
+  starts. That is more than the 226 bits it takes to number every order
+  of the deck, so the seed is not what limits which deals can come.
+- **The generator** is HMAC-SHA-256 keyed by the seed. Hand `h` — the
+  game's first hand is 0 — reads its words from the blocks
+
+  ```text
+      block b of hand h  =  HMAC-SHA-256(seed, "deal" ‖ h ‖ b)
+  ```
+
+  for `b` = 0, 1, 2 …, where `"deal"` is those four bytes of ASCII and
+  `h` and `b` are four bytes each, big-endian; each block is eight
+  32-bit big-endian words, taken in order. HMAC keyed by a secret is a
+  pseudorandom function: without the seed, what it gave for one input
+  says nothing about what it gives for another, so the hands dealt so
+  far say nothing about the next. Nor does one game say anything about
+  the one after it, which draws a seed of its own.
+- **The shuffle** is Fisher–Yates. The deck starts in index order —
+  clubs, diamonds, spades, hearts, two to ace in each — and for `i` from
+  51 down to 1, position `i` swaps with a position drawn from `0 … i`. A
+  draw from `0 … n−1` is the next word mod `n`, except that a word among
+  the top `2³² mod n` is thrown away and the next one taken, since those
+  would make the low numbers likelier. That is at most 48 words in four
+  billion, which is close to nothing and is still not nothing: with every
+  draw uniform, every one of the 52! orders is exactly as likely as any
+  other. Seat `s` is dealt positions `13s` to `13s + 12`, and seat 0 is
+  the player.
+- **The same on the web.** Nothing in it is wider than 32 bits, which is
+  as wide as JavaScript does bitwise arithmetic, so a browser deals what
+  the VM deals.
+
+**The record is the whole game**: the seed, the bots by name — drawn
+from the roster by the same secure generator — and the player's own
+passes and plays. The bots are deterministic, so everything else
+follows. It is kept on the device when the game ends, and **Copy
+record** on the game-over sheet hands it over as one line:
+
+```text
+oh2:<seed, 64 hex digits>:<west>,<north>,<east>:<passes>:<plays>[:<target>]
+```
+
+— the player's passes three cards each, `|` between hands and `-` for a
+hold hand; the target only when it is not fifty. A record made before
+this is `oh1`, with an int for its seed, and replays exactly as it
+always did: an int seed still means `Random`, which is also how the
+tests and the tools name a game by a small number.
+
+**To audit a game**, `cd packages/engine && dart run tool/replay.dart
+'<record>'` prints every hand as dealt and every trick played from it.
+To check the deal without any of our code, this prints hand `h` as
+dealt — a seat a line, the player first, then west, north and east —
+from Python's standard library and nothing else:
+
+```python
+import hashlib, hmac, struct, sys
+
+seed, hand = bytes.fromhex(sys.argv[1]), int(sys.argv[2])
+words = []
+for block in range(16):  # a deal needs seven blocks; sixteen is plenty
+    mac = hmac.new(seed, b'deal' + struct.pack('>II', hand, block), hashlib.sha256)
+    words += struct.unpack('>8I', mac.digest())
+deck = list(range(52))
+for i in range(51, 0, -1):
+    n = i + 1
+    while words[0] >= 2**32 - 2**32 % n:
+        words.pop(0)
+    j = words.pop(0) % n
+    deck[i], deck[j] = deck[j], deck[i]
+cards = [r + s for s in 'CDSH' for r in '2 3 4 5 6 7 8 9 10 J Q K A'.split()]
+for seat in range(4):
+    print(' '.join(cards[c] for c in sorted(deck[13 * seat:13 * seat + 13])))
+```
+
+`python3 deal.py <seed> 0` gives the same four lines as the replay's
+first hand, and so on down the game.
+
+**What it does not do.** The seed is in the device's memory from the
+first card, and in its storage once the game ends; a player who goes
+looking can find it, and with it every hand of their own game, the
+bots' included. Nothing could stop that in a game against your own
+device, and nothing here tries. What is guaranteed is the deal: drawn
+uniformly, by a generator nobody without the seed can predict, and the
+same deal on every replay, everywhere.
+
+**Tests** (`packages/engine/test/deal_seed_test.dart` and
+`solo_record_test.dart`): the generator against known answers worked
+out in Python from this description rather than from the code; a draw
+from the uneven top thrown away; every order of four cards as likely as
+every other, over twenty-four thousand shuffles; where each card lands
+over 20,000 deals, a χ² over 52 × 52 that two broken shuffles fail —
+every position swapped with any of the 52, and draws taken modulo from
+a byte; and records of both versions replaying trick for trick to what
+they replayed to when they were made, the `oh1` ones by the engine as it
+was before there was a deal seed. All of it runs in Chrome as well as on
+the VM.
+
 ## References
 
 - Shamir, Rivest and Adleman, *Mental Poker*, MIT Technical Memo

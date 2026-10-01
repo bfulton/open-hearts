@@ -25,7 +25,8 @@ class GameController extends ChangeNotifier implements TableModel {
   }
 
   /// Fixes the shuffle, so [newGame] reshuffles the same way a test
-  /// expects. Null in the app, where every game is a fresh draw.
+  /// expects: dealt by [Random] from it, as every game once was. Null in
+  /// the app, where every game is a fresh draw of a [DealSeed].
   final int? seed;
 
   /// The score this game runs to, and every game after it on this
@@ -33,10 +34,6 @@ class GameController extends ChangeNotifier implements TableModel {
   final int target;
 
   final RecordStore _store;
-
-  /// The seed this game was actually dealt from — drawn once when the
-  /// game starts, so every game has one and the record can name it.
-  late int _dealSeed;
 
   /// This game as a line of text: the deal, the bots, and the player's
   /// own passes and plays. Everything the bots did follows from those.
@@ -49,11 +46,15 @@ class GameController extends ChangeNotifier implements TableModel {
   Future<List<String>> pastRecords() => _store.load();
 
   void _start() {
-    _dealSeed = seed ?? Random().nextInt(1 << 31);
-    _game = HeartsGame(seed: _dealSeed, target: target);
-    _bots = _seatBots(_dealSeed);
+    // A player's game is dealt from 256 bits of the platform's secure
+    // generator, drawn once when it starts, and its record names them
+    // (engine, deal_seed.dart); a test's from its seed, by Random.
+    final dealSeed = seed == null ? DealSeed.draw() : null;
+    _game = HeartsGame(seed: seed, dealSeed: dealSeed, target: target);
+    _bots = _seatBots(seed == null ? Random.secure() : Random(seed));
     _record = SoloRecord(
-      seed: _dealSeed,
+      seed: seed,
+      dealSeed: dealSeed,
       personas: [for (var s = 0; s < seatCount; s++) s == humanSeat ? '' : _bots[s]!.persona.name],
       target: target,
     );
@@ -70,8 +71,10 @@ class GameController extends ChangeNotifier implements TableModel {
 
   late HeartsGame _game;
 
-  /// Who holds each seat; null at the player's. Three from the roster,
-  /// drawn by the game's seed so a seeded table is the same table.
+  /// Who holds each seat; null at the player's. Three from the roster:
+  /// drawn by a test's seed, so a seeded table is the same table, and
+  /// otherwise by the secure generator. The record names them, so
+  /// nothing has to draw them again.
   late List<Bot?> _bots;
 
   final Random _rhythm = Random();
@@ -101,8 +104,8 @@ class GameController extends ChangeNotifier implements TableModel {
   @override
   Persona? personaAt(int seat) => _bots[seat]?.persona;
 
-  static List<Bot?> _seatBots(int seed) {
-    final draw = List.of(Persona.roster)..shuffle(Random(seed));
+  static List<Bot?> _seatBots(Random random) {
+    final draw = List.of(Persona.roster)..shuffle(random);
     return [
       for (var s = 0; s < seatCount; s++)
         s == humanSeat ? null : Bot(persona: draw[s]),

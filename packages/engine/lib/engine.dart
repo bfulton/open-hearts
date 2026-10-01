@@ -8,6 +8,7 @@ library;
 export 'src/arena.dart';
 export 'src/bot.dart';
 export 'src/card.dart';
+export 'src/deal_seed.dart';
 export 'src/game.dart';
 export 'src/oblivious.dart';
 export 'src/persona.dart';
