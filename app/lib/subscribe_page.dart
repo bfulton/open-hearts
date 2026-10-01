@@ -24,6 +24,7 @@ import 'net/household.dart';
 import 'net/licence.dart';
 import 'net/remote_config.dart';
 import 'net/share.dart';
+import 'net/store_buying.dart';
 import 'theme.dart';
 import 'ui/qr_view.dart';
 
@@ -48,6 +49,7 @@ class _SubscribePageState extends State<SubscribePage> {
   /// for one and has not given it: said where the list would be,
   /// rather than leaving the "…" of a list still coming there for good.
   String? _unlisted;
+  bool _listing = false;
   Ticket? _code;
   bool _working = false;
 
@@ -55,17 +57,26 @@ class _SubscribePageState extends State<SubscribePage> {
   void initState() {
     super.initState();
     Entitlement.current.addListener(_changed);
+    StoreShop.current.addListener(_changed);
     unawaited(_load());
   }
 
   @override
   void dispose() {
     Entitlement.current.removeListener(_changed);
+    StoreShop.current.removeListener(_changed);
     super.dispose();
   }
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    // Bought on this page, in a store: the page turns into the one a
+    // subscriber sees, and that one lists the devices.
+    final me = _me;
+    if (me != null && Entitlement.current.live && _household == null && _unlisted == null && !_listing) {
+      unawaited(_list(me));
+    }
   }
 
   Future<void> _load() async {
@@ -73,7 +84,13 @@ class _SubscribePageState extends State<SubscribePage> {
     if (!mounted) return;
     setState(() => _me = me);
     if (!Entitlement.current.live) return;
+    await _list(me);
+  }
+
+  Future<void> _list(Signer me) async {
+    _listing = true;
     final said = await devicesOn(me);
+    _listing = false;
     if (!mounted) return;
     setState(() {
       _household = said.answer;
@@ -96,6 +113,18 @@ class _SubscribePageState extends State<SubscribePage> {
         _refusal = refusal.say(context.l10n);
       });
     }
+  }
+
+  /// The store's own sheet. What comes of it arrives through the shop:
+  /// a licence, which turns this page into a subscriber's, or a reason.
+  Future<void> _buyInStore() async {
+    setState(() => _refusal = null);
+    await StoreShop.current.buy();
+  }
+
+  Future<void> _restore() async {
+    setState(() => _refusal = null);
+    await StoreShop.current.restore();
   }
 
   /// To Stripe's billing portal, for a web subscription: cancelling is
@@ -157,6 +186,12 @@ class _SubscribePageState extends State<SubscribePage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final licence = Entitlement.current.licence;
+    final shop = StoreShop.current;
+    // A store build buys in its store, and a store's purchase is still
+    // being made while the sheet is up or the service is being shown it.
+    final inStore = shop.ready;
+    final waiting = _leaving || shop.busy;
+    final refusal = _refusal ?? shop.refusal?.say(l10n);
     return Scaffold(
       backgroundColor: Felt.dark,
       appBar: AppBar(
@@ -192,19 +227,44 @@ class _SubscribePageState extends State<SubscribePage> {
                     ),
                     const SizedBox(height: 26),
                     FilledButton(
-                      onPressed: _leaving ? null : _buy,
+                      onPressed: waiting ? null : (inStore ? _buyInStore : _buy),
                       style: _gold(),
-                      child: _leaving
+                      child: waiting
                           ? const SizedBox(
                               width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Felt.dark))
                           : Text(l10n.subscribe, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      canBuyHere ? l10n.cancelWhenever : l10n.storeSubscriptionLater,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
-                    ),
+                    if (inStore) ...[
+                      // What the stores require beside the button: the
+                      // price, the period, that it renews by itself, and
+                      // how to stop it.
+                      Text(
+                        l10n.storeRenewal(priceShown, shop.store!.kind.name),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
+                      ),
+                      if (shop.pending) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.storePending,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 13, height: 1.4, color: Palette.chrome),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      // Apple requires a way back to a subscription this
+                      // store account already has; a new phone needs one.
+                      TextButton(
+                        onPressed: waiting ? null : _restore,
+                        child: Text(l10n.restorePurchases),
+                      ),
+                    ] else
+                      Text(
+                        canBuyHere ? l10n.cancelWhenever : l10n.storeSubscriptionLater,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
+                      ),
                   ] else
                     ..._yours(),
                   const SizedBox(height: 14),
@@ -217,9 +277,9 @@ class _SubscribePageState extends State<SubscribePage> {
                       TextButton(onPressed: () => openLink(legalPage('terms')), child: Text(l10n.termsOfUse)),
                     ],
                   ),
-                  if (_refusal != null) ...[
+                  if (refusal != null) ...[
                     const SizedBox(height: 14),
-                    Text(_refusal!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
+                    Text(refusal, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
                   ],
                 ],
               ),
@@ -288,8 +348,22 @@ class _SubscribePageState extends State<SubscribePage> {
         ),
       ],
       // A web subscription is managed in Stripe's portal; one bought in
-      // a store, in the store's own settings.
-      if (canBuyHere) ...[
+      // a store, in the store's own settings, which is the only place it
+      // can be.
+      if (StoreShop.current.store case final store? when StoreShop.current.boughtHere) ...[
+        const SizedBox(height: 26),
+        Text(l10n.manageInStore(store.kind.name), style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim)),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: () => unawaited(openLink(store.kind.manage)),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Palette.gold,
+            side: BorderSide(color: Palette.gold.withValues(alpha: 0.5)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text(l10n.manageSubscription),
+        ),
+      ] else if (canLeaveForStripe) ...[
         const SizedBox(height: 26),
         Text(l10n.manageSubscriptionHint, style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim)),
         const SizedBox(height: 12),

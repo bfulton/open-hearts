@@ -470,6 +470,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'onAnotherSubscription':
           'Dieses Gerät gehört zu einem anderen Abo. Entferne es dort zuerst.',
       'clockOff': 'Die Uhr dieses Geräts geht falsch. Stell sie richtig und versuch es noch einmal.',
+      'notAStore': 'Diesen Store kennt der Dienst nicht.',
+      'noProof': 'Der Store hat keinen Beleg für den Kauf geliefert.',
+      'notFromStore': 'Dieser Kauf kommt nicht aus dem Store.',
+      'notPaid': 'Laut Store ist dieser Kauf nicht bezahlt.',
+      'storeNotAnswering':
+          'Der Store antwortet nicht. Versuch es gleich noch einmal.',
+      'storeNotSetUp': 'Kaufen im Store ist noch nicht geöffnet.',
       'other': 'Der Dienst hat abgelehnt.',
     });
     return '$_temp0';
@@ -995,4 +1002,45 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get managedWhereBought =>
       'Dieses Abo wird dort verwaltet, wo es gekauft wurde.';
+
+  @override
+  String get licenceNotForThisDevice =>
+      'Die Antwort des Dienstes war keine Lizenz für dieses Gerät.';
+
+  @override
+  String get storeFailed =>
+      'Der Store hat den Kauf nicht abgeschlossen. Versuch es gleich noch einmal.';
+
+  @override
+  String get nothingToRestore =>
+      'In diesem Store-Konto wurde kein Abo zum Wiederherstellen gefunden.';
+
+  @override
+  String get restorePurchases => 'Käufe wiederherstellen';
+
+  @override
+  String get storePending =>
+      'Der Store wartet noch auf die Freigabe der Zahlung. Sobald sie da ist, ist Live-Spiel hier offen.';
+
+  @override
+  String storeRenewal(String price, String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple-Konto',
+      'other': 'Google-Konto',
+    });
+    String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'des App Store',
+      'other': 'von Google Play',
+    });
+    return '$price im Jahr, abgebucht über dein $_temp0, wenn du bestätigst. Das Abo verlängert sich jedes Jahr von selbst, bis du kündigst – jederzeit, in den Abo-Einstellungen $_temp1, spätestens einen Tag vor der Verlängerung.';
+  }
+
+  @override
+  String manageInStore(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'apple': 'im App Store',
+      'other': 'bei Google Play',
+    });
+    return 'Kündigen oder ändern $_temp0.';
+  }
 }

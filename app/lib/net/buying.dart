@@ -7,9 +7,10 @@
 /// account, and nothing about the card comes back here — what comes
 /// back is a licence (licence.dart).
 ///
-/// On a phone it will be the store's own subscription, which needs the
-/// app to be in a store first: [canBuyHere] is false there for now, and
-/// says so rather than opening a checkout a phone should not be using.
+/// On a phone it is the store's own subscription (store_buying.dart),
+/// and never a checkout: [canBuyHere] is true there once the store has
+/// said what the product costs, and false until then, saying so rather
+/// than opening a checkout a phone should not be using.
 library;
 
 import 'dart:convert';
@@ -20,6 +21,7 @@ import '../l10n/l10n.dart';
 import 'household.dart' show askService;
 import 'licence.dart';
 import 'remote_config.dart';
+import 'store_buying.dart';
 import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 
@@ -29,13 +31,15 @@ import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' a
 /// paid once (doc 06).
 const priceAmount = r'$5.99';
 
-/// The price as shown: the operator's, when remote config gives one
-/// with a new Stripe price, and the build's otherwise.
-String get priceShown => RemoteSettings.current.config.price ?? priceAmount;
+/// The price as shown: the store's, in a store build, since it is the
+/// store's price that is charged and in the buyer's own currency; else
+/// the operator's, when remote config gives one with a new Stripe
+/// price; and the build's otherwise.
+String get priceShown => StoreShop.current.product?.price ?? RemoteSettings.current.config.price ?? priceAmount;
 
 /// Whether this build can take money at all: the web can, over Stripe;
-/// a phone will over its store, and does not yet.
-bool get canBuyHere => canLeaveForStripe;
+/// a phone can over its store, once the store has the product.
+bool get canBuyHere => canLeaveForStripe || StoreShop.current.ready;
 
 /// Whether this build can be sent to Stripe and brought back, and how
 /// it goes: the platform's, and a test's to replace.
@@ -92,7 +96,7 @@ enum BuyRefusal {
 /// its way there.
 Future<BuyRefusal?> buy(Signer signer, {Uri? endpoint, Uri? from, Duration? timeout}) async {
   timeout ??= waits.buy;
-  if (!canBuyHere) return BuyRefusal.notHere;
+  if (!canLeaveForStripe) return BuyRefusal.notHere;
   final url = endpoint ?? handlerAt('checkout');
   if (url == null) return BuyRefusal.notHere;
   final at = from ?? Uri.base;
@@ -123,7 +127,7 @@ Future<BuyRefusal?> buy(Signer signer, {Uri? endpoint, Uri? from, Duration? time
 /// not; null when the browser is on its way.
 Future<BuyRefusal?> manageSubscription(Signer signer, {Uri? endpoint, Uri? from, Duration? timeout}) async {
   timeout ??= waits.buy;
-  if (!canBuyHere) return BuyRefusal.notHere;
+  if (!canLeaveForStripe) return BuyRefusal.notHere;
   final url = endpoint ?? handlerAt('manage');
   if (url == null) return BuyRefusal.notHere;
   final at = from ?? Uri.base;

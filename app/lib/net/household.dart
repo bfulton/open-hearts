@@ -109,8 +109,9 @@ class Refused {
   /// answer; one the app has no words for keeps the service's own.
   factory Refused.from(String said) => Refused(_named[said] ?? 'other', said);
 
-  /// `unreachable`, `notForThisDevice`, one of the service's own named
-  /// in [_named], or `other`.
+  /// `unreachable`, `notForThisDevice`, one of the store's own
+  /// (store_buying.dart), one of the service's own named in [_named],
+  /// or `other`.
   final String reason;
 
   /// The service's own words, in English.
@@ -127,6 +128,13 @@ class Refused {
     'not a device on this subscription': 'notADevice',
     'this device is on another subscription: drop it there first': 'onAnotherSubscription',
     "this device's clock is out by more than five minutes": 'clockOff',
+    // A store's purchase brought to the service (store_buying.dart).
+    'not a store': 'notAStore',
+    'no proof': 'noProof',
+    'not from the store': 'notFromStore',
+    'not paid': 'notPaid',
+    'the store is not answering': 'storeNotAnswering',
+    'the store is not set up yet': 'storeNotSetUp',
   };
 
   /// The refusal as the player is told it.
@@ -135,6 +143,9 @@ class Refused {
     return switch (reason) {
       'unreachable' => say.serviceUnreachable,
       'notForThisDevice' => say.codeNotForThisDevice,
+      'licenceNotForThisDevice' => say.licenceNotForThisDevice,
+      'storeFailed' => say.storeFailed,
+      'nothingToRestore' => say.nothingToRestore,
       'other' => '${said![0].toUpperCase()}${said!.substring(1)}.',
       _ => say.serviceRefusal(reason),
     };
@@ -157,21 +168,22 @@ class Refused {
 Future<({int status, String body})> Function(Uri url, String body) askService = http.post;
 
 /// [what] is the part of [more] the request asks for beyond itself,
-/// which the signature covers (licence.dart, [signedAsk]).
-Future<({int status, String body})?> _ask(String handler, Signer signer, Map<String, Object?> more, Uri? endpoint,
-    {String what = ''}) async {
+/// which the signature covers (licence.dart, [signedAsk]). Null when
+/// nobody answered in [timeout] — a household's wait, unless said.
+Future<({int status, String body})?> askHandler(String handler, Signer signer, Map<String, Object?> more, Uri? endpoint,
+    {String what = '', Duration? timeout}) async {
   final url = endpoint ?? handlerAt(handler);
   if (url == null) return null;
   try {
     return await askService(url, jsonEncode({...signedAsk(signer, handler, what: what), ...more}))
-        .timeout(waits.household);
+        .timeout(timeout ?? waits.household);
   } catch (_) {
     return null;
   }
 }
 
 /// What a refusal said, in its own words where it gave any.
-Refused _why(({int status, String body})? answer) {
+Refused refusalOf(({int status, String body})? answer) {
   if (answer == null) return _unreachable;
   try {
     final json = jsonDecode(answer.body);
@@ -187,16 +199,16 @@ const _unreachable = Refused('unreachable');
 
 /// A code for another device to arrive with.
 Future<Said<Ticket>> askForCode(Signer signer, {Uri? endpoint}) async {
-  final answer = await _ask('ticket', signer, const {}, endpoint);
-  if (answer?.status != 200) return (answer: null, refusal: _why(answer));
+  final answer = await askHandler('ticket', signer, const {}, endpoint);
+  if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
   final ticket = Ticket.parse(jsonDecode(answer!.body));
   return ticket == null ? (answer: null, refusal: _unreachable) : (answer: ticket, refusal: null);
 }
 
 /// Arriving with a code: the licence it was claimed for, or why not.
 Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, String service = serviceKey}) async {
-  final answer = await _ask('claim', signer, {'ticket': code}, endpoint, what: code);
-  if (answer?.status != 200) return (answer: null, refusal: _why(answer));
+  final answer = await askHandler('claim', signer, {'ticket': code}, endpoint, what: code);
+  if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
   final licence = Licence.parse(jsonDecode(answer!.body)['licence']);
   if (licence == null || !licence.holdsFor(signer.publicKey, service: service)) {
     return (answer: null, refusal: const Refused('notForThisDevice'));
@@ -206,8 +218,8 @@ Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, Stri
 
 /// The devices on this subscription; with [drop], one fewer.
 Future<Said<Household>> devicesOn(Signer signer, {PublicKey? drop, Uri? endpoint}) async {
-  final answer = await _ask('devices', signer, {'drop': ?drop}, endpoint, what: drop ?? '');
-  if (answer?.status != 200) return (answer: null, refusal: _why(answer));
+  final answer = await askHandler('devices', signer, {'drop': ?drop}, endpoint, what: drop ?? '');
+  if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
   final household = Household.parse(jsonDecode(answer!.body));
   return household == null ? (answer: null, refusal: _unreachable) : (answer: household, refusal: null);
 }

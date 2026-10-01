@@ -462,6 +462,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'notADevice': 'Cet appareil ne fait pas partie de cet abonnement.',
       'onAnotherSubscription': 'Cet appareil fait partie d\'un autre abonnement. Retirez-le d\'abord de celui-ci.',
       'clockOff': 'L\'horloge de cet appareil n\'est pas à l\'heure. Réglez-la et réessayez.',
+      'notAStore': 'Le service ne connaît pas cette boutique.',
+      'noProof': 'La boutique n\'a fourni aucune preuve de l\'achat.',
+      'notFromStore': 'Cet achat ne vient pas de la boutique.',
+      'notPaid': 'D\'après la boutique, cet achat n\'est pas payé.',
+      'storeNotAnswering':
+          'La boutique ne répond pas. Réessayez dans un instant.',
+      'storeNotSetUp': 'L\'achat dans la boutique n\'est pas encore ouvert.',
       'other': 'Le service a refusé.',
     });
     return '$_temp0';
@@ -989,4 +996,45 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get managedWhereBought =>
       'Cet abonnement se gère là où il a été acheté.';
+
+  @override
+  String get licenceNotForThisDevice =>
+      'La réponse du service n\'était pas une licence pour cet appareil.';
+
+  @override
+  String get storeFailed =>
+      'La boutique n\'a pas terminé l\'achat. Réessayez dans un instant.';
+
+  @override
+  String get nothingToRestore =>
+      'Aucun abonnement à restaurer n\'a été trouvé sur ce compte de la boutique.';
+
+  @override
+  String get restorePurchases => 'Restaurer les achats';
+
+  @override
+  String get storePending =>
+      'La boutique attend d\'approuver le paiement. Le jeu en direct s\'ouvrira ici dès que ce sera fait.';
+
+  @override
+  String storeRenewal(String price, String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'apple': 'compte Apple',
+      'other': 'compte Google',
+    });
+    String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'de l\'App Store',
+      'other': 'de Google Play',
+    });
+    return '$price par an, débité sur votre $_temp0 à la confirmation. L\'abonnement se renouvelle tout seul chaque année jusqu\'à ce que vous le résiliiez, quand vous voulez, dans les réglages d\'abonnement $_temp1, au moins un jour avant le renouvellement.';
+  }
+
+  @override
+  String manageInStore(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'apple': 'dans l\'App Store',
+      'other': 'dans Google Play',
+    });
+    return 'Résiliez-le ou modifiez-le $_temp0.';
+  }
 }

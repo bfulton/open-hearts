@@ -88,7 +88,7 @@
   "noDealBuild": "Esta versão não consegue rodar a distribuição que mantém as cartas honestas, então não pode sentar a uma mesa ao vivo.",
   "serviceUnreachable": "Não foi possível falar com o serviço. Tente de novo daqui a pouco.",
   "codeNotForThisDevice": "Esse código não é para este aparelho.",
-  "serviceRefusal": "{reason, select, noSubscription{Nenhuma assinatura.} fiveDevices{Esta assinatura já tem todos os aparelhos que pode ter.} notACode{Isso não é um código.} noSuchCode{Esse código não existe.} codeUsed{Esse código já foi usado.} codeRunOut{Esse código expirou.} notADevice{Esse aparelho não está nesta assinatura.} onAnotherSubscription{Este aparelho está em outra assinatura. Remova-o de lá primeiro.} clockOff{O relógio deste aparelho está errado. Acerte-o e tente de novo.} other{O serviço recusou.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Nenhuma assinatura.} fiveDevices{Esta assinatura já tem todos os aparelhos que pode ter.} notACode{Isso não é um código.} noSuchCode{Esse código não existe.} codeUsed{Esse código já foi usado.} codeRunOut{Esse código expirou.} notADevice{Esse aparelho não está nesta assinatura.} onAnotherSubscription{Este aparelho está em outra assinatura. Remova-o de lá primeiro.} clockOff{O relógio deste aparelho está errado. Acerte-o e tente de novo.} notAStore{Essa não é uma loja que o serviço conheça.} noProof{A loja não deu nenhum comprovante da compra.} notFromStore{Essa compra não veio da loja.} notPaid{A loja diz que essa compra não foi paga.} storeNotAnswering{A loja não está respondendo. Tente de novo daqui a pouco.} storeNotSetUp{A compra na loja ainda não está aberta.} other{O serviço recusou.}}",
   "buyingNotOpen": "Ainda não dá para comprar neste aparelho.",
   "shopUnreachable": "Não foi possível falar com a loja. Tente de novo daqui a pouco.",
   "shopNotOpen": "A loja ainda não abriu.",
@@ -206,5 +206,12 @@
   "termsOfUse": "Termos de uso",
   "manageSubscription": "Gerenciar assinatura",
   "manageSubscriptionHint": "Cancele, troque o cartão ou veja os recibos.",
-  "managedWhereBought": "Esta assinatura é gerenciada onde foi comprada."
+  "managedWhereBought": "Esta assinatura é gerenciada onde foi comprada.",
+  "licenceNotForThisDevice": "A resposta do serviço não era uma licença para este aparelho.",
+  "storeFailed": "A loja não concluiu a compra. Tente de novo daqui a pouco.",
+  "nothingToRestore": "Nenhuma assinatura para restaurar foi encontrada nesta conta da loja.",
+  "restorePurchases": "Restaurar compras",
+  "storePending": "A loja está esperando para aprovar o pagamento. O jogo ao vivo abre aqui assim que ela aprovar.",
+  "storeRenewal": "{price} por ano, cobrados na sua {store, select, apple{conta Apple} other{conta Google}} ao confirmar. Renova sozinha a cada ano até você cancelar, quando quiser, nas assinaturas {store, select, apple{da App Store} other{do Google Play}}, pelo menos um dia antes da renovação.",
+  "manageInStore": "Cancele ou altere {store, select, apple{na App Store} other{no Google Play}}."
 }

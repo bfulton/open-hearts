@@ -321,6 +321,24 @@ service account's JSON key, as a secret), `OH_PLAY_PUSH_AUDIENCE` and
 `OH_PLAY_PUSH_EMAIL` (the push subscription's). Without them each store
 answers that it is not set up yet (503).
 
+**The store half, the app's side** (`app/lib/net/store_buying.dart`):
+Subscribe opens the store's own sheet for a yearly auto-renewing
+product (`OH_APPLE_PRODUCT`, `OH_PLAY_PRODUCT`, both `live_play_yearly`
+until the products exist), and what the store hands back — StoreKit 2's
+signed transaction, or Play's purchase token — goes to **store**, signed
+over by the device's key like every other request, and comes back a
+licence. The purchase is recorded in the store against a name made from
+the key, so the store's own notifications say which device paid:
+`h = sha256("oh-store/1\n" + key)`, Play's obfuscated account id is `h`
+in hex, and the App Store's app account token is a version-4 UUID from
+its first sixteen bytes. A purchase is finished with the store only once
+the service has taken it, or has said the proof is not from the store or
+not paid for; anything else leaves it for the store to hand back at the
+next start, or at Restore purchases. A store subscriber manages it in
+the store's own subscription settings. Until the store says what the
+product costs, `canBuyHere` is false off the web and says so rather
+than opening a checkout a phone should not be using.
+
 Three things have to be set on the project for any of it to work:
 `OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` (a yearly recurring price) and
 `OH_STRIPE_WEBHOOK_SECRET`, with the webhook pointed at `/api/stripe`

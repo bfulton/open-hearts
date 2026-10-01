@@ -88,7 +88,7 @@
   "noDealBuild": "Cette version ne peut pas exécuter la donne qui garantit des cartes honnêtes, et ne peut donc pas s'asseoir à une table en direct.",
   "serviceUnreachable": "Impossible de joindre le service. Réessayez dans un instant.",
   "codeNotForThisDevice": "Ce code n'est pas pour cet appareil.",
-  "serviceRefusal": "{reason, select, noSubscription{Aucun abonnement.} fiveDevices{Cet abonnement a déjà tous les appareils qu'il peut avoir.} notACode{Ce n'est pas un code.} noSuchCode{Ce code n'existe pas.} codeUsed{Ce code a déjà servi.} codeRunOut{Ce code a expiré.} notADevice{Cet appareil ne fait pas partie de cet abonnement.} onAnotherSubscription{Cet appareil fait partie d'un autre abonnement. Retirez-le d'abord de celui-ci.} clockOff{L'horloge de cet appareil n'est pas à l'heure. Réglez-la et réessayez.} other{Le service a refusé.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Aucun abonnement.} fiveDevices{Cet abonnement a déjà tous les appareils qu'il peut avoir.} notACode{Ce n'est pas un code.} noSuchCode{Ce code n'existe pas.} codeUsed{Ce code a déjà servi.} codeRunOut{Ce code a expiré.} notADevice{Cet appareil ne fait pas partie de cet abonnement.} onAnotherSubscription{Cet appareil fait partie d'un autre abonnement. Retirez-le d'abord de celui-ci.} clockOff{L'horloge de cet appareil n'est pas à l'heure. Réglez-la et réessayez.} notAStore{Le service ne connaît pas cette boutique.} noProof{La boutique n'a fourni aucune preuve de l'achat.} notFromStore{Cet achat ne vient pas de la boutique.} notPaid{D'après la boutique, cet achat n'est pas payé.} storeNotAnswering{La boutique ne répond pas. Réessayez dans un instant.} storeNotSetUp{L'achat dans la boutique n'est pas encore ouvert.} other{Le service a refusé.}}",
   "buyingNotOpen": "L'achat n'est pas encore possible sur cet appareil.",
   "shopUnreachable": "Impossible de joindre la boutique. Réessayez dans un instant.",
   "shopNotOpen": "La boutique n'est pas encore ouverte.",
@@ -206,5 +206,12 @@
   "termsOfUse": "Conditions d'utilisation",
   "manageSubscription": "Gérer l'abonnement",
   "manageSubscriptionHint": "Résiliez, changez de carte ou consultez les reçus.",
-  "managedWhereBought": "Cet abonnement se gère là où il a été acheté."
+  "managedWhereBought": "Cet abonnement se gère là où il a été acheté.",
+  "licenceNotForThisDevice": "La réponse du service n'était pas une licence pour cet appareil.",
+  "storeFailed": "La boutique n'a pas terminé l'achat. Réessayez dans un instant.",
+  "nothingToRestore": "Aucun abonnement à restaurer n'a été trouvé sur ce compte de la boutique.",
+  "restorePurchases": "Restaurer les achats",
+  "storePending": "La boutique attend d'approuver le paiement. Le jeu en direct s'ouvrira ici dès que ce sera fait.",
+  "storeRenewal": "{price} par an, débité sur votre {store, select, apple{compte Apple} other{compte Google}} à la confirmation. L'abonnement se renouvelle tout seul chaque année jusqu'à ce que vous le résiliiez, quand vous voulez, dans les réglages d'abonnement {store, select, apple{de l'App Store} other{de Google Play}}, au moins un jour avant le renouvellement.",
+  "manageInStore": "Résiliez-le ou modifiez-le {store, select, apple{dans l'App Store} other{dans Google Play}}."
 }

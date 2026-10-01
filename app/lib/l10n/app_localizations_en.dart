@@ -462,6 +462,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'onAnotherSubscription':
           'This device is on another subscription. Drop it there first.',
       'clockOff': 'This device\'s clock is out. Set it right and try again.',
+      'notAStore': 'That is not a store the service knows.',
+      'noProof': 'The store gave nothing to show for the purchase.',
+      'notFromStore': 'That purchase did not come from the store.',
+      'notPaid': 'The store says that purchase is not paid for.',
+      'storeNotAnswering': 'The store is not answering. Try again in a moment.',
+      'storeNotSetUp': 'Buying in the store is not open yet.',
       'other': 'The service turned that down.',
     });
     return '$_temp0';
@@ -983,4 +989,45 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get managedWhereBought =>
       'This subscription is managed where it was bought.';
+
+  @override
+  String get licenceNotForThisDevice =>
+      'The service\'s answer was not a licence for this device.';
+
+  @override
+  String get storeFailed =>
+      'The store did not finish the purchase. Try again in a moment.';
+
+  @override
+  String get nothingToRestore =>
+      'No subscription to restore was found in this store account.';
+
+  @override
+  String get restorePurchases => 'Restore purchases';
+
+  @override
+  String get storePending =>
+      'The store is waiting to approve the payment. Live play opens here as soon as it does.';
+
+  @override
+  String storeRenewal(String price, String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple Account',
+      'other': 'Google account',
+    });
+    String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'the App Store\'s',
+      'other': 'Google Play\'s',
+    });
+    return '$price a year, charged to your $_temp0 when you confirm. It renews by itself every year until you cancel, which you can do whenever you like in $_temp1 subscription settings, at least a day before it renews.';
+  }
+
+  @override
+  String manageInStore(String store) {
+    String _temp0 = intl.Intl.selectLogic(store, {
+      'apple': 'the App Store',
+      'other': 'Google Play',
+    });
+    return 'Cancel or change it in $_temp0.';
+  }
 }
