@@ -63,6 +63,24 @@ void main() {
     }
   });
 
+  test('a handler that never answers is given its few seconds, and STUN alone after', () async {
+    // It takes the request and says nothing: a worker that has hung. The
+    // credentials are fetched beside the relays rather than in front of
+    // them (home_page.dart), so nothing on the screen waits on this —
+    // but a table started later still has to have something to dial with.
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((_) {});
+    try {
+      final began = DateTime.now();
+      final servers = await iceServersFor(signer,
+          endpoint: Uri.parse('http://127.0.0.1:${server.port}/api/turn'), timeout: const Duration(milliseconds: 300));
+      expect(servers, stunOnly);
+      expect(DateTime.now().difference(began), lessThan(const Duration(seconds: 3)));
+    } finally {
+      await server.close(force: true);
+    }
+  });
+
   test('no endpoint, no servers: localhost connects directly', () async {
     expect(await iceServersFor(signer), isEmpty);
   });
