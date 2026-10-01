@@ -2,7 +2,7 @@
 // test runner: node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import worker, { CONFIG_DEFAULTS, configOf } from './worker.mjs';
+import worker, { CONFIG_DEFAULTS, TABLE_TIMING_BOUNDS, configOf } from './worker.mjs';
 
 /// Cloudflare KV as the worker reads it: a JSON value by key.
 const kvWith = (rows) => ({
@@ -97,4 +97,32 @@ test('read with GET, from the site and a dev machine', async () => {
   assert.equal(pre.headers.get('access-control-allow-methods'), 'GET, OPTIONS');
   const elsewhere = await ask(env, { headers: { origin: 'https://evil.example' } });
   assert.equal(elsewhere.headers.get('access-control-allow-origin'), null);
+});
+
+test('a table timing is served whole where every field checks out, and left out where any does not', () => {
+  const table = { graceMs: 10000, bankMs: 90000, botActsMs: 20000 };
+  assert.deepEqual(configOf({ table }).table, table);
+  assert.deepEqual(configOf({ table: { ...table, later: 'a later build' } }).table, table, 'names it does not know are dropped');
+  for (const bad of [
+    { graceMs: 1000 },
+    { graceMs: 61000 },
+    { bankMs: '45000' },
+    { fixedMs: 40000.5 },
+    { graceMs: 10000, silenceMs: null },
+    { jurorsWaitMs: 20000, jurorsWaitAgainMs: 30000 },
+    { jurorsWaitAgainMs: 50000 },
+  ]) {
+    assert.equal('table' in configOf({ table: bad }), false, JSON.stringify(bad));
+  }
+  for (const nothing of [null, 'fast', [6000], {}]) {
+    assert.equal('table' in configOf({ table: nothing }), false);
+  }
+  assert.equal('table' in configOf({}), false, 'absent is the standard table, and says nothing');
+  // The edges are in.
+  const least = Object.fromEntries(Object.entries(TABLE_TIMING_BOUNDS).map(([k, [lo]]) => [k, lo]));
+  const most = Object.fromEntries(Object.entries(TABLE_TIMING_BOUNDS).map(([k, [, hi]]) => [k, hi]));
+  assert.deepEqual(configOf({ table: least }).table, least);
+  assert.deepEqual(configOf({ table: { ...most, jurorsWaitAgainMs: 60000 } }).table, { ...most, jurorsWaitAgainMs: 60000 });
+  // And the rest of the row is served regardless.
+  assert.equal(configOf({ live: false, table: { graceMs: 1 } }).live, false);
 });

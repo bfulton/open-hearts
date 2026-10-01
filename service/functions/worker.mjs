@@ -1066,7 +1066,48 @@ export function configOf(raw) {
       if (page || mail) c.feedback = u.toString();
     } catch {}
   }
+  // The clocks of the tables a device starts: served only where the
+  // whole of it checks out, and left out otherwise, which the app
+  // reads as the standard table.
+  const table = tableTimingOf(raw.table);
+  if (table) c.table = table;
   return c;
+}
+
+/// What each of a table's clocks may be, in milliseconds, least and
+/// most: the same bounds the table package parses a start event by
+/// (packages/table/lib/src/timing.dart, TableTiming.bounds).
+export const TABLE_TIMING_BOUNDS = Object.freeze({
+  graceMs: [2000, 60000],
+  passGraceMs: [2000, 120000],
+  bankMs: [10000, 300000],
+  fixedMs: [15000, 120000],
+  botActsMs: [5000, 60000],
+  botDealsMs: [15000, 120000],
+  quorumLostMs: [10000, 120000],
+  silenceMs: [30000, 600000],
+  jurorSilenceMs: [10000, 120000],
+  jurorsWaitMs: [20000, 180000],
+  jurorsWaitAgainMs: [10000, 60000],
+});
+
+/// A table's timing as the operator wrote it, or null: all or nothing,
+/// as a seat reads it — one field of the wrong type or out of bounds,
+/// or a second wait for jurors longer than the first, and none of it is
+/// served. Names it does not know are dropped.
+function tableTimingOf(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  for (const [name, [least, most]] of Object.entries(TABLE_TIMING_BOUNDS)) {
+    if (!(name in raw)) continue;
+    const v = raw[name];
+    if (!Number.isInteger(v) || v < least || v > most) return null;
+    out[name] = v;
+  }
+  const wait = out.jurorsWaitMs ?? 40000;
+  const again = out.jurorsWaitAgainMs ?? 10000;
+  if (again > wait) return null;
+  return Object.keys(out).length ? out : null;
 }
 
 async function configRoute(request, env) {
