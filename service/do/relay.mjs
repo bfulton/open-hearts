@@ -31,6 +31,27 @@ export const maxSubscriptions = 8;
 /// without end; past the cap it drops back to the ids actually kept.
 export const rememberedIds = 40000;
 
+/// What the object (worker.mjs) holds one socket to. The node host under
+/// the suites carries whole tables, whose deal is the big one, and asks
+/// for no limits; the object carries presence, whose largest event is a
+/// summons of a few kilobytes, for everyone on the tag at once — and
+/// takes a socket from anybody. Cloudflare hands an object messages of
+/// up to 32 MiB, and an event that matches presence is sent on to
+/// every device listening, on the one thread they all share.
+export const objectLimits = {
+  /// The longest message read at all, in characters.
+  message: 64 * 1024,
+  /// The longest REQ: its id and its filters are what the socket
+  /// carries through hibernation, and eight of these sit well inside
+  /// the 16 KiB an attachment may be.
+  request: 1024,
+  /// Events one socket may publish at once, and then each second. A
+  /// device beats every five seconds and summons a draw's jurors
+  /// together; a flood is refused before its signature is checked.
+  burst: 30,
+  perSecond: 2,
+};
+
 /// What may name an object: one path segment, and the characters a
 /// table id, a pool or a topic are made of. A tag is a name in a
 /// global namespace, so it is worth being strict about — everything
@@ -211,7 +232,10 @@ export function memoryStore(keep = 10000) {
 /// hibernating object — hands each one back through [open] with the
 /// subscriptions it was carrying. [refuse] may answer with a promise:
 /// the node host asks the Dart test that installed the policy.
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null }) {
+///
+/// [limits] is [objectLimits], or null for none; [now] is the clock
+/// the rate is measured by.
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -222,16 +246,39 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
   /// before it would miss it.
   const turns = new Map();
   const seen = new Set();
+  /// socket -> {tokens, at}: what it may still publish under [limits].
+  const buckets = new Map();
 
-  const send = (socket, message) => {
+  const sendText = (socket, text) => {
     try {
-      socket.send(JSON.stringify(message));
+      socket.send(text);
     } catch {
       // A socket on its way out; its close will drop it.
     }
   };
+  const send = (socket, message) => sendText(socket, JSON.stringify(message));
+
+  /// Whether [socket] may publish one more event now, taking it if so.
+  /// The bucket refills with time; a socket that went quiet has its
+  /// whole burst back.
+  function spend(socket) {
+    if (!limits) return true;
+    const t = now();
+    const bucket = buckets.get(socket) ?? { tokens: limits.burst, at: t };
+    bucket.tokens = Math.min(limits.burst, bucket.tokens + ((t - bucket.at) / 1000) * limits.perSecond);
+    bucket.at = t;
+    buckets.set(socket, bucket);
+    if (bucket.tokens < 1) return false;
+    bucket.tokens -= 1;
+    return true;
+  }
 
   async function publish(from, json) {
+    // Before the signature, which is the expensive part of an event.
+    if (!spend(from)) {
+      const id = json && typeof json === 'object' && typeof json.id === 'string' ? json.id : '';
+      return send(from, ['OK', id, false, 'rate-limited: slow down']);
+    }
     const event = await checkEvent(json, verify);
     if (!event) {
       const id = json && typeof json === 'object' ? json.id : null;
@@ -257,10 +304,12 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       for (const id of stored) seen.add(id);
     }
     send(from, ['OK', event.id, true, '']);
+    // Written out once, not once a listener: the same text either way.
+    const wire = JSON.stringify(event);
     for (const [socket, subscriptions] of sockets) {
       for (const [id, sub] of subscriptions) {
         if (sub.filters.some((f) => matches(f, event))) {
-          send(socket, ['EVENT', id, event]);
+          sendText(socket, `["EVENT",${JSON.stringify(id)},${wire}]`);
           break;
         }
       }
@@ -289,6 +338,8 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
   }
 
   async function handle(socket, raw) {
+    // Not read at all past the limit: parsing it is the cost.
+    if (limits && raw.length > limits.message) return send(socket, ['NOTICE', 'too big: this relay carries presence']);
     let message;
     try {
       message = JSON.parse(raw);
@@ -304,6 +355,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
         return publish(socket, message[1]);
       case 'REQ':
         if (message.length < 3 || typeof message[1] !== 'string') return send(socket, ['NOTICE', 'REQ takes an id and filters']);
+        if (limits && raw.length > limits.request) return send(socket, ['NOTICE', 'too big: a subscription is carried through hibernation']);
         return request(socket, message);
       case 'CLOSE':
         if (message.length === 2 && typeof message[1] === 'string') sockets.get(socket)?.delete(message[1]);
@@ -344,6 +396,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     close(socket) {
       sockets.delete(socket);
       turns.delete(socket);
+      buckets.delete(socket);
       log?.(`closed (${sockets.size})`);
     },
 
@@ -362,4 +415,19 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       return store ? store.size : 0;
     },
   };
+}
+
+/// The relay the object runs (worker.mjs), built here so that what the
+/// tests build is that relay and not one set up to look like it:
+/// nothing written down, nothing but the ephemeral kinds, and every
+/// socket held to [objectLimits].
+export function objectRelay(verify, { now = Date.now } = {}) {
+  return createRelay({
+    verify,
+    store: null,
+    refuse: (event) =>
+      ephemeral(event.kind) ? null : 'blocked: this relay carries ephemeral kinds; the stored ones live on the relays',
+    limits: objectLimits,
+    now,
+  });
 }

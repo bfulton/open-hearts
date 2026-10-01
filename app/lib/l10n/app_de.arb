@@ -88,7 +88,7 @@
   "noDealBuild": "Diese Version kann das Austeilen, das die Karten ehrlich hält, nicht ausführen und darum an keinem Live-Tisch sitzen.",
   "serviceUnreachable": "Der Dienst ist nicht erreichbar. Versuch es gleich noch einmal.",
   "codeNotForThisDevice": "Dieser Code ist nicht für dieses Gerät.",
-  "serviceRefusal": "{reason, select, noSubscription{Kein Abo.} fiveDevices{Schon fünf Geräte.} notACode{Das ist kein Code.} noSuchCode{Diesen Code gibt es nicht.} codeUsed{Dieser Code wurde schon benutzt.} codeRunOut{Dieser Code ist abgelaufen.} notADevice{Dieses Gerät gehört nicht zu diesem Abo.} other{Der Dienst hat abgelehnt.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Kein Abo.} fiveDevices{Schon fünf Geräte.} notACode{Das ist kein Code.} noSuchCode{Diesen Code gibt es nicht.} codeUsed{Dieser Code wurde schon benutzt.} codeRunOut{Dieser Code ist abgelaufen.} notADevice{Dieses Gerät gehört nicht zu diesem Abo.} onAnotherSubscription{Dieses Gerät gehört zu einem anderen Abo. Entferne es dort zuerst.} clockOff{Die Uhr dieses Geräts geht mehr als fünf Minuten falsch. Stell sie richtig und versuch es noch einmal.} other{Der Dienst hat abgelehnt.}}",
   "buyingNotOpen": "Auf diesem Gerät kann man noch nicht kaufen.",
   "shopUnreachable": "Der Shop ist nicht erreichbar. Versuch es gleich noch einmal.",
   "shopNotOpen": "Der Shop ist noch nicht geöffnet.",

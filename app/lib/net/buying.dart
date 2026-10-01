@@ -86,7 +86,7 @@ Future<BuyRefusal?> buy(Signer signer, {Uri? endpoint, Uri? from, Duration timeo
         .postJson(
             url,
             jsonEncode({
-              'key': signer.publicKey,
+              ...signedAsk(signer, 'checkout'),
               'back': returnAddress(at, bought: true),
               'cancelled': returnAddress(at, bought: false),
             }))

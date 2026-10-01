@@ -15,5 +15,9 @@ measurements/*/wasm/target/
 node_modules/
 .wrangler/
 
+# The service's signing secret, as bin/service_key.dart writes it for
+# one paste into the project's secrets. Never a commit.
+service.secret
+
 # OS
 .DS_Store

@@ -459,6 +459,8 @@ class AppLocalizationsFr extends AppLocalizations {
       'codeUsed': 'Ce code a déjà servi.',
       'codeRunOut': 'Ce code a expiré.',
       'notADevice': 'Cet appareil ne fait pas partie de cet abonnement.',
+      'onAnotherSubscription': 'Cet appareil fait partie d\'un autre abonnement. Retirez-le d\'abord de celui-ci.',
+      'clockOff': 'L\'horloge de cet appareil a plus de cinq minutes d\'écart. Réglez-la et réessayez.',
       'other': 'Le service a refusé.',
     });
     return '$_temp0';

@@ -26,7 +26,7 @@
 
 import wasm from '../../app/web/schnorr.wasm';
 
-import { createRelay, ephemeral, schnorrVerifier, tagOf } from './relay.mjs';
+import { objectRelay, schnorrVerifier, tagOf } from './relay.mjs';
 
 export class TagRelay {
   constructor(state) {
@@ -45,14 +45,12 @@ export class TagRelay {
   }
 
   /// The sockets this object already holds are handed back to the new
-  /// relay with the subscriptions they were carrying.
+  /// relay with the subscriptions they were carrying. What the relay
+  /// takes from each of them is bounded (relay.mjs, objectLimits): the
+  /// tag is open to anybody, and every device on it shares this one
+  /// thread.
   async build() {
-    const relay = createRelay({
-      verify: await schnorrVerifier(wasm),
-      store: null,
-      refuse: (event) =>
-        ephemeral(event.kind) ? null : 'blocked: this relay carries ephemeral kinds; the stored ones live on the relays',
-    });
+    const relay = objectRelay(await schnorrVerifier(wasm));
     for (const socket of this.state.getWebSockets()) relay.open(socket, socket.deserializeAttachment());
     return relay;
   }

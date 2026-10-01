@@ -124,6 +124,8 @@ class Refused {
     'that code has been used': 'codeUsed',
     'that code has run out': 'codeRunOut',
     'not a device on this subscription': 'notADevice',
+    'this device is on another subscription: drop it there first': 'onAnotherSubscription',
+    "this device's clock is out by more than five minutes": 'clockOff',
   };
 
   /// The refusal as the player is told it.
@@ -153,11 +155,15 @@ class Refused {
 /// the service it stands up has to go here rather than on a port.
 Future<({int status, String body})> Function(Uri url, String body) askService = http.post;
 
-Future<({int status, String body})?> _ask(String handler, Signer signer, Map<String, Object?> more, Uri? endpoint) async {
+/// [what] is the part of [more] the request asks for beyond itself,
+/// which the signature covers (licence.dart, [signedAsk]).
+Future<({int status, String body})?> _ask(String handler, Signer signer, Map<String, Object?> more, Uri? endpoint,
+    {String what = ''}) async {
   final url = endpoint ?? handlerAt(handler);
   if (url == null) return null;
   try {
-    return await askService(url, jsonEncode({'key': signer.publicKey, ...more})).timeout(const Duration(seconds: 10));
+    return await askService(url, jsonEncode({...signedAsk(signer, handler, what: what), ...more}))
+        .timeout(const Duration(seconds: 10));
   } catch (_) {
     return null;
   }
@@ -188,7 +194,7 @@ Future<Said<Ticket>> askForCode(Signer signer, {Uri? endpoint}) async {
 
 /// Arriving with a code: the licence it was claimed for, or why not.
 Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, String service = serviceKey}) async {
-  final answer = await _ask('claim', signer, {'ticket': code}, endpoint);
+  final answer = await _ask('claim', signer, {'ticket': code}, endpoint, what: code);
   if (answer?.status != 200) return (answer: null, refusal: _why(answer));
   final licence = Licence.parse(jsonDecode(answer!.body)['licence']);
   if (licence == null || !licence.holdsFor(signer.publicKey, service: service)) {
@@ -199,7 +205,7 @@ Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, Stri
 
 /// The devices on this subscription; with [drop], one fewer.
 Future<Said<Household>> devicesOn(Signer signer, {PublicKey? drop, Uri? endpoint}) async {
-  final answer = await _ask('devices', signer, {'drop': ?drop}, endpoint);
+  final answer = await _ask('devices', signer, {'drop': ?drop}, endpoint, what: drop ?? '');
   if (answer?.status != 200) return (answer: null, refusal: _why(answer));
   final household = Household.parse(jsonDecode(answer!.body));
   return household == null ? (answer: null, refusal: _unreachable) : (answer: household, refusal: null);

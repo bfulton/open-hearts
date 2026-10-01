@@ -635,7 +635,7 @@ abstract class AppLocalizations {
   /// Why the server turned down a request about a subscription's devices.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, noSubscription{No subscription.} fiveDevices{Five devices already.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} other{The service turned that down.}}'**
+  /// **'{reason, select, noSubscription{No subscription.} fiveDevices{Five devices already.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device\'s clock is more than five minutes out. Set it right and try again.} other{The service turned that down.}}'**
   String serviceRefusal(String reason);
 
   /// Shown when live play cannot be bought on this device.

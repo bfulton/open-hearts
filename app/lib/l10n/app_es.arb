@@ -88,7 +88,7 @@
   "noDealBuild": "Esta versión no puede ejecutar el reparto que mantiene honestas las cartas, así que no puede sentarse a una mesa en vivo.",
   "serviceUnreachable": "No se pudo contactar con el servicio. Inténtalo de nuevo en un momento.",
   "codeNotForThisDevice": "Ese código no es para este dispositivo.",
-  "serviceRefusal": "{reason, select, noSubscription{No hay suscripción.} fiveDevices{Ya hay cinco dispositivos.} notACode{Eso no es un código.} noSuchCode{Ese código no existe.} codeUsed{Ese código ya se usó.} codeRunOut{Ese código ha caducado.} notADevice{Ese dispositivo no está en esta suscripción.} other{El servicio lo rechazó.}}",
+  "serviceRefusal": "{reason, select, noSubscription{No hay suscripción.} fiveDevices{Ya hay cinco dispositivos.} notACode{Eso no es un código.} noSuchCode{Ese código no existe.} codeUsed{Ese código ya se usó.} codeRunOut{Ese código ha caducado.} notADevice{Ese dispositivo no está en esta suscripción.} onAnotherSubscription{Este dispositivo está en otra suscripción. Quítalo de allí primero.} clockOff{El reloj de este dispositivo va desfasado más de cinco minutos. Ajústalo y vuelve a intentarlo.} other{El servicio lo rechazó.}}",
   "buyingNotOpen": "Todavía no se puede comprar en este dispositivo.",
   "shopUnreachable": "No se pudo contactar con la tienda. Inténtalo de nuevo en un momento.",
   "shopNotOpen": "La tienda aún no está abierta.",

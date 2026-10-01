@@ -466,6 +466,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'codeUsed': 'Dieser Code wurde schon benutzt.',
       'codeRunOut': 'Dieser Code ist abgelaufen.',
       'notADevice': 'Dieses Gerät gehört nicht zu diesem Abo.',
+      'onAnotherSubscription':
+          'Dieses Gerät gehört zu einem anderen Abo. Entferne es dort zuerst.',
+      'clockOff': 'Die Uhr dieses Geräts geht mehr als fünf Minuten falsch. Stell sie richtig und versuch es noch einmal.',
       'other': 'Der Dienst hat abgelehnt.',
     });
     return '$_temp0';

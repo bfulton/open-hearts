@@ -88,7 +88,7 @@
   "noDealBuild": "Cette version ne peut pas exécuter la donne qui garantit des cartes honnêtes, et ne peut donc pas s'asseoir à une table en direct.",
   "serviceUnreachable": "Impossible de joindre le service. Réessayez dans un instant.",
   "codeNotForThisDevice": "Ce code n'est pas pour cet appareil.",
-  "serviceRefusal": "{reason, select, noSubscription{Aucun abonnement.} fiveDevices{Déjà cinq appareils.} notACode{Ce n'est pas un code.} noSuchCode{Ce code n'existe pas.} codeUsed{Ce code a déjà servi.} codeRunOut{Ce code a expiré.} notADevice{Cet appareil ne fait pas partie de cet abonnement.} other{Le service a refusé.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Aucun abonnement.} fiveDevices{Déjà cinq appareils.} notACode{Ce n'est pas un code.} noSuchCode{Ce code n'existe pas.} codeUsed{Ce code a déjà servi.} codeRunOut{Ce code a expiré.} notADevice{Cet appareil ne fait pas partie de cet abonnement.} onAnotherSubscription{Cet appareil fait partie d'un autre abonnement. Retirez-le d'abord de celui-ci.} clockOff{L'horloge de cet appareil a plus de cinq minutes d'écart. Réglez-la et réessayez.} other{Le service a refusé.}}",
   "buyingNotOpen": "L'achat n'est pas encore possible sur cet appareil.",
   "shopUnreachable": "Impossible de joindre la boutique. Réessayez dans un instant.",
   "shopNotOpen": "La boutique n'est pas encore ouverte.",

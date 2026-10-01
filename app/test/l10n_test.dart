@@ -148,7 +148,10 @@ void main() {
         expect({for (final c in engine.Card.deck) words.cardInSentence(c)}, hasLength(52));
         expect({for (final s in engine.Suit.values) words.refuseFollowSuit(s.name)}, hasLength(4));
         expect({for (final d in engine.PassDirection.values) words.pass(d)}, hasLength(4));
-        const named = ['noSubscription', 'fiveDevices', 'notACode', 'noSuchCode', 'codeUsed', 'codeRunOut', 'notADevice', 'other'];
+        const named = [
+          'noSubscription', 'fiveDevices', 'notACode', 'noSuchCode', 'codeUsed', 'codeRunOut', 'notADevice', //
+          'onAnotherSubscription', 'clockOff', 'other',
+        ];
         expect({for (final r in named) words.serviceRefusal(r)}, hasLength(named.length));
         expect({for (final p in [1, 6, 15, 40]) words.paceLine(Pace(secondsPerCard: p.toDouble(), cards: 30))}, hasLength(4));
         expect(words.paceLine(Pace.fresh), words.paceUnknown);

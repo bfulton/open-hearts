@@ -155,6 +155,28 @@ Uri? handlerFor(String handler, Uri at) {
   return Uri(scheme: at.scheme, host: at.host, port: at.hasPort ? at.port : null, path: '/api/$handler');
 }
 
+/// What every handler is asked with: this device's key, the second the
+/// request is made, and the key's signature over both and over what is
+/// asked for — the code being spent, the device being dropped — or
+/// nothing (service/functions/worker.mjs, "who is asking").
+///
+/// A key is public: it signs every event this device says at a table,
+/// and the relays hand those to anybody. So the service acts for a key
+/// only on a request the key signed, or anybody who had read it could
+/// list this device's household, drop it, or make a code against what
+/// it paid for.
+Map<String, Object?> signedAsk(Signer signer, String handler, {String what = '', DateTime? now}) {
+  final at = (now ?? DateTime.now()).millisecondsSinceEpoch ~/ 1000;
+  return {'key': signer.publicKey, 'at': at, 'sig': signer.sign(requestDigest(handler, signer.publicKey, at, what))};
+}
+
+/// The hash a request's signature is over. A line each, and none of
+/// them can hold a newline but the last, so there is one way to read
+/// it; the handler is in it, so a licence request is never spent as a
+/// request for a code.
+String requestDigest(String handler, PublicKey key, int at, [String what = '']) =>
+    sha256Hex(utf8.encode('oh-request/1\n$handler\n$key\n$at\n$what'));
+
 /// This device's licence as the service will give it: the current one,
 /// or null when the service says there is no subscription behind the
 /// key, when it cannot be reached, or when what comes back is not a
@@ -168,7 +190,7 @@ Future<Licence?> fetchLicence(Signer signer,
   final url = endpoint ?? handlerAt('licence');
   if (url == null) return null;
   try {
-    final body = await http.postJson(url, jsonEncode({'key': signer.publicKey})).timeout(timeout);
+    final body = await http.postJson(url, jsonEncode(signedAsk(signer, 'licence'))).timeout(timeout);
     if (body == null) return null;
     final json = jsonDecode(body);
     if (json is! Map) return null;

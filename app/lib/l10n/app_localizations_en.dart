@@ -459,6 +459,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'codeUsed': 'That code has been used.',
       'codeRunOut': 'That code has run out.',
       'notADevice': 'Not a device on this subscription.',
+      'onAnotherSubscription':
+          'This device is on another subscription. Drop it there first.',
+      'clockOff': 'This device\'s clock is more than five minutes out. Set it right and try again.',
       'other': 'The service turned that down.',
     });
     return '$_temp0';

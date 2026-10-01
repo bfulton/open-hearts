@@ -460,6 +460,9 @@ class AppLocalizationsPt extends AppLocalizations {
       'codeUsed': 'Esse código já foi usado.',
       'codeRunOut': 'Esse código expirou.',
       'notADevice': 'Esse aparelho não está nesta assinatura.',
+      'onAnotherSubscription':
+          'Este aparelho está em outra assinatura. Remova-o de lá primeiro.',
+      'clockOff': 'O relógio deste aparelho está mais de cinco minutos errado. Acerte-o e tente de novo.',
       'other': 'O serviço recusou.',
     });
     return '$_temp0';
