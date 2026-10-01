@@ -8,7 +8,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:engine/engine.dart' show botPolicyVersion;
+import 'package:engine/engine.dart' show Persona, botPolicyVersion;
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/avatar.dart';
@@ -178,6 +178,68 @@ void main() {
         r.dispose();
       }
     });
+  });
+
+  test('the leader\'s clocks are the table\'s: its timing rides in the start event', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      // Two devices whose remote configs say different clocks. Only the
+      // one that starts the table has a say, as with the score.
+      final quick = TableTiming.parse({'graceMs': 3000, 'botActsMs': 8000});
+      final rooms = [
+        for (final n in ['Ada', 'Bao'])
+          Room(
+              canDeal: true,
+              channel: bus.attach(FakeSigner(n)),
+              code: 'ROOM',
+              myName: n,
+              timing: n == 'Ada' ? quick : TableTiming.standard,
+              nowMs: now)
+      ];
+      async.elapse(const Duration(seconds: 14));
+      final leader = rooms.firstWhere((r) => r.amLeader);
+      for (final r in rooms) {
+        expect(r.spec!.timing, leader.timing, reason: 'one table, one set of clocks');
+      }
+      for (final r in rooms) {
+        r.dispose();
+      }
+    });
+  });
+
+  test('a start that says no timing, or one out of bounds, is the standard table', () {
+    for (final said in <Object?>[null, {'graceMs': 500}, {'bankMs': '45000'}, 'quick']) {
+      fakeAsync((async) {
+        final bus = Bus();
+        int now() => async.elapsed.inMilliseconds;
+        final ada = FakeSigner('Ada');
+        final zed = FakeSigner('Zed');
+        final room = Room(canDeal: true, channel: bus.attach(ada), code: 'ROOM', myName: 'Ada', nowMs: now);
+        async.elapse(const Duration(seconds: 1));
+        // A start by another build: everything a start says, and the
+        // timing as given.
+        bus.attach(zed).announce({
+          'kind': 'start',
+          'seed': 7,
+          'seats': [
+            {'key': ada.publicKey, 'name': 'Ada'},
+            {'key': zed.publicKey, 'name': 'Zed'},
+            {'bot': Persona.roster[0].id},
+            {'bot': Persona.roster[1].id},
+          ],
+          'policy': botPolicyVersion,
+          'sealed': true,
+          'target': 50,
+          'at': now(),
+          'timing': ?said,
+        });
+        async.elapse(const Duration(seconds: 1));
+        expect(room.spec, isNotNull, reason: '$said');
+        expect(room.spec!.timing, TableTiming.standard, reason: '$said');
+        room.dispose();
+      });
+    }
   });
 
   test('the seat you get is drawn, not won by arriving first', () {

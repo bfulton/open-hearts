@@ -16,6 +16,7 @@ import 'package:open_hearts/net/relays.dart';
 import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table/table.dart' show TableTiming;
 
 import 'home_page_test.dart' show licenceThisDevice;
 
@@ -96,6 +97,18 @@ void main() {
     expect(RemoteConfig.parse({'banner': {'id': 'x', 'text': {'de': 'nur Deutsch'}}}).banner, isNull);
     expect(RemoteConfig.parse({'banner': {'text': {'en': 'no id'}}}).banner, isNull);
     expect(RemoteConfig.parse({'update': {'before': 'soon'}}).updateBefore, isNull);
+  });
+
+  test('the clocks of the tables this device starts: the operator\'s where all of them check out, else the standard', () {
+    expect(RemoteConfig.none.table, TableTiming.standard);
+    expect(RemoteConfig.parse(const {}).table, TableTiming.standard);
+    final quick = RemoteConfig.parse({'table': {'graceMs': 3000, 'bankMs': 30000}}).table;
+    expect(quick.bank.graceMs, 3000);
+    expect(quick.bank.bankMs, 30000);
+    expect(quick.botActsMs, TableTiming.standard.botActsMs, reason: 'a field not named is the standard');
+    expect(RemoteConfig.parse({'table': {'graceMs': 3000, 'bankMs': 1}}).table, TableTiming.standard, reason: 'all or nothing');
+    expect(RemoteConfig.parse({'table': 'fast'}).table, TableTiming.standard);
+    expect(RemoteConfig.parse({'live': false, 'table': {'graceMs': 1}}).live, isFalse, reason: 'and the rest of the row stands');
   });
 
   test('please update: a build older than the day asked for, and never a local one', () {

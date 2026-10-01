@@ -94,6 +94,7 @@ class Room extends ChangeNotifier {
     required this.myName,
     this.myAvatar = Avatar.none,
     this.target = gameOverScore,
+    this.timing = TableTiming.standard,
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
     this.startAfterMs = 10000,
@@ -131,6 +132,7 @@ class Room extends ChangeNotifier {
     required String name,
     Avatar avatar = Avatar.none,
     int target = gameOverScore,
+    TableTiming timing = TableTiming.standard,
     Duration startAfter = Room.startAfter,
   }) =>
       Room(
@@ -139,6 +141,7 @@ class Room extends ChangeNotifier {
         myName: name,
         myAvatar: avatar,
         target: target,
+        timing: timing,
         startAfterMs: startAfter.inMilliseconds,
       );
 
@@ -177,6 +180,13 @@ class Room extends ChangeNotifier {
   /// ask for it. Only the leader's counts, and it says so in the start
   /// event, because the four have to agree on when the game ends.
   final int target;
+
+  /// The clocks of a table started here (timing.dart in the table
+  /// package), as this device's remote config has them. Only the
+  /// leader's count, and for the same reason as [target]: four seats
+  /// that disagree about when a boot is due back different sides of
+  /// it.
+  final TableTiming timing;
 
   final int heartbeatMs;
 
@@ -411,6 +421,7 @@ class Room extends ChangeNotifier {
       // Every live table is sealed (docs/03-fair-deal.md).
       'sealed': true,
       'target': target,
+      'timing': timing.toJson(),
       'at': _nowMs(),
     });
   }
@@ -492,6 +503,9 @@ class Room extends ChangeNotifier {
       // The leader's game, not this device's: a start event from a
       // build that had no say says fifty.
       target: c['target'] as int? ?? gameOverScore,
+      // And the leader's clocks: none said is the standard table, and
+      // one out of bounds is too, at every seat alike.
+      timing: TableTiming.parse(c['timing']),
     );
     seatNames = names;
     seatAvatars = avatars;

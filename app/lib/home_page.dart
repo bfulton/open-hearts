@@ -471,6 +471,8 @@ class _HomePageState extends State<HomePage> {
       pace: _pace.stated,
       botRating: Standing.botPicker(ledger),
       sealed: true,
+      // The tables this device hosts keep its remote config's clocks.
+      timing: RemoteSettings.current.config.table,
       avatar: _avatar.isDefault ? null : _avatar.toJson(withPicture: false),
       picture: _avatar.picture == null ? null : base64Encode(_avatar.picture!),
     );
@@ -587,6 +589,7 @@ class _HomePageState extends State<HomePage> {
         name: _name,
         avatar: _avatar,
         target: _options.target,
+        timing: RemoteSettings.current.config.table,
         // Ten seconds, unless the address asks for longer and is
         // allowed to (net/address.dart).
         startAfter: roomWait(Uri.base, standard: Room.startAfter),
