@@ -359,6 +359,11 @@ const STRIPE = 'https://api.stripe.com/v1';
 /// was never paid leaves `incomplete_expired`.
 const ENDED = new Set(['canceled', 'unpaid', 'incomplete_expired']);
 
+/// And of those, the ones that are final: `unpaid` comes back when the
+/// invoice is paid after all; these two do not, and neither does a
+/// subscription Stripe has deleted.
+const FINAL = new Set(['canceled', 'incomplete_expired']);
+
 /// How far out of date a webhook's own timestamp may be. Stripe signs
 /// the moment it sends; a replay from last week is not a payment.
 const WEBHOOK_TOLERANCE_S = 300;
@@ -474,13 +479,24 @@ export async function record(event, store, { now = Date.now() } = {}) {
     // out. A subscription that is merely *cancelling* is not this — it
     // runs to the end of what was paid for, which is what renews_at
     // already says.
-    const gone = event.type.endsWith('.deleted') || ENDED.has(object.status);
+    const final = event.type.endsWith('.deleted') || FINAL.has(object.status);
+    const gone = final || ENDED.has(object.status);
+    // Stripe does not promise to deliver in order, and a delivery that
+    // failed is tried again for days: an update from before the end
+    // can arrive after it. An event older than the one that wrote the
+    // row is not news, and nothing is news after the end.
+    const created = Number.isSafeInteger(event.created) ? event.created : null;
+    const known = await store.get(`SUB#${subscription}`, 'META');
+    if (known?.final) return null;
+    if (created !== null && known?.event_at != null && created < known.event_at) return null;
     const renews_at = gone ? today : period ? dayOf(period * 1000) : null;
     await store.put(`SUB#${subscription}`, 'META', {
       source: 'stripe',
       txn_ref: object.latest_invoice ?? null,
       renews_at,
       cancelled_at: object.canceled_at ? dayOf(object.canceled_at * 1000) : gone ? today : null,
+      event_at: created ?? known?.event_at ?? null,
+      ...(final ? { final: true } : {}),
     });
     // The devices under it hold a copy of the date so that a licence is
     // one read (doc 06). A renewal may leave those copies stale — they

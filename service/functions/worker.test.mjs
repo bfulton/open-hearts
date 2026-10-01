@@ -510,6 +510,36 @@ test('cancelling is not ending: the year paid for still runs, and dunning giving
   assert.equal(await entitlementOf(unpaid, KEY, { now: Date.UTC(2026, 8, 17) }), null);
 });
 
+test('Stripe\'s events in the wrong order do not bring back a subscription that has ended', async () => {
+  // Stripe does not promise order, and retries a delivery that failed
+  // for days: an update from before the end can land after it.
+  const now = Date.UTC(2026, 8, 16);
+  const at = (day) => Math.floor(Date.UTC(2026, 8, day) / 1000);
+  const nextYear = Math.floor(Date.UTC(2027, 8, 16) / 1000);
+  const store = memoryStore();
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store, { now });
+  await record({ type: 'customer.subscription.created', created: at(16), data: { object: { id: 'sub_9', status: 'active', current_period_end: nextYear } } }, store, { now });
+  await record({ type: 'customer.subscription.deleted', created: at(18), data: { object: { id: 'sub_9', status: 'canceled' } } }, store, { now: Date.UTC(2026, 8, 18) });
+
+  // The update that was refused on the 17th, at last.
+  const late = { type: 'customer.subscription.updated', created: at(17), data: { object: { id: 'sub_9', status: 'active', current_period_end: nextYear } } };
+  await record(late, store, { now: Date.UTC(2026, 8, 19) });
+  assert.equal(await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 20) }), null, 'a refund is not a year of play');
+
+  // And a deleted subscription stays deleted even against an event
+  // stamped the same second, which Stripe never sends after a deletion.
+  await record({ ...late, created: at(18) }, store, { now: Date.UTC(2026, 8, 19) });
+  assert.equal(await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 20) }), null);
+
+  // Whereas dunning that gave up is not the end: paid after all, it is
+  // a subscription again.
+  const owed = memoryStore();
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, owed, { now });
+  await record({ type: 'customer.subscription.updated', created: at(16), data: { object: { id: 'sub_9', status: 'unpaid', current_period_end: nextYear } } }, owed, { now });
+  await record({ type: 'customer.subscription.updated', created: at(17), data: { object: { id: 'sub_9', status: 'active', current_period_end: nextYear } } }, owed, { now: Date.UTC(2026, 8, 17) });
+  assert.equal((await entitlementOf(owed, KEY, { now: Date.UTC(2026, 8, 18) })).licensed_until, '2027-09-16');
+});
+
 // ---- a subscription is a person's ---------------------------------------
 
 const OTHER = 'cd'.repeat(32);

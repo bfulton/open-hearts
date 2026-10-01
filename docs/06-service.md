@@ -75,7 +75,12 @@ body, and a signature from last week is refused whatever it says, since
 a replay is not a payment. `checkout.session.completed` binds the
 device; the subscription's own events carry the date. The two arrive in
 either order, so a device bound before its date is known is dated on
-its first ask after.
+its first ask after. Nor do the subscription's own events arrive in
+order — Stripe promises none, and tries a failed delivery again for
+days — so the row keeps the time of the event that wrote it, an older
+one is not news, and nothing is news after a deletion or a final
+status: an update from before a refund, delivered after it, would
+otherwise have been a year of play.
 
 **attest** and **supersede**, `POST /api/attest` and
 `/api/supersede`, are one proof with two endings. The proof is the
