@@ -197,10 +197,16 @@ What follows:
   - `SUB#<Stripe subscription id>|META` — source, latest invoice id,
     renewal day, cancellation day
   - `SUB#<id>|DEVICE#<key>` — the day the device was bound
+  - `SUB#<id>|CUSTOMER` — the Stripe customer id, so a device on the
+    subscription can open Stripe's billing portal
   - `KEY#<key>|ENTITLEMENT` — subscription id, licensed-until day, the
     day it was written
-- **No KV row has an expiry.** An ended subscription is dated down, not
-  deleted.
+- **`POST /api/manage {key, back}`** opens a Stripe billing portal
+  session for that customer (`billing.stripe.com`, Stripe's page, where
+  the subscriber sees their email, card and receipts). Any device bound
+  to the subscription may open it.
+- **Only a household code's rows expire** (an hour after the code is
+  made). An ended subscription is dated down, not deleted.
 
 So KV joins a device key to a Stripe subscription, and Stripe joins the
 subscription to an email address. With §3, the owner can connect a
@@ -558,8 +564,9 @@ costs.
 - **Terms of service**: drafted at `site/terms.html` (served at
   `/terms`), not yet reviewed by a lawyer. It defers to Apple's Standard
   EULA for App Store purchases and covers web purchases: a year at
-  $5.99, automatic renewal, cancelling (on the web, by mail or phone —
-  there is no self-service portal), refunds, conduct, MIT against the
+  $5.99, automatic renewal, cancelling (on the web, in Stripe's billing
+  portal from Manage subscription, or by mail or phone with no device
+  left), refunds, conduct, MIT against the
   service, no warranty, a liability cap, South Carolina law. To check:
   automatic-renewal disclosures (California and others) at checkout and
   a reminder before renewal, which we cannot send without an email

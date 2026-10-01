@@ -1188,5 +1188,17 @@
   "termsOfUse": "Terms of use",
   "@termsOfUse": {
     "description": "Link on the Live play page to the terms of use."
+  },
+  "manageSubscription": "Manage subscription",
+  "@manageSubscription": {
+    "description": "Button on the Live play page for a web subscriber: opens Stripe's billing portal."
+  },
+  "manageSubscriptionHint": "Cancel, change the card, or see receipts.",
+  "@manageSubscriptionHint": {
+    "description": "Under the Manage subscription button: what it is for."
+  },
+  "managedWhereBought": "This subscription is managed where it was bought.",
+  "@managedWhereBought": {
+    "description": "Said when a subscription bought in the App Store or Google Play is asked to be managed on the web."
   }
 }

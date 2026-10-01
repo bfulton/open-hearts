@@ -203,5 +203,8 @@
   "join": "Unirse",
   "notNow": "Ahora no",
   "privacyPolicy": "Política de privacidad",
-  "termsOfUse": "Condiciones de uso"
+  "termsOfUse": "Condiciones de uso",
+  "manageSubscription": "Gestionar suscripción",
+  "manageSubscriptionHint": "Cancela, cambia la tarjeta o mira los recibos.",
+  "managedWhereBought": "Esta suscripción se gestiona donde se compró."
 }

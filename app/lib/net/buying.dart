@@ -17,6 +17,7 @@ import 'dart:convert';
 import 'package:table/table.dart';
 
 import '../l10n/l10n.dart';
+import 'household.dart' show askService;
 import 'licence.dart';
 import 'remote_config.dart';
 import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
@@ -34,7 +35,12 @@ String get priceShown => RemoteSettings.current.config.price ?? priceAmount;
 
 /// Whether this build can take money at all: the web can, over Stripe;
 /// a phone will over its store, and does not yet.
-bool get canBuyHere => platform.canLeaveForCheckout;
+bool get canBuyHere => canLeaveForStripe;
+
+/// Whether this build can be sent to Stripe and brought back, and how
+/// it goes: the platform's, and a test's to replace.
+bool canLeaveForStripe = platform.canLeaveForCheckout;
+void Function(String url) leaveFor = platform.leaveFor;
 
 /// The app's own address, which is where a purchase comes back to.
 /// Kept whole — a driven build stays driven across the round trip
@@ -63,7 +69,10 @@ enum BuyRefusal {
   unreachable,
 
   /// It answered, with no checkout to go to.
-  shut;
+  shut,
+
+  /// The subscription was bought in a store, and is managed there.
+  elsewhere;
 
   /// As the player is told it.
   String say([AppLocalizations? words]) {
@@ -72,6 +81,7 @@ enum BuyRefusal {
       notHere => say.buyingNotOpen,
       unreachable => say.shopUnreachable,
       shut => say.shopNotOpen,
+      elsewhere => say.managedWhereBought,
     };
   }
 }
@@ -103,14 +113,43 @@ Future<BuyRefusal?> buy(Signer signer, {Uri? endpoint, Uri? from, Duration? time
   if (body == null) return BuyRefusal.shut;
   final to = _checkoutUrl(body);
   if (to == null) return BuyRefusal.shut;
-  platform.leaveFor(to);
+  leaveFor(to);
+  return null;
+}
+
+/// Opens Stripe's billing portal for the web subscription [signer]'s
+/// device is on — to cancel, change the card, read an invoice — and
+/// leaves for it, coming back to where it was. A reason when it could
+/// not; null when the browser is on its way.
+Future<BuyRefusal?> manageSubscription(Signer signer, {Uri? endpoint, Uri? from, Duration? timeout}) async {
+  timeout ??= waits.buy;
+  if (!canBuyHere) return BuyRefusal.notHere;
+  final url = endpoint ?? handlerAt('manage');
+  if (url == null) return BuyRefusal.notHere;
+  final at = from ?? Uri.base;
+  ({int status, String body}) answer;
+  try {
+    answer = await askService(url, jsonEncode({...signedAsk(signer, 'manage'), 'back': returnAddress(at, bought: false)}))
+        .timeout(timeout);
+  } catch (_) {
+    return BuyRefusal.unreachable;
+  }
+  if (answer.status == 409) return BuyRefusal.elsewhere;
+  if (answer.status != 200) return BuyRefusal.shut;
+  final to = _stripeUrl(answer.body, (host) => host == 'billing.stripe.com');
+  if (to == null) return BuyRefusal.shut;
+  leaveFor(to);
   return null;
 }
 
 /// The checkout's address out of the handler's answer, and only if it
 /// is one of Stripe's: this device is about to be sent there, and what
 /// it is sent to is not a place a bad answer gets to choose.
-String? _checkoutUrl(String body) {
+String? _checkoutUrl(String body) =>
+    _stripeUrl(body, (host) => host == 'checkout.stripe.com' || host.endsWith('.checkout.stripe.com'));
+
+/// The `url` of a handler's answer, over https to a host [ours] takes.
+String? _stripeUrl(String body, bool Function(String host) ours) {
   try {
     final json = jsonDecode(body);
     if (json is! Map) return null;
@@ -118,7 +157,7 @@ String? _checkoutUrl(String body) {
     if (to is! String) return null;
     final at = Uri.tryParse(to);
     if (at == null || at.scheme != 'https') return null;
-    return at.host == 'checkout.stripe.com' || at.host.endsWith('.checkout.stripe.com') ? to : null;
+    return ours(at.host) ? to : null;
   } catch (_) {
     return null;
   }

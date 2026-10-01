@@ -138,8 +138,10 @@ KEY#<key>                  META           provider, attested_at, attestation
 KEY#<key>                  SUPERSEDES     predecessor, link, at
 SUB#<subscription>         META           source, txn_ref, renews_at, cancelled_at
 SUB#<subscription>         DEVICE#<key>   bound_at
+SUB#<subscription>         CUSTOMER       customer (Stripe's, for the billing portal)
 KEY#<key>                  ENTITLEMENT    subscription, licensed_until, at
 TICKET#<code>              META           subscription, expires_at, used_at
+SUB#<subscription>         TICKET         code, expires_at (the one outstanding, handed back while unspent)
 COUNTER#<metric>#<day>     -              n
 ```
 
@@ -281,6 +283,19 @@ for `checkout.session.completed`,
 `checkout.session.async_payment_succeeded` and
 `customer.subscription.*`. Without them the shop says it is not open
 yet, which is what a deployment with no keys should say.
+
+A web subscriber manages the subscription — cancels, changes the
+card, reads a receipt — in Stripe's billing portal: **manage** opens a
+portal session for the subscription's Stripe customer and the app goes
+there as it went to the checkout, accepting only `billing.stripe.com`,
+and comes back to this site. Any device bound to the subscription may
+open it, as any may drop another, so a household that lost the phone
+that paid can still cancel. The customer is kept from the webhook
+(`SUB#…|CUSTOMER`); for a subscription bought before it was, Stripe is
+asked once. One bought in a store answers 409 and the app says it is
+managed where it was bought. The portal itself — cancellation allowed,
+the business's name and links — is configured in the Stripe
+dashboard.
 
 A checkout binds a key only if this service opened it: the key is read
 from the session's `metadata`, which only our checkout writes, and not

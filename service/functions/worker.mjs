@@ -592,6 +592,7 @@ export async function record(event, store, { now = Date.now() } = {}) {
     // have arrived yet: bound now, dated on the first ask after it has.
     const known = await store.get(`SUB#${subscription}`, 'META');
     await store.put(`SUB#${subscription}`, `DEVICE#${key}`, { bound_at: today });
+    await keepCustomer(store, subscription, object.customer);
     await store.put(`KEY#${key}`, 'ENTITLEMENT', {
       subscription,
       licensed_until: known?.renews_at ?? null,
@@ -615,6 +616,7 @@ export async function record(event, store, { now = Date.now() } = {}) {
     // row is not news, and nothing is news after the end.
     const created = Number.isSafeInteger(event.created) ? event.created : null;
     const known = await store.get(`SUB#${subscription}`, 'META');
+    await keepCustomer(store, subscription, object.customer);
     if (known?.final) return null;
     if (created !== null && known?.event_at != null && created < known.event_at) return null;
     const renews_at = gone ? today : period ? dayOf(period * 1000) : null;
@@ -642,6 +644,71 @@ export async function record(event, store, { now = Date.now() } = {}) {
     return { subscription, renews_at };
   }
   return null;
+}
+
+/// The Stripe customer behind [subscription], kept so a device on it can
+/// open the billing portal. A row of its own, since the subscription's
+/// META is written whole by every subscription event.
+async function keepCustomer(store, subscription, customer) {
+  const id = typeof customer === 'string' ? customer : customer?.id;
+  if (typeof id !== 'string' || !/^cus_[A-Za-z0-9]{1,64}$/.test(id)) return;
+  const known = await store.get(`SUB#${subscription}`, 'CUSTOMER');
+  if (known?.customer !== id) await store.put(`SUB#${subscription}`, 'CUSTOMER', { customer: id });
+}
+
+// ---- managing a web subscription ------------------------------------------
+// A web subscriber cancels, changes card or reads an invoice in Stripe's
+// own billing portal: the service opens a session for the subscription's
+// customer and the device goes there, as it went to the checkout. Any
+// device on the subscription may, as any may drop another: a household
+// that lost the phone that paid still has to be able to cancel. A
+// subscription bought in a store is managed in the store, and local
+// mode's open house was never bought at all.
+
+/// A billing portal session for the subscription [key] is on: {status, body}.
+export async function manage(key, back, store, env, fetchImpl = fetch) {
+  const secret = env.OH_STRIPE_SECRET;
+  if (!secret) return { status: 503, body: { error: 'the shop is not open yet' } };
+  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  const subscription = held?.subscription;
+  if (!subscription) return { status: 402, body: { error: 'no subscription' } };
+  if (!subscription.startsWith('sub_')) return { status: 409, body: { error: 'not a web subscription' } };
+  // Bound to it, not merely once on it: a dropped device keeps no say.
+  if (!(await store.get(`SUB#${subscription}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
+  const auth = { authorization: `Bearer ${secret}` };
+  let customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
+  if (!customer) {
+    // Bought before the customer was kept: Stripe knows.
+    try {
+      const res = await fetchImpl(`${STRIPE}/subscriptions/${encodeURIComponent(subscription)}`, { headers: auth });
+      if (res.ok) customer = (await res.json())?.customer;
+    } catch {
+      return { status: 502, body: { error: 'the shop is not answering' } };
+    }
+    if (typeof customer !== 'string' || !/^cus_[A-Za-z0-9]{1,64}$/.test(customer)) {
+      return { status: 502, body: { error: 'the shop does not know this subscription' } };
+    }
+    await keepCustomer(store, subscription, customer);
+  }
+  let res;
+  try {
+    res = await fetchImpl(`${STRIPE}/billing_portal/sessions`, {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ customer, return_url: back }).toString(),
+    });
+  } catch {
+    return { status: 502, body: { error: 'the shop is not answering' } };
+  }
+  if (!res.ok) return { status: 502, body: { error: `the shop said ${res.status}` } };
+  let session;
+  try {
+    session = await res.json();
+  } catch {
+    return { status: 502, body: { error: 'the shop talked nonsense' } };
+  }
+  if (typeof session.url !== 'string') return { status: 502, body: { error: 'the shop gave no portal' } };
+  return { status: 200, body: { url: session.url } };
 }
 
 // ---- a subscription is a person's, not a device's ----------------------
@@ -1147,6 +1214,20 @@ async function checkoutRoute(request, env) {
   return json(request, status, out);
 }
 
+async function manageRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'manage');
+  if (asked instanceof Response) return asked;
+  const back = sameSite(asked.body.back, request.url);
+  if (!back) return json(request, 400, { error: 'somewhere on this site to come back to' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  const { status, body } = await manage(asked.key, back, store, env);
+  return json(request, status, body);
+}
+
 async function stripeRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
   const raw = await textOf(request, MOST_EVENT);
@@ -1417,6 +1498,7 @@ const ROUTES = {
   licence: (request, env) => licenceRoute(request, env),
   checkout: (request, env) => checkoutRoute(request, env),
   stripe: (request, env) => stripeRoute(request, env),
+  manage: (request, env) => manageRoute(request, env),
   ticket: (request, env) => ticketRoute(request, env),
   claim: (request, env) => claimRoute(request, env),
   devices: (request, env) => devicesRoute(request, env),

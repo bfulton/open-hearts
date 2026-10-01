@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/net/buying.dart';
 import 'package:open_hearts/net/household.dart';
 import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/remote_config.dart';
@@ -157,6 +158,79 @@ void main() {
       expect(refused.answer, isNull);
       expect(refused.refusal?.say(), shown);
     }
+  });
+
+  testWidgets('a web subscriber manages it in Stripe\'s portal, and one bought in a store is told where', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    await licenceThisDevice();
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+    });
+    final wasCan = canLeaveForStripe;
+    final wasLeave = leaveFor;
+    final sentTo = <String>[];
+    canLeaveForStripe = true;
+    leaveFor = sentTo.add;
+    addTearDown(() {
+      canLeaveForStripe = wasCan;
+      leaveFor = wasLeave;
+    });
+    tester.view
+      ..physicalSize = const Size(390, 1200)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpAndSettle();
+
+    // A portal on Stripe's own host: gone to, with this device's signed ask.
+    stand.says('manage', {'url': 'https://billing.stripe.com/p/session/test_1'});
+    await tester.ensureVisible(find.text('Manage subscription'));
+    await tester.tap(find.text('Manage subscription'));
+    await tester.pumpAndSettle();
+    expect(sentTo, ['https://billing.stripe.com/p/session/test_1']);
+    final asked = jsonDecode(stand.seen.lastWhere((s) => s.startsWith('/api/manage ')).substring('/api/manage '.length)) as Map;
+    expect(asked['key'], me.publicKey);
+    expect(asked['sig'], isA<String>());
+    expect(asked['back'], isA<String>());
+
+    // An answer that would send it anywhere else sends it nowhere. (A
+    // fresh page: the one that went is spinning, as a page left should.)
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpAndSettle();
+    stand.says('manage', {'url': 'https://billing.stripe.com.evil.example/p'});
+    await tester.ensureVisible(find.text('Manage subscription'));
+    await tester.tap(find.text('Manage subscription'));
+    await tester.pumpAndSettle();
+    expect(sentTo, hasLength(1));
+    expect(find.text('The shop is not open yet.'), findsOneWidget);
+
+    // Bought in a store: managed there.
+    stand.says('manage', {'error': 'not a web subscription'}, status: 409);
+    await tester.tap(find.text('Manage subscription'));
+    await tester.pumpAndSettle();
+    expect(find.text('This subscription is managed where it was bought.'), findsOneWidget);
+    expect(sentTo, hasLength(1));
+  });
+
+  testWidgets('no Manage button where this build cannot go to Stripe', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    await licenceThisDevice();
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+    });
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpAndSettle();
+    expect(find.text('This device'), findsOneWidget);
+    expect(find.text('Manage subscription'), findsNothing);
   });
 
   test('a service that is not there is said to be, rather than nothing happening', () async {

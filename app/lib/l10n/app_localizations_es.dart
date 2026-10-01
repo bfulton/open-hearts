@@ -977,4 +977,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get termsOfUse => 'Condiciones de uso';
+
+  @override
+  String get manageSubscription => 'Gestionar suscripción';
+
+  @override
+  String get manageSubscriptionHint =>
+      'Cancela, cambia la tarjeta o mira los recibos.';
+
+  @override
+  String get managedWhereBought =>
+      'Esta suscripción se gestiona donde se compró.';
 }

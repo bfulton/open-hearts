@@ -203,5 +203,8 @@
   "join": "Beitreten",
   "notNow": "Nicht jetzt",
   "privacyPolicy": "Datenschutzerklärung",
-  "termsOfUse": "Nutzungsbedingungen"
+  "termsOfUse": "Nutzungsbedingungen",
+  "manageSubscription": "Abo verwalten",
+  "manageSubscriptionHint": "Kündigen, Karte ändern oder Belege ansehen.",
+  "managedWhereBought": "Dieses Abo wird dort verwaltet, wo es gekauft wurde."
 }

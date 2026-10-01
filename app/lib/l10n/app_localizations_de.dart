@@ -984,4 +984,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get termsOfUse => 'Nutzungsbedingungen';
+
+  @override
+  String get manageSubscription => 'Abo verwalten';
+
+  @override
+  String get manageSubscriptionHint =>
+      'Kündigen, Karte ändern oder Belege ansehen.';
+
+  @override
+  String get managedWhereBought =>
+      'Dieses Abo wird dort verwaltet, wo es gekauft wurde.';
 }

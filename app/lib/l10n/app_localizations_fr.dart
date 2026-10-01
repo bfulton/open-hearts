@@ -978,4 +978,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get termsOfUse => 'Conditions d\'utilisation';
+
+  @override
+  String get manageSubscription => 'Gérer l\'abonnement';
+
+  @override
+  String get manageSubscriptionHint =>
+      'Résiliez, changez de carte ou consultez les reçus.';
+
+  @override
+  String get managedWhereBought =>
+      'Cet abonnement se gère là où il a été acheté.';
 }

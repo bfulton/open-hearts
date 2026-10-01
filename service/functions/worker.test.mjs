@@ -16,6 +16,7 @@ import worker, {
   forgetProviderKeys,
   licence,
   licenceFor,
+  manage,
   openHouse,
   loginRow,
   memoryStore,
@@ -1098,4 +1099,96 @@ test('local mode has a token of its own, and it is nothing anywhere else', async
   assert.equal(openHouse(local, new Request('http://localhost/api/licence')), true);
   assert.equal(openHouse(local, new Request('https://open-hearts.pages.dev/api/attest')), false);
   assert.equal(openHouse(signedInAs, new Request('http://127.0.0.1:8788/api/attest')), false);
+});
+
+// ---- managing a web subscription ------------------------------------------
+
+/// Stripe, as far as the portal needs it: what was asked, and an answer.
+const stripeFake = ({ customerOf = {}, portal = 'https://billing.stripe.com/p/session/test_1' } = {}) => {
+  const calls = [];
+  const f = async (url, init = {}) => {
+    calls.push({ url, init });
+    const sub = url.match(/\/v1\/subscriptions\/(.+)$/)?.[1];
+    if (sub) return customerOf[sub] ? Response.json({ id: sub, customer: customerOf[sub] }) : new Response('no', { status: 404 });
+    if (url.endsWith('/v1/billing_portal/sessions')) return Response.json({ url: portal });
+    return new Response('no', { status: 400 });
+  };
+  f.calls = calls;
+  return f;
+};
+
+test('a checkout keeps its customer, and so does a subscription event, for the portal', async () => {
+  const store = memoryStore();
+  const now = Date.UTC(2026, 8, 16);
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_9', customer: 'cus_A1', metadata: { key: KEY } } } }, store, { now });
+  assert.deepEqual(await store.get('SUB#sub_9', 'CUSTOMER'), { customer: 'cus_A1' });
+  await record({ type: 'customer.subscription.updated', data: { object: { id: 'sub_8', customer: 'cus_B2', current_period_end: 1800000000 } } }, store, { now });
+  assert.deepEqual(await store.get('SUB#sub_8', 'CUSTOMER'), { customer: 'cus_B2' });
+  await record({ type: 'customer.subscription.updated', data: { object: { id: 'sub_7', customer: 'not a customer' } } }, store, { now });
+  assert.equal(await store.get('SUB#sub_7', 'CUSTOMER'), null);
+  // A household's devices are listed without it.
+  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY]);
+});
+
+test('any device on a web subscription opens its portal, and comes back to this site', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  await store.put('SUB#sub_9', 'CUSTOMER', { customer: 'cus_A1' });
+  await claimWith(OTHER, (await ticketFor(KEY, store, { now })).body.ticket, store, { now });
+  const stripe = stripeFake();
+  const env = { OH_STRIPE_SECRET: 'sk_test' };
+  for (const key of [KEY, OTHER]) {
+    const out = await manage(key, 'https://x/play/', store, env, stripe);
+    assert.deepEqual(out, { status: 200, body: { url: 'https://billing.stripe.com/p/session/test_1' } });
+  }
+  const form = new URLSearchParams(stripe.calls[0].init.body);
+  assert.equal(form.get('customer'), 'cus_A1');
+  assert.equal(form.get('return_url'), 'https://x/play/');
+  assert.equal(stripe.calls[0].init.headers.authorization, 'Bearer sk_test');
+});
+
+test('a subscription bought before the customer was kept: Stripe is asked once, and it is kept', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const stripe = stripeFake({ customerOf: { sub_9: 'cus_Old' } });
+  const env = { OH_STRIPE_SECRET: 'sk_test' };
+  assert.equal((await manage(KEY, 'https://x/', store, env, stripe)).status, 200);
+  assert.equal((await manage(KEY, 'https://x/', store, env, stripe)).status, 200);
+  assert.equal(stripe.calls.filter((c) => c.url.includes('/v1/subscriptions/')).length, 1);
+  assert.deepEqual(await store.get('SUB#sub_9', 'CUSTOMER'), { customer: 'cus_Old' });
+  assert.equal((await manage(KEY, 'https://x/', await household(now), env, stripeFake())).status, 502, 'and one Stripe does not know');
+});
+
+test('no portal for a device off the subscription, a store or open-house one, or a shop not open', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  await store.put('SUB#sub_9', 'CUSTOMER', { customer: 'cus_A1' });
+  const env = { OH_STRIPE_SECRET: 'sk_test' };
+  assert.equal((await manage(OTHER, 'https://x/', store, env, stripeFake())).status, 402, 'never on it');
+  await claimWith(OTHER, (await ticketFor(KEY, store, { now })).body.ticket, store, { now });
+  await dropDevice(KEY, OTHER, store, { now });
+  assert.equal((await manage(OTHER, 'https://x/', store, env, stripeFake())).status, 402, 'dropped');
+  const open = memoryStore();
+  await entitlementOf(open, KEY, { now, openHouse: true });
+  assert.equal((await manage(KEY, 'https://x/', open, env, stripeFake())).status, 409, 'local mode bought nothing');
+  assert.equal((await manage(KEY, 'https://x/', store, {}, stripeFake())).status, 503);
+});
+
+test('the manage route: signed by the device, and back only to this site', async () => {
+  const now = Date.now();
+  const store = await household(now, ADA.public);
+  await store.put('SUB#sub_9', 'CUSTOMER', { customer: 'cus_A1' });
+  const { held, send } = serving(store);
+  const shop = { ...held, OH_STRIPE_SECRET: 'sk_test' };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stripeFake();
+  try {
+    assert.equal((await worker.fetch(send('manage', { key: ADA.public, back: 'https://dev.open-hearts.pages.dev/play/' }), shop)).status, 401);
+    assert.equal((await worker.fetch(send('manage', await asking(ADA, 'manage', { back: 'https://elsewhere.example/' })), shop)).status, 400);
+    const ok = await worker.fetch(send('manage', await asking(ADA, 'manage', { back: 'https://dev.open-hearts.pages.dev/play/' })), shop);
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).url, 'https://billing.stripe.com/p/session/test_1');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

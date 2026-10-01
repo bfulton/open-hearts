@@ -1327,6 +1327,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Terms of use'**
   String get termsOfUse;
+
+  /// Button on the Live play page for a web subscriber: opens Stripe's billing portal.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage subscription'**
+  String get manageSubscription;
+
+  /// Under the Manage subscription button: what it is for.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel, change the card, or see receipts.'**
+  String get manageSubscriptionHint;
+
+  /// Said when a subscription bought in the App Store or Google Play is asked to be managed on the web.
+  ///
+  /// In en, this message translates to:
+  /// **'This subscription is managed where it was bought.'**
+  String get managedWhereBought;
 }
 
 class _AppLocalizationsDelegate

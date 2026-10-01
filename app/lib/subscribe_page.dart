@@ -98,6 +98,23 @@ class _SubscribePageState extends State<SubscribePage> {
     }
   }
 
+  /// To Stripe's billing portal, for a web subscription: cancelling is
+  /// the subscriber's to do, not a phone call's.
+  Future<void> _manage() async {
+    setState(() {
+      _leaving = true;
+      _refusal = null;
+    });
+    final refusal = await manageSubscription(await Identity.signer());
+    if (!mounted) return;
+    if (refusal != null) {
+      setState(() {
+        _leaving = false;
+        _refusal = refusal.say(context.l10n);
+      });
+    }
+  }
+
   Future<void> _showACode() async {
     final me = _me;
     if (me == null || _working) return;
@@ -268,6 +285,22 @@ class _SubscribePageState extends State<SubscribePage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: Text(l10n.sendLinkInstead),
+        ),
+      ],
+      // A web subscription is managed in Stripe's portal; one bought in
+      // a store, in the store's own settings.
+      if (canBuyHere) ...[
+        const SizedBox(height: 26),
+        Text(l10n.manageSubscriptionHint, style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim)),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: _leaving ? null : _manage,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Palette.gold,
+            side: BorderSide(color: Palette.gold.withValues(alpha: 0.5)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text(l10n.manageSubscription),
         ),
       ],
     ];

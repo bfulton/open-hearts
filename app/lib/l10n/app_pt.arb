@@ -203,5 +203,8 @@
   "join": "Entrar",
   "notNow": "Agora não",
   "privacyPolicy": "Política de privacidade",
-  "termsOfUse": "Termos de uso"
+  "termsOfUse": "Termos de uso",
+  "manageSubscription": "Gerenciar assinatura",
+  "manageSubscriptionHint": "Cancele, troque o cartão ou veja os recibos.",
+  "managedWhereBought": "Esta assinatura é gerenciada onde foi comprada."
 }
