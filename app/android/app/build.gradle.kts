@@ -65,6 +65,13 @@ android {
 // needs no key and is untouched.
 gradle.taskGraph.whenReady {
     val releasing = allTasks.any { it.project == project && (it.name == "packageRelease" || it.name == "bundleRelease") }
+    // Every live table is sealed, so a release without the deal's native
+    // library is a phone that plays alone and cannot say why.
+    // crypto/build_android.sh puts it, and Schnorr's beside it, here.
+    val missing = listOf("arm64-v8a", "armeabi-v7a", "x86_64").filter { !file("src/main/jniLibs/$it/libdeal.so").exists() }
+    if (releasing && missing.isNotEmpty()) {
+        throw GradleException("No libdeal.so for ${missing.joinToString()}: run crypto/build_android.sh first.")
+    }
     if (releaseKeys == null && releasing) {
         throw GradleException(
             "No android/key.properties: a release is signed with the release key or not built. " +
