@@ -5,6 +5,7 @@ library;
 import 'package:engine/engine.dart';
 
 import 'signing.dart';
+import 'timing.dart';
 
 sealed class SeatHolder {
   const SeatHolder();
@@ -26,7 +27,8 @@ class BotSeat extends SeatHolder {
 
 class TableSpec {
   const TableSpec(
-      {required this.id, required this.seed, required this.seats, this.rated = false, this.sealed = false, this.target = gameOverScore});
+      {required this.id, required this.seed, required this.seats, this.rated = false, this.sealed = false, this.target = gameOverScore,
+      this.timing = TableTiming.standard});
 
   final String id;
 
@@ -47,6 +49,14 @@ class TableSpec {
   /// a hand.
   final int target;
 
+  /// The table's clocks: a person's grace and bank, a held bot seat's
+  /// deadlines, the silences and waits after which a seat proposes
+  /// what the table then settles (timing.dart). Chosen like [target],
+  /// by the device that starts the table from its remote config, and
+  /// carried in the signed start event for the same reason: seats that
+  /// disagree about when a boot is due back different sides of it.
+  final TableTiming timing;
+
   /// The deal's seed at an unsealed table, where every seat can compute
   /// every hand from it; at a sealed one, the randomness of the jury
   /// draw and of the bots' public deal secrets.
@@ -62,6 +72,9 @@ class TableSpec {
         'rated': rated,
         'sealed': sealed,
         'target': target,
+        // Left out at the standard, so that an ordinary table's spec
+        // reads as it did before a table had timing of its own.
+        if (timing != TableTiming.standard) 'timing': timing.toJson(),
         'seats': [
           for (final h in seats)
             switch (h) {
@@ -87,7 +100,8 @@ class TableSpec {
           seats: seats,
           rated: m['rated'] == true,
           sealed: m['sealed'] == true,
-          target: m['target'] as int? ?? gameOverScore);
+          target: m['target'] as int? ?? gameOverScore,
+          timing: TableTiming.parse(m['timing']));
     } catch (_) {
       return null;
     }

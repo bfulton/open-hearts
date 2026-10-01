@@ -11,6 +11,7 @@ import '../jury.dart';
 import '../signing.dart';
 import '../spec.dart';
 import '../time_bank.dart';
+import '../timing.dart';
 import 'scripted_human.dart';
 import 'sim_deal_worker.dart';
 import 'sim_juror.dart';
@@ -38,7 +39,8 @@ class SimTable {
     bool withPresence = false,
     int target = gameOverScore,
     this.crypto,
-    TimeBank timeBank = TimeBank.standard,
+    TableTiming timing = TableTiming.standard,
+    TimeBank? timeBank,
     bool botsFirst = false,
     bool sweepJurors = false,
     bool workers = false,
@@ -76,6 +78,7 @@ class SimTable {
       seed: seed,
       sealed: crypto != null,
       target: target,
+      timing: timeBank == null ? timing : timing.withBank(timeBank),
       seats: [
         for (var s = 0; s < seatCount; s++)
           if (botsFirst ? s >= seatCount - humans : s < humans)
@@ -93,7 +96,6 @@ class SimTable {
           presence: presence,
           crypto: crypto,
           dealWorker: workerFor(signers[i].publicKey),
-          timeBank: timeBank,
           random: Random(seed * 1000 + i));
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }

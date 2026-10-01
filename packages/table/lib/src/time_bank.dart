@@ -20,7 +20,8 @@ class TimeBank {
     this.fixedMs = 40000,
   });
 
-  /// The one clock every table plays against.
+  /// The standard table's clock. A table's own is in its timing
+  /// (timing.dart), chosen by whoever started it.
   static const standard = TimeBank();
 
   /// What a card costs nothing up to.

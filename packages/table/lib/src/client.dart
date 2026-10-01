@@ -72,6 +72,7 @@ import 'sealed_pass.dart';
 import 'signing.dart';
 import 'spec.dart';
 import 'time_bank.dart';
+import 'timing.dart';
 import 'jury.dart';
 import 'transport.dart';
 
@@ -125,7 +126,7 @@ enum Pause {
 /// Why a game ended without finishing: a connection failure, and which.
 enum Failure {
   /// A turn the table is stopped at that nobody left could move, and
-  /// has been, for [TableClient.quorumLostAfterMs]: a seat nobody left
+  /// has been, for [TableTiming.quorumLostMs]: a seat nobody left
   /// could open — a held bot seat with its own juror gone and fewer
   /// than [escrowThreshold] of the jurors holding a piece of it still
   /// heard, or a departed person's with none — or a turn put to a jury
@@ -250,14 +251,14 @@ class TableClient {
     required this.signer,
     required this.transport,
     required this.clock,
-    this.timeBank = TimeBank.standard,
-    this.silenceAfterMs = 120000,
+    int? silenceAfterMs,
     this.heartbeatMs = 5000,
     this.presence,
     this.crypto,
     this.dealWorker,
     Random? random,
   })  : _random = random,
+        _silenceAfterMs = silenceAfterMs,
         game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target),
         holders = List.of(spec.seats),
         _humans = {for (final h in spec.seats) if (h is HumanSeat) h.key} {
@@ -269,10 +270,18 @@ class TableClient {
   final Transport transport;
   final Clock clock;
 
+  /// The table's clocks, as whoever started it chose them and the
+  /// start event said (timing.dart): the same at every seat and juror.
+  TableTiming get timing => spec.timing;
+
   /// The clock every seat plays against: a grace per decision, a bank
   /// per hand, Boot once both are spent (time_bank.dart).
-  final TimeBank timeBank;
-  final int silenceAfterMs;
+  TimeBank get timeBank => timing.bank;
+
+  /// How long a person may be silent before the table removes them:
+  /// the table's, unless a test asked for a shorter one.
+  int get silenceAfterMs => _silenceAfterMs ?? timing.silenceMs;
+  final int? _silenceAfterMs;
   final int heartbeatMs;
 
   /// Who is online, and how a juror is summoned; null at a table that
@@ -1886,7 +1895,7 @@ class TableClient {
   /// The hand in which this juror last heard an appeal.
   int _carryingHand = -1;
 
-  bool _jurorRecent(PublicKey j) => clock.nowMs - (_jurorHeard[j] ?? _never) < 30000;
+  bool _jurorRecent(PublicKey j) => clock.nowMs - (_jurorHeard[j] ?? _never) < timing.jurorSilenceMs;
 
   void _onAction(TableEvent event) {
     _relayIfAppealed(event);
@@ -2674,7 +2683,7 @@ class TableClient {
   /// them is what makes the wait worth having (docs/04-live-play.md).
   /// The wait is bounded: nothing can be gained by waiting past the
   /// point where nobody is coming, and a table frozen for good is
-  /// worse than one whose bots are public. So at [_jurorsWaitMs] the
+  /// worse than one whose bots are public. So at [_jurorsWait] the
   /// hand goes ahead with its bot seats in the open, which is what a
   /// deserted table with no service behind it falls back to.
   void _startDealWhenReady() {
@@ -2716,14 +2725,10 @@ class TableClient {
   /// most of the table's life.
   bool _fellBackOpen = false;
 
-  /// How long a hand waits for a jury that can hold its bot seats.
-  /// Long enough for a called-for juror to come online and be drawn
-  /// into a redraw or two, short enough that a table behind a service
-  /// that is down still plays.
-  static const _jurorsWaitMs = 40000;
-
-  /// The window as this hand has it.
-  int get _jurorsWait => _fellBackOpen ? 10000 : _jurorsWaitMs;
+  /// The window as this hand has it: the table's
+  /// [TableTiming.jurorsWaitMs], or [TableTiming.jurorsWaitAgainMs]
+  /// once a hand has gone ahead without.
+  int get _jurorsWait => _fellBackOpen ? timing.jurorsWaitAgainMs : timing.jurorsWaitMs;
 
   /// And how long the hand's *draw* is held back for the same reason,
   /// which is ten seconds less: a jury proposed at the end of its
@@ -3953,51 +3958,12 @@ class TableClient {
   }
 
   /// How long a bot seat's holder has to take the seat's turn, a card
-  /// or the pass. A bot's move is worked out rather than thought
-  /// about, so this is a deadline on a computation and not on a
-  /// person: there is no grace in it and no bank behind it, which is
-  /// what a person's seat gets instead (time_bank.dart).
-  ///
-  /// Fifteen seconds, measured on a slow machine rather than a fast
-  /// one. It was three: over six seeded hands a held bot seat answered
-  /// in 69 ms at the middle and 155 ms at the worst over a data
-  /// channel, 365 ms and 787 ms with a relay's latency under it, and
-  /// three was about four times the worst. On two cores shared by four
-  /// browsers — a hosted runner, nearer a cheap phone than a desk is —
-  /// a held pass took 4.3 s at the ninety-fifth percentile and a held
-  /// card 8.7 at the worst, and a juror that was working missed the
-  /// three in five runs of six there: its seat went to the escrow and
-  /// it was left out of the next draw. Fifteen is three and a half
-  /// times that 4.3, as a deal step's allowance is of its own, and 1.7
-  /// times the worst card.
-  static const botActsWithinMs = 15000;
+  /// or the pass, at a table of the standard timing; a table's own is
+  /// [TableTiming.botActsMs], where the measurement behind it is.
+  static final botActsWithinMs = TableTiming.standard.botActsMs;
 
-  /// And its deal steps. A deal step is slower and waits on more — a
-  /// held seat's keys wait for the record to say which draw the hand is
-  /// sealed to ([_checkSealed]), and a step is checked against things
-  /// that may not have arrived — and it answers at 2.9 s at the ninety-fifth
-  /// percentile against a play's 0.16 on a machine with room to spare.
-  /// A held seat that misses it goes to the escrow like one that misses
-  /// a card, and a seat given up with deal steps still to take gives
-  /// the hand up undealt ([_carryEscrow]).
-  ///
-  /// Forty seconds, measured on a slow machine rather than a fast one.
-  /// It was ten, three and a half times that 2.9 s. On two cores
-  /// shared by four browsers — a hosted runner, nearer a cheap phone
-  /// than a desk is — held seats' deal steps took 3.9 s at the middle,
-  /// 11.7 at the ninety-fifth percentile and 24.9 at the worst of 187,
-  /// one in eleven of them past ten; and a working juror that missed
-  /// the ten cost its table the whole hand, twice in four runs. Forty
-  /// is the same three and a half times, now of the slow machine's
-  /// 11.7, and 1.6 times the worst it did. A juror gone quiet is still
-  /// let go at half a minute's silence ([_liveJurors]); this is only
-  /// how long one still heard from may sit on a step.
-  ///
-  /// There was no allowance here at all before: a deal that could not
-  /// finish was caught by silence alone, and a juror heard from and
-  /// doing nothing — a tab starved of a processor, a phone in a pocket
-  /// — is never silent, so the deal waited on its keys for good.
-  static const botDealsWithinMs = 40000;
+  /// And its deal steps ([TableTiming.botDealsMs]).
+  static final botDealsWithinMs = TableTiming.standard.botDealsMs;
 
   /// Whether the seat's holder has had the seat's turn in front of it
   /// for longer than that, and said nothing.
@@ -4010,7 +3976,7 @@ class TableClient {
   /// and a hand sat at one turn for minutes with the seat's own
   /// device apparently present. Heard from is not the same as playing.
   ///
-  /// A deal step has longer ([botDealsWithinMs]), and its clock waits
+  /// A deal step has longer ([TableTiming.botDealsMs]), and its clock waits
   /// for the holder to be at the hand at all. A deal step is the first
   /// thing a holder does in a hand, so it is the one turn a holder can
   /// still be arriving at: drawn this minute, summoned, connecting, and
@@ -4061,7 +4027,7 @@ class TableClient {
       return false;
     }
     final since = _botTurnSince.putIfAbsent(key, () => clock.nowMs);
-    return clock.nowMs - since >= (turn.isDeal || turn.isAudit ? botDealsWithinMs : botActsWithinMs);
+    return clock.nowMs - since >= (turn.isDeal || turn.isAudit ? timing.botDealsMs : timing.botActsMs);
   }
 
   /// Whether a juror has yet to be heard at [hand]: not heard from
@@ -4079,7 +4045,7 @@ class TableClient {
       if (d.event.jurors.contains(juror) && heard < (_juryAt[d.event.id] ?? 0)) return true;
     }
     if (pos.$1 >= hand) return false;
-    return clock.nowMs - (_positionMovedAt[juror] ?? clock.nowMs) < botDealsWithinMs;
+    return clock.nowMs - (_positionMovedAt[juror] ?? clock.nowMs) < timing.botDealsMs;
   }
 
   /// An open turn of a bot seat a juror holds that nobody still being
@@ -4213,16 +4179,12 @@ class TableClient {
   ({TurnId turn, int since})? _unopenableSince;
 
   /// How long a table stopped at a seat nobody left can open waits,
-  /// saying so, before the game ends ([_judgeQuorum]). Those who could
-  /// open it have not been heard from for half a minute by then
-  /// ([_liveJurors]), so the game ends no sooner than fifty seconds
-  /// after the last of them was. It was two minutes, the silence a person is given, and
-  /// that was two minutes of a stopped table in front of people who
-  /// could do nothing about it.
-  static const quorumLostAfterMs = 20000;
+  /// saying so, before the game ends ([_judgeQuorum]), at a table of
+  /// the standard timing; a table's own is [TableTiming.quorumLostMs].
+  static final quorumLostAfterMs = TableTiming.standard.quorumLostMs;
 
   /// Ends the game when the table has been stopped at one turn, with
-  /// nobody left who could move it, for [quorumLostAfterMs]: a seat
+  /// nobody left who could move it, for [TableTiming.quorumLostMs]: a seat
   /// nobody left could open ([_unopenable]), or a turn put to a jury
   /// none of whose jurors is left to rule on it ([_unruled]).
   ///
@@ -4258,7 +4220,7 @@ class TableClient {
     // this side takes its part at once, as it used to end with it.
     if (_races[at.turn]?.ends.isNotEmpty ?? false) return _claimEnd(at);
     if (_unopenableSince?.turn != at.turn) _unopenableSince = (turn: at.turn, since: clock.nowMs);
-    if (clock.nowMs - _unopenableSince!.since < quorumLostAfterMs) return;
+    if (clock.nowMs - _unopenableSince!.since < timing.quorumLostMs) return;
     _claimEnd(at);
   }
 
@@ -4326,7 +4288,7 @@ class TableClient {
       final free = !mine && !_myWitness.containsKey(turn);
       if (free && connectedToMajority && _endingCanCarry(turn)) {
         if (race.ends.isEmpty) {
-          _trace('stopped at $turn for ${quorumLostAfterMs ~/ 1000} seconds: nobody left can move it (seat ${at.seat}); '
+          _trace('stopped at $turn for ${timing.quorumLostMs ~/ 1000} seconds: nobody left can move it (seat ${at.seat}); '
               'claiming the game\'s end there');
           _endedWord = _say(EventKind.ended, {'hand': turn.hand, 'turn': turn.index, 'seat': at.seat, 'vote': true});
         } else {
@@ -5278,8 +5240,10 @@ class TableClient {
   }
 
   /// Jurors in force at [hand] heard from lately, or drawn too recently
-  /// to have been: within half a minute, or [withinMs].
-  Set<PublicKey> _liveJurors(int hand, {int withinMs = 30000}) {
+  /// to have been: within the table's [TableTiming.jurorSilenceMs],
+  /// half a minute as standard, or [withinMs].
+  Set<PublicKey> _liveJurors(int hand, {int? withinMs}) {
+    final within = withinMs ?? timing.jurorSilenceMs;
     final live = <PublicKey>{};
     // This side is live to itself while it serves the hand. Heard-from
     // is how a juror knows about the others, and a client never hears
@@ -5291,7 +5255,7 @@ class TableClient {
       for (final j in jurors) {
         if (live.contains(j)) continue;
         final heard = _jurorHeard[j];
-        if ((heard != null && clock.nowMs - heard < withinMs) || clock.nowMs - drawn < withinMs) live.add(j);
+        if ((heard != null && clock.nowMs - heard < within) || clock.nowMs - drawn < within) live.add(j);
       }
     }
 
@@ -5381,7 +5345,7 @@ class TableClient {
       // does not move the seats — which makes it worth holding the
       // first draw back while a called-for juror could still arrive,
       // rather than drawing a jury now that can hold nothing. Only up
-      // to [_jurorsWaitMs], after which the jury is whoever is there.
+      // to [_jurorsWait], after which the jury is whoever is there.
       if (!own && clock.nowMs - _handOpenedAt < _juryDrawWait) {
         if (!_shortOfJurors) {
           _shortOfJurors = true;

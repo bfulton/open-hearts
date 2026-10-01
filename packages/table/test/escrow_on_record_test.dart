@@ -244,7 +244,7 @@ void main() {
     // Its audit held back ten seconds past the escrow, which is
     // claimed once a deal step's allowance is up; the seat's pieces kept
     // from the people until four seconds after that.
-    const late = TableClient.botDealsWithinMs + 10000;
+    final late = TableClient.botDealsWithinMs + 10000;
     int? said;
     TableEvent? audit;
     t.net.steer = (from, to, message) {

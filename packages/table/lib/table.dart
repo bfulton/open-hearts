@@ -30,4 +30,5 @@ export 'src/relays.dart';
 export 'src/signing.dart';
 export 'src/spec.dart';
 export 'src/time_bank.dart';
+export 'src/timing.dart';
 export 'src/transport.dart';
