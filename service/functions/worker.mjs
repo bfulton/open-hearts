@@ -534,6 +534,23 @@ export async function priceIdOf(named, secret, fetchImpl = fetch, { now = Date.n
   return id;
 }
 
+/// How Stripe's checkout page looks: the app's, not the account's — the
+/// felt, the gold, the front door's heart, and the name (one account may
+/// sell more than one app). The icon is the site's own copy, so a
+/// preview's checkout shows a preview's icon. Only the top of the page
+/// takes the name; receipts carry the account's public business name.
+export function checkoutBranding(back) {
+  return {
+    'branding_settings[display_name]': 'Open Hearts',
+    'branding_settings[icon][type]': 'url',
+    'branding_settings[icon][url]': new URL('/icon-512.png', back).toString(),
+    'branding_settings[background_color]': '#06231A',
+    'branding_settings[button_color]': '#E4B363',
+    'branding_settings[border_style]': 'rounded',
+    'branding_settings[font_family]': 'roboto',
+  };
+}
+
 /// A checkout session for [key], as Stripe answers: {status, body}.
 export async function checkout(key, back, cancelled, env, fetchImpl = fetch) {
   const secret = env.OH_STRIPE_SECRET;
@@ -559,6 +576,7 @@ export async function checkout(key, back, cancelled, env, fetchImpl = fetch) {
     'metadata[key]': key,
     client_reference_id: key,
     'subscription_data[metadata][key]': key,
+    ...checkoutBranding(back),
   });
   let res;
   try {

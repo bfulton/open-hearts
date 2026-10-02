@@ -386,6 +386,11 @@ test('checkout: a subscription session carrying the key three ways', async () =>
   assert.equal(form.get('metadata[key]'), KEY);
   assert.equal(form.get('client_reference_id'), KEY);
   assert.equal(form.get('subscription_data[metadata][key]'), KEY, 'so a renewal a year from now still names the device');
+  // Dressed as the app, with the site's own icon.
+  assert.equal(form.get('branding_settings[display_name]'), 'Open Hearts');
+  assert.equal(form.get('branding_settings[icon][url]'), 'https://x/icon-512.png');
+  assert.equal(form.get('branding_settings[background_color]'), '#06231A');
+  assert.equal(form.get('branding_settings[button_color]'), '#E4B363');
 });
 
 test('checkout: no keys is a shop that is not open, not a broken one', async () => {

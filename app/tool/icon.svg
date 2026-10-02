@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Open Hearts' icon: the front door's heart (lib/ui/folding_heart.dart,
+       heartPath, in Palette.mark) whole on the felt, between its folds.
+       Every size the app and the site ship is rendered from this file by
+       tool/icons.mjs. -->
+  <defs>
+    <radialGradient id="felt" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#14513C"/>
+      <stop offset="0.55" stop-color="#0E3B2E"/>
+      <stop offset="1" stop-color="#06231A"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#felt)"/>
+  <g id="card">
+    <path d="M 512.0 774.0 C 248.0 594.0 224.0 426.0 332.0 318.0 C 422.0 234.0 488.0 294.0 512.0 378.0 C 536.0 294.0 602.0 234.0 692.0 318.0 C 800.0 426.0 776.0 594.0 512.0 774.0 Z" fill="#E8EFEA"/>
+  </g>
+</svg>
