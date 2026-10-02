@@ -11,6 +11,9 @@ main = "worker.mjs"
 base_dir = "../.."
 compatibility_date = "2025-01-01"
 
+# Where the apps find it (app/lib/net/relays.dart, homeTagRelay).
+routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
+
 # The binding the worker routes through. One object per tag, named by
 # the tag itself.
 [[durable_objects.bindings]]
@@ -26,16 +29,16 @@ new_sqlite_classes = ["TagRelay"]
 # A household's codes, claims and drops, one at a time per subscription
 # (docs/06-service.md, "One household at a time"). Bound to the Pages
 # project as HOUSEHOLD (script open-hearts-relay, class Household); it
-# reads and writes the project's own store, so bind the same KV
-# namespace here as OH_STORE first — the id is in the dashboard — and
-# uncomment it. A HOUSEHOLD bound before the store answers 503.
+# reads and writes the project's own store, the same KV namespace as
+# the Pages project's OH_STORE (open-hearts-store). A HOUSEHOLD bound
+# without the store answers 503.
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Household"]
 
-# [[kv_namespaces]]
-# binding = "OH_STORE"
-# id = "<the Pages project's OH_STORE namespace id>"
+[[kv_namespaces]]
+binding = "OH_STORE"
+id = "5b65151de63341dc9f7a9d417c9b6a4e"
 
 # What the operator watches (docs/06-service.md, "Watching it run"): a
 # line of counts a minute from each object in use — connections,
