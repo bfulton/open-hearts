@@ -47,7 +47,7 @@
   "copyRecord": "Protokoll kopieren",
   "ratingNow": "Wertung {rating}",
   "ratingMoved": "Wertung {before} → {after}",
-  "tagline": "Open Source, keine Werbung. Allein oder live spielen.",
+  "tagline": "Open Source, keine Werbung, mehr Herz.",
   "playSolo": "Allein spielen",
   "stillLookingForRelay": "Suche noch ein Relay…",
   "noRelayTakesEvents": "Kein Relay nimmt die Nachrichten dieses Geräts an: {reason}",
@@ -59,13 +59,11 @@
   "yourProfile": "Dein Profil",
   "gameOptions": "Spieloptionen",
   "gameLine": "{target} Punkte · {rated, select, rated{gewertet} other{ungewertet}}",
-  "fourSeatsWaiting": "Vier Plätze, für alle, die gerade warten.",
   "youAreRated": "Deine Wertung ist {rating}{provisional, select, true{, vorläufig} other{}}, {games, plural, =1{aus 1 gewerteten Spiel} other{aus {games} gewerteten Spielen}}.",
   "playLive": "Live spielen",
   "playLiveSpoken": "{online, plural, =0{Live spielen, sonst niemand online} =1{Live spielen, sonst niemand online} other{Live spielen, {online} online}}",
   "onlineCount": "{online, plural, =0{Sonst niemand online} =1{Sonst niemand online} other{{online} online}}",
   "playFriends": "Mit Freunden spielen",
-  "playFriendsDetail": "Ein neuer Tisch und ein Link zum Verschicken. Der Link eines Freundes öffnet dessen Tisch.",
   "pricePerYear": "{amount} im Jahr",
   "seatsOrFriends": "Vier Plätze, für alle, die gerade warten — oder ein Link, den du an drei Freunde schickst.",
   "subscribe": "Abonnieren",
@@ -216,5 +214,6 @@
   "manageInStore": "Kündigen oder ändern {store, select, apple{im App Store} other{bei Google Play}}.",
   "subscription": "Abo",
   "finishingPurchase": "Kauf wird abgeschlossen …",
-  "paidLiveSoon": "Deine Zahlung ist durch. Live-Spiel öffnet sich, sobald sie bei uns ankommt – lade in einer Minute neu."
+  "paidLiveSoon": "Deine Zahlung ist durch. Live-Spiel öffnet sich, sobald sie bei uns ankommt – lade in einer Minute neu.",
+  "checkingOnline": "Suche Spieler online …"
 }

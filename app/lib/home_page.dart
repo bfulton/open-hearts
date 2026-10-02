@@ -922,25 +922,18 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          // How many are online rides on this line rather than in the
-          // button, which kept an empty line for it until the relays
-          // answered. The button still says it to a screen reader, so it
-          // is not said twice here.
+          // Your rating, once the standings are in, and how many are online
+          // — said to be on its way until the relays answer. The button
+          // says the count to a screen reader, so it is not said twice.
           Builder(builder: (context) {
-            final about = standing == null
-                ? l10n.fourSeatsWaiting
+            final rated = standing == null
+                ? null
                 : l10n.youAreRated(standing.mine.shown, flag(standing.mine.provisional), standing.ledger.gamesOf(standing.me));
             final n = _online;
-            return Text.rich(
-              TextSpan(children: [
-                TextSpan(text: about),
-                if (n != null)
-                  TextSpan(
-                    text: ' · ${l10n.onlineCount(n)}',
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: Palette.gold),
-                  ),
-              ]),
-              semanticsLabel: about,
+            final online = n == null ? l10n.checkingOnline : l10n.onlineCount(n);
+            return Text(
+              rated == null ? online : '$rated · $online',
+              semanticsLabel: rated ?? '',
               style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
             );
           }),
@@ -953,12 +946,6 @@ class _HomePageState extends State<HomePage> {
             onPressed: _busy ? null : _enter,
             style: _primary(),
             child: _Trying(busy: _opening == _Opening.friends, label: l10n.playFriends, weight: FontWeight.w700, size: 15.5),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            l10n.playFriendsDetail,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
           ),
         ],
       ),

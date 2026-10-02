@@ -389,6 +389,14 @@ void main() {
     expect(find.text('Live play'), findsOneWidget, reason: 'the card on the door, and not a second one in the menu');
   });
 
+  testWidgets('the live card: no filler, and the online count said to be on its way until it is known', (tester) async {
+    await pumpHome(tester);
+    expect(find.text('Checking online players…'), findsOneWidget);
+    expect(find.text('Four seats, filled with whoever is waiting.'), findsNothing);
+    expect(find.textContaining('A new table, and a link to send'), findsNothing);
+    expect(find.text('Open source, no ads, more heart.'), findsOneWidget);
+  });
+
   testWidgets('back from paying: said so at once, and live play opens when the licence comes', (tester) async {
     tester.view
       ..physicalSize = const Size(390, 844)

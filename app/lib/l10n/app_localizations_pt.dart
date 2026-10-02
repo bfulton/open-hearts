@@ -256,8 +256,7 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get tagline =>
-      'Código aberto, sem anúncios. Jogue sozinho ou ao vivo.';
+  String get tagline => 'Código aberto, sem anúncios, mais coração.';
 
   @override
   String get playSolo => 'Jogar sozinho';
@@ -304,9 +303,6 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get fourSeatsWaiting => 'Quatro lugares, para quem estiver esperando.';
-
-  @override
   String youAreRated(int rating, String provisional, int games) {
     String _temp0 = intl.Intl.selectLogic(provisional, {
       'true': ', provisório',
@@ -350,10 +346,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get playFriends => 'Jogar com amigos';
-
-  @override
-  String get playFriendsDetail =>
-      'Uma mesa nova e um link para enviar. O link de um amigo abre a dele.';
 
   @override
   String pricePerYear(String amount) {
@@ -1046,4 +1038,7 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get paidLiveSoon =>
       'Seu pagamento foi aprovado. O jogo ao vivo abre assim que chegar até nós — recarregue em um minuto.';
+
+  @override
+  String get checkingOnline => 'Procurando jogadores online…';
 }

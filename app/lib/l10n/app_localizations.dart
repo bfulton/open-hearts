@@ -389,7 +389,7 @@ abstract class AppLocalizations {
   /// Under the app's name on the front door.
   ///
   /// In en, this message translates to:
-  /// **'Open source, no ads. Play alone or live.'**
+  /// **'Open source, no ads, more heart.'**
   String get tagline;
 
   /// Button: a game against three bots.
@@ -458,12 +458,6 @@ abstract class AppLocalizations {
   /// **'{target} points · {rated, select, rated{rated} other{unrated}}'**
   String gameLine(int target, String rated);
 
-  /// Under the game options on the front door, before the player's rating is known.
-  ///
-  /// In en, this message translates to:
-  /// **'Four seats, filled with whoever is waiting.'**
-  String get fourSeatsWaiting;
-
   /// Under the game options on the front door. provisional is true while too few games have settled the rating.
   ///
   /// In en, this message translates to:
@@ -493,12 +487,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Play friends'**
   String get playFriends;
-
-  /// Under the Play friends button.
-  ///
-  /// In en, this message translates to:
-  /// **'A new table, and a link to send. A link from a friend opens theirs.'**
-  String get playFriendsDetail;
 
   /// What live play costs. amount is the price with its currency, e.g. $5.99.
   ///
@@ -1405,6 +1393,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your payment went through. Live play opens as soon as it reaches us — reload in a minute.'**
   String get paidLiveSoon;
+
+  /// On the front door, where the count of players online goes, before the relays have answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking online players…'**
+  String get checkingOnline;
 }
 
 class _AppLocalizationsDelegate

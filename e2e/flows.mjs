@@ -67,7 +67,7 @@ flow('the front door', async ({ open }) => {
   // Everything before a game is on this one screen: who you are, the
   // game being asked for, and the three ways in.
   for (const want of [
-    /^Open source, no ads\. Play alone or live\.$/,
+    /^Open source, no ads, more heart\.$/,
     /^Menu$/,
     /^Your profile$/,
     /^Play solo$/,
@@ -281,8 +281,8 @@ flow('a second device, brought in by the code the first one shows', async ({ ope
   const first = await open();
   await waitFor(first, /^Play live/, { what: 'live play open on the first device', timeout: 40000 });
   await click(first, /^Menu$/);
-  await waitFor(first, /^Live play$/, { what: 'the menu' });
-  await click(first, /^Live play$/);
+  await waitFor(first, /^Subscription$/, { what: 'the menu' });
+  await click(first, /^Subscription$/);
   await waitFor(first, /^Add a device$/, { what: 'the subscription page' });
   await waitFor(first, /^This device$/, { what: 'this device on the list' });
   await click(first, /^Add a device$/);
@@ -313,8 +313,8 @@ flow('a second device, brought in by the code the first one shows', async ({ ope
   await first.reload();
   await waitFor(first, /^Play live/, { what: 'the first device back at the door', timeout: 40000 });
   await click(first, /^Menu$/);
-  await waitFor(first, /^Live play$/, { what: 'the menu' });
-  await click(first, /^Live play$/);
+  await waitFor(first, /^Subscription$/, { what: 'the menu' });
+  await click(first, /^Subscription$/);
   await waitFor(first, /^2 of 5$/, { what: 'both devices on the subscription', timeout: 20000 });
 });
 

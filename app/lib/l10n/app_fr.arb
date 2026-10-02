@@ -47,7 +47,7 @@
   "copyRecord": "Copier le relevé",
   "ratingNow": "Classement {rating}",
   "ratingMoved": "Classement {before} → {after}",
-  "tagline": "Open source, sans publicité. Jouez seul ou en direct.",
+  "tagline": "Open source, sans pub, plus de cœur.",
   "playSolo": "Jouer seul",
   "stillLookingForRelay": "Recherche d'un relais…",
   "noRelayTakesEvents": "Aucun relais n'accepte les messages de cet appareil : {reason}",
@@ -59,13 +59,11 @@
   "yourProfile": "Votre profil",
   "gameOptions": "Options de partie",
   "gameLine": "{target} points · {rated, select, rated{classée} other{non classée}}",
-  "fourSeatsWaiting": "Quatre places, pour ceux qui attendent.",
   "youAreRated": "Votre classement est de {rating}{provisional, select, true{, provisoire} other{}}, {games, plural, =1{sur 1 partie classée} other{sur {games} parties classées}}.",
   "playLive": "Jouer en direct",
   "playLiveSpoken": "{online, plural, =0{Jouer en direct, personne d'autre en ligne} =1{Jouer en direct, personne d'autre en ligne} other{Jouer en direct, {online} en ligne}}",
   "onlineCount": "{online, plural, =0{Personne d'autre en ligne} =1{Personne d'autre en ligne} other{{online} en ligne}}",
   "playFriends": "Jouer entre amis",
-  "playFriendsDetail": "Une nouvelle table, et un lien à envoyer. Le lien d'un ami ouvre la sienne.",
   "pricePerYear": "{amount} par an",
   "seatsOrFriends": "Quatre places, pour ceux qui attendent — ou un lien que vous envoyez à trois amis.",
   "subscribe": "S'abonner",
@@ -216,5 +214,6 @@
   "manageInStore": "Résiliez-le ou modifiez-le {store, select, apple{dans l'App Store} other{dans Google Play}}.",
   "subscription": "Abonnement",
   "finishingPurchase": "Finalisation de votre achat…",
-  "paidLiveSoon": "Votre paiement est passé. Le jeu en direct s'ouvre dès qu'il nous parvient — rechargez dans une minute."
+  "paidLiveSoon": "Votre paiement est passé. Le jeu en direct s'ouvre dès qu'il nous parvient — rechargez dans une minute.",
+  "checkingOnline": "Recherche des joueurs en ligne…"
 }

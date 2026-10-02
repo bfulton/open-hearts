@@ -334,7 +334,7 @@
       }
     }
   },
-  "tagline": "Open source, no ads. Play alone or live.",
+  "tagline": "Open source, no ads, more heart.",
   "@tagline": {
     "description": "Under the app's name on the front door."
   },
@@ -400,10 +400,6 @@
       }
     }
   },
-  "fourSeatsWaiting": "Four seats, filled with whoever is waiting.",
-  "@fourSeatsWaiting": {
-    "description": "Under the game options on the front door, before the player's rating is known."
-  },
   "youAreRated": "You are rated {rating}{provisional, select, true{, provisionally} other{}}, {games, plural, =1{from 1 rated game} other{from {games} rated games}}.",
   "@youAreRated": {
     "description": "Under the game options on the front door. provisional is true while too few games have settled the rating.",
@@ -444,10 +440,6 @@
   "playFriends": "Play friends",
   "@playFriends": {
     "description": "Button: a new table of the player's own, and a link to send to friends."
-  },
-  "playFriendsDetail": "A new table, and a link to send. A link from a friend opens theirs.",
-  "@playFriendsDetail": {
-    "description": "Under the Play friends button."
   },
   "pricePerYear": "{amount} a year",
   "@pricePerYear": {
@@ -1253,5 +1245,9 @@
   "paidLiveSoon": "Your payment went through. Live play opens as soon as it reaches us — reload in a minute.",
   "@paidLiveSoon": {
     "description": "On the front door when the payment went through but the licence has not arrived after a while."
+  },
+  "checkingOnline": "Checking online players…",
+  "@checkingOnline": {
+    "description": "On the front door, where the count of players online goes, before the relays have answered."
   }
 }

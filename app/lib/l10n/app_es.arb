@@ -47,7 +47,7 @@
   "copyRecord": "Copiar registro",
   "ratingNow": "Clasificación {rating}",
   "ratingMoved": "Clasificación {before} → {after}",
-  "tagline": "Código abierto, sin anuncios. Juega solo o en vivo.",
+  "tagline": "Código abierto, sin anuncios, más corazón.",
   "playSolo": "Jugar solo",
   "stillLookingForRelay": "Todavía buscando un relé…",
   "noRelayTakesEvents": "Ningún relé acepta los mensajes de este dispositivo: {reason}",
@@ -59,13 +59,11 @@
   "yourProfile": "Tu perfil",
   "gameOptions": "Opciones de partida",
   "gameLine": "{target} puntos · {rated, select, rated{con clasificación} other{sin clasificación}}",
-  "fourSeatsWaiting": "Cuatro asientos, para quien esté esperando.",
   "youAreRated": "Tu clasificación es {rating}{provisional, select, true{, provisional} other{}}, {games, plural, =1{tras 1 partida clasificada} other{tras {games} partidas clasificadas}}.",
   "playLive": "Jugar en vivo",
   "playLiveSpoken": "{online, plural, =0{Jugar en vivo, nadie más conectado} =1{Jugar en vivo, nadie más conectado} other{Jugar en vivo, {online} conectados}}",
   "onlineCount": "{online, plural, =0{Nadie más conectado} =1{Nadie más conectado} other{{online} conectados}}",
   "playFriends": "Jugar con amigos",
-  "playFriendsDetail": "Una mesa nueva y un enlace para enviar. El enlace de un amigo abre la suya.",
   "pricePerYear": "{amount} al año",
   "seatsOrFriends": "Cuatro asientos, para quien esté esperando — o un enlace que envías a tres amigos.",
   "subscribe": "Suscribirse",
@@ -216,5 +214,6 @@
   "manageInStore": "Cancélala o cámbiala en {store, select, apple{App Store} other{Google Play}}.",
   "subscription": "Suscripción",
   "finishingPurchase": "Terminando tu compra…",
-  "paidLiveSoon": "Tu pago se ha realizado. El juego en vivo se abre en cuanto nos llegue: recarga en un minuto."
+  "paidLiveSoon": "Tu pago se ha realizado. El juego en vivo se abre en cuanto nos llegue: recarga en un minuto.",
+  "checkingOnline": "Buscando jugadores en línea…"
 }

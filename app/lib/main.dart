@@ -118,6 +118,9 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: languageInAddress(),
+      // Any words on any screen can be selected and copied: a name, a
+      // rule, an error to send us.
+      builder: (context, child) => SelectionArea(child: child ?? const SizedBox()),
       home: HomePage(
         openRoom: room != null && Room.validCode(room) ? room : null,
         openClaim: claimInAddress(),
