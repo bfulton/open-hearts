@@ -93,6 +93,15 @@ the bottom with the day.
   change.
 ## Cloudflare and deploying
 
+- **Email for backup codes**, after the Workers Paid plan: onboard
+  openhearts.game to Cloudflare Email Service (dashboard → Email →
+  Email Sending; it adds its DNS records to the zone), then uncomment
+  `send_email` and `OH_MAIL_FROM` in `service/do/wrangler.toml` and
+  redeploy the relay. And give the service's Stripe key
+  (`OH_STRIPE_SECRET`) **Customers: Read**, which replacing codes needs
+  to look the payer's address up; without it, replaced codes are only
+  shown in the app.
+
 - **Tighter rate limits need a paid zone plan.** The Free plan allows
   one rule; it is in place (below). Per-handler limits — `/api/ticket`,
   `/api/claim`, `/api/checkout`, `/api/turn` at about ten a minute

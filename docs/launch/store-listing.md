@@ -74,8 +74,9 @@ Found while writing this; none is a copy change.
   a store. It links neither today.
 - **The Android launcher label** reads `open_hearts`
   (`AndroidManifest.xml`).
-- **iOS purpose strings** for camera and microphone may be demanded
-  because `flutter_webrtc` links them (privacy.md).
+- **iOS purpose strings**: the camera's is set (scanning a code to
+  add a device, `NSCameraUsageDescription`); the microphone's may be
+  demanded because `flutter_webrtc` links it (privacy.md).
 - **A privacy policy link inside the app** — both stores want one; the
   About page has none.
 

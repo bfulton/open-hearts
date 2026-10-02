@@ -205,6 +205,13 @@ What follows:
   session for that customer (`billing.stripe.com`, Stripe's page, where
   the subscriber sees their email, card and receipts). Any device bound
   to the subscription may open it.
+- **`SUB#<id>|BACKUP`** — the subscription's five backup codes in
+  the clear (any device bound to it is shown them), which are used and
+  when; and `BACKUP#<digest>|META` per code, naming the subscription.
+  When the codes are made, and when they are replaced, they are
+  emailed to the payer of a web subscription through Cloudflare's
+  Email Sending: the address is read off Stripe's checkout event, or
+  from `GET /v1/customers/{id}` on a replacement, and not stored.
 - **Only a household code's rows expire** (an hour after the code is
   made). An ended subscription is dated down, not deleted.
 
