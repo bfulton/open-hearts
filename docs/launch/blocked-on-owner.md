@@ -86,12 +86,6 @@ the bottom with the day.
   thresholds (commonly $100,000 or 200 sales a year in a state), which
   Stripe Tax's monitoring shows when it is on. The checkout does not
   turn on automatic tax today.
-- **Set up the billing portal** (Stripe → Settings → Billing →
-  Customer portal): allow cancelling (at the end of the period),
-  updating the payment method and viewing invoices; add the business
-  name, the privacy and terms links, and save it. Without a saved
-  configuration Stripe refuses to open a portal, and Manage
-  subscription says the shop is not open.
 - **Decide who may open the portal.** As built, any device on the
   subscription may — so a household that lost the phone that paid can
   still cancel — which also shows any of them the payer's email and
@@ -127,3 +121,4 @@ the bottom with the day.
 
 - 2 October: the yearly $5.99 product created in Stripe.
 - 2 October: `OH_STRIPE_PRICE` set to the price's lookup key.
+- 2 October: Stripe's customer portal: cancelling, payment method and invoices on (the defaults). Confirm Manage subscription opens it in the first production test.
