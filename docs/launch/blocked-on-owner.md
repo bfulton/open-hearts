@@ -93,31 +93,16 @@ the bottom with the day.
   change.
 ## Cloudflare and deploying
 
-- **Email for backup codes**, after the Workers Paid plan: onboard
-  openhearts.game to Cloudflare Email Service (dashboard → Email →
-  Email Sending; it adds its DNS records to the zone), then uncomment
-  `send_email` and `OH_MAIL_FROM` in `service/do/wrangler.toml` and
-  redeploy the relay. And give the service's Stripe key
-  (`OH_STRIPE_SECRET`) **Customers: Read**, which replacing codes needs
-  to look the payer's address up; without it, replaced codes are only
-  shown in the app.
+- **Email for backup codes**: onboard openhearts.game to Cloudflare
+  Email Service (dashboard → Email → Email Sending; it adds its DNS
+  records to the zone). Then I uncomment `send_email` and
+  `OH_MAIL_FROM` in `service/do/wrangler.toml` and redeploy the relay.
+  Until then the codes are only shown in the app.
 
 - **Tighter rate limits need a paid zone plan.** The Free plan allows
   one rule; it is in place (below). Per-handler limits — `/api/ticket`,
   `/api/claim`, `/api/checkout`, `/api/turn` at about ten a minute
   (`docs/security-review.md`) — need Pro.
-- **The Workers Paid plan ($5 a month)** — Cloudflare dashboard →
-  Workers & Pages → Plans. Checked 2 October: the account has none.
-  Three things wait on it: the jurors of last resort as a Cloudflare
-  Container (live tables with bots wait for a jury and, until the
-  bench runs, a quiet night means they wait for good — do not deploy
-  the no-fallback build to production before it); emailing backup
-  codes (Cloudflare Email Sending, 3,000 a month included); and KV
-  past the free 1,000 writes a day. Once it is on, the bench is
-  mine to deploy (built, tested against a real table, and its config
-  checked with a dry run): uncomment the container block in
-  `service/do/wrangler.toml`, `service/bench/build.sh`, set
-  `OH_JUROR_SECRET`, deploy the relay.
 - **Buy it once for real**: on https://openhearts.game/play, subscribe
   with your own card, play a live table on two devices, open Manage
   subscription, then cancel and refund it in Stripe. Everything short
@@ -189,3 +174,14 @@ the bottom with the day.
   what one misused credential carries; the budget alerts would show
   misuse at $10. If it is ever needed: shorten `turnTtlS` (config|service)
   to an hour and have the app refresh its credentials mid-session.
+- 2 October: the Workers Paid plan on.
+- 2 October: the service's Stripe key replaced with one restricted to
+  what it calls (Products, Subscriptions and Customers read; Checkout
+  Sessions and Customer Portal write); the old one, which a template
+  had given read and write on nearly everything, expired. A checkout on
+  production opened with the new key.
+- 2 October: the jurors of last resort deployed as a Cloudflare
+  Container. Checked on production: a call for a juror on
+  relay.openhearts.game brought all four online 2.4 s later.
+- 2 October: production deployed with no open-bot fallback, Activate
+  subscription, backup codes and the About links.
