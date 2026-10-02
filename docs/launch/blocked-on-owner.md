@@ -86,11 +86,6 @@ the bottom with the day.
   thresholds (commonly $100,000 or 200 sales a year in a state), which
   Stripe Tax's monitoring shows when it is on. The checkout does not
   turn on automatic tax today.
-- **A restricted API key** (Developers → API keys → Create restricted
-  key), with only: Checkout Sessions **Write**, Prices **Read**,
-  Subscriptions **Read**, Customer portal **Write**; everything else
-  None. As the secret `OH_STRIPE_SECRET` — `rk_live_…` in Production,
-  `rk_test_…` in Preview.
 - **Decide who may open the portal.** As built, any device on the
   subscription may — so a household that lost the phone that paid can
   still cancel — which also shows any of them the payer's email and
@@ -141,3 +136,4 @@ the bottom with the day.
   receives are answered and ignored); the portal's default
   configuration cancels at the period's end, updates cards and shows
   invoices, and now links the privacy policy and terms.
+- 2 October: the service's restricted Stripe key saved as `OH_STRIPE_SECRET`.
