@@ -154,3 +154,7 @@ the bottom with the day.
 - 2 October: Preview has its own store (`open-hearts-store-preview`)
   and no `HOUSEHOLD` binding (that object reads production's store), so
   nothing done on a preview deployment touches production's rows.
+- 2 October: the first real purchase, on production: checkout, the
+  webhook and the licence all worked. Stripe's account renamed to Open
+  Hearts inside a Bright Fulton organization; checkout branded like the
+  app; receipt emails (successful payments) switched on.
