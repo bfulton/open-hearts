@@ -86,6 +86,14 @@ the bottom with the day.
   thresholds (commonly $100,000 or 200 sales a year in a state), which
   Stripe Tax's monitoring shows when it is on. The checkout does not
   turn on automatic tax today.
+- **A restricted API key** (Developers → API keys → Create restricted
+  key), with only: Checkout Sessions **Write**, Prices **Read**,
+  Subscriptions **Read**, Customer portal **Write**; everything else
+  None. As the secret `OH_STRIPE_SECRET` — `rk_live_…` in Production,
+  `rk_test_…` in Preview.
+- **Check the webhook's mode**: `OH_STRIPE_WEBHOOK_SECRET` is set; it
+  belongs in Production if the endpoint was made in live mode, Preview
+  if in test mode, and each mode needs its own endpoint.
 - **Decide who may open the portal.** As built, any device on the
   subscription may — so a household that lost the phone that paid can
   still cancel — which also shows any of them the payer's email and
@@ -122,3 +130,4 @@ the bottom with the day.
 - 2 October: the yearly $5.99 product created in Stripe.
 - 2 October: `OH_STRIPE_PRICE` set to the price's lookup key.
 - 2 October: Stripe's customer portal: cancelling, payment method and invoices on (the defaults). Confirm Manage subscription opens it in the first production test.
+- 2 October: `OH_STRIPE_WEBHOOK_SECRET` set.

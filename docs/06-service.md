@@ -340,7 +340,9 @@ product costs, `canBuyHere` is false off the web and says so rather
 than opening a checkout a phone should not be using.
 
 Three things have to be set on the project for any of it to work:
-`OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` (a yearly recurring price: its
+`OH_STRIPE_SECRET` (a restricted key, `rk_…`, with only what the
+worker calls: Checkout Sessions write, Prices read, Subscriptions
+read, Customer portal write), `OH_STRIPE_PRICE` (a yearly recurring price: its
 `price_…` id, or its lookup key — the same in test mode and live, and
 moved to a new price in the dashboard with nothing changed here; the
 worker asks Stripe for the active price holding it and keeps the
