@@ -100,7 +100,7 @@ export function serviceSettingsOf(raw) {
   }
   // A code handed back again has to have the time left to be used.
   if (c.ticketReuseMinutes >= c.ticketMinutes) c.ticketReuseMinutes = Math.min(SERVICE_DEFAULTS.ticketReuseMinutes, c.ticketMinutes - 1);
-  if (typeof raw.stripePrice === 'string' && /^price_[A-Za-z0-9]{1,64}$/.test(raw.stripePrice)) c.stripePrice = raw.stripePrice;
+  if (typeof raw.stripePrice === 'string' && STRIPE_PRICE.test(raw.stripePrice)) c.stripePrice = raw.stripePrice;
   return c;
 }
 
@@ -494,11 +494,47 @@ export function sameSite(candidate, requestUrl) {
   return at.origin === new URL(requestUrl).origin ? at.toString() : null;
 }
 
+/// What names the price a checkout sells: its id (`price_…`), or its
+/// lookup key, which is the same in test mode and live and moves to a
+/// new price in the dashboard with nothing changed here.
+export const STRIPE_PRICE = /^(price_[A-Za-z0-9]{1,64}|(?!price_)[A-Za-z0-9_.:-]{1,200})$/;
+
+/// Lookup keys already asked of Stripe, kept a few minutes: a key moved
+/// to a new price reaches checkouts within that.
+const priceIds = new Map();
+const PRICE_KEPT_MS = 5 * 60 * 1000;
+
+/// For a test: ask Stripe again.
+export const forgetPriceIds = () => priceIds.clear();
+
+/// The price id [named] stands for — itself, when it is one; the active
+/// price holding it as its lookup key, when it is not; null when Stripe
+/// has no such price.
+export async function priceIdOf(named, secret, fetchImpl = fetch, { now = Date.now() } = {}) {
+  if (named.startsWith('price_')) return named;
+  const kept = priceIds.get(named);
+  if (kept && kept.until > now) return kept.id;
+  const url = `${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
+  const res = await fetchImpl(url, { headers: { authorization: `Bearer ${secret}` } });
+  if (!res.ok) throw new Error(`stripe prices ${res.status}`);
+  const id = (await res.json())?.data?.[0]?.id;
+  if (typeof id !== 'string' || !id.startsWith('price_')) return null;
+  priceIds.set(named, { id, until: now + PRICE_KEPT_MS });
+  return id;
+}
+
 /// A checkout session for [key], as Stripe answers: {status, body}.
 export async function checkout(key, back, cancelled, env, fetchImpl = fetch) {
   const secret = env.OH_STRIPE_SECRET;
-  const price = S().stripePrice ?? env.OH_STRIPE_PRICE;
-  if (!secret || !price) return { status: 503, body: { error: 'the shop is not open yet' } };
+  const named = S().stripePrice ?? env.OH_STRIPE_PRICE;
+  if (!secret || typeof named !== 'string' || !STRIPE_PRICE.test(named)) return { status: 503, body: { error: 'the shop is not open yet' } };
+  let price;
+  try {
+    price = await priceIdOf(named, secret, fetchImpl);
+  } catch {
+    return { status: 502, body: { error: 'the shop is not answering' } };
+  }
+  if (!price) return { status: 503, body: { error: 'the shop is not open yet' } };
   const form = new URLSearchParams({
     mode: 'subscription',
     'line_items[0][price]': price,

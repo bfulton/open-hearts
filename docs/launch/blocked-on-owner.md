@@ -80,14 +80,13 @@ the bottom with the day.
 
 ## Stripe
 
-- **Set the price id.** The yearly $5.99 product is made (2 October).
-  What the service needs is its **price** id, `price_…` (the product's
-  page, under Pricing), not the product's `prod_…`: set it as the
-  secret `OH_STRIPE_PRICE` on the Pages project, or as `stripePrice` in
-  `config|service` (doc 06, "The service's settings"), which refuses
-  anything that is not a `price_` id. Use the live-mode price with the
-  live secret key, and the test-mode one with the test key: a price
-  from one mode is unknown to the other.
+- **Name the price.** The yearly $5.99 product is made (2 October).
+  Set `OH_STRIPE_PRICE` on the Pages project to the price's **lookup
+  key** (simplest: give the test-mode and live-mode prices the same
+  one, and later move it to a new price with nothing changed here) or
+  to its `price_…` id — not the product's `prod_…`. A `price_…` id
+  belongs to one mode, so it has to match the secret key's mode; a
+  lookup key resolves in whichever mode the key is.
 - **Set up the billing portal** (Stripe → Settings → Billing →
   Customer portal): allow cancelling (at the end of the period),
   updating the payment method and viewing invoices; add the business

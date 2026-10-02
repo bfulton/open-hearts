@@ -340,7 +340,11 @@ product costs, `canBuyHere` is false off the web and says so rather
 than opening a checkout a phone should not be using.
 
 Three things have to be set on the project for any of it to work:
-`OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` (a yearly recurring price) and
+`OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` (a yearly recurring price: its
+`price_…` id, or its lookup key — the same in test mode and live, and
+moved to a new price in the dashboard with nothing changed here; the
+worker asks Stripe for the active price holding it and keeps the
+answer five minutes) and
 `OH_STRIPE_WEBHOOK_SECRET`, with the webhook pointed at `/api/stripe`
 for `checkout.session.completed`,
 `checkout.session.async_payment_succeeded` and
@@ -518,7 +522,7 @@ npx wrangler kv key put --binding OH_STORE 'config|relay' '{"burst": 30, "perSec
 
 | Field | What it is | Bounds | With none |
 |---|---|---|---|
-| `stripePrice` | The Stripe price a checkout sells (`price_…`), in place of `OH_STRIPE_PRICE`. Change `price` in the app's row with it. | a price id | `OH_STRIPE_PRICE` |
+| `stripePrice` | The Stripe price a checkout sells, in place of `OH_STRIPE_PRICE`: its id (`price_…`) or its lookup key. Change `price` in the app's row with it. | a price id or lookup key | `OH_STRIPE_PRICE` |
 | `licenceDays` | How long a licence lasts before the device asks again; never past the subscription's own end. | 1–62 | 31 |
 | `mostDevices` | Devices on one subscription. | 1–10 | 5 |
 | `ticketMinutes` | How long a household code is good for. | 1–60 | 10 |
