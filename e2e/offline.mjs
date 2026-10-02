@@ -111,12 +111,12 @@ async function home(page) {
   await waitFor(page, /^Play solo$/, { what: 'the door' });
 }
 
-/// The Live play page, behind the menu, where a subscriber's devices are.
+/// The Subscription page, behind the menu, where a subscriber's devices are.
 async function livePlayPage(page) {
   await click(page, /^Menu$/);
-  await waitFor(page, /^Live play$/, { what: 'the menu' });
-  await click(page, /^Live play$/);
-  await waitFor(page, /^Your devices$/, { what: 'the Live play page' });
+  await waitFor(page, /^Subscription$/, { what: 'the menu' });
+  await click(page, /^Subscription$/);
+  await waitFor(page, /^Your devices$/, { what: 'the Subscription page' });
 }
 
 /// A whole hand against the bots, played through the tree.
