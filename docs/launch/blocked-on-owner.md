@@ -165,3 +165,8 @@ the bottom with the day.
   of spend in a billing period, emailed to bright.fulton@gmail.com.
   Cloudflare has no hard cap; TURN (free to 1,000 GB a month) is the
   one cost here that grows with use.
+- 2 October, decided: no daily cap on TURN credentials. Play uses
+  kilobytes against a free 1,000 GB a month; a count cap would not limit
+  what one misused credential carries; the budget alerts would show
+  misuse at $10. If it is ever needed: shorten `turnTtlS` (config|service)
+  to an hour and have the app refresh its credentials mid-session.
