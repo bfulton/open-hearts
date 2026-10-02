@@ -93,10 +93,10 @@ the bottom with the day.
   change.
 ## Cloudflare and deploying
 
-- **Rate limits** (WAF): `/api/*` per IP, generous; tighter on
-  `/api/ticket`, `/api/claim`, `/api/checkout`, `/api/turn`; and one on
-  WebSocket upgrades to the relay host (`docs/security-review.md`,
-  "What the owner has to do").
+- **Tighter rate limits need a paid zone plan.** The Free plan allows
+  one rule; it is in place (below). Per-handler limits — `/api/ticket`,
+  `/api/claim`, `/api/checkout`, `/api/turn` at about ten a minute
+  (`docs/security-review.md`) — need Pro.
 - **TURN**: a usage alert or budget on Cloudflare Realtime.
 - **Plan**: the Workers paid plan, or the rate limits above, before
   launch — KV's free 1,000 writes a day is spendable.
@@ -158,3 +158,7 @@ the bottom with the day.
   webhook and the licence all worked. Stripe's account renamed to Open
   Hearts inside a Bright Fulton organization; checkout branded like the
   app; receipt emails (successful payments) switched on.
+- 2 October: a rate limit on openhearts.game: `/api/*` (but not the
+  Stripe, Apple and Play webhooks) and relay.openhearts.game, 30
+  requests per 10 seconds per address, blocked for 10 seconds. Checked:
+  a burst of 300 from this machine's handful of addresses drew 429s.
