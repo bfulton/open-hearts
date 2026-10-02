@@ -143,3 +143,7 @@ the bottom with the day.
   signature wasm on Cloudflare (every signed request answered 503), and
   five old preview deployments that handed TURN credentials to anyone
   were deleted.
+- 2 October: only real secrets are encrypted now; `OH_TURN_KEY_ID`
+  (`open-hearts-turn`, d681af4e…), `OH_STRIPE_PRICE` and
+  `OH_SERVICE_KEY` are plain text. Checked: production minted TURN
+  credentials for a device given a test subscription (rows deleted).
