@@ -130,10 +130,16 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp -r site/. "$STAGE"/
 # The service's handlers (docs/06-service.md) run as the Pages worker:
-# _worker.js at the root of what is published answers /api/…, and
+# _worker.js/ at the root of what is published answers /api/…, and
 # hands everything else to the static assets. Its secrets — the TURN
 # key — are the project's, set in the Pages dashboard, never here.
-cp service/functions/worker.mjs "$STAGE/_worker.js"
+# A directory rather than one file: the entry imports the signature
+# wasm as a module, which Cloudflare compiles at upload — it refuses to
+# compile wasm from bytes while running (service/functions/entry.mjs).
+mkdir -p "$STAGE/_worker.js"
+cp service/functions/entry.mjs "$STAGE/_worker.js/index.js"
+cp service/functions/worker.mjs "$STAGE/_worker.js/worker.mjs"
+cp app/web/schnorr.wasm "$STAGE/_worker.js/schnorr.wasm"
 
 # OH_RELAYS is left empty so the build uses its own relay list
 # (app/lib/net/relays.dart); the local rig is the only thing that sets

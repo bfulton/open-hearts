@@ -305,7 +305,10 @@ export function memoryStore(seed = {}) {
 let signing = null;
 
 export async function signerOn(bytes) {
-  const { memory, alloc, reset, sign, verify } = (await WebAssembly.instantiate(bytes, {})).instance.exports;
+  // A compiled module (what Cloudflare hands an imported .wasm) gives an
+  // instance; bytes (Node, the tests) give the module and the instance.
+  const made = await WebAssembly.instantiate(bytes, {});
+  const { memory, alloc, reset, sign, verify } = (made.instance ?? made).exports;
   reset();
   const at = { sk: alloc(32), pk: alloc(32), msg: alloc(32), aux: alloc(32), sig: alloc(64) };
   const put = (to, hex) => {
@@ -335,7 +338,14 @@ export async function signerOn(bytes) {
 /// What is kept is the promise of it rather than the signer, so a
 /// second request arriving while the first is still fetching gets the
 /// one the first built and not one of its own.
+/// The signature wasm as a compiled module, when the runtime imported
+/// one (service/functions/entry.mjs): Cloudflare will not compile wasm
+/// from bytes at run time, so on Cloudflare this is the only way in.
+let schnorrModule = null;
+export const useSchnorrModule = (module) => (schnorrModule = module);
+
 function signerFor(request, env) {
+  if (schnorrModule) return (signing ??= signerOn(schnorrModule));
   return (signing ??= (async () => {
     const res = await env.ASSETS.fetch(new URL('/play/schnorr.wasm', request.url));
     if (!res.ok) throw new Error(`no schnorr wasm: ${res.status}`);
