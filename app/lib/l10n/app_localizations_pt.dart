@@ -817,10 +817,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get unrated => 'Não ranqueada';
 
   @override
-  String get sourceCode => 'Código-fonte';
+  String get sourceCode => 'Código';
 
   @override
-  String get licenseName => 'Licença MIT';
+  String get licenseName => 'Licença';
 
   @override
   String get build => 'Versão';
@@ -1118,4 +1118,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get haveACode => 'Tem um código? Ativar';
+
+  @override
+  String get privacyShort => 'Privacidade';
+
+  @override
+  String get termsShort => 'Termos';
 }

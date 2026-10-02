@@ -168,8 +168,8 @@
   "ratedMovesRatings": "Partidas ranqueadas mexem no seu rating, e no dos bots",
   "rated": "Ranqueada",
   "unrated": "Não ranqueada",
-  "sourceCode": "Código-fonte",
-  "licenseName": "Licença MIT",
+  "sourceCode": "Código",
+  "licenseName": "Licença",
   "build": "Versão",
   "published": "Publicada",
   "buildIsUp": "{build} já está disponível",
@@ -239,5 +239,7 @@
   "replace": "Substituir",
   "codesEmailed": "Novos códigos criados e enviados para o seu e-mail.",
   "codesMade": "Novos códigos criados.",
-  "haveACode": "Tem um código? Ativar"
+  "haveACode": "Tem um código? Ativar",
+  "privacyShort": "Privacidade",
+  "termsShort": "Termos"
 }

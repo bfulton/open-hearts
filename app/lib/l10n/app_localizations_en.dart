@@ -815,10 +815,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unrated => 'Unrated';
 
   @override
-  String get sourceCode => 'Source code';
+  String get sourceCode => 'Code';
 
   @override
-  String get licenseName => 'MIT License';
+  String get licenseName => 'License';
 
   @override
   String get build => 'Build';
@@ -1113,4 +1113,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get haveACode => 'Have a code? Activate';
+
+  @override
+  String get privacyShort => 'Privacy';
+
+  @override
+  String get termsShort => 'Terms';
 }

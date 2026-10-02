@@ -168,8 +168,8 @@
   "ratedMovesRatings": "Gewertete Spiele verändern deine Wertung, und die der Bots",
   "rated": "Gewertet",
   "unrated": "Ungewertet",
-  "sourceCode": "Quellcode",
-  "licenseName": "MIT-Lizenz",
+  "sourceCode": "Code",
+  "licenseName": "Lizenz",
   "build": "Version",
   "published": "Veröffentlicht",
   "buildIsUp": "{build} ist da",
@@ -239,5 +239,7 @@
   "replace": "Ersetzen",
   "codesEmailed": "Neue Codes erstellt und dir per E-Mail geschickt.",
   "codesMade": "Neue Codes erstellt.",
-  "haveACode": "Hast du einen Code? Aktivieren"
+  "haveACode": "Hast du einen Code? Aktivieren",
+  "privacyShort": "Datenschutz",
+  "termsShort": "Bedingungen"
 }

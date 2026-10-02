@@ -168,8 +168,8 @@
   "ratedMovesRatings": "Las partidas con clasificación mueven la tuya, y la de los bots",
   "rated": "Con clasificación",
   "unrated": "Sin clasificación",
-  "sourceCode": "Código fuente",
-  "licenseName": "Licencia MIT",
+  "sourceCode": "Código",
+  "licenseName": "Licencia",
   "build": "Versión",
   "published": "Publicada",
   "buildIsUp": "{build} ya está disponible",
@@ -239,5 +239,7 @@
   "replace": "Reemplazar",
   "codesEmailed": "Códigos nuevos creados y enviados a tu correo.",
   "codesMade": "Códigos nuevos creados.",
-  "haveACode": "¿Tienes un código? Activar"
+  "haveACode": "¿Tienes un código? Activar",
+  "privacyShort": "Privacidad",
+  "termsShort": "Términos"
 }

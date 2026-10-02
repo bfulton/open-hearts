@@ -1115,13 +1115,13 @@ abstract class AppLocalizations {
   /// On the About page: a link to the project's repository on GitHub.
   ///
   /// In en, this message translates to:
-  /// **'Source code'**
+  /// **'Code'**
   String get sourceCode;
 
   /// On the About page: the name of the code's licence, a link to its text.
   ///
   /// In en, this message translates to:
-  /// **'MIT License'**
+  /// **'License'**
   String get licenseName;
 
   /// On the About page: which build of the app this is.
@@ -1543,6 +1543,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Have a code? Activate'**
   String get haveACode;
+
+  /// On the About page: a link to the privacy policy, in one word.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get privacyShort;
+
+  /// On the About page: a link to the terms of use, in one word.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms'**
+  String get termsShort;
 }
 
 class _AppLocalizationsDelegate

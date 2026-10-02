@@ -985,11 +985,11 @@
   "@unrated": {
     "description": "In game options: an unrated game."
   },
-  "sourceCode": "Source code",
+  "sourceCode": "Code",
   "@sourceCode": {
     "description": "On the About page: a link to the project's repository on GitHub."
   },
-  "licenseName": "MIT License",
+  "licenseName": "License",
   "@licenseName": {
     "description": "On the About page: the name of the code's licence, a link to its text."
   },
@@ -1345,5 +1345,13 @@
   "haveACode": "Have a code? Activate",
   "@haveACode": {
     "description": "On the Subscription page before buying: a link to Activate subscription."
+  },
+  "privacyShort": "Privacy",
+  "termsShort": "Terms",
+  "@privacyShort": {
+    "description": "On the About page: a link to the privacy policy, in one word."
+  },
+  "@termsShort": {
+    "description": "On the About page: a link to the terms of use, in one word."
   }
 }

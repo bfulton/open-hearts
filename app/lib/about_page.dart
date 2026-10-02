@@ -51,8 +51,8 @@ class AboutPage extends StatelessWidget {
                   children: [
                     _Link(context.l10n.sourceCode, projectSource),
                     _Link(context.l10n.licenseName, projectLicense),
-                    _Link(context.l10n.privacyPolicy, legalPage('privacy')),
-                    _Link(context.l10n.termsOfUse, legalPage('terms')),
+                    _Link(context.l10n.privacyShort, legalPage('privacy')),
+                    _Link(context.l10n.termsShort, legalPage('terms')),
                   ],
                 ),
               ],

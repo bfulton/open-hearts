@@ -168,8 +168,8 @@
   "ratedMovesRatings": "Les parties classées font bouger votre classement, et celui des bots",
   "rated": "Classée",
   "unrated": "Non classée",
-  "sourceCode": "Code source",
-  "licenseName": "Licence MIT",
+  "sourceCode": "Code",
+  "licenseName": "Licence",
   "build": "Version",
   "published": "Publiée",
   "buildIsUp": "{build} est disponible",
@@ -239,5 +239,7 @@
   "replace": "Remplacer",
   "codesEmailed": "Nouveaux codes créés et envoyés par e-mail.",
   "codesMade": "Nouveaux codes créés.",
-  "haveACode": "Vous avez un code ? Activer"
+  "haveACode": "Vous avez un code ? Activer",
+  "privacyShort": "Confidentialité",
+  "termsShort": "Conditions"
 }
