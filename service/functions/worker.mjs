@@ -155,6 +155,7 @@ export function allowedOrigin(origin, requestUrl = null) {
     return null;
   }
   if (host === 'localhost' || host === '127.0.0.1') return requestUrl && isLocal(requestUrl) ? origin : null;
+  if (host === 'openhearts.game' || host === 'www.openhearts.game') return origin;
   if (host === 'open-hearts.pages.dev' || host.endsWith('.open-hearts.pages.dev')) return origin;
   return null;
 }

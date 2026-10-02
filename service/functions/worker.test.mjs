@@ -97,6 +97,10 @@ const post = (body, origin) =>
   });
 
 test('origins: the site, its branches and a dev machine; nobody else', () => {
+  assert.equal(allowedOrigin('https://openhearts.game'), 'https://openhearts.game');
+  assert.equal(allowedOrigin('https://www.openhearts.game'), 'https://www.openhearts.game');
+  assert.equal(allowedOrigin('https://openhearts.game.evil.example'), null);
+  assert.equal(allowedOrigin('https://openhearts.lol'), null, 'the redirect serves nothing');
   assert.equal(allowedOrigin('https://dev.open-hearts.pages.dev'), 'https://dev.open-hearts.pages.dev');
   assert.equal(allowedOrigin('https://open-hearts.pages.dev'), 'https://open-hearts.pages.dev');
   // A dev machine's own pages, asking a dev machine; never the deployed
