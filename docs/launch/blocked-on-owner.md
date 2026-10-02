@@ -91,10 +91,6 @@ the bottom with the day.
   still cancel — which also shows any of them the payer's email and
   receipts. Restricting it to the device that paid is a one-line
   change.
-- **When the domain moves** to openhearts.game: the live webhook's URL
-  and the portal's privacy and terms links still name
-  open-hearts.pages.dev.
-
 ## Cloudflare and deploying
 
 - **Rate limits** (WAF): `/api/*` per IP, generous; tighter on
@@ -104,24 +100,15 @@ the bottom with the day.
 - **TURN**: a usage alert or budget on Cloudflare Realtime.
 - **Plan**: the Workers paid plan, or the rate limits above, before
   launch — KV's free 1,000 writes a day is spendable.
-- **Secrets** set as encrypted secrets, not plain variables;
-  `OH_OPEN_HOUSE` unset everywhere.
-- **Bind the household**: set the Pages project's `OH_STORE` namespace
-  id in `service/do/wrangler.toml`, deploy `service/do`, then bind
-  `HOUSEHOLD` on the Pages project (script `open-hearts-relay`, class
-  `Household`). In that order.
-- **Deploy to production.** Nothing is at open-hearts.pages.dev yet
-  (Cloudflare's 404); only an old preview at dev.open-hearts.pages.dev,
-  from before remote config. The live Stripe webhook points at the
-  production URL, so it fails until then — harmless before anyone buys.
-- **Secrets go in Production**: the Stripe key, price and webhook
-  secret are live-mode, so they belong in the Pages project's
-  Production environment, not Preview.
-- **The domain**: attach openhearts.game to the Pages project; the
-  site, the store listing and the app's legal links assume it.
-- **After deploying**, check the headers (`docs/security-review.md`,
-  item 6) and that live play works on production end to end — it has
-  not been confirmed there.
+- **Buy it once for real**: on https://openhearts.game/play, subscribe
+  with your own card, play a live table on two devices, open Manage
+  subscription, then cancel and refund it in Stripe. Everything short
+  of a payment has been checked on production (2 October).
+- **Revoke the temporary keys** given to set this up: the Stripe
+  restricted key and the Cloudflare API token.
+- **Preview shares production's store**: preview deployments bind the
+  same KV namespace and service key. Fine while previews are only
+  yours; give Preview its own namespace before anyone else deploys one.
 
 ## Done
 
@@ -137,3 +124,22 @@ the bottom with the day.
   configuration cancels at the period's end, updates cards and shows
   invoices, and now links the privacy policy and terms.
 - 2 October: the service's restricted Stripe key saved as `OH_STRIPE_SECRET`.
+- 2 October: Cloudflare set up through the API. Stripe and TURN values
+  re-saved as encrypted secrets (the price as plain text); a new
+  service signing pair (`OH_SERVICE_SECRET`, public key
+  `8031cb21…a46b` compiled into the build) and `OH_ID_HMAC`; the
+  `open-hearts-store` KV namespace bound as `OH_STORE`; the relay
+  deployed at `relay.openhearts.game` with the store, and its Household
+  object bound to the Pages project as `HOUSEHOLD`.
+- 2 October: production deployed. openhearts.game serves the site, the
+  app at /play, the legal pages and /api; www.openhearts.game and all
+  of openhearts.lol redirect (301) to it, path and query kept. Stripe's
+  webhook and portal links moved to openhearts.game.
+- 2 October, checked on production: headers (frame-ancestors, DENY,
+  HSTS, nosniff); a signed licence for an unpaid key 402, unsigned 401;
+  a real Stripe checkout session opened; Manage 402 for a non-subscriber;
+  a forged webhook 400; TURN 402 for a non-subscriber; the relay
+  answering. Fixed on the way: the Pages worker could not load its
+  signature wasm on Cloudflare (every signed request answered 503), and
+  five old preview deployments that handed TURN credentials to anyone
+  were deleted.
