@@ -1121,11 +1121,6 @@ class _LiveLocked extends StatelessWidget {
                   style: const TextStyle(fontSize: 13, color: Palette.chrome, fontWeight: FontWeight.w600)),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            l10n.seatsOrFriends,
-            style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
-          ),
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: onTap,

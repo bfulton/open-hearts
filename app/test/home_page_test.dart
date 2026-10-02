@@ -392,7 +392,7 @@ void main() {
   testWidgets('the live card: no filler, and the online count said to be on its way until it is known', (tester) async {
     await pumpHome(tester);
     expect(find.text('Checking online players…'), findsOneWidget);
-    expect(find.text('Four seats, filled with whoever is waiting.'), findsNothing);
+    expect(find.textContaining('Four seats, filled'), findsNothing);
     expect(find.textContaining('A new table, and a link to send'), findsNothing);
     expect(find.text('Open source, no ads, more heart.'), findsOneWidget);
   });
