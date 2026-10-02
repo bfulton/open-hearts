@@ -40,6 +40,15 @@ new_sqlite_classes = ["Household"]
 binding = "OH_STORE"
 id = "5b65151de63341dc9f7a9d417c9b6a4e"
 
+# Backup codes are emailed from the Household (docs/06-service.md,
+# "Backup codes") by Cloudflare's Email Sending, which needs the Workers
+# Paid plan and openhearts.game onboarded to Email Service. Uncomment
+# once both are done; without them the codes are only shown on the
+# devices.
+# send_email = [{ name = "EMAIL" }]
+# [vars]
+# OH_MAIL_FROM = "codes@openhearts.game"
+
 # What the operator watches (docs/06-service.md, "Watching it run"): a
 # line of counts a minute from each object in use — connections,
 # events, deliveries, refusals — and nothing about who. Uncomment once

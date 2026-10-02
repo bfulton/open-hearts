@@ -880,6 +880,138 @@ export async function claimWith(key, code, store, { now = Date.now() } = {}) {
   });
 }
 
+// ---- backup codes ----------------------------------------------------------
+// A code on the screen of a device already on the subscription is good
+// for ten minutes; a backup code is good until it is used or replaced.
+// It is for the day there is no such screen: a phone lost, a new one in
+// hand. Five to a subscription, each good once, kept with the
+// subscription and shown on any device bound to it; replaced all five
+// at once from any of them, which spends the old ones. The person who
+// paid on the web is sent them by email when the subscription is made
+// and again when they are replaced — to the address Stripe holds, read
+// from Stripe when it is needed and not kept here.
+//
+// Sixteen characters of Crockford's base32, eighty bits, read and typed
+// by a person: no I, L, O or U, case and dashes ignored, and an O, I or
+// L typed is taken as the 0 or 1 it looks like. A code's row is keyed
+// by its digest, so a listing of the store does not list the codes.
+
+export const BACKUP_CODES = 5;
+const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+function backupCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  let bits = 0;
+  let value = 0;
+  let out = '';
+  for (const b of bytes) {
+    value = (value << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      out += CROCKFORD[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+    value &= (1 << bits) - 1;
+  }
+  return out.match(/.{4}/g).join('-');
+}
+
+/// [text] as a backup code, XXXX-XXXX-XXXX-XXXX, or null when it is not
+/// one: what a person typed or pasted, read generously.
+export function backupCodeOf(text) {
+  if (typeof text !== 'string' || text.length > 64) return null;
+  const plain = text
+    .toUpperCase()
+    .replace(/[\s-]/g, '')
+    .replace(/O/g, '0')
+    .replace(/[IL]/g, '1');
+  if (!/^[0-9A-HJKMNP-TV-Z]{16}$/.test(plain)) return null;
+  return plain.match(/.{4}/g).join('-');
+}
+
+const backupRow = async (code) => `BACKUP#${await digestOf(`oh-backup/1\n${code}`)}`;
+
+/// Five new codes for [subscription], replacing any it had: their rows
+/// go, so an old one is no such code. Returns the household's row.
+async function makeBackups(store, subscription, { now }) {
+  const old = await store.get(`SUB#${subscription}`, 'BACKUP');
+  for (const c of old?.codes ?? []) await store.del(await backupRow(c.code), 'META');
+  const codes = [];
+  while (codes.length < BACKUP_CODES) {
+    const code = backupCode();
+    if (!codes.some((c) => c.code === code)) codes.push({ code, used_at: null });
+  }
+  for (const c of codes) await store.put(await backupRow(c.code), 'META', { subscription });
+  const row = { codes, made_at: new Date(now).toISOString(), emailed_at: null };
+  await store.put(`SUB#${subscription}`, 'BACKUP', row);
+  return row;
+}
+
+/// The codes as a device on the subscription is shown them.
+const backupsShown = (row) => ({ codes: row.codes.map((c) => ({ code: c.code, used: c.used_at !== null })), made_at: row.made_at });
+
+/// Sends [row]'s codes to [email] with [mail], and notes that it did.
+/// A send that fails is logged and otherwise nothing: the codes are on
+/// every device on the subscription regardless.
+async function mailBackups(store, subscription, row, email, mail, { now }) {
+  if (!mail || typeof email !== 'string' || !email.includes('@')) return row;
+  try {
+    await mail(email, row.codes.filter((c) => c.used_at === null).map((c) => c.code));
+  } catch (e) {
+    console.log(`backup codes for ${subscription}: not sent: ${e?.code ?? ''} ${e?.message ?? e}`);
+    return row;
+  }
+  const sent = { ...row, emailed_at: new Date(now).toISOString() };
+  await store.put(`SUB#${subscription}`, 'BACKUP', sent);
+  return sent;
+}
+
+/// A subscription just paid for: its codes, made once, and sent to the
+/// payer once. A webhook delivered twice finds them made, and sends
+/// only if the first send did not go.
+export async function backupsMade(subscription, email, store, mail, { now = Date.now() } = {}) {
+  let row = await store.get(`SUB#${subscription}`, 'BACKUP');
+  if (!row) row = await makeBackups(store, subscription, { now });
+  if (!row.emailed_at) row = await mailBackups(store, subscription, row, email, mail, { now });
+  return { status: 200, body: { made_at: row.made_at, emailed: row.emailed_at !== null } };
+}
+
+/// The codes, for a device bound to the subscription: made if there are
+/// none yet (a subscription from before them, or bought in a store),
+/// and replaced when [rotate] — then sent to [email] where there is one.
+export async function backupsFor(key, store, mail, { rotate = false, email = null, now = Date.now() } = {}) {
+  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  if (!held) return { status: 402, body: { error: 'no subscription' } };
+  if (!(await store.get(`SUB#${held.subscription}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
+  let row = await store.get(`SUB#${held.subscription}`, 'BACKUP');
+  if (!row || rotate) {
+    row = await makeBackups(store, held.subscription, { now });
+    if (rotate) row = await mailBackups(store, held.subscription, row, email, mail, { now });
+  }
+  return { status: 200, body: { ...backupsShown(row), emailed: rotate && row.emailed_at !== null } };
+}
+
+/// A device arriving with a backup code. Spent only by a join that
+/// goes through: a code turned down for a full household is still good
+/// once a device is dropped.
+export async function redeemBackup(key, code, store, { now = Date.now() } = {}) {
+  const at = await store.get(await backupRow(code), 'META');
+  if (!at) return { status: 404, body: { error: 'no such code' } };
+  const row = await store.get(`SUB#${at.subscription}`, 'BACKUP');
+  const mine = row?.codes.find((c) => c.code === code);
+  if (!mine) return { status: 404, body: { error: 'no such code' } };
+  if (mine.used_at) return { status: 409, body: { error: 'that code has been used' } };
+  const today = dayOf(now);
+  return joinSubscription(key, at.subscription, store, {
+    now,
+    spend: () =>
+      store.put(`SUB#${at.subscription}`, 'BACKUP', {
+        ...row,
+        codes: row.codes.map((c) => (c.code === code ? { ...c, used_at: today } : c)),
+      }),
+  });
+}
+
 /// [key] onto [subscription], by the household's rules: no more devices
 /// than it carries, and not off another subscription that is still paid
 /// up unless [moving] — which only the device that paid for this one
@@ -979,12 +1111,18 @@ export function sequencer({ now = Date.now } = {}) {
 }
 
 /// What a household is asked: {op: 'ticket' | 'claim' | 'drop' | 'list', ...}.
-export async function householdOp(op, store, { now = Date.now() } = {}) {
+export async function householdOp(op, store, { now = Date.now(), mail = null } = {}) {
   switch (op.op) {
     case 'ticket':
       return ticketFor(op.key, store, { now });
     case 'claim':
       return claimWith(op.key, op.code, store, { now });
+    case 'redeem':
+      return redeemBackup(op.key, op.code, store, { now });
+    case 'backups':
+      return backupsFor(op.key, store, mail, { rotate: op.rotate === true, email: op.email ?? null, now });
+    case 'made':
+      return backupsMade(op.subscription, op.email ?? null, store, mail, { now });
     case 'bind':
       return bindPurchase(op, store, { now });
     case 'drop':
@@ -999,7 +1137,41 @@ export async function householdOp(op, store, { now = Date.now() } = {}) {
   }
 }
 
-const kindOf = (op) => (op.op === 'list' ? 'read' : 'change');
+const kindOf = (op) => (op.op === 'list' || (op.op === 'backups' && op.rotate !== true) ? 'read' : 'change');
+
+/// How backup codes are emailed where [env] can: Cloudflare's Email
+/// Sending, bound as EMAIL to the worker the household runs in, from
+/// OH_MAIL_FROM. Null where either is missing, and the codes are only
+/// shown on the devices.
+export function mailerOf(env) {
+  const from = env.OH_MAIL_FROM;
+  if (!env.EMAIL || typeof from !== 'string' || !from.includes('@')) return null;
+  return (to, codes) =>
+    env.EMAIL.send({
+      to,
+      from: { email: from, name: 'Open Hearts' },
+      subject: 'Your Open Hearts backup codes',
+      text: backupMailText(codes),
+    });
+}
+
+/// The email itself: the codes, and how to use one.
+export function backupMailText(codes) {
+  return [
+    'Your Open Hearts backup codes:',
+    '',
+    ...codes.map((c) => `  ${c}`),
+    '',
+    'Each one brings one device onto your subscription, once. On the',
+    'device: menu, Activate subscription, and type or paste a code.',
+    '',
+    'Any device on the subscription shows these codes under Subscription,',
+    'and can replace them with new ones; this email is sent again when it',
+    'does, and the codes above stop working.',
+    '',
+    'Open Hearts — https://openhearts.game',
+  ].join('\n');
+}
 
 /// The Durable Object a household runs in, one per subscription, named
 /// by it. Exported from the relay's worker beside TagRelay
@@ -1016,7 +1188,7 @@ export class Household {
     await settle(this.env);
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: { error: 'licensing not configured' } });
-    return Response.json(await this.next(kindOf(op), () => householdOp(op, store)));
+    return Response.json(await this.next(kindOf(op), () => householdOp(op, store, { mail: mailerOf(this.env) })));
   }
 }
 
@@ -1034,7 +1206,7 @@ export async function inHousehold(env, subscription, op) {
   const store = storeOf(env);
   if (!store) return { status: 503, body: { error: 'licensing not configured' } };
   if (!households.has(subscription)) households.set(subscription, sequencer());
-  return households.get(subscription)(kindOf(op), () => householdOp(op, store));
+  return households.get(subscription)(kindOf(op), () => householdOp(op, store, { mail: mailerOf(env) }));
 }
 
 /// Forgets this isolate's queues, for a test that starts afresh.
@@ -1067,14 +1239,58 @@ async function claimRoute(request, env) {
   if (!store) return json(request, 503, { error: 'licensing not configured' });
   // In the household the code is for, which the code's row says; a code
   // nobody made is said so here, without queueing anybody.
-  if (typeof body.ticket !== 'string' || !/^[0-9a-f]{2,64}$/.test(body.ticket)) return json(request, 400, { error: 'not a code' });
-  const ticket = await store.get(`TICKET#${body.ticket}`, 'META');
-  if (!ticket) return json(request, 404, { error: 'no such code' });
-  const claimed = await inHousehold(env, ticket.subscription, { op: 'claim', key, code: body.ticket });
+  // A backup code, typed by a person, or a code off another device's
+  // screen: sixteen characters of one alphabet, or thirty-two hex.
+  const backup = backupCodeOf(body.ticket);
+  let claimed;
+  if (backup) {
+    const at = await store.get(await backupRow(backup), 'META');
+    if (!at) return json(request, 404, { error: 'no such code' });
+    claimed = await inHousehold(env, at.subscription, { op: 'redeem', key, code: backup });
+  } else {
+    if (typeof body.ticket !== 'string' || !/^[0-9a-f]{2,64}$/.test(body.ticket)) return json(request, 400, { error: 'not a code' });
+    const ticket = await store.get(`TICKET#${body.ticket}`, 'META');
+    if (!ticket) return json(request, 404, { error: 'no such code' });
+    claimed = await inHousehold(env, ticket.subscription, { op: 'claim', key, code: body.ticket });
+  }
   if (claimed.status !== 200) return json(request, claimed.status, claimed.body);
   // Straight back with the licence it was claimed for, so the device
   // that scanned a code is playing rather than waiting to be told.
   const { status, body: out } = await licence(key, env, { signer, open: openHouse(env, request) });
+  return json(request, status, out);
+}
+
+/// The email Stripe holds for the customer behind [subscription], or
+/// null: read when backup codes are sent, and not kept.
+export async function payerEmail(store, subscription, env, fetchImpl = fetch) {
+  const secret = env.OH_STRIPE_SECRET;
+  if (!secret || typeof subscription !== 'string' || !subscription.startsWith('sub_')) return null;
+  const customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
+  if (!customer) return null;
+  try {
+    const res = await fetchImpl(`${STRIPE}/customers/${encodeURIComponent(customer)}`, { headers: { authorization: `Bearer ${secret}` } });
+    if (!res.ok) return null;
+    const email = (await res.json())?.email;
+    return typeof email === 'string' && email.includes('@') ? email : null;
+  } catch {
+    return null;
+  }
+}
+
+async function backupsRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'backups', (body) => (body.rotate === true ? 'rotate' : ''));
+  if (asked instanceof Response) return asked;
+  const { key, body } = asked;
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  if (!held) return json(request, 402, { error: 'no subscription' });
+  const rotate = body.rotate === true;
+  const email = rotate ? await payerEmail(store, held.subscription, env) : null;
+  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'backups', key, rotate, email });
   return json(request, status, out);
 }
 
@@ -1351,7 +1567,13 @@ async function stripeRoute(request, env) {
   } catch {
     return json(request, 400, { error: 'not json' });
   }
-  await record(event, store);
+  const done = await record(event, store);
+  // A subscription just paid for: its backup codes, sent to the email
+  // the checkout was paid with. Not kept: it is on the event.
+  if (done?.bound) {
+    const email = event.data?.object?.customer_details?.email ?? null;
+    await inHousehold(env, done.subscription, { op: 'made', subscription: done.subscription, email });
+  }
   // Anything not ours is still a delivery taken: a webhook that gets an
   // error back is a webhook Stripe keeps sending.
   return json(request, 200, { ok: true });
@@ -2108,6 +2330,7 @@ const ROUTES = {
   play: (request, env) => playRoute(request, env),
   ticket: (request, env) => ticketRoute(request, env),
   claim: (request, env) => claimRoute(request, env),
+  backups: (request, env) => backupsRoute(request, env),
   devices: (request, env) => devicesRoute(request, env),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),

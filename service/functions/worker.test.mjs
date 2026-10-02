@@ -509,6 +509,43 @@ test('the webhook route: unsigned is refused, signed is recorded and acknowledge
   assert.equal((await store.get('SUB#sub_9', 'META')).renews_at, '2027-09-16');
 });
 
+test('the webhook route: a checkout paid for makes the backup codes and emails them to the payer', async () => {
+  const store = memoryStore();
+  const got = [];
+  const shop = {
+    ...env,
+    OH_STRIPE_WEBHOOK_SECRET: SIGNING,
+    OH_STORE: kvOf(store),
+    EMAIL: { send: async (m) => got.push(m) },
+    OH_MAIL_FROM: 'codes@openhearts.game',
+  };
+  const at = 'https://dev.open-hearts.pages.dev/api/stripe';
+  const raw = JSON.stringify({
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        mode: 'subscription',
+        payment_status: 'paid',
+        subscription: 'sub_9',
+        customer: 'cus_1',
+        customer_details: { email: 'payer@example.com' },
+        metadata: { key: KEY },
+      },
+    },
+  });
+  const hook = async () =>
+    worker.fetch(new Request(at, { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }), shop);
+  assert.equal((await hook()).status, 200);
+  assert.equal(got.length, 1);
+  assert.equal(got[0].to, 'payer@example.com');
+  const row = await store.get('SUB#sub_9', 'BACKUP');
+  for (const c of row.codes) assert.match(got[0].text, new RegExp(c.code));
+  // Stripe delivers again: nothing new is made or sent.
+  assert.equal((await hook()).status, 200);
+  assert.equal(got.length, 1);
+  assert.deepEqual((await store.get('SUB#sub_9', 'BACKUP')).codes, row.codes);
+});
+
 test('the checkout route: the key, and somewhere on this site to come back to', async () => {
   const at = 'https://dev.open-hearts.pages.dev/api/checkout';
   const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1' };
@@ -680,6 +717,33 @@ test('any device can drop another, and the dropped one stops being licensed', as
   // And nobody drops a device off somebody else's subscription.
   assert.equal((await dropDevice(THIRD, OTHER, store, { now })).status, 402);
   assert.equal((await dropDevice(OTHER, THIRD, store, { now })).status, 404);
+});
+
+test('the routes: backup codes shown, one claimed with the licence back, and replaced', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now, ADA.public);
+  const { held, send } = serving(store);
+  const shown = await worker.fetch(send('backups', await asking(ADA, 'backups')), held);
+  assert.equal(shown.status, 200);
+  const { codes } = await shown.json();
+  assert.equal(codes.length, 5);
+  assert.equal((await worker.fetch(send('backups', await asking(CY, 'backups')), held)).status, 402, 'not on the subscription');
+
+  // Typed the way a person types it, and spent with the licence back.
+  const typed = codes[0].code.toLowerCase().replaceAll('-', ' ');
+  const claimed = await worker.fetch(send('claim', await asking(BAO, 'claim', { what: typed, ticket: typed })), held);
+  assert.equal(claimed.status, 200);
+  assert.equal((await claimed.json()).licence.key, BAO.public);
+
+  // Replacing is signed as such: a plain read cannot be replayed as one.
+  const plain = await asking(ADA, 'backups');
+  assert.equal((await worker.fetch(send('backups', { ...plain, rotate: true }), held)).status, 401);
+  const replaced = await worker.fetch(send('backups', await asking(ADA, 'backups', { what: 'rotate', rotate: true })), held);
+  assert.equal(replaced.status, 200);
+  const fresh = (await replaced.json()).codes.map((c) => c.code);
+  assert.equal(fresh.includes(codes[1].code), false);
+  const old = codes[1].code;
+  assert.equal((await worker.fetch(send('claim', await asking(CY, 'claim', { what: old, ticket: old })), held)).status, 404);
 });
 
 test('the routes: a code, a claim that answers with the licence, and the devices list', async () => {

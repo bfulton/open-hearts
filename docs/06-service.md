@@ -428,6 +428,36 @@ so a code made while there was room cannot let a sixth device in. A
 code's row is let go by the store an hour after it is made, spent or
 not, so codes do not pile up for ever.
 
+### Backup codes
+
+A code on a screen needs a screen: a device already on the
+subscription, in hand. The day there is none — the only phone lost, a
+new one in hand — a **backup code** stands in. Five to a subscription,
+each good for one device, once, and good until it is used or replaced.
+Sixteen characters of Crockford's base32, `XXXX-XXXX-XXXX-XXXX`, eighty
+bits: typed by a person, so case and dashes are ignored, and an O, I or
+L is taken as the 0 or 1 it looks like.
+
+They are made when the subscription is paid for and **emailed** to the
+address the checkout was paid with, which is on Stripe's event and not
+kept. Any device on the subscription shows them under Subscription,
+marked once used, and can **replace** all five at once, which spends
+the old ones; the new ones are emailed to the payer again, the address
+read from Stripe at that moment (`/customers/{id}`) and not kept. A
+store subscription has no address here, so its codes are only shown.
+The email goes through Cloudflare's Email Sending, bound as `EMAIL` to
+the relay worker the household runs in, from `OH_MAIL_FROM`; without
+both, nothing is sent and the codes are only shown.
+
+A backup code is entered where a screen's code is (`/api/claim`, the
+same signed request): the service tells the two apart by their shape.
+It is spent only by a join that goes through, so one turned away by a
+full household is still good once a device is dropped. Its row is
+keyed by a digest of the code, so a listing of the store lists none of
+them; the codes themselves sit in the subscription's row, which only a
+device bound to it is shown (`/api/backups`, signed; replacing is
+signed as such, so a read cannot be replayed as one).
+
 A code does not take a device off another subscription that is still
 paid up. A code arrives in a link, and the app asks before it spends
 one — "Join this subscription?" — but a yes is easily given to a link
