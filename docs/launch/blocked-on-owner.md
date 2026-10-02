@@ -106,9 +106,13 @@ the bottom with the day.
   of a payment has been checked on production (2 October).
 - **Revoke the temporary keys** given to set this up: the Stripe
   restricted key and the Cloudflare API token.
-- **Preview shares production's store**: preview deployments bind the
-  same KV namespace and service key. Fine while previews are only
-  yours; give Preview its own namespace before anyone else deploys one.
+- **A Stripe sandbox** (needs a computer: the dashboard's account
+  picker → Sandboxes → Create), its secret key `sk_test_…` added to the
+  environment as `STRIPE_SANDBOX_KEY`. Then the price (same lookup key
+  `openhearts_annual`), a webhook to
+  `https://dev.open-hearts.pages.dev/api/stripe`, the portal, and a
+  restricted key for Preview can be set up from here, so purchases can
+  be tested on preview without real money.
 
 ## Done
 
@@ -147,3 +151,6 @@ the bottom with the day.
   (`open-hearts-turn`, d681af4e…), `OH_STRIPE_PRICE` and
   `OH_SERVICE_KEY` are plain text. Checked: production minted TURN
   credentials for a device given a test subscription (rows deleted).
+- 2 October: Preview has its own store (`open-hearts-store-preview`)
+  and no `HOUSEHOLD` binding (that object reads production's store), so
+  nothing done on a preview deployment touches production's rows.
