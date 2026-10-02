@@ -80,6 +80,12 @@ the bottom with the day.
 
 ## Stripe
 
+- **Sales tax, with an accountant**: whether South Carolina, where the
+  business is, taxes this subscription, and so whether to register
+  there. Other states need registering only past their economic-nexus
+  thresholds (commonly $100,000 or 200 sales a year in a state), which
+  Stripe Tax's monitoring shows when it is on. The checkout does not
+  turn on automatic tax today.
 - **Set up the billing portal** (Stripe → Settings → Billing →
   Customer portal): allow cancelling (at the end of the period),
   updating the payment method and viewing invoices; add the business
