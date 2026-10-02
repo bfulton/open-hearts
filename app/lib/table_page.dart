@@ -8,7 +8,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'about_page.dart';
 import 'avatar.dart';
@@ -18,6 +17,7 @@ import 'feedback_page.dart';
 import 'game_controller.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'net/copy.dart';
 import 'table_model.dart';
 import 'theme.dart';
 import 'ui/hand_fan.dart';
@@ -94,7 +94,7 @@ class _TablePageState extends State<TablePage> {
   }
 
   Future<void> _copyRecord() async {
-    await Clipboard.setData(ClipboardData(text: _controller.recordText));
+    await copyText(_controller.recordText);
     if (mounted) _say(context.l10n.recordCopied);
   }
 

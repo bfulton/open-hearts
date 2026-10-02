@@ -16,6 +16,7 @@ import 'net/remote_config.dart';
 import 'net/room.dart';
 import 'net/store_buying.dart';
 import 'theme.dart';
+import 'ui/selection.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -120,7 +121,7 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
       locale: languageInAddress(),
       // Any words on any screen can be selected and copied: a name, a
       // rule, an error to send us.
-      builder: (context, child) => SelectionArea(child: child ?? const SizedBox()),
+      builder: (context, child) => CopyableSelection(child: child ?? const SizedBox()),
       home: HomePage(
         openRoom: room != null && Room.validCode(room) ? room : null,
         openClaim: claimInAddress(),

@@ -12,7 +12,6 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:table/table.dart';
 
@@ -20,6 +19,7 @@ import 'activate_page.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'net/copy.dart';
 import 'net/buying.dart';
 import 'net/household.dart';
 import 'net/licence.dart';
@@ -210,7 +210,7 @@ class _SubscribePageState extends State<SubscribePage> {
   }
 
   Future<void> _copy(String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
+    await copyText(text);
     if (mounted) _say(context.l10n.copied);
   }
 
@@ -485,7 +485,7 @@ class _SubscribePageState extends State<SubscribePage> {
   Future<void> _sendTheLink(String code) async {
     final link = claimLink(code);
     if (await shareLink(Uri.parse(link))) return;
-    await Clipboard.setData(ClipboardData(text: link));
+    await copyText(link);
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()

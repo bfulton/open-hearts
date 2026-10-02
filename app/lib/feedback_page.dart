@@ -17,10 +17,10 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'build_info.dart';
 import 'l10n/l10n.dart';
+import 'net/copy.dart';
 import 'net/remote_config.dart';
 import 'net/share.dart';
 import 'theme.dart';
@@ -105,7 +105,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
     // A page that does not take the report in its address, or no way
     // to open one: the report goes by the clipboard, and the player is
     // told where it is going.
-    await Clipboard.setData(ClipboardData(text: opened ? report : '$report\n\n$to'));
+    await copyText(opened ? report : '$report\n\n$to');
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()

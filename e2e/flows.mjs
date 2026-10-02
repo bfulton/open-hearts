@@ -272,6 +272,29 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   if (new URL(page.url()).searchParams.get('room')) throw new Error(`the room is still in the address: ${page.url()}`);
 });
 
+flow('the backup codes, shown on request and copied', async ({ open }) => {
+  // Copy goes through the page (app/web/copy.js) so that Safari allows
+  // it; here, that the text that arrives is the codes the page shows.
+  const page = await open();
+  await waitFor(page, /^Play live/, { what: 'live play open', timeout: 40000 });
+  await click(page, /^Menu$/);
+  await waitFor(page, /^Subscription$/, { what: 'the menu' });
+  await click(page, /^Subscription$/);
+  await waitFor(page, /^This device$/, { what: 'the subscription page' });
+  await waitFor(page, /^Show backup codes$/, { what: 'the backup codes button' });
+  await click(page, /^Show backup codes$/);
+  await waitFor(page, /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/, { what: 'the codes' });
+  const shown = (await texts(page)).filter((t) => /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/.test(t));
+  if (shown.length !== 5) throw new Error(`five codes, not ${shown.length}`);
+  // The Copy under the list, not one beside a code: the last of them.
+  const copies = await page.$$('flt-semantics[aria-label="Copy"], flt-semantics[role="button"]:text-is("Copy")');
+  if (!copies.length) throw new Error('no Copy button');
+  await copies[copies.length - 1].click();
+  await sleep(500);
+  const copied = await page.evaluate('navigator.clipboard.readText()');
+  if (copied.split('\n').join(',') !== shown.join(',')) throw new Error(`copied ${JSON.stringify(copied)}, shown ${shown.join(',')}`);
+});
+
 flow('a second device, brought in by the code the first one shows', async ({ open }) => {
   // A subscription is a person's, not a device's (docs/06-service.md).
   // The first device shows a code; the second arrives carrying it, and

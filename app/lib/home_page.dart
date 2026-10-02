@@ -22,7 +22,6 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:table/table.dart';
 
 import 'about_page.dart';
@@ -35,6 +34,7 @@ import 'feedback_page.dart';
 import 'game_options.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'net/copy.dart';
 import 'profile_page.dart';
 import 'record_store.dart';
 import 'stats.dart';
@@ -706,7 +706,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _share(String code) async {
     final link = roomLink(code);
     if (await shareLink(link)) return;
-    await Clipboard.setData(ClipboardData(text: link.toString()));
+    await copyText(link.toString());
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
