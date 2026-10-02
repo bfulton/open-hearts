@@ -74,6 +74,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>To scan the code another of your devices shows, and bring this one onto your subscription.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>To use a photo of your own as your avatar at the table.</string>
 </dict>

@@ -15,6 +15,7 @@ import 'dart:io' show SocketException;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/activate_page.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/net/buying.dart';
@@ -340,6 +341,120 @@ void main() {
     await tester.pumpAndSettle();
     expect(Entitlement.current.live, isFalse, reason: 'a device that dropped itself is not licensed');
     expect(find.text('open'), findsOneWidget, reason: 'and the page it did it from is gone');
+    expect(tester.takeException(), isNull);
+  });
+  test('a code is read the way a person types, pastes or scans it', () {
+    // Off another device's screen: the link it travels in, or the code
+    // itself, as shown in fours or run together, in either case.
+    const ticket = '0a1b2c3d4e5f60718293a4b5c6d7e8f9';
+    expect(codeIn('https://openhearts.game/play/?claim=$ticket'), ticket);
+    expect(codeIn(ticket), ticket);
+    expect(codeIn(' 0A1B 2C3D 4E5F 6071 8293 A4B5 C6D7 E8F9 '), ticket);
+    // A backup code, from the email.
+    expect(codeIn('abcd-efgh-jkmn-pqrs'), 'ABCD-EFGH-JKMN-PQRS');
+    expect(codeIn('ABCDEFGHJKMNPQRS'), 'ABCD-EFGH-JKMN-PQRS');
+    expect(codeIn('oil0 0000 0000 0000'), '0110-0000-0000-0000', reason: 'O, I and L are the digits they look like');
+    for (final nonsense in ['', 'hello', 'ABCD-EFGH-JKMN-PQRU', 'https://elsewhere.example/', '0a1b2c', 'x' * 3000]) {
+      expect(codeIn(nonsense), isNull, reason: nonsense);
+    }
+  });
+
+  testWidgets('Activate: a backup code typed brings this device on, signed as typed by the service\'s reading', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    await Entitlement.current.load(me.publicKey);
+    stand.says('claim', {'error': 'no such code'}, status: 404);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: Scaffold(body: Builder(builder: (context) => TextButton(onPressed: () => showActivate(context), child: const Text('open')))),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Scan a code'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'nonsense');
+    await tester.tap(find.text('Activate'));
+    await tester.pumpAndSettle();
+    expect(find.text('Not a code.'), findsOneWidget, reason: 'nonsense is not sent');
+    expect(stand.seen, isEmpty);
+
+    await tester.enterText(find.byType(TextField), 'zzzz zzzz zzzz zzzz');
+    await tester.tap(find.text('Activate'));
+    await tester.pumpAndSettle();
+    expect(find.text('No such code.'), findsOneWidget);
+
+    stand.says('claim', {'licence': signedFor(me.publicKey)});
+    await tester.enterText(find.byType(TextField), 'abcd-efgh-jkmn-pqrs');
+    await tester.tap(find.text('Activate'));
+    await tester.pumpAndSettle();
+    final asked = jsonDecode(stand.seen.last.split(' ').last) as Map<String, Object?>;
+    expect(asked['ticket'], 'ABCD-EFGH-JKMN-PQRS');
+    expect(schnorrVerifier(me.publicKey, requestDigest('claim', me.publicKey, asked['at'] as int, 'ABCD-EFGH-JKMN-PQRS'), asked['sig'] as String),
+        isTrue,
+        reason: 'the code is part of what is signed');
+    expect(Entitlement.current.live, isTrue);
+    expect(find.text('open'), findsOneWidget, reason: 'and the page is done');
+    expect(find.text('Live play is open on this device.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the page shows a screen\'s code to type, and the backup codes, and replaces them', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    await licenceThisDevice();
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+    });
+    tester.view
+      ..physicalSize = const Size(390, 1400)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpAndSettle();
+
+    stand.says('ticket', {'ticket': '0a1b2c3d4e5f60718293a4b5c6d7e8f9', 'expires_at': '2026-09-16T12:00:00Z', 'devices': 1, 'most': 5});
+    await tester.tap(find.text('Add a device'));
+    await tester.pumpAndSettle();
+    expect(find.text('0a1b 2c3d 4e5f 6071 8293 a4b5 c6d7 e8f9'), findsOneWidget, reason: 'the same code, to type');
+
+    // Not on the screen until asked for.
+    expect(find.text('Backup codes'), findsOneWidget);
+    expect(find.text('AAAA-AAAA-AAAA-AAAA'), findsNothing);
+    stand.says('backups', {
+      'codes': [
+        {'code': 'AAAA-AAAA-AAAA-AAAA', 'used': true},
+        for (final c in ['BBBB', 'CCCC', 'DDDD', 'EEEE']) {'code': '$c-$c-$c-$c', 'used': false},
+      ],
+      'made_at': '2026-10-02T00:00:00Z',
+    });
+    await tester.ensureVisible(find.text('Show backup codes'));
+    await tester.tap(find.text('Show backup codes'));
+    await tester.pumpAndSettle();
+    expect(find.text('AAAA-AAAA-AAAA-AAAA'), findsOneWidget);
+    expect(find.text('used'), findsOneWidget);
+    expect(find.text('EEEE-EEEE-EEEE-EEEE'), findsOneWidget);
+
+    // Replaced, after asking; signed as a replacement.
+    stand.says('backups', {
+      'codes': [for (final c in ['FFFF', 'GGGG', 'HHHH', 'JJJJ', 'KKKK']) {'code': '$c-$c-$c-$c', 'used': false}],
+      'made_at': '2026-10-02T01:00:00Z',
+      'emailed': true,
+    });
+    await tester.ensureVisible(find.text('Replace codes'));
+    await tester.tap(find.text('Replace codes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Replace the backup codes?'), findsOneWidget);
+    await tester.tap(find.text('Replace'));
+    await tester.pumpAndSettle();
+    final asked = jsonDecode(stand.seen.last.split(' ').last) as Map<String, Object?>;
+    expect(asked['rotate'], isTrue);
+    expect(schnorrVerifier(me.publicKey, requestDigest('backups', me.publicKey, asked['at'] as int, 'rotate'), asked['sig'] as String), isTrue);
+    expect(find.text('AAAA-AAAA-AAAA-AAAA'), findsNothing);
+    expect(find.text('KKKK-KKKK-KKKK-KKKK'), findsOneWidget);
+    expect(find.text('New codes made, and emailed to you.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

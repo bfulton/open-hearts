@@ -3,8 +3,9 @@
 /// So a second device has to be able to hold the same licence. The way
 /// that costs nothing to type: the subscribed device shows a code, and
 /// the other device arrives carrying it. The code goes in a link and
-/// the link goes in a QR, so the phone's own camera is the scanner —
-/// there is no camera in this app, and no permission to ask for.
+/// the link goes in a QR, so the phone's own camera can be the scanner;
+/// Activate subscription scans it too, or takes it typed, and takes a
+/// backup code from the email (activate_page.dart).
 ///
 /// A code is spent the first time it is used, so a photograph of
 /// somebody's screen an hour later is worth nothing. Five devices to a
@@ -95,6 +96,66 @@ String claimLink(String code, [Uri? base]) {
 String? claimInAddress([Uri? at]) {
   final code = (at ?? Uri.base).queryParameters['claim'];
   return code != null && RegExp(r'^[0-9a-f]{2,64}$').hasMatch(code) ? code : null;
+}
+
+/// What a person typed, pasted or scanned, as a code the service takes:
+/// a link carrying one, a code off another device's screen (32 hex), or
+/// a backup code — or null when it is none of them. Read generously, as
+/// the service reads it (worker.mjs, `backupCodeOf`).
+String? codeIn(String text) {
+  final t = text.trim();
+  if (t.isEmpty || t.length > 2048) return null;
+  final link = Uri.tryParse(t);
+  if (link != null && link.hasScheme && link.queryParameters.containsKey('claim')) return claimInAddress(link);
+  final compact = t.toLowerCase().replaceAll(RegExp(r'[\s-]'), '');
+  if (RegExp(r'^[0-9a-f]{32}$').hasMatch(compact)) return compact;
+  return backupCodeOf(t);
+}
+
+/// [text] as a backup code, XXXX-XXXX-XXXX-XXXX, or null: Crockford's
+/// base32, case and spaces and dashes ignored, an O, I or L taken as
+/// the 0 or 1 it looks like.
+String? backupCodeOf(String text) {
+  if (text.length > 64) return null;
+  final plain = text.toUpperCase().replaceAll(RegExp(r'[\s-]'), '').replaceAll('O', '0').replaceAll(RegExp('[IL]'), '1');
+  if (!RegExp(r'^[0-9A-HJKMNP-TV-Z]{16}$').hasMatch(plain)) return null;
+  return [for (var i = 0; i < 16; i += 4) plain.substring(i, i + 4)].join('-');
+}
+
+/// A subscription's backup codes, as a device on it is shown them.
+class BackupCodes {
+  const BackupCodes({required this.codes, this.madeAt, this.emailed = false});
+
+  final List<({String code, bool used})> codes;
+  final DateTime? madeAt;
+
+  /// Whether replacing them sent the new ones to the payer's email.
+  final bool emailed;
+
+  Iterable<String> get unused => codes.where((c) => !c.used).map((c) => c.code);
+
+  static BackupCodes? parse(Object? json) {
+    if (json is! Map || json['codes'] is! List) return null;
+    return BackupCodes(
+      codes: [
+        for (final c in json['codes'] as List)
+          if (c is Map && c['code'] is String) (code: c['code'] as String, used: c['used'] == true),
+      ],
+      madeAt: DateTime.tryParse(json['made_at'] as String? ?? ''),
+      emailed: json['emailed'] == true,
+    );
+  }
+}
+
+/// This subscription's backup codes; with [replace], five new ones in
+/// place of them, which are emailed to the payer where the service has
+/// an address for them.
+Future<Said<BackupCodes>> backupCodes(Signer signer, {bool replace = false, Uri? endpoint}) async {
+  final answer =
+      await askHandler('backups', signer, {if (replace) 'rotate': true}, endpoint, what: replace ? 'rotate' : '');
+  if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
+  final codes = BackupCodes.parse(jsonDecode(answer!.body));
+  return codes == null ? (answer: null, refusal: _unreachable) : (answer: codes, refusal: null);
 }
 
 /// What the service said, or why it did not answer.

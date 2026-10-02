@@ -1253,5 +1253,97 @@
   "checkingOnline": "Checking online players…",
   "@checkingOnline": {
     "description": "On the front door, where the count of players online goes, before the relays have answered."
+  },
+  "activateSubscription": "Activate subscription",
+  "@activateSubscription": {
+    "description": "Menu item and page title: bring this device onto a subscription already bought, with a code."
+  },
+  "activateBody": "Bring this device onto a subscription you already have. Scan the code another of your devices shows under Subscription, or type or paste a code: that one, or a backup code from the email.",
+  "@activateBody": {
+    "description": "On the Activate subscription page."
+  },
+  "code": "Code",
+  "@code": {
+    "description": "Label of the field a code is typed or pasted into."
+  },
+  "paste": "Paste",
+  "@paste": {
+    "description": "Button: paste from the clipboard into the code field."
+  },
+  "scanCode": "Scan a code",
+  "@scanCode": {
+    "description": "Button: open the camera to scan another device's code."
+  },
+  "activate": "Activate",
+  "@activate": {
+    "description": "Button: spend the code and bring this device onto the subscription."
+  },
+  "activated": "Live play is open on this device.",
+  "@activated": {
+    "description": "Shown once a code has brought this device onto a subscription."
+  },
+  "noCamera": "No camera to scan with here. Type or paste the code instead.",
+  "@noCamera": {
+    "description": "Shown when the camera could not be opened to scan."
+  },
+  "pointAtCode": "Point the camera at the code on your other device.",
+  "@pointAtCode": {
+    "description": "Under the camera view while scanning."
+  },
+  "orTypeCode": "Or type this code on the other device, under Activate subscription:",
+  "@orTypeCode": {
+    "description": "On the Subscription page, under the code to scan: the same code as text."
+  },
+  "copy": "Copy",
+  "@copy": {
+    "description": "Button: copy to the clipboard."
+  },
+  "copied": "Copied",
+  "@copied": {
+    "description": "Shown briefly once something is copied to the clipboard."
+  },
+  "backupCodes": "Backup codes",
+  "@backupCodes": {
+    "description": "Heading on the Subscription page."
+  },
+  "backupCodesHint": "For the day none of your devices is at hand to show a code. Each brings one device onto this subscription, once. Keep them somewhere safe.",
+  "@backupCodesHint": {
+    "description": "On the Subscription page, above the backup codes."
+  },
+  "showBackupCodes": "Show backup codes",
+  "@showBackupCodes": {
+    "description": "Button on the Subscription page."
+  },
+  "codeUsedMark": "used",
+  "@codeUsedMark": {
+    "description": "Beside a backup code that has been used."
+  },
+  "replaceCodes": "Replace codes",
+  "@replaceCodes": {
+    "description": "Button: make five new backup codes in place of these."
+  },
+  "replaceCodesTitle": "Replace the backup codes?",
+  "@replaceCodesTitle": {
+    "description": "Title of the dialog asking before replacing backup codes."
+  },
+  "replaceCodesBody": "These five stop working, and five new ones take their place.",
+  "@replaceCodesBody": {
+    "description": "In the dialog asking before replacing backup codes."
+  },
+  "replace": "Replace",
+  "@replace": {
+    "description": "Button in the dialog: replace the backup codes."
+  },
+  "codesEmailed": "New codes made, and emailed to you.",
+  "@codesEmailed": {
+    "description": "Shown once backup codes are replaced and emailed."
+  },
+  "codesMade": "New codes made.",
+  "@codesMade": {
+    "description": "Shown once backup codes are replaced, when they could not be emailed."
+  },
+  "haveACode": "Have a code? Activate",
+  "@haveACode": {
+    "description": "On the Subscription page before buying: a link to Activate subscription."
   }
 }

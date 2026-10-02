@@ -407,11 +407,16 @@ internet; five is a household.
 
 **As built**, the QR one, and with one change to it. The subscribed
 device asks for a code, shows it as a QR of a link back into the app,
-and the other device opens that link with its own camera — so there is
-no camera in this app and no permission to ask for, which is most of
-why this is the cheap way in. A device with no camera pointed at the
-screen gets the same link through the share sheet, as a room's link
-goes.
+and the other device opens that link with its own camera. Or the other
+device scans it in the app — menu, **Activate subscription**, Scan a
+code — or types it there, since the page shows it as text too, in
+fours; a device with no camera pointed at the screen also gets the
+same link through the share sheet, as a room's link goes. The app's
+scanner is the platform's own on a phone (ML Kit on Android, from Play
+services rather than bundled; Apple's on iOS), and in a browser its
+own BarcodeDetector where it has one that reads QR codes, else ZXing's
+JavaScript port served from the site (`web/zxing`) — never a library
+fetched from somebody's CDN at the moment a camera is pointed.
 
 The change: the code is sixteen random bytes and nothing else. The
 design has it carry the subscription and an expiry under a signature;

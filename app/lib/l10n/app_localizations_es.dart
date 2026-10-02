@@ -1043,4 +1043,79 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get checkingOnline => 'Buscando jugadores en línea…';
+
+  @override
+  String get activateSubscription => 'Activar suscripción';
+
+  @override
+  String get activateBody =>
+      'Añade este dispositivo a una suscripción que ya tienes. Escanea el código que otro de tus dispositivos muestra en Suscripción, o escribe o pega un código: ese, o un código de respaldo del correo.';
+
+  @override
+  String get code => 'Código';
+
+  @override
+  String get paste => 'Pegar';
+
+  @override
+  String get scanCode => 'Escanear un código';
+
+  @override
+  String get activate => 'Activar';
+
+  @override
+  String get activated => 'El juego en vivo está abierto en este dispositivo.';
+
+  @override
+  String get noCamera =>
+      'No hay cámara con la que escanear aquí. Escribe o pega el código.';
+
+  @override
+  String get pointAtCode =>
+      'Apunta la cámara al código de tu otro dispositivo.';
+
+  @override
+  String get orTypeCode =>
+      'O escribe este código en el otro dispositivo, en Activar suscripción:';
+
+  @override
+  String get copy => 'Copiar';
+
+  @override
+  String get copied => 'Copiado';
+
+  @override
+  String get backupCodes => 'Códigos de respaldo';
+
+  @override
+  String get backupCodesHint =>
+      'Para el día en que no tengas a mano ninguno de tus dispositivos para mostrar un código. Cada uno añade un dispositivo a esta suscripción, una vez. Guárdalos en un lugar seguro.';
+
+  @override
+  String get showBackupCodes => 'Mostrar códigos de respaldo';
+
+  @override
+  String get codeUsedMark => 'usado';
+
+  @override
+  String get replaceCodes => 'Reemplazar códigos';
+
+  @override
+  String get replaceCodesTitle => '¿Reemplazar los códigos de respaldo?';
+
+  @override
+  String get replaceCodesBody =>
+      'Estos cinco dejan de funcionar, y cinco nuevos ocupan su lugar.';
+
+  @override
+  String get replace => 'Reemplazar';
+
+  @override
+  String get codesEmailed => 'Códigos nuevos creados y enviados a tu correo.';
+
+  @override
+  String get codesMade => 'Códigos nuevos creados.';
+
+  @override
+  String get haveACode => '¿Tienes un código? Activar';
 }

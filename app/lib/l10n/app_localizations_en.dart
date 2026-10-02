@@ -1038,4 +1038,79 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkingOnline => 'Checking online players…';
+
+  @override
+  String get activateSubscription => 'Activate subscription';
+
+  @override
+  String get activateBody =>
+      'Bring this device onto a subscription you already have. Scan the code another of your devices shows under Subscription, or type or paste a code: that one, or a backup code from the email.';
+
+  @override
+  String get code => 'Code';
+
+  @override
+  String get paste => 'Paste';
+
+  @override
+  String get scanCode => 'Scan a code';
+
+  @override
+  String get activate => 'Activate';
+
+  @override
+  String get activated => 'Live play is open on this device.';
+
+  @override
+  String get noCamera =>
+      'No camera to scan with here. Type or paste the code instead.';
+
+  @override
+  String get pointAtCode =>
+      'Point the camera at the code on your other device.';
+
+  @override
+  String get orTypeCode =>
+      'Or type this code on the other device, under Activate subscription:';
+
+  @override
+  String get copy => 'Copy';
+
+  @override
+  String get copied => 'Copied';
+
+  @override
+  String get backupCodes => 'Backup codes';
+
+  @override
+  String get backupCodesHint =>
+      'For the day none of your devices is at hand to show a code. Each brings one device onto this subscription, once. Keep them somewhere safe.';
+
+  @override
+  String get showBackupCodes => 'Show backup codes';
+
+  @override
+  String get codeUsedMark => 'used';
+
+  @override
+  String get replaceCodes => 'Replace codes';
+
+  @override
+  String get replaceCodesTitle => 'Replace the backup codes?';
+
+  @override
+  String get replaceCodesBody =>
+      'These five stop working, and five new ones take their place.';
+
+  @override
+  String get replace => 'Replace';
+
+  @override
+  String get codesEmailed => 'New codes made, and emailed to you.';
+
+  @override
+  String get codesMade => 'New codes made.';
+
+  @override
+  String get haveACode => 'Have a code? Activate';
 }

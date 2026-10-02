@@ -1051,4 +1051,80 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get checkingOnline => 'Suche Spieler online …';
+
+  @override
+  String get activateSubscription => 'Abo aktivieren';
+
+  @override
+  String get activateBody =>
+      'Hol dieses Gerät in ein Abo, das du schon hast. Scanne den Code, den ein anderes deiner Geräte unter Abo zeigt, oder tippe oder füge einen Code ein: diesen oder einen Backup-Code aus der E-Mail.';
+
+  @override
+  String get code => 'Code';
+
+  @override
+  String get paste => 'Einfügen';
+
+  @override
+  String get scanCode => 'Code scannen';
+
+  @override
+  String get activate => 'Aktivieren';
+
+  @override
+  String get activated => 'Live-Spiel ist auf diesem Gerät offen.';
+
+  @override
+  String get noCamera =>
+      'Hier gibt es keine Kamera zum Scannen. Tippe oder füge den Code stattdessen ein.';
+
+  @override
+  String get pointAtCode =>
+      'Richte die Kamera auf den Code auf deinem anderen Gerät.';
+
+  @override
+  String get orTypeCode =>
+      'Oder tippe diesen Code auf dem anderen Gerät unter Abo aktivieren ein:';
+
+  @override
+  String get copy => 'Kopieren';
+
+  @override
+  String get copied => 'Kopiert';
+
+  @override
+  String get backupCodes => 'Backup-Codes';
+
+  @override
+  String get backupCodesHint =>
+      'Für den Tag, an dem keines deiner Geräte zur Hand ist, um einen Code zu zeigen. Jeder holt ein Gerät in dieses Abo, einmal. Bewahre sie sicher auf.';
+
+  @override
+  String get showBackupCodes => 'Backup-Codes zeigen';
+
+  @override
+  String get codeUsedMark => 'benutzt';
+
+  @override
+  String get replaceCodes => 'Codes ersetzen';
+
+  @override
+  String get replaceCodesTitle => 'Backup-Codes ersetzen?';
+
+  @override
+  String get replaceCodesBody =>
+      'Diese fünf funktionieren nicht mehr, und fünf neue treten an ihre Stelle.';
+
+  @override
+  String get replace => 'Ersetzen';
+
+  @override
+  String get codesEmailed =>
+      'Neue Codes erstellt und dir per E-Mail geschickt.';
+
+  @override
+  String get codesMade => 'Neue Codes erstellt.';
+
+  @override
+  String get haveACode => 'Hast du einen Code? Aktivieren';
 }

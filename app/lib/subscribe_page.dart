@@ -16,6 +16,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:table/table.dart';
 
+import 'activate_page.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
@@ -52,6 +53,9 @@ class _SubscribePageState extends State<SubscribePage> {
   bool _listing = false;
   Ticket? _code;
   bool _working = false;
+
+  /// The backup codes, once asked for: not on the screen until then.
+  BackupCodes? _backups;
 
   @override
   void initState() {
@@ -160,6 +164,60 @@ class _SubscribePageState extends State<SubscribePage> {
     });
   }
 
+  Future<void> _showBackups() async {
+    final me = _me;
+    if (me == null || _working) return;
+    setState(() {
+      _working = true;
+      _refusal = null;
+    });
+    final said = await backupCodes(me);
+    if (!mounted) return;
+    setState(() {
+      _working = false;
+      _backups = said.answer ?? _backups;
+      _refusal = said.refusal?.say(context.l10n);
+    });
+  }
+
+  Future<void> _replaceBackups() async {
+    final me = _me;
+    if (me == null || _working) return;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(dialog.l10n.replaceCodesTitle),
+        content: Text(dialog.l10n.replaceCodesBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: Text(dialog.l10n.notNow)),
+          FilledButton(onPressed: () => Navigator.of(dialog).pop(true), child: Text(dialog.l10n.replace)),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+    setState(() {
+      _working = true;
+      _refusal = null;
+    });
+    final said = await backupCodes(me, replace: true);
+    if (!mounted) return;
+    setState(() {
+      _working = false;
+      _backups = said.answer ?? _backups;
+      _refusal = said.refusal?.say(context.l10n);
+    });
+    if (said.answer case final made?) _say(made.emailed ? context.l10n.codesEmailed : context.l10n.codesMade);
+  }
+
+  Future<void> _copy(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) _say(context.l10n.copied);
+  }
+
+  void _say(String text) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.center), duration: const Duration(milliseconds: 1800)));
+
   Future<void> _drop(PublicKey device) async {
     final me = _me;
     if (me == null || _working) return;
@@ -265,6 +323,8 @@ class _SubscribePageState extends State<SubscribePage> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
                       ),
+                    const SizedBox(height: 6),
+                    TextButton(onPressed: waiting ? null : () => showActivate(context), child: Text(l10n.haveACode)),
                   ] else
                     ..._yours(),
                   const SizedBox(height: 14),
@@ -336,6 +396,14 @@ class _SubscribePageState extends State<SubscribePage> {
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
         ),
+        const SizedBox(height: 14),
+        Text(
+          l10n.orTypeCode,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
+        ),
+        const SizedBox(height: 6),
+        _CodeLine(text: _grouped(code.code), onCopy: () => unawaited(_copy(code.code)), copy: l10n.copy),
         const SizedBox(height: 12),
         OutlinedButton(
           onPressed: () => unawaited(_sendTheLink(code.code)),
@@ -347,6 +415,37 @@ class _SubscribePageState extends State<SubscribePage> {
           child: Text(l10n.sendLinkInstead),
         ),
       ],
+      const SizedBox(height: 26),
+      _Heading(l10n.backupCodes),
+      const SizedBox(height: 8),
+      Text(l10n.backupCodesHint, style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim)),
+      const SizedBox(height: 12),
+      if (_backups case final backups?) ...[
+        for (final c in backups.codes)
+          _CodeLine(
+            text: c.code,
+            used: c.used ? l10n.codeUsedMark : null,
+            onCopy: c.used ? null : () => unawaited(_copy(c.code)),
+            copy: l10n.copy,
+          ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: backups.unused.isEmpty ? null : () => unawaited(_copy(backups.unused.join('\n'))),
+                style: _outlined(),
+                child: Text(l10n.copy),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton(onPressed: _working ? null : _replaceBackups, style: _outlined(), child: Text(l10n.replaceCodes)),
+            ),
+          ],
+        ),
+      ] else
+        OutlinedButton(onPressed: _working ? null : _showBackups, style: _outlined(), child: Text(l10n.showBackupCodes)),
       // A web subscription is managed in Stripe's portal; one bought in
       // a store, in the store's own settings, which is the only place it
       // can be.
@@ -393,6 +492,16 @@ class _SubscribePageState extends State<SubscribePage> {
       ..showSnackBar(SnackBar(
           content: Text(context.l10n.linkCopied, textAlign: TextAlign.center), duration: const Duration(milliseconds: 1600), width: 200));
   }
+
+  static ButtonStyle _outlined() => OutlinedButton.styleFrom(
+        foregroundColor: Palette.gold,
+        side: BorderSide(color: Palette.gold.withValues(alpha: 0.5)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      );
+
+  /// A screen's code in fours, for a person to read across: the spaces
+  /// are ignored where it is typed (net/household.dart, [codeIn]).
+  static String _grouped(String code) => [for (var i = 0; i < code.length; i += 4) code.substring(i, i + 4 > code.length ? code.length : i + 4)].join(' ');
 
   static ButtonStyle _gold() => FilledButton.styleFrom(
         backgroundColor: Palette.gold,
@@ -514,3 +623,50 @@ Future<void> openLink(Uri url) async {
   } catch (_) {}
 }
 
+
+/// A code on a line of its own, set to be read and copied.
+class _CodeLine extends StatelessWidget {
+  const _CodeLine({required this.text, required this.copy, this.onCopy, this.used});
+
+  final String text;
+  final String copy;
+  final VoidCallback? onCopy;
+
+  /// Said beside a code that has been used, which is crossed out.
+  final String? used;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: used == null ? Palette.chrome : Palette.chromeDim,
+                decoration: used == null ? null : TextDecoration.lineThrough,
+              ),
+            ),
+          ),
+          if (used != null) ...[
+            const SizedBox(width: 8),
+            Text(used!, style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
+          ] else
+            IconButton(
+              tooltip: copy,
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.copy, size: 18, color: Palette.chromeDim),
+              onPressed: onCopy,
+            ),
+        ],
+      ),
+    );
+  }
+}

@@ -1405,6 +1405,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Checking online players…'**
   String get checkingOnline;
+
+  /// Menu item and page title: bring this device onto a subscription already bought, with a code.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate subscription'**
+  String get activateSubscription;
+
+  /// On the Activate subscription page.
+  ///
+  /// In en, this message translates to:
+  /// **'Bring this device onto a subscription you already have. Scan the code another of your devices shows under Subscription, or type or paste a code: that one, or a backup code from the email.'**
+  String get activateBody;
+
+  /// Label of the field a code is typed or pasted into.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get code;
+
+  /// Button: paste from the clipboard into the code field.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get paste;
+
+  /// Button: open the camera to scan another device's code.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan a code'**
+  String get scanCode;
+
+  /// Button: spend the code and bring this device onto the subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get activate;
+
+  /// Shown once a code has brought this device onto a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Live play is open on this device.'**
+  String get activated;
+
+  /// Shown when the camera could not be opened to scan.
+  ///
+  /// In en, this message translates to:
+  /// **'No camera to scan with here. Type or paste the code instead.'**
+  String get noCamera;
+
+  /// Under the camera view while scanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Point the camera at the code on your other device.'**
+  String get pointAtCode;
+
+  /// On the Subscription page, under the code to scan: the same code as text.
+  ///
+  /// In en, this message translates to:
+  /// **'Or type this code on the other device, under Activate subscription:'**
+  String get orTypeCode;
+
+  /// Button: copy to the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copy;
+
+  /// Shown briefly once something is copied to the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copied;
+
+  /// Heading on the Subscription page.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup codes'**
+  String get backupCodes;
+
+  /// On the Subscription page, above the backup codes.
+  ///
+  /// In en, this message translates to:
+  /// **'For the day none of your devices is at hand to show a code. Each brings one device onto this subscription, once. Keep them somewhere safe.'**
+  String get backupCodesHint;
+
+  /// Button on the Subscription page.
+  ///
+  /// In en, this message translates to:
+  /// **'Show backup codes'**
+  String get showBackupCodes;
+
+  /// Beside a backup code that has been used.
+  ///
+  /// In en, this message translates to:
+  /// **'used'**
+  String get codeUsedMark;
+
+  /// Button: make five new backup codes in place of these.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace codes'**
+  String get replaceCodes;
+
+  /// Title of the dialog asking before replacing backup codes.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace the backup codes?'**
+  String get replaceCodesTitle;
+
+  /// In the dialog asking before replacing backup codes.
+  ///
+  /// In en, this message translates to:
+  /// **'These five stop working, and five new ones take their place.'**
+  String get replaceCodesBody;
+
+  /// Button in the dialog: replace the backup codes.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get replace;
+
+  /// Shown once backup codes are replaced and emailed.
+  ///
+  /// In en, this message translates to:
+  /// **'New codes made, and emailed to you.'**
+  String get codesEmailed;
+
+  /// Shown once backup codes are replaced, when they could not be emailed.
+  ///
+  /// In en, this message translates to:
+  /// **'New codes made.'**
+  String get codesMade;
+
+  /// On the Subscription page before buying: a link to Activate subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Have a code? Activate'**
+  String get haveACode;
 }
 
 class _AppLocalizationsDelegate

@@ -441,12 +441,24 @@ void main() {
     expect(find.text('Play live'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
+    expect(find.text('Activate subscription'), findsNothing, reason: 'already active');
     await tester.tap(find.text('Subscription'));
     await tester.pumpAndSettle();
     expect(find.text('Subscription'), findsWidgets, reason: 'the page is named for what it holds');
     final until = Licence.dayOf(Entitlement.current.until!);
     expect(find.text('Open on this device, to $until'), findsOneWidget);
     expect(find.text('Subscribe'), findsNothing, reason: 'nothing to buy twice');
+  });
+
+  testWidgets('without live play the menu has the way in with a code, and with it does not', (tester) async {
+    await pumpHome(tester, live: false);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(find.text('Subscription'), findsNothing);
+    await tester.tap(find.text('Activate subscription'));
+    await tester.pumpAndSettle();
+    expect(find.text('Scan a code'), findsOneWidget);
+    expect(find.text('Activate'), findsOneWidget);
   });
 
   testWidgets('the page behind the price says what the money is for, and it is not the game', (tester) async {

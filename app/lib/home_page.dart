@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:table/table.dart';
 
 import 'about_page.dart';
+import 'activate_page.dart';
 import 'avatar.dart';
 import 'build_info.dart' show buildDate, reloadPage;
 import 'crypto/deal.dart';
@@ -809,6 +810,10 @@ class _HomePageState extends State<HomePage> {
             // to the one page.
             if (liveOpen)
               MenuAction(l10n.subscription, icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
+            // Not subscribed here: a subscription bought on another
+            // device, or a backup code from the email, brings it in.
+            if (!liveOpen)
+              MenuAction(l10n.activateSubscription, icon: Icons.key_outlined, onSelected: () => showActivate(context)),
             MenuAction(l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
             MenuAction(l10n.about, icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
           ],
