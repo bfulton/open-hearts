@@ -1797,6 +1797,62 @@ function tableTimingOf(raw) {
   return Object.keys(out).length ? out : null;
 }
 
+// ---- is it up ----------------------------------------------------------
+// What an outside monitor asks every minute (docs/06-service.md,
+// "Watching it run"): not whether this worker answers — any page would
+// say that — but whether what a purchase needs does. The store is read,
+// and Stripe is asked for the price with the key the service holds,
+// which is the call that failed for an hour on 2 October, with the key
+// expired and the worker answering everything else. The answer is kept
+// for half a minute in this isolate, so asking in a loop does not put
+// the asker's load on Stripe.
+
+const HEALTH_KEPT_MS = 30 * 1000;
+let health = null;
+
+/// For a test: look again.
+export const forgetHealth = () => {
+  health = null;
+};
+
+/// {ok, store, stripe}: each check `ok`, or what went wrong in a few
+/// words, without anything secret.
+export async function healthOf(env, fetchImpl = fetch, { now = Date.now() } = {}) {
+  if (health && health.until > now) return health.said;
+  const said = { ok: false, store: 'ok', stripe: 'ok' };
+  try {
+    const store = storeOf(env);
+    if (!store) said.store = 'not bound';
+    else await store.get(...CONFIG_ROW);
+  } catch (e) {
+    said.store = 'unreadable';
+  }
+  const secret = env.OH_STRIPE_SECRET;
+  const named = S().stripePrice ?? env.OH_STRIPE_PRICE;
+  if (!secret || typeof named !== 'string') {
+    said.stripe = 'not configured';
+  } else {
+    try {
+      const res = await fetchImpl(`${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`, {
+        headers: { authorization: `Bearer ${secret}` },
+      });
+      if (!res.ok) said.stripe = `stripe said ${res.status}`;
+      else if (!(await res.json())?.data?.length) said.stripe = 'no such price';
+    } catch {
+      said.stripe = 'not answering';
+    }
+  }
+  said.ok = said.store === 'ok' && said.stripe === 'ok';
+  health = { said, until: now + HEALTH_KEPT_MS };
+  return said;
+}
+
+async function healthRoute(request, env) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return json(request, 405, { error: 'GET' }, { allow: 'GET' });
+  const said = await healthOf(env);
+  return json(request, said.ok ? 200 : 503, said, { 'cache-control': 'no-store' });
+}
+
 async function configRoute(request, env) {
   const pre = preflight(request, 'GET');
   if (pre) return pre;
@@ -2320,6 +2376,7 @@ async function playRoute(request, env) {
 
 const ROUTES = {
   config: (request, env) => configRoute(request, env),
+  health: (request, env) => healthRoute(request, env),
   turn: (request, env) => turn(request, env),
   licence: (request, env) => licenceRoute(request, env),
   checkout: (request, env) => checkoutRoute(request, env),
@@ -2339,7 +2396,7 @@ const ROUTES = {
 /// A request out of how many is written down, by handler: one in ten
 /// for the config, which every open app asks for each quarter of an
 /// hour; every one of the rest, which are a person doing something.
-const SAMPLED = { config: 10 };
+const SAMPLED = { config: 10, health: 10 };
 
 /// One line of numbers a request, for the operator (doc 06, "Watching
 /// it run"): which handler, what it answered and how long it took — and

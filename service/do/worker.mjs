@@ -128,7 +128,11 @@ export class TagRelay {
 
 export default {
   async fetch(request, env) {
-    const tag = tagOf(new URL(request.url).pathname);
+    const path = new URL(request.url).pathname;
+    // The root answers, for the monitor that asks whether the relay is
+    // up (observability/monitoring.mjs); it opens no object.
+    if (path === '/') return new Response('open hearts relay: a relay lives at /<tag>\n', { status: 200 });
+    const tag = tagOf(path);
     if (!tag) return new Response('a relay lives at /<tag>\n', { status: 404 });
     // One object per tag, found by name: every client that asks for
     // this tag, wherever it is in the world, lands on this one object.
