@@ -320,11 +320,16 @@ void main() {
     });
     t.start();
     // The bots' hands are the jury's, never dealt in the open, so the
-    // one person at the table never sees one, leaving or not. (What
-    // the jurors do with a table nobody is left at is another matter.)
+    // one person at the table never sees one, leaving or not. And with
+    // nobody left the jurors are serving nobody: they stop, and their
+    // duty lets the table go (juror_duty.dart).
     expect(t.clock.runUntil(() => t.people[0].gone, limitMs: 10 * 60 * 1000), isTrue, reason: me.describe());
     expect(sawABot, isFalse);
     expect(me.pause, isNull);
+    List<TableClient> jurors() => [for (final j in t.jurors) if (j.client != null) j.client!];
+    expect(jurors(), isNotEmpty);
+    expect(t.clock.runUntil(() => jurors().every((c) => !c.serving), limitMs: 10 * 60 * 1000), isTrue,
+        reason: jurors().map((c) => c.describe()).join('\n'));
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
