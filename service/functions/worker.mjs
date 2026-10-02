@@ -1558,14 +1558,11 @@ export const TABLE_TIMING_BOUNDS = Object.freeze({
   quorumLostMs: [10000, 120000],
   silenceMs: [30000, 600000],
   jurorSilenceMs: [10000, 120000],
-  jurorsWaitMs: [20000, 180000],
-  jurorsWaitAgainMs: [10000, 60000],
 });
 
 /// A table's timing as the operator wrote it, or null: all or nothing,
 /// as a seat reads it — one field of the wrong type or out of bounds,
-/// or a second wait for jurors longer than the first, and none of it is
-/// served. Names it does not know are dropped.
+/// and none of it is served. Names it does not know are dropped.
 function tableTimingOf(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const out = {};
@@ -1575,9 +1572,6 @@ function tableTimingOf(raw) {
     if (!Number.isInteger(v) || v < least || v > most) return null;
     out[name] = v;
   }
-  const wait = out.jurorsWaitMs ?? 40000;
-  const again = out.jurorsWaitAgainMs ?? 10000;
-  if (again > wait) return null;
   return Object.keys(out).length ? out : null;
 }
 

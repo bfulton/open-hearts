@@ -1049,7 +1049,7 @@ abstract class AppLocalizations {
   /// Under the table before a hand with bots can be dealt.
   ///
   /// In en, this message translates to:
-  /// **'Waiting for jurors to hold the bots\' hands'**
+  /// **'Waiting for jury…'**
   String get waitingForJurors;
 
   /// Under the table while the cards are dealt.

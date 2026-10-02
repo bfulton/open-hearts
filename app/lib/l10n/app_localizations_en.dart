@@ -777,7 +777,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get back => 'Back';
 
   @override
-  String get waitingForJurors => 'Waiting for jurors to hold the bots\' hands';
+  String get waitingForJurors => 'Waiting for jury…';
 
   @override
   String get dealing => 'Dealing';

@@ -104,7 +104,7 @@ playing ──last trick──▶ auditing ──every audit──▶ over
 
 | From | To | Decided |
 |---|---|---|
-| awaitingJury | dealing | on the record — every seat's keys name the draw they are sealed to, and the hand's is the one the first person to key it named, lowest seat first: none where that person dealt the bot seats in the open, at 40 s without a jury able to hold them |
+| awaitingJury | dealing | on the record — every seat's keys name the draw they are sealed to, and the hand's is the one the first person to key it named, lowest seat first: none where that person dealt the bot seats in the open (an older build's fall-back; a hand with bot seats now waits for a jury that holds them) |
 | dealing | passing, playing, opening | from the record |
 | dealing | abandoned | from the record — follows from the escrow of a held seat that still owed a step, which a side behind is carried to; the verifier asks for it |
 | passing | playing | from the record |
@@ -645,12 +645,15 @@ juries' own order and the order they carry in had agreed in every
 walk and run until then; it went on the list below, and is on the
 record now (below, "The escrow's custodians on the record").
 
-The fall-back to bot seats in the open comes with the draw. A person
-whose table has had no jury able to hold the bot seats for forty
-seconds deals without one, and its keys then name no draw; where those
-are the first person's keys, that is the hand's, and every side deals
+The fall-back to bot seats in the open came with the draw. A person
+whose table had had no jury able to hold the bot seats for forty
+seconds dealt without one, and its keys then named no draw; where those
+were the first person's keys, that was the hand's, and every side dealt
 the bots in the open, a side that had a jury by then included. Two
-sides judging the forty seconds differently now deal one hand one way.
+sides judging the forty seconds differently dealt one hand one way.
+The fall-back is gone since (October): a hand with bot seats waits for
+a jury that holds them, however long that takes. Keys that name no
+draw, from an older build, are still read the same way.
 
 It costs a little over a tenth of a second in the deal. A juror's keys
 now wait for the first person's to settle, where the two seconds it

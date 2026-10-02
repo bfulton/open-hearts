@@ -31,8 +31,6 @@ void main() {
       expect(s.quorumLostMs, 20000);
       expect(s.silenceMs, 120000);
       expect(s.jurorSilenceMs, 30000);
-      expect(s.jurorsWaitMs, 40000);
-      expect(s.jurorsWaitAgainMs, 10000);
       expect(TableTiming.bounds.keys, unorderedEquals(s.toJson().keys), reason: 'every field has bounds');
       for (final MapEntry(:key, :value) in s.toJson().entries) {
         final (least, most) = TableTiming.bounds[key]!;
@@ -53,15 +51,13 @@ void main() {
     test('one field out of bounds, or of the wrong type, and the whole of it is the standard', () {
       for (final MapEntry(:key, value: (least, most)) in TableTiming.bounds.entries) {
         expect(TableTiming.parse({key: least}).toJson()[key], least, reason: '$key at its least is in');
-        expect(TableTiming.parse({key: most}).toJson()[key], key == 'jurorsWaitAgainMs' ? 10000 : most,
-            reason: '$key at its most is in, but for a second wait longer than the first');
+        expect(TableTiming.parse({key: most}).toJson()[key], most, reason: '$key at its most is in');
         for (final bad in [least - 1, most + 1, '$least', least.toDouble(), null, true]) {
           expect(TableTiming.parse({'graceMs': 3000, key: bad}), TableTiming.standard, reason: '$key: $bad');
         }
       }
-      expect(TableTiming.parse({'jurorsWaitMs': 20000, 'jurorsWaitAgainMs': 30000}), TableTiming.standard,
-          reason: 'the wait after a fall-back is never the longer');
-      expect(TableTiming.parse({'jurorsWaitMs': 30000, 'jurorsWaitAgainMs': 30000}).jurorsWaitAgainMs, 30000);
+      expect(TableTiming.parse({'graceMs': 3000, 'jurorsWaitMs': 40000}).bank.graceMs, 3000,
+          reason: 'the jury waits an older build said are passed over, not refused');
     });
 
     test('a function of what it is given: the same event is the same clocks, however often it is read', () {

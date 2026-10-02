@@ -29,8 +29,6 @@ class TableTiming {
     this.quorumLostMs = 20000,
     this.silenceMs = 120000,
     this.jurorSilenceMs = 30000,
-    this.jurorsWaitMs = 40000,
-    this.jurorsWaitAgainMs = 10000,
   });
 
   /// The timing every table had before a table could have its own, and
@@ -103,19 +101,6 @@ class TableTiming {
   /// as there: half a minute, after which its bot seat is the escrow's.
   final int jurorSilenceMs;
 
-  /// How long a hand waits for a jury that can hold its bot seats.
-  /// Long enough for a called-for juror to come online and be drawn
-  /// into a redraw or two, short enough that a table behind a service
-  /// that is down still plays.
-  final int jurorsWaitMs;
-
-  /// The same wait at a table that has already dealt a hand with its
-  /// bot seats in the open for want of jurors: [jurorsWaitMs] is what
-  /// it costs to learn that nobody is coming, and paying it once a hand
-  /// at a table whose service is down would be most of the table's
-  /// life.
-  final int jurorsWaitAgainMs;
-
   /// The fields as a start event carries them, all in milliseconds.
   Map<String, int> toJson() => {
         'graceMs': bank.graceMs,
@@ -127,8 +112,6 @@ class TableTiming {
         'quorumLostMs': quorumLostMs,
         'silenceMs': silenceMs,
         'jurorSilenceMs': jurorSilenceMs,
-        'jurorsWaitMs': jurorsWaitMs,
-        'jurorsWaitAgainMs': jurorsWaitAgainMs,
       };
 
   /// What each field may be, in milliseconds, least and most. The
@@ -144,8 +127,6 @@ class TableTiming {
     'quorumLostMs': (10000, 120000),
     'silenceMs': (30000, 600000),
     'jurorSilenceMs': (10000, 120000),
-    'jurorsWaitMs': (20000, 180000),
-    'jurorsWaitAgainMs': (10000, 60000),
   };
 
   /// The timing [json] says, field by field, with the standard for any
@@ -154,9 +135,8 @@ class TableTiming {
   ///
   /// Every seat parses the same signed event and has to come out with
   /// the same clocks, so this is a function of [json] alone, and all or
-  /// nothing: a field of the wrong type or outside its [bounds], or a
-  /// second wait longer than the first, and the whole timing is the
-  /// standard. Clamping one field and keeping the rest would be as
+  /// nothing: a field of the wrong type or outside its [bounds], and
+  /// the whole timing is the standard. Clamping one field and keeping the rest would be as
   /// deterministic, but would make a table nobody chose. Names it does
   /// not know are passed over, for a later build's fields.
   static TableTiming parse(Object? json) {
@@ -169,7 +149,6 @@ class TableTiming {
       if (value is! int || value < range.$1 || value > range.$2) return standard;
       at[key as String] = value;
     }
-    if (at['jurorsWaitAgainMs']! > at['jurorsWaitMs']!) return standard;
     return TableTiming(
       bank: TimeBank(
         graceMs: at['graceMs']!,
@@ -182,8 +161,6 @@ class TableTiming {
       quorumLostMs: at['quorumLostMs']!,
       silenceMs: at['silenceMs']!,
       jurorSilenceMs: at['jurorSilenceMs']!,
-      jurorsWaitMs: at['jurorsWaitMs']!,
-      jurorsWaitAgainMs: at['jurorsWaitAgainMs']!,
     );
   }
 
@@ -195,8 +172,6 @@ class TableTiming {
         quorumLostMs: quorumLostMs,
         silenceMs: silenceMs,
         jurorSilenceMs: jurorSilenceMs,
-        jurorsWaitMs: jurorsWaitMs,
-        jurorsWaitAgainMs: jurorsWaitAgainMs,
       );
 
   @override

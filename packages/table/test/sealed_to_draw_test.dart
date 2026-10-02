@@ -178,11 +178,11 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  test('the first person dealing without a jury is the hand dealt without one, at every side', () {
-    // The first person hears nothing of the jury for a minute, so it
-    // deals its bots in the open at forty seconds; the other two have
-    // a jury long before and deal to it. The first person's keys say
-    // which, and it is the open one.
+  test('a person who hears of no jury waits for one, and never deals the bots in the open', () {
+    // The first person hears nothing of the jury for a minute; the
+    // other two have a jury long before. It used to deal its bots in
+    // the open at forty seconds. Now it waits the minute out, and the
+    // hand is dealt to the jury at every side.
     final t = SimTable(humans: 3, seed: 5, crypto: crypto, jurors: jurySize);
     final first = t.clients.first;
     t.net.steer = (from, to, message) {
@@ -194,11 +194,14 @@ void main() {
     t.start();
     final b = t.clients.elementAt(1);
     expect(t.clock.runUntil(() => b.botHolders(0).isNotEmpty, limitMs: 30000), isTrue, reason: 'the others had a jury for the hand');
+    t.clock.runUntil(() => t.clock.nowMs >= 55000, limitMs: 60000);
+    expect(first.dealOf(0), isNull, reason: 'still waiting for a jury at fifty-five seconds');
+    expect(first.game.handNumber, 0);
     expect(t.clock.runUntil(() => t.survivors.every((c) => c.game.handNumber >= 1), limitMs: 20 * 60 * 1000), isTrue,
         reason: t.clients.map((c) => c.describe()).join('\n'));
     for (final c in t.survivors) {
-      expect(c.sealedTo(0), isNull, reason: 'sealed to no draw');
-      expect(c.botHolders(0), isEmpty, reason: 'the bot seats in the open');
+      expect(c.sealedTo(0), isNotNull, reason: 'sealed to the draw');
+      expect(c.botHolders(0), isNotEmpty, reason: 'the bot seats held by the jury');
     }
     expect(first.record.where((d) => d.removal), isEmpty, reason: 'nobody was put out for it');
     final v = verifyRecord(t.spec, first.record, allowPartial: true, juries: first.juries, crypto: crypto, releases: first.releases);

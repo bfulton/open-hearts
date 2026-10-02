@@ -833,19 +833,19 @@ answers is a **bench** of jurors of last resort rather than one
 which is the bend above and not a new one; what they are not is
 another player.
 
-The wait is bounded (`TableTiming.jurorsWaitMs`, forty seconds). Past the point
-where nobody is coming, a table frozen for good is worse than one
-whose bots are public, so the hand goes ahead in the open — which now
-means nobody else online *and* our own bench unreachable, rather than
-merely a quiet night.
+The wait has no limit. A bot's hand dealt in the open is the table's
+to see, and at two people and two bots that is the other person's hand
+by subtraction, so a rated table played that way is one a person can
+win by reading. A table nobody can hold waits, and says so ("Waiting
+for jury…"); it used to go ahead in the open after forty seconds.
 
 Holding the *draw* back, rather than drawing a small jury now and a
 bigger one after, is deliberate: a hand has one jury and the
 assignment comes from it, so a second draw would not move the seats
 anyway — it would only pin them to a jury that can hold none. The cost
-is that a deadlock in those forty seconds has no jury to break it. It
-is bounded by the same forty seconds, it only arises at a table whose
-bot seats need holding, and the table says what it is waiting for.
+is that a deadlock while it waits has no jury to break it. It only
+arises at a table whose bot seats need holding, it ends when the jurors
+come, and the table says what it is waiting for.
 - **A stranger sees a bot's hand for one hand.** Bounded by the draw:
   jurors come from other tables, the table's own humans are excluded,
   and the draw is the deal's own randomness, so nobody chooses to be
@@ -1867,7 +1867,7 @@ On the wire:
   or more (`juryToHoldBots`), `assignBots` gives each bot seat a juror
   of its own in the drawn order, foreman skipped. A table with bot
   seats and too few jurors to hold them holds its draw and its deal
-  back for up to forty seconds while the bench it called for comes
+  back, with no time limit, while the bench it called for comes
   online, and says on the table that it is waiting. That juror draws the
   seat's key, takes its turns in the deal, says its pass and its
   plays, and publishes its secret at the audit with everyone else's.

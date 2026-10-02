@@ -157,7 +157,7 @@
   "botTookYourSeat": "Um bot ficou com o seu lugar",
   "tableCouldNotHear": "A mesa não teve notícias suas e continuou sem você.",
   "back": "Voltar",
-  "waitingForJurors": "Esperando jurados para guardar as mãos dos bots",
+  "waitingForJurors": "Esperando o júri…",
   "dealing": "Distribuindo",
   "dealingKeys": "Distribuindo — chaves",
   "shuffling": "Embaralhando ({turn} de 4)",

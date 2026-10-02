@@ -779,8 +779,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get back => 'Voltar';
 
   @override
-  String get waitingForJurors =>
-      'Esperando jurados para guardar as mãos dos bots';
+  String get waitingForJurors => 'Esperando o júri…';
 
   @override
   String get dealing => 'Distribuindo';

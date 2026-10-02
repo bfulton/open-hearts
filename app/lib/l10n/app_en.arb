@@ -931,7 +931,7 @@
   "@back": {
     "description": "Button: go back."
   },
-  "waitingForJurors": "Waiting for jurors to hold the bots' hands",
+  "waitingForJurors": "Waiting for jury…",
   "@waitingForJurors": {
     "description": "Under the table before a hand with bots can be dealt."
   },

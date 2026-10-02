@@ -116,8 +116,6 @@ test('a table timing is served whole where every field checks out, and left out 
     { bankMs: '45000' },
     { fixedMs: 40000.5 },
     { graceMs: 10000, silenceMs: null },
-    { jurorsWaitMs: 20000, jurorsWaitAgainMs: 30000 },
-    { jurorsWaitAgainMs: 50000 },
   ]) {
     assert.equal('table' in configOf({ table: bad }), false, JSON.stringify(bad));
   }
@@ -129,7 +127,7 @@ test('a table timing is served whole where every field checks out, and left out 
   const least = Object.fromEntries(Object.entries(TABLE_TIMING_BOUNDS).map(([k, [lo]]) => [k, lo]));
   const most = Object.fromEntries(Object.entries(TABLE_TIMING_BOUNDS).map(([k, [, hi]]) => [k, hi]));
   assert.deepEqual(configOf({ table: least }).table, least);
-  assert.deepEqual(configOf({ table: { ...most, jurorsWaitAgainMs: 60000 } }).table, { ...most, jurorsWaitAgainMs: 60000 });
+  assert.deepEqual(configOf({ table: most }).table, most);
   // And the rest of the row is served regardless.
   assert.equal(configOf({ live: false, table: { graceMs: 1 } }).live, false);
 });

@@ -780,8 +780,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get back => 'Retour';
 
   @override
-  String get waitingForJurors =>
-      'En attente de jurés pour tenir les mains des bots';
+  String get waitingForJurors => 'En attente du jury…';
 
   @override
   String get dealing => 'Distribution';

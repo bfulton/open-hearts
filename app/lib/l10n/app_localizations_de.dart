@@ -789,7 +789,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get back => 'Zurück';
 
   @override
-  String get waitingForJurors => 'Warte auf Juroren für die Hände der Bots';
+  String get waitingForJurors => 'Warte auf die Jury…';
 
   @override
   String get dealing => 'Teile aus';
