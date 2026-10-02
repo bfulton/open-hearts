@@ -212,6 +212,12 @@ What follows:
   emailed to the payer of a web subscription through Cloudflare's
   Email Sending: the address is read off Stripe's checkout event, or
   from `GET /v1/customers/{id}` on a replacement, and not stored.
+- **New Relic Browser on the web build** (`app/web/observability.js`,
+  only on openhearts.game): page loads and timings, JavaScript errors,
+  and the paths (not query strings) of the app's requests, with browser,
+  device type and a location derived from the IP address, which New
+  Relic overwrites within 24 hours. No cookies, session replay or
+  session traces. Kept eight days. The phone builds load none of it.
 - **Only a household code's rows expire** (an hour after the code is
   made). An ended subscription is dated down, not deleted.
 

@@ -22,7 +22,9 @@
 
 import { createHash } from 'node:crypto';
 
-import { alerts, app, synthetics } from './monitoring.mjs';
+import { readFile, writeFile } from 'node:fs/promises';
+
+import { alerts, app, browser, synthetics } from './monitoring.mjs';
 
 const write = process.argv.includes('--apply');
 const key = process.env.NEW_RELIC_API_KEY;
@@ -306,6 +308,92 @@ async function applyNotifications(policyId) {
   }
 }
 
+// ---- the browser -------------------------------------------------------
+
+const browserName = prefix + browser.name;
+const browserSettings = {
+  browserMonitoring: { privacy: { cookiesEnabled: false }, distributedTracing: { enabled: false } },
+  sessionReplay: { enabled: false, autoStart: false },
+  sessionTrace: { enabled: false },
+};
+
+async function applyBrowser() {
+  const found = await graph(
+    `query($q: String!) { actor { entitySearch(query: $q) { results { entities { guid name tags { key values } } } } } }`,
+    { q: `domain = 'BROWSER' AND type = 'APPLICATION' AND accountId = ${account} AND name = '${browserName}'` },
+  );
+  let guid = found.actor.entitySearch.results.entities.find((e) => e.name === browserName)?.guid ?? null;
+  for (const old of guid ? [] : browser.formerly ?? []) {
+    const was = await graph(
+      `query($q: String!) { actor { entitySearch(query: $q) { results { entities { guid name tags { key values } } } } } }`,
+      { q: `domain = 'BROWSER' AND type = 'APPLICATION' AND accountId = ${account} AND name = '${prefix + old}' AND tags.app = '${app.key}'` },
+    );
+    const e = was.actor.entitySearch.results.entities.find((x) => x.name === prefix + old);
+    if (!e) continue;
+    // New Relic renames APM apps only; a browser app under an old name is
+    // deleted, with what it had collected, and made again under the new.
+    say(`delete browser app "${prefix + old}" to make it again as "${browserName}" (browser apps cannot be renamed)`);
+    if (write) {
+      await graph(`mutation($g: EntityGuid!) { agentApplicationDelete(guid: $g) { success } }`, { g: e.guid });
+    }
+    break;
+  }
+  if (!guid) {
+    say(`create browser app "${browserName}" (no cookies, no session replay, no session traces)`);
+    if (!write) return;
+    const r = await graph(
+      `mutation($a: Int!, $n: String!, $s: AgentApplicationBrowserSettingsInput) {
+        agentApplicationCreateBrowser(accountId: $a, name: $n, settings: $s) { guid } }`,
+      { a: account, n: browserName, s: { cookiesEnabled: false, distributedTracingEnabled: false, loaderType: browser.loader } },
+    );
+    guid = r.agentApplicationCreateBrowser.guid;
+    await graph(
+      `mutation($g: EntityGuid!, $t: [TaggingTagInput!]!) { taggingAddTagsToEntity(guid: $g, tags: $t) { errors { message } } }`,
+      { g: guid, t: managed },
+    );
+  }
+  // Settings every time: they are cheap, and the loader below has to
+  // reflect them.
+  if (write) {
+    await graph(
+      `mutation($g: EntityGuid!, $s: AgentApplicationSettingsUpdateInput!) { agentApplicationSettingsUpdate(guid: $g, settings: $s) { guid } }`,
+      { g: guid, s: browserSettings },
+    );
+  }
+  // A browser app just made has no loader for a minute or two.
+  let loader = null;
+  for (let tries = 0; tries < 24 && !loader; tries++) {
+    if (tries) await new Promise((r) => setTimeout(r, 5000));
+    const props = await graph(
+      `query($g: EntityGuid!) { actor { entity(guid: $g) { ... on BrowserApplicationEntity { browserProperties { jsLoaderScript } } } } }`,
+      { g: guid },
+    );
+    loader = props.actor.entity?.browserProperties?.jsLoaderScript ?? null;
+  }
+  if (!loader) throw new Error('browser: New Relic gave no loader script');
+  // And off in the page itself, not only in New Relic's settings: what
+  // the page may do is decided here, where it is read.
+  const script = loader
+    .replace(/^\s*<script[^>]*>/i, '')
+    .replace(/<\/script>\s*$/i, '')
+    .replace('NREUM.init={', 'NREUM.init={session_replay:{enabled:false},session_trace:{enabled:false},');
+  if (!script.includes('session_trace:{enabled:false}')) throw new Error('browser: the loader is not the shape expected; look at it');
+  const file = [
+    '// New Relic Browser (observability/monitoring.mjs, `browser`), written by',
+    '// observability/apply.mjs: run it again rather than editing this. Only on',
+    `// ${browser.onlyOn}, so a fork or a local build reports nothing to us.`,
+    `if (location.hostname === ${JSON.stringify(browser.onlyOn)}) {`,
+    script.trim(),
+    '}',
+    '',
+  ].join('\n');
+  const out = new URL(`../${browser.out}`, import.meta.url);
+  const was = await readFile(out, 'utf8').catch(() => null);
+  if (was === file) return;
+  say(`write ${browser.out} with the browser app's loader`);
+  if (write) await writeFile(out, file);
+}
+
 // ---- the workload ------------------------------------------------------
 
 async function applyWorkload() {
@@ -325,5 +413,6 @@ await applySynthetics();
 const policyId = await applyPolicy();
 await applyCondition(policyId);
 await applyNotifications(policyId);
+await applyBrowser();
 await applyWorkload();
 console.log(write ? `applied: ${plan.length} change(s)` : `${plan.length} change(s); --apply to make them`);

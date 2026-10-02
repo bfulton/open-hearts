@@ -7,6 +7,12 @@ rather than set up by hand.
   the site, the app, `/api/health` and the relay, once a minute from
   two places; an alert when one fails from both for two minutes; an
   email to the address in `OH_ALERT_EMAIL`.
+- The **Open Hearts: web** browser app (New Relic Browser, real-user
+  monitoring): errors, load times and the service's calls from people's
+  own browsers, with no cookies, session replay or session traces.
+  `apply.mjs` writes its loader to `app/web/observability.js`, which
+  runs only on openhearts.game. New Relic cannot rename a browser app,
+  so changing its name in the definition deletes it and makes it again.
 - `apply.mjs` — makes the account match. A dry run by default:
 
       node observability/apply.mjs            # what would change
