@@ -113,7 +113,11 @@ the bottom with the day.
   bench runs, a quiet night means they wait for good — do not deploy
   the no-fallback build to production before it); emailing backup
   codes (Cloudflare Email Sending, 3,000 a month included); and KV
-  past the free 1,000 writes a day.
+  past the free 1,000 writes a day. Once it is on, the bench is
+  mine to deploy (built, tested against a real table, and its config
+  checked with a dry run): uncomment the container block in
+  `service/do/wrangler.toml`, `service/bench/build.sh`, set
+  `OH_JUROR_SECRET`, deploy the relay.
 - **Buy it once for real**: on https://openhearts.game/play, subscribe
   with your own card, play a live table on two devices, open Manage
   subscription, then cancel and refund it in Stripe. Everything short

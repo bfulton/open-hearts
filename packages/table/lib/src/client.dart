@@ -5281,8 +5281,8 @@ class TableClient {
     final here = p.online(withinMs: 15000).difference(_humans).difference(quiet);
     // What this table needs a jury for. Escrow needs somebody; bot
     // seats need enough jurors that a seat survives its holder going
-    // (jury.dart, [juryToHoldBots]), and short of that the seats are
-    // held by nobody and their hands are the table's to see.
+    // (jury.dart, [juryToHoldBots]), and short of that the hand is not
+    // dealt ([_startDealWhenReady]): it waits, and calls.
     final wanted = spec.sealed && _hasBotSeats ? juryToHoldBots : 1;
     // Drawn from the settled ones where there are enough of them.
     // What a hand's escrow rests on is the jurors it draws still

@@ -186,19 +186,39 @@ class LastResortBench {
   LastResortBench({
     required List<Signer> signers,
     required List<Uri> relays,
+    List<Uri>? presenceRelays,
     void Function(String line)? log,
     int idleMs = 10 * 60 * 1000,
     int? silenceAfterMs,
     DealCrypto? crypto,
   }) : jurors = [
           for (final s in signers)
-            LastResortJuror(relays: relays, signer: s, log: log, idleMs: idleMs, silenceAfterMs: silenceAfterMs, crypto: crypto),
+            LastResortJuror(
+                relays: relays,
+                presenceRelays: presenceRelays,
+                signer: s,
+                log: log,
+                idleMs: idleMs,
+                silenceAfterMs: silenceAfterMs,
+                crypto: crypto),
         ];
 
   final List<LastResortJuror> jurors;
 
   /// Whether any of the bench is up.
   bool get online => jurors.any((j) => j.online);
+
+  /// How many tables the bench is serving, counted once a juror.
+  int get serving => jurors.fold(0, (n, j) => n + j.duty.serving);
+
+  /// Called for by [table] some other way than on the relay — the
+  /// service that woke this bench, passing the call on — so the bench
+  /// is online for it now rather than at the table's next call.
+  void wake(String table) {
+    for (final j in jurors) {
+      j.wake(table);
+    }
+  }
 
   void start() {
     for (final j in jurors) {
@@ -218,9 +238,19 @@ class LastResortBench {
 /// every other juror runs — and quiet again once it has been idle for
 /// a while.
 class LastResortJuror {
+  /// [presenceRelays] are where it says it is here and hears the calls,
+  /// as a device's presence is carried (app/lib/net/relays.dart,
+  /// presenceRelays); [relays] where it follows the tables. The same
+  /// list for both unless said.
   LastResortJuror(
-      {required this.relays, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int? silenceAfterMs, DealCrypto? crypto}) {
-    presence = RelayPresence(relays: relays, signer: signer, status: 'last-resort', log: log)..silent = true;
+      {required this.relays,
+      List<Uri>? presenceRelays,
+      required this.signer,
+      this.log,
+      this.idleMs = 10 * 60 * 1000,
+      int? silenceAfterMs,
+      DealCrypto? crypto}) {
+    presence = RelayPresence(relays: presenceRelays ?? relays, signer: signer, status: 'last-resort', log: log)..silent = true;
     duty = JurorDuty(relays: relays, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs, crypto: crypto);
   }
 
@@ -243,6 +273,9 @@ class LastResortJuror {
     _calls = presence.calls.listen(_onCall);
     _idle = Timer.periodic(const Duration(seconds: 30), (_) => _checkIdle());
   }
+
+  /// As a call heard on the relay.
+  void wake(String table) => _onCall(table);
 
   void _onCall(String table) {
     _calledAt = DateTime.now().millisecondsSinceEpoch;

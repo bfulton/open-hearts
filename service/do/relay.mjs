@@ -276,7 +276,7 @@ export function memoryStore(keep = 10000) {
 /// the rate is measured by. [count], if given, is told what became of
 /// each message — `count('events')`, `count('delivered', n)` — and
 /// nothing about who sent it: what the operator watches (worker.mjs).
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null }) {
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -352,6 +352,9 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       for (const id of stored) seen.add(id);
     }
     send(from, ['OK', event.id, true, '']);
+    // Whatever the host wants to know of an event it took: a call for a
+    // juror, for one (worker.mjs).
+    heard?.(event);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);
     let delivered = 0;
@@ -487,8 +490,9 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// tests build is that relay and not one set up to look like it:
 /// nothing written down, nothing but the ephemeral kinds, and every
 /// socket held to [objectLimits].
-export function objectRelay(verify, { now = Date.now, count = null, limits = objectLimits } = {}) {
+export function objectRelay(verify, { now = Date.now, count = null, limits = objectLimits, heard = null } = {}) {
   return createRelay({
+    heard,
     verify,
     store: null,
     refuse: (event) =>

@@ -1742,6 +1742,25 @@ scales inversely with the player base: it runs when the room is empty
 and never otherwise. This is the only place a gameplay event reaches
 anything of ours, and what it carries is "a table needs a juror."
 
+**As built**, the bench is `service/bin/juror.dart`, four jurors in one
+process, run as a Cloudflare Container (`service/bench`,
+`service/do/bench.mjs`). The call is a presence event, and presence is
+carried by our own relay object (`service/do/worker.mjs`), so the
+relay is what notices it: it passes the call to the `Bench` object at
+most every twenty seconds, which starts the container if it is not
+running, waits for the bench to answer on its port, and hands it the
+call, so the bench comes online for that table at once. The bench
+then looks in once a minute: left alone while it serves a table or
+waits to be drawn, stopped once it has gone quiet, which it does by
+itself ten minutes after the last call with nothing to serve. So it
+costs nothing while nobody needs it. Measured against a real table on
+a local relay (`service/tool/bench_check.dart`), the bench uses about
+22 MiB, and a deal with it holding both bot seats took 9 s at a whole
+vCPU and 21 s at a quarter; it runs on `standard-1`, half a vCPU. Anyone
+can make the relay pass a call on — a presence event is anybody's to
+sign — and the worst that does is keep one container awake, at about
+four cents an hour; the relay's own rate limits bound it.
+
 **The draw is verifiable.** The four at the table agree a snapshot of
 who is online, and apply the deal's own randomness to it. Nobody at the
 table can steer the draw, and nobody outside it can either.
@@ -1793,8 +1812,8 @@ On the wire:
   new one, and that is when it needs the old. A jury gone quiet is
   redrawn from whoever is left; with nobody online to draw from — or
   with too few to hold the table's bot seats — it says so and calls
-  for the jurors of last resort, holding the hand's draw back while
-  they could still arrive.
+  for the jurors of last resort, holding the hand's draw back until
+  they do.
 - **The juror** follows the table like any peer behind — a summoned
   client is carried forward by the same heartbeats — and heartbeats
   while it serves. Over channels, like any peer: the summons is the
@@ -1803,7 +1822,7 @@ On the wire:
   stranger's machine (`Transport.reach`, `JurorDuty.dial`). The relay
   is still the lane until the channel is up, and it is the whole path
   for a juror that has no WebRTC to be dialled with — the service's
-  own jurors of last resort, in a VM with no peer connection in it,
+  own jurors of last resort, in a container with no peer connection in it,
   which is exactly the case doc 02's fallback exists for. Holding a
   bot seat is the most a juror has ever put through either path and it
   is still small — 23,780 bytes a seat a hand as JSON on a relay,

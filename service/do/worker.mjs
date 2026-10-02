@@ -27,12 +27,21 @@
 import wasm from '../../app/web/schnorr.wasm';
 
 import { limitsFrom, objectRelay, schnorrVerifier, tagOf, tally } from './relay.mjs';
+import { callIn } from './bench.mjs';
 
 // One object per subscription, through which a household's codes,
 // claims and drops run one at a time (service/functions/worker.mjs,
 // "one household at a time"). It lives here because a Pages project
 // cannot define a Durable Object of its own, only bind one.
 export { Household } from '../functions/worker.mjs';
+
+// The jurors of last resort, a Cloudflare Container started when a table
+// calls for a juror and nobody is there (bench.mjs).
+export { Bench } from './bench.mjs';
+
+/// How often one object passes a call on to the bench: a table calls
+/// every ten seconds while it is short, and the bench needs one.
+const WAKE_EVERY_MS = 20 * 1000;
 
 export class TagRelay {
   constructor(state, env = {}) {
@@ -42,6 +51,22 @@ export class TagRelay {
     // What the operator watches, if the dataset is bound (wrangler.toml,
     // OH_METRICS): a line of counts a minute, nothing about anyone.
     this.tally = tally(env.OH_METRICS ?? null);
+    this.wokeAt = 0;
+  }
+
+  /// A call for a juror heard here, passed to the bench where one is
+  /// bound (wrangler.toml, BENCH). Not awaited by the relay: the caller
+  /// has its OK already, and the bench takes a while to start.
+  heard(event) {
+    const table = callIn(event);
+    if (!table || !this.env.BENCH) return;
+    const now = Date.now();
+    if (now - this.wokeAt < WAKE_EVERY_MS) return;
+    this.wokeAt = now;
+    const bench = this.env.BENCH.get(this.env.BENCH.idFromName('bench'));
+    this.state.waitUntil(
+      bench.fetch(`https://bench/wake?table=${encodeURIComponent(table)}`, { method: 'POST' }).catch(() => {}),
+    );
   }
 
   /// The relay for this object, built on first use — which is the
@@ -61,7 +86,7 @@ export class TagRelay {
   /// thread.
   async build() {
     const [verify, limits] = await Promise.all([schnorrVerifier(wasm), limitsFrom(this.env)]);
-    const relay = objectRelay(verify, { count: (what, n) => this.tally.count(what, n), limits });
+    const relay = objectRelay(verify, { count: (what, n) => this.tally.count(what, n), limits, heard: (event) => this.heard(event) });
     for (const socket of this.state.getWebSockets()) relay.open(socket, socket.deserializeAttachment());
     return relay;
   }

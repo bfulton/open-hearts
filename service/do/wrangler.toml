@@ -36,6 +36,31 @@ new_sqlite_classes = ["TagRelay"]
 tag = "v2"
 new_sqlite_classes = ["Household"]
 
+# The jurors of last resort, as a Cloudflare Container (bench.mjs; the
+# image is service/bench, built by its build.sh). The presence relay
+# above passes a table's call for a juror to it, and it runs only while
+# the bench is serving or waiting to be drawn. Needs the Workers Paid
+# plan; uncomment once it is on, run service/bench/build.sh, set the
+# bench's identity with
+#   npx wrangler@4 secret put OH_JUROR_SECRET   (64 hex, kept, so the
+#   bench has the same four keys after every start)
+# and deploy. standard-1 is half a vCPU and 4 GiB: a deal took 9 s at a
+# whole vCPU and 21 s at a quarter (service/tool/bench_check.dart), and
+# the bench itself uses about 22 MiB.
+# [[containers]]
+# class_name = "Bench"
+# image = "../bench/Dockerfile"
+# max_instances = 1
+# instance_type = "standard-1"
+#
+# [[durable_objects.bindings]]
+# name = "BENCH"
+# class_name = "Bench"
+#
+# [[migrations]]
+# tag = "v3"
+# new_sqlite_classes = ["Bench"]
+
 [[kv_namespaces]]
 binding = "OH_STORE"
 id = "5b65151de63341dc9f7a9d417c9b6a4e"
