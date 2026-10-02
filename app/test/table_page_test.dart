@@ -603,6 +603,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AboutPage), findsOneWidget);
     expect(find.text('dev'), findsWidgets, reason: 'the build tag, and its date');
+    expect(find.text('Open source, no ads, more heart.'), findsOneWidget, reason: 'the home page\'s tagline');
+    for (final link in ['Source code', 'MIT License', 'Privacy policy', 'Terms of use']) {
+      expect(find.widgetWithText(TextButton, link), findsOneWidget, reason: link);
+    }
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget);

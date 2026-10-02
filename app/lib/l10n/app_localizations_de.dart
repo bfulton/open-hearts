@@ -827,8 +827,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get unrated => 'Ungewertet';
 
   @override
-  String get aboutBlurb =>
-      'Hearts, Open Source. Spiel allein gegen das Haus oder live: Ihr vier teilt die Karten untereinander aus, und kein Server sieht eine Hand.';
+  String get sourceCode => 'Quellcode';
+
+  @override
+  String get licenseName => 'MIT-Lizenz';
 
   @override
   String get build => 'Version';

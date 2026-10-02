@@ -817,8 +817,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get unrated => 'Não ranqueada';
 
   @override
-  String get aboutBlurb =>
-      'Copas, de código aberto. Jogue sozinho contra a casa, ou ao vivo: vocês quatro distribuem as cartas entre si, e nenhum servidor vê uma mão.';
+  String get sourceCode => 'Código-fonte';
+
+  @override
+  String get licenseName => 'Licença MIT';
 
   @override
   String get build => 'Versão';

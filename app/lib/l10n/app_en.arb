@@ -985,9 +985,13 @@
   "@unrated": {
     "description": "In game options: an unrated game."
   },
-  "aboutBlurb": "Hearts, open source. Play alone against the house, or live: the four of you deal the cards between you, and no server sees a hand.",
-  "@aboutBlurb": {
-    "description": "On the About page."
+  "sourceCode": "Source code",
+  "@sourceCode": {
+    "description": "On the About page: a link to the project's repository on GitHub."
+  },
+  "licenseName": "MIT License",
+  "@licenseName": {
+    "description": "On the About page: the name of the code's licence, a link to its text."
   },
   "build": "Build",
   "@build": {

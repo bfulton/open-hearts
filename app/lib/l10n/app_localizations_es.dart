@@ -818,8 +818,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get unrated => 'Sin clasificación';
 
   @override
-  String get aboutBlurb =>
-      'Corazones, de código abierto. Juega solo contra la casa, o en vivo: los cuatro se reparten las cartas entre ellos, y ningún servidor ve una mano.';
+  String get sourceCode => 'Código fuente';
+
+  @override
+  String get licenseName => 'Licencia MIT';
 
   @override
   String get build => 'Versión';

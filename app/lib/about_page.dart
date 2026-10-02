@@ -5,7 +5,12 @@ import 'package:flutter/material.dart';
 
 import 'build_info.dart';
 import 'l10n/l10n.dart';
+import 'subscribe_page.dart' show legalPage, openLink;
 import 'theme.dart';
+
+/// Where the code is, and its licence.
+final projectSource = Uri.parse('https://github.com/bfulton/open-hearts');
+final projectLicense = Uri.parse('https://github.com/bfulton/open-hearts/blob/main/LICENSE');
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -32,7 +37,7 @@ class AboutPage extends StatelessWidget {
                 const Text('Open Hearts', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
                 const SizedBox(height: 8),
                 Text(
-                  context.l10n.aboutBlurb,
+                  context.l10n.tagline,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 13.5, height: 1.45, color: Palette.chromeDim),
                 ),
@@ -40,7 +45,16 @@ class AboutPage extends StatelessWidget {
                 _Line(label: context.l10n.build, value: buildTag),
                 const SizedBox(height: 8),
                 _Line(label: context.l10n.published, value: buildDate),
-                const SizedBox(height: 8),
+                const SizedBox(height: 24),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _Link(context.l10n.sourceCode, projectSource),
+                    _Link(context.l10n.licenseName, projectLicense),
+                    _Link(context.l10n.privacyPolicy, legalPage('privacy')),
+                    _Link(context.l10n.termsOfUse, legalPage('terms')),
+                  ],
+                ),
               ],
             ),
           ),
@@ -75,4 +89,14 @@ class _Line extends StatelessWidget {
       ],
     );
   }
+}
+
+class _Link extends StatelessWidget {
+  const _Link(this.label, this.url);
+
+  final String label;
+  final Uri url;
+
+  @override
+  Widget build(BuildContext context) => TextButton(onPressed: () => openLink(url), child: Text(label));
 }

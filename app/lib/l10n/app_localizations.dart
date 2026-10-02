@@ -1112,11 +1112,17 @@ abstract class AppLocalizations {
   /// **'Unrated'**
   String get unrated;
 
-  /// On the About page.
+  /// On the About page: a link to the project's repository on GitHub.
   ///
   /// In en, this message translates to:
-  /// **'Hearts, open source. Play alone against the house, or live: the four of you deal the cards between you, and no server sees a hand.'**
-  String get aboutBlurb;
+  /// **'Source code'**
+  String get sourceCode;
+
+  /// On the About page: the name of the code's licence, a link to its text.
+  ///
+  /// In en, this message translates to:
+  /// **'MIT License'**
+  String get licenseName;
 
   /// On the About page: which build of the app this is.
   ///
