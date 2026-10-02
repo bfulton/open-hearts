@@ -97,8 +97,14 @@ the bottom with the day.
   one rule; it is in place (below). Per-handler limits — `/api/ticket`,
   `/api/claim`, `/api/checkout`, `/api/turn` at about ten a minute
   (`docs/security-review.md`) — need Pro.
-- **Plan**: the Workers paid plan, or the rate limits above, before
-  launch — KV's free 1,000 writes a day is spendable.
+- **The Workers Paid plan ($5 a month)** — Cloudflare dashboard →
+  Workers & Pages → Plans. Checked 2 October: the account has none.
+  Three things wait on it: the jurors of last resort as a Cloudflare
+  Container (live tables with bots wait for a jury and, until the
+  bench runs, a quiet night means they wait for good — do not deploy
+  the no-fallback build to production before it); emailing backup
+  codes (Cloudflare Email Sending, 3,000 a month included); and KV
+  past the free 1,000 writes a day.
 - **Buy it once for real**: on https://openhearts.game/play, subscribe
   with your own card, play a live table on two devices, open Manage
   subscription, then cancel and refund it in Stripe. Everything short
