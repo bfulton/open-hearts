@@ -1030,4 +1030,14 @@ class AppLocalizationsEn extends AppLocalizations {
     });
     return 'Cancel or change it in $_temp0.';
   }
+
+  @override
+  String get subscription => 'Subscription';
+
+  @override
+  String get finishingPurchase => 'Finishing your purchase…';
+
+  @override
+  String get paidLiveSoon =>
+      'Your payment went through. Live play opens as soon as it reaches us — reload in a minute.';
 }

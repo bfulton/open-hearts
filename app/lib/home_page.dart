@@ -137,6 +137,13 @@ class _HomePageState extends State<HomePage> {
   /// error — there is nothing to do about it but wait — so it is said
   /// quietly and it goes as soon as one answers.
   bool _slow = false;
+
+  /// Back from a checkout and waiting for the licence it bought: said
+  /// so, where the way to buy would otherwise sit looking as if nothing
+  /// had happened. [_paidWaiting] is the wait run out with no licence
+  /// yet — the payment went through, the webhook has not.
+  late bool _finishing = widget.justBought;
+  bool _paidWaiting = false;
   Room? _room;
   WaitingRoom? _queue;
   RelayTransport? _transport;
@@ -281,6 +288,11 @@ class _HomePageState extends State<HomePage> {
       await Future<void>.delayed(const Duration(seconds: 2));
     }
     _forget('bought');
+    if (!mounted) return;
+    setState(() {
+      _finishing = false;
+      _paidWaiting = !liveOpen;
+    });
   }
 
   /// Who this device is and what game it asks for, off the device. In
@@ -796,7 +808,7 @@ class _HomePageState extends State<HomePage> {
             // the way to it, and the menu saying it again was a second way
             // to the one page.
             if (liveOpen)
-              MenuAction(l10n.livePlay, icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
+              MenuAction(l10n.subscription, icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
             MenuAction(l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
             MenuAction(l10n.about, icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
           ],
@@ -850,6 +862,9 @@ class _HomePageState extends State<HomePage> {
         ] else if (liveOpen) ...[
           const SizedBox(height: 16),
           _live(),
+        ] else if (_finishing || _paidWaiting) ...[
+          const SizedBox(height: 16),
+          _Finishing(waiting: _finishing),
         ] else if (RemoteSettings.current.config.offer) ...[
           const SizedBox(height: 16),
           _LiveLocked(onTap: () => showSubscribe(context)),
@@ -907,12 +922,28 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          Text(
-            standing == null
+          // How many are online rides on this line rather than in the
+          // button, which kept an empty line for it until the relays
+          // answered. The button still says it to a screen reader, so it
+          // is not said twice here.
+          Builder(builder: (context) {
+            final about = standing == null
                 ? l10n.fourSeatsWaiting
-                : l10n.youAreRated(standing.mine.shown, flag(standing.mine.provisional), standing.ledger.gamesOf(standing.me)),
-            style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
-          ),
+                : l10n.youAreRated(standing.mine.shown, flag(standing.mine.provisional), standing.ledger.gamesOf(standing.me));
+            final n = _online;
+            return Text.rich(
+              TextSpan(children: [
+                TextSpan(text: about),
+                if (n != null)
+                  TextSpan(
+                    text: ' · ${l10n.onlineCount(n)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Palette.gold),
+                  ),
+              ]),
+              semanticsLabel: about,
+              style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
+            );
+          }),
           const SizedBox(height: 12),
           _PlayLive(online: _online, busy: _opening == _Opening.live, disabled: _busy, onTap: _play),
           const SizedBox(height: 10),
@@ -1008,7 +1039,6 @@ class _PlayLive extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final n = online;
-    final count = n == null ? null : l10n.onlineCount(n);
     // One spoken line, so a screen reader and the suite read the same
     // thing the button says.
     final spoken = n == null ? l10n.playLive : l10n.playLiveSpoken(n);
@@ -1022,18 +1052,45 @@ class _PlayLive extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _Trying(busy: busy, label: l10n.playLive, weight: FontWeight.w700, size: 15.5),
-              // Holds its line while there is nothing to say, so the
-              // button does not grow when the count arrives.
-              SizedBox(
-                height: 16,
-                child: count == null
-                    ? null
-                    : Text(count,
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Felt.dark.withValues(alpha: 0.75))),
-              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Back from paying, before the licence is here: a spinner while it is
+/// asked for, and once the asking has run out, word that the payment
+/// went through and live play opens when it reaches us.
+class _Finishing extends StatelessWidget {
+  const _Finishing({required this.waiting});
+
+  final bool waiting;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          if (waiting) ...[
+            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Palette.gold)),
+            const SizedBox(width: 14),
+          ],
+          Expanded(
+            child: Text(
+              waiting ? l10n.finishingPurchase : l10n.paidLiveSoon,
+              style: const TextStyle(fontSize: 14, height: 1.4, color: Palette.chrome),
+            ),
+          ),
+        ],
       ),
     );
   }

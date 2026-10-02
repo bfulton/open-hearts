@@ -1387,6 +1387,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel or change it in {store, select, apple{the App Store} other{Google Play}}.'**
   String manageInStore(String store);
+
+  /// The menu entry and the title of the page where a live-play subscription is bought and managed: devices, cancelling, receipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription'**
+  String get subscription;
+
+  /// On the front door, back from paying, while the licence it bought is being fetched.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing your purchase…'**
+  String get finishingPurchase;
+
+  /// On the front door when the payment went through but the licence has not arrived after a while.
+  ///
+  /// In en, this message translates to:
+  /// **'Your payment went through. Live play opens as soon as it reaches us — reload in a minute.'**
+  String get paidLiveSoon;
 }
 
 class _AppLocalizationsDelegate

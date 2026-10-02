@@ -213,5 +213,8 @@
   "restorePurchases": "Restaurar compras",
   "storePending": "La tienda está esperando para aprobar el pago. El juego en vivo se abrirá aquí en cuanto lo haga.",
   "storeRenewal": "{price} al año, cobrado a tu {store, select, apple{cuenta de Apple} other{cuenta de Google}} al confirmar. Se renueva sola cada año hasta que la canceles, cuando quieras, en los ajustes de suscripciones de {store, select, apple{App Store} other{Google Play}}, al menos un día antes de la renovación.",
-  "manageInStore": "Cancélala o cámbiala en {store, select, apple{App Store} other{Google Play}}."
+  "manageInStore": "Cancélala o cámbiala en {store, select, apple{App Store} other{Google Play}}.",
+  "subscription": "Suscripción",
+  "finishingPurchase": "Terminando tu compra…",
+  "paidLiveSoon": "Tu pago se ha realizado. El juego en vivo se abre en cuanto nos llegue: recarga en un minuto."
 }

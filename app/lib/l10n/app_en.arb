@@ -1241,5 +1241,17 @@
         "type": "String"
       }
     }
+  },
+  "subscription": "Subscription",
+  "@subscription": {
+    "description": "The menu entry and the title of the page where a live-play subscription is bought and managed: devices, cancelling, receipts."
+  },
+  "finishingPurchase": "Finishing your purchase…",
+  "@finishingPurchase": {
+    "description": "On the front door, back from paying, while the licence it bought is being fetched."
+  },
+  "paidLiveSoon": "Your payment went through. Live play opens as soon as it reaches us — reload in a minute.",
+  "@paidLiveSoon": {
+    "description": "On the front door when the payment went through but the licence has not arrived after a while."
   }
 }

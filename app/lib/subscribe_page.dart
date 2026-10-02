@@ -197,7 +197,7 @@ class _SubscribePageState extends State<SubscribePage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Palette.chromeDim,
-        title: Text(l10n.livePlay, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
+        title: Text(l10n.subscription, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -209,7 +209,7 @@ class _SubscribePageState extends State<SubscribePage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(l10n.livePlay, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
+                  Text(l10n.subscription, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
                   const SizedBox(height: 6),
                   Text(
                     licence == null ? l10n.pricePerYear(priceShown) : l10n.openUntil(Licence.dayOf(licence.until)),

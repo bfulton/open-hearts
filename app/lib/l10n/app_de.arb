@@ -213,5 +213,8 @@
   "restorePurchases": "Käufe wiederherstellen",
   "storePending": "Der Store wartet noch auf die Freigabe der Zahlung. Sobald sie da ist, ist Live-Spiel hier offen.",
   "storeRenewal": "{price} im Jahr, abgebucht über dein {store, select, apple{Apple-Konto} other{Google-Konto}}, wenn du bestätigst. Das Abo verlängert sich jedes Jahr von selbst, bis du kündigst – jederzeit, in den Abo-Einstellungen {store, select, apple{des App Store} other{von Google Play}}, spätestens einen Tag vor der Verlängerung.",
-  "manageInStore": "Kündigen oder ändern {store, select, apple{im App Store} other{bei Google Play}}."
+  "manageInStore": "Kündigen oder ändern {store, select, apple{im App Store} other{bei Google Play}}.",
+  "subscription": "Abo",
+  "finishingPurchase": "Kauf wird abgeschlossen …",
+  "paidLiveSoon": "Deine Zahlung ist durch. Live-Spiel öffnet sich, sobald sie bei uns ankommt – lade in einer Minute neu."
 }

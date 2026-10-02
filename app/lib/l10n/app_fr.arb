@@ -213,5 +213,8 @@
   "restorePurchases": "Restaurer les achats",
   "storePending": "La boutique attend d'approuver le paiement. Le jeu en direct s'ouvrira ici dès que ce sera fait.",
   "storeRenewal": "{price} par an, débité sur votre {store, select, apple{compte Apple} other{compte Google}} à la confirmation. L'abonnement se renouvelle tout seul chaque année jusqu'à ce que vous le résiliiez, quand vous voulez, dans les réglages d'abonnement {store, select, apple{de l'App Store} other{de Google Play}}, au moins un jour avant le renouvellement.",
-  "manageInStore": "Résiliez-le ou modifiez-le {store, select, apple{dans l'App Store} other{dans Google Play}}."
+  "manageInStore": "Résiliez-le ou modifiez-le {store, select, apple{dans l'App Store} other{dans Google Play}}.",
+  "subscription": "Abonnement",
+  "finishingPurchase": "Finalisation de votre achat…",
+  "paidLiveSoon": "Votre paiement est passé. Le jeu en direct s'ouvre dès qu'il nous parvient — rechargez dans une minute."
 }

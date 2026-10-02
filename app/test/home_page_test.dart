@@ -389,13 +389,53 @@ void main() {
     expect(find.text('Live play'), findsOneWidget, reason: 'the card on the door, and not a second one in the menu');
   });
 
+  testWidgets('back from paying: said so at once, and live play opens when the licence comes', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final slow = _LicenceOnAsk(2);
+    Entitlement.current = slow;
+    await Entitlement.current.load((await Identity.signer()).publicKey);
+    await tester.pumpWidget(still(const HomePage(justBought: true, online: false)));
+    await tester.pump();
+    expect(find.text('Finishing your purchase…'), findsOneWidget, reason: 'from the first frame, not after a pause');
+    expect(find.text('Play live'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    // The webhook's licence arrives on the second ask, two seconds on.
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
+    expect(slow.asks, 2);
+    expect(find.text('Finishing your purchase…'), findsNothing);
+    expect(find.text('Play live'), findsOneWidget);
+  });
+
+  testWidgets('back from paying with no licence yet: the payment is said to have gone through', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    Entitlement.current = _LicenceOnAsk(null);
+    await Entitlement.current.load((await Identity.signer()).publicKey);
+    await tester.pumpWidget(still(const HomePage(justBought: true, online: false)));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(seconds: 2));
+    }
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Your payment went through.'), findsOneWidget);
+    expect(find.text('Finishing your purchase…'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
   testWidgets('with live play open the menu is where the date on the licence is', (tester) async {
     await pumpHome(tester);
     expect(find.text('Play live'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Live play'));
+    await tester.tap(find.text('Subscription'));
     await tester.pumpAndSettle();
+    expect(find.text('Subscription'), findsWidgets, reason: 'the page is named for what it holds');
     final until = Licence.dayOf(Entitlement.current.until!);
     expect(find.text('Open on this device, to $until'), findsOneWidget);
     expect(find.text('Subscribe'), findsNothing, reason: 'nothing to buy twice');
@@ -419,4 +459,19 @@ class _DeadWorker implements DealWorker {
   void run(DealJob job, {required void Function(Object answer) done, required void Function(Object error) failed}) => failed('dead');
   @override
   void close() {}
+}
+
+/// The service, standing in for the webhook's lag: no licence until the
+/// [on]th time it is asked, and none at all when [on] is null.
+class _LicenceOnAsk extends Entitlement {
+  _LicenceOnAsk(this.on) : super(service: _service);
+
+  final int? on;
+  int asks = 0;
+
+  @override
+  Future<void> refresh(Signer signer, {Uri? endpoint}) async {
+    asks++;
+    if (on != null && asks >= on!) await licenceThisDevice();
+  }
 }

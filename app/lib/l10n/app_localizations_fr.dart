@@ -1037,4 +1037,14 @@ class AppLocalizationsFr extends AppLocalizations {
     });
     return 'Résiliez-le ou modifiez-le $_temp0.';
   }
+
+  @override
+  String get subscription => 'Abonnement';
+
+  @override
+  String get finishingPurchase => 'Finalisation de votre achat…';
+
+  @override
+  String get paidLiveSoon =>
+      'Votre paiement est passé. Le jeu en direct s\'ouvre dès qu\'il nous parvient — rechargez dans une minute.';
 }

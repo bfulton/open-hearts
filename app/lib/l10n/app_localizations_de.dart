@@ -1043,4 +1043,14 @@ class AppLocalizationsDe extends AppLocalizations {
     });
     return 'Kündigen oder ändern $_temp0.';
   }
+
+  @override
+  String get subscription => 'Abo';
+
+  @override
+  String get finishingPurchase => 'Kauf wird abgeschlossen …';
+
+  @override
+  String get paidLiveSoon =>
+      'Deine Zahlung ist durch. Live-Spiel öffnet sich, sobald sie bei uns ankommt – lade in einer Minute neu.';
 }

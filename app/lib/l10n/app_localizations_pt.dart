@@ -1036,4 +1036,14 @@ class AppLocalizationsPt extends AppLocalizations {
     });
     return 'Cancele ou altere $_temp0.';
   }
+
+  @override
+  String get subscription => 'Assinatura';
+
+  @override
+  String get finishingPurchase => 'Concluindo sua compra…';
+
+  @override
+  String get paidLiveSoon =>
+      'Seu pagamento foi aprovado. O jogo ao vivo abre assim que chegar até nós — recarregue em um minuto.';
 }
