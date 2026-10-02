@@ -748,6 +748,41 @@ void main() {
     });
   }
 
+  testWidgets('your turn is told with a pill that glows and breathes, and holds still for reduced motion', (tester) async {
+    turnPillBreathes = true;
+    addTearDown(() => turnPillBreathes = false);
+    await pumpTable(tester);
+    final hand = fanCards(tester);
+    for (var i = 0; i < 3; i++) {
+      await tapCard(tester, hand[i].card);
+    }
+    await tester.tap(find.widgetWithText(FilledButton, 'Pass'));
+    // Not pumpAndSettle: a breathing pill never settles, which is the point.
+    for (var i = 0; i < 60 && find.text('Your turn').evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Your turn'), findsOneWidget);
+    double glow() {
+      final glowing = tester
+          .widgetList<DecoratedBox>(find.ancestor(of: find.text('Your turn'), matching: find.byType(DecoratedBox)))
+          .map((b) => b.decoration)
+          .whereType<BoxDecoration>()
+          .where((d) => d.boxShadow?.isNotEmpty ?? false);
+      return glowing.single.boxShadow!.single.color.a;
+    }
+
+    final seen = <double>[];
+    for (var i = 0; i < 6; i++) {
+      seen.add(glow());
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    expect(seen.reduce((a, b) => a > b ? a : b) - seen.reduce((a, b) => a < b ? a : b), greaterThan(0.2),
+        reason: 'the glow rises and falls: $seen');
+    expect(seen.every((a) => a >= 0.25), isTrue, reason: 'and never goes out');
+    // Gone from the table, the breathing stops with it.
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('the action line sits against the hand, and what the table says floats in the room under your badge', (tester) async {
     await pumpTable(tester);
     final hand = tester.getRect(find.byType(HandFan));

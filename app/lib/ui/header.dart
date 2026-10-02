@@ -15,11 +15,14 @@ import '../l10n/l10n.dart';
 
 /// One entry on the table's menu.
 class MenuAction {
-  const MenuAction(this.label, {required this.icon, required this.onSelected});
+  const MenuAction(this.label, {required this.icon, required this.onSelected, this.danger = false});
 
   final String label;
   final IconData icon;
   final VoidCallback onSelected;
+
+  /// Drawn red: an action that ends something, like leaving a table.
+  final bool danger;
 }
 
 class TableHeader extends StatelessWidget {
@@ -113,12 +116,12 @@ class MenuButton extends StatelessWidget {
             onTap: action.onSelected,
             child: Row(
               children: [
-                Icon(action.icon, size: 18, color: Palette.chromeDim),
+                Icon(action.icon, size: 18, color: action.danger ? Palette.danger : Palette.chromeDim),
                 const SizedBox(width: 12),
                 // A label longer than the menu is wide — a long one in a
                 // long language — goes onto a second line rather than off
                 // the side.
-                Flexible(child: Text(action.label, style: const TextStyle(fontSize: 14, color: Palette.chrome))),
+                Flexible(child: Text(action.label, style: TextStyle(fontSize: 14, color: action.danger ? Palette.danger : Palette.chrome))),
               ],
             ),
           ),

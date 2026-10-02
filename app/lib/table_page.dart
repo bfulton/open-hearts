@@ -128,7 +128,7 @@ class _TablePageState extends State<TablePage> {
                 header: TableHeader(
                   game: game,
                   menu: [
-                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: () => Navigator.of(context).maybePop()),
+                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: () => Navigator.of(context).maybePop(), danger: true),
                     MenuAction(context.l10n.tellUsWhatsBroken,
                         icon: Icons.feedback_outlined, onSelected: () => showFeedback(context, record: _controller.recordText)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {

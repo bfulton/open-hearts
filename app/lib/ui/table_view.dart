@@ -79,6 +79,14 @@ const _wideTrickOffset = <int, Offset>{
   3: Offset(1.12, 0),
 };
 
+/// Whether the "your turn" pill breathes. A test that waits for the
+/// table to come to rest turns it off, since a breath is a frame every
+/// sixteen milliseconds for as long as the turn is yours
+/// (test/flutter_test_config.dart); one test turns it back on to watch
+/// it breathe.
+@visibleForTesting
+bool turnPillBreathes = true;
+
 class TableView extends StatelessWidget {
   const TableView({super.key, required this.controller, this.onHold});
 
@@ -886,33 +894,95 @@ class _TurnHint extends StatelessWidget {
     if (seat == null) return const SizedBox.shrink();
     // "Your turn" whether leading or following: "your lead" reads as
     // a standing in the game, and in Hearts leading is no prize.
-    if (seat == mySeat) return Announced(message: context.l10n.yourTurn, child: _Pill(text: context.l10n.yourTurn, tone: Palette.gold));
+    if (seat == mySeat) return Announced(message: context.l10n.yourTurn, child: _YourTurn(text: context.l10n.yourTurn));
     return const SizedBox.shrink();
   }
 }
 
+/// The pill that says it is your turn, glowing and breathing gold so it
+/// is seen from across the room — a turn waited on is a table waiting.
+/// Held still, glow and all, for a reader who has asked for less
+/// movement.
+class _YourTurn extends StatefulWidget {
+  const _YourTurn({required this.text});
+
+  final String text;
+
+  @override
+  State<_YourTurn> createState() => _YourTurnState();
+}
+
+class _YourTurnState extends State<_YourTurn> with SingleTickerProviderStateMixin {
+  late final AnimationController _breath = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!turnPillBreathes || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
+      _breath
+        ..stop()
+        ..value = 0.6;
+    } else if (!_breath.isAnimating) {
+      _breath.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _breath.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _breath,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_breath.value);
+        return Transform.scale(
+          scale: 1 + 0.06 * t,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: Palette.gold.withValues(alpha: 0.25 + 0.45 * t), blurRadius: 10 + 14 * t, spreadRadius: 1 + 3 * t),
+              ],
+            ),
+            child: child,
+          ),
+        );
+      },
+      child: _Pill(text: widget.text, tone: Palette.gold, strong: true),
+    );
+  }
+}
+
 class _Pill extends StatelessWidget {
-  const _Pill({required this.text, required this.tone});
+  const _Pill({required this.text, required this.tone, this.strong = false});
 
   final String text;
   final Color tone;
+
+  /// Filled with its tone rather than outlined: the one pill that asks
+  /// for something.
+  final bool strong;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
+        color: strong ? tone : Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tone.withValues(alpha: 0.5)),
+        border: Border.all(color: tone.withValues(alpha: strong ? 1 : 0.5)),
       ),
       child: Text(
         text,
         style: TextStyle(
           fontSize: 12.5,
-          fontWeight: FontWeight.w600,
+          fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
           letterSpacing: 0.2,
-          color: tone,
+          color: strong ? Felt.dark : tone,
         ),
       ),
     );

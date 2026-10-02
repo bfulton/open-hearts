@@ -292,7 +292,7 @@ class _LivePageState extends State<LivePage> {
                 header: TableHeader(
                   game: game,
                   menu: [
-                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _leave),
+                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _leave, danger: true),
                     MenuAction(context.l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
                       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
