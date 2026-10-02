@@ -91,18 +91,14 @@ the bottom with the day.
   Subscriptions **Read**, Customer portal **Write**; everything else
   None. As the secret `OH_STRIPE_SECRET` — `rk_live_…` in Production,
   `rk_test_…` in Preview.
-- **Check the webhook's mode**: `OH_STRIPE_WEBHOOK_SECRET` is set; it
-  belongs in Production if the endpoint was made in live mode, Preview
-  if in test mode, and each mode needs its own endpoint.
 - **Decide who may open the portal.** As built, any device on the
   subscription may — so a household that lost the phone that paid can
   still cancel — which also shows any of them the payer's email and
   receipts. Restricting it to the device that paid is a one-line
   change.
-- **The webhook** sends `checkout.session.completed`,
-  `checkout.session.async_payment_succeeded` and
-  `customer.subscription.*` to `/api/stripe`. No other product checked
-  out through the API with a `key` in its metadata on this account.
+- **When the domain moves** to openhearts.game: the live webhook's URL
+  and the portal's privacy and terms links still name
+  open-hearts.pages.dev.
 
 ## Cloudflare and deploying
 
@@ -119,6 +115,13 @@ the bottom with the day.
   id in `service/do/wrangler.toml`, deploy `service/do`, then bind
   `HOUSEHOLD` on the Pages project (script `open-hearts-relay`, class
   `Household`). In that order.
+- **Deploy to production.** Nothing is at open-hearts.pages.dev yet
+  (Cloudflare's 404); only an old preview at dev.open-hearts.pages.dev,
+  from before remote config. The live Stripe webhook points at the
+  production URL, so it fails until then — harmless before anyone buys.
+- **Secrets go in Production**: the Stripe key, price and webhook
+  secret are live-mode, so they belong in the Pages project's
+  Production environment, not Preview.
 - **The domain**: attach openhearts.game to the Pages project; the
   site, the store listing and the app's legal links assume it.
 - **After deploying**, check the headers (`docs/security-review.md`,
@@ -131,3 +134,10 @@ the bottom with the day.
 - 2 October: `OH_STRIPE_PRICE` set to the price's lookup key.
 - 2 October: Stripe's customer portal: cancelling, payment method and invoices on (the defaults). Confirm Manage subscription opens it in the first production test.
 - 2 October: `OH_STRIPE_WEBHOOK_SECRET` set.
+- 2 October, checked through the API: live mode; price
+  `openhearts_annual`, $5.99 a year, active; the live webhook at
+  `https://open-hearts.pages.dev/api/stripe`, enabled, with every event
+  the service reads (the extra checkout and subscription events it
+  receives are answered and ignored); the portal's default
+  configuration cancels at the period's end, updates cards and shows
+  invoices, and now links the privacy policy and terms.
