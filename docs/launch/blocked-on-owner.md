@@ -97,7 +97,6 @@ the bottom with the day.
   one rule; it is in place (below). Per-handler limits — `/api/ticket`,
   `/api/claim`, `/api/checkout`, `/api/turn` at about ten a minute
   (`docs/security-review.md`) — need Pro.
-- **TURN**: a usage alert or budget on Cloudflare Realtime.
 - **Plan**: the Workers paid plan, or the rate limits above, before
   launch — KV's free 1,000 writes a day is spendable.
 - **Buy it once for real**: on https://openhearts.game/play, subscribe
@@ -162,3 +161,7 @@ the bottom with the day.
   Stripe, Apple and Play webhooks) and relay.openhearts.game, 30
   requests per 10 seconds per address, blocked for 10 seconds. Checked:
   a burst of 300 from this machine's handful of addresses drew 429s.
+- 2 October: Cloudflare budget alerts at $10, $20, $50, $100 and $200
+  of spend in a billing period, emailed to bright.fulton@gmail.com.
+  Cloudflare has no hard cap; TURN (free to 1,000 GB a month) is the
+  one cost here that grows with use.
