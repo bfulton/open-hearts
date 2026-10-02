@@ -181,8 +181,9 @@ void main() {
   test('a person who hears of no jury waits for one, and never deals the bots in the open', () {
     // The first person hears nothing of the jury for a minute; the
     // other two have a jury long before. It used to deal its bots in
-    // the open at forty seconds. Now it waits the minute out, and the
-    // hand is dealt to the jury at every side.
+    // the open at forty seconds. Now it waits, and to the others it is
+    // a seat that has not taken its deal step: put out at the step's
+    // clock like any other, while the hand is dealt to the jury.
     final t = SimTable(humans: 3, seed: 5, crypto: crypto, jurors: jurySize);
     final first = t.clients.first;
     t.net.steer = (from, to, message) {
@@ -203,8 +204,11 @@ void main() {
       expect(c.sealedTo(0), isNotNull, reason: 'sealed to the draw');
       expect(c.botHolders(0), isNotEmpty, reason: 'the bot seats held by the jury');
     }
-    expect(first.record.where((d) => d.removal), isEmpty, reason: 'nobody was put out for it');
-    final v = verifyRecord(t.spec, first.record, allowPartial: true, juries: first.juries, crypto: crypto, releases: first.releases);
+    final survivor = t.survivors.first;
+    final removed = survivor.record.where((d) => d.removal).toList();
+    expect(removed, hasLength(1), reason: 'only the person who could not deal');
+    expect(removed.single.turn.isDeal, isTrue, reason: 'put out at its deal step');
+    final v = verifyRecord(t.spec, survivor.record, allowPartial: true, juries: survivor.juries, crypto: crypto, releases: survivor.releases);
     expect(v.ok, isTrue, reason: v.reason);
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));

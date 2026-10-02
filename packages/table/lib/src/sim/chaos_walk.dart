@@ -15,6 +15,7 @@ import 'package:engine/engine.dart';
 
 import '../client.dart';
 import '../events.dart';
+import '../jury.dart';
 import '../model.dart';
 import '../record.dart';
 import '../signing.dart';
@@ -207,6 +208,13 @@ String? walkChaos(int seed,
   // the table waits for want of a majority — with none of the hand's
   // jurors up to rule on it. The game ends there (doc 04), and only
   // there.
+  // Waiting for a jury that can hold the bot seats, with too few
+  // jurors up and in reach to make one: the hand is never dealt with
+  // its bots in the open, so the table waits and says so, and only a
+  // juror coming up moves it (doc 04). With enough of them up, the
+  // wait is a fault.
+  bool starved(TableClient c) => c.shortOfJurors && reachableFrom(c).length < juryToHoldBots;
+
   bool immovable(TableClient c, Set<PublicKey> up) {
     if (unopenable(c, up)) return true;
     final f = c.failedAt;
@@ -369,6 +377,7 @@ String? walkChaos(int seed,
       for (final c in survivors) {
         // Ended for a lost quorum, and judged fair when it was seen.
         if (c.tableState == TableState.failed) continue;
+        if (c.tableState == TableState.playing && starved(c)) continue;
         // Stopped for good where nobody up could move it: the game
         // ends rather than wait on a jury that is gone.
         if (immovable(c, up)) {
@@ -394,7 +403,7 @@ String? walkChaos(int seed,
       }
       // With a jury there is no pause a live juror could not end — save
       // the one above, which none could.
-      if (up.isNotEmpty && !survivors.where((c) => c.failure == null).every((c) => unopenable(c, up))) {
+      if (up.isNotEmpty && !survivors.where((c) => c.failure == null).every((c) => unopenable(c, up) || starved(c))) {
         return 'paused with a juror still up; faults were [${faults()}]\n${survivors.first.describe()}';
       }
     }

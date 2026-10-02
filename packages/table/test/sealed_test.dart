@@ -36,26 +36,43 @@ void main() {
 
   void agree(SimTable t) => agreeAmong(t, t.survivors);
 
-  for (final humans in [1, 2, 4]) {
-    test('$humans human(s) and ${4 - humans} bot(s) play a whole sealed game, and it verifies', () {
+  test('four people play a whole sealed game, and it verifies', () {
+    final t = SimTable(humans: 4, seed: 7, crypto: crypto, jurors: 2);
+    t.start();
+    // The first hand dealt: each person sees its own cards and nothing
+    // of the other people's.
+    expect(t.clock.runUntil(() => t.clients.every((c) => c.game.phase == Phase.passing), limitMs: 60000), isTrue,
+        reason: 'the first deal completes');
+    for (final c in t.clients) {
+      expect(c.record.where((d) => d.turn.isDeal).length, 16, reason: 'four deal steps per person');
+      for (var s = 0; s < seatCount; s++) {
+        expect(c.game.knowsHand(s), s == c.mySeat, reason: 'seat $s as seen by seat ${c.mySeat}');
+        expect(c.game.handSizeOf(s), 13);
+      }
+    }
+    expect(t.run(), isTrue, reason: 'every client reaches the end of the game');
+    agree(t);
+    expect(t.clients.first.pause, isNull);
+    t.stop();
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
+  for (final humans in [1, 2, 3]) {
+    test('$humans human(s) and too few jurors to hold ${4 - humans} bot(s): the hand waits, and is never dealt in the open', () {
+      // Two jurors cannot hold the bot seats (juryToHoldBots), and
+      // nobody else is coming. A bot's hand dealt in the open would be
+      // the table's to see, so the table waits and says so.
       final t = SimTable(humans: humans, seed: 7, crypto: crypto, jurors: 2);
       t.start();
-      // The first hand dealt: each person sees its own cards and the
-      // bots', and nothing of the other people's.
-      expect(t.clock.runUntil(() => t.clients.every((c) => c.game.phase == Phase.passing), limitMs: 60000), isTrue,
-          reason: 'the first deal completes');
+      t.clock.runUntil(() => t.clock.nowMs >= 10 * 60 * 1000, limitMs: 10 * 60 * 1000 + 1);
       for (final c in t.clients) {
-        expect(c.record.where((d) => d.turn.isDeal).length, humans * 4, reason: 'four deal steps per person, none per bot');
+        expect(c.shortOfJurors, isTrue, reason: 'it says what it is waiting for');
+        expect(c.dealOf(0), isNull, reason: 'no deal started at ten minutes');
+        expect(c.game.phase, isNot(Phase.passing));
         for (var s = 0; s < seatCount; s++) {
-          final own = s == c.mySeat;
-          final bot = t.spec.seats[s] is BotSeat;
-          expect(c.game.knowsHand(s), own || bot, reason: 'seat $s as seen by seat ${c.mySeat}');
-          expect(c.game.handSizeOf(s), 13);
+          if (s != c.mySeat) expect(c.game.knowsHand(s), isFalse, reason: 'seat $s as seen by seat ${c.mySeat}');
         }
       }
-      expect(t.run(), isTrue, reason: 'every client reaches the end of the game');
-      agree(t);
-      expect(t.clients.first.pause, isNull);
+      expect(t.clients.first.record.where((d) => d.removal), isEmpty, reason: 'nobody is put out for waiting');
       t.stop();
     }, timeout: const Timeout(Duration(minutes: 5)));
   }
@@ -132,7 +149,7 @@ void main() {
   /// they are. The lie lasts one hand: the seat that told it is out
   /// before another is dealt, and the rest play on honestly.
   SimTable liarsTable(Lie how, {int seed = 11}) {
-    final t = SimTable(humans: 4, seed: seed, crypto: crypto, jurors: 2);
+    final t = SimTable(humans: 4, seed: seed, crypto: crypto, jurors: juryToHoldBots);
     for (final c in t.clients) {
       c.lies = how;
       c.changes.listen((_) {
@@ -214,7 +231,7 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 5)));
 
   test('a pass sealed to nothing gets no further than its own turn, and the clock has the seat', () {
-    final t = SimTable(humans: 4, seed: 3, crypto: crypto, jurors: 2);
+    final t = SimTable(humans: 4, seed: 3, crypto: crypto, jurors: juryToHoldBots);
     final sealer = t.clients.first;
     sealer.lies = Lie.seal;
     sealer.changes.listen((_) {
@@ -290,17 +307,24 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
-  test('a lone person who leaves during the pass sees the bots play the game out, their own seat included', () {
-    final t = SimTable(humans: 1, seed: 11, crypto: crypto, jurors: 2);
+  test('a lone person who leaves during the pass saw no bot\'s hand, and holds no pause', () {
+    final t = SimTable(humans: 1, seed: 11, crypto: crypto, jurors: juryToHoldBots);
     t.people[0].exitAt = Moment.duringPass;
     t.people[0].exit = Exit.leave;
+    final me = t.clients.first;
+    var sawABot = false;
+    me.changes.listen((_) {
+      for (var s = 1; s < seatCount; s++) {
+        if (me.game.knowsHand(s)) sawABot = true;
+      }
+    });
     t.start();
-    // Nobody is left to finish for: the leaver's client looks on as
-    // four bots play, its own seat's moves computed from the secret
-    // it still holds, until the game ends.
-    expect(t.clock.runUntil(() => t.clients.first.done, limitMs: 3 * 60 * 60 * 1000), isTrue);
-    expect(t.people[0].gone, isTrue);
-    expect(t.clients.first.pause, isNull);
+    // The bots' hands are the jury's, never dealt in the open, so the
+    // one person at the table never sees one, leaving or not. (What
+    // the jurors do with a table nobody is left at is another matter.)
+    expect(t.clock.runUntil(() => t.people[0].gone, limitMs: 10 * 60 * 1000), isTrue, reason: me.describe());
+    expect(sawABot, isFalse);
+    expect(me.pause, isNull);
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
