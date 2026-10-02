@@ -301,6 +301,9 @@ for (const [how, answer, shop] of [
     // Somebody arriving with a code another device showed.
     const arriving = await context.newPage();
     await arriving.goto(`${app.url}/?e2e=1&claim=0a1b2c3d`);
+    // Asked before anything is spent: a link is anybody's to send.
+    await waitFor(arriving, /^Join this subscription\?$/, { timeout: 60000, what: 'the question before a code is spent' });
+    await click(arriving, /^Join$/);
     await within(arriving, noService, fast ? 20 : 30, 'a code arrived with');
     // And a device with no licence, at the shop.
     const stranger = await open({ fresh: true, route: ['**/api/**', answer] });
