@@ -206,7 +206,27 @@ class _SubscribePageState extends State<SubscribePage> {
       _backups = said.answer ?? _backups;
       _refusal = said.refusal?.say(context.l10n);
     });
-    if (said.answer case final made?) _say(made.emailed ? context.l10n.codesEmailed : context.l10n.codesMade);
+    if (said.answer != null) _say(context.l10n.codesMade);
+  }
+
+  Future<void> _emailBackups() async {
+    final me = _me;
+    if (me == null || _working) return;
+    setState(() {
+      _working = true;
+      _refusal = null;
+    });
+    final said = await backupCodes(me, send: true);
+    if (!mounted) return;
+    setState(() {
+      _working = false;
+      _backups = said.answer ?? _backups;
+      _refusal = said.refusal?.say(context.l10n);
+    });
+    if (said.answer case final sent?) {
+      final l10n = context.l10n;
+      _say(sent.emailed ? l10n.codesSent : (sent.unsent == 'no address' ? l10n.codesNoAddress : l10n.codesNotSent));
+    }
   }
 
   Future<void> _copy(String text) async {
@@ -440,10 +460,16 @@ class _SubscribePageState extends State<SubscribePage> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: OutlinedButton(onPressed: _working ? null : _replaceBackups, style: _outlined(), child: Text(l10n.replaceCodes)),
+              child: OutlinedButton(
+                onPressed: _working || backups.unused.isEmpty ? null : _emailBackups,
+                style: _outlined(),
+                child: Text(l10n.emailCodes),
+              ),
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        OutlinedButton(onPressed: _working ? null : _replaceBackups, style: _outlined(), child: Text(l10n.replaceCodes)),
       ] else
         OutlinedButton(onPressed: _working ? null : _showBackups, style: _outlined(), child: Text(l10n.showBackupCodes)),
       // A web subscription is managed in Stripe's portal; one bought in

@@ -124,13 +124,17 @@ String? backupCodeOf(String text) {
 
 /// A subscription's backup codes, as a device on it is shown them.
 class BackupCodes {
-  const BackupCodes({required this.codes, this.madeAt, this.emailed = false});
+  const BackupCodes({required this.codes, this.madeAt, this.emailed = false, this.unsent});
 
   final List<({String code, bool used})> codes;
   final DateTime? madeAt;
 
-  /// Whether replacing them sent the new ones to the payer's email.
+  /// Whether asking to send them sent them to the payer's email.
   final bool emailed;
+
+  /// Why they were not sent, when they were asked to be: `no address`
+  /// (a subscription bought in a store), or the service's trouble.
+  final String? unsent;
 
   Iterable<String> get unused => codes.where((c) => !c.used).map((c) => c.code);
 
@@ -143,16 +147,18 @@ class BackupCodes {
       ],
       madeAt: DateTime.tryParse(json['made_at'] as String? ?? ''),
       emailed: json['emailed'] == true,
+      unsent: json['unsent'] as String?,
     );
   }
 }
 
 /// This subscription's backup codes; with [replace], five new ones in
-/// place of them, which are emailed to the payer where the service has
-/// an address for them.
-Future<Said<BackupCodes>> backupCodes(Signer signer, {bool replace = false, Uri? endpoint}) async {
-  final answer =
-      await askHandler('backups', signer, {if (replace) 'rotate': true}, endpoint, what: replace ? 'rotate' : '');
+/// place of them; with [send], the ones still good emailed to the
+/// payer, and [BackupCodes.emailed] or [BackupCodes.unsent] says how
+/// that went.
+Future<Said<BackupCodes>> backupCodes(Signer signer, {bool replace = false, bool send = false, Uri? endpoint}) async {
+  final answer = await askHandler('backups', signer, {if (replace) 'rotate': true, if (send && !replace) 'send': true}, endpoint,
+      what: replace ? 'rotate' : (send ? 'send' : ''));
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
   final codes = BackupCodes.parse(jsonDecode(answer!.body));
   return codes == null ? (answer: null, refusal: _unreachable) : (answer: codes, refusal: null);

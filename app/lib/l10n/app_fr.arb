@@ -237,8 +237,11 @@
   "replaceCodesTitle": "Remplacer les codes de secours ?",
   "replaceCodesBody": "Ces cinq cessent de fonctionner, et cinq nouveaux les remplacent.",
   "replace": "Remplacer",
-  "codesEmailed": "Nouveaux codes créés et envoyés par e-mail.",
   "codesMade": "Nouveaux codes créés.",
+  "emailCodes": "Envoyer par e-mail",
+  "codesSent": "Envoyés à l'adresse e-mail de votre abonnement.",
+  "codesNoAddress": "Cet abonnement n'a pas d'adresse e-mail où les envoyer.",
+  "codesNotSent": "Impossible de les envoyer pour l'instant. Réessayez plus tard.",
   "haveACode": "Vous avez un code ? Activer",
   "privacyShort": "Confidentialité",
   "termsShort": "Conditions"

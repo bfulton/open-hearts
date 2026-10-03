@@ -1526,17 +1526,35 @@ abstract class AppLocalizations {
   /// **'Replace'**
   String get replace;
 
-  /// Shown once backup codes are replaced and emailed.
-  ///
-  /// In en, this message translates to:
-  /// **'New codes made, and emailed to you.'**
-  String get codesEmailed;
-
-  /// Shown once backup codes are replaced, when they could not be emailed.
+  /// Shown once backup codes are replaced.
   ///
   /// In en, this message translates to:
   /// **'New codes made.'**
   String get codesMade;
+
+  /// Button by the backup codes: email the ones still good to the subscription's address.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get emailCodes;
+
+  /// Shown once the backup codes have been emailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to the email you subscribed with.'**
+  String get codesSent;
+
+  /// Shown when the subscription has no email address (bought in an app store).
+  ///
+  /// In en, this message translates to:
+  /// **'This subscription has no email to send them to.'**
+  String get codesNoAddress;
+
+  /// Shown when emailing the backup codes failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not email them just now. Try again later.'**
+  String get codesNotSent;
 
   /// On the Subscription page before buying: a link to Activate subscription.
   ///

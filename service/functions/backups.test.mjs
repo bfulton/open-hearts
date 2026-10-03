@@ -100,20 +100,40 @@ test('a code turned away by a full household is still good', async () => {
   assert.equal((await backupsFor(KEY, store, null, { now })).body.codes[4].used, false);
 });
 
-test('replaced all at once from any device, which spends the old ones, and emails the new', async () => {
+test('replaced all at once from any device, which spends the old ones, and sends nothing', async () => {
   const store = await household();
   const old = (await backupsFor(KEY, store, null, { now })).body.codes.map((c) => c.code);
   const { sent, mail } = mailbox();
   const fresh = await backupsFor(KEY, store, mail, { rotate: true, email: 'payer@example.com', now });
-  assert.equal(fresh.body.emailed, true);
-  assert.deepEqual(sent[0].codes, fresh.body.codes.map((c) => c.code));
+  assert.equal(fresh.body.emailed, false);
+  assert.equal(sent.length, 0, 'replacing is not sending: the Email button is');
   for (const c of old) assert.equal(fresh.body.codes.some((n) => n.code === c), false);
   assert.equal((await redeemBackup(device(1), old[0], store, { now })).status, 404, 'an old code is no such code');
   assert.equal((await redeemBackup(device(1), fresh.body.codes[0].code, store, { now })).status, 200);
-  // Without an address (a store subscription), replaced and only shown.
-  const quiet = await backupsFor(KEY, store, mail, { rotate: true, now });
-  assert.equal(quiet.body.emailed, false);
-  assert.equal(sent.length, 1);
+});
+
+test('sent when a device asks: the codes still good, to the payer, and why not when they cannot be', async () => {
+  const store = await household();
+  const { sent, mail } = mailbox();
+  const asked = await backupsFor(KEY, store, mail, { send: true, email: 'payer@example.com', now });
+  assert.equal(asked.body.emailed, true);
+  assert.equal(asked.body.unsent, undefined);
+  assert.equal(sent[0].to, 'payer@example.com');
+  assert.deepEqual(sent[0].codes, asked.body.codes.map((c) => c.code));
+  // A code spent is not sent again.
+  await redeemBackup(device(1), asked.body.codes[0].code, store, { now });
+  await backupsFor(KEY, store, mail, { send: true, email: 'payer@example.com', now });
+  assert.equal(sent[1].codes.length, 4);
+  // No address (a store subscription), no mail bound, a send that fails.
+  assert.equal((await backupsFor(KEY, store, mail, { send: true, now })).body.unsent, 'no address');
+  assert.equal((await backupsFor(KEY, store, null, { send: true, email: 'payer@example.com', now })).body.unsent, 'no mail');
+  const broken = async () => {
+    throw new Error('refused');
+  };
+  const failed = await backupsFor(KEY, store, broken, { send: true, email: 'payer@example.com', now });
+  assert.equal(failed.body.emailed, false);
+  assert.equal(failed.body.unsent, 'failed');
+  assert.equal(sent.length, 2);
 });
 
 test('only a device bound to the subscription sees its codes', async () => {

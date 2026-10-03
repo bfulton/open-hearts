@@ -446,10 +446,13 @@ L is taken as the 0 or 1 it looks like.
 They are made when the subscription is paid for and **emailed** to the
 address the checkout was paid with, which is on Stripe's event and not
 kept. Any device on the subscription shows them under Subscription,
-marked once used, and can **replace** all five at once, which spends
-the old ones; the new ones are emailed to the payer again, the address
-read from Stripe at that moment (`/customers/{id}`) and not kept. A
-store subscription has no address here, so its codes are only shown.
+marked once used, can **replace** all five at once, which spends the
+old ones, and can **email** the ones still good to the payer (its own
+signed ask), the address read from Stripe at that moment
+(`/customers/{id}`) and not kept. The answer says whether they went,
+and if not why — no address, no mail bound, or the send failed — and
+the relay's log says the same. A store subscription has no address
+here, so its codes are only shown.
 The email goes through Cloudflare's Email Sending, bound as `EMAIL` to
 the relay worker the household runs in, from `OH_MAIL_FROM`; without
 both, nothing is sent and the codes are only shown.

@@ -1334,13 +1334,25 @@
   "@replace": {
     "description": "Button in the dialog: replace the backup codes."
   },
-  "codesEmailed": "New codes made, and emailed to you.",
-  "@codesEmailed": {
-    "description": "Shown once backup codes are replaced and emailed."
-  },
   "codesMade": "New codes made.",
   "@codesMade": {
-    "description": "Shown once backup codes are replaced, when they could not be emailed."
+    "description": "Shown once backup codes are replaced."
+  },
+  "emailCodes": "Email",
+  "@emailCodes": {
+    "description": "Button by the backup codes: email the ones still good to the subscription's address."
+  },
+  "codesSent": "Sent to the email you subscribed with.",
+  "@codesSent": {
+    "description": "Shown once the backup codes have been emailed."
+  },
+  "codesNoAddress": "This subscription has no email to send them to.",
+  "@codesNoAddress": {
+    "description": "Shown when the subscription has no email address (bought in an app store)."
+  },
+  "codesNotSent": "Could not email them just now. Try again later.",
+  "@codesNotSent": {
+    "description": "Shown when emailing the backup codes failed."
   },
   "haveACode": "Have a code? Activate",
   "@haveACode": {

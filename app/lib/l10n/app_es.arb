@@ -237,8 +237,11 @@
   "replaceCodesTitle": "¿Reemplazar los códigos de respaldo?",
   "replaceCodesBody": "Estos cinco dejan de funcionar, y cinco nuevos ocupan su lugar.",
   "replace": "Reemplazar",
-  "codesEmailed": "Códigos nuevos creados y enviados a tu correo.",
   "codesMade": "Códigos nuevos creados.",
+  "emailCodes": "Enviar por correo",
+  "codesSent": "Enviados al correo con el que te suscribiste.",
+  "codesNoAddress": "Esta suscripción no tiene un correo al que enviarlos.",
+  "codesNotSent": "No se pudieron enviar ahora. Inténtalo más tarde.",
   "haveACode": "¿Tienes un código? Activar",
   "privacyShort": "Privacidad",
   "termsShort": "Términos"

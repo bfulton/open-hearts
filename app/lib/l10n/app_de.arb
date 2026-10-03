@@ -237,8 +237,11 @@
   "replaceCodesTitle": "Backup-Codes ersetzen?",
   "replaceCodesBody": "Diese fünf funktionieren nicht mehr, und fünf neue treten an ihre Stelle.",
   "replace": "Ersetzen",
-  "codesEmailed": "Neue Codes erstellt und dir per E-Mail geschickt.",
   "codesMade": "Neue Codes erstellt.",
+  "emailCodes": "Per E-Mail",
+  "codesSent": "An die E-Mail-Adresse deines Abos gesendet.",
+  "codesNoAddress": "Für dieses Abo gibt es keine E-Mail-Adresse, an die sie gehen könnten.",
+  "codesNotSent": "Gerade konnten sie nicht gesendet werden. Versuch es später noch einmal.",
   "haveACode": "Hast du einen Code? Aktivieren",
   "privacyShort": "Datenschutz",
   "termsShort": "Bedingungen"

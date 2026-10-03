@@ -950,20 +950,28 @@ async function makeBackups(store, subscription, { now }) {
 /// The codes as a device on the subscription is shown them.
 const backupsShown = (row) => ({ codes: row.codes.map((c) => ({ code: c.code, used: c.used_at !== null })), made_at: row.made_at });
 
-/// Sends [row]'s codes to [email] with [mail], and notes that it did.
-/// A send that fails is logged and otherwise nothing: the codes are on
-/// every device on the subscription regardless.
+/// Sends [row]'s codes to [email] with [mail], and notes that it did:
+/// {row, unsent}, [unsent] null when it went and otherwise why not —
+/// `no address`, `no mail` (Email Sending not bound here), `no codes`
+/// (all used) or `failed`. Every one that did not go is logged; the
+/// codes are on every device on the subscription regardless.
 async function mailBackups(store, subscription, row, email, mail, { now }) {
-  if (!mail || typeof email !== 'string' || !email.includes('@')) return row;
+  const codes = row.codes.filter((c) => c.used_at === null).map((c) => c.code);
+  const unsent = !mail ? 'no mail' : typeof email !== 'string' || !email.includes('@') ? 'no address' : codes.length === 0 ? 'no codes' : null;
+  if (unsent) {
+    console.log(`backup codes for ${subscription}: not sent: ${unsent}`);
+    return { row, unsent };
+  }
   try {
-    await mail(email, row.codes.filter((c) => c.used_at === null).map((c) => c.code));
+    await mail(email, codes);
   } catch (e) {
     console.log(`backup codes for ${subscription}: not sent: ${e?.code ?? ''} ${e?.message ?? e}`);
-    return row;
+    return { row, unsent: 'failed' };
   }
+  console.log(`backup codes for ${subscription}: sent`);
   const sent = { ...row, emailed_at: new Date(now).toISOString() };
   await store.put(`SUB#${subscription}`, 'BACKUP', sent);
-  return sent;
+  return { row: sent, unsent: null };
 }
 
 /// A subscription just paid for: its codes, made once, and sent to the
@@ -972,23 +980,24 @@ async function mailBackups(store, subscription, row, email, mail, { now }) {
 export async function backupsMade(subscription, email, store, mail, { now = Date.now() } = {}) {
   let row = await store.get(`SUB#${subscription}`, 'BACKUP');
   if (!row) row = await makeBackups(store, subscription, { now });
-  if (!row.emailed_at) row = await mailBackups(store, subscription, row, email, mail, { now });
+  if (!row.emailed_at) ({ row } = await mailBackups(store, subscription, row, email, mail, { now }));
   return { status: 200, body: { made_at: row.made_at, emailed: row.emailed_at !== null } };
 }
 
 /// The codes, for a device bound to the subscription: made if there are
 /// none yet (a subscription from before them, or bought in a store),
-/// and replaced when [rotate] — then sent to [email] where there is one.
-export async function backupsFor(key, store, mail, { rotate = false, email = null, now = Date.now() } = {}) {
+/// and replaced when [rotate]; with [send], the ones still good sent to
+/// [email], the payer's, when a device asks (the Email button) — and
+/// `emailed`, or `unsent` and why not, in the answer.
+export async function backupsFor(key, store, mail, { rotate = false, send = false, email = null, now = Date.now() } = {}) {
   const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (!held) return { status: 402, body: { error: 'no subscription' } };
   if (!(await store.get(`SUB#${held.subscription}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
   let row = await store.get(`SUB#${held.subscription}`, 'BACKUP');
-  if (!row || rotate) {
-    row = await makeBackups(store, held.subscription, { now });
-    if (rotate) row = await mailBackups(store, held.subscription, row, email, mail, { now });
-  }
-  return { status: 200, body: { ...backupsShown(row), emailed: rotate && row.emailed_at !== null } };
+  if (!row || rotate) row = await makeBackups(store, held.subscription, { now });
+  if (!send) return { status: 200, body: { ...backupsShown(row), emailed: false } };
+  const mailed = await mailBackups(store, held.subscription, row, email, mail, { now });
+  return { status: 200, body: { ...backupsShown(mailed.row), emailed: mailed.unsent === null, ...(mailed.unsent ? { unsent: mailed.unsent } : {}) } };
 }
 
 /// A device arriving with a backup code. Spent only by a join that
@@ -1120,7 +1129,7 @@ export async function householdOp(op, store, { now = Date.now(), mail = null } =
     case 'redeem':
       return redeemBackup(op.key, op.code, store, { now });
     case 'backups':
-      return backupsFor(op.key, store, mail, { rotate: op.rotate === true, email: op.email ?? null, now });
+      return backupsFor(op.key, store, mail, { rotate: op.rotate === true, send: op.send === true, email: op.email ?? null, now });
     case 'made':
       return backupsMade(op.subscription, op.email ?? null, store, mail, { now });
     case 'bind':
@@ -1166,8 +1175,8 @@ export function backupMailText(codes) {
     'device: menu, Activate subscription, and type or paste a code.',
     '',
     'Any device on the subscription shows these codes under Subscription,',
-    'and can replace them with new ones; this email is sent again when it',
-    'does, and the codes above stop working.',
+    'can email them here again, and can replace them with new ones, after',
+    'which the codes above stop working.',
     '',
     'Open Hearts — https://openhearts.game',
   ].join('\n');
@@ -1269,7 +1278,10 @@ export async function payerEmail(store, subscription, env, fetchImpl = fetch) {
   if (!customer) return null;
   try {
     const res = await fetchImpl(`${STRIPE}/customers/${encodeURIComponent(customer)}`, { headers: { authorization: `Bearer ${secret}` } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.log(`payer email for ${subscription}: Stripe said ${res.status}`);
+      return null;
+    }
     const email = (await res.json())?.email;
     return typeof email === 'string' && email.includes('@') ? email : null;
   } catch {
@@ -1281,7 +1293,7 @@ async function backupsRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
-  const asked = await signedFor(request, env, 'backups', (body) => (body.rotate === true ? 'rotate' : ''));
+  const asked = await signedFor(request, env, 'backups', (body) => (body.rotate === true ? 'rotate' : body.send === true ? 'send' : ''));
   if (asked instanceof Response) return asked;
   const { key, body } = asked;
   const store = storeOf(env);
@@ -1289,8 +1301,9 @@ async function backupsRoute(request, env) {
   const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (!held) return json(request, 402, { error: 'no subscription' });
   const rotate = body.rotate === true;
-  const email = rotate ? await payerEmail(store, held.subscription, env) : null;
-  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'backups', key, rotate, email });
+  const send = !rotate && body.send === true;
+  const email = send ? await payerEmail(store, held.subscription, env) : null;
+  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'backups', key, rotate, send, email });
   return json(request, status, out);
 }
 

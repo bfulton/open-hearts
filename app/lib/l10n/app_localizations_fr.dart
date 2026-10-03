@@ -1112,10 +1112,21 @@ class AppLocalizationsFr extends AppLocalizations {
   String get replace => 'Remplacer';
 
   @override
-  String get codesEmailed => 'Nouveaux codes créés et envoyés par e-mail.';
+  String get codesMade => 'Nouveaux codes créés.';
 
   @override
-  String get codesMade => 'Nouveaux codes créés.';
+  String get emailCodes => 'Envoyer par e-mail';
+
+  @override
+  String get codesSent => 'Envoyés à l\'adresse e-mail de votre abonnement.';
+
+  @override
+  String get codesNoAddress =>
+      'Cet abonnement n\'a pas d\'adresse e-mail où les envoyer.';
+
+  @override
+  String get codesNotSent =>
+      'Impossible de les envoyer pour l\'instant. Réessayez plus tard.';
 
   @override
   String get haveACode => 'Vous avez un code ? Activer';

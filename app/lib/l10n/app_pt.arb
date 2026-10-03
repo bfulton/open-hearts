@@ -237,8 +237,11 @@
   "replaceCodesTitle": "Substituir os códigos de backup?",
   "replaceCodesBody": "Estes cinco deixam de funcionar, e cinco novos tomam o seu lugar.",
   "replace": "Substituir",
-  "codesEmailed": "Novos códigos criados e enviados para o seu e-mail.",
   "codesMade": "Novos códigos criados.",
+  "emailCodes": "Enviar por e-mail",
+  "codesSent": "Enviados para o e-mail com que assinou.",
+  "codesNoAddress": "Esta assinatura não tem um e-mail para onde enviá-los.",
+  "codesNotSent": "Não foi possível enviá-los agora. Tente mais tarde.",
   "haveACode": "Tem um código? Ativar",
   "privacyShort": "Privacidade",
   "termsShort": "Termos"

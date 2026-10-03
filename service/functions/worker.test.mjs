@@ -744,6 +744,12 @@ test('the routes: backup codes shown, one claimed with the licence back, and rep
   assert.equal(fresh.includes(codes[1].code), false);
   const old = codes[1].code;
   assert.equal((await worker.fetch(send('claim', await asking(CY, 'claim', { what: old, ticket: old })), held)).status, 404);
+
+  // Sending is signed as such too.
+  assert.equal((await worker.fetch(send('backups', { ...plain, send: true }), held)).status, 401);
+  const sentTo = await worker.fetch(send('backups', await asking(ADA, 'backups', { what: 'send', send: true })), held);
+  assert.equal(sentTo.status, 200);
+  assert.equal(typeof (await sentTo.json()).emailed, 'boolean');
 });
 
 test('the routes: a code, a claim that answers with the licence, and the devices list', async () => {

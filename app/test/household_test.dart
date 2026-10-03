@@ -398,7 +398,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the page shows a screen\'s code to type, and the backup codes, and replaces them', (tester) async {
+  testWidgets('the page shows a screen\'s code to type, and the backup codes, replaces them, and emails them', (tester) async {
     final stand = standUp();
     final me = await Identity.signer();
     await licenceThisDevice();
@@ -441,7 +441,6 @@ void main() {
     stand.says('backups', {
       'codes': [for (final c in ['FFFF', 'GGGG', 'HHHH', 'JJJJ', 'KKKK']) {'code': '$c-$c-$c-$c', 'used': false}],
       'made_at': '2026-10-02T01:00:00Z',
-      'emailed': true,
     });
     await tester.ensureVisible(find.text('Replace codes'));
     await tester.tap(find.text('Replace codes'));
@@ -454,7 +453,32 @@ void main() {
     expect(schnorrVerifier(me.publicKey, requestDigest('backups', me.publicKey, asked['at'] as int, 'rotate'), asked['sig'] as String), isTrue);
     expect(find.text('AAAA-AAAA-AAAA-AAAA'), findsNothing);
     expect(find.text('KKKK-KKKK-KKKK-KKKK'), findsOneWidget);
-    expect(find.text('New codes made, and emailed to you.'), findsOneWidget);
+    expect(find.text('New codes made.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    // Emailed when asked, signed as such; and said when it could not be.
+    final fresh = {
+      'codes': [for (final c in ['FFFF', 'GGGG', 'HHHH', 'JJJJ', 'KKKK']) {'code': '$c-$c-$c-$c', 'used': false}],
+      'made_at': '2026-10-02T01:00:00Z',
+    };
+    stand.says('backups', {...fresh, 'emailed': true});
+    await tester.ensureVisible(find.text('Email'));
+    await tester.tap(find.text('Email'));
+    await tester.pumpAndSettle();
+    final sent = jsonDecode(stand.seen.last.split(' ').last) as Map<String, Object?>;
+    expect(sent['send'], isTrue);
+    expect(sent.containsKey('rotate'), isFalse);
+    expect(schnorrVerifier(me.publicKey, requestDigest('backups', me.publicKey, sent['at'] as int, 'send'), sent['sig'] as String), isTrue);
+    expect(find.text('Sent to the email you subscribed with.'), findsOneWidget);
+    expect(find.text('KKKK-KKKK-KKKK-KKKK'), findsOneWidget, reason: 'the same codes, still shown');
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    stand.says('backups', {...fresh, 'emailed': false, 'unsent': 'no address'});
+    await tester.tap(find.text('Email'));
+    await tester.pumpAndSettle();
+    expect(find.text('This subscription has no email to send them to.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

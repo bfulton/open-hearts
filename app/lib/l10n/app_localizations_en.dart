@@ -1106,10 +1106,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get replace => 'Replace';
 
   @override
-  String get codesEmailed => 'New codes made, and emailed to you.';
+  String get codesMade => 'New codes made.';
 
   @override
-  String get codesMade => 'New codes made.';
+  String get emailCodes => 'Email';
+
+  @override
+  String get codesSent => 'Sent to the email you subscribed with.';
+
+  @override
+  String get codesNoAddress =>
+      'This subscription has no email to send them to.';
+
+  @override
+  String get codesNotSent => 'Could not email them just now. Try again later.';
 
   @override
   String get haveACode => 'Have a code? Activate';
