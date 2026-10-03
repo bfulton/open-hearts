@@ -14,6 +14,12 @@ compatibility_date = "2025-01-01"
 # Where the apps find it (app/lib/net/relays.dart, homeTagRelay).
 routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 
+# Logs, the worker's and the jurors' container's own output, kept seven
+# days in Workers Logs (docs: "How do Container logs work?"). Without
+# them a stalled table showed a running container and nothing else.
+[observability]
+enabled = true
+
 # The binding the worker routes through. One object per tag, named by
 # the tag itself.
 [[durable_objects.bindings]]
