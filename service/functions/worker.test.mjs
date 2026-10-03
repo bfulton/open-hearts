@@ -517,7 +517,7 @@ test('the webhook route: a checkout paid for makes the backup codes and emails t
     OH_STRIPE_WEBHOOK_SECRET: SIGNING,
     OH_STORE: kvOf(store),
     EMAIL: { send: async (m) => got.push(m) },
-    OH_MAIL_FROM: 'codes@openhearts.game',
+    OH_MAIL_FROM: 'noreply@openhearts.game',
   };
   const at = 'https://dev.open-hearts.pages.dev/api/stripe';
   const raw = JSON.stringify({

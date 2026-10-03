@@ -139,10 +139,10 @@ test('the mailer: Cloudflare Email Sending from the address configured, or none'
   assert.equal(mailerOf({}), null);
   assert.equal(mailerOf({ EMAIL: { send() {} } }), null, 'no sender address');
   const got = [];
-  const mail = mailerOf({ EMAIL: { send: async (m) => got.push(m) }, OH_MAIL_FROM: 'codes@openhearts.game' });
+  const mail = mailerOf({ EMAIL: { send: async (m) => got.push(m) }, OH_MAIL_FROM: 'noreply@openhearts.game' });
   await mail('payer@example.com', ['AAAA-BBBB-CCCC-DDDD']);
   assert.equal(got[0].to, 'payer@example.com');
-  assert.deepEqual(got[0].from, { email: 'codes@openhearts.game', name: 'Open Hearts' });
+  assert.deepEqual(got[0].from, { email: 'noreply@openhearts.game', name: 'Open Hearts' });
   assert.match(got[0].text, /AAAA-BBBB-CCCC-DDDD/);
   assert.match(backupMailText(['X']), /Activate subscription/);
 });
