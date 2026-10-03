@@ -93,12 +93,6 @@ the bottom with the day.
   change.
 ## Cloudflare and deploying
 
-- **Email for backup codes**: onboard openhearts.game to Cloudflare
-  Email Service (dashboard → Email → Email Sending; it adds its DNS
-  records to the zone). Then I uncomment `send_email` and
-  `OH_MAIL_FROM` in `service/do/wrangler.toml` and redeploy the relay.
-  Until then the codes are only shown in the app.
-
 - **Tighter rate limits need a paid zone plan.** The Free plan allows
   one rule; it is in place (below). Per-handler limits — `/api/ticket`,
   `/api/claim`, `/api/checkout`, `/api/turn` at about ten a minute
