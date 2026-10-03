@@ -81,6 +81,7 @@ class HandOverSheet extends StatelessWidget {
             delta: scores[seat],
             total: totals[seat],
             you: seat == mySeat,
+            mark: null,
           ),
       ],
       action: action ?? l10n.nextHand,
@@ -157,6 +158,13 @@ class GameOverSheet extends StatelessWidget {
             delta: game.handScores[seat],
             total: game.totals[seat],
             you: seat == mySeat,
+            // Who won it green, and who ended it red: at or past the
+            // target, which is what ends a game.
+            mark: won.contains(seat)
+                ? Palette.win
+                : game.totals[seat] >= game.target
+                    ? Palette.danger
+                    : null,
           ),
       ],
       note: rating == null ? null : _RatingLine(change: rating!),
@@ -168,7 +176,7 @@ class GameOverSheet extends StatelessWidget {
   }
 }
 
-typedef _Row = ({String name, String seed, Avatar? avatar, int delta, int total, bool you});
+typedef _Row = ({String name, String seed, Avatar? avatar, int delta, int total, bool you, Color? mark});
 
 class _Sheet extends StatelessWidget {
   const _Sheet({
@@ -362,7 +370,7 @@ class _ScoreRow extends StatelessWidget {
                     // Your own row is the weight, not the colour: which
                     // row is yours is a fact about the sheet.
                     fontWeight: row.you ? FontWeight.w700 : FontWeight.w500,
-                    color: Palette.chrome,
+                    color: row.mark ?? Palette.chrome,
                   ),
                 ),
               ),
@@ -383,11 +391,11 @@ class _ScoreRow extends StatelessWidget {
                 child: Text(
                   '${row.total}',
                   textAlign: TextAlign.right,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                    color: Palette.chrome,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: row.mark ?? Palette.chrome,
                   ),
                 ),
               ),

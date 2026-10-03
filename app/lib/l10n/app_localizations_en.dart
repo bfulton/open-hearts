@@ -827,9 +827,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get published => 'Published';
 
   @override
-  String buildIsUp(String build) {
-    return '$build is up';
-  }
+  String get newBuildAvailable => 'New build available';
 
   @override
   String get livePaused => 'Live play is paused for now. Playing alone is not.';

@@ -42,6 +42,10 @@ abstract final class Palette {
   static const chromeDim = Color(0x99E8EFEA);
   static const danger = Color(0xFFE0674F);
 
+  /// The game's winner, on the sheet that ends it: the one green thing,
+  /// as [danger] is the red one.
+  static const win = Color(0xFF7FD69B);
+
   /// The mark: the heart the app wears and the name beside it. White,
   /// because gold is what a button is.
   static const mark = chrome;

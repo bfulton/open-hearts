@@ -829,9 +829,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get published => 'Publicada';
 
   @override
-  String buildIsUp(String build) {
-    return '$build já está disponível';
-  }
+  String get newBuildAvailable => 'Nova versão disponível';
 
   @override
   String get livePaused =>

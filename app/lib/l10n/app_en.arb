@@ -1001,14 +1001,9 @@
   "@published": {
     "description": "On the About page: when this build was published."
   },
-  "buildIsUp": "{build} is up",
-  "@buildIsUp": {
-    "description": "A small button that appears when a newer build of the web app has been published; tapping it reloads.",
-    "placeholders": {
-      "build": {
-        "type": "String"
-      }
-    }
+  "newBuildAvailable": "New build available",
+  "@newBuildAvailable": {
+    "description": "A small button that appears when a newer build of the web app has been published; tapping it reloads."
   },
   "livePaused": "Live play is paused for now. Playing alone is not.",
   "@livePaused": {

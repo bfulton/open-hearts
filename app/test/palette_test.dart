@@ -144,6 +144,29 @@ void main() {
     expect(_buttonUnder(tester, 'New game'), Palette.gold, reason: 'the way on is the same colour whoever won');
   });
 
+  testWidgets('at the end, the winner\'s row is green and every row at or past the target red', (tester) async {
+    final over = _finished();
+    final game = over.game;
+    await pumpSheet(tester, GameOverSheet(game: game, names: _names, mySeat: over.won, onNewGame: () {}));
+    var red = 0;
+    for (var seat = 0; seat < engine.seatCount; seat++) {
+      final expected = game.winners.contains(seat)
+          ? Palette.win
+          : game.totals[seat] >= game.target
+              ? Palette.danger
+              : Palette.chrome;
+      if (expected == Palette.danger) red++;
+      expect(_colourOf(tester, _names[seat]), expected, reason: 'seat $seat, ${game.totals[seat]} of ${game.target}');
+      if (find.text('${game.totals[seat]}').evaluate().length == 1) {
+        expect(_colourOf(tester, '${game.totals[seat]}'), expected, reason: 'and its total');
+      }
+    }
+    expect(red, greaterThan(0), reason: 'somebody ended the game');
+    // A hand's sheet marks nobody: nothing is won or lost yet.
+    await pumpSheet(tester, HandOverSheet(handNumber: 0, scores: const [3, 8, 2, 13], totals: const [3, 8, 2, 13], moonShooter: null, names: _names, mySeat: _me, onNext: () {}));
+    expect(_colourOf(tester, 'Ada'), Palette.chrome);
+  });
+
   testWidgets('what a game did to your rating is a number, up or down', (tester) async {
     final over = _finished();
     final before = Rating.fresh;

@@ -71,7 +71,7 @@ class _UpdatePillState extends State<UpdatePill> with WidgetsBindingObserver {
           children: [
             const Icon(Icons.refresh, size: 13, color: Felt.dark),
             const SizedBox(width: 5),
-            Text(context.l10n.buildIsUp(newBuild),
+            Text(context.l10n.newBuildAvailable,
                 style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Felt.dark)),
           ],
         ),

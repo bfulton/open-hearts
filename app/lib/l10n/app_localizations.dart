@@ -1139,8 +1139,8 @@ abstract class AppLocalizations {
   /// A small button that appears when a newer build of the web app has been published; tapping it reloads.
   ///
   /// In en, this message translates to:
-  /// **'{build} is up'**
-  String buildIsUp(String build);
+  /// **'New build available'**
+  String get newBuildAvailable;
 
   /// In place of the live play buttons, while the operator has paused live play for everyone.
   ///

@@ -839,9 +839,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get published => 'Veröffentlicht';
 
   @override
-  String buildIsUp(String build) {
-    return '$build ist da';
-  }
+  String get newBuildAvailable => 'Neue Version verfügbar';
 
   @override
   String get livePaused =>

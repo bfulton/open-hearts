@@ -172,7 +172,7 @@
   "licenseName": "Licencia",
   "build": "Versión",
   "published": "Publicada",
-  "buildIsUp": "{build} ya está disponible",
+  "newBuildAvailable": "Nueva versión disponible",
   "livePaused": "El juego en vivo está en pausa por ahora. Jugar solo sigue abierto.",
   "updateDueWeb": "Esta versión está desactualizada. Recarga para obtener la nueva.",
   "updateDueApp": "Esta versión está desactualizada. Actualiza la app para obtener la nueva.",
