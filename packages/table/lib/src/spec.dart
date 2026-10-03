@@ -2,6 +2,8 @@
 /// seed the deal comes from until the verifiable deal replaces it.
 library;
 
+import 'dart:math';
+
 import 'package:engine/engine.dart';
 
 import 'signing.dart';
@@ -24,6 +26,19 @@ class BotSeat extends SeatHolder {
   @override
   String toString() => 'bot ${persona.id}';
 }
+
+/// A table's id: 128 bits from the system's own randomness, as 32 hex
+/// digits. It is the table's address — the tag its object on the relay
+/// is named by, and `/play/table/<id>` — so it is unguessable, and two
+/// tables never share one.
+String newTableId([Random? random]) {
+  final rng = random ?? Random.secure();
+  // Sixteen bits at a time: a wider shift folds to zero in JavaScript.
+  return List.generate(8, (_) => rng.nextInt(1 << 16).toRadixString(16).padLeft(4, '0')).join();
+}
+
+/// Whether [id] is one [newTableId] would make.
+bool validTableId(String id) => RegExp(r'^[0-9a-f]{32}$').hasMatch(id);
 
 class TableSpec {
   const TableSpec(

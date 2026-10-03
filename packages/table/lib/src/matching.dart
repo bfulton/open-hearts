@@ -307,10 +307,7 @@ class WaitingRoom {
     if (p.tables.isEmpty) return;
     log?.call('$pool round $round: hosting, ${all.length} present, ${p.tables.length} table(s)');
     for (final humans in p.tables) {
-      // Two halves: a 32-bit shift folds to zero when compiled to
-      // JavaScript, where ints are doubles and shifts are 32-bit.
-      final id = 'm${_random.nextInt(1 << 16).toRadixString(16).padLeft(4, '0')}'
-          '${_random.nextInt(1 << 16).toRadixString(16).padLeft(4, '0')}';
+      final id = newTableId(_random);
       final seed = _random.nextInt(1 << 31);
       final mean = humans.map((w) => w.rating).reduce((a, b) => a + b) ~/ humans.length;
       final wanted = seatCount - humans.length;
@@ -420,7 +417,9 @@ class WaitingRoom {
         }
         s++;
       }
-      if (!mine || seats.length != seatCount) return;
+      // A table is named by its id, and its id is its address: one that
+      // could be guessed, or shared with another table, is not taken.
+      if (!mine || seats.length != seatCount || c['table'] is! String || !validTableId(c['table'] as String)) return;
       _offers.add((
         TableSpec(
             id: c['table'] as String,

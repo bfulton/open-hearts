@@ -53,6 +53,9 @@ class BusChannel implements RoomChannel {
   }
 }
 
+/// A table id as a leader names one.
+const _table = '0123456789abcdef0123456789abcdef';
+
 void main() {
   test('a code is eight characters, none of them a lookalike, and no two alike', () {
     expect(Room.validCode('ABCDEFGH'), isTrue);
@@ -103,11 +106,11 @@ void main() {
       expect(a.spec!.seats.whereType<HumanSeat>().map((h) => h.key).toSet(), {signers[0].publicKey, signers[1].publicKey},
           reason: 'both of them, in whichever seats the draw gave');
       expect(a.spec!.seats.whereType<BotSeat>().length, 2);
-      // The table's id is its own, under the code: a reused code must
-      // not put two tables' events on one tag.
-      expect(a.spec!.id, startsWith('ROOM-'));
+      // The table's id is its own, not the code: a reused code must not
+      // put two tables' events on one tag, and the id is the table's
+      // address, so it is unguessable.
+      expect(validTableId(a.spec!.id), isTrue, reason: a.spec!.id);
       expect(a.spec!.id, b.spec!.id);
-      expect(a.spec!.id, isNot('ROOM'));
       a.dispose();
       b.dispose();
     });
@@ -221,6 +224,7 @@ void main() {
         // timing as given.
         bus.attach(zed).announce({
           'kind': 'start',
+          'table': _table,
           'seed': 7,
           'seats': [
             {'key': ada.publicKey, 'name': 'Ada'},
@@ -237,6 +241,37 @@ void main() {
         async.elapse(const Duration(seconds: 1));
         expect(room.spec, isNotNull, reason: '$said');
         expect(room.spec!.timing, TableTiming.standard, reason: '$said');
+        room.dispose();
+      });
+    }
+  });
+
+  test('a start without a table id of its own, or with a guessable one, is another build\'s', () {
+    for (final id in <Object?>[null, 'ROOM-7-1', 'm1234abcd', '0123456789ABCDEF0123456789ABCDEF']) {
+      fakeAsync((async) {
+        final bus = Bus();
+        int now() => async.elapsed.inMilliseconds;
+        final ada = FakeSigner('Ada');
+        final zed = FakeSigner('Zed');
+        final room = Room(canDeal: true, channel: bus.attach(ada), code: 'ROOM', myName: 'Ada', nowMs: now);
+        async.elapse(const Duration(seconds: 1));
+        bus.attach(zed).announce({
+          'kind': 'start',
+          'table': ?id,
+          'seed': 7,
+          'seats': [
+            {'key': ada.publicKey, 'name': 'Ada'},
+            {'key': zed.publicKey, 'name': 'Zed'},
+            {'bot': Persona.roster[0].id},
+            {'bot': Persona.roster[1].id},
+          ],
+          'policy': botPolicyVersion,
+          'sealed': true,
+          'at': now(),
+        });
+        async.elapse(const Duration(seconds: 1));
+        expect(room.spec, isNull, reason: '$id');
+        expect(room.refusal, RoomRefusal.otherBuild, reason: '$id');
         room.dispose();
       });
     }
@@ -363,7 +398,7 @@ void main() {
       final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus.publish(NostrEvent.sign(ada, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': ada.publicKey, 'name': 'Ada'}, {'key': b.me, 'name': 'Bao'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -381,7 +416,7 @@ void main() {
       final c = Room(canDeal: true, channel: bus2.attach(FakeSigner('c')), code: 'ROOM', myName: 'Cara', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': c.me, 'name': 'Cara'}, {'bot': 'Han'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -397,7 +432,7 @@ void main() {
       final d = Room(canDeal: true, channel: bus3.attach(FakeSigner('d')), code: 'ROOM', myName: 'Dee', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus3.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': d.me, 'name': 'Dee'}, {'bot': 'Han'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -417,7 +452,7 @@ void main() {
       final e = Room(canDeal: true, channel: bus4.attach(FakeSigner('e')), code: 'ROOM', myName: 'Eve', nowMs: now);
       async.elapse(const Duration(seconds: 1));
       bus4.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': before,
+        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': before,
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': e.me, 'name': 'Eve'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -484,7 +519,7 @@ void main() {
       bus2.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
       async.elapse(const Duration(seconds: 1));
       bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
+        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': false, 'at': now(),
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': c.me, 'name': 'Cara'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -523,7 +558,7 @@ void main() {
       bus2.attach(ghost).announce({'kind': 'here', 'name': 'Ghost', 'seed': 1, 'since': now(), 'policy': botPolicyVersion}, ephemeral: true);
       async.elapse(const Duration(seconds: 1));
       bus2.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'key': c.me, 'name': 'Cara'}, {'bot': 'Westley'}, {'bot': 'Romeo'},
         ],
@@ -544,7 +579,7 @@ void main() {
       // The relay still holds the start of a game under this code an
       // hour ago, by someone who is not here.
       bus.stored.add(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now() - 3600000,
+        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now() - 3600000,
         'seats': [
           {'key': ghost.publicKey, 'name': 'Ghost'}, {'bot': 'Westley'}, {'bot': 'Romeo'}, {'bot': 'Juliet'},
         ],
@@ -555,7 +590,7 @@ void main() {
       expect(a.members.length, 1);
       // And a recent one from someone not present: still not a table.
       bus.publish(NostrEvent.sign(ghost, kind: 4244, content: jsonEncode({
-        'kind': 'start', 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
+        'kind': 'start', 'table': _table, 'seed': 1, 'policy': botPolicyVersion, 'sealed': true, 'at': now(),
         'seats': [
           {'key': a.me, 'name': 'Ada'}, {'bot': 'Westley'}, {'bot': 'Romeo'}, {'bot': 'Juliet'},
         ],

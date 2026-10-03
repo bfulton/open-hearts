@@ -415,6 +415,10 @@ class Room extends ChangeNotifier {
     }
     channel.announce({
       'kind': 'start',
+      // The table's own id, not the code: a code is reused, and two
+      // tables that start under one code — two halves of a room that
+      // could not hear each other — must not hear each other's plays.
+      'table': newTableId(),
       'seed': seed,
       'seats': seats,
       'policy': botPolicyVersion,
@@ -492,11 +496,15 @@ class Room extends ChangeNotifier {
       refusal = RoomRefusal.noDeal;
       return;
     }
-    // The table's own id, not the code: a code is reused, and two
-    // tables that start under one code — two halves of a room that
-    // could not hear each other — must not hear each other's plays.
+    // Named by the leader (above): a start without an id is another
+    // build's.
+    final id = c['table'];
+    if (id is! String || !validTableId(id)) {
+      if (mine) refusal = RoomRefusal.otherBuild;
+      return;
+    }
     spec = TableSpec(
-      id: '$code-${seed.toRadixString(36)}-${(c['at'] as int).toRadixString(36)}',
+      id: id,
       seed: seed,
       seats: seats,
       sealed: c['sealed'] == true,
