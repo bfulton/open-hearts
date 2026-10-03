@@ -7,8 +7,7 @@
 /// arranging its own way back.
 ///
 ///   /                   the home screen
-///   /room/ABCD          the home screen, in room ABCD (`?room=ABCD`, the
-///                       older form of a room's link, comes here too)
+///   /room/ABCD          the home screen, in room ABCD
 ///   /subscription …     the pages in pages.dart, over the home screen
 ///   /table, /live       a game alone, and a live one. A game lives in
 ///                       memory, so these are reached only by playing:
@@ -81,13 +80,6 @@ GoRouter appRouter({
   return GoRouter(
     initialLocation: initialLocation,
     initialExtra: initialExtra,
-    redirect: (context, state) {
-      // A room's older link.
-      final asked = state.uri.queryParameters;
-      final room = asked['room']?.trim().toUpperCase();
-      if (room == null || state.uri.path != '/') return null;
-      return located(Room.validCode(room) ? roomPath(room) : '/', Map.of(asked)..remove('room'));
-    },
     routes: [
       GoRoute(
         path: '/',

@@ -227,7 +227,7 @@ async function main() {
     // time the last is looked at that fourth arrival may already have
     // started the table, so either screen is arriving.
     for (let i = 1; i < 4; i++) {
-      await pages[i].goto(`${app.url}/?${driven}&room=${code}`);
+      await pages[i].goto(`${app.url}/room/${code}?${driven}`);
       await waitFor(pages[i], /^Share the link$|^\d of 4 here/, { what: `the room, by its link (${names[i]})`, timeout: 60000 });
     }
     // Four in a room is a table at once, whoever leads.

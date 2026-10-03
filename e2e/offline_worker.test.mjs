@@ -105,8 +105,8 @@ test('offline, the kept copy answers — and every page in the scope is the one 
   await w.ask(get('main.dart.js'));
   w.net.online = false;
   assert.equal(await (await w.ask(get('main.dart.js'))).text(), 'v1');
-  // A room's link, opened on a train: the same page, whatever its query.
-  assert.equal(await (await w.ask(get('./?room=KP4T9MXR', 'navigate'))).text(), '<html>');
+  // The same page, whatever its query.
+  assert.equal(await (await w.ask(get('./?lang=fr', 'navigate'))).text(), '<html>');
   // And a page of it, by its own address (app/lib/router.dart).
   assert.equal(await (await w.ask(get('./room/KP4T9MXR', 'navigate'))).text(), '<html>');
   assert.equal(await (await w.ask(get('./subscription', 'navigate'))).text(), '<html>');

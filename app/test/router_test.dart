@@ -42,11 +42,8 @@ void main() {
     expect(where(router), '/');
   });
 
-  testWidgets('a room is the home screen, in that room; an older link and a bad code are sent where they belong', (tester) async {
+  testWidgets('a room is the home screen, in that room; a bad code goes home', (tester) async {
     var router = await pumpAt(tester, '/room/KP4T9MXR');
-    expect(find.text('home KP4T9MXR'), findsOneWidget);
-    router = await pumpAt(tester, '/?room=KP4T9MXR');
-    expect(where(router), '/room/KP4T9MXR', reason: 'a link from before rooms had addresses');
     expect(find.text('home KP4T9MXR'), findsOneWidget);
     router = await pumpAt(tester, '/room/not-a-code');
     expect(where(router), '/');
