@@ -1,7 +1,11 @@
 # 08 — Our own relay, and only ours
 
-> **Status: approved 3 October 2026, being built.** Ratings start fresh;
-> the relay-endpoint setting stays, and only ever names our own relays.
+> **Status: live 3 October 2026.** Ratings start fresh; the
+> relay-endpoint setting stays, and only ever names our own relays.
+> Proved before deploying by the table and service suites (the latter
+> also through the deployed object's rules, `OH_RELAY=object`), the
+> browser flows, and `bench_check` against a local object; after, by
+> two hands on openhearts.game's relay with the bench holding the bots.
 
 ## Why
 
