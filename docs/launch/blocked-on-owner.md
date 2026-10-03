@@ -185,3 +185,8 @@ the bottom with the day.
   relay.openhearts.game brought all four online 2.4 s later.
 - 2 October: production deployed with no open-bot fallback, Activate
   subscription, backup codes and the About links.
+- 3 October: Cloudflare Web Analytics switched off for openhearts.game
+  (it injected a script from static.cloudflareinsights.com into the
+  site and the app, which the site says it does not do); New Relic is
+  what watches the app now (observability/). altesc.game's left as it
+  was.
