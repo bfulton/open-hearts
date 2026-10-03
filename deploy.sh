@@ -150,8 +150,18 @@ cp -r site/. "$STAGE"/
 # compile wasm from bytes while running (service/functions/entry.mjs).
 mkdir -p "$STAGE/_worker.js"
 cp service/functions/entry.mjs "$STAGE/_worker.js/index.js"
-cp service/functions/worker.mjs "$STAGE/_worker.js/worker.mjs"
+# Every module the handlers import, not a list of them kept by hand:
+# one left off is a worker Cloudflare refuses at upload. Not the tests,
+# nor their fixtures.
+for f in service/functions/*.mjs; do
+  case "$f" in *.test.mjs | *.fixtures.mjs | */entry.mjs) continue ;; esac
+  cp "$f" "$STAGE/_worker.js/"
+done
 cp app/web/schnorr.wasm "$STAGE/_worker.js/schnorr.wasm"
+# And loaded here before anything is uploaded: a module that imports
+# one that is not there fails now, not at Cloudflare's end.
+node --input-type=module -e "await import('$STAGE/_worker.js/worker.mjs')" ||
+  { echo "deploy: the staged worker does not load" >&2; exit 1; }
 
 # OH_RELAYS is left empty so the build uses its own relay list
 # (app/lib/net/relays.dart); the local rig is the only thing that sets
