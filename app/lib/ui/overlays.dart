@@ -101,6 +101,7 @@ class GameOverSheet extends StatelessWidget {
     required this.names,
     required this.onNewGame,
     this.onCopyRecord,
+    this.onSeeGame,
     this.seeds,
     this.avatars,
     this.rating,
@@ -133,6 +134,10 @@ class GameOverSheet extends StatelessWidget {
   /// Puts the game's record on the clipboard: a line that replays the
   /// whole game, for looking at a hand afterwards.
   final VoidCallback? onCopyRecord;
+
+  /// Opens the finished game, hand by hand: at a live table, whose game
+  /// is kept (review_page.dart). In place of the record to copy.
+  final VoidCallback? onSeeGame;
 
   @override
   Widget build(BuildContext context) {
@@ -170,8 +175,8 @@ class GameOverSheet extends StatelessWidget {
       note: rating == null ? null : _RatingLine(change: rating!),
       action: action ?? l10n.newGame,
       onAction: onNewGame,
-      secondary: onCopyRecord == null ? null : l10n.copyRecord,
-      onSecondary: onCopyRecord,
+      secondary: onSeeGame != null ? l10n.seeWholeGame : (onCopyRecord == null ? null : l10n.copyRecord),
+      onSecondary: onSeeGame ?? onCopyRecord,
     );
   }
 }

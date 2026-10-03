@@ -1271,3 +1271,28 @@ test('the manage route: signed by the device, and back only to this site', async
     globalThis.fetch = realFetch;
   }
 });
+
+test('a game\'s record: sent by a player signed for its table, kept, and fetched by its id', async () => {
+  const kept = new Map();
+  const bucket = {
+    head: async (k) => (kept.has(k) ? {} : null),
+    get: async (k) => (kept.has(k) ? { body: new Blob([kept.get(k)]).stream() } : null),
+    put: async (k, body) => kept.set(k, Buffer.from(body)),
+  };
+  const store = await household(Date.now(), ADA.public);
+  const { held, send } = serving(store);
+  const env = { ...held, OH_RECORDS: bucket };
+  const table = '0123456789abcdef0123456789abcdef';
+  const record = JSON.stringify({ v: 1, spec: { id: table, seats: [{ key: ADA.public }, { key: BAO.public }, { bot: 'Romeo' }, { bot: 'Juliet' }] }, record: [] });
+  // Signed for another table: not this one's.
+  const wrong = await worker.fetch(send('record', await asking(ADA, 'record', { what: 'f'.repeat(32), table, record })), env);
+  assert.equal(wrong.status, 401);
+  const sent = await worker.fetch(send('record', await asking(ADA, 'record', { what: table, table, record })), env);
+  assert.equal(sent.status, 200);
+  assert.deepEqual(await sent.json(), { kept: true });
+  const got = await worker.fetch(new Request(`https://dev.open-hearts.pages.dev/api/record/${table}`), env);
+  assert.equal(got.status, 200);
+  assert.equal(got.headers.get('content-encoding'), 'gzip');
+  const { gunzipSync } = await import('node:zlib');
+  assert.equal(gunzipSync(Buffer.from(await got.arrayBuffer())).toString(), record);
+});

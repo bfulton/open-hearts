@@ -25,6 +25,18 @@ class _CopyableSelectionState extends State<CopyableSelection> {
   /// to show Copy.
   late final _entry = OverlayEntry(builder: (context) => _area());
 
+  /// The area's own focus, out of the Tab order: it is there to select
+  /// text, not to be tabbed to. And in the order, it is asked where it
+  /// is when the browser says the window has focus — which can be before
+  /// the first frame is laid out, so it threw, every load.
+  final _focus = FocusNode(debugLabel: 'selection', skipTraversal: true);
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
   @override
   void didUpdateWidget(CopyableSelection old) {
     super.didUpdateWidget(old);
@@ -36,6 +48,7 @@ class _CopyableSelectionState extends State<CopyableSelection> {
 
   Widget _area() {
     return SelectionArea(
+      focusNode: _focus,
       onSelectionChanged: (content) => _selected = content?.plainText ?? '',
       // On the web, Copy goes through the page (net/copy.dart), which is
       // the only way Safari lets it reach the clipboard. Elsewhere the

@@ -1127,4 +1127,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get termsShort => 'Terms';
+
+  @override
+  String get gameTitle => 'The game';
+
+  @override
+  String get checkingGame =>
+      'Checking every card of the game. This can take half a minute.';
+
+  @override
+  String get noGameHere => 'No finished game is kept at this address.';
+
+  @override
+  String gameDoesNotCheck(String reason) {
+    return 'This game\'s record does not check out: $reason';
+  }
+
+  @override
+  String get cantCheckGame =>
+      'This device cannot check the deal, so it cannot show the game.';
+
+  @override
+  String trickNumber(int trick) {
+    return 'Trick $trick';
+  }
+
+  @override
+  String seatPlayer(int seat) {
+    return 'Player $seat';
+  }
+
+  @override
+  String get seeWholeGame => 'See the whole game';
 }

@@ -1360,5 +1360,52 @@
   },
   "@termsShort": {
     "description": "On the About page: a link to the terms of use, in one word."
+  },
+  "gameTitle": "The game",
+  "@gameTitle": {
+    "description": "Title of the page that shows a finished live game, hand by hand."
+  },
+  "checkingGame": "Checking every card of the game. This can take half a minute.",
+  "@checkingGame": {
+    "description": "Shown while the finished game's record is fetched and checked."
+  },
+  "noGameHere": "No finished game is kept at this address.",
+  "@noGameHere": {
+    "description": "Shown when no record is kept for the game at this address."
+  },
+  "gameDoesNotCheck": "This game's record does not check out: {reason}",
+  "@gameDoesNotCheck": {
+    "description": "Shown when the kept record fails verification; reason is technical, in English.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "cantCheckGame": "This device cannot check the deal, so it cannot show the game.",
+  "@cantCheckGame": {
+    "description": "Shown when this device cannot run the deal's cryptography to check the game."
+  },
+  "trickNumber": "Trick {trick}",
+  "@trickNumber": {
+    "description": "Heading for one trick in the game review.",
+    "placeholders": {
+      "trick": {
+        "type": "int"
+      }
+    }
+  },
+  "seatPlayer": "Player {seat}",
+  "@seatPlayer": {
+    "description": "A player with no name in the record, by seat number.",
+    "placeholders": {
+      "seat": {
+        "type": "int"
+      }
+    }
+  },
+  "seeWholeGame": "See the whole game",
+  "@seeWholeGame": {
+    "description": "Link on the sheet at the end of a live game: opens the finished game, hand by hand."
   }
 }

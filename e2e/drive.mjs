@@ -166,9 +166,27 @@ async function handlersFor(serve) {
       list: async ({ prefix }) => ({ keys: [...store.rows.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
     },
     ASSETS: { fetch: serve },
+    OH_RECORDS: records,
   };
   return (request) => handler.fetch(request, env);
 }
+
+/// The kept games' bucket (service/functions/records.mjs), in memory:
+/// what the site would keep in R2. A flow can look at it, or put a game
+/// in it to open.
+export const records = {
+  kept: new Map(),
+  async head(key) {
+    return this.kept.has(key) ? { key } : null;
+  },
+  async get(key) {
+    const body = this.kept.get(key);
+    return body ? { body: new Blob([body]).stream() } : null;
+  },
+  async put(key, body) {
+    this.kept.set(key, Buffer.from(body));
+  },
+};
 
 export async function serveApp() {
   // Static files as a fetch, which is what the worker's own ASSETS

@@ -1132,4 +1132,37 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get termsShort => 'Termos';
+
+  @override
+  String get gameTitle => 'A partida';
+
+  @override
+  String get checkingGame =>
+      'A verificar cada carta da partida. Pode demorar meio minuto.';
+
+  @override
+  String get noGameHere =>
+      'Não há nenhuma partida terminada guardada neste endereço.';
+
+  @override
+  String gameDoesNotCheck(String reason) {
+    return 'O registo desta partida não é válido: $reason';
+  }
+
+  @override
+  String get cantCheckGame =>
+      'Este dispositivo não consegue verificar a distribuição, por isso não pode mostrar a partida.';
+
+  @override
+  String trickNumber(int trick) {
+    return 'Vaza $trick';
+  }
+
+  @override
+  String seatPlayer(int seat) {
+    return 'Jogador $seat';
+  }
+
+  @override
+  String get seeWholeGame => 'Ver a partida inteira';
 }

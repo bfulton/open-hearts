@@ -42,7 +42,12 @@ String located(String path, [Map<String, String> query = const {}]) {
 /// A room's address (the home screen, in that room).
 String roomPath(String code) => '/room/$code';
 
-/// The games' addresses. A game lives in memory: these name it while it
-/// is played, and an address alone (a refresh, history) goes home.
-const tablePath = '/table';
+/// The games' addresses while they are played. A game lives in memory:
+/// these name it while it is played, and an address alone (a refresh,
+/// history) goes home.
+const soloPath = '/solo';
 const livePath = '/live';
+
+/// A finished live game, by its table's id: kept, and looked at by
+/// anyone with the address (review_page.dart).
+String tablePath(String id) => '/table/$id';

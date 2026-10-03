@@ -82,6 +82,18 @@ void main() {
     verifiesComplete(json);
   });
 
+  test('names travel with the record, as labels, and nonsense in them is dropped', () {
+    final t = SimTable(humans: 4, seed: 3, crypto: crypto);
+    t.start();
+    expect(t.run(), isTrue);
+    final json = GameRecord.of(t.people.first.client, names: {0: 'Ada', 2: 'Cy'}).toJson();
+    t.stop();
+    (json['names'] as Map)['9'] = 'nobody';
+    (json['names'] as Map)['1'] = 'x' * 500;
+    final read = GameRecord.parse(jsonDecode(jsonEncode(json)))!;
+    expect(read.names, {0: 'Ada', 1: 'x' * 40, 2: 'Cy'});
+  });
+
   test('a copy with one event changed, or an event from another table, does not read', () {
     final json = jsonDecode(playedOut(SimTable(humans: 4, seed: 3, crypto: crypto))) as Map<String, Object?>;
     final record = json['record'] as List;

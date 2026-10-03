@@ -244,5 +244,13 @@
   "codesNotSent": "Gerade konnten sie nicht gesendet werden. Versuch es später noch einmal.",
   "haveACode": "Hast du einen Code? Aktivieren",
   "privacyShort": "Datenschutz",
-  "termsShort": "Bedingungen"
+  "termsShort": "Bedingungen",
+  "gameTitle": "Die Partie",
+  "checkingGame": "Jede Karte der Partie wird geprüft. Das kann eine halbe Minute dauern.",
+  "noGameHere": "Unter dieser Adresse ist keine beendete Partie gespeichert.",
+  "gameDoesNotCheck": "Das Protokoll dieser Partie ist nicht stimmig: {reason}",
+  "cantCheckGame": "Dieses Gerät kann das Geben nicht prüfen und die Partie daher nicht zeigen.",
+  "trickNumber": "Stich {trick}",
+  "seatPlayer": "Spieler {seat}",
+  "seeWholeGame": "Die ganze Partie ansehen"
 }

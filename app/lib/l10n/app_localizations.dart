@@ -1573,6 +1573,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Terms'**
   String get termsShort;
+
+  /// Title of the page that shows a finished live game, hand by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'The game'**
+  String get gameTitle;
+
+  /// Shown while the finished game's record is fetched and checked.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking every card of the game. This can take half a minute.'**
+  String get checkingGame;
+
+  /// Shown when no record is kept for the game at this address.
+  ///
+  /// In en, this message translates to:
+  /// **'No finished game is kept at this address.'**
+  String get noGameHere;
+
+  /// Shown when the kept record fails verification; reason is technical, in English.
+  ///
+  /// In en, this message translates to:
+  /// **'This game\'s record does not check out: {reason}'**
+  String gameDoesNotCheck(String reason);
+
+  /// Shown when this device cannot run the deal's cryptography to check the game.
+  ///
+  /// In en, this message translates to:
+  /// **'This device cannot check the deal, so it cannot show the game.'**
+  String get cantCheckGame;
+
+  /// Heading for one trick in the game review.
+  ///
+  /// In en, this message translates to:
+  /// **'Trick {trick}'**
+  String trickNumber(int trick);
+
+  /// A player with no name in the record, by seat number.
+  ///
+  /// In en, this message translates to:
+  /// **'Player {seat}'**
+  String seatPlayer(int seat);
+
+  /// Link on the sheet at the end of a live game: opens the finished game, hand by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'See the whole game'**
+  String get seeWholeGame;
 }
 
 class _AppLocalizationsDelegate

@@ -244,5 +244,13 @@
   "codesNotSent": "No se pudieron enviar ahora. Inténtalo más tarde.",
   "haveACode": "¿Tienes un código? Activar",
   "privacyShort": "Privacidad",
-  "termsShort": "Términos"
+  "termsShort": "Términos",
+  "gameTitle": "La partida",
+  "checkingGame": "Comprobando cada carta de la partida. Puede tardar medio minuto.",
+  "noGameHere": "No hay ninguna partida terminada en esta dirección.",
+  "gameDoesNotCheck": "El registro de esta partida no es válido: {reason}",
+  "cantCheckGame": "Este dispositivo no puede comprobar el reparto, así que no puede mostrar la partida.",
+  "trickNumber": "Baza {trick}",
+  "seatPlayer": "Jugador {seat}",
+  "seeWholeGame": "Ver la partida entera"
 }

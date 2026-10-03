@@ -26,6 +26,8 @@
 // is the one the whole project signs on, so the signing is the app's
 // own wasm, fetched from the static assets this worker serves.
 
+import { keepRecord, recordMost, recordResponse } from './records.mjs';
+
 const UPSTREAM = 'https://rtc.live.cloudflare.com/v1/turn/keys';
 
 /// Whether [url] is this machine: local mode, `wrangler pages dev` and
@@ -1315,6 +1317,22 @@ async function backupsRoute(request, env) {
   return json(request, status, out);
 }
 
+/// A finished game's record, sent by one of its players' devices to be
+/// kept (records.mjs): signed for the table it is the record of.
+async function recordRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  // A game's record is a few hundred kilobytes, where every other
+  // signed ask is a few hundred bytes.
+  const asked = await signedFor(request, env, 'record', (body) => (typeof body.table === 'string' ? body.table : ''), {
+    most: recordMost + 4096,
+  });
+  if (asked instanceof Response) return asked;
+  const { status, body } = await keepRecord(env.OH_RECORDS, asked.key, asked.body.table, asked.body.record);
+  return json(request, status, body);
+}
+
 async function devicesRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -1629,8 +1647,8 @@ async function textOf(request, most) {
   return text.length > most ? null : text;
 }
 
-async function bodyOf(request) {
-  const text = await textOf(request, MOST_BODY);
+async function bodyOf(request, most = MOST_BODY) {
+  const text = await textOf(request, most);
   if (text === null) return null;
   try {
     return JSON.parse(text);
@@ -1642,8 +1660,8 @@ async function bodyOf(request) {
 /// The request read and its signature checked (who is asking, above):
 /// {key, body, signer}, or the response to answer with instead.
 /// [whatOf] reads what the request asks for out of its body.
-async function signedFor(request, env, handler, whatOf = () => '') {
-  const body = await bodyOf(request);
+async function signedFor(request, env, handler, whatOf = () => '', { most = MOST_BODY } = {}) {
+  const body = await bodyOf(request, most);
   if (!keyOf(body)) return json(request, 400, { error: 'a table key, 64 hex' });
   let signer;
   try {
@@ -2415,6 +2433,7 @@ const ROUTES = {
   devices: (request, env) => devicesRoute(request, env),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),
+  record: (request, env) => recordRoute(request, env),
 };
 
 /// A request out of how many is written down, by handler: one in ten
@@ -2458,6 +2477,8 @@ export default {
     const url = new URL(request.url);
     const name = url.pathname.startsWith('/api/') ? url.pathname.slice('/api/'.length) : null;
     if (name === null) return env.ASSETS.fetch(appPage(url) ? new Request(new URL('/play/', url), request) : request);
+    // A finished game's record, by its table's id (records.mjs).
+    if (name.startsWith('record/') && request.method === 'GET') return recordResponse(env.OH_RECORDS, name.slice('record/'.length), cors(request));
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await settle(env);

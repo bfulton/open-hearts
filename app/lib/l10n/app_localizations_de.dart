@@ -1141,4 +1141,37 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get termsShort => 'Bedingungen';
+
+  @override
+  String get gameTitle => 'Die Partie';
+
+  @override
+  String get checkingGame =>
+      'Jede Karte der Partie wird geprüft. Das kann eine halbe Minute dauern.';
+
+  @override
+  String get noGameHere =>
+      'Unter dieser Adresse ist keine beendete Partie gespeichert.';
+
+  @override
+  String gameDoesNotCheck(String reason) {
+    return 'Das Protokoll dieser Partie ist nicht stimmig: $reason';
+  }
+
+  @override
+  String get cantCheckGame =>
+      'Dieses Gerät kann das Geben nicht prüfen und die Partie daher nicht zeigen.';
+
+  @override
+  String trickNumber(int trick) {
+    return 'Stich $trick';
+  }
+
+  @override
+  String seatPlayer(int seat) {
+    return 'Spieler $seat';
+  }
+
+  @override
+  String get seeWholeGame => 'Die ganze Partie ansehen';
 }

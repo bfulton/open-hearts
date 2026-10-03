@@ -9,10 +9,12 @@
 ///   /                   the home screen
 ///   /room/ABCD          the home screen, in room ABCD
 ///   /subscription …     the pages in pages.dart, over the home screen
-///   /table, /live       a game alone, and a live one. A game lives in
+///   /solo, /live        a game alone, and a live one. A game lives in
 ///                       memory, so these are reached only by playing:
 ///                       an address alone, a refresh or a step through
 ///                       history, goes home.
+///   /table/ID           a finished live game, kept and checked
+///                       (review_page.dart)
 ///
 /// A few query parameters are the session's rather than the page's —
 /// `lang`, and the suites' `e2e`, `roomWait` and `updatecheck` — and stay
@@ -22,6 +24,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:table/table.dart' show validTableId;
 
 import 'about_page.dart';
 import 'activate_page.dart';
@@ -34,6 +37,7 @@ import 'net/household.dart';
 import 'net/room.dart';
 import 'pages.dart';
 import 'profile_page.dart';
+import 'review_page.dart';
 import 'stats.dart';
 import 'subscribe_page.dart';
 import 'table_page.dart';
@@ -91,7 +95,7 @@ GoRouter appRouter({
           GoRoute(path: AppPage.feedback.name, builder: (_, state) => FeedbackPage(record: state.extra as String?)),
           GoRoute(path: AppPage.profile.name, builder: (_, state) => ProfilePage(stats: state.extra as Stream<PlayerStats>?)),
           GoRoute(
-            path: tablePath.substring(1),
+            path: soloPath.substring(1),
             redirect: (_, state) => state.extra is SoloGame ? null : '/',
             builder: (_, state) {
               final game = state.extra! as SoloGame;
@@ -104,6 +108,11 @@ GoRouter appRouter({
             builder: (_, state) => LivePage(controller: state.extra! as LiveController),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/table/:id',
+        redirect: (_, state) => validTableId(state.pathParameters['id'] ?? '') ? null : '/',
+        builder: (_, state) => ReviewPage(table: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/room/:code',

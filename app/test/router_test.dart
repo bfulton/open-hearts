@@ -71,10 +71,10 @@ void main() {
 
   testWidgets('a game opened with the session\'s parameters in the address is the game, not the front door', (tester) async {
     final router = await pumpAt(tester, '/?e2e=1', boot: 'https://openhearts.game/play/?e2e=1');
-    router.push(located(tablePath), extra: const SoloGame(seed: 4, paced: false));
+    router.push(located(soloPath), extra: const SoloGame(seed: 4, paced: false));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget, reason: where(router));
-    expect(Uri.parse(where(router)).path, tablePath);
+    expect(Uri.parse(where(router)).path, soloPath);
     expect(Uri.parse(where(router)).queryParameters, {'e2e': '1'});
   });
 

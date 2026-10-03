@@ -244,5 +244,13 @@
   "codesNotSent": "Não foi possível enviá-los agora. Tente mais tarde.",
   "haveACode": "Tem um código? Ativar",
   "privacyShort": "Privacidade",
-  "termsShort": "Termos"
+  "termsShort": "Termos",
+  "gameTitle": "A partida",
+  "checkingGame": "A verificar cada carta da partida. Pode demorar meio minuto.",
+  "noGameHere": "Não há nenhuma partida terminada guardada neste endereço.",
+  "gameDoesNotCheck": "O registo desta partida não é válido: {reason}",
+  "cantCheckGame": "Este dispositivo não consegue verificar a distribuição, por isso não pode mostrar a partida.",
+  "trickNumber": "Vaza {trick}",
+  "seatPlayer": "Jogador {seat}",
+  "seeWholeGame": "Ver a partida inteira"
 }

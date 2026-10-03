@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:engine/engine.dart' as engine;
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
@@ -353,6 +354,10 @@ class _LivePageState extends State<LivePage> {
                   rating: _c.ratingChange,
                   action: context.l10n.home,
                   onNewGame: () => Navigator.of(context).pop(),
+                  // The game is kept as it ends (home_page.dart), and its
+                  // address is the table's: in place of this one, so back
+                  // is home either way.
+                  onSeeGame: () => context.pushReplacement(located(tablePath(_c.client.spec.id))),
                 ),
             ],
           ),

@@ -44,8 +44,12 @@ class SimTable {
     bool botsFirst = false,
     bool sweepJurors = false,
     bool workers = false,
+    String? id,
+    List<Signer>? keys,
   })  : clock = VirtualClock(),
-        signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
+        // Fake keys unless told otherwise: a table played for a record
+        // a real device will check needs real signatures.
+        signers = keys ?? [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
     SimDealWorker? workerFor(PublicKey key) {
       final c = crypto;
@@ -74,7 +78,7 @@ class SimTable {
       }
     }
     spec = TableSpec(
-      id: 'table-$seed',
+      id: id ?? 'table-$seed',
       seed: seed,
       sealed: crypto != null,
       target: target,
@@ -109,7 +113,7 @@ class SimTable {
   /// Each device's deal worker, by its key, when the table has them.
   final Map<PublicKey, SimDealWorker> dealWorkers = {};
   final VirtualClock clock;
-  final List<FakeSigner> signers;
+  final List<Signer> signers;
   late final SimNetwork net;
   late final TableSpec spec;
   final List<ScriptedHuman> people = [];

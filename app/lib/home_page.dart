@@ -42,6 +42,7 @@ import 'live_controller.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
 import 'net/duty.dart';
+import 'net/game_records.dart';
 import 'net/household.dart';
 import 'net/mesh_transport.dart';
 import 'net/network.dart';
@@ -650,6 +651,12 @@ class _HomePageState extends State<HomePage> {
     controller.addListener(() {
       if (!controller.client.done || _paced) return;
       _paced = true;
+      // The game, kept for anyone to look at afterwards by its address
+      // (net/game_records.dart): every player's device sends it, and the
+      // first is kept.
+      unawaited(keepGame(signer, GameRecord.of(controller.client, names: seatNames)).then((kept) {
+        if (!kept) debugPrint('record: not kept');
+      }));
       unawaited(PaceStore.fold(controller.client.myCardMs).then((pace) {
         if (mounted) setState(() => _pace = pace);
       }));
@@ -887,7 +894,7 @@ class _HomePageState extends State<HomePage> {
         Text(l10n.tagline, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
         const SizedBox(height: 22),
         FilledButton(
-          onPressed: () => context.push<void>(located(tablePath), extra: SoloGame(target: _options.target)),
+          onPressed: () => context.push<void>(located(soloPath), extra: SoloGame(target: _options.target)),
           style: _primary(),
           child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),

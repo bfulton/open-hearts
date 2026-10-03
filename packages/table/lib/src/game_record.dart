@@ -8,21 +8,28 @@
 /// a copy that verifies is the game, whoever kept it.
 library;
 
+import 'package:engine/engine.dart' show seatCount;
+
 import 'client.dart';
 import 'events.dart';
 import 'spec.dart';
 
 class GameRecord {
-  const GameRecord({required this.spec, required this.record, this.juries = const [], this.releases = const []});
+  const GameRecord({required this.spec, required this.record, this.juries = const [], this.releases = const [], this.names = const {}});
 
   final TableSpec spec;
   final List<Decision> record;
   final List<Decision> juries;
   final List<TableEvent> releases;
 
+  /// What each person was called at the table, by seat. Not signed: a
+  /// name is what a device said it was called, and shown as that. The
+  /// moves are what the record vouches for.
+  final Map<int, String> names;
+
   /// What a table's client holds once the game is over.
-  factory GameRecord.of(TableClient client) =>
-      GameRecord(spec: client.spec, record: client.record, juries: client.juries, releases: client.releases);
+  factory GameRecord.of(TableClient client, {Map<int, String> names = const {}}) =>
+      GameRecord(spec: client.spec, record: client.record, juries: client.juries, releases: client.releases, names: names);
 
   Map<String, Object?> toJson() => {
         'v': 1,
@@ -30,6 +37,7 @@ class GameRecord {
         'record': [for (final d in record) _decision(d)],
         if (juries.isNotEmpty) 'juries': [for (final d in juries) _decision(d)],
         if (releases.isNotEmpty) 'releases': [for (final e in releases) e.toJson()],
+        if (names.isNotEmpty) 'names': {for (final e in names.entries) '${e.key}': e.value},
       };
 
   static Map<String, Object?> _decision(Decision d) => {
@@ -74,6 +82,11 @@ class GameRecord {
         record: [for (final d in m['record'] as List) decision(d)],
         juries: [for (final d in (m['juries'] as List?) ?? const []) decision(d)],
         releases: [for (final e in (m['releases'] as List?) ?? const []) event(e)],
+        names: {
+          for (final e in ((m['names'] as Map?) ?? const {}).entries)
+            if (int.tryParse('${e.key}') case final seat? when seat >= 0 && seat < seatCount && e.value is String)
+              seat: (e.value as String).length > 40 ? (e.value as String).substring(0, 40) : e.value as String,
+        },
       );
     } catch (_) {
       return null;

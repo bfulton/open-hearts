@@ -586,7 +586,7 @@ void main() {
       ..physicalSize = _phone
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(routed(tablePath, extra: const SoloGame(seed: 4, paced: false)));
+    await tester.pumpWidget(routed(soloPath, extra: const SoloGame(seed: 4, paced: false)));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget);
 

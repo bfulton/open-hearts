@@ -14,9 +14,10 @@
 import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 import { chromium } from './browser.mjs';
-import { act, appDir, argOf, click, dismiss, has, labelOf, log, root, serveApp, sleep, startRelay, texts, type, waitFor, roomIn } from './drive.mjs';
+import { act, appDir, argOf, click, dismiss, has, labelOf, log, root, serveApp, sleep, startRelay, texts, type, waitFor, roomIn, records } from './drive.mjs';
 
 const portrait = { width: 390, height: 844 };
 const landscape = { width: 844, height: 390 };
@@ -331,6 +332,29 @@ flow('every page by its own address: opened, refreshed, and back to the front do
   const game = await open({ url: `${app.url}/live?e2e=1` });
   await waitFor(game, /^Play solo$/, { what: 'the front door, for a game\'s address' });
   if (new URL(game.url()).pathname !== '/') throw new Error(`a game's address stayed: ${game.url()}`);
+});
+
+flow('a kept game, opened by its address: checked in the browser, then shown hand by hand', async ({ open, app }) => {
+  // A real record, as a player's device sends one: a sealed game of four
+  // played out on the simulator (packages/table, tool/game_fixture.dart),
+  // kept as the site keeps it. The browser fetches it and replays every
+  // signature and every step of the deal before showing a card.
+  const json = execFileSync('dart', ['run', 'tool/game_fixture.dart'], { cwd: join(root, 'packages', 'table'), maxBuffer: 16 << 20 }).toString().trim();
+  const table = JSON.parse(json).spec.id;
+  records.kept.set(`tables/${table}.json`, gzipSync(Buffer.from(json)));
+  const page = await open({ url: `${app.url}/table/${table}?e2e=1`, ready: /^The game$/ });
+  const began = Date.now();
+  await waitFor(page, /^Hand 1  ·  Pass left$/, { what: 'the game, checked', timeout: 180000 });
+  log(`      checked and shown in ${((Date.now() - began) / 1000).toFixed(1)}s`);
+  // The tricks under it (a list builds only what is on the screen).
+  // As a screen reader reads it: each trick, each card by its name and
+  // who played it.
+  await waitFor(page, /^Trick 1$/, { what: 'the hand\'s tricks' });
+  await waitFor(page, /^\w+ of \w+, (Ada|Bao|Cy|Dee)$/, { what: 'a card, by name and player' });
+  if (await has(page, /does not check out/)) throw new Error('the record did not check out');
+  // An address that is not a table's goes to the front door.
+  const nowhere = await open({ url: `${app.url}/table/not-a-table?e2e=1` });
+  if (new URL(nowhere.url()).pathname !== '/') throw new Error(`a bad table address stayed: ${nowhere.url()}`);
 });
 
 flow('a second device, brought in by the code the first one shows', async ({ open }) => {

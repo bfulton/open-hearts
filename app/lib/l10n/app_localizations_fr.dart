@@ -1134,4 +1134,37 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get termsShort => 'Conditions';
+
+  @override
+  String get gameTitle => 'La partie';
+
+  @override
+  String get checkingGame =>
+      'Vérification de chaque carte de la partie. Cela peut prendre une demi-minute.';
+
+  @override
+  String get noGameHere =>
+      'Aucune partie terminée n\'est conservée à cette adresse.';
+
+  @override
+  String gameDoesNotCheck(String reason) {
+    return 'Le relevé de cette partie n\'est pas valable : $reason';
+  }
+
+  @override
+  String get cantCheckGame =>
+      'Cet appareil ne peut pas vérifier la donne, il ne peut donc pas montrer la partie.';
+
+  @override
+  String trickNumber(int trick) {
+    return 'Pli $trick';
+  }
+
+  @override
+  String seatPlayer(int seat) {
+    return 'Joueur $seat';
+  }
+
+  @override
+  String get seeWholeGame => 'Voir toute la partie';
 }

@@ -244,5 +244,13 @@
   "codesNotSent": "Impossible de les envoyer pour l'instant. Réessayez plus tard.",
   "haveACode": "Vous avez un code ? Activer",
   "privacyShort": "Confidentialité",
-  "termsShort": "Conditions"
+  "termsShort": "Conditions",
+  "gameTitle": "La partie",
+  "checkingGame": "Vérification de chaque carte de la partie. Cela peut prendre une demi-minute.",
+  "noGameHere": "Aucune partie terminée n'est conservée à cette adresse.",
+  "gameDoesNotCheck": "Le relevé de cette partie n'est pas valable : {reason}",
+  "cantCheckGame": "Cet appareil ne peut pas vérifier la donne, il ne peut donc pas montrer la partie.",
+  "trickNumber": "Pli {trick}",
+  "seatPlayer": "Joueur {seat}",
+  "seeWholeGame": "Voir toute la partie"
 }
