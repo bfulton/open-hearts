@@ -9,6 +9,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:math' show min;
 import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
@@ -92,6 +93,7 @@ Verification verifyRecord(
   List<Decision> juries = const [],
   DealCrypto? crypto,
   List<TableEvent> releases = const [],
+  TableReplay? replay,
 }) {
   // A record that ends the game where nobody could move the table ends
   // mid-hand, before the audit that opens every seat's cards: what it
@@ -496,6 +498,7 @@ Verification verifyRecord(
       );
       final card = bot.chooseCard(view, game.legalPlaysFor(seat));
       if (d != null) d.playOpen(seat, d.positionOf(seat, card.index)!);
+      replay?._played(game.handNumber, seat, card);
       game.play(seat, card);
       played.add(card);
     }
@@ -506,7 +509,10 @@ Verification verifyRecord(
     if (game.pendingTrick != null) game.collectTrick();
     if (game.phase == Phase.handOver) {
       played.clear();
-      if (!spec.sealed) game.nextHand();
+      if (!spec.sealed) {
+        replay?._ended(game);
+        game.nextHand();
+      }
     }
   }
 
@@ -821,6 +827,9 @@ Verification verifyRecord(
       // seated; then the next deal.
       final v = takeAudits();
       if (v != null) return v;
+      // Every card open now: what each seat was dealt, and held after
+      // the pass, for whoever is looking at the game afterwards.
+      replay?._ended(game, deal);
       game.nextHand();
       deal = null;
       continue;
@@ -882,6 +891,7 @@ Verification verifyRecord(
       );
       if (want != card) return fail('a play at $turn by seat $seat that the policy does not play: $card, not $want');
     }
+    replay?._played(game.handNumber, seat, card);
     game.play(seat, card);
     played.add(card);
     sweep();
@@ -897,6 +907,7 @@ Verification verifyRecord(
     if (endedBy != null) return endedHere();
     final v = takeAudits();
     if (v != null) return v;
+    replay?._ended(game, deal);
   }
   // And nothing after: a decision the replay never reached is one it
   // never checked.
@@ -915,4 +926,69 @@ Verification verifyRecord(
     ratings[original.key] = botWon ? 0 : (winners.contains(s) ? 1 : -1);
   }
   return Verification(ok: true, reason: 'verified', winners: winners, ratings: ratings, finalHolders: holders);
+}
+
+
+/// A game as the verifier replayed it, for looking at afterwards: hand
+/// by hand, what each seat was dealt and held after the pass, every
+/// card in the order played, and the scores. Filled only as far as the
+/// record checks out — a record that fails has no replay worth showing.
+class TableReplay {
+  final List<TableReplayHand> hands = [];
+
+  TableReplayHand _hand(int number) {
+    while (hands.length <= number) {
+      hands.add(TableReplayHand._(hands.length));
+    }
+    return hands[number];
+  }
+
+  void _played(int hand, int seat, Card card) => _hand(hand).plays.add((seat: seat, card: card));
+
+  void _ended(HeartsGame game, [DealSession? deal]) {
+    final h = _hand(game.handNumber)
+      ..scores = List.of(game.handScores)
+      ..totals = List.of(game.totals);
+    if (deal == null) return;
+    List<Card>? cards(List<int>? indices) => indices == null ? null : ([for (final i in indices) Card.deck[i]]..sort());
+    final dealt = [for (var s = 0; s < seatCount; s++) cards(deal.dealtHandOf(s))];
+    if (dealt.every((c) => c != null)) h.dealt = [for (final c in dealt) c!];
+  }
+}
+
+class TableReplayHand {
+  TableReplayHand._(this.number);
+
+  final int number;
+
+  /// Each seat's thirteen as dealt; null where the deal never opened
+  /// them (a game that ended mid-hand).
+  List<List<Card>>? dealt;
+
+  /// Each seat's thirteen once the pass was made: what it played, since
+  /// a hand is played out to the last card. Null for a hand cut short.
+  List<List<Card>>? get held => plays.length < seatCount * 13
+      ? null
+      : [
+          for (var s = 0; s < seatCount; s++) [for (final p in plays) if (p.seat == s) p.card]..sort(),
+        ];
+
+  /// Every card in the order it was played.
+  final List<({int seat, Card card})> plays = [];
+
+  /// The hand's points per seat, and the running totals after it; empty
+  /// for a hand the game ended in the middle of.
+  List<int> scores = const [];
+  List<int> totals = const [];
+
+  /// The plays, four to a trick.
+  List<List<({int seat, Card card})>> get tricks => [
+        for (var i = 0; i < plays.length; i += seatCount) plays.sublist(i, min(i + seatCount, plays.length)),
+      ];
+
+  /// What [seat] passed: dealt and not held.
+  List<Card> passedBy(int seat) {
+    final held = this.held;
+    return dealt == null || held == null ? const [] : [for (final c in dealt![seat]) if (!held[seat].contains(c)) c];
+  }
 }

@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:deal/deal.dart';
+import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
@@ -39,6 +40,37 @@ void main() {
     final packed = gzip.encode(utf8.encode(json)).length;
     // What one costs to keep, said where a test run shows it.
     print('a game\'s record: ${(bytes / 1024).toStringAsFixed(0)} KB, ${(packed / 1024).toStringAsFixed(0)} KB packed');
+  });
+
+  test('the replay of a verified record: every hand dealt, passed and played, and the scores as the game kept them', () {
+    final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4);
+    t.start();
+    expect(t.run(), isTrue);
+    final client = t.people.first.client;
+    final read = GameRecord.parse(jsonDecode(jsonEncode(GameRecord.of(client).toJson())))!;
+    t.stop();
+    final replay = TableReplay();
+    final v = verifyRecord(read.spec, read.record, juries: read.juries, crypto: crypto, releases: read.releases, replay: replay);
+    expect(v.ok && v.complete, isTrue, reason: v.reason);
+    expect(replay.hands.length, client.game.handNumber + 1, reason: 'every hand of the game');
+    for (final h in replay.hands) {
+      expect(h.plays.length, 52, reason: 'hand ${h.number}');
+      expect(h.tricks.length, 13);
+      expect(h.plays.map((p) => p.card).toSet().length, 52, reason: 'every card once');
+      final dealt = h.dealt!;
+      final held = h.held!;
+      expect(dealt.expand((c) => c).toSet().length, 52);
+      for (var s = 0; s < seatCount; s++) {
+        expect(dealt[s].length, 13);
+        expect(held[s].length, 13);
+        // What a seat held is what it played.
+        expect(h.plays.where((p) => p.seat == s).map((p) => p.card).toSet(), held[s].toSet(), reason: 'hand ${h.number}, seat $s');
+        final passed = h.passedBy(s);
+        expect(passed.length, PassDirection.forHand(h.number) == PassDirection.hold ? 0 : 3, reason: 'hand ${h.number}, seat $s');
+      }
+      expect(h.scores.reduce((a, b) => a + b), anyOf(26, 78), reason: 'twenty-six a hand, or a moon');
+    }
+    expect(replay.hands.last.totals, client.game.totals, reason: 'the game\'s own totals');
   });
 
   test('one who left mid-game: the escrow released for their seat is in the record too', () {
