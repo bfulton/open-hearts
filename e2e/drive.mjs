@@ -25,6 +25,9 @@ export const argOf = (name) => {
   return eq === undefined ? undefined : eq.slice(flag.length + 1);
 };
 export const appDir = argOf('app-dir') ?? join(root, 'app', 'build', 'e2e');
+/// The room an address is in: `/room/ABCD` (app/lib/router.dart), or
+/// null.
+export const roomIn = (url) => new URL(url).pathname.match(/\/room\/([A-Z0-9]+)$/)?.[1] ?? null;
 export const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -200,7 +203,11 @@ export async function serveApp() {
       res.end(Buffer.from(await answer.arrayBuffer()));
       return;
     }
-    const answer = await asset(url);
+    // A page of the app — `/subscription`, `/room/ABCD` — is answered
+    // with the app, as the site's worker does under /play
+    // (service/functions/worker.mjs, appPage).
+    const last = url.pathname.slice(url.pathname.lastIndexOf('/') + 1);
+    const answer = await asset(url.pathname !== '/' && !last.includes('.') ? new URL('/', url) : url);
     if (!answer.ok) {
       res.writeHead(404).end();
       return;

@@ -23,10 +23,11 @@ import 'package:open_hearts/net/household.dart';
 import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/subscribe_page.dart';
-import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/qr_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
+
+import 'routes.dart';
 
 import 'home_page_test.dart' show licenceThisDevice;
 
@@ -184,7 +185,7 @@ void main() {
       ..physicalSize = const Size(390, 1200)
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpWidget(routed('/subscription'));
     await tester.pumpAndSettle();
 
     // A portal on Stripe's own host: gone to, with this device's signed ask.
@@ -201,7 +202,7 @@ void main() {
     // An answer that would send it anywhere else sends it nowhere. (A
     // fresh page: the one that went is spinning, as a page left should.)
     await tester.pumpWidget(const SizedBox());
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpWidget(routed('/subscription'));
     await tester.pumpAndSettle();
     stand.says('manage', {'url': 'https://billing.stripe.com.evil.example/p'});
     await tester.ensureVisible(find.text('Manage subscription'));
@@ -228,7 +229,7 @@ void main() {
       ],
       'most': 5,
     });
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpWidget(routed('/subscription'));
     await tester.pumpAndSettle();
     expect(find.text('This device'), findsOneWidget);
     expect(find.text('Manage subscription'), findsNothing);
@@ -257,7 +258,7 @@ void main() {
       ..physicalSize = const Size(390, 900)
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpWidget(routed('/subscription'));
     await tester.pumpAndSettle();
 
     expect(find.text('This device'), findsOneWidget);
@@ -296,7 +297,7 @@ void main() {
     final stand = standUp();
     stand.reachable = false;
     await licenceThisDevice();
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpWidget(routed('/subscription'));
     await tester.pumpAndSettle();
     expect(find.text('…'), findsNothing, reason: 'nothing is still coming');
     expect(find.text('Could not reach the service. Try again in a moment.'), findsOneWidget);
@@ -308,7 +309,7 @@ void main() {
     standUp();
     askService = (url, body) => Completer<({int status, String body})>().future;
     await licenceThisDevice();
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpWidget(routed('/subscription'));
     await tester.pump();
     await tester.pump();
     expect(find.text('…'), findsOneWidget, reason: 'asked, and not answered yet');
@@ -328,10 +329,7 @@ void main() {
       ],
       'most': 5,
     });
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(),
-      home: Builder(builder: (context) => TextButton(onPressed: () => showSubscribe(context), child: const Text('open'))),
-    ));
+    await tester.pumpWidget(routed('/', home: Builder(builder: (context) => TextButton(onPressed: () => showSubscribe(context), child: const Text('open')))));
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     expect(Entitlement.current.live, isTrue);
@@ -364,10 +362,7 @@ void main() {
     final me = await Identity.signer();
     await Entitlement.current.load(me.publicKey);
     stand.says('claim', {'error': 'no such code'}, status: 404);
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(),
-      home: Scaffold(body: Builder(builder: (context) => TextButton(onPressed: () => showActivate(context), child: const Text('open')))),
-    ));
+    await tester.pumpWidget(routed('/', home: Scaffold(body: Builder(builder: (context) => TextButton(onPressed: () => showActivate(context), child: const Text('open'))))));
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     expect(find.text('Scan a code'), findsOneWidget);
@@ -412,7 +407,7 @@ void main() {
       ..physicalSize = const Size(390, 1400)
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+    await tester.pumpWidget(routed('/subscription'));
     await tester.pumpAndSettle();
 
     stand.says('ticket', {'ticket': '0a1b2c3d4e5f60718293a4b5c6d7e8f9', 'expires_at': '2026-09-16T12:00:00Z', 'devices': 1, 'most': 5});

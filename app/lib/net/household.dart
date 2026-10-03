@@ -18,6 +18,7 @@ import 'dart:convert';
 import 'package:table/table.dart';
 
 import '../l10n/l10n.dart';
+import 'address.dart';
 import 'licence.dart';
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 import 'remote_config.dart' show waits;
@@ -75,10 +76,12 @@ class Ticket {
   }
 }
 
-/// The link a code travels in: this app's own address, carrying the
-/// code and nothing that belonged to this device's session.
+/// The link a code travels in: the app's own address — the front door,
+/// not the page showing it (router.dart) — carrying the code and
+/// nothing that belonged to this device's session.
 String claimLink(String code, [Uri? base]) {
   final at = base ?? Uri.base;
+  final root = base ?? appBase();
   final params = Map<String, String>.from(at.queryParameters)
     ..remove('room')
     ..remove('bought')
@@ -87,7 +90,7 @@ String claimLink(String code, [Uri? base]) {
     scheme: at.scheme,
     host: at.host,
     port: at.hasPort ? at.port : null,
-    path: at.path.isEmpty ? '/' : at.path,
+    path: root.path.isEmpty ? '/' : root.path,
     queryParameters: params,
   ).toString();
 }

@@ -21,7 +21,7 @@ import 'theme.dart';
 import 'ui/scan_setup_io.dart' if (dart.library.js_interop) 'ui/scan_setup_web.dart' as scanner;
 
 Future<void> showActivate(BuildContext context) =>
-    Navigator.of(context).push(pageRoute<void>(AppPage.activate, (_) => const ActivatePage()));
+    openPage<void>(context, AppPage.activate);
 
 class ActivatePage extends StatefulWidget {
   const ActivatePage({super.key});

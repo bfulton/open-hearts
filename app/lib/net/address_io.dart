@@ -1,5 +1,5 @@
-/// No address bar off the web: a room is shared from the sheet, and a
-/// native app is not refreshed onto anything.
+/// No page off the web: the app's address is the platform's own, which
+/// nothing builds a link from (a phone shares the site's).
 library;
 
-void showAddress(String url) {}
+Uri appBase() => Uri.base;

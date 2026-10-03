@@ -9,7 +9,6 @@ import 'package:engine/engine.dart' as engine;
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
-import '../about_page.dart';
 import '../avatar.dart';
 import '../feedback_page.dart';
 import '../l10n/l10n.dart';
@@ -297,7 +296,7 @@ class _LivePageState extends State<LivePage> {
                     MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _leave, danger: true),
                     MenuAction(context.l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
-                      Navigator.of(context).push(pageRoute<void>(AppPage.about, (_) => const AboutPage()));
+                      openPage<void>(context, AppPage.about);
                     }),
                   ],
                 ),

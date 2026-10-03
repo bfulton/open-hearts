@@ -2440,11 +2440,24 @@ export function measure(env, handler, status, ms, { random = Math.random } = {})
   }
 }
 
+/// Whether [url] is a page of the app rather than one of its files: an
+/// address under /play/ with no extension, `/play/subscription` or
+/// `/play/room/ABCD` (app/lib/router.dart). Each is answered with the
+/// app, which reads the address and opens the page. Decided by the path,
+/// not by a file being missing: the site has no 404 page, so a missing
+/// file comes back as the site's front page rather than as missing.
+export function appPage(url) {
+  const path = url.pathname;
+  if (!path.startsWith('/play/') || path === '/play/') return false;
+  const last = path.slice(path.lastIndexOf('/') + 1);
+  return !last.includes('.');
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const name = url.pathname.startsWith('/api/') ? url.pathname.slice('/api/'.length) : null;
-    if (name === null) return env.ASSETS.fetch(request);
+    if (name === null) return env.ASSETS.fetch(appPage(url) ? new Request(new URL('/play/', url), request) : request);
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await settle(env);

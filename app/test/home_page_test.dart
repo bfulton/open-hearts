@@ -12,8 +12,6 @@ import 'dart:async';
 import 'package:deal/deal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:open_hearts/about_page.dart';
-import 'package:open_hearts/pages.dart';
 import 'package:open_hearts/crypto/deal.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
@@ -23,6 +21,7 @@ import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/table_page.dart';
+import 'package:open_hearts/router.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/folding_heart.dart';
 import 'package:open_hearts/ui/header.dart';
@@ -71,9 +70,15 @@ Future<void> pumpHome(WidgetTester tester, {String? openRoom, String? openClaim,
 /// opens for as long as the app is open (ui/folding_heart.dart), so a
 /// test that waits for the screen to come to rest has to ask for the
 /// same stillness a reader can ask for.
-Widget still(Widget home) => MaterialApp(
+/// [home] as the home screen, on the app's own routes (router.dart): the
+/// pages and games it opens are the real ones.
+Widget still(Widget home) => MaterialApp.router(
       theme: buildTheme(),
-      home: MediaQuery(data: const MediaQueryData(disableAnimations: true), child: home),
+      routerConfig: appRouter(
+        boot: Uri.parse('https://openhearts.game/play/'),
+        initialLocation: '/',
+        home: (_, _) => MediaQuery(data: const MediaQueryData(disableAnimations: true), child: home),
+      ),
     );
 
 void main() {
@@ -397,22 +402,6 @@ void main() {
     expect(find.textContaining('Four seats, filled'), findsNothing);
     expect(find.textContaining('A new table, and a link to send'), findsNothing);
     expect(find.text('Open source, no ads, more heart.'), findsOneWidget);
-  });
-
-  testWidgets('an address that names a page opens it on top of the front door, and back comes home', (tester) async {
-    tester.view
-      ..physicalSize = const Size(390, 844)
-      ..devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(still(const HomePage(online: false, openAt: AppPage.about)));
-    await tester.pumpAndSettle();
-    expect(find.byType(AboutPage), findsOneWidget);
-    final route = ModalRoute.of(tester.element(find.byType(AboutPage)))!;
-    expect(route.settings.name, '/about', reason: 'the name the address is written from');
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    expect(find.byType(AboutPage), findsNothing);
-    expect(find.byType(HomePage), findsOneWidget);
   });
 
   testWidgets('back from paying: said so at once, and live play opens when the licence comes', (tester) async {

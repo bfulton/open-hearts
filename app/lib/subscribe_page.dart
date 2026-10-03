@@ -32,7 +32,7 @@ import 'ui/qr_view.dart';
 import 'ui/reading_time.dart';
 
 Future<void> showSubscribe(BuildContext context) =>
-    Navigator.of(context).push(pageRoute<void>(AppPage.subscription, (_) => const SubscribePage()));
+    openPage<void>(context, AppPage.subscription);
 
 class SubscribePage extends StatefulWidget {
   const SubscribePage({super.key});

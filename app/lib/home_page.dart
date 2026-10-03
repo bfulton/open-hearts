@@ -22,9 +22,9 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:table/table.dart';
 
-import 'about_page.dart';
 import 'activate_page.dart';
 import 'avatar.dart';
 import 'build_info.dart' show buildDate, reloadPage;
@@ -37,9 +37,6 @@ import 'l10n/l10n.dart';
 import 'net/copy.dart';
 import 'pages.dart';
 import 'profile_page.dart';
-import 'record_store.dart';
-import 'stats.dart';
-import 'live/live_page.dart';
 import 'live/options_sheet.dart';
 import 'live_controller.dart';
 import 'net/address.dart';
@@ -84,7 +81,7 @@ void _relayLog(String line) => debugPrint('relay: $line');
 final _debugging = Uri.base.queryParameters.containsKey('e2e');
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true, this.openAt});
+  const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true});
 
   /// A room to open onto, from a shared link.
   final String? openRoom;
@@ -95,10 +92,6 @@ class HomePage extends StatefulWidget {
 
   /// Whether this load is the one coming back from a checkout.
   final bool justBought;
-
-  /// The page the address names, opened on top of this one as its menu
-  /// would open it (pages.dart).
-  final AppPage? openAt;
 
   /// False in widget tests: the device keeps off the relays, so no
   /// presence connection outlives the test. The app is always online.
@@ -212,29 +205,65 @@ class _HomePageState extends State<HomePage> {
     // behind that (net/household.dart).
     if (widget.justBought) unawaited(_justBought());
     if (widget.openClaim != null) unawaited(_arriving());
-    if (widget.openAt case final page?) unawaited(_open(page));
   }
 
-  /// [page], as the address asked for it: by the same call the menu
-  /// makes, once this screen is drawn under it.
-  Future<void> _open(AppPage page) async {
-    await WidgetsBinding.instance.endOfFrame;
+  /// The router, listened to for the moment this screen is on top again
+  /// (router.dart): a page closed over it, or a game ended.
+  GoRouter? _router;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final router = GoRouter.maybeOf(context);
+    if (identical(router, _router)) return;
+    _router?.routerDelegate.removeListener(_moved);
+    _router = router?..routerDelegate.addListener(_moved);
+  }
+
+  bool get _onTop => _isHome(_router?.state.uri.path);
+
+  static bool _isHome(String? path) => path == '/' || (path?.startsWith('/room/') ?? false);
+
+  bool _wasOnTop = true;
+
+  void _moved() {
+    final onTop = _onTop;
+    if (onTop && !_wasOnTop) unawaited(_back());
+    _wasOnTop = onTop;
+  }
+
+  /// On top again. Who this device is may have changed on a page over
+  /// this one — the profile keeps itself — and the address is this
+  /// screen's again: in the room this device is in, or none.
+  Future<void> _back() async {
+    final name = await Identity.name();
+    final avatar = await Identity.avatar();
     if (!mounted) return;
-    switch (page) {
-      case AppPage.subscription:
-        await showSubscribe(context);
-      case AppPage.activate:
-        await showActivate(context);
-      case AppPage.profile:
-        await _editProfile();
-      case AppPage.about:
-        await _goAbout();
-      case AppPage.feedback:
-        await showFeedback(context);
-    }
+    setState(() {
+      _name = name ?? '';
+      _avatar = avatar;
+    });
+    _showAddress();
   }
 
-  Future<void> _goAbout() => Navigator.of(context).push(pageRoute<void>(AppPage.about, (_) => const AboutPage()));
+  /// The address, as this screen says it: its room, or none, and [drop]
+  /// taken out — a mark a round trip put there (the code a claim came
+  /// with, the `bought` a checkout came back with), which a refresh
+  /// should not act on twice. Not a place in the history: entering and
+  /// leaving a room is not something to go back to. Only while this
+  /// screen is the one showing; a page over it says where it is.
+  void _showAddress({Set<String> drop = const {}}) {
+    final router = _router;
+    if (!mounted || router == null || !_onTop) return;
+    final at = router.state.uri;
+    final room = _room;
+    final query = Map<String, String>.of(at.queryParameters)..removeWhere((k, _) => drop.contains(k));
+    final to = Uri(path: room == null ? '/' : roomPath(room.code), queryParameters: query.isEmpty ? null : query).toString();
+    if (to == at.toString()) return;
+    Router.neglect(context, () => router.go(to));
+  }
+
+  Future<void> _goAbout() => openPage<void>(context, AppPage.about);
 
   /// Arrived by a code another device showed (docs/06-service.md): this
   /// device joins that subscription and is given a licence of its own.
@@ -283,7 +312,7 @@ class _HomePageState extends State<HomePage> {
   /// least once.
   void _forget(String name) {
     if (!mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) => forgetInAddress(name));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showAddress(drop: {name}));
   }
 
   /// Live play opened, or shut, under this screen.
@@ -389,9 +418,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _router?.routerDelegate.removeListener(_moved);
     Entitlement.current.removeListener(_licensed);
     RemoteSettings.current.removeListener(_configured);
-    _closeLobby();
+    _closeLobby(address: false);
     _onlineClock?.cancel();
     _refusalSub?.cancel();
     super.dispose();
@@ -400,13 +430,13 @@ class _HomePageState extends State<HomePage> {
   /// Everything a waiting room or a room needs while it is open, shut:
   /// the pool, the room, and the transport they share — a matched or
   /// started table opens its own.
-  void _closeLobby() {
+  void _closeLobby({bool address = true}) {
     _queueSub?.cancel();
     _queueSub = null;
     _queue?.close();
     _queue = null;
     _waitClock?.cancel();
-    _dropRoom();
+    _dropRoom(address: address);
     _transport?.close();
     _transport = null;
   }
@@ -415,18 +445,18 @@ class _HomePageState extends State<HomePage> {
   /// left — is an answer to the room's own notification, and a
   /// [ChangeNotifier] may not be disposed inside one, so the disposal
   /// waits for the notification to finish.
-  void _dropRoom() {
+  void _dropRoom({bool address = true}) {
     final room = _room;
     if (room == null) return;
     room.removeListener(_onRoom);
     scheduleMicrotask(room.dispose);
     _room = null;
     // Out of the room, so out of the address: a refresh from here is
-    // the front door, not a table that has started or emptied.
-    showRoom(null);
+    // the front door, not a table that has started or emptied. Not when
+    // a table is opening over this screen, which says where it is; the
+    // address is this screen's again when it is back on top ([_back]).
+    if (address) _showAddress();
   }
-
-  Future<void> _go(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
   /// Connects to the relays on [tag], or explains why not. Nothing
   /// goes near a relay without a name on it.
@@ -625,13 +655,13 @@ class _HomePageState extends State<HomePage> {
       }));
     });
     _paced = false;
-    setState(_closeLobby);
+    setState(() => _closeLobby(address: false));
     // Online *and* at a table, which another table's draw prefers:
     // somebody mid-game has a reason to still be here in a minute
     // (docs/04-live-play.md, "The sizing"). Cleared on the way back
     // to the front door, however the table ended.
     Duty.seated = true;
-    unawaited(_go(LivePage(controller: controller)).whenComplete(() => Duty.seated = false));
+    unawaited(context.push<void>(located(livePath), extra: controller).whenComplete(() => Duty.seated = false));
   }
 
   /// Into the room this device arrived at by a link, or a new one of
@@ -659,7 +689,7 @@ class _HomePageState extends State<HomePage> {
       setState(() => _room = room);
       // The room is its link, and the link is in the address bar while
       // this device is in it (net/address.dart).
-      showRoom(code);
+      _showAddress();
     } on TimeoutException {
       if (!mounted) return;
       setState(() {
@@ -679,36 +709,12 @@ class _HomePageState extends State<HomePage> {
   /// the face they see it on, and what the games say. The first two are
   /// kept on the device as soon as the page is left.
   Future<void> _editProfile() async {
-    final chosen = await showProfile(
-      context,
-      current: (name: _name, avatar: _avatar),
-      seed: _signer?.publicKey ?? '',
-      stats: _statsOnThisDevice(),
-    );
-    if (chosen == null || !mounted) return;
-    setState(() {
-      _name = chosen.name;
-      _avatar = chosen.avatar;
-    });
-    await Identity.setName(chosen.name);
-    await Identity.setAvatar(chosen.avatar);
-  }
-
-  /// What the profile page shows about the games. The games played
-  /// alone are the device's own to count; the rating is the relays' to
-  /// say, and the standing this door already loaded when it connected
-  /// is the same answer, so it is handed over rather than asked for
-  /// again. A door told to stay off the relays asks them nothing here
-  /// either, and nor does a device that says it has no network: it
-  /// would only say so eight seconds later (net/network.dart).
-  Stream<PlayerStats> _statsOnThisDevice() async* {
-    final signer = _signer ??= await Identity.signer();
-    yield* playerStats(
-      store: PrefsRecordStore(),
-      signer: signer,
-      standing: _standing,
-      relays: widget.online && !deviceOffline() ? _relays : null,
-    );
+    // The profile keeps what it is left with on the device itself; this
+    // screen reads it back when it is on top again ([_back]), however
+    // the page was opened. Waited for here as well, for [_named], which
+    // goes on only once there is a name.
+    await showProfile(context, stats: statsOnThisDevice(standing: _standing, online: widget.online));
+    if (mounted) await _back();
   }
 
   /// The name the others will see, asked for if this device has none:
@@ -881,7 +887,7 @@ class _HomePageState extends State<HomePage> {
         Text(l10n.tagline, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
         const SizedBox(height: 22),
         FilledButton(
-          onPressed: () => _go(TablePage(target: _options.target)),
+          onPressed: () => context.push<void>(located(tablePath), extra: SoloGame(target: _options.target)),
           style: _primary(),
           child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),

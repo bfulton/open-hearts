@@ -9,7 +9,6 @@ library;
 
 import 'package:flutter/material.dart';
 
-import 'about_page.dart';
 import 'avatar.dart';
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
@@ -30,6 +29,16 @@ import 'ui/reading_time.dart';
 import 'ui/table_layout.dart';
 import 'ui/table_view.dart';
 import 'ui/update_pill.dart';
+
+/// A game alone, as `/table` is opened with it (router.dart): what the
+/// address cannot carry.
+class SoloGame {
+  const SoloGame({this.target = gameOverScore, this.seed, this.paced = true});
+
+  final int target;
+  final int? seed;
+  final bool paced;
+}
 
 class TablePage extends StatefulWidget {
   const TablePage({super.key, this.seed, this.paced = true, this.target = gameOverScore});
@@ -134,7 +143,7 @@ class _TablePageState extends State<TablePage> {
                     MenuAction(context.l10n.tellUsWhatsBroken,
                         icon: Icons.feedback_outlined, onSelected: () => showFeedback(context, record: _controller.recordText)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
-                      Navigator.of(context).push(pageRoute<void>(AppPage.about, (_) => const AboutPage()));
+                      openPage<void>(context, AppPage.about);
                     }),
                   ],
                 ),

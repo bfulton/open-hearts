@@ -2,25 +2,27 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:go_router/go_router.dart';
 
 import 'crypto/deal.dart';
 import 'crypto/schnorr.dart';
 import 'entitlement.dart';
-import 'home_page.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
-import 'net/buying.dart';
 import 'net/duty.dart';
-import 'net/household.dart';
 import 'net/remote_config.dart';
-import 'net/room.dart';
+import 'router.dart';
 import 'net/store_buying.dart';
-import 'pages.dart';
 import 'theme.dart';
 import 'ui/selection.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Addresses are paths, `/play/subscription`, not `/play/#/subscription`:
+  // the site answers every address under /play with the app
+  // (service/functions/worker.mjs), and the router reads the rest.
+  usePathUrlStrategy();
   // The end-to-end suite drives the app through its accessibility
   // tree, which the web build only grows on request.
   if (Uri.base.queryParameters.containsKey('e2e')) {
@@ -104,19 +106,13 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
     super.dispose();
   }
 
+  /// Where everything is (router.dart): made once, for the life of the
+  /// app, so its history is the app's.
+  late final GoRouter _router = appRouter();
+
   @override
   Widget build(BuildContext context) {
-    // What the address is asking for, read here rather than by the page
-    // it is asking: a room shared by a link, a code another device
-    // showed, a checkout coming back.
-    final room = Uri.base.queryParameters['room']?.trim().toUpperCase();
-    final home = HomePage(
-      openRoom: room != null && Room.validCode(room) ? room : null,
-      openClaim: claimInAddress(),
-      justBought: boughtJustNow(),
-      openAt: AppPage.at(WidgetsBinding.instance.platformDispatcher.defaultRouteName),
-    );
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Open Hearts',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
@@ -129,11 +125,7 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
       // Any words on any screen can be selected and copied: a name, a
       // rule, an error to send us.
       builder: (context, child) => CopyableSelection(child: child ?? const SizedBox()),
-      home: home,
-      // The address's page is opened by the home screen, on top of
-      // itself (pages.dart): the stack starts as the home screen alone,
-      // whatever the address names.
-      onGenerateInitialRoutes: (_) => [MaterialPageRoute<void>(builder: (_) => home, settings: const RouteSettings(name: '/'))],
+      routerConfig: _router,
     );
   }
 }

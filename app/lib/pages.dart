@@ -1,19 +1,14 @@
-/// The app's pages that have an address of their own.
+/// The app's pages that have an address of their own (router.dart).
 ///
-/// On the web each of these is a place in the browser's history: opening
-/// one puts `#/subscription` (say) in the address, and an address that
-/// names one opens it, on top of the home screen. So the back button
-/// coming back from Stripe, Stripe's own link home, a refresh, and a link
-/// someone sent all land on the page they name, not the front door.
-///
-/// A page is opened from an address by the home screen, with the same
-/// call its menu makes (home_page.dart, [HomePage.openAt]): a page that
-/// hands something back to the home screen — the profile does — is then
-/// opened exactly as it always is. A game is not here: it is a state in
-/// memory, and an address cannot bring one back.
+/// Each is a place in the browser's history: opening one puts
+/// `/play/subscription` (say) in the address, and an address that names
+/// one opens it, on top of the home screen. The back button coming back
+/// from Stripe, Stripe's own link home, a refresh, and a link someone
+/// sent all land on the page they name, not the front door.
 library;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 
 enum AppPage {
   subscription,
@@ -22,21 +17,32 @@ enum AppPage {
   about,
   feedback;
 
-  /// As the address names it.
+  /// As the address names it, under the home screen.
   String get path => '/$name';
-
-  /// The page an address's route names, or null for the home screen or
-  /// one this build does not know.
-  static AppPage? at(String? route) {
-    if (route == null) return null;
-    final name = Uri.tryParse(route)?.path.replaceFirst('/', '') ?? '';
-    for (final p in values) {
-      if (p.name == name) return p;
-    }
-    return null;
-  }
 }
 
-/// [page]'s route, carrying its name to the address.
-MaterialPageRoute<T> pageRoute<T>(AppPage page, WidgetBuilder builder) =>
-    MaterialPageRoute<T>(builder: builder, settings: RouteSettings(name: page.path));
+/// Opens [page] over the current one, with [extra] for what an address
+/// cannot carry; resolves to what it was closed with.
+Future<T?> openPage<T>(BuildContext context, AppPage page, {Object? extra}) => context.push<T>(located(page.path), extra: extra);
+
+/// The query parameters that belong to the session rather than to a
+/// page — `lang`, and the suites' `e2e`, `roomWait` and `updatecheck` —
+/// as the app was opened with them (router.dart sets this).
+Map<String, String> session = const {};
+
+/// [path] as an address: with the session's parameters, so a refresh
+/// anywhere is the same session. Every way to a page goes through here;
+/// a redirect could add them too, but a redirect drops what a push hands
+/// its page in memory — a game's.
+String located(String path, [Map<String, String> query = const {}]) {
+  final all = {...session, ...query};
+  return Uri(path: path, queryParameters: all.isEmpty ? null : all).toString();
+}
+
+/// A room's address (the home screen, in that room).
+String roomPath(String code) => '/room/$code';
+
+/// The games' addresses. A game lives in memory: these name it while it
+/// is played, and an address alone (a refresh, history) goes home.
+const tablePath = '/table';
+const livePath = '/live';

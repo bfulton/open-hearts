@@ -20,6 +20,9 @@ import 'package:open_hearts/ui/player_icon.dart';
 import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/pages.dart';
+
+import 'routes.dart';
 
 import 'drawn.dart';
 
@@ -577,22 +580,13 @@ void main() {
   });
 
   testWidgets('the menu leaves the table, and names the build on the About page', (tester) async {
-    // Pushed from a front door, as the app does it, so leaving has
-    // somewhere to go.
+    // At its own address, over the front door, as the app opens it, so
+    // leaving has somewhere to go.
     tester.view
       ..physicalSize = _phone
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(),
-      home: Builder(
-        builder: (context) => TextButton(
-          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TablePage(seed: 4, paced: false))),
-          child: const Text('Play solo'),
-        ),
-      ),
-    ));
-    await tester.tap(find.text('Play solo'));
+    await tester.pumpWidget(routed(tablePath, extra: const SoloGame(seed: 4, paced: false)));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget);
 
@@ -616,7 +610,7 @@ void main() {
     await tester.tap(find.text('Leave the table'));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsNothing);
-    expect(find.text('Play solo'), findsOneWidget);
+    expect(find.text('home'), findsOneWidget, reason: 'back at the front door');
   });
 
   testWidgets('everyone\'s standing: on their badges, yours among them, no card counts', (tester) async {

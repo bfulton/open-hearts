@@ -1,11 +1,6 @@
-/// The room's link, in the browser's address bar.
-///
-/// The code is nobody's to type and is shown nowhere: the link is the
-/// way in. So while this device is in a room the address bar is where
-/// that room lives — a refresh comes back to it, and the address is
-/// there to copy for anyone who would rather copy than share. Off the
-/// web there is no address bar, as there is no share sheet
-/// (share.dart), and this does nothing.
+/// The app's address, as far as the app needs to know it: where it was
+/// served from, and how long a room waits as the address asks. Which
+/// page is showing is the router's (router.dart).
 library;
 
 import 'address_io.dart' if (dart.library.js_interop) 'address_web.dart' as platform;
@@ -35,34 +30,8 @@ Duration roomWait(Uri at, {required Duration standard, Duration most = const Dur
   return Duration(seconds: asked.clamp(standard.inSeconds, most.inSeconds));
 }
 
-/// Puts the room under [code] in the address bar, or takes a room out
-/// of it when [code] is null.
-void showRoom(String? code) => platform.showAddress(roomAddress(code, Uri.base));
-
-/// Takes [name] out of the address and leaves the rest of it alone:
-/// for a mark a round trip put there — the `bought` a checkout comes
-/// back with — which a refresh should not act on twice.
-void forgetInAddress(String name) => platform.showAddress(addressWithout(name, Uri.base));
-
-String addressWithout(String name, Uri at) {
-  final params = Map<String, String>.from(at.queryParameters)..remove(name);
-  return Uri(
-    path: at.path.isEmpty ? '/' : at.path,
-    queryParameters: params.isEmpty ? null : params,
-    fragment: at.fragment.isEmpty ? null : at.fragment,
-  ).toString();
-}
-
-/// What the address becomes: [at] with the room set or dropped, and
-/// the rest of it left alone — a build driven with `?e2e` stays driven
-/// with it across a refresh.
-String roomAddress(String? code, Uri at) {
-  final params = Map<String, String>.from(at.queryParameters)..remove('room');
-  if (code != null) params['room'] = code;
-  return Uri(
-    // An empty path would leave the address where it is, query and all.
-    path: at.path.isEmpty ? '/' : at.path,
-    queryParameters: params.isEmpty ? null : params,
-    fragment: at.fragment.isEmpty ? null : at.fragment,
-  ).toString();
-}
+/// Where the app itself is: the address its page was served at, under
+/// which every page's address sits (router.dart) — `/play/` on the site.
+/// What a link to the app is made from, rather than the address of
+/// whichever page happens to be showing.
+Uri appBase() => platform.appBase();

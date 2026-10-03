@@ -11,6 +11,7 @@ import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Scrolls to something and presses it. A tap at a point off the
 /// screen lands on whatever is at that point, which is nothing, and
@@ -105,6 +106,8 @@ void main() {
   });
 
   testWidgets('the profile: a name, an icon, a colour, Done — and My initials clears it', (tester) async {
+    // The page keeps what it is left with on the device itself.
+    SharedPreferences.setMockInitialValues({});
     // A phone, because the page is longer than a phone and what is
     // below the fold has to be scrolled to, here as there.
     tester.view
@@ -117,7 +120,9 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Builder(
         builder: (context) => TextButton(
-          onPressed: () async => picked = await showProfile(context, current: current, seed: 'k1'),
+          onPressed: () async => picked = await Navigator.of(context).push<Profile>(
+            MaterialPageRoute(builder: (_) => ProfilePage(current: current, seed: 'k1', stats: const Stream.empty())),
+          ),
           child: const Text('open'),
         ),
       ),

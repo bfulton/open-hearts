@@ -29,6 +29,7 @@ import {
   texts,
   type,
   waitFor,
+  roomIn,
 } from './drive.mjs';
 
 // ---- the scenarios -------------------------------------------------------
@@ -207,7 +208,7 @@ async function main() {
     // copies it from and where this reads it.
     await click(pages[0], /^Play friends$/);
     await waitFor(pages[0], /^Share the link$/, { what: 'the room' });
-    const code = new URL(pages[0].url()).searchParams.get('room');
+    const code = roomIn(pages[0].url());
     if (!/^[A-Z0-9]{8}$/.test(code ?? '')) throw new Error(`no room in the address: ${pages[0].url()}`);
     log(`room ${code}`);
     // Nobody types a code: the others arrive by the shared link — the

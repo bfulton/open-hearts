@@ -24,8 +24,13 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import 'avatar.dart';
+import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'net/network.dart';
+import 'net/relays.dart';
+import 'net/standing.dart';
 import 'pages.dart';
+import 'record_store.dart';
 import 'stats.dart';
 import 'theme.dart';
 import 'ui/photo_crop.dart';
@@ -89,37 +94,44 @@ img.Image _cut(img.Image decoded, Rect from) {
 /// Who this device is to everyone else.
 typedef Profile = ({String name, Avatar avatar});
 
-/// Opens the profile over [context]; resolves to what it was left
-/// with, or null if there is nothing to keep.
-Future<Profile?> showProfile(
-  BuildContext context, {
-  required Profile current,
-  required String seed,
-  Stream<PlayerStats> stats = const Stream<PlayerStats>.empty(),
-}) {
-  return Navigator.of(context).push<Profile>(
-    pageRoute<Profile>(AppPage.profile, (_) => ProfilePage(current: current, seed: seed, stats: stats)),
+/// Opens the profile over [context] (router.dart, `/profile`); resolves
+/// to what it was left with. The page keeps it on the device itself, so
+/// one opened by its address alone loses nothing.
+Future<Profile?> showProfile(BuildContext context, {Stream<PlayerStats>? stats}) =>
+    openPage<Profile>(context, AppPage.profile, extra: stats);
+
+/// What the games say on this device: its own games, and the relays'
+/// results when it is online — [standing] when the caller already holds
+/// it, so they are not asked twice.
+Stream<PlayerStats> statsOnThisDevice({Standing? standing, bool online = true}) async* {
+  final signer = await Identity.signer();
+  yield* playerStats(
+    store: PrefsRecordStore(),
+    signer: signer,
+    standing: standing,
+    relays: online && !deviceOffline() ? appRelays() : null,
   );
 }
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key, required this.current, required this.seed, required this.stats});
+  const ProfilePage({super.key, this.current, this.seed, this.stats});
 
-  final Profile current;
-  final String seed;
+  /// Who this device is, and the key its colour comes from: the
+  /// device's own, read off it, when null.
+  final Profile? current;
+  final String? seed;
 
-  /// What the games say, as it comes. The page asks nobody anything
-  /// itself: whoever opens it knows which relays this build is on and
-  /// whether it should be talking to them (stats.dart).
-  final Stream<PlayerStats> stats;
+  /// What the games say, as it comes: [statsOnThisDevice] when null.
+  final Stream<PlayerStats>? stats;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  late Avatar _avatar = widget.current.avatar;
-  late final _name = TextEditingController(text: widget.current.name);
+  late Avatar _avatar = widget.current?.avatar ?? Avatar.none;
+  late final _name = TextEditingController(text: widget.current?.name ?? '');
+  late String _seed = widget.seed ?? '';
   String? _note;
   bool _busy = false;
 
@@ -132,6 +144,20 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _watch();
+    if (widget.current == null) unawaited(_readDevice());
+  }
+
+  /// Who this device is, when nobody said: opened by its address.
+  Future<void> _readDevice() async {
+    final name = await Identity.name();
+    final avatar = await Identity.avatar();
+    final signer = await Identity.signer();
+    if (!mounted) return;
+    setState(() {
+      _name.text = name ?? '';
+      _avatar = avatar;
+      _seed = widget.seed ?? signer.publicKey;
+    });
   }
 
   @override
@@ -142,7 +168,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _watch() {
     _watching?.cancel();
-    _watching = widget.stats.listen(
+    _watching = (widget.stats ?? statsOnThisDevice()).listen(
       (s) {
         if (mounted) setState(() => _stats = s);
       },
@@ -244,7 +270,7 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 // Who you are: the face, and the name under it.
                 Center(
-                  child: PlayerIcon(name: _shownName, seed: widget.seed, avatar: _avatar, size: 92),
+                  child: PlayerIcon(name: _shownName, seed: _seed, avatar: _avatar, size: 92),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -339,12 +365,22 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _done() => Navigator.of(context).pop((name: _name.text.trim(), avatar: _avatar));
+  /// Kept on the device, then closed with it: whoever opened the page
+  /// reads it back from there (home_page.dart), so it is the same
+  /// whether the menu opened it or an address did.
+  Future<void> _done() async {
+    final chosen = (name: _name.text.trim(), avatar: _avatar);
+    if (widget.current == null || widget.current != chosen) {
+      await Identity.setName(chosen.name);
+      await Identity.setAvatar(chosen.avatar);
+    }
+    if (mounted) Navigator.of(context).pop(chosen);
+  }
 
   /// What the badge in the sheet wears while there is nothing to go on.
   String get _shownName => _name.text.trim().isEmpty ? '?' : _name.text.trim();
 
-  int _derivedIndex() => PlayerIcon.palette.indexOf(PlayerIcon.colorOf(widget.seed));
+  int _derivedIndex() => PlayerIcon.palette.indexOf(PlayerIcon.colorOf(_seed));
 
   static InputDecoration _field(String label) => InputDecoration(
     labelText: label,

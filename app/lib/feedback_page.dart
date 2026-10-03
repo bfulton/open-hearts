@@ -30,7 +30,7 @@ import 'theme.dart';
 final projectIssues = Uri.parse('https://github.com/bfulton/open-hearts/issues/new');
 
 Future<void> showFeedback(BuildContext context, {String? record}) =>
-    Navigator.of(context).push(pageRoute<void>(AppPage.feedback, (_) => FeedbackPage(record: record)));
+    openPage<void>(context, AppPage.feedback, extra: record);
 
 /// A report: what the player wrote, then what goes with it. The labels
 /// are English whatever the app's language — they are for whoever

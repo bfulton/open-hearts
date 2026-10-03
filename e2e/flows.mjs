@@ -16,7 +16,7 @@ import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { chromium } from './browser.mjs';
-import { act, appDir, argOf, click, dismiss, has, labelOf, log, root, serveApp, sleep, startRelay, texts, type, waitFor } from './drive.mjs';
+import { act, appDir, argOf, click, dismiss, has, labelOf, log, root, serveApp, sleep, startRelay, texts, type, waitFor, roomIn } from './drive.mjs';
 
 const portrait = { width: 390, height: 844 };
 const landscape = { width: 844, height: 390 };
@@ -252,7 +252,7 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   await waitFor(page, /^Share the link$/, { what: 'the room', timeout: 60000 });
   // The way in is the link, and the link is in the address bar: the
   // room says who is here and nothing about its code.
-  const code = new URL(page.url()).searchParams.get('room');
+  const code = roomIn(page.url());
   if (!/^[A-Z0-9]{8}$/.test(code ?? '')) throw new Error(`no room in the address: ${page.url()}`);
   const seen = await texts(page);
   if (seen.some((t) => t.includes(code))) throw new Error(`the code is on the screen\nsaw: ${seen.join(' | ')}`);
@@ -264,12 +264,12 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   // comes back to it.
   await page.reload();
   await waitFor(page, /^Share the link$/, { what: 'the room after a refresh', timeout: 60000 });
-  if (new URL(page.url()).searchParams.get('room') !== code) throw new Error(`the refresh landed elsewhere: ${page.url()}`);
+  if (roomIn(page.url()) !== code) throw new Error(`the refresh landed elsewhere: ${page.url()}`);
   // Leaving a room lands back on the front door, and takes the room
   // out of the address with it.
   await click(page, /^Leave$/);
   await waitFor(page, /^Play solo$/, { what: 'the home screen after leaving' });
-  if (new URL(page.url()).searchParams.get('room')) throw new Error(`the room is still in the address: ${page.url()}`);
+  if (roomIn(page.url())) throw new Error(`the room is still in the address: ${page.url()}`);
 });
 
 flow('the backup codes, shown on request and copied', async ({ open }) => {
@@ -306,7 +306,7 @@ flow('a page keeps its address: away to another site and back lands on it', asyn
   await click(page, /^Subscription$/);
   await waitFor(page, /^This device$/, { what: 'the subscription page' });
   await sleep(300);
-  if (!page.url().endsWith('#/subscription')) throw new Error(`the address does not name the page: ${page.url()}`);
+  if (new URL(page.url()).pathname !== '/subscription') throw new Error(`the address does not name the page: ${page.url()}`);
   await page.goto('about:blank');
   await page.goBack();
   await waitFor(page, /^This device$/, { what: 'the subscription page, after coming back', timeout: 60000 });
@@ -315,6 +315,22 @@ flow('a page keeps its address: away to another site and back lands on it', asyn
   await waitFor(page, /^Play solo$/, { what: 'the home screen' });
   await sleep(500);
   if (await has(page, /^This device$/)) throw new Error('still on the subscription page');
+});
+
+flow('every page by its own address: opened, refreshed, and back to the front door', async ({ open, app }) => {
+  // A link to a page, a refresh on it, or history landing on it opens
+  // that page over the front door (app/lib/router.dart).
+  const page = await open({ url: `${app.url}/about?e2e=1`, ready: /^Build$/ });
+  await page.reload();
+  await waitFor(page, /^Build$/, { what: 'the about page, after a refresh', timeout: 60000 });
+  if (new URL(page.url()).searchParams.get('e2e') !== '1') throw new Error(`the session's parameters went: ${page.url()}`);
+  await click(page, /^Back$/);
+  await waitFor(page, /^Play solo$/, { what: 'the front door, under it' });
+  if (new URL(page.url()).pathname !== '/') throw new Error(`the address did not come home: ${page.url()}`);
+  // A game is reached only by playing: its address alone is the front door.
+  const game = await open({ url: `${app.url}/live?e2e=1` });
+  await waitFor(game, /^Play solo$/, { what: 'the front door, for a game\'s address' });
+  if (new URL(game.url()).pathname !== '/') throw new Error(`a game's address stayed: ${game.url()}`);
 });
 
 flow('a second device, brought in by the code the first one shows', async ({ open }) => {
@@ -339,7 +355,7 @@ flow('a second device, brought in by the code the first one shows', async ({ ope
   await sleep(500);
   const link = await first.evaluate('navigator.clipboard.readText()');
   if (!/[?&]claim=[0-9a-f]+/.test(link)) throw new Error(`no code in the link: ${link}`);
-  if (new URL(link).hash) throw new Error(`the link carries a page with it: ${link}`);
+  if (new URL(link).pathname !== '/' || new URL(link).hash) throw new Error(`the link carries a page with it: ${link}`);
 
   // A second device, opening it.
   // Asked before anything is spent, since a link is anybody's to send:

@@ -1,9 +1,10 @@
-/// The room in the address bar: what the address becomes on the way
-/// into a room and on the way out of one.
+/// The app's address: how long a room waits as it asks, and a room's
+/// link (the pages' own addresses are router_test.dart's).
 library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/net/address.dart';
+import 'package:open_hearts/net/share.dart';
 
 void main() {
   test('the room waits as long as the address asks, within reason and only under e2e', () {
@@ -27,22 +28,9 @@ void main() {
     expect(waits('https://openhearts.game/play/?e2e=1&roomWait=99999'), const Duration(minutes: 1));
   });
 
-  test('a room goes into the address and comes out of it, and the rest is left alone', () {
-    expect(roomAddress('KP4T9MXR', Uri.parse('https://openhearts.game/play/')), '/play/?room=KP4T9MXR');
-    // A build being driven stays driven across the refresh the address
-    // is there for.
-    expect(roomAddress('KP4T9MXR', Uri.parse('https://openhearts.game/play/?e2e=1#/')), '/play/?e2e=1&room=KP4T9MXR#/');
-    // Including what it was driven with: a suite's room keeps its
-    // longer wait across the refresh it is about to be asked for.
-    expect(roomAddress('KP4T9MXR', Uri.parse('https://openhearts.game/play/?e2e=1&roomWait=45')),
-        '/play/?e2e=1&roomWait=45&room=KP4T9MXR');
-    // A second room replaces the first rather than joining it.
-    expect(roomAddress('WXY23TUV', Uri.parse('https://openhearts.game/play/?room=KP4T9MXR')), '/play/?room=WXY23TUV');
-    // Out of the room: the link goes, and a refresh is the front door.
-    expect(roomAddress(null, Uri.parse('https://openhearts.game/play/?e2e=1&room=KP4T9MXR')), '/play/?e2e=1');
-    expect(roomAddress(null, Uri.parse('https://openhearts.game/play/?room=KP4T9MXR')), '/play/');
-    // Nothing of a bare address is lost either, which would leave it
-    // where it was, room and all.
-    expect(roomAddress(null, Uri.parse('https://openhearts.game?room=KP4T9MXR')), '/');
+  test('a room\'s link is the app\'s own address and the room under it, whatever page made it', () {
+    expect(roomLink('KP4T9MXR', Uri.parse('https://openhearts.game/play/')).toString(), 'https://openhearts.game/play/room/KP4T9MXR');
+    expect(roomLink('KP4T9MXR', Uri.parse('https://openhearts.game/play/?e2e=1')).toString(), 'https://openhearts.game/play/room/KP4T9MXR');
+    expect(roomLink('KP4T9MXR', Uri.parse('http://127.0.0.1:8123/')).toString(), 'http://127.0.0.1:8123/room/KP4T9MXR');
   });
 }
