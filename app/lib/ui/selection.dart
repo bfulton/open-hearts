@@ -19,8 +19,22 @@ class CopyableSelection extends StatefulWidget {
 class _CopyableSelectionState extends State<CopyableSelection> {
   String _selected = '';
 
+  /// Where the toolbar and the handles are drawn. This sits above the
+  /// app's navigator, whose overlay is below it, so it brings its own:
+  /// without one, a long press selected the words and then had nowhere
+  /// to show Copy.
+  late final _entry = OverlayEntry(builder: (context) => _area());
+
   @override
-  Widget build(BuildContext context) {
+  void didUpdateWidget(CopyableSelection old) {
+    super.didUpdateWidget(old);
+    _entry.markNeedsBuild();
+  }
+
+  @override
+  Widget build(BuildContext context) => Overlay(initialEntries: [_entry]);
+
+  Widget _area() {
     return SelectionArea(
       onSelectionChanged: (content) => _selected = content?.plainText ?? '',
       // On the web, Copy goes through the page (net/copy.dart), which is
