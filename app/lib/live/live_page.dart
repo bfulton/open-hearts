@@ -21,6 +21,7 @@ import '../ui/hand_fan.dart';
 import '../ui/gone.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
+import '../ui/reading_time.dart';
 import '../ui/table_layout.dart';
 import '../ui/table_view.dart';
 
@@ -74,7 +75,7 @@ class _LivePageState extends State<LivePage> {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
         content: Text(message, textAlign: TextAlign.center),
-        duration: const Duration(milliseconds: 1600),
+        duration: readingTime(message),
         width: 260,
       ));
   }

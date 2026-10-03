@@ -28,6 +28,7 @@ import 'net/share.dart';
 import 'net/store_buying.dart';
 import 'theme.dart';
 import 'ui/qr_view.dart';
+import 'ui/reading_time.dart';
 
 Future<void> showSubscribe(BuildContext context) =>
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SubscribePage()));
@@ -236,7 +237,7 @@ class _SubscribePageState extends State<SubscribePage> {
 
   void _say(String text) => ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.center), duration: const Duration(milliseconds: 1800)));
+    ..showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.center), duration: readingTime(text)));
 
   Future<void> _drop(PublicKey device) async {
     final me = _me;
