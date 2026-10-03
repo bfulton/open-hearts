@@ -50,7 +50,7 @@ void main() {
   });
 
   testWidgets('a game is reached only by playing: its address alone goes home', (tester) async {
-    for (final game in ['/table', '/live']) {
+    for (final game in [soloPath, livePath, '/table/not-a-table-id']) {
       final router = await pumpAt(tester, game);
       expect(where(router), '/', reason: game);
       expect(find.text('home -'), findsOneWidget);
