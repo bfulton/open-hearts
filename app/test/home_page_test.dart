@@ -12,6 +12,8 @@ import 'dart:async';
 import 'package:deal/deal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/about_page.dart';
+import 'package:open_hearts/pages.dart';
 import 'package:open_hearts/crypto/deal.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
@@ -395,6 +397,22 @@ void main() {
     expect(find.textContaining('Four seats, filled'), findsNothing);
     expect(find.textContaining('A new table, and a link to send'), findsNothing);
     expect(find.text('Open source, no ads, more heart.'), findsOneWidget);
+  });
+
+  testWidgets('an address that names a page opens it on top of the front door, and back comes home', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(still(const HomePage(online: false, openAt: AppPage.about)));
+    await tester.pumpAndSettle();
+    expect(find.byType(AboutPage), findsOneWidget);
+    final route = ModalRoute.of(tester.element(find.byType(AboutPage)))!;
+    expect(route.settings.name, '/about', reason: 'the name the address is written from');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(AboutPage), findsNothing);
+    expect(find.byType(HomePage), findsOneWidget);
   });
 
   testWidgets('back from paying: said so at once, and live play opens when the licence comes', (tester) async {

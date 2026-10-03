@@ -35,6 +35,7 @@ import 'game_options.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/copy.dart';
+import 'pages.dart';
 import 'profile_page.dart';
 import 'record_store.dart';
 import 'stats.dart';
@@ -83,7 +84,7 @@ void _relayLog(String line) => debugPrint('relay: $line');
 final _debugging = Uri.base.queryParameters.containsKey('e2e');
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true});
+  const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true, this.openAt});
 
   /// A room to open onto, from a shared link.
   final String? openRoom;
@@ -94,6 +95,10 @@ class HomePage extends StatefulWidget {
 
   /// Whether this load is the one coming back from a checkout.
   final bool justBought;
+
+  /// The page the address names, opened on top of this one as its menu
+  /// would open it (pages.dart).
+  final AppPage? openAt;
 
   /// False in widget tests: the device keeps off the relays, so no
   /// presence connection outlives the test. The app is always online.
@@ -207,7 +212,29 @@ class _HomePageState extends State<HomePage> {
     // behind that (net/household.dart).
     if (widget.justBought) unawaited(_justBought());
     if (widget.openClaim != null) unawaited(_arriving());
+    if (widget.openAt case final page?) unawaited(_open(page));
   }
+
+  /// [page], as the address asked for it: by the same call the menu
+  /// makes, once this screen is drawn under it.
+  Future<void> _open(AppPage page) async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    switch (page) {
+      case AppPage.subscription:
+        await showSubscribe(context);
+      case AppPage.activate:
+        await showActivate(context);
+      case AppPage.profile:
+        await _editProfile();
+      case AppPage.about:
+        await _goAbout();
+      case AppPage.feedback:
+        await showFeedback(context);
+    }
+  }
+
+  Future<void> _goAbout() => Navigator.of(context).push(pageRoute<void>(AppPage.about, (_) => const AboutPage()));
 
   /// Arrived by a code another device showed (docs/06-service.md): this
   /// device joins that subscription and is given a licence of its own.
@@ -815,7 +842,7 @@ class _HomePageState extends State<HomePage> {
             if (!liveOpen)
               MenuAction(l10n.activateSubscription, icon: Icons.key_outlined, onSelected: () => showActivate(context)),
             MenuAction(l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
-            MenuAction(l10n.about, icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
+            MenuAction(l10n.about, icon: Icons.info_outline, onSelected: _goAbout),
           ],
         ),
         const Spacer(),

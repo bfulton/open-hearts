@@ -16,11 +16,12 @@ import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/household.dart';
+import 'pages.dart';
 import 'theme.dart';
 import 'ui/scan_setup_io.dart' if (dart.library.js_interop) 'ui/scan_setup_web.dart' as scanner;
 
 Future<void> showActivate(BuildContext context) =>
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ActivatePage()));
+    Navigator.of(context).push(pageRoute<void>(AppPage.activate, (_) => const ActivatePage()));
 
 class ActivatePage extends StatefulWidget {
   const ActivatePage({super.key});

@@ -321,10 +321,10 @@ flow('the update check, with nothing to say', async ({ context, open }) => {
   // newer one is up. One that cannot ask says nothing, and nothing turns.
   await context.route('**/build-info.json*', (route) => route.fulfill({ status: 200, body: '{"build":"abc1234","date":"2026-10-01"}' }));
   const newer = await open({ query: 'e2e=1&updatecheck' });
-  await within(newer, /^abc1234 is up$/, 10, 'the pill, when a newer build is up');
+  await within(newer, /^New build available$/, 10, 'the pill, when a newer build is up');
   for (const [how, answer] of [['offline', (route) => route.abort('internetdisconnected')], ['never answering', () => {}]]) {
     const page = await open({ fresh: true, query: 'e2e=1&updatecheck', route: ['**/build-info.json*', answer] });
-    await never(page, / is up$/, 5, `${how}: a pill all the same`);
+    await never(page, /^New build available$/, 5, `${how}: a pill all the same`);
     log(`      ${how}: no pill, nothing waiting`);
   }
   return newer;

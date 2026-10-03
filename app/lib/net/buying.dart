@@ -58,6 +58,9 @@ String returnAddress(Uri at, {required bool bought}) {
     port: at.hasPort ? at.port : null,
     path: at.path.isEmpty ? '/' : at.path,
     queryParameters: params.isEmpty ? null : params,
+    // The page that left (pages.dart): Stripe's link home comes back to
+    // it, as the back button does.
+    fragment: at.fragment.isEmpty ? null : at.fragment,
   ).toString();
 }
 

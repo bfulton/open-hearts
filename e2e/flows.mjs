@@ -295,6 +295,28 @@ flow('the backup codes, shown on request and copied', async ({ open }) => {
   if (copied.split('\n').join(',') !== shown.join(',')) throw new Error(`copied ${JSON.stringify(copied)}, shown ${shown.join(',')}`);
 });
 
+flow('a page keeps its address: away to another site and back lands on it', async ({ open }) => {
+  // Stripe's checkout and portal are whole pages of their own. The back
+  // button from there loads the app again, and it has to come back to
+  // the page that left (app/lib/pages.dart), not to the front door.
+  const page = await open();
+  await waitFor(page, /^Play live/, { what: 'live play open', timeout: 40000 });
+  await click(page, /^Menu$/);
+  await waitFor(page, /^Subscription$/, { what: 'the menu' });
+  await click(page, /^Subscription$/);
+  await waitFor(page, /^This device$/, { what: 'the subscription page' });
+  await sleep(300);
+  if (!page.url().endsWith('#/subscription')) throw new Error(`the address does not name the page: ${page.url()}`);
+  await page.goto('about:blank');
+  await page.goBack();
+  await waitFor(page, /^This device$/, { what: 'the subscription page, after coming back', timeout: 60000 });
+  // And back from there is the front door.
+  await page.goBack();
+  await waitFor(page, /^Play solo$/, { what: 'the home screen' });
+  await sleep(500);
+  if (await has(page, /^This device$/)) throw new Error('still on the subscription page');
+});
+
 flow('a second device, brought in by the code the first one shows', async ({ open }) => {
   // A subscription is a person's, not a device's (docs/06-service.md).
   // The first device shows a code; the second arrives carrying it, and
@@ -317,6 +339,7 @@ flow('a second device, brought in by the code the first one shows', async ({ ope
   await sleep(500);
   const link = await first.evaluate('navigator.clipboard.readText()');
   if (!/[?&]claim=[0-9a-f]+/.test(link)) throw new Error(`no code in the link: ${link}`);
+  if (new URL(link).hash) throw new Error(`the link carries a page with it: ${link}`);
 
   // A second device, opening it.
   // Asked before anything is spent, since a link is anybody's to send:
@@ -333,12 +356,9 @@ flow('a second device, brought in by the code the first one shows', async ({ ope
 
   // And the first device's subscription now carries both of them. The
   // page reads the list when it opens, so it is opened again.
+  // A reload keeps the page it was on (app/lib/pages.dart).
   await first.reload();
-  await waitFor(first, /^Play live/, { what: 'the first device back at the door', timeout: 40000 });
-  await click(first, /^Menu$/);
-  await waitFor(first, /^Subscription$/, { what: 'the menu' });
-  await click(first, /^Subscription$/);
-  await waitFor(first, /^2 of 5$/, { what: 'both devices on the subscription', timeout: 20000 });
+  await waitFor(first, /^2 of 5$/, { what: 'both devices on the subscription, after a reload', timeout: 40000 });
 });
 
 // ---- the runner ----------------------------------------------------------

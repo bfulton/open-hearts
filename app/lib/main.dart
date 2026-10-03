@@ -15,6 +15,7 @@ import 'net/household.dart';
 import 'net/remote_config.dart';
 import 'net/room.dart';
 import 'net/store_buying.dart';
+import 'pages.dart';
 import 'theme.dart';
 import 'ui/selection.dart';
 
@@ -109,6 +110,12 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
     // it is asking: a room shared by a link, a code another device
     // showed, a checkout coming back.
     final room = Uri.base.queryParameters['room']?.trim().toUpperCase();
+    final home = HomePage(
+      openRoom: room != null && Room.validCode(room) ? room : null,
+      openClaim: claimInAddress(),
+      justBought: boughtJustNow(),
+      openAt: AppPage.at(WidgetsBinding.instance.platformDispatcher.defaultRouteName),
+    );
     return MaterialApp(
       title: 'Open Hearts',
       debugShowCheckedModeBanner: false,
@@ -122,11 +129,11 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
       // Any words on any screen can be selected and copied: a name, a
       // rule, an error to send us.
       builder: (context, child) => CopyableSelection(child: child ?? const SizedBox()),
-      home: HomePage(
-        openRoom: room != null && Room.validCode(room) ? room : null,
-        openClaim: claimInAddress(),
-        justBought: boughtJustNow(),
-      ),
+      home: home,
+      // The address's page is opened by the home screen, on top of
+      // itself (pages.dart): the stack starts as the home screen alone,
+      // whatever the address names.
+      onGenerateInitialRoutes: (_) => [MaterialPageRoute<void>(builder: (_) => home, settings: const RouteSettings(name: '/'))],
     );
   }
 }

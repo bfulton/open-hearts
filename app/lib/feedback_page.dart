@@ -23,13 +23,14 @@ import 'l10n/l10n.dart';
 import 'net/copy.dart';
 import 'net/remote_config.dart';
 import 'net/share.dart';
+import 'pages.dart';
 import 'theme.dart';
 
 /// Where a report goes when the operator has said nothing.
 final projectIssues = Uri.parse('https://github.com/bfulton/open-hearts/issues/new');
 
 Future<void> showFeedback(BuildContext context, {String? record}) =>
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FeedbackPage(record: record)));
+    Navigator.of(context).push(pageRoute<void>(AppPage.feedback, (_) => FeedbackPage(record: record)));
 
 /// A report: what the player wrote, then what goes with it. The labels
 /// are English whatever the app's language — they are for whoever

@@ -18,6 +18,7 @@ import 'game_controller.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/copy.dart';
+import 'pages.dart';
 import 'table_model.dart';
 import 'theme.dart';
 import 'ui/hand_fan.dart';
@@ -133,7 +134,7 @@ class _TablePageState extends State<TablePage> {
                     MenuAction(context.l10n.tellUsWhatsBroken,
                         icon: Icons.feedback_outlined, onSelected: () => showFeedback(context, record: _controller.recordText)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
-                      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
+                      Navigator.of(context).push(pageRoute<void>(AppPage.about, (_) => const AboutPage()));
                     }),
                   ],
                 ),

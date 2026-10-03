@@ -14,6 +14,7 @@ import '../avatar.dart';
 import '../feedback_page.dart';
 import '../l10n/l10n.dart';
 import '../live_controller.dart';
+import '../pages.dart';
 import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
@@ -296,7 +297,7 @@ class _LivePageState extends State<LivePage> {
                     MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _leave, danger: true),
                     MenuAction(context.l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
-                      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
+                      Navigator.of(context).push(pageRoute<void>(AppPage.about, (_) => const AboutPage()));
                     }),
                   ],
                 ),

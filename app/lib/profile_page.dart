@@ -25,6 +25,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'avatar.dart';
 import 'l10n/l10n.dart';
+import 'pages.dart';
 import 'stats.dart';
 import 'theme.dart';
 import 'ui/photo_crop.dart';
@@ -97,9 +98,7 @@ Future<Profile?> showProfile(
   Stream<PlayerStats> stats = const Stream<PlayerStats>.empty(),
 }) {
   return Navigator.of(context).push<Profile>(
-    MaterialPageRoute<Profile>(
-      builder: (_) => ProfilePage(current: current, seed: seed, stats: stats),
-    ),
+    pageRoute<Profile>(AppPage.profile, (_) => ProfilePage(current: current, seed: seed, stats: stats)),
   );
 }
 

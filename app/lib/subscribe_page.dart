@@ -26,12 +26,13 @@ import 'net/licence.dart';
 import 'net/remote_config.dart';
 import 'net/share.dart';
 import 'net/store_buying.dart';
+import 'pages.dart';
 import 'theme.dart';
 import 'ui/qr_view.dart';
 import 'ui/reading_time.dart';
 
 Future<void> showSubscribe(BuildContext context) =>
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SubscribePage()));
+    Navigator.of(context).push(pageRoute<void>(AppPage.subscription, (_) => const SubscribePage()));
 
 class SubscribePage extends StatefulWidget {
   const SubscribePage({super.key});
