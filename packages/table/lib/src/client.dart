@@ -695,6 +695,10 @@ class TableClient {
         'step $step current ${game.currentSeat} pause $_pause participants ${participants.length} '
         'holders $holders');
     if (_failure != null) b.writeln('  ended: ${_failure!.label}, at ${_failedAt?.turn} for seat ${_failedAt?.seat}');
+    final held = botHolders(game.handNumber);
+    if (held.isNotEmpty) {
+      b.writeln('  bot seats held: ${held.entries.map((e) => '${e.key} by ${e.value.substring(0, 4)}${e.value == signer.publicKey ? ' (here)' : ''}').join(', ')}');
+    }
     for (final e in _races.entries) {
       if (e.value.settled) continue;
       final r = e.value;

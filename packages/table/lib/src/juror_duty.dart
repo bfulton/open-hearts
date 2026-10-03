@@ -118,15 +118,33 @@ class JurorDuty {
     t.client.serveFor(s.hand, s.jurors, juryId: s.juryId, first: s.first, draws: s.draws);
   }
 
+  /// Where each table followed last moved, and when the juror last
+  /// said why it has not since.
+  final Map<String, ({int hand, int step, int movedAt, int toldAt})> _progress = {};
+
   void _sweepTables() {
+    final now = DateTime.now().millisecondsSinceEpoch;
     for (final e in List.of(_tables.entries)) {
       final c = e.value.client;
       // A line every ten seconds per table followed: where the juror
       // stands, for a log read after the fact.
       log?.call('following ${e.key}: hand ${c.game.handNumber} ${c.game.phase.name} step ${c.step} pause ${c.pause?.name} '
           'heartbeats ${c.heartbeatsSent} deferred ${c.deferred} serving ${c.serving}');
+      // And a table that has not moved for a minute, once a minute: the
+      // whole of what this side sees of it — whose turn, what is open,
+      // what it holds back — so a stall can be read off the log rather
+      // than guessed at (a live table stood still on 3 October with
+      // nothing else to go on).
+      final was = _progress[e.key];
+      if (was == null || was.hand != c.game.handNumber || was.step != c.step) {
+        _progress[e.key] = (hand: c.game.handNumber, step: c.step, movedAt: now, toldAt: now);
+      } else if (now - was.movedAt >= 60000 && now - was.toldAt >= 60000) {
+        _progress[e.key] = (hand: was.hand, step: was.step, movedAt: was.movedAt, toldAt: now);
+        log?.call('stalled ${e.key} for ${(now - was.movedAt) ~/ 1000}s:\n${c.describe()}');
+      }
       if (c.serving) continue;
       log?.call('done with ${e.key}');
+      _progress.remove(e.key);
       letGo.record(e.key, c.game.handNumber);
       c.close();
       e.value.transport.close();
