@@ -14,6 +14,7 @@ import {
   mailerOf,
   memoryStore,
   payerEmail,
+  payerLookup,
   record,
   redeemBackup,
 } from './worker.mjs';
@@ -153,6 +154,11 @@ test('the payer\'s address is read from Stripe when it is needed, and only for a
   assert.equal(await payerEmail(store, 'sub_9', {}, fetchImpl), null, 'no key, no address');
   assert.equal(await payerEmail(store, 'apple_1', { OH_STRIPE_SECRET: 'rk_x' }, fetchImpl), null);
   assert.equal(await payerEmail(store, 'sub_9', { OH_STRIPE_SECRET: 'rk_x' }, async () => new Response('', { status: 500 })), null);
+  // And why not, for the log.
+  const refused = async () => Response.json({ error: { code: 'secret_key_required' } }, { status: 403 });
+  assert.equal((await payerLookup(store, 'sub_9', { OH_STRIPE_SECRET: 'rk_x' }, refused)).why, 'Stripe said 403 (secret_key_required)');
+  assert.equal((await payerLookup(store, 'sub_9', {}, fetchImpl)).why, 'no Stripe key');
+  assert.equal((await payerLookup(store, 'sub_none', { OH_STRIPE_SECRET: 'rk_x' }, fetchImpl)).why, 'no customer on record');
 });
 
 test('the mailer: Cloudflare Email Sending from the address configured, or none', async () => {

@@ -955,11 +955,11 @@ const backupsShown = (row) => ({ codes: row.codes.map((c) => ({ code: c.code, us
 /// `no address`, `no mail` (Email Sending not bound here), `no codes`
 /// (all used) or `failed`. Every one that did not go is logged; the
 /// codes are on every device on the subscription regardless.
-async function mailBackups(store, subscription, row, email, mail, { now }) {
+async function mailBackups(store, subscription, row, email, mail, { now, why = null }) {
   const codes = row.codes.filter((c) => c.used_at === null).map((c) => c.code);
   const unsent = !mail ? 'no mail' : typeof email !== 'string' || !email.includes('@') ? 'no address' : codes.length === 0 ? 'no codes' : null;
   if (unsent) {
-    console.log(`backup codes for ${subscription}: not sent: ${unsent}`);
+    console.log(`backup codes for ${subscription}: not sent: ${unsent}${why ? ` (${String(why).slice(0, 200)})` : ''}`);
     return { row, unsent };
   }
   try {
@@ -989,14 +989,14 @@ export async function backupsMade(subscription, email, store, mail, { now = Date
 /// and replaced when [rotate]; with [send], the ones still good sent to
 /// [email], the payer's, when a device asks (the Email button) — and
 /// `emailed`, or `unsent` and why not, in the answer.
-export async function backupsFor(key, store, mail, { rotate = false, send = false, email = null, now = Date.now() } = {}) {
+export async function backupsFor(key, store, mail, { rotate = false, send = false, email = null, why = null, now = Date.now() } = {}) {
   const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (!held) return { status: 402, body: { error: 'no subscription' } };
   if (!(await store.get(`SUB#${held.subscription}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
   let row = await store.get(`SUB#${held.subscription}`, 'BACKUP');
   if (!row || rotate) row = await makeBackups(store, held.subscription, { now });
   if (!send) return { status: 200, body: { ...backupsShown(row), emailed: false } };
-  const mailed = await mailBackups(store, held.subscription, row, email, mail, { now });
+  const mailed = await mailBackups(store, held.subscription, row, email, mail, { now, why });
   return { status: 200, body: { ...backupsShown(mailed.row), emailed: mailed.unsent === null, ...(mailed.unsent ? { unsent: mailed.unsent } : {}) } };
 }
 
@@ -1129,7 +1129,7 @@ export async function householdOp(op, store, { now = Date.now(), mail = null } =
     case 'redeem':
       return redeemBackup(op.key, op.code, store, { now });
     case 'backups':
-      return backupsFor(op.key, store, mail, { rotate: op.rotate === true, send: op.send === true, email: op.email ?? null, now });
+      return backupsFor(op.key, store, mail, { rotate: op.rotate === true, send: op.send === true, email: op.email ?? null, why: op.why ?? null, now });
     case 'made':
       return backupsMade(op.subscription, op.email ?? null, store, mail, { now });
     case 'bind':
@@ -1272,20 +1272,28 @@ async function claimRoute(request, env) {
 /// The email Stripe holds for the customer behind [subscription], or
 /// null: read when backup codes are sent, and not kept.
 export async function payerEmail(store, subscription, env, fetchImpl = fetch) {
+  return (await payerLookup(store, subscription, env, fetchImpl)).email;
+}
+
+/// [payerEmail], with why there is none: {email, why}. The why goes to
+/// the household with the ask, which logs it beside the send it
+/// stopped (the relay's log is the one that can be read afterwards).
+export async function payerLookup(store, subscription, env, fetchImpl = fetch) {
   const secret = env.OH_STRIPE_SECRET;
-  if (!secret || typeof subscription !== 'string' || !subscription.startsWith('sub_')) return null;
+  if (!secret) return { email: null, why: 'no Stripe key' };
+  if (typeof subscription !== 'string' || !subscription.startsWith('sub_')) return { email: null, why: 'not a web subscription' };
   const customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
-  if (!customer) return null;
+  if (!customer) return { email: null, why: 'no customer on record' };
   try {
     const res = await fetchImpl(`${STRIPE}/customers/${encodeURIComponent(customer)}`, { headers: { authorization: `Bearer ${secret}` } });
     if (!res.ok) {
-      console.log(`payer email for ${subscription}: Stripe said ${res.status}`);
-      return null;
+      const code = (await res.json().catch(() => null))?.error?.code;
+      return { email: null, why: `Stripe said ${res.status}${code ? ` (${code})` : ''}` };
     }
     const email = (await res.json())?.email;
-    return typeof email === 'string' && email.includes('@') ? email : null;
-  } catch {
-    return null;
+    return typeof email === 'string' && email.includes('@') ? { email, why: null } : { email: null, why: 'no email on the customer' };
+  } catch (e) {
+    return { email: null, why: `Stripe unreachable: ${e?.message ?? e}` };
   }
 }
 
@@ -1302,8 +1310,8 @@ async function backupsRoute(request, env) {
   if (!held) return json(request, 402, { error: 'no subscription' });
   const rotate = body.rotate === true;
   const send = !rotate && body.send === true;
-  const email = send ? await payerEmail(store, held.subscription, env) : null;
-  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'backups', key, rotate, send, email });
+  const payer = send ? await payerLookup(store, held.subscription, env) : { email: null, why: null };
+  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'backups', key, rotate, send, email: payer.email, why: payer.why });
   return json(request, status, out);
 }
 
