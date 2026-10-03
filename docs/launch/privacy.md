@@ -8,6 +8,12 @@ reasoning for each, where the claim "no data collected" does not hold
 and what would make it hold, and what is still the owner's or a
 lawyer's to decide.
 
+**Updated 3 October 2026.** Live play moved off the public relays onto
+our own relay, `relay.openhearts.game`, and nothing else
+([doc 08](../08-own-relays.md)). The rows, retention and findings below
+are revised to match; findings that change resolved are marked so, with
+the date, rather than deleted.
+
 ## The answer first
 
 **Is "Data Not Collected" accurate today?** For the web app with live
@@ -26,8 +32,8 @@ does.
   picker is local. The label is true for that binary.
 - **The web app with live play: no.** A subscriber's display name,
   avatar and photo, their game results and their public key are written
-  to relays that other people run, which keep them and let anyone read
-  them. Our service keeps their subscription against their key, and
+  to our relay, which keeps some of them (rooms, seatings and pictures
+  a day, results for good) and lets anyone who asks read them. Our service keeps their subscription against their key, and
   Stripe holds their email address. That is collection under Apple's
   definition and under Google's (below).
 - **Phones, once live play ships as designed: no**, for the same
@@ -44,7 +50,7 @@ The other three claims:
   cookies set by our pages. Two things on the web still need saying:
   the Flutter engine fetches fallback fonts from Google whenever it has
   to draw an emoji, an arrow or a non-Latin name, and anyone can listen
-  on the public relays and log who is online and under what name.
+  on our relay, which is open, and log who is online and under what name.
 - **"No sign-up"**: true. There is no account. A web buyer gives Stripe
   an email address, and live play needs a display name.
 
@@ -56,8 +62,8 @@ The other three claims:
 | **Other players** | their devices, peer to peer over WebRTC | live play |
 | **Jurors** | other people's apps, drawn at random from whoever is online; they hold shares of each hand's escrow and play the bot seats (doc 04). A subscriber's own app is a juror for other tables while it is open | live play |
 | **Our service** | the Cloudflare Pages worker `service/functions/worker.mjs` at `/api/…`, with Cloudflare KV (`OH_STORE`) | web: every start (licence check), subscribing, household |
-| **Our relays** | `wss://nostr.openhearts.game` (in the list for tables; not running yet — doc 06) and `wss://relay.openhearts.game/{tag}` (presence only; a Durable Object that writes nothing down, `service/do/`) | live play |
-| **Public relays** | `wss://relay.damus.io`, `wss://relay.primal.net`, `wss://nos.lol`. Independent operators with their own policies. We have no agreement with any of them | live play; the profile page |
+| **Our relay** | `wss://relay.openhearts.game/{tag}`: the Cloudflare Worker `open-hearts-relay`, one Durable Object per tag — a table id, a room code, a pool (`queue:…`), `online`, `results` (`service/do/`). Ephemeral kinds are forwarded and not stored; the lobby kind, 4244, is stored in the object of the tag it carries (§3). Open: anyone can subscribe to any tag. The only relay in a deployed build and in the jurors of last resort's image | live play; the profile page |
+| **Public relays** | none since 3 October 2026. Until then `wss://relay.damus.io`, `wss://relay.primal.net` and `wss://nos.lol` carried live play and the profile page, and the never-built `wss://nostr.openhearts.game` was in the list. The test games' results left there are abandoned (doc 08) | — |
 | **Cloudflare** | hosting for the site, the app and the worker; KV; STUN (`stun.cloudflare.com`); TURN (Cloudflare Realtime) | always on the web |
 | **Stripe** | Checkout and subscriptions | buying on the web |
 | **Google** | `fonts.gstatic.com`, fetched by the Flutter web engine for characters its bundled Roboto lacks | on the web, when such a character is drawn (§2) |
@@ -125,31 +131,35 @@ There is no in-app control that clears all of this at once.
 - **The update check** fetches `build-info.json` from our own origin and
   sends nothing.
 - **The profile page**, opened by anyone on the web, calls
-  `Standing.load`: a connection to every relay in the build's list,
-  subscribed to the `results` tag. Nothing is published, but the
-  subscription carries a filter naming this device's public key
-  (`RelayTransport` always asks for signalling addressed to itself), and
-  every relay sees the IP address. For someone who never subscribes,
-  this is their only contact with third-party relays.
+  `Standing.load`: a connection to our relay's `results` object.
+  Nothing is published, but the subscription carries a filter naming
+  this device's public key (`RelayTransport` always asks for signalling
+  addressed to itself), and the relay — Cloudflare — sees the IP
+  address. For someone who never subscribes, this is their only contact
+  with a relay, and it is ours; until 3 October 2026 it reached the
+  public relays too.
 
 ### 3. Live play — subscribers; the web today
 
-"Every relay" means the build's whole list, public relays included.
-Kinds 20000–29999 are ephemeral: by NIP-01 a relay forwards them to
-whoever is subscribed at that moment and keeps nothing. Kind 4244 is a
-regular kind, and relays store it.
+"The relay" means our relay, `relay.openhearts.game`, and the object
+for the tag in the address; there is no other (doc 08). Kinds
+20000–29999 are ephemeral: the relay forwards them to whoever is
+subscribed at that moment and keeps nothing. Kind 4244 is stored, and
+only in the object of the tag it carries (its `t` tag must name that
+object's tag): a day for everything but results, which are kept
+(`tag_store.mjs`, `KEPT_MS`). The `online` object stores nothing.
 
 | # | What | When | Where | Kind | Who can read it | Kept |
 |---|---|---|---|---|---|---|
-| 1 | **Presence**: `{"kind":"here","status":"online"\|"seated"}`, signed by the device key; `gone` when the app is backgrounded (`presence_relay.dart`, `duty.dart`) | every 5 s while the app is open, licensed and able to deal | every relay, and `relay.openhearts.game/online` first | 24246, ephemeral | anyone subscribed to the tag `online` | not by the relays; anyone listening can record it |
-| 2 | **Pool beat**: `{"kind":"wait", name, rating, pace, since, avatar}` — `avatar` is icon and colour (`matching.dart`) | every 2 s while waiting | every relay | 24245, ephemeral | anyone subscribed to the pool's tag (`queue:rated`, `queue:unrated`, `…:100`) | as row 1 |
-| 3 | **Room beat**: `{"kind":"here", name, seed, since, policy, avatar}` (`room.dart`) | every 2 s in a friends' room | every relay | 24245, ephemeral | anyone subscribed to the room code | as row 1 |
-| 4 | **Picture**: `{"kind":"picture","jpeg":…}` | once on entering a pool or a room, if the player has one | every relay | 4244, **stored** | anyone — a filter on the kind alone returns it; the tag is no barrier | as long as each relay chooses |
-| 5 | **Seating**: `match` (pool) or `start` (room) — table id, seed, target, rated, and for each person their key, display name, icon and colour | once per table, by the round's host or the room's leader | every relay | 4244, **stored** | anyone | as long as each relay chooses |
+| 1 | **Presence**: `{"kind":"here","status":"online"\|"seated"}`, signed by the device key; `gone` when the app is backgrounded (`presence_relay.dart`, `duty.dart`) | every 5 s while the app is open, licensed and able to deal | the relay, tag `online` | 24246, ephemeral | anyone subscribed to the tag `online` | not by the relay; anyone listening can record it |
+| 2 | **Pool beat**: `{"kind":"wait", name, rating, pace, since, avatar}` — `avatar` is icon and colour (`matching.dart`) | every 2 s while waiting | the relay, the pool's tag | 24245, ephemeral | anyone subscribed to the pool's tag (`queue:rated`, `queue:unrated`, `…:100`) | as row 1 |
+| 3 | **Room beat**: `{"kind":"here", name, seed, since, policy, avatar}` (`room.dart`) | every 2 s in a friends' room | the relay, the room code | 24245, ephemeral | anyone subscribed to the room code | as row 1 |
+| 4 | **Picture**: `{"kind":"picture","jpeg":…}` | on each entry to a pool or a room, if the player has one; at most 12,000 bytes | the relay, the pool's tag or the room code | 4244, **stored** | anyone subscribed to that tag — a pool's tag is well known, a room's is its code | a day, then swept by the object's alarm |
+| 5 | **Seating**: `match` (pool) or `start` (room) — table id, seed, target, rated, and for each person their key, display name, icon and colour | once per table, by the round's host or the room's leader | the relay, the pool's tag or the room code | 4244, **stored** | anyone subscribed to that tag | a day, then swept |
 | 6 | **Table events**: passes, plays, heartbeats (with the relays the sender reads), leaves, boots, jury business, the deal's cryptography, and the audit that opens every hand at its end | throughout a game | WebRTC data channels (DTLS) to the other people and the hand's jurors; a relay only while someone has no channel open (`mesh_transport.dart`) | 24242, ephemeral, tagged with the table id | the table and its jurors; on the relay lane, anyone subscribed to that table id while it plays | not stored |
-| 7 | **Signalling**: offers, answers, ICE candidates | when a channel is set up | every relay | 24243, ephemeral, sealed with NIP-44 to the recipient | the recipient only — but it carries IP addresses, so the recipient learns yours | not stored |
-| 8 | **Summonses and calls** for jurors: the table's seats (keys and bot ids), the hand, the jury | when a table draws a jury | every relay | 24246, ephemeral | anyone subscribed to `online` | not stored |
-| 9 | **Result**: `{"kind":"result", table, rated, seats: [{key or bot, total, fromStart, left}]}` (`results.dart`) | the end of every live game, **rated or unrated** (`home_page.dart`, `onResult`), retried until a relay takes it | every relay | 4244, **stored**, tag `results` | anyone | meant to be permanent: every rating is folded from all of them |
+| 7 | **Signalling**: offers, answers, ICE candidates | when a channel is set up | the relay, the table id | 24243, ephemeral, sealed with NIP-44 to the recipient | the recipient only — but it carries IP addresses, so the recipient learns yours | not stored |
+| 8 | **Summonses and calls** for jurors: the table's seats (keys and bot ids), the hand, the jury | when a table draws a jury | the relay, tag `online` | 24246, ephemeral | anyone subscribed to `online` | not stored |
+| 9 | **Result**: `{"kind":"result", table, rated, seats: [{key or bot, total, fromStart, left}]}` (`results.dart`) | the end of every live game, **rated or unrated** (`home_page.dart`, `onResult`), retried until the relay takes it | the relay, tag `results` | 4244, **stored**, tag `results` | anyone | indefinitely, in the `results` object's storage: every rating is folded from all of them. Deleted by hand on request |
 | 10 | **ICE servers**: `POST /api/turn {key}`; STUN at `stun.cloudflare.com` | on connecting | our worker; Cloudflare | — | — | the worker keeps nothing; Cloudflare's STUN and TURN see IP addresses, and TURN carries already-encrypted bytes |
 
 What follows:
@@ -159,9 +169,11 @@ What follows:
   player played, against whom, how they scored, whether they left, and
   the rating that comes out of it.
 - **A "private" friends' room only keeps strangers from sitting down.**
-  Its start event and pictures are stored on public relays like any
-  other, readable by anyone who asks for the kind.
-- **IP addresses** reach every relay, Cloudflare, every person at the
+  Its start event and pictures are stored a day in the room code's
+  object like any other, readable by anyone who subscribes to the code.
+  (Until 3 October 2026 they went to public relays, where a filter on
+  the kind alone returned them.)
+- **IP addresses** reach our relay and the rest of Cloudflare, every person at the
   table and every juror. Jurors are strangers — and while a subscriber's
   app is open it is itself a juror, dialled by the people at other
   tables. Browsers hide local network addresses in ICE candidates behind
@@ -174,7 +186,7 @@ What follows:
   nowhere else") — and the profile page says only that you are seated
   with players at a similar pace.
 - **Nothing in the app says that a name or a picture becomes public and
-  is kept by other people.** The profile page asks for "Your name" and
+  is kept.** The profile page asks for "Your name" and
   offers "Use a photo".
 - **The picture check** described in doc 04 is not shipped:
   `Pictures` runs with `check: null`, so every picture shows unless the
@@ -315,8 +327,8 @@ image it returns (`image_picker_android` 0.8.13+23). Then
 `img.decodeImage` reads the EXIF into the image, `copyCrop` and
 `copyResize` clone it, and `encodeJpg` writes it back out (`image`
 4.10.0). So the 64 × 64 avatar can carry the latitude and longitude
-where the original was taken — and in live play it is published to
-public relays and kept. The iOS picker keeps metadata the same way
+where the original was taken — and in live play it is published on
+the relay and kept. The iOS picker keeps metadata the same way
 (`FLTImagePickerMetaDataUtil`), so iOS is probably the same. The web is
 spared: `image_picker_for_web` redraws through a canvas, which drops
 EXIF.
@@ -339,9 +351,10 @@ pushing a picture over the 12,000-byte cap.
 | Where | How long | How it is deleted today |
 |---|---|---|
 | The device | until removed | clear the site's data in the browser, or delete the app; the profile page edits name and picture |
-| Public relays — pictures, seatings, results | each operator's choice; often indefinite. Anyone can copy a signed event to another relay | not by us. The app sends no NIP-09 deletion requests (kind 5), and a relay need not honour one |
-| Ephemeral events — presence, beats, table events, signalling | not stored by relays | — (anyone listening could have recorded them) |
-| Our relay object | nothing written down | — |
+| Our relay — rooms, seatings, table starts, pictures | a day, then deleted by the tag's object's alarm (`tag_store.mjs`) | automatically; sooner by hand on request |
+| Our relay — results | indefinitely, since the ratings are folded from all of them | by hand on request: rows deleted from the `results` object's storage. A signed event someone else copied is out of our reach |
+| Ephemeral events — presence, beats, table events, signalling | not stored by the relay | — (anyone listening could have recorded them) |
+| Public relays (until 3 October 2026) — the test games' pictures, seatings, results | each operator's choice | not by us; abandoned, and the ratings start fresh on our relay (doc 08) |
 | KV — subscriptions, devices, tickets | indefinitely | by hand, on request. There is no self-service delete, and a requester has to say which key is theirs, which the app shows only six characters of |
 | Stripe | Stripe's policy and the law on payment records | the owner can delete a customer in the Dashboard; Stripe keeps what it must |
 | Cloudflare request logs | Cloudflare's policy and the account's settings | — |
@@ -397,8 +410,8 @@ Not declared, and why:
 - **Identifiers → Device ID.** The key is made per device, but it is the
   player's identity, so User ID is the closer fit. Ticking both does no
   harm.
-- **Usage Data.** Presence and pace are ephemeral: neither we nor the
-  relays keep them.
+- **Usage Data.** Presence and pace are ephemeral: the relay forwards
+  them and nobody on our side keeps them.
 - **Diagnostics.** None are gathered.
 - **Coarse Location.** IP addresses are not retained by us and not used
   to place anyone. Confirm Cloudflare's logging settings.
@@ -452,14 +465,17 @@ Not declared: Location (the metadata bug is fixed), App info and
 performance (no crash logs), Messages (no chat), Email address. As with
 Apple, the key could also go under Device or other IDs.
 
-**Why "shared".** The public relays are not our service providers:
-there is no contract, and they keep what they are given for their own
-users. The user-initiated exception — the user "reasonably expects the
-data to be shared" — fits the people at the table, but is weak for
-permanent copies on strangers' servers, all the more while the app does
-not say so. Declare it shared. Once the app shows a prominent notice
-and asks before live play, the disclosure-and-consent exception may
-apply; even then "shared" is the safer answer.
+**Why "shared".** Until 3 October 2026 the reason was the public
+relays: not our service providers, no contract, and they kept what they
+were given for their own users. Since then live play goes to our own
+relay alone, so no third-party operator holds it. It is still shared in
+the plain sense: the relay is open, and anyone who asks can read a
+name, a picture or a result. The user-initiated exception — the user
+"reasonably expects the data to be shared" — fits the people at the
+table, but is weak for strangers reading a public ledger, all the more
+while the app does not say so. Declare it shared. Once the app shows a
+prominent notice and asks before live play, the disclosure-and-consent
+exception may apply; even then "shared" is the safer answer.
 
 **Security practices.**
 
@@ -467,8 +483,10 @@ apply; even then "shared" is the safer answer.
   production relay URL, DTLS on the data channels, NIP-44 on
   signalling. The `ws://` local relay is never in a release build.
 - *You can request that data be deleted*: answer yes only once there is
-  a working way to do it (open decisions), and say in the policy that
-  the public relays are out of reach.
+  a working way to do it (open decisions). Since 3 October 2026 what
+  the relay stores is ours to delete, and the policy promises deletion
+  of a device's results on request; copies someone else made are out
+  of reach, and the policy says so.
 - *Account deletion*: Google requires an in-app and a web route to
   delete an account when an app lets people create one. A key with a
   public name is closer to an account than not, and with Play Billing
@@ -497,7 +515,9 @@ costs.
    folding only the games it saw, which makes ratings local and partial;
    (c) results on our relay only, deleted after a set time — still
    collected, by us, but not by third parties. "Data Not Collected" and a
-   public rating ledger cannot both be true.
+   public rating ledger cannot both be true. *Since 3 October 2026,* the
+   first half of (c) is done: results go to our relay only. They are
+   kept indefinitely, and deleted by hand on request.
 4. **Unrated games publish results too** — `home_page.dart`, `onResult`
    publishes whatever `spec.rated` says. *Change:* publish only rated
    results. Cheap, and an unrated game then leaves nothing behind.
@@ -516,6 +536,9 @@ costs.
    *Change:* carry them on our own relays only, once those are reliable
    (presence already prefers `relay.openhearts.game`). *Cost:* when ours
    are down, nobody is online.
+   **Resolved 3 October 2026:** they go to our relay only (doc 08), and
+   the cost is as stated. Anyone subscribed to the tag can still record
+   them.
 7. **IP addresses reach peers and jurors** — WebRTC. Not collection in
    either store's sense, but personal data shown to strangers.
    *Change:* `iceTransportPolicy: 'relay'` forces TURN and hides
@@ -537,6 +560,10 @@ costs.
    `home_page.dart`, `_statsOnThisDevice` passes `_relays` whenever the
    app is online. *Change:* pass them only when live play is open.
    Cheap.
+   **Resolved 3 October 2026** as far as third parties go: `_relays` is
+   our relay alone, so a non-subscriber reaches only our `results`
+   object. It still connects whenever the app is online; the narrower
+   change is still cheap.
 10. **KV rows kept for ever** — `ticketFor` and the subscription rows.
     *Change:* an `expirationTtl` on ticket rows (a day), and delete a
     subscription's rows a stated time after it ends.
@@ -544,7 +571,7 @@ costs.
 12. **The words** — the pace comments, and a profile page that says
     nothing about who will see a name or a picture. *Change:* say,
     where the name is asked for, that the name and picture are public
-    at live tables and kept by relays that other people run.
+    at live tables and kept on our relay (a day; results for good).
 
 ## Gaps the stores will ask about
 
@@ -559,8 +586,8 @@ costs.
   shipped). Live play on iOS will probably need report and block at
   least.
 - **No self-service deletion.** A `/api/forget` signed by the device key
-  could delete that key's KV rows, and the app could send NIP-09
-  deletion requests for its own stored events, which relays may honour.
+  could delete that key's KV rows, and its rows in the relay's
+  storage — today both are deleted by hand, on request.
 - **No contact email.** A postal address and a phone number are
   published (`site/privacy.html`, Contact; `site/support.html`); there is
   still no email address, which Play Console requires. See below.
@@ -590,7 +617,11 @@ costs.
 - **Publishing personal data to third-party relays by design**:
   transparency, the erasure requests that cannot be carried out there
   (Art. 17(2), "reasonable steps"), and transfers to operators in
-  unknown countries.
+  unknown countries. **Resolved 3 October 2026** for third parties:
+  live play goes to our relay alone, on Cloudflare (already a
+  processor), and its stored rows can be erased. Still to check:
+  publishing names, pictures and results openly on our own relay, and
+  results kept indefinitely.
 - **Processor terms**: Cloudflare (Pages, KV, Realtime TURN — its DPA is
   part of its terms) and Stripe (its DPA; Stripe is an independent
   controller for some of its own processing).

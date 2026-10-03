@@ -13,6 +13,6 @@ COPY stage/ /bench/
 EXPOSE 8080
 # The relays come from the environment the Worker starts it with; the
 # defaults are production's (app/lib/net/relays.dart).
-ENV OH_RELAYS="wss://nostr.openhearts.game,wss://relay.damus.io,wss://relay.primal.net,wss://nos.lol"
-ENV OH_PRESENCE_RELAYS="wss://relay.openhearts.game/{tag},wss://nostr.openhearts.game,wss://relay.damus.io,wss://relay.primal.net,wss://nos.lol"
+ENV OH_RELAYS="wss://relay.openhearts.game/{tag}"
+ENV OH_PRESENCE_RELAYS="wss://relay.openhearts.game/{tag}"
 CMD ["sh", "-c", "exec /bench/juror --relay \"$OH_RELAYS\" --presence \"$OH_PRESENCE_RELAYS\" --port 8080"]

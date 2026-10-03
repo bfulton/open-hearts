@@ -30,12 +30,18 @@ import 'package:table/table.dart';
 import 'relay.dart';
 
 class JsRelay implements Relay {
-  JsRelay({this.keep = 10000, this.log, String? Function(NostrEvent event)? refuse}) {
+  JsRelay({this.keep = 10000, this.log, String? Function(NostrEvent event)? refuse, this.object = false}) {
     _refuse = refuse;
   }
 
   /// How many stored events the host holds before the oldest go.
   final int keep;
+
+  /// The deployed object's rules (`OH_RELAY=object`): one object per
+  /// tag, the tag in the address ([url] carries [tagMark]), the
+  /// ephemeral kinds and the tag's own lobby taken and nothing else,
+  /// and a table's limits.
+  final bool object;
 
   /// Receives the host's own log lines, connections and subscriptions
   /// and refusals, or null to start it quiet.
@@ -59,7 +65,7 @@ class JsRelay implements Relay {
   int get port => _port ?? (throw StateError('the relay is not serving'));
 
   @override
-  Uri get url => Uri(scheme: 'ws', host: '127.0.0.1', port: port);
+  Uri get url => Uri(scheme: 'ws', host: '127.0.0.1', port: port, pathSegments: object ? const [tagMark] : null);
 
   @override
   int get connections => _count('connections');
@@ -88,6 +94,7 @@ class JsRelay implements Relay {
       '--keep', '$keep',
       '--stats', _counts!.path,
       '--control',
+      if (object) '--object',
       if (log == null) '--quiet',
     ]);
     _host = host;

@@ -13,7 +13,7 @@ whole path cost. A juror is dialled now
 (`Transport.reach`, `JurorDuty.dial`), which matters most for
 [doc 04](../../docs/04-live-play.md)'s computation: at one human the
 **foreman is a computing party**, and it now computes down a channel
-rather than through a stranger's machine.
+rather than through the relay.
 
 Two readers are still on the relay and always will be. One is a peer
 whose channel has not come up or has failed, which is what the lane is
@@ -22,9 +22,8 @@ service's Dart VM with no peer connection in it to be dialled at: the
 1.79x column below is what that one computes at, and the reason the
 bench is the empty-room fallback rather than the common case.
 
-What goes down a channel is not this. A relay is a stranger's machine
-that has to read and store what it carries, so it gets NIP-01 JSON and
-base64; a channel has two ends that share our own code, so it gets the
+What goes down a channel is not this. A relay has to read, check and
+sometimes store what it carries, so it gets JSON and base64; a channel has two ends that share our own code, so it gets the
 event as bytes (`packages/table/lib/src/frame.dart`) — **36% less than
 the same hand as JSON**, with no compressor in the path
 (`packages/table/tool/wire_breakdown.dart`).
@@ -40,9 +39,8 @@ dart compile js -O2 -o seal.js seal.dart && node seal.mjs   # and on the web
 `bench.mjs` runs the relay the object runs (`service/do/relay.mjs`) on
 the node host (`service/do/host.mjs`) over a loopback socket, with real
 BIP-340 signatures through the app's own wasm. Like the channel bench
-it is a ceiling and not a link: a public relay is somebody else's
-machine with its own limits, and our own object is a hop across the
-world. What loopback measures honestly is the envelope, the work each
+it is a ceiling and not a link: our relay's object is a hop across
+the world, with its own limits (`tableLimits` on a table's tag). What loopback measures honestly is the envelope, the work each
 end must do per event, and what a small message waits behind.
 
 ## The envelope
@@ -100,8 +98,10 @@ magnitude either way, and a few milliseconds either way. What is
 shared differs: there a congestion window, here the relay itself, one
 queue checking a signature and rehashing every event that passes
 through it. On an object that queue is per tag and so belongs to this
-table alone; on a public relay it is everybody's, and this loopback
-had nothing else to do.
+table alone, as it has been in production since every table moved to
+its own object (docs/08-own-relays.md); on the public relays the tables
+used before that it was everybody's, and this loopback had nothing
+else to do.
 
 **And the sender's own queue is the same story as the channel's.** 7.7
 MB handed over at once drains in 180 ms on loopback and holds up
@@ -112,8 +112,8 @@ waiting behind the sender's own upload.
 
 ## Sealing, which the relay path needs and the channel does not
 
-A channel is between two peers. A relay is a stranger's machine that
-carries the event, which is why signalling is already sealed to its
+A channel is between two peers. A relay is open — anyone can subscribe
+to a tag and read what it carries — which is why signalling is already sealed to its
 recipient with NIP-44 v2 (`packages/table/lib/src/nip44.dart`), and
 why anything else addressed to one party would be. NIP-44 is Dart, not
 wasm, so the web app pays dart2js for it:

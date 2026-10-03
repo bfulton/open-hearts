@@ -1,7 +1,7 @@
 # 08 — Our own relay, and only ours
 
-> **Status: proposed, 3 October 2026. Not built.** Approve, change or
-> reject before any of it is.
+> **Status: approved 3 October 2026, being built.** Ratings start fresh;
+> the relay-endpoint setting stays, and only ever names our own relays.
 
 ## Why
 
@@ -126,11 +126,10 @@ cost less than this.
 
 About two days of work, most of it in step 2 and its tests.
 
-## Questions for the owner
+## Decided
 
-1. Start the ratings again on our relay, rather than copying the test
-   games' results over? (Recommended: start again.)
-2. Keep the remote config's `relays` as the way back to public relays in
-   an emergency? It only works while our format still matches theirs, so
-   it lasts until the first change to the format. (Recommended: keep it
-   until then, unused.)
+1. **Ratings start fresh** on our relay; the test games' results on the
+   public relays are left where they are.
+2. **The remote config's `relays` stays**, as a way to point the app at
+   another relay of ours without a release. It never names a public
+   relay.

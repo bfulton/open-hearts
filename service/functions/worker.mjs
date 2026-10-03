@@ -1718,13 +1718,16 @@ export function configOf(raw) {
   if (typeof raw.offer === 'boolean') c.offer = raw.offer;
   // Which relays the tables meet on, in place of the build's. wss only:
   // these carry every live game, and a relay over plain ws would carry
-  // them in the open.
+  // them in the open. And ours only (docs/08-own-relays.md): this is the
+  // way to move the tables to another relay of ours without a release,
+  // never the way back to a public one.
   if (Array.isArray(raw.relays) && raw.relays.length > 0 && raw.relays.length <= MOST_RELAYS) {
     const relays = [];
     for (const r of raw.relays) {
       try {
         const u = new URL(r);
-        if (u.protocol === 'wss:' && !u.username && !u.password) relays.push(u.toString());
+        const ours = u.hostname === 'openhearts.game' || u.hostname.endsWith('.openhearts.game');
+        if (u.protocol === 'wss:' && ours && !u.username && !u.password) relays.push(u.toString().replaceAll('%7Btag%7D', '{tag}'));
       } catch {}
     }
     if (relays.length === raw.relays.length) c.relays = relays;

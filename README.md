@@ -62,7 +62,7 @@ rigged. Roughly in order:
    departure matrix passes on a simulated network, and a thousand
    seeds of random faults walk its explicit state model without a
    fork or a deadlock ([doc 06](docs/06-service.md), `packages/table`).
-   The local relay exists (`service/`, a NIP-01 subset), the same
+   The local relay exists (`service/`, speaking the deployed relay's format), the same
    clients play a hand over it with real keys and real sockets, and
    the app has live play: one screen before a game, your name and
    avatar behind the icon in its corner and the game you are asking
@@ -80,13 +80,13 @@ rigged. Roughly in order:
    the table signs — and every table is dealt by the verifiable deal (5).
    Four headless browsers prove it on every commit — matched, a hand
    over WebRTC, a browser closed mid-hand, a stalled one booted, a
-   leaver (`e2e/`). A deployed build starts on a few public relays —
-   the build's, never a setting on the page — our own relay and a few
-   public ones, listening on all of them, a table's events written to
-   one relay everyone reads (ours preferred while up), what forms a
-   table and what goes unanswered to all, so one relay turning on a
-   table, or deaf to one player, is not the end of it (`packages/table`,
-   `relays.dart`); the local rig points `OH_RELAYS` at its bridges. The deployed
+   leaver (`e2e/`). A deployed build talks to our relay and no other —
+   the build's, never a setting on the page —
+   `relay.openhearts.game`, one Cloudflare object per tag: a table,
+   its signalling, a pool, a room code, the results, presence
+   ([doc 08](docs/08-own-relays.md), `relays.dart`). The remote config
+   can move the tables to another relay of ours without a release,
+   never to anyone else's; the local rig points `OH_RELAYS` at its bridges. The deployed
    site's worker mints TURN credentials for the pairs no direct path
    serves (`service/functions/`, doc 06).
    Meanwhile every solo game is kept on the device as a

@@ -26,7 +26,8 @@
 
 import wasm from '../../app/web/schnorr.wasm';
 
-import { limitsFrom, objectRelay, schnorrVerifier, tagOf, tally } from './relay.mjs';
+import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, tagOf, tally } from './relay.mjs';
+import { tagStore } from './tag_store.mjs';
 import { callIn } from './bench.mjs';
 
 // One object per subscription, through which a household's codes,
@@ -86,14 +87,41 @@ export class TagRelay {
   /// thread.
   async build() {
     const [verify, limits] = await Promise.all([schnorrVerifier(wasm), limitsFrom(this.env)]);
-    const relay = objectRelay(verify, { count: (what, n) => this.tally.count(what, n), limits, heard: (event) => this.heard(event) });
+    const tag = (this.tag ??= (await this.state.storage.get('tag')) ?? presenceTag);
+    const presence = tag === presenceTag;
+    // A table's or a lobby's tag keeps the lobby kind (docs/08-own-relays.md):
+    // what an evicted object held comes back from its own storage.
+    const kept = tagStore(this.state.storage, tag);
+    const relay = objectRelay(verify, {
+      tag,
+      count: (what, n) => this.tally.count(what, n),
+      // The operator's limits are presence's; a table's are the relay's own.
+      limits: presence ? limits : null,
+      heard: (event) => this.heard(event),
+      store: await kept.load(),
+      kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
+    });
     for (const socket of this.state.getWebSockets()) relay.open(socket, socket.deserializeAttachment());
     return relay;
+  }
+
+  /// A day's stored events gone; the relay in memory built again from
+  /// storage at the next message.
+  async alarm() {
+    if (this.tag === undefined) this.tag = (await this.state.storage.get('tag')) ?? presenceTag;
+    if (await tagStore(this.state.storage, this.tag).sweep()) this.relay = null;
   }
 
   async fetch(request) {
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
       return new Response('this is a relay: open a websocket\n', { status: 426 });
+    }
+    // The tag this object is for, said once and kept: an object cannot
+    // read its own name, and an alarm has no request to read it from.
+    if (this.tag === undefined) {
+      const tag = tagOf(new URL(request.url).pathname) || presenceTag;
+      this.tag = tag;
+      if ((await this.state.storage.get('tag')) !== tag) await this.state.storage.put('tag', tag);
     }
     const relay = await this.ready();
     const pair = new WebSocketPair();

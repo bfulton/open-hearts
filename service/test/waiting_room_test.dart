@@ -165,10 +165,12 @@ void main() {
       // room announced before it arrived; a pool's pile up with it, and
       // a device pressing Play was handed every one the pool had ever
       // carried. An hour of a busy pool's rounds, and one from now.
-      final ws = WebSocketChannel.connect(relay.url);
+      // A socket a tag: on the deployed relay each tag is its own object.
+      final sockets = <String, WebSocketChannel>{};
       final host = SchnorrSigner.generate();
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      void store(String tag, int at, String what) => ws.sink.add(jsonEncode([
+      void store(String tag, int at, String what) =>
+          sockets.putIfAbsent(tag, () => WebSocketChannel.connect(relaysForTag([relay.url], tag).single)).sink.add(jsonEncode([
             'EVENT',
             NostrEvent.sign(host, kind: TableKinds.lobby, content: jsonEncode({'what': what}), tags: [
               ['t', tag],
@@ -198,7 +200,9 @@ void main() {
 
       entering.close();
       joining.close();
-      await ws.sink.close();
+      for (final ws in sockets.values) {
+        await ws.sink.close();
+      }
     });
 
     test('if the lowest key falls silent, the next seats the round', () async {

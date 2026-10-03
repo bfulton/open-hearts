@@ -7,7 +7,15 @@
 > no game server, and a table under way needs nothing from us. What does
 > exist is a handful of stateless handlers for sign-in, entitlement and
 > TURN credentials, described in [doc 06](06-service.md). TURN itself is
-> Cloudflare's; signalling is public Nostr relays, unchanged.
+> Cloudflare's.
+>
+> **Revised again by [doc 08](08-own-relays.md).** Signalling, the
+> relay lane and everything else that meets on a relay moved off the
+> public Nostr relays on 3 October 2026, onto our own relay,
+> `relay.openhearts.game`, one Cloudflare object per tag. The reasoning
+> below is why public relays were used while there was no server and no
+> bill; it is kept as history. Where it says "public Nostr relays", read
+> "our relay" for today.
 
 **Question.** Can four people play a real-time game of Hearts with no
 game server, no hosting bill, and sub-second latency?
@@ -60,7 +68,7 @@ of this page says not to do. It is a fallback again.
 | Direct data channel, same continent | 20–60 ms | 150 ms |
 | Direct, intercontinental | 120–200 ms | 300 ms |
 | Via TURN relay | +20–80 ms | +150 ms |
-| Via a Nostr relay lane (fallback) | 150–400 ms | 800 ms |
+| Via the relay lane (fallback) | 150–400 ms | 800 ms |
 
 A trick-taking game asks for one message per play. Even the worst row
 clears a second. Latency is not the risk.
@@ -91,6 +99,11 @@ infrastructure with rate limits and no uptime promise. Depending on them
 for the *fallback* path is a reasonable bet. Depending on them for the
 *primary* path would not be — which is why the primary path is a direct
 connection that needs nobody.
+
+The bet held until the jurors of last resort, which have no direct
+connections, put whole tables on the relay lane, and a public relay
+banned them mid-game. That is why the relays are now ours
+([doc 08](08-own-relays.md)).
 
 ## Who is in charge
 

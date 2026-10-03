@@ -276,7 +276,7 @@ export function memoryStore(keep = 10000) {
 /// the rate is measured by. [count], if given, is told what became of
 /// each message — `count('events')`, `count('delivered', n)` — and
 /// nothing about who sent it: what the operator watches (worker.mjs).
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null }) {
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -343,6 +343,9 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     if (!ephemeral(event.kind)) {
       const gone = store?.add(event);
       if (gone) seen.delete(gone.id);
+      // And for a host that keeps it beyond this process: the object
+      // writes it to its own storage (worker.mjs).
+      kept?.(event, gone ?? null);
     } else if (seen.size > rememberedIds) {
       // Ephemeral ids are remembered only to answer duplicates. They
       // are the traffic, so this is the set that would grow for ever:
@@ -490,18 +493,70 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// tests build is that relay and not one set up to look like it:
 /// nothing written down, nothing but the ephemeral kinds, and every
 /// socket held to [objectLimits].
-export function objectRelay(verify, { now = Date.now, count = null, limits = objectLimits, heard = null } = {}) {
+export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null } = {}) {
+  const presence = tag === presenceTag;
+  const own = refusalFor(tag);
   return createRelay({
     heard,
     verify,
-    store: null,
-    refuse: (event) =>
-      ephemeral(event.kind) ? null : 'blocked: this relay carries ephemeral kinds; the stored ones live on the relays',
-    limits,
+    // Presence keeps nothing; a table's tag keeps its lobby.
+    store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
+    kept: presence ? null : kept,
+    // [also]: a test's own policy on top, asked only of what the object
+    // itself takes (host.mjs, --object --control).
+    refuse: also ? (event) => own(event) ?? also(event) : own,
+    limits: limits ?? (presence ? objectLimits : tableLimits),
     now,
     count,
   });
 }
+
+/// The one tag presence rides on (packages/table, presence_relay.dart).
+export const presenceTag = 'online';
+
+/// The one kind this relay stores: the lobby — a room announced, a
+/// pool's seating, a table started, a player's picture, a game's result
+/// (packages/table, nostr.dart, TableKinds.lobby; docs/08-own-relays.md).
+export const lobbyKind = 4244;
+
+/// The tag game results are written under (packages/table, results.dart,
+/// GameResult.tag): kept, since the ratings are folded from all of them.
+/// Everything else stored is kept a day (worker.mjs, the sweep).
+export const resultsTag = 'results';
+
+/// How many stored events a tag's object holds in memory. A room or a
+/// pool's lobby is a handful; the results are every game's, folded by
+/// every device that loads its rating — 20,000 is some 20 MB, well
+/// inside an object's memory, and the point at which ratings should be
+/// folded by the service rather than by every device.
+export const storedKeep = (tag) => (tag === resultsTag ? 20000 : 2000);
+
+/// What a tag's object refuses. Presence: anything but the ephemeral
+/// kinds. A table's or a lobby's tag: anything but the ephemeral kinds
+/// and the lobby kind tagged for this very tag — an object stores what
+/// belongs to it, and nobody writes into one tag's store through
+/// another's.
+export function refusalFor(tag) {
+  return (event) => {
+    if (ephemeral(event.kind)) return null;
+    if (tag !== presenceTag && event.kind === lobbyKind && event.tags?.some((t) => t[0] === 't' && t[1] === tag)) return null;
+    return tag === presenceTag
+      ? 'blocked: presence carries ephemeral kinds only'
+      : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
+  };
+}
+
+/// A table's tag carries what presence does not: a deal's steps of up
+/// to some tens of kilobytes, and every seat and juror saying its moves
+/// and repeating what is unsettled, in bursts at the deal. Measured
+/// against real tables through this relay (docs/08-own-relays.md);
+/// presence keeps [objectLimits].
+export const tableLimits = Object.freeze({
+  message: 128 * 1024,
+  request: 1024,
+  burst: 200,
+  perSecond: 20,
+});
 
 /// What one object has seen since it last said so, in the order the
 /// operator's query reads the numbers (doc 06, "Watching it run"):

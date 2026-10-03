@@ -2,7 +2,7 @@
 
 What runs on our side, which is deliberately little. The game is peer to
 peer ([doc 02](02-multiplayer.md)), the deal is verifiable
-([doc 03](03-fair-deal.md)), presence rides relays and bot seats are
+([doc 03](03-fair-deal.md)), presence rides our relay and bot seats are
 played by the players and the jury ([doc 04](04-live-play.md)). What is
 left is identity, entitlement, and jurors when the room is empty.
 
@@ -190,10 +190,10 @@ the renewal path.
 
 The design is written against DynamoDB's single-table shape and ports to
 any key-value store almost literally; the platform choice is deferred to
-deployment. A bucket is reserved for archiving public game records,
-since relays do not promise retention; whether the service subscribes
-to relays or clients post copies is undecided, and nothing depends on
-it yet.
+deployment. A bucket is reserved for archiving public game records. It
+was meant for relays that promise no retention; our relay now keeps the
+results itself (the `results` tag's object, below), so whether the
+bucket is needed at all is undecided, and nothing depends on it yet.
 
 ## What is paid for, and how
 
@@ -499,8 +499,8 @@ TURN is Cloudflare's.
 ## Remote config
 
 Some things have to change for every device at once, sooner than a
-build reaches them: live play shut while the relays are down, a line on
-the front door saying so, the tables moved to other relays, a build too
+build reaches them: live play shut while the relay is down, a line on
+the front door saying so, the tables moved to another relay of ours, a build too
 old to sit with the others told to update. The **config** handler serves
 them, from one row the operator writes:
 
@@ -514,7 +514,7 @@ npx wrangler kv key put --binding OH_STORE 'config|app' \
 |---|---|---|
 | `live` | `false` shuts the doors to live play — the buttons, a link to a table, going online as a juror at the start — and says so where the buttons were. A game already at a table plays on, and a device already online stays a juror to the tables that drew it until it is next started. | open |
 | `offer` | `false` hides the paid tier from a device that has not bought it: no price, no Subscribe. One with a licence keeps live play. For a store build that may not show a web price. | offered |
-| `relays` | The relays the tables meet on, in place of the build's: one to eight, `wss://` only, every one good or none taken. Read at the app's start, so the devices that started since the change meet on the new ones and those before it finish where they are. A local build and the rig keep their own. | the build's |
+| `relays` | The relays the tables meet on, in place of the build's: one to eight, `wss://` only, on `openhearts.game` or a host under it — never a public relay ([doc 08](08-own-relays.md)) — every one good or none taken. Read at the app's start, so the devices that started since the change meet on the new ones and those before it finish where they are. A local build and the rig keep their own. | the build's |
 | `banner` | A line across the front door: `id` (letters, digits, `.` `_` `-`), `level` `info` or `warn`, and `text` by language, English required — a device is told it in its own language where the row has it and in English where it does not. | nothing |
 | `feedback` | Where "Tell us what's broken" sends a report: an `https://` page or a `mailto:` address. GitHub's new-issue page and mail take the report in the address; another page is opened with the report on the clipboard. | the project's GitHub issues |
 | `privacy`, `terms` | Where the privacy policy and the terms of use are, `https://` only, for the links under Subscribe. | the site's `/privacy` and `/terms` |
@@ -657,7 +657,7 @@ code and different adapters:
 | Sign-in | Apple/Google published keys | `local:<subject>`, a token naming a `sub` |
 | Entitlement | store and Stripe webhooks | an open house: a key that asks is licensed for a month |
 | TURN | Cloudflare | none; localhost connects directly |
-| Signalling, waiting rooms, results | our own relay and a few public ones, listened on together; table events written to one relay everyone reads, ours preferred while up; lobby, signalling and whatever goes unanswered to all | a minimal NIP-01 relay in the repo |
+| Signalling, waiting rooms, results | our own relay, `relay.openhearts.game`, one object per tag ([doc 08](08-own-relays.md)) | a minimal relay in the repo, same wire format |
 | Last-resort jurors | woken on demand | always available |
 
 One process, one flag.
@@ -680,8 +680,9 @@ for them.
 
 `service/` is, so far, the local relay — and only that: matchmaking
 is the players' own business on the relay (doc 04, "The live table"),
-and so are results and ratings. The relay is a NIP-01 subset in a few
-hundred lines of Dart — `EVENT`, `REQ` with filters on ids, authors,
+and so are results and ratings. The relay is a subset of our wire
+format (Nostr's NIP-01, which it began as) in a few hundred lines of
+Dart — `EVENT`, `REQ` with filters on ids, authors,
 kinds, `since`, `until`, `limit` and single-letter tags, `CLOSE`, and
 `OK`, `EOSE` and `NOTICE` back. Every event's id and BIP-340 signature
 are checked before anything else sees it. Stored kinds live in memory
@@ -695,8 +696,9 @@ that wraps each table message in an ephemeral event of kind 24242,
 tagged with the table id and signed by the sender, and subscribes to
 the same — on every relay in its list, writing to the first that has
 not refused it lately and moving a refused event on to the next
-(`relays.dart`; doc 04, "The live table"). The local relay takes a
-`refuse` policy so a test can be the public relay that turns on a
+(`relays.dart`; doc 04, "The live table"). A deployed build's list
+is one relay, ours, with the table id in the address. The local relay
+takes a `refuse` policy so a test can be the relay that turns on a
 client. What arrives is stamped *from* the envelope's signer — the
 peer that sent it, which for a relayed message is not the author — and
 that is the distinction "heard from" rests on. The relay says nothing
@@ -706,7 +708,7 @@ signalling — an offer, an answer, an ICE candidate — addressed with a
 `p` tag to one recipient, who is the only one subscribed to it, and
 sealed to that recipient's key with NIP-44 (`nip44.dart`, version 2,
 written out in Dart and pinned to the published vectors), since a
-candidate carries an address and a public relay carries the event.
+candidate carries an address and anyone can read what the relay carries.
 The two ends' conversation key comes from their keys' shared point
 (`Signer.sharedXWith`), the same ECDH the deal's escrow rests on.
 
@@ -714,8 +716,8 @@ What the path itself carries is measured
 ([measurements/relay](../measurements/relay/README.md)) — and it is the
 relay path only: a data channel carries the event as bytes instead,
 which is 36% less again (`packages/table/lib/src/frame.dart`), because
-a channel has our own code at both ends where a relay has to read and
-store what it is given. On the relay, then: 366 bytes of
+a channel has our own code at both ends where a relay has to read,
+check and sometimes store what it is given. On the relay, then: 366 bytes of
 envelope on an event, a third more again for anything that is not text,
 a signature to send one and a rehash and a signature to accept one at
 the relay and at every receiver — about 1,650 small events a second on
@@ -772,28 +774,29 @@ open. Ours is a **Cloudflare Durable Object per tag** (`service/do/`):
 `wss://relay.openhearts.game/<tag>`, the tag in the path because the
 object has to be named before the socket is opened, and everyone on
 that tag lands on that one object wherever they are — no fan-out
-between machines, no database in the middle. Presence is one tag,
-`online`, and one object. Tables and matchmaking have not moved.
+between machines, no database in the middle. Every tag is its own
+object: a table's id (its events and its signalling), a pool's
+`queue:…` (waiting to be matched), a room code, `results`, and
+`online` for presence. It is the only relay a deployed build or a
+juror of last resort talks to ([doc 08](08-own-relays.md)); presence
+ran on it alone from September, and everything else moved to it from
+the public Nostr relays on 3 October 2026.
 
-**It is preferred, and nothing depends on it.** The beats still go to
-every relay the device can write to, the public ones included: a device
-is online for whoever can hear it, and what another device can reach is
-not ours to assume — a build from before the object existed, a network
-that blocks the host, a deploy that is down. So a device on the object
-and a device on the public relays alone see each other, and the day the
-object is not there presence is exactly what it was before it existed
-(`service/test/presence_object_test.dart`).
+**It is the one relay, so it is watched.** If the object is down, live
+play is down, as it is when the licence handler or TURN is: they are
+all on Cloudflare. The monitors (`observability/`) watch it, and the
+remote config's `relays` can point the tables at another relay of ours
+without a release.
 
 **Marked in the list, never assumed.** A relay that keeps one object
 per tag wears `{tag}` where the tag goes, and the client that has a tag
-puts it there (`tagMark`, `presence_relay.dart`). It cannot be
-inferred from a hostname in either direction: a public relay serves
-every tag at its root and would answer a path with a 404, and a
-sharded one cannot serve a client that gives it no tag. That is also
-why the marked relay is in the list presence takes
-(`presenceRelays`, `app/lib/net/relays.dart`) and not in the list
-tables and signalling take — a table has nowhere to put its tag until
-it moves here.
+puts it there (`tagMark`, `presence_relay.dart`; `relaysForTag`, used
+by the table's transport as well as presence). It cannot be inferred
+from a hostname in either direction: a relay that serves every tag at
+its root would answer a path with a 404, and a sharded one cannot serve
+a client that gives it no tag. Presence, tables, signalling, pools,
+rooms and results now take the same list (`presenceRelays`,
+`app/lib/net/relays.dart`).
 
 **Hibernation, which is the difference between free and a monthly
 bill.** The object hands its sockets to the runtime
@@ -809,8 +812,8 @@ size limit, so a socket is held to a few subscriptions and the oldest
 goes as a new one arrives — bounded as it is written, which is the
 rule for everything here.
 
-**Bounded per socket.** The tag is open to anybody who can open a
-socket, Cloudflare hands an object messages of up to 32 MiB, and an
+**Bounded per socket.** Every tag is open to anybody who can open a
+socket, and anyone may subscribe to any tag and read what it carries, Cloudflare hands an object messages of up to 32 MiB, and an
 event that matches presence goes on to every device listening, on the
 one thread they share — one message of four megabytes was 800 MB out
 to two hundred listeners and three seconds of that thread. So the
@@ -819,19 +822,34 @@ longer than 64 K characters, which is several times a summons, the
 largest thing presence says; takes a REQ of a kilobyte at most, so
 eight of them ride in the 16 KiB a socket's attachment may carry; and
 holds each socket to a burst of thirty events and two a second after,
-refused before their signatures are checked. The node host under the
-suites carries whole tables and is held to none of it.
+refused before their signatures are checked. Those are presence's,
+and the operator can change them; a table's tag carries a deal's
+steps and every seat and juror repeating what is unsettled, so it
+takes messages of up to 128 KiB and a burst of two hundred and twenty
+a second after (`tableLimits`). The node host under the suites is held
+to none of it.
 
-**Nothing is written down.** Presence is ephemeral by definition,
-forwarded to whoever is listening and forgotten, so the object has no
-storage to pay for, none to read on the way back from hibernation, and
-nothing that could ever need a scheduled sweep. A kind that is not
-ephemeral is refused with a reason rather than quietly dropped, and the
-client writes it to the relays that keep things.
+**Only the lobby is written down.** Presence, table events,
+signalling and waiting to be matched are ephemeral kinds, forwarded to
+whoever is listening and forgotten. The `online` object stores nothing
+and refuses any other kind with a reason. Every other tag's object
+keeps one kind, 4244, the lobby — a room announced, a pool's seating,
+a table started, a player's picture, a game's result — and only when
+the event's `t` tag is that object's own tag, so nobody writes into
+one tag's store through another's (`refusalFor`). It is kept in the
+object's own storage (`tag_store.mjs`), so it is still there after
+eviction, and a new subscriber is answered with it. A room, a seating,
+a start or a picture is kept a day, then deleted by an hourly alarm
+(`KEPT_MS`); results, under `results`, are kept for good in storage,
+since the ratings are folded from all of them, and the newest 20,000
+are held in memory (`storedKeep`). A picture is at most 12,000 bytes
+and is sent again on each join of a room or pool. Rows can be deleted
+from a tag's storage by hand, which is how a request to delete a
+device's results is met.
 
 **One relay, two runtimes, one set of tests.** The core
-(`service/do/relay.mjs`) is the NIP-01 subset the Dart relay already
-speaks, written as plain functions over anything that can send a
+(`service/do/relay.mjs`) speaks the same subset of our wire format as
+the Dart relay, written as plain functions over anything that can send a
 string: no Cloudflare imports and no node ones, signatures through the
 very wasm the app carries (`app/web/schnorr.wasm`, handed in compiled
 because a Worker may not compile one at runtime) rather than a third
@@ -859,9 +877,9 @@ binding (`TABLE`), the class and the SQLite migration are in
 `wrangler.toml`, and a first deploy answers on the worker's own
 `workers.dev` host. The name the app looks for is a Workers custom
 domain on `relay.openhearts.game`, which writes its own DNS record and
-needs the zone to be on the account; until it is, builds find the
-object down and presence rides the public relays, which is the same
-thing that has always been true of `nostr.openhearts.game`.
+needs the zone to be on the account. It is: the relay is deployed
+there, and a build with nothing else configured finds live play down
+when the object is.
 
 ## Language and layout
 
@@ -870,7 +888,7 @@ The juror runs the bot policy — it plays the bot seats it holds
 bot is Dart. So the juror is Dart, and rather than carry a second
 language for two hundred lines of handlers, the whole service is Dart. The one exception is the
 object per tag, which is JavaScript because the runtime it hibernates
-on is: a few hundred lines of NIP-01 that the Dart suites hold to the
+on is: a few hundred lines of relay that the Dart suites hold to the
 Dart relay's own behaviour, rather than a runtime chosen to keep the
 language. Locally that is one
 `dart run`; in production it is a container, or Dart on a serverless

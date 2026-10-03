@@ -157,7 +157,7 @@
     </div>
     <h1>Privacy</h1>
     <p class="tagline">What Open Hearts does with what you give it, in plain words.</p>
-    <p class="updated">Last updated 1 October 2026</p>
+    <p class="updated">Last updated 3 October 2026</p>
   </div>
 </header>
 
@@ -178,8 +178,8 @@
         <div>
           <b>Live play is public, on purpose</b>
           <span>To play people, your name, your picture and your results go
-          to relays — public servers, most of them run by other people — where
-          anyone can read them and where they may be kept for good.</span>
+          through our relay, where anyone who asks can read them. Rooms and
+          pictures are kept a day; results are kept for the ratings.</span>
         </div>
       </li>
       <li>
@@ -272,9 +272,8 @@
       <li><b>A licence check.</b> Each time the game starts it sends your
       device's public key to our service to ask whether it holds a
       subscription. If it does not, nothing is kept.</li>
-      <li><b>Your profile page</b> asks the relays for game results so it can
-      show your rating. That connects your browser to them, so they see your
-      IP address. Nothing about you is published by it.</li>
+      <li><b>Your profile page</b> asks our relay for game results so it can
+      show your rating. Nothing about you is published by it.</li>
       <li><b>New Relic</b> tells us when the game breaks or is slow for you
       on the web at openhearts.game. The game's page sends it the errors it
       meets, how long it took to load, the addresses of the calls it makes
@@ -292,22 +291,26 @@
 
     <h3>What everyone can see</h3>
     <p>
-      A live game is played between devices, through relays. A relay is a
-      public server that passes messages between apps. Anything on a relay
-      can be read by anyone who asks it, and some of it is kept. In live play:
+      A live game is played between devices, through our relay,
+      <code>relay.openhearts.game</code>, a server that passes messages
+      between apps. It is open: anyone who asks it for a room, a table or the
+      results can read what it carries there, and some of it is kept. In live
+      play:
     </p>
     <ul class="plain">
-      <li><b>Kept on relays and readable by anyone:</b> your name, icon and
+      <li><b>Kept, and readable by anyone who asks:</b> your name, icon and
       colour, and your public key, each time you are seated at a table; your
       picture, if you chose one; and the result of every live game you play,
       rated or not — the table, each seat's key and final score, and who
       left. Ratings are worked out from these results by anyone who cares to,
-      which is the point: nobody has to take our word for a rating.</li>
+      which is the point: nobody has to take our word for a rating. Names,
+      icons, keys and pictures are kept a day; results are kept for as long
+      as the ratings are.</li>
       <li><b>Passed on but not kept:</b> while you wait for a game, your name,
       rating, icon and colour and how many seconds you usually take over a
       card, every couple of seconds; and while the app is open, that your
-      device is online or at a table. Relays forward these to whoever is
-      listening at that moment and keep nothing — but anyone listening could
+      device is online or at a table. The relay forwards these to whoever is
+      listening at that moment and keeps nothing — but anyone listening could
       record them.</li>
     </ul>
     <p>
@@ -322,18 +325,10 @@
     </p>
 
     <h3>Where it goes</h3>
-    <p>The game uses these relays today:</p>
-    <ul class="plain">
-      <li><code>relay.openhearts.game</code> and <code>nostr.openhearts.game</code>,
-      ours. The first keeps nothing it is sent. The second is not running
-      yet; when it is, this page will say what it keeps.</li>
-      <li><code>relay.damus.io</code>, <code>relay.primal.net</code> and
-      <code>nos.lol</code>, run by other people under their own policies. They
-      may keep what is stored on them indefinitely, and anything signed can be
-      copied from one relay to another by anyone.</li>
-    </ul>
     <p>
-      We cannot delete anything from relays we do not run.
+      Only to our relay, which runs on Cloudflare. Every message is signed by
+      the device that sent it, so anyone who keeps a copy can show it is
+      genuine; we cannot delete a copy someone else made.
     </p>
 
     <h3>What only your table sees</h3>
@@ -428,9 +423,9 @@
     <h2>How long things are kept</h2>
     <ul class="plain">
       <li><b>On your device:</b> until you remove them.</li>
-      <li><b>On relays:</b> whatever is passed on is not kept. Whatever is
-      stored is kept as long as each relay's operator chooses, which may be
-      for good.</li>
+      <li><b>On our relay:</b> moves, presence and waiting for a game: not
+      kept. Rooms, seatings and pictures: a day. Game results: for as long as
+      the ratings are worked out from them.</li>
       <li><b>Our service's subscription records:</b> while the subscription
       runs, and afterwards until you ask us to delete them.</li>
       <li><b>Stripe:</b> as long as Stripe's policy and the law on payment
@@ -449,8 +444,8 @@
       <li>Change your name or picture at any time. What was already published
       stays where it is.</li>
       <li>Ask us for a copy of what our service keeps about your device, or
-      ask us to delete it. We will also ask the relays we do not run to delete
-      what your device published there, but we cannot make them.</li>
+      ask us to delete it, including the results your device published on our
+      relay.</li>
     </ul>
     <p>
       Where data protection law gives you rights — to see, correct or delete

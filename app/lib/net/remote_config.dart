@@ -281,6 +281,11 @@ class RemoteConfig {
 
   static final _day = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
+  /// A relay of ours: the only kind the config may name
+  /// (docs/08-own-relays.md), so it can move the tables between our
+  /// relays and never to a public one.
+  static bool ours(Uri u) => u.host == 'openhearts.game' || u.host.endsWith('.openhearts.game');
+
   /// The config as the worker serves it, every field checked again: one
   /// that does not check out is left as the build has it.
   static RemoteConfig parse(Object? json) {
@@ -293,7 +298,7 @@ class RemoteConfig {
           if (e is String) Uri.tryParse(e),
       ];
       if (parsed.length == r.length &&
-          parsed.every((u) => u != null && u.scheme == 'wss' && u.host.isNotEmpty && u.userInfo.isEmpty)) {
+          parsed.every((u) => u != null && u.scheme == 'wss' && ours(u) && u.userInfo.isEmpty)) {
         relays = [for (final u in parsed) u!];
       }
     }

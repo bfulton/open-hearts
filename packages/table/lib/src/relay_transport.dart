@@ -22,6 +22,7 @@ import 'dart:typed_data';
 
 import 'nip44.dart';
 import 'nostr.dart';
+import 'presence_relay.dart' show relaysForTag;
 import 'relays.dart';
 import 'signing.dart';
 import 'transport.dart';
@@ -29,7 +30,7 @@ import 'transport.dart';
 class RelayTransport implements Transport {
   RelayTransport(
       {required List<Uri> relays, required this.signer, required this.table, this.log, int pinned = 0, int refusalMs = RelayGroup.defaultRefusalMs})
-      : relays = Relays.turnedBy(relays, table, pinned: pinned) {
+      : relays = Relays.turnedBy(relaysForTag(relays, table), table, pinned: pinned) {
     _group = RelayGroup(
       urls: this.relays,
       refusalMs: refusalMs,

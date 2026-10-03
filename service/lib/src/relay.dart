@@ -38,9 +38,11 @@ import 'relay_js.dart';
 /// whichever of the two is running underneath.
 abstract class Relay {
   factory Relay({int keep = 10000, void Function(String line)? log, String? Function(NostrEvent event)? refuse}) =>
-      Platform.environment['OH_RELAY'] == 'js'
-          ? JsRelay(keep: keep, log: log, refuse: refuse)
-          : DartRelay(keep: keep, log: log, refuse: refuse);
+      switch (Platform.environment['OH_RELAY']) {
+        'js' => JsRelay(keep: keep, log: log, refuse: refuse),
+        'object' => JsRelay(keep: keep, log: log, refuse: refuse, object: true),
+        _ => DartRelay(keep: keep, log: log, refuse: refuse),
+      };
 
   /// A policy, for a test: the reason to refuse an event that checks
   /// out, or null to take it — what a public relay does when it

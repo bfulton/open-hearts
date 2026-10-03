@@ -10,7 +10,9 @@
 ///       -e OH_RELAYS=ws://127.0.0.1:7449 -e OH_PRESENCE_RELAYS=ws://127.0.0.1:7449 oh-bench:local
 ///
 /// It waits for the bench to come up on the relay, so the two can be
-/// started in either order.
+/// started in either order. `--relay <url>` uses a relay already
+/// running instead of starting one: the deployed object's, say, as
+/// `node do/host.mjs --object` runs it, at `ws://127.0.0.1:7448/{tag}`.
 library;
 
 // A check's output is its log.
@@ -27,15 +29,17 @@ import 'package:table/table.dart';
 Future<void> main(List<String> args) async {
   var port = 7449;
   var hands = 1;
+  Uri? given;
   for (var i = 0; i < args.length; i++) {
+    if (args[i] == '--relay' && i + 1 < args.length) given = Relays.parse(args[++i]).single;
     if (args[i] == '--port' && i + 1 < args.length) port = int.parse(args[++i]);
     if (args[i] == '--hands' && i + 1 < args.length) hands = int.parse(args[++i]);
   }
   await installNativeSchnorr();
   final crypto = await DealCrypto.load();
-  final relay = DartRelay();
-  await relay.serve(port: port);
-  final url = Uri.parse('ws://127.0.0.1:$port');
+  final relay = given == null ? DartRelay() : null;
+  await relay?.serve(port: port);
+  final url = given ?? Uri.parse('ws://127.0.0.1:$port');
   print('relay on $url; waiting for a table to be dealt');
 
   final signers = [SchnorrSigner.generate(), SchnorrSigner.generate()];
@@ -83,6 +87,6 @@ Future<void> main(List<String> args) async {
   for (final p in presences) {
     p.close();
   }
-  await relay.close();
+  await relay?.close();
   exit(ok ? 0 : 1);
 }

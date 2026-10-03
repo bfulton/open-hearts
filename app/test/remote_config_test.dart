@@ -78,23 +78,23 @@ void main() {
     final c = RemoteConfig.parse({
       'live': false,
       'offer': false,
-      'relays': ['wss://one.example', 'wss://two.example/'],
+      'relays': ['wss://one.openhearts.game', 'wss://two.openhearts.game/'],
       'banner': {'id': 'm1', 'level': 'warn', 'text': {'en': 'Down till noon.', 'de': 'Bis Mittag aus.'}},
       'update': {'before': '2026-10-01', 'text': {'en': 'Too old.'}},
     });
     expect(c.live, isFalse);
     expect(c.offer, isFalse);
-    expect(c.relays, [Uri.parse('wss://one.example'), Uri.parse('wss://two.example/')]);
+    expect(c.relays, [Uri.parse('wss://one.openhearts.game'), Uri.parse('wss://two.openhearts.game/')]);
     expect(c.banner!.warning, isTrue);
     expect(c.banner!.text.inLanguage('de'), 'Bis Mittag aus.');
     expect(c.banner!.text.inLanguage('fr'), 'Down till noon.', reason: 'English where the operator wrote none');
     expect(c.updateText!.inLanguage('es'), 'Too old.');
 
     expect(RemoteConfig.parse({'live': 'false'}).live, isTrue);
-    expect(RemoteConfig.parse({'relays': ['ws://plain.example']}).relays, isNull, reason: 'never in the open');
-    expect(RemoteConfig.parse({'relays': ['wss://ok.example', 42]}).relays, isNull, reason: 'not quietly shortened');
-    expect(RemoteConfig.parse({'relays': ['wss://u:p@ok.example']}).relays, isNull);
-    expect(RemoteConfig.parse({'relays': [for (var i = 0; i < 9; i++) 'wss://r$i.example']}).relays, isNull);
+    expect(RemoteConfig.parse({'relays': ['ws://plain.openhearts.game']}).relays, isNull, reason: 'never in the open');
+    expect(RemoteConfig.parse({'relays': ['wss://ok.openhearts.game', 42]}).relays, isNull, reason: 'not quietly shortened');
+    expect(RemoteConfig.parse({'relays': ['wss://u:p@ok.openhearts.game']}).relays, isNull);
+    expect(RemoteConfig.parse({'relays': [for (var i = 0; i < 9; i++) 'wss://r$i.openhearts.game']}).relays, isNull);
     expect(RemoteConfig.parse({'banner': {'id': 'x', 'text': {'de': 'nur Deutsch'}}}).banner, isNull);
     expect(RemoteConfig.parse({'banner': {'text': {'en': 'no id'}}}).banner, isNull);
     expect(RemoteConfig.parse({'update': {'before': 'soon'}}).updateBefore, isNull);
@@ -205,12 +205,17 @@ void main() {
     expect(asked, isEmpty, reason: 'a build with no service behind it asks nobody');
   });
 
-  test('the relays the operator names, on a deployed build; a local one keeps its own', () {
-    final named = RemoteConfig.parse({'relays': ['wss://moved.example']});
-    expect(appRelays(base: Uri.parse('https://open-hearts.pages.dev/play/'), config: named), [Uri.parse('wss://moved.example')]);
-    expect(appRelays(base: Uri.parse('https://open-hearts.pages.dev/play/'), config: RemoteConfig.none),
-        [for (final r in publicRelays) Uri.parse(r)]);
-    expect(appRelays(base: Uri.parse('http://localhost:8080/'), config: named), [Uri.parse(localRelay)]);
+  test('the relays the operator names, on a deployed build, ours only; a local one keeps its own', () {
+    final named = RemoteConfig.parse({'relays': ['wss://moved.openhearts.game/{tag}']});
+    expect(appRelays(base: Uri.parse('https://openhearts.game/play/'), config: named, web: true),
+        [Uri.parse('wss://moved.openhearts.game/{tag}')]);
+    expect(appRelays(base: Uri.parse('https://openhearts.game/play/'), config: RemoteConfig.none, web: true),
+        [for (final r in deployedRelays) Uri.parse(r)]);
+    expect(appRelays(base: Uri.parse('http://localhost:8080/'), config: named, web: true), [Uri.parse(localRelay)]);
+    // Never anyone else's: a public relay named is no relay named.
+    for (final theirs in ['wss://relay.damus.io', 'wss://openhearts.game.evil.example', 'wss://evilopenhearts.game']) {
+      expect(RemoteConfig.parse({'relays': [theirs]}).relays, isNull, reason: theirs);
+    }
   });
 
   testWidgets('paused: no way into a live game, solo as it was, and why', (tester) async {

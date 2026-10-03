@@ -48,7 +48,7 @@ blocks some of the copy.
    dev alias is an older build: someone sent there today would get
    English only, and none of the Read aloud work.
 3. **Live play on production is unconfirmed.** The repo cannot show
-   whether the Stripe keys, the service key and the relays are set
+   whether the Stripe keys, the service key and the relay are set
    (README, "Developing"; security-review.md, "What the owner has to
    do"). Until someone buys a subscription on production and plays a
    live table, cut every line about live play, the deal and ratings:
@@ -102,7 +102,7 @@ the web. Every piece below says which one it means.
 | No account, no sign-up | yes. A web buyer gives Stripe an email address, and live play needs a display name | yes | privacy.md |
 | To play alone, it never asks for a name, an email or a card | yes | yes | *Play solo* goes straight to the table (`home_page.dart`) |
 | Data Not Collected | **no**: never say it of the web | yes, for this build | privacy.md, "The answer first" |
-| "No tracking" | only as privacy.md qualifies it: no analytics, no ad identifiers, no cookies of ours; Google fonts fetched for emoji and non-Latin names; public relays at live tables | yes | privacy.md |
+| "No tracking" | only as privacy.md qualifies it: no analytics, no ad identifiers, no cookies of ours; Google fonts fetched for emoji and non-Latin names; at live tables, our relay is open and anyone can read names, pictures and results | yes | privacy.md |
 | Tells you which rule stopped a card | yes | yes | `refusalFor` |
 | Forty named bots with temperaments, each measured | yes | yes | `persona.dart`, doc 04 |
 | Bots rated like people, seated near your rating | live play only | no | doc 04, "Ratings" |
@@ -279,15 +279,15 @@ Hello,
 
 Open Hearts is a Hearts game in Flutter, MIT-licensed ([SOURCE URL]; play at [PLAY URL]). Two parts of it may interest your readers.
 
-Live tables have no dealer. The four devices shuffle in turn, each publishing a zero-knowledge proof (Barnett–Smart with a Bayer–Groth argument, from the geometryxyz/mental-poker crate compiled to WebAssembly), so the order is fair if any one shuffler is honest and each player can open only their own cards. Bot seats are held by a jury of other players' devices, so nobody at the table sees a bot's hand either. Cards travel over WebRTC; public Nostr relays make the introductions.
+Live tables have no dealer. The four devices shuffle in turn, each publishing a zero-knowledge proof (Barnett–Smart with a Bayer–Groth argument, from the geometryxyz/mental-poker crate compiled to WebAssembly), so the order is fair if any one shuffler is honest and each player can open only their own cards. Bot seats are held by a jury of other players' devices, so nobody at the table sees a bot's hand either. Cards travel over WebRTC; our own relay makes the introductions.
 
 The bots are readable heuristics, not a model: forty named characters at nine strengths, calibrated over 20,000 simulated tables and rated alongside people.
 
-Playing alone is free; live play is $5.99 a year, which pays for relays and TURN. The crypto crate is unaudited research code, and scrutiny is welcome.
+Playing alone is free; live play is $5.99 a year, which pays for the relay and TURN. The crypto crate is unaudited research code, and scrutiny is welcome.
 
 [YOUR NAME]
 ```
-Count: 155 of 170 words
+Count: 156 of 170 words
 
 ## 3. Senior-centre kit
 
@@ -445,7 +445,7 @@ In live play the bots are rated like people, from real results, and you're seate
 
 **Rules:** the standard ones. Pass left, right, across, then hold; the 2♣ leads; no points on the first trick; hearts can't be led until broken; the Q♠ is 13; shoot the moon and everyone else takes 26. Solo games go to 50; live games to 50 or 100.
 
-**Money:** playing alone is free for good. Live play against people is $5.99 a year, on the web for now, and pays for the relays and for connections that can't go direct.
+**Money:** playing alone is free for good. Live play against people is $5.99 a year, on the web for now, and pays for the relay and for connections that can't go direct.
 
 **What I'd like from you:** hands where the bots play badly ("Tell us what's broken" in the table's menu can attach the game's record, which I can replay trick by trick), rules or options you expect and can't find, and whether a deal you can check is something you'd care about at a table of strangers.
 

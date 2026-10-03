@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:service/service.dart';
 import 'package:table/table.dart';
@@ -43,6 +44,16 @@ class Client {
 }
 
 void main() {
+  // The relay at a bare address, every kind stored, any tag on one
+  // socket: the Dart relay and the JS core as the local rig runs them.
+  // The deployed object (`OH_RELAY=object`) is one tag an address and
+  // stores only its own lobby; its rules are tested in service/do
+  // (relay.test.mjs, tag_store.test.mjs), and the table suites here
+  // run over it.
+  if (Platform.environment['OH_RELAY'] == 'object') {
+    test('the general relay', () {}, skip: 'the deployed object has its own rules, tested in service/do');
+    return;
+  }
   late Relay relay;
   setUp(() async {
     relay = Relay();

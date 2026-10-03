@@ -28,7 +28,7 @@ test('the row is served, checked', async () => {
   const row = {
     live: false,
     offer: false,
-    relays: ['wss://relay.one.example', 'wss://relay.two.example/'],
+    relays: ['wss://relay.openhearts.game/{tag}', 'wss://two.openhearts.game/'],
     banner: { id: 'maint-1', level: 'warn', text: { en: 'Live play is down until noon UTC.', de: 'Live-Spiel bis 12 Uhr UTC aus.' } },
     update: { before: '2026-10-01', text: { en: 'This version is too old for live play.' } },
     feedback: 'mailto:help@openhearts.example',
@@ -38,7 +38,7 @@ test('the row is served, checked', async () => {
     v: 1,
     live: false,
     offer: false,
-    relays: ['wss://relay.one.example/', 'wss://relay.two.example/'],
+    relays: ['wss://relay.openhearts.game/{tag}', 'wss://two.openhearts.game/'],
     banner: row.banner,
     update: row.update,
     feedback: 'mailto:help@openhearts.example',
@@ -56,12 +56,17 @@ test('a field that does not check out is left at its default, and the rest still
   assert.equal(configOf({ live: false, offer: 0 }).offer, true);
   // Relays: wss, a few, every one of them good — a list with one bad
   // entry is not quietly shortened into a different list.
-  assert.equal(configOf({ relays: ['ws://plain.example'] }).relays, null, 'not in the open');
-  assert.equal(configOf({ relays: ['wss://ok.example', 'https://not-a-relay.example'] }).relays, null);
-  assert.equal(configOf({ relays: ['wss://user:pw@ok.example'] }).relays, null);
+  assert.equal(configOf({ relays: ['ws://plain.openhearts.game'] }).relays, null, 'not in the open');
+  assert.equal(configOf({ relays: ['wss://ok.openhearts.game', 'https://not-a-relay.example'] }).relays, null);
+  assert.equal(configOf({ relays: ['wss://user:pw@ok.openhearts.game'] }).relays, null);
   assert.equal(configOf({ relays: [] }).relays, null);
-  assert.equal(configOf({ relays: Array.from({ length: 9 }, (_, i) => `wss://r${i}.example`) }).relays, null);
-  assert.equal(configOf({ relays: 'wss://ok.example' }).relays, null);
+  // Ours only (docs/08-own-relays.md): the setting moves the tables
+  // between our relays, never to anyone else's.
+  for (const theirs of ['wss://relay.damus.io', 'wss://openhearts.game.evil.example', 'wss://evilopenhearts.game']) {
+    assert.equal(configOf({ relays: [theirs] }).relays, null, theirs);
+  }
+  assert.equal(configOf({ relays: Array.from({ length: 9 }, (_, i) => `wss://r${i}.openhearts.game`) }).relays, null);
+  assert.equal(configOf({ relays: 'wss://ok.openhearts.game' }).relays, null);
   // A banner needs an id and English, and keeps only what it can say.
   assert.equal(configOf({ banner: { id: 'x', text: { de: 'nur Deutsch' } } }).banner, null);
   assert.equal(configOf({ banner: { text: { en: 'no id' } } }).banner, null);

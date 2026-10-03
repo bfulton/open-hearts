@@ -25,7 +25,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
-import { createRelay, memoryStore, schnorrVerifier, tagOf } from './relay.mjs';
+import { createRelay, memoryStore, objectRelay, schnorrVerifier, tagOf } from './relay.mjs';
 import { listen } from './ws.mjs';
 
 /// The signature wasm the app carries, checked by the same code in the
@@ -49,7 +49,11 @@ export function alsoFakeSignatures(verify) {
 /// A relay per tag on one port. [refuse] and [log] are handed to every
 /// relay; [onChange] is called whenever the counts a test watches move,
 /// before anything is written back to the socket that moved them.
-export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = null, refuse = null, onChange = null } = {}) {
+/// With [object], each tag's relay is the deployed object's
+/// (worker.mjs): presence's limits on `online`, a table's on every other
+/// tag, and only the lobby kind tagged for the tag stored — so a table
+/// played here meets the rules it will meet on Cloudflare.
+export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = null, refuse = null, onChange = null, object = false } = {}) {
   const verify = alsoFakeSignatures(await schnorrVerifier(readFileSync(wasmPath)));
   const relays = new Map();
   const relayFor = (path) => {
@@ -57,7 +61,9 @@ export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = 
     if (tag === null) return null;
     let relay = relays.get(tag);
     if (!relay) {
-      relay = createRelay({ verify, store: memoryStore(keep), refuse, log: log && ((line) => log(tag ? `${tag}: ${line}` : line)) });
+      relay = object
+        ? objectRelay(verify, { tag: tag || 'online', also: refuse, count: (what) => what === 'rateLimited' || what === 'refused' || what === 'tooBig' ? log?.(`${tag}: ${what}`) : null })
+        : createRelay({ verify, store: memoryStore(keep), refuse, log: log && ((line) => log(tag ? `${tag}: ${line}` : line)) });
       relays.set(tag, relay);
     }
     return relay;
@@ -115,12 +121,14 @@ async function main(argv) {
   let quiet = false;
   let stats = null;
   let control = false;
+  let object = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port') port = Number(argv[++i]);
     if (argv[i] === '--keep') keep = Number(argv[++i]);
     if (argv[i] === '--quiet') quiet = true;
     if (argv[i] === '--stats') stats = argv[++i];
     if (argv[i] === '--control') control = true;
+    if (argv[i] === '--object') object = true;
   }
 
   // A policy on the other end of stdin: ask, and wait for the answer.
@@ -172,7 +180,7 @@ async function main(argv) {
       }
     : null;
 
-  const relay = await serve({ port, keep, log: quiet ? null : (line) => process.stdout.write(`${line}\n`), refuse, onChange });
+  const relay = await serve({ port, keep, log: quiet ? null : (line) => process.stdout.write(`${line}\n`), refuse, onChange, object });
   onChange?.(relay.counts());
   // Always say where, even when quiet: a harness reads this line.
   process.stdout.write(`relay ${relay.url}\n`);

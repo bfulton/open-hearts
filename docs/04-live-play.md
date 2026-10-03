@@ -218,21 +218,24 @@ opens, the jurors as each jury carries), the mesh offers a channel to
 each, and the relay is back to what doc 02 gave it, signalling and a
 fallback. A table whose channels are all up costs the relays its
 presence and its signalling and nothing else. And what goes down a
-channel is not what goes to a relay: a relay is a stranger's machine
-that has to read and store what it carries, so it gets NIP-01 JSON,
-where a channel has our own code at both ends and gets the event as
+channel is not what goes to a relay: a relay has to read, check and
+sometimes store what it carries, so it gets JSON events, where a channel has our own code at both ends and gets the event as
 bytes — no base64 around the deal's cryptography, no hex around a key
 or a signature, no table id (a channel is one table's) and no event id
 (it is the hash of the rest, so it is recomputed). **36% less than the
 same hand as JSON**, with no compressor and no CPU in the path
 (`frame.dart`, `packages/table/tool/wire_breakdown.dart`). What is
 signed does not change: the canonical bytes underneath are the same
-bytes, and an event has the same id whichever way it arrived. Relays, plural: a
-client holds a short list — the build's, not a setting anyone types
-(`app/lib/net/relays.dart`) — keeps a subscription on every one of
-them and writes each table event to the first that has not refused it
-lately, our own relay ahead of the volunteer ones while it is up
-(`relays.dart`, `app/lib/net/relays.dart`); what forms a room and what
+bytes, and an event has the same id whichever way it arrived. Relays, plural, in
+principle: a client holds a list — the build's, or another relay of
+ours the remote config names, never a setting anyone types
+(`app/lib/net/relays.dart`). A deployed build's list has been one
+relay, ours, since 3 October 2026 ([doc 08](08-own-relays.md)), with
+the table's id in the address so that a table meets in one object;
+what follows is what a client does with a longer list, and it costs
+nothing with a list of one. It keeps a subscription on every relay and
+writes each table event to the first that has not refused it lately,
+ours first (`relays.dart`, `app/lib/net/relays.dart`); what forms a room and what
 sets up a channel — a lobby's beats and starts, presence, signalling —
 goes to every relay, since a device that has lost one relay must still
 be seen and reached on the others, or two tables start under one code.
@@ -249,9 +252,9 @@ this seat — its own action for the turn, or a heartbeat if it has
 none. A reader that cannot read the relay this device writes to cannot
 say so, and is exactly the one that must hear it: a table that took a
 seat's silence for absence when the silence was its own deafness is
-the failure this prevents. A public relay is volunteer infrastructure
-with rate limits and no uptime promise, and one turned on a live table
-six minutes in — every event answered with a proof-of-work demand, the
+the failure this prevents. A relay can turn on a table: when the tables
+still met on public relays, volunteer infrastructure with rate limits
+and no uptime promise, one turned on a live table six minutes in — every event answered with a proof-of-work demand, the
 play on its way reaching nobody, the seat booted for silence — so a
 refusal moves the event on to the next relay, and when every relay
 refuses, the line under the felt says so. Writing to one keeps the
@@ -1819,7 +1822,7 @@ On the wire:
   while it serves. Over channels, like any peer: the summons is the
   introduction and the seats dial it from there, so what it hears and
   says goes the direct way rather than across two hops and a
-  stranger's machine (`Transport.reach`, `JurorDuty.dial`). The relay
+  relay (`Transport.reach`, `JurorDuty.dial`). The relay
   is still the lane until the channel is up, and it is the whole path
   for a juror that has no WebRTC to be dialled with — the service's
   own jurors of last resort, in a container with no peer connection in it,
@@ -1964,7 +1967,9 @@ motivated to use it.
 ## Presence and matchmaking
 
 There is no presence server. Every online client publishes a signed,
-short-lived event to a well-known relay topic every few seconds —
+short-lived event to a well-known relay topic every few seconds — the
+tag `online`, its own object on our relay, which forwards and keeps
+nothing ([doc 08](08-own-relays.md)) —
 *identity, status, region* — and everyone subscribes. At hundreds online
 that is a few dozen tiny events per second per client.
 
@@ -1982,14 +1987,17 @@ appears on the topic and the older device signs itself out. An honest
 client does; a modified one could ignore it and be at two tables at
 once, which random matchmaking makes hard to turn into anything.
 
-What decentralising presence buys is that the game keeps working if we
-vanish. What it costs is the second or two above and the honour-system
+What decentralising presence bought, while it rode public relays, was
+that the game kept working if we vanished; on our own relay it no
+longer does, and what is left is that nothing of ours decides who is
+matched or keeps who was online. What it costs is the second or two above and the honour-system
 device rule. Fairness was never at stake either way — a presence server
 could refuse to match you, but never see a card.
 
 ## Identity
 
-An identity is a keypair generated on the device, in Nostr's format. The
+An identity is a keypair generated on the device: an x-only secp256k1
+key with BIP-340 Schnorr signatures (`signing.dart`). The
 public key is what appears in every public record — plays, ratings, jury
 draws. It is opaque, and nothing links it to who you are.
 
@@ -2007,8 +2015,7 @@ so everything follows you. Within a platform the key syncs through the
 keychain and nothing is needed; a cross-platform move is a supersession.
 
 The player sees none of this. Sign in, and you have an identity. There
-is no key to look at and no export — the word Nostr appears nowhere in
-the app.
+is no key to look at and no export.
 
 ## What the service does
 
