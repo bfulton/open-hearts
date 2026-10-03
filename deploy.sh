@@ -160,7 +160,7 @@ done
 cp app/web/schnorr.wasm "$STAGE/_worker.js/schnorr.wasm"
 # And loaded here before anything is uploaded: a module that imports
 # one that is not there fails now, not at Cloudflare's end.
-node --input-type=module -e "await import('$STAGE/_worker.js/worker.mjs')" ||
+node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.js/worker.mjs')" ||
   { echo "deploy: the staged worker does not load" >&2; exit 1; }
 
 # OH_RELAYS is left empty so the build uses its own relay list
