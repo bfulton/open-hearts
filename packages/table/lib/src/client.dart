@@ -5654,12 +5654,15 @@ class TableClient {
     if (last != null && clock.nowMs - last < 10000) return;
     final seat = _turnSeat[turn]!;
     final holder = holders[seat];
-    if (holder is! HumanSeat && race.boots.isNotEmpty) {
+    if (holder is! HumanSeat && (race.boots.isNotEmpty || race.rivals.isEmpty)) {
       // A held seat's juror's move against the escrow, neither able to
-      // carry: ruled as a person's seat is, by the juror's presence to
-      // this one — heard and moved, the move stands; silent, or out of
-      // time on the turn by this juror's clock, the escrow. Heard and
-      // not yet out of time is nobody's to decide.
+      // carry — or its move alone, short of a majority because the only
+      // other person at the table has gone silent: ruled as a person's
+      // seat is, by the juror's presence to this one — heard and moved,
+      // the move stands; silent, or out of time on the turn by this
+      // juror's clock, the escrow. Heard and not yet out of time is
+      // nobody's to decide, and with no escrow said there is no other
+      // side to rule for.
       final of = _participantsAt(turn);
       final needed = _majority(of);
       final forAction = race.forAction.intersection(of);
@@ -5673,7 +5676,7 @@ class TableClient {
       if (heard && race.action != null) {
         winner = race.action!;
         side = 'action';
-      } else if (!heard || _outOfTime(seat)) {
+      } else if (race.boots.isNotEmpty && (!heard || _outOfTime(seat))) {
         winner = race.boots.first;
         side = 'removal';
       } else {
