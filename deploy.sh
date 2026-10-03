@@ -42,11 +42,11 @@ branch_of_git() {
 # ---- sweeping up old deployments ---------------------------------------
 # The alias — dev.open-hearts.pages.dev — always points at the newest
 # deployment of its branch, so deleting older previews takes nothing
-# down. Production deployments are left alone whatever their age.
+# down. Production keeps the live deployment and the two before it.
 prune() {
   local keep=${1:-5} dry=${2:-}
   local api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments"
-  local page=1 skip=$keep ids all=""
+  local page=1 skip=$keep pskip=3 ids all=""
   # A page at a time, newest first, until a page comes back empty: the
   # newest [keep] are left alone and everything after them goes.
   while :; do
@@ -58,7 +58,10 @@ if not page.get('success'):
     sys.exit('cloudflare said no: ' + json.dumps(page.get('errors')))
 found = page['result']
 print('#', len(found))
-for d in [x for x in found if x['environment'] != 'production'][$skip:]:
+previews = [x for x in found if x['environment'] != 'production'][$skip:]
+# Production keeps the live one and the two before it, to roll back to.
+production = [x for x in found if x['environment'] == 'production'][$pskip:]
+for d in previews + [x for x in production if not x.get('aliases')]:
     print(d['id'], d['created_on'][:19], (d.get('deployment_trigger') or {}).get('metadata', {}).get('branch', '?'))
 ")
     [ "$(echo "$ids" | head -1 | cut -d' ' -f2)" = 0 ] && break
@@ -66,11 +69,12 @@ for d in [x for x in found if x['environment'] != 'production'][$skip:]:
 $(echo "$ids" | tail -n +2)"
     page=$((page + 1))
     skip=0
+    pskip=0
     [ "$page" -gt 20 ] && break
   done
   all=$(echo "$all" | sed '/^$/d')
   if [ -z "$all" ]; then
-    echo "nothing to sweep: $keep or fewer previews"
+    echo "nothing to sweep: $keep or fewer previews, 3 or fewer production"
     return
   fi
   echo "$all" | while read -r id made branch; do
