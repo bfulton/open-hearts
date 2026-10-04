@@ -27,6 +27,19 @@ void main() {
         reason: 'Flutter web does not read the safe-area insets, so the browser keeps the page clear of the notch');
   });
 
+  test('the page is held at its top, so a tap lands where it is drawn', () {
+    // A Home Screen app on an iPhone, turned and turned back, was left
+    // scrolled past its top by the status bar's 62 points, and every tap
+    // landed that far above the finger (web/hold_still.js).
+    final head = File('web/index.html').readAsStringSync();
+    expect(head, contains('<script src="hold_still.js"></script>'));
+    final script = File('web/hold_still.js').readAsStringSync();
+    expect(script, contains('scrollTo(0, 0)'));
+    for (final event in ['resize', 'orientationchange', 'scroll']) {
+      expect(script, contains("'$event'"), reason: 'put back on $event');
+    }
+  });
+
   test('nobody else\'s page frames the app', () {
     // Subscribe and Drop are a tap each; under another site's frame
     // the taps are that site's to steer. The rule is the site's, which

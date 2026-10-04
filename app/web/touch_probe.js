@@ -35,6 +35,7 @@
       view: r ? [r.left, r.top, r.width, r.height] : null,
       scroll: [scrollX, scrollY],
       safe: safe,
+      settled: window.ohSettled,
       standalone: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches,
     });
   };

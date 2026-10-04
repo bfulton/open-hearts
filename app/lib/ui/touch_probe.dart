@@ -119,7 +119,7 @@ class _TouchProbeState extends State<TouchProbe> {
       else ...[
         'page inner ${r(page['inner'])}  client ${r(page['client'])}  visual ${r(page['visual'])}',
         'page screen ${r(page['screen'])} ${page['orientation']}  dpr ${r(page['dpr'])}  standalone ${page['standalone']}',
-        'page view ${r(page['view'])}  scroll ${r(page['scroll'])}  safe ${r(page['safe'])}',
+        'page view ${r(page['view'])}  scroll ${r(page['scroll'])}  safe ${r(page['safe'])}  settled ${page['settled']}',
         for (final kind in ['touchstart', 'pointerdown'])
           'page $kind ${last[kind] == null ? '-' : '${r(last[kind]['x'])},${r(last[kind]['y'])}'}',
       ],
