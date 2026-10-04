@@ -78,7 +78,6 @@ name = "EMAIL"
 
 [vars]
 OH_MAIL_FROM = "noreply@openhearts.game"
-OH_MAIL_REPLY_TO = "help@openhearts.game"
 
 # What the operator watches (docs/06-service.md, "Watching it run"): a
 # line of counts a minute from each object in use — connections,

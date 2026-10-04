@@ -1152,18 +1152,16 @@ const kindOf = (op) => (op.op === 'list' || (op.op === 'backups' && op.rotate !=
 
 /// How backup codes are emailed where [env] can: Cloudflare's Email
 /// Sending, bound as EMAIL to the worker the household runs in, from
-/// OH_MAIL_FROM, answered at OH_MAIL_REPLY_TO where that is set. Null
-/// where the binding or the sender is missing, and the codes are only
-/// shown on the devices.
+/// OH_MAIL_FROM. Null where either is missing, and the codes are only
+/// shown on the devices. No reply address: a reply would quote the codes
+/// to whoever reads it, so the mail sends questions to the support page.
 export function mailerOf(env) {
   const from = env.OH_MAIL_FROM;
   if (!env.EMAIL || typeof from !== 'string' || !from.includes('@')) return null;
-  const replyTo = typeof env.OH_MAIL_REPLY_TO === 'string' && env.OH_MAIL_REPLY_TO.includes('@') ? env.OH_MAIL_REPLY_TO : null;
   return (to, codes) =>
     env.EMAIL.send({
       to,
       from: { email: from, name: 'Open Hearts' },
-      ...(replyTo ? { replyTo } : {}),
       subject: 'Your Open Hearts backup codes',
       text: backupMailText(codes),
       html: backupMailHtml(codes),
@@ -1184,6 +1182,10 @@ export function backupMailText(codes) {
     'can email them here again, and can replace them with new ones, after',
     'which the codes above stop working.',
     '',
+    'Keep them private: anyone with a code can join a device to your',
+    'subscription. Replies to this email are not read; for help, see',
+    'https://openhearts.game/support',
+    '',
     'Open Hearts — https://openhearts.game',
   ].join('\n');
 }
@@ -1200,6 +1202,7 @@ export function backupMailHtml(codes) {
     `<div style="margin:12px 0 16px 0">${codes.map(code).join('')}</div>`,
     '<p>Each one brings one device onto your subscription, once. On the device: menu, <b>Activate subscription</b>, and type or paste a code.</p>',
     '<p>Any device on the subscription shows these codes under Subscription, can email them here again, and can replace them with new ones, after which the codes above stop working.</p>',
+    '<p>Keep them private: anyone with a code can join a device to your subscription. Replies to this email are not read; for help, see <a href="https://openhearts.game/support">openhearts.game/support</a>.</p>',
     '<p style="color:#666">Open Hearts — <a href="https://openhearts.game">openhearts.game</a></p>',
     '</body></html>',
   ].join('\n');

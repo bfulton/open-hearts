@@ -454,8 +454,9 @@ and if not why — no address, no mail bound, or the send failed — and
 the relay's log says the same. A store subscription has no address
 here, so its codes are only shown.
 The email goes through Cloudflare's Email Sending, bound as `EMAIL` to
-the relay worker the household runs in, from `OH_MAIL_FROM`, with replies
-to `OH_MAIL_REPLY_TO` (`help@`, forwarded by Email Routing); without
+the relay worker the household runs in, from `OH_MAIL_FROM`, with no reply
+address — a reply would quote the codes — and the support page named
+for help; without
 both, nothing is sent and the codes are only shown.
 The zone's Email Address Obfuscation is off: it rewrote `help@` on the
 site's pages and injected a script of Cloudflare's to put it back.
