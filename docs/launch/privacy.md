@@ -588,9 +588,9 @@ costs.
 - **No self-service deletion.** A `/api/forget` signed by the device key
   could delete that key's KV rows, and its rows in the relay's
   storage — today both are deleted by hand, on request.
-- **No contact email.** A postal address and a phone number are
-  published (`site/privacy.html`, Contact; `site/support.html`); there is
-  still no email address, which Play Console requires. See below.
+- **A contact email.** help@openhearts.game, forwarded by Cloudflare
+  Email Routing, is published beside the postal address and phone
+  (`site/privacy.html`, Contact; `site/support.html`).
 
 ## For the owner and a lawyer to check
 
@@ -601,9 +601,8 @@ costs.
   address and a phone number for privacy requests: Open Hearts, 6650
   Rivers Ave, Ste 105, PMB #804106, North Charleston, SC 29406, USA;
   +1 (843) 827-0686. That is a mailbox service's address, which may not
-  do as the controller's establishment for GDPR Article 13. There is
-  still **no email address** (`[CONTACT EMAIL]` in outreach.md stays
-  open). GitHub issues (<https://github.com/bfulton/open-hearts/issues>)
+  do as the controller's establishment for GDPR Article 13. Email:
+  help@openhearts.game. GitHub issues (<https://github.com/bfulton/open-hearts/issues>)
   stay the place for bugs, and the page says to put nothing private in
   one. A requester still has no way to show which key is theirs: the
   page asks for the name they play under and, for a web subscriber, the

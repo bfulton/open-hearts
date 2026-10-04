@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import {
   BACKUP_CODES,
   backupCodeOf,
-  backupMailText,
+  backupMailText, backupMailHtml,
   backupsFor,
   backupsMade,
   devicesOn,
@@ -171,4 +171,10 @@ test('the mailer: Cloudflare Email Sending from the address configured, or none'
   assert.deepEqual(got[0].from, { email: 'noreply@openhearts.game', name: 'Open Hearts' });
   assert.match(got[0].text, /AAAA-BBBB-CCCC-DDDD/);
   assert.match(backupMailText(['X']), /Activate subscription/);
+  assert.equal(got[0].replyTo, undefined, 'no reply address unless one is set');
+  assert.match(got[0].html, /AAAA-BBBB-CCCC-DDDD/);
+  assert.match(backupMailHtml(['<b>']), /&#60;b&#62;/, 'escaped');
+  const replied = [];
+  await mailerOf({ EMAIL: { send: async (m) => replied.push(m) }, OH_MAIL_FROM: 'noreply@openhearts.game', OH_MAIL_REPLY_TO: 'help@openhearts.game' })('p@example.com', ['X']);
+  assert.equal(replied[0].replyTo, 'help@openhearts.game');
 });

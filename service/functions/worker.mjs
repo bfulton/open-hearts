@@ -1152,17 +1152,21 @@ const kindOf = (op) => (op.op === 'list' || (op.op === 'backups' && op.rotate !=
 
 /// How backup codes are emailed where [env] can: Cloudflare's Email
 /// Sending, bound as EMAIL to the worker the household runs in, from
-/// OH_MAIL_FROM. Null where either is missing, and the codes are only
+/// OH_MAIL_FROM, answered at OH_MAIL_REPLY_TO where that is set. Null
+/// where the binding or the sender is missing, and the codes are only
 /// shown on the devices.
 export function mailerOf(env) {
   const from = env.OH_MAIL_FROM;
   if (!env.EMAIL || typeof from !== 'string' || !from.includes('@')) return null;
+  const replyTo = typeof env.OH_MAIL_REPLY_TO === 'string' && env.OH_MAIL_REPLY_TO.includes('@') ? env.OH_MAIL_REPLY_TO : null;
   return (to, codes) =>
     env.EMAIL.send({
       to,
       from: { email: from, name: 'Open Hearts' },
+      ...(replyTo ? { replyTo } : {}),
       subject: 'Your Open Hearts backup codes',
       text: backupMailText(codes),
+      html: backupMailHtml(codes),
     });
 }
 
@@ -1181,6 +1185,23 @@ export function backupMailText(codes) {
     'which the codes above stop working.',
     '',
     'Open Hearts — https://openhearts.game',
+  ].join('\n');
+}
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/// The same email as a page, for the mail readers that prefer one: the
+/// same words, the codes set in a fixed-width face.
+export function backupMailHtml(codes) {
+  const code = (c) => `<div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;letter-spacing:1px;margin:4px 0">${escapeHtml(c)}</div>`;
+  return [
+    '<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1b1b1b">',
+    '<p>Your Open Hearts backup codes:</p>',
+    `<div style="margin:12px 0 16px 0">${codes.map(code).join('')}</div>`,
+    '<p>Each one brings one device onto your subscription, once. On the device: menu, <b>Activate subscription</b>, and type or paste a code.</p>',
+    '<p>Any device on the subscription shows these codes under Subscription, can email them here again, and can replace them with new ones, after which the codes above stop working.</p>',
+    '<p style="color:#666">Open Hearts — <a href="https://openhearts.game">openhearts.game</a></p>',
+    '</body></html>',
   ].join('\n');
 }
 

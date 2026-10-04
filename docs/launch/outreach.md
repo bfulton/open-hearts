@@ -30,8 +30,8 @@ that name is filled. Values are as found on 1 October 2026.
 | `[COUNTRIES]` | Three-letter ISO codes for the nomination | Not decided; store-listing.md plans the United States first |
 | `[PRESS KIT URL]` | Screenshots and the icon, in one place | None. store-listing.md lists the screenshots to take |
 | `[TESTFLIGHT LINK]` | A public TestFlight link, optional | None |
-| `[CONTACT EMAIL]` | An address the press can write to | **Still missing**: no email address exists. Until one does, a pitch can give the phone, +1 (843) 827-0686 |
-| `[HELP CONTACT]` | Where a player gets help in private: an email address or a phone number | Filled below with the phone, +1 (843) 827-0686; the postal address is Open Hearts, 6650 Rivers Ave, Ste 105, PMB #804106, North Charleston, SC 29406, USA (`site/support.html`). In the app, "Tell us what's broken" still opens a public GitHub issue, on a repository that is private |
+| `[CONTACT EMAIL]` | An address the press can write to | help@openhearts.game |
+| `[HELP CONTACT]` | Where a player gets help in private: an email address or a phone number | help@openhearts.game, or the phone, +1 (843) 827-0686; the postal address is Open Hearts, 6650 Rivers Ave, Ste 105, PMB #804106, North Charleston, SC 29406, USA (`site/support.html`). In the app, "Tell us what's broken" still opens a public GitHub issue, on a repository that is private |
 | `[YOUR NAME]` | Who signs | The owner's to decide (privacy.md: the controller's name is undecided) |
 | `[ACTIVITY DIRECTOR NAME]` | Mail merge, one letter each | — |
 

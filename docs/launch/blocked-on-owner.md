@@ -20,9 +20,6 @@ the bottom with the day.
 
 ## Accounts and identifiers
 
-- **A contact email address.** Outreach, the Play Console listing and
-  the support page still lack one (`docs/launch/outreach.md`,
-  `store-listing.md`).
 - **Apple Developer account and App Store Connect** — unblocks buying
   on iPhone (the code is built and tested against a stand-in chain):
   - the app's bundle id → `OH_APPLE_BUNDLE_ID` on the Pages project;
@@ -181,3 +178,4 @@ the bottom with the day.
   site and the app, which the site says it does not do); New Relic is
   what watches the app now (observability/). altesc.game's left as it
   was.
+- **A contact email address** — help@openhearts.game, forwarded by Cloudflare Email Routing (4 October 2026).

@@ -454,7 +454,8 @@ and if not why — no address, no mail bound, or the send failed — and
 the relay's log says the same. A store subscription has no address
 here, so its codes are only shown.
 The email goes through Cloudflare's Email Sending, bound as `EMAIL` to
-the relay worker the household runs in, from `OH_MAIL_FROM`; without
+the relay worker the household runs in, from `OH_MAIL_FROM`, with replies
+to `OH_MAIL_REPLY_TO` (`help@`, forwarded by Email Routing); without
 both, nothing is sent and the codes are only shown.
 
 A backup code is entered where a screen's code is (`/api/claim`, the
