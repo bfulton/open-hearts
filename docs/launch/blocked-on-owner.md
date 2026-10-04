@@ -15,9 +15,6 @@ the bottom with the day.
   It names no legal entity. Open questions it raises: a mailbox
   address as the GDPR establishment; auto-renewal reminder laws, since
   we hold no email address; the EU 14-day withdrawal right.
-- **When to switch on `table` timing** in remote config: only after
-  older builds are asked to update (`update.before`), since they ignore
-  it and play the standard clocks (doc 06, Remote config).
 - **Make the repo public.** The site's privacy page already says "the
   code is public", and the footer links to GitHub.
 
