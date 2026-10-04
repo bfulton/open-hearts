@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 
 import 'build_info.dart';
+import 'ui/touch_probe.dart';
 import 'l10n/l10n.dart';
 import 'subscribe_page.dart' show legalPage, openLink;
 import 'theme.dart';
@@ -42,7 +43,10 @@ class AboutPage extends StatelessWidget {
                   style: const TextStyle(fontSize: 13.5, height: 1.45, color: Palette.chromeDim),
                 ),
                 const SizedBox(height: 30),
-                _Line(label: context.l10n.build, value: buildTag),
+                // Five taps on the build switch the touch probe on or off
+                // (ui/touch_probe.dart): a way to see where a tap lands on
+                // a device that cannot be watched from here.
+                _Taps(times: 5, onTaps: () => touchProbeOn.value = !touchProbeOn.value, child: _Line(label: context.l10n.build, value: buildTag)),
                 const SizedBox(height: 8),
                 _Line(label: context.l10n.published, value: buildDate),
                 const SizedBox(height: 24),
@@ -99,4 +103,38 @@ class _Link extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextButton(onPressed: () => openLink(url), child: Text(label));
+}
+
+/// Calls [onTaps] at the [times]th tap in a row, each within a second of
+/// the last.
+class _Taps extends StatefulWidget {
+  const _Taps({required this.times, required this.onTaps, required this.child});
+
+  final int times;
+  final VoidCallback onTaps;
+  final Widget child;
+
+  @override
+  State<_Taps> createState() => _TapsState();
+}
+
+class _TapsState extends State<_Taps> {
+  int _count = 0;
+  DateTime _last = DateTime(0);
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: () {
+          final now = DateTime.now();
+          _count = now.difference(_last) < const Duration(seconds: 1) ? _count + 1 : 1;
+          _last = now;
+          if (_count >= widget.times) {
+            _count = 0;
+            widget.onTaps();
+          }
+        },
+        child: widget.child,
+      );
 }
