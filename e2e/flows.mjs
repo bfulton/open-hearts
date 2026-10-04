@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 import { chromium } from './browser.mjs';
-import { act, appDir, argOf, click, dismiss, has, labelOf, log, root, serveApp, sleep, startRelay, texts, type, waitFor, roomIn, records } from './drive.mjs';
+import { act, appDir, argOf, click, dismiss, has, labelOf, log, root, serveApp, sleep, startRelay, texts, type, waitFor, waitGone, roomIn, records } from './drive.mjs';
 
 const portrait = { width: 390, height: 844 };
 const landscape = { width: 844, height: 390 };
@@ -344,8 +344,27 @@ flow('a kept game, opened by its address: checked in the browser, then shown han
   records.kept.set(`tables/${table}.json`, gzipSync(Buffer.from(json)));
   const page = await open({ url: `${app.url}/table/${table}?e2e=1`, ready: /^The game$/ });
   const began = Date.now();
-  await waitFor(page, /^Hand 1  ·  Pass left$/, { what: 'the game, checked', timeout: 180000 });
-  log(`      checked and shown in ${((Date.now() - began) / 1000).toFixed(1)}s`);
+  // The check runs in a worker of its own (app/worker/review_worker.dart):
+  // the page's thread stays free the whole time, which a script asking
+  // the page for nothing, over and over, measures. Each hand is shown as
+  // its check is done.
+  let slowest = 0;
+  let checking = true;
+  const watching = (async () => {
+    while (checking) {
+      const t = Date.now();
+      await page.evaluate('1');
+      slowest = Math.max(slowest, Date.now() - t);
+      await sleep(100);
+    }
+  })();
+  await waitFor(page, /^Hand 1  ·  Pass left$/, { what: 'the first hand, checked', timeout: 180000 });
+  const first = (Date.now() - began) / 1000;
+  await waitGone(page, /^Checking the rest of the game…$/, { what: 'the rest of the game, checked', timeout: 180000 });
+  checking = false;
+  await watching;
+  log(`      first hand shown in ${first.toFixed(1)}s, the whole game checked in ${((Date.now() - began) / 1000).toFixed(1)}s; the page answered within ${slowest} ms throughout`);
+  if (slowest > 1500) throw new Error(`the page was held still for ${slowest} ms while the game was checked`);
   // The tricks under it (a list builds only what is on the screen).
   // As a screen reader reads it: each trick, each card by its name and
   // who played it.

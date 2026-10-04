@@ -1137,8 +1137,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get gameTitle => 'A partida';
 
   @override
-  String get checkingGame =>
-      'A verificar cada carta da partida. Pode demorar meio minuto.';
+  String get checkingGame => 'Verificando cada carta do jogo.';
+
+  @override
+  String get stillCheckingGame => 'Verificando o resto do jogo…';
 
   @override
   String get noGameHere =>

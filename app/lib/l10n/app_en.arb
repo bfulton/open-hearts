@@ -1365,9 +1365,13 @@
   "@gameTitle": {
     "description": "Title of the page that shows a finished live game, hand by hand."
   },
-  "checkingGame": "Checking every card of the game. This can take half a minute.",
+  "checkingGame": "Checking every card of the game.",
   "@checkingGame": {
     "description": "Shown while the finished game's record is fetched and checked."
+  },
+  "stillCheckingGame": "Checking the rest of the game\u2026",
+  "@stillCheckingGame": {
+    "description": "Shown above the hands already checked while the rest of a finished game is still being checked."
   },
   "noGameHere": "No finished game is kept at this address.",
   "@noGameHere": {

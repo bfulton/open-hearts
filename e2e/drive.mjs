@@ -262,6 +262,16 @@ export async function waitFor(page, re, { timeout = 30000, what = String(re) } =
   throw new Error(`timed out waiting for ${what}\nsaw: ${(await texts(page)).join(' | ')}`);
 }
 
+/// Waits for nothing on the screen to match [re] any longer.
+export async function waitGone(page, re, { timeout = 30000, what = String(re) } = {}) {
+  const until = Date.now() + timeout;
+  while (Date.now() < until) {
+    if (!(await has(page, re))) return;
+    await sleep(250);
+  }
+  throw new Error(`timed out waiting for ${what}\nsaw: ${(await texts(page)).join(' | ')}`);
+}
+
 /// Clicks the first semantics node whose label or text matches, if
 /// there is one: for a thing that goes on its own — the score sheet,
 /// a few seconds after a hand — and may be gone by the time it is

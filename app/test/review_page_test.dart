@@ -2,12 +2,14 @@
 /// hand — and a record that does not check out, or none, says so.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:deal/deal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
+import 'package:open_hearts/net/record_check.dart';
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:table/src/sim/sim.dart';
@@ -15,6 +17,8 @@ import 'package:table/table.dart';
 
 void main() {
   late GameRecord played;
+  // The hands as the real check gives them, to hand over one at a time.
+  final checked = <RecordCheck>[];
   setUpAll(() async {
     dealCrypto = await DealCrypto.load();
     final t = SimTable(humans: 4, seed: 3, crypto: dealCrypto);
@@ -22,6 +26,7 @@ void main() {
     expect(t.run(), isTrue);
     played = GameRecord.of(t.people.first.client, names: {0: 'Ada', 1: 'Bao', 2: 'Cy', 3: 'Dee'});
     t.stop();
+    await checkRecord(played).forEach(checked.add);
   });
 
   Future<void> pumpReview(WidgetTester tester, GameRecord? record) async {
@@ -73,5 +78,53 @@ void main() {
   testWidgets('no game kept at the address: said so', (tester) async {
     await pumpReview(tester, null);
     expect(find.text('No finished game is kept at this address.'), findsOneWidget);
+  });
+
+  testWidgets('hands are shown as their check is done, the rest said to be still checking; a failure later takes them away', (tester) async {
+    final hands = checked.whereType<HandChecked>().toList();
+    final verdict = checked.last as RecordChecked;
+    expect(verdict.ok, isTrue);
+
+    Future<StreamController<RecordCheck>> open() async {
+      final checking = StreamController<RecordCheck>();
+      tester.view
+        ..physicalSize = const Size(390, 1600)
+        ..devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(),
+        home: ReviewPage(key: UniqueKey(), table: played.spec.id, load: (_) async => played, check: (_) => checking.stream),
+      ));
+      await tester.pump();
+      await tester.pump();
+      return checking;
+    }
+
+    var checking = await open();
+    expect(find.text('Checking every card of the game.'), findsOneWidget, reason: 'nothing checked yet');
+    checking.add(hands.first);
+    await tester.pump();
+    expect(find.text('Hand 1  ·  Pass left'), findsOneWidget, reason: 'the first hand, as soon as it is checked');
+    expect(find.text('Checking the rest of the game…'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '2'), findsNothing, reason: 'no hand not yet checked');
+    for (final h in hands.skip(1)) {
+      checking.add(h);
+    }
+    checking.add(verdict);
+    await tester.pumpAndSettle();
+    expect(find.text('Checking the rest of the game…'), findsNothing, reason: 'all checked');
+    expect(find.widgetWithText(ChoiceChip, '4'), findsOneWidget);
+    await checking.close();
+
+    // A record that fails after its first hands were shown: none of it stays.
+    checking = await open();
+    checking.add(hands.first);
+    await tester.pump();
+    expect(find.text('Trick 1'), findsOneWidget);
+    checking.add(const RecordChecked(ok: false, reason: 'a play out of turn'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('does not check out'), findsOneWidget);
+    expect(find.text('Trick 1'), findsNothing);
+    await checking.close();
   });
 }

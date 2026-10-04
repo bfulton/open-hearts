@@ -181,6 +181,7 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
     --base-href /play/ \
     --dart-define=OH_RELAYS="${OH_RELAYS:-}" \
     --dart-define=OH_SERVICE_KEY="${OH_SERVICE_KEY:-}" )
+FLUTTER="$FLUTTER" app/worker/build.sh app/build/web
 
 mkdir -p "$STAGE/play"
 cp -r app/build/web/. "$STAGE/play"/

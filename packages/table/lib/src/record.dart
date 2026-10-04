@@ -934,7 +934,14 @@ Verification verifyRecord(
 /// card in the order played, and the scores. Filled only as far as the
 /// record checks out — a record that fails has no replay worth showing.
 class TableReplay {
+  TableReplay({this.onHand});
+
   final List<TableReplayHand> hands = [];
+
+  /// Called as each hand's check is done — and again for the last hand
+  /// once the game's closing audit opens its cards — so a game can be
+  /// shown a hand at a time while the rest is still being checked.
+  final void Function(TableReplayHand hand)? onHand;
 
   TableReplayHand _hand(int number) {
     while (hands.length <= number) {
@@ -949,15 +956,40 @@ class TableReplay {
     final h = _hand(game.handNumber)
       ..scores = List.of(game.handScores)
       ..totals = List.of(game.totals);
-    if (deal == null) return;
-    List<Card>? cards(List<int>? indices) => indices == null ? null : ([for (final i in indices) Card.deck[i]]..sort());
-    final dealt = [for (var s = 0; s < seatCount; s++) cards(deal.dealtHandOf(s))];
-    if (dealt.every((c) => c != null)) h.dealt = [for (final c in dealt) c!];
+    if (deal != null) {
+      List<Card>? cards(List<int>? indices) => indices == null ? null : ([for (final i in indices) Card.deck[i]]..sort());
+      final dealt = [for (var s = 0; s < seatCount; s++) cards(deal.dealtHandOf(s))];
+      if (dealt.every((c) => c != null)) h.dealt = [for (final c in dealt) c!];
+    }
+    onHand?.call(h);
   }
 }
 
 class TableReplayHand {
   TableReplayHand._(this.number);
+
+  /// As [toJson] wrote it: cards by their index in the deck.
+  factory TableReplayHand.fromJson(Map<String, Object?> json) {
+    List<Card> cards(Object? l) => [for (final i in l as List) Card.deck[i as int]];
+    final h = TableReplayHand._(json['number'] as int)
+      ..scores = [for (final x in json['scores'] as List) x as int]
+      ..totals = [for (final x in json['totals'] as List) x as int];
+    final dealt = json['dealt'];
+    if (dealt != null) h.dealt = [for (final d in dealt as List) cards(d)];
+    for (final p in json['plays'] as List) {
+      final pair = p as List;
+      h.plays.add((seat: pair[0] as int, card: Card.deck[pair[1] as int]));
+    }
+    return h;
+  }
+
+  Map<String, Object?> toJson() => {
+        'number': number,
+        'dealt': dealt == null ? null : [for (final d in dealt!) [for (final c in d) c.index]],
+        'plays': [for (final p in plays) [p.seat, p.card.index]],
+        'scores': scores,
+        'totals': totals,
+      };
 
   final int number;
 

@@ -49,10 +49,26 @@ void main() {
     final client = t.people.first.client;
     final read = GameRecord.parse(jsonDecode(jsonEncode(GameRecord.of(client).toJson())))!;
     t.stop();
-    final replay = TableReplay();
+    // Each hand announced as its check is done, as a page shows them
+    // while the rest is checked: read back from its JSON, as a worker
+    // sends it, the last word on each hand is the hand.
+    final announced = <int, Map<String, Object?>>{};
+    final order = <int>[];
+    final replay = TableReplay(onHand: (h) {
+      announced[h.number] = jsonDecode(jsonEncode(h.toJson())) as Map<String, Object?>;
+      order.add(h.number);
+    });
     final v = verifyRecord(read.spec, read.record, juries: read.juries, crypto: crypto, releases: read.releases, replay: replay);
     expect(v.ok && v.complete, isTrue, reason: v.reason);
     expect(replay.hands.length, client.game.handNumber + 1, reason: 'every hand of the game');
+    expect(order.first, 0, reason: 'the first hand announced before the second');
+    for (var i = 1; i < order.length; i++) {
+      expect(order[i], greaterThanOrEqualTo(order[i - 1]), reason: 'in order');
+    }
+    expect(announced.keys.toList()..sort(), [for (final h in replay.hands) h.number]);
+    for (final h in replay.hands) {
+      expect(TableReplayHand.fromJson(announced[h.number]!).toJson(), h.toJson(), reason: 'hand ${h.number} as announced');
+    }
     for (final h in replay.hands) {
       expect(h.plays.length, 52, reason: 'hand ${h.number}');
       expect(h.tricks.length, 13);

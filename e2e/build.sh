@@ -10,9 +10,10 @@
 # else, and the real one's secret lives in the project's secrets.
 set -euo pipefail
 cd "$(dirname "$0")/../app"
-exec "${FLUTTER:-flutter}" build web \
+"${FLUTTER:-flutter}" build web \
   -o build/e2e \
   --base-href / \
   --no-web-resources-cdn \
   --dart-define=OH_SERVICE_KEY=dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659 \
   "$@"
+worker/build.sh build/e2e

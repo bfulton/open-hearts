@@ -3,30 +3,39 @@
 /// The record is fetched by the table's id and checked here, on this
 /// device, before a card of it is shown: every signature, every step of
 /// the deal, every play against the rules (packages/table, record.dart).
-/// What it shows is what the check replayed — every seat's thirteen as
-/// dealt, what was passed, each trick in order, and the scores — so it
-/// is the game as it was played, whoever kept the copy.
+/// The check runs off the page's thread (net/record_check.dart) and
+/// each hand is shown as its check is done, the rest said to be still
+/// in hand; a record that fails anywhere is shown as failing, whatever
+/// was on the screen before. What it shows is what the check replayed
+/// — every seat's thirteen as dealt, what was passed, each trick in
+/// order, and the scores — so it is the game as it was played, whoever
+/// kept the copy.
 library;
+
+import 'dart:async';
 
 import 'package:engine/engine.dart' hide Replay;
 import 'package:flutter/material.dart' hide Card;
 import 'package:table/table.dart';
 
-import 'crypto/deal.dart';
 import 'l10n/l10n.dart';
 import 'net/game_records.dart';
+import 'net/record_check.dart';
 import 'theme.dart';
 import 'ui/pip.dart';
 import 'ui/player_icon.dart';
 
 class ReviewPage extends StatefulWidget {
-  const ReviewPage({super.key, required this.table, this.load = gameOf});
+  const ReviewPage({super.key, required this.table, this.load = gameOf, this.check});
 
   /// The table's id.
   final String table;
 
   /// How the record is fetched: the service's, and a test's to replace.
   final Future<GameRecord?> Function(String table) load;
+
+  /// How it is checked: [checkRecord] unless a test says otherwise.
+  final Stream<RecordCheck> Function(GameRecord record)? check;
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
@@ -52,15 +61,27 @@ class _Failed extends _Shown {
 }
 
 class _Game extends _Shown {
-  const _Game(this.record, this.replay, this.winners);
+  const _Game(this.record, this.hands, {required this.done, this.winners = const []});
   final GameRecord record;
-  final TableReplay replay;
+
+  /// The hands checked so far, in order.
+  final List<TableReplayHand> hands;
+
+  /// Whether the whole record is checked; [winners] only once it is.
+  final bool done;
   final List<int> winners;
 }
 
 class _ReviewPageState extends State<ReviewPage> {
   _Shown _shown = const _Checking();
   int _hand = 0;
+  StreamSubscription<RecordCheck>? _checking;
+
+  @override
+  void dispose() {
+    _checking?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -80,22 +101,18 @@ class _ReviewPageState extends State<ReviewPage> {
     if (!mounted) return;
     final kept = record;
     if (kept == null) return setState(() => _shown = const _Nothing());
-    final crypto = dealCrypto;
-    if (kept.spec.sealed && crypto == null) return setState(() => _shown = const _Failed(null));
-    // A frame first, so "checking" is on the screen while it is done.
-    await WidgetsBinding.instance.endOfFrame;
-    final replay = TableReplay();
-    final v = verifyRecord(
-      kept.spec,
-      kept.record,
-      juries: kept.juries,
-      releases: kept.releases,
-      crypto: crypto,
-      allowPartial: true,
-      replay: replay,
-    );
-    if (!mounted) return;
-    setState(() => _shown = v.ok ? _Game(kept, replay, v.winners) : _Failed(v.reason));
+    final hands = <int, TableReplayHand>{};
+    List<TableReplayHand> inOrder() => [for (final n in hands.keys.toList()..sort()) hands[n]!];
+    _checking = (widget.check ?? checkRecord)(kept).listen((c) {
+      if (!mounted) return;
+      switch (c) {
+        case HandChecked(:final hand):
+          hands[hand.number] = hand;
+          setState(() => _shown = _Game(kept, inOrder(), done: false));
+        case RecordChecked(:final ok, :final reason, :final winners):
+          setState(() => _shown = ok ? _Game(kept, inOrder(), done: true, winners: winners) : _Failed(reason));
+      }
+    });
   }
 
   @override
@@ -126,7 +143,8 @@ class _ReviewPageState extends State<ReviewPage> {
       BotSeat(:final persona) => persona.name,
       HumanSeat(:final key) => key,
     };
-    final hands = g.replay.hands;
+    final hands = g.hands;
+    if (hands.isEmpty) return _Note(l10n.checkingGame, busy: true);
     final hand = hands[_hand.clamp(0, hands.length - 1)];
     final totals = hands.lastWhere((h) => h.totals.isNotEmpty, orElse: () => hand).totals;
     Color markOf(int seat) =>
@@ -140,6 +158,19 @@ class _ReviewPageState extends State<ReviewPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // The rest still being checked: what is shown has been, and a
+          // failure later on takes the whole game off the screen.
+          if (!g.done)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(l10n.stillCheckingGame, style: const TextStyle(fontSize: 13, color: Palette.chromeDim))),
+                ],
+              ),
+            ),
           // Who played, and how it ended.
           for (var s = 0; s < seatCount; s++)
             Padding(

@@ -1583,8 +1583,14 @@ abstract class AppLocalizations {
   /// Shown while the finished game's record is fetched and checked.
   ///
   /// In en, this message translates to:
-  /// **'Checking every card of the game. This can take half a minute.'**
+  /// **'Checking every card of the game.'**
   String get checkingGame;
+
+  /// Shown above the hands already checked while the rest of a finished game is still being checked.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the rest of the game…'**
+  String get stillCheckingGame;
 
   /// Shown when no record is kept for the game at this address.
   ///
