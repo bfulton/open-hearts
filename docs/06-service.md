@@ -457,6 +457,8 @@ The email goes through Cloudflare's Email Sending, bound as `EMAIL` to
 the relay worker the household runs in, from `OH_MAIL_FROM`, with replies
 to `OH_MAIL_REPLY_TO` (`help@`, forwarded by Email Routing); without
 both, nothing is sent and the codes are only shown.
+The zone's Email Address Obfuscation is off: it rewrote `help@` on the
+site's pages and injected a script of Cloudflare's to put it back.
 
 A backup code is entered where a screen's code is (`/api/claim`, the
 same signed request): the service tells the two apart by their shape.
