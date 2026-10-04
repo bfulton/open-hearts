@@ -801,6 +801,7 @@ class _HomePageState extends State<HomePage> {
                       // The app's name is the door's own: a screen with
                       // one thing to say says that instead.
                       title: queue == null && room == null,
+                      tagline: context.l10n.tagline,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -891,8 +892,6 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.tagline, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
-        const SizedBox(height: 22),
         FilledButton(
           onPressed: () => context.push<void>(located(soloPath), extra: SoloGame(target: _options.target)),
           style: _primary(),

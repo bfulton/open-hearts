@@ -50,4 +50,29 @@ void main() {
     // start over because the screen under it changed.
     expect(heart.currentState, same(folding));
   });
+
+  testWidgets('a phone on its side: the name beside the buttons, and nothing to scroll', (tester) async {
+    for (final size in const [Size(874, 402), Size(844, 340), Size(667, 300)]) {
+      tester.view
+        ..physicalSize = size
+        ..devicePixelRatio = 1.0;
+      await tester.pumpWidget(still(Scaffold(
+        body: Doorway(
+          heart: FoldingHeart(key: GlobalKey(), size: 46, color: Palette.mark),
+          title: true,
+          tagline: 'Open source, no ads, more heart.',
+          child: const SizedBox(height: 240, child: Placeholder()),
+        ),
+      )));
+      await tester.pumpAndSettle();
+      final name = tester.getRect(find.text('Open Hearts'));
+      final buttons = tester.getRect(find.byType(Placeholder));
+      expect(name.right, lessThan(buttons.left), reason: '$size: the name to the left of the buttons');
+      expect(tester.getRect(find.text('Open source, no ads, more heart.')).right, lessThan(buttons.left), reason: '$size: and the tagline with it');
+      for (final scroll in tester.stateList<ScrollableState>(find.byType(Scrollable))) {
+        expect(scroll.position.maxScrollExtent, 0, reason: '$size: nothing to scroll');
+      }
+    }
+    tester.view.reset();
+  });
 }
