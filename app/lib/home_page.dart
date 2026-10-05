@@ -274,7 +274,7 @@ class _HomePageState extends State<HomePage> {
     if (code == null) return;
     // Asked first. A link is anybody's to send, and a code spent on
     // opening it would put this device in whatever household sent it,
-    // without a word to its owner (docs/security-review.md, 5).
+    // without a word to its owner (docs/security-review.md).
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     final join = await showDialog<bool>(

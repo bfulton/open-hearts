@@ -2,7 +2,8 @@
 // test runner: node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import worker, { CONFIG_DEFAULTS, TABLE_TIMING_BOUNDS, configOf } from './worker.mjs';
+import { readFileSync } from 'node:fs';
+import worker, { CONFIG_DEFAULTS, TABLE_TIMING_BOUNDS, WAITS_BOUNDS, configOf } from './worker.mjs';
 
 /// Cloudflare KV as the worker reads it: a JSON value by key.
 const kvWith = (rows) => ({
@@ -135,4 +136,19 @@ test('a table timing is served whole where every field checks out, and left out 
   assert.deepEqual(configOf({ table: most }).table, most);
   // And the rest of the row is served regardless.
   assert.equal(configOf({ live: false, table: { graceMs: 1 } }).live, false);
+});
+
+test('the waits are served field by field, each within its bounds, the relay pair in order', () => {
+  assert.equal(configOf({}).waits, undefined, 'none set: the app keeps its own');
+  assert.deepEqual(configOf({ waits: { licenceMs: 9000, buyMs: 1, configEveryMin: 30, junk: 5 } }).waits, { licenceMs: 9000, configEveryMin: 30 });
+  assert.equal(configOf({ waits: { licenceMs: 9000.5 } }).waits, undefined, 'whole numbers only');
+  assert.deepEqual(configOf({ waits: { relaySlowMs: 10000, relayGiveUpMs: 60000 } }).waits, { relaySlowMs: 10000, relayGiveUpMs: 60000 });
+  assert.equal(configOf({ waits: { relaySlowMs: 30000, relayGiveUpMs: 20000 } }).waits, undefined, 'slow after giving up: neither');
+  assert.equal(configOf({ waits: [1, 2] }).waits, undefined);
+});
+
+test('the waits\' bounds are the app\'s own', () => {
+  const dart = readFileSync(new URL('../../app/lib/net/remote_config.dart', import.meta.url), 'utf8');
+  const app = Object.fromEntries([...dart.matchAll(/'(\w+)': \((\d+), (\d+)\)/g)].map((m) => [m[1], [Number(m[2]), Number(m[3])]]));
+  assert.deepEqual(app, { ...WAITS_BOUNDS });
 });

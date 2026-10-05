@@ -43,10 +43,10 @@ export function isLocal(url) {
   }
 }
 
-/// Local mode's open house (doc 06): every device that asks licensed,
-/// and `local:` sign-ins taken. Only where it is set and only on this
-/// machine: set in a production project by mistake, it would license
-/// everyone and let anybody sign in as anybody.
+/// Local mode's open house (docs/06-service.md): every device that asks
+/// licensed, and `local:` sign-ins taken. Only where it is set and only
+/// on this machine: set in a production project by mistake, it would
+/// license everyone and let anybody sign in as anybody.
 export const openHouse = (env, request) => !!env.OH_OPEN_HOUSE && isLocal(request.url);
 
 // ---- The service's own settings ---------------------------------------
@@ -252,9 +252,9 @@ export const dayAfter = (at, days) => dayOf(new Date(at).getTime() + days * 8640
 /// was paid for.
 const earlier = (a, b) => (a < b ? a : b);
 
-/// Everything the service keeps, as one key-value table (doc 06): a
-/// lookup by key, never a scan. Cloudflare KV in production; a Map
-/// stands in for the tests and for local mode.
+/// Everything the service keeps, as one key-value table
+/// (docs/06-service.md): a lookup by key, never a scan. Cloudflare KV in
+/// production; a Map stands in for the tests and for local mode.
 export function storeOf(env) {
   const kv = env.OH_STORE;
   if (!kv) return null;
@@ -273,7 +273,7 @@ export function storeOf(env) {
     },
     /// The sort keys under [pk] that begin with [prefix]. The only
     /// call here that is not a point lookup, and it is bounded by what
-    /// lives under one subscription: five devices (doc 06).
+    /// lives under one subscription: five devices (docs/06-service.md).
     async under(pk, prefix) {
       const found = [];
       let cursor;
@@ -1818,7 +1818,48 @@ export function configOf(raw) {
   // reads as the standard table.
   const table = tableTimingOf(raw.table);
   if (table) c.table = table;
+  const waits = waitsOf(raw.waits);
+  if (waits) c.waits = waits;
   return c;
+}
+
+/// How long a device waits on the network, each field least and most:
+/// the bounds the app parses them by (app/lib/net/remote_config.dart,
+/// AppWaits.bounds). Milliseconds, minutes for configEveryMin.
+export const WAITS_BOUNDS = Object.freeze({
+  licenceMs: [2000, 30000],
+  householdMs: [3000, 30000],
+  buyMs: [3000, 60000],
+  turnMs: [2000, 30000],
+  configMs: [2000, 30000],
+  configEveryMin: [5, 240],
+  relaySlowMs: [3000, 30000],
+  relayGiveUpMs: [15000, 180000],
+  standingMs: [3000, 30000],
+  standingAllMs: [1000, 20000],
+  roomStartMs: [3000, 60000],
+  meshAnswerMs: [5000, 60000],
+});
+
+/// The waits the row sets, each field taken on its own when it is a
+/// whole number within its bounds; null when none is. The relay's pair
+/// goes together or not at all: saying it is slow comes before giving up.
+export function waitsOf(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  for (const [name, [least, most]] of Object.entries(WAITS_BOUNDS)) {
+    const v = raw[name];
+    if (Number.isInteger(v) && v >= least && v <= most) out[name] = v;
+  }
+  if ('relaySlowMs' in out || 'relayGiveUpMs' in out) {
+    const slow = out.relaySlowMs ?? 8000;
+    const giveUp = out.relayGiveUpMs ?? 40000;
+    if (slow >= giveUp) {
+      delete out.relaySlowMs;
+      delete out.relayGiveUpMs;
+    }
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /// What each of a table's clocks may be, in milliseconds, least and
