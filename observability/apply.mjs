@@ -323,21 +323,6 @@ async function applyBrowser() {
     { q: `domain = 'BROWSER' AND type = 'APPLICATION' AND accountId = ${account} AND name = '${browserName}'` },
   );
   let guid = found.actor.entitySearch.results.entities.find((e) => e.name === browserName)?.guid ?? null;
-  for (const old of guid ? [] : browser.formerly ?? []) {
-    const was = await graph(
-      `query($q: String!) { actor { entitySearch(query: $q) { results { entities { guid name tags { key values } } } } } }`,
-      { q: `domain = 'BROWSER' AND type = 'APPLICATION' AND accountId = ${account} AND name = '${prefix + old}' AND tags.app = '${app.key}'` },
-    );
-    const e = was.actor.entitySearch.results.entities.find((x) => x.name === prefix + old);
-    if (!e) continue;
-    // New Relic renames APM apps only; a browser app under an old name is
-    // deleted, with what it had collected, and made again under the new.
-    say(`delete browser app "${prefix + old}" to make it again as "${browserName}" (browser apps cannot be renamed)`);
-    if (write) {
-      await graph(`mutation($g: EntityGuid!) { agentApplicationDelete(guid: $g) { success } }`, { g: e.guid });
-    }
-    break;
-  }
   if (!guid) {
     say(`create browser app "${browserName}" (no cookies, no session replay, no session traces)`);
     if (!write) return;

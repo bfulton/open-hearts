@@ -238,7 +238,7 @@ export const zones = {
 /// Spend alerts, since Cloudflare has no hard cap. Ours are the ones with
 /// this description; who is told is OH_ALERT_EMAIL (as observability's).
 export const budgetAlerts = {
-  description: 'Cloudflare usage charges for the billing period (Open Hearts launch list).',
+  description: 'Cloudflare usage charges for the billing period (Open Hearts).',
   dollars: [10, 20, 50, 100, 200],
   name: (dollars) => `Spend reached $${dollars} this month`,
   emailFrom: 'OH_ALERT_EMAIL',

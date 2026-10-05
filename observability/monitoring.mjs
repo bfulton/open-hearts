@@ -44,8 +44,6 @@ export const synthetics = {
 export const browser = {
   // The web build's; a phone build is an app of its own.
   name: 'web',
-  // Names it had, so apply.mjs renames it rather than making another.
-  formerly: ['app'],
   loader: 'PRO',
   onlyOn: 'openhearts.game',
   out: 'app/web/observability.js',
