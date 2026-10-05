@@ -18,6 +18,9 @@
   border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
 .lang-pick[open] summary::after { margin-top: 3px; transform: rotate(-135deg); }
+/* At the footer's own size. */
+.lang-pick summary, .lang-pick .langs a { font-size: inherit; line-height: 1.5; padding: 1px 10px; }
+.lang-pick summary::after { width: 5px; height: 5px; }
 .lang-pick summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .lang-pick .langs {
   position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
