@@ -102,7 +102,7 @@ void main() {
     }
     final kept = await store.load();
     expect(kept, hasLength(22));
-    final history = soloGames(['oh1:5:Cyrano,Juliet,Sid:-:2C', ...kept]).history;
+    final history = soloGames(['oh1:5:Cyrano,Juliet,Tristan:-:2C', ...kept]).history;
     expect(history.recent, finals.sublist(2), reason: 'the newest twenty, the oldest of them first');
   });
 
@@ -155,7 +155,7 @@ void main() {
     expect(soloTally(const ['not a record at all']).games, 0);
     // A real record with its plays cut off: the game was left, so
     // there is no score to claim for it.
-    const whole = 'oh1:11:Cyrano,Juliet,Sid:-:2C';
+    const whole = 'oh1:11:Cyrano,Juliet,Tristan:-:2C';
     expect(soloTally(const [whole]).games, 0);
   });
 

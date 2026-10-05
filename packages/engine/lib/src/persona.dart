@@ -440,8 +440,8 @@ class Persona {
     passStyle: PassStyle.keepQueen,
   );
 
-  static const sid = Persona(
-    name: 'Sid',
+  static const tristan = Persona(
+    name: 'Tristan',
     epithet: 'Throws everything, all at once.',
     passStyle: PassStyle.dumpQueen,
     shootLoserShare: 3,
@@ -449,8 +449,8 @@ class Persona {
     pace: BotPace.quick,
   );
 
-  static const nancy = Persona(
-    name: 'Nancy',
+  static const isolde = Persona(
+    name: 'Isolde',
     epithet: 'Wants the queen gone yesterday.',
     passStyle: PassStyle.dumpQueen,
     moonDefenseTrigger: 3,
@@ -573,8 +573,8 @@ class Persona {
     clyde,
     diegoRivera,
     fridaKahlo,
-    sid,
-    nancy,
+    tristan,
+    isolde,
     han,
     leia,
     heathcliff,
@@ -596,9 +596,11 @@ class Persona {
   /// A persona by [id]: a name, or `name/level`.
   static Persona named(String id) {
     final slash = id.indexOf('/');
-    if (slash < 0) return candidates.firstWhere((p) => p.name == id);
-    return candidates
-        .firstWhere((p) => p.name == id.substring(0, slash))
-        .at(int.parse(id.substring(slash + 1)));
+    final name = slash < 0 ? id : id.substring(0, slash);
+    final persona = candidates.firstWhere((p) => p.name == (_renamed[name] ?? name));
+    return slash < 0 ? persona : persona.at(int.parse(id.substring(slash + 1)));
   }
+
+  /// Names a persona had before, as records already kept may carry them.
+  static const _renamed = {'Sid': 'Tristan', 'Nancy': 'Isolde'};
 }

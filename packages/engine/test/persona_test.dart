@@ -34,4 +34,10 @@ void main() {
               'against a best of ${best.toStringAsFixed(1)}');
     }
   });
+
+  test('a record kept under a persona\'s earlier name reads as that persona', () {
+    expect(Persona.named('Sid'), same(Persona.tristan));
+    expect(Persona.named('Nancy'), same(Persona.isolde));
+    expect(Persona.named('Sid/3').name, 'Tristan');
+  });
 }
