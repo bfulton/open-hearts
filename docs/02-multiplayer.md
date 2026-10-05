@@ -17,13 +17,13 @@ and how it agrees on every turn is [doc 04](04-live-play.md).
         signalling (once, at join)          play (every trick)
    ┌──────────────────────────────┐   ┌──────────────────────────┐
    │  our relay, one object a tag │   │  WebRTC data channel     │
-   │  trades SDP + ICE            │   │  direct peer to peer     │
-   │  and is the fallback lane    │   │  20-150 ms typical RTT   │
+   │  trades SDP + ICE            │   │  peer to peer, via TURN  │
+   │  and is the fallback lane    │   │  every play, every event │
    └──────────────────────────────┘   └──────────────────────────┘
 ```
 
 Signalling is a handful of small messages when someone joins; after
-that every event travels directly between devices. The mesh is the four
+that every event travels between devices over their data channels. The mesh is the four
 seats plus the hand's jurors — strangers drawn to break deadlocks and
 hold bot seats ([doc 04](04-live-play.md)). A juror is introduced by a
 summons over the relay and then dialled like a seat. It dials the seats,
@@ -34,31 +34,36 @@ events a hand.
 
 | Hop | Typical | Worst realistic |
 |---|---|---|
-| Direct data channel, same continent | 20–60 ms | 150 ms |
-| Direct, intercontinental | 120–200 ms | 300 ms |
-| Via TURN | +20–80 ms | +150 ms |
+| Data channel through TURN, same continent | 20–60 ms, plus 20–80 ms for TURN | 150 ms, plus 150 ms |
+| Through TURN, intercontinental | 120–200 ms, plus 20–80 ms | 300 ms, plus 150 ms |
 | Via the relay lane | 150–400 ms | 800 ms |
 
 A trick-taking game sends one message per play. Even the worst row
 clears a second.
 
-## When a direct connection fails
+## Through TURN, never direct
 
-STUN gets a direct connection through most NATs. Roughly 10–20% of
-connection pairs sit behind symmetric NAT or a strict firewall and need
-TURN, which relays real bytes and so costs money. In order:
+A peer never learns another's address — not the players', and not the
+jurors', who are strangers. Every data channel goes through Cloudflare's
+TURN (`iceTransportPolicy: 'relay'`), with short-lived credentials from
+the service's turn handler (`app/lib/net/turn.dart`,
+[doc 06](06-service.md)), so the browser gathers no address of its own
+to send. TURN is billed by the gigabyte delivered: a game is at most a
+few tens of megabytes, a tenth of a cent, and the first 1,000 GB a month
+are free. In order:
 
-1. **Direct, when it works** — most pairs.
-2. **TURN** — Cloudflare's, with short-lived credentials from the
-   service's turn handler (`app/lib/net/turn.dart`,
-   [doc 06](06-service.md)). Without credentials, a STUN server still
-   gives every peer its public address.
-3. **The relay lane** — while anyone a device must reach has no channel
+1. **TURN** — every channel, wherever the credentials are in hand.
+2. **The relay lane** — while anyone a device must reach has no channel
    open, events also go to the relay as signed JSON
    (`app/lib/net/mesh_transport.dart`). A dial unanswered in twenty
    seconds is left to the lane and retried after a minute, then two,
    four, up to a quarter of an hour. A table whose channels are all up
-   costs the relay its presence and signalling and nothing else.
+   costs the relay its presence and signalling and nothing else. With
+   no TURN credentials a device makes no channels at all, and the lane
+   carries its table.
+
+The test rigs run the same way against a local coturn on 127.0.0.1
+(`e2e/drive.mjs`).
 
 ## Who is in charge
 

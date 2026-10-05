@@ -54,34 +54,33 @@ void main() {
     }
   });
 
-  test('a handler with none to give, or unreachable, leaves STUN alone', () async {
+  test('a handler with none to give, or unreachable, leaves no servers, and so no channels', () async {
     final h = await handler(503, jsonEncode({'error': 'turn not configured'}));
     try {
-      expect(await iceServersFor(signer, endpoint: h.url), stunOnly);
+      expect(await iceServersFor(signer, endpoint: h.url), isEmpty);
     } finally {
       await h.stop();
     }
-    expect(await iceServersFor(signer, endpoint: Uri.parse('http://127.0.0.1:1/api/turn')), stunOnly);
+    expect(await iceServersFor(signer, endpoint: Uri.parse('http://127.0.0.1:1/api/turn')), isEmpty);
     final nonsense = await handler(200, '<html>');
     try {
-      expect(await iceServersFor(signer, endpoint: nonsense.url), stunOnly);
+      expect(await iceServersFor(signer, endpoint: nonsense.url), isEmpty);
     } finally {
       await nonsense.stop();
     }
   });
 
-  test('a handler that never answers is given its few seconds, and STUN alone after', () async {
+  test('a handler that never answers is given its few seconds, and no servers after', () async {
     // It takes the request and says nothing: a worker that has hung. The
     // credentials are fetched beside the relays rather than in front of
-    // them (home_page.dart), so nothing on the screen waits on this —
-    // but a table started later still has to have something to dial with.
+    // them (home_page.dart), so nothing on the screen waits on this.
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((_) {});
     try {
       final began = DateTime.now();
       final servers = await iceServersFor(signer,
           endpoint: Uri.parse('http://127.0.0.1:${server.port}/api/turn'), timeout: const Duration(milliseconds: 300));
-      expect(servers, stunOnly);
+      expect(servers, isEmpty);
       expect(DateTime.now().difference(began), lessThan(const Duration(seconds: 3)));
     } finally {
       await server.close(force: true);

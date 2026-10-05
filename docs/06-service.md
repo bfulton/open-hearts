@@ -176,7 +176,9 @@ is limited to 20 changes and 60 reads an hour.
 `turn` mints Cloudflare Realtime TURN credentials (`OH_TURN_KEY_ID`,
 `OH_TURN_API_TOKEN`) valid for four hours, only for a device whose
 subscription stands, since TURN is billed by the gigabyte. Without the
-secrets it answers 503 and the app uses STUN alone.
+secrets it answers 503, and the app makes no data channels and plays
+over the relay: channels go through TURN or not at all, so no peer
+learns another's address ([doc 02](02-multiplayer.md)).
 
 ### Game records
 
@@ -359,7 +361,7 @@ which is ignored by version control.
 
 A deployment with no keys degrades safely: no service key means live
 play is shut, no Stripe means the shop says it is not open, and no TURN
-means STUN only.
+means tables play over the relay.
 
 ## Testing
 
@@ -370,7 +372,10 @@ are accepted as sign-ins. The flag is honoured only for requests to
 `localhost` or `127.0.0.1`, so setting it in production does nothing.
 `e2e/build.sh` compiles the app against BIP-340's published test key
 pair, so the suites exercise the real handlers, signatures and licence
-check.
+check. With `OH_TURN_LOCAL` set as well, `turn` hands out that local TURN
+server with fixed credentials; the rig points it at a coturn it starts
+on 127.0.0.1, so channels in the suites go through TURN as they do in
+production.
 
 **The departure matrix.** The table protocol's job is to keep four
 seats playing while people come and go. The same client code runs under

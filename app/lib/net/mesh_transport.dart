@@ -27,9 +27,12 @@
 /// closing or failing is reported as a disconnect, which the protocol
 /// treats as most of the silence allowance already spent.
 ///
-/// Who offers: of any two peers, the one with the lower key. ICE runs
-/// without servers here — peers on one network, or a dev machine — and
-/// a TURN server is a configuration away (docs/06-service.md).
+/// Who offers: of any two peers, the one with the lower key.
+///
+/// A channel goes through a TURN server and nowhere else, so no peer —
+/// a stranger drawn as a juror among them — ever learns another's
+/// address. Without a TURN server to hand, no channel is made at all and
+/// the relay carries the table.
 library;
 
 import 'dart:async';
@@ -56,7 +59,7 @@ class MeshTransport implements Transport {
   /// Of any two peers, the one with the lower key offers; the other
   /// waits to be offered to.
   void _dial(PublicKey peer) {
-    if (peer == relay.signer.publicKey || _links.containsKey(peer)) return;
+    if (!_channels || peer == relay.signer.publicKey || _links.containsKey(peer)) return;
     if (peer.compareTo(relay.signer.publicKey) > 0) _offerTo(peer);
   }
 
@@ -80,6 +83,25 @@ class MeshTransport implements Transport {
   final Set<PublicKey> peers;
   final List<Map<String, Object?>> iceServers;
   final void Function(String line)? log;
+
+  bool get _channels => makesChannels(iceServers);
+
+  /// Whether a device makes channels at all: only with a TURN server.
+  static bool makesChannels(List<Map<String, Object?>> iceServers) => iceServers.any(isTurn);
+
+  /// Whether [server] is a TURN server (not STUN).
+  static bool isTurn(Map<String, Object?> server) {
+    final urls = server['urls'];
+    final list = urls is List ? urls : [urls];
+    return list.any((u) => u is String && (u.startsWith('turn:') || u.startsWith('turns:')));
+  }
+
+  /// What a peer connection is made with: through TURN alone, so the
+  /// browser gathers no address of its own to send.
+  static Map<String, Object?> rtcConfiguration(List<Map<String, Object?>> iceServers) => {
+        'iceServers': iceServers,
+        'iceTransportPolicy': 'relay',
+      };
 
   final Map<PublicKey, _Link> _links = {};
   final _incoming = StreamController<({PublicKey from, Map<String, Object?> message})>.broadcast();
@@ -147,7 +169,7 @@ class MeshTransport implements Transport {
   void heard(PublicKey peer, List<String> paths) => relay.heard(peer, paths);
 
   Future<RTCPeerConnection> _connection(PublicKey peer) async {
-    final pc = await createPeerConnection({'iceServers': iceServers});
+    final pc = await createPeerConnection(rtcConfiguration(iceServers));
     pc.onIceCandidate = (c) {
       if (c.candidate == null) return;
       relay.signal(peer, Signal(from: '', type: 'ice', payload: {
@@ -225,6 +247,9 @@ class MeshTransport implements Transport {
     try {
       switch (s.type) {
         case 'offer':
+          // Not answered where this device makes no channels: the
+          // offerer gives up on it and the relay carries the two.
+          if (!_channels) return;
           // The lower key offers; an offer from a higher key is a peer
           // that came back and started over, and is answered the same.
           final link = _links[s.from] = _Link();

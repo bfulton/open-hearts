@@ -355,21 +355,15 @@
     <p>
       The cards are dealt between the devices at the table so that each
       player's hand can be read by that player alone, and no server of ours
-      ever sees a hand. Plays go directly from device to device wherever a
-      direct connection can be made.
+      ever sees a hand. Plays go from device to device.
     </p>
     <p>
-      A direct connection means the devices at your table learn each other's
-      IP addresses. So do the <b>jurors</b>: the apps of other players, drawn
-      at random, that help settle a table and play the bots' seats. While your
-      app is open and subscribed it serves as a juror at other people's tables
-      too, so their devices learn your IP address.
-    </p>
-    <p>
-      To make those connections the app uses Cloudflare's connection services
-      (STUN and TURN), which see your IP address. When two devices cannot
-      reach each other directly, Cloudflare passes the traffic between them,
-      encrypted so that it cannot read it.
+      Those connections all go through Cloudflare's relay service (TURN), so
+      the other devices at your table never learn your IP address — not the
+      other players, and not the <b>jurors</b>: the apps of other players,
+      drawn at random, that help settle a table and play the bots' seats.
+      Cloudflare sees your IP address, as any server you connect to does, and
+      passes the traffic on encrypted, so that it cannot read it.
     </p>
   </section>
 

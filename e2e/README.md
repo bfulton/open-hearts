@@ -7,8 +7,10 @@ from the start. The suites find buttons, cards and state pills by their
 labels, so they exercise the screen a person sees. `flows.mjs` also
 taps with a real pointer, so a tap landing in the wrong place shows up.
 
-Run everything from the repository root, after building the app the way
-the suites expect it:
+The rig starts a coturn on 127.0.0.1 for the data channels, which go
+through TURN as in production (`apt-get install coturn`; its log is
+`app/build/logs/turn.log`). Run everything from the repository root,
+after building the app the way the suites expect it:
 
 ```bash
 ./e2e/build.sh                          # app/build/e2e, served at / and keyed to the rig's service

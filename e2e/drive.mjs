@@ -7,7 +7,8 @@
 // Flutter's hit test, so a suite that only ever clicks them cannot see
 // a tap landing in the wrong place. `tapAt` in flows.mjs is the other
 // half.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createSocket } from 'node:dgram';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { createWriteStream, mkdirSync } from 'node:fs';
@@ -142,13 +143,49 @@ export const localService = {
   secret: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef',
 };
 
-async function handlersFor(serve) {
+/// A TURN server on this machine (coturn's turnserver), for the app's
+/// channels to go through as they go through Cloudflare's in
+/// production: TURN only, so the rig plays the path production plays.
+/// The handlers hand out its address and the user `rig`.
+export async function startTurn() {
+  if (spawnSync('turnserver', ['--version']).error) {
+    throw new Error("coturn's turnserver is needed for the browser suites (apt-get install coturn)");
+  }
+  // A free port, as the system gives one; coturn takes no port 0.
+  const port = await new Promise((resolve) => {
+    const probe = createSocket('udp4');
+    probe.bind(0, '127.0.0.1', () => {
+      const p = probe.address().port;
+      probe.close(() => resolve(p));
+    });
+  });
+  const logFile = join(root, 'app', 'build', 'logs', 'turn.log');
+  mkdirSync(dirname(logFile), { recursive: true });
+  const proc = spawn('turnserver', [
+    '-n', '--no-cli', '--no-tls', '--no-dtls',
+    '--listening-ip=127.0.0.1', '--relay-ip=127.0.0.1', `--listening-port=${port}`,
+    '--lt-cred-mech', '--user=rig:rig', '--realm=openhearts.local',
+    // The peers it relays between are on this machine too.
+    '--allow-loopback-peers',
+    `--log-file=${logFile}`, '--simple-log', '--no-stdout-log',
+  ]);
+  await new Promise((resolveUp, reject) => {
+    proc.on('exit', (code) => reject(new Error(`turnserver exited ${code}; see ${logFile}`)));
+    setTimeout(resolveUp, 500);
+  });
+  // Gone with the suite, however the suite ends.
+  process.on('exit', () => proc.kill());
+  return { url: `turn:127.0.0.1:${port}`, stop: () => proc.kill() };
+}
+
+async function handlersFor(serve, turn) {
   const { default: handler, memoryStore } = await import(new URL('../service/functions/worker.mjs', import.meta.url));
   const store = memoryStore();
   const env = {
     OH_SERVICE_SECRET: localService.secret,
     OH_SERVICE_KEY: localService.key,
     OH_OPEN_HOUSE: '1',
+    OH_TURN_LOCAL: turn,
     OH_STORE: {
       get: async (at, kind) => {
         const [pk, sk] = at.split('|');
@@ -204,7 +241,8 @@ export async function serveApp() {
       return new Response(null, { status: 404 });
     }
   };
-  const handlers = await handlersFor(asset);
+  const turn = await startTurn();
+  const handlers = await handlersFor(asset, turn.url);
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
     if (url.pathname.startsWith('/api/')) {
@@ -234,7 +272,13 @@ export async function serveApp() {
     res.end(Buffer.from(await answer.arrayBuffer()));
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  return { url: `http://127.0.0.1:${server.address().port}`, stop: () => server.close() };
+  return {
+    url: `http://127.0.0.1:${server.address().port}`,
+    stop: () => {
+      server.close();
+      turn.stop();
+    },
+  };
 }
 
 // ---- driving the app through its accessibility tree ----------------------

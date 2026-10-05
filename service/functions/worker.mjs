@@ -201,6 +201,9 @@ export function serversOf(answer) {
     .filter((x) => x.urls.length);
 }
 
+/// The user name and password of local mode's TURN server.
+export const LOCAL_TURN = 'rig';
+
 /// Mints credentials: the status and body to answer with.
 export async function mint(env, fetchImpl = fetch) {
   const keyId = env.OH_TURN_KEY_ID;
@@ -1724,6 +1727,11 @@ async function turn(request, env) {
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
   if (!(await entitlementOf(store, asked.key, { openHouse: openHouse(env, request) }))) return json(request, 402, { error: 'no subscription' });
+  // Local mode's own TURN server (the browser rig's, e2e/drive.mjs), so
+  // the rig's channels take the path production's do.
+  if (openHouse(env, request) && env.OH_TURN_LOCAL) {
+    return json(request, 200, { iceServers: [{ urls: [env.OH_TURN_LOCAL], username: LOCAL_TURN, credential: LOCAL_TURN }], ttl: S().turnTtlS });
+  }
   const { status, body: out } = await mint(env);
   return json(request, status, out);
 }

@@ -203,6 +203,26 @@ test('the worker: a key is required, then credentials come back, no-store', asyn
   }
 });
 
+test('the worker: local mode hands out its own TURN server, and a deployed origin never does', async () => {
+  const local = (body) =>
+    new Request('http://127.0.0.1:8788/api/turn', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const rig = { OH_OPEN_HOUSE: '1', OH_TURN_LOCAL: 'turn:127.0.0.1:3478', OH_STORE: kvOf(memoryStore()), ASSETS: assets };
+  const res = await worker.fetch(local(await asking(ADA, 'turn')), rig);
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).iceServers, [{ urls: ['turn:127.0.0.1:3478'], username: 'rig', credential: 'rig' }]);
+  // Set on a deployed project by mistake, it is not open house there, so
+  // it is never handed out.
+  const held = { ...env, OH_TURN_LOCAL: 'turn:127.0.0.1:3478', OH_STORE: kvOf(await household(Date.now(), ADA.public)) };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = okUpstream;
+  try {
+    const deployed = await worker.fetch(post(await asking(ADA, 'turn')), held);
+    assert.deepEqual((await deployed.json()).iceServers, answer.iceServers);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 // ---- the licence --------------------------------------------------------
 
 /// A store with the rows a paid-up subscription leaves.
