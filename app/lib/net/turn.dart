@@ -3,15 +3,15 @@
 /// Most pairs of players connect directly; the ten to twenty percent
 /// behind a symmetric NAT or a strict firewall need a TURN relay
 /// (docs/02-multiplayer.md), and without one they play over the relay
-/// lane, which a public relay turned on once. TURN is Cloudflare's,
+/// lane. TURN is Cloudflare's,
 /// and its credentials come from the service's turn-creds handler
 /// (docs/06-service.md; service/functions/worker.mjs), short-lived,
 /// fetched when a device connects so they are in hand when its table
 /// starts. When the handler has none to give — no TURN key configured
 /// yet, or the handler unreachable — a STUN server that needs no
 /// credentials still gives every peer its public address. On
-/// localhost there is nothing: peers connect directly (doc 06, local
-/// mode), and the browser suite stays off the network.
+/// localhost there is nothing: peers connect directly
+/// (docs/06-service.md), and the browser suite stays off the network.
 library;
 
 import 'dart:convert';

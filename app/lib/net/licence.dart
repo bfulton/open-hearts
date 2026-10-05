@@ -46,14 +46,15 @@ class Licence {
   static const statement = 'oh-licence/1';
 
   /// The device the licence is for. A licence is a device's; a
-  /// subscription is a person's, and carries several (doc 06).
+  /// subscription is a person's, and carries several
+  /// (docs/06-service.md).
   final PublicKey key;
 
   /// The last day this licence is good for, at midnight UTC. It runs to
   /// the end of that day: see [goodAt].
   final DateTime until;
 
-  /// What was bought. One plan so far.
+  /// What was bought. There is one plan.
   final String plan;
 
   /// The service's signature over [digest].
@@ -141,7 +142,7 @@ class Licence {
 /// Where the service's handlers are, by name: the origin this app was
 /// served by, which is the site the worker runs beside. Over http as
 /// well as https — the browser suite serves the app and the handlers
-/// together on localhost (doc 06, local mode) — and nowhere at all
+/// together on localhost (docs/06-service.md) — and nowhere at all
 /// when there is no origin, which is a build asking nobody rather than
 /// asking anybody.
 ///
@@ -159,7 +160,7 @@ Uri? handlerFor(String handler, Uri at) {
 /// What every handler is asked with: this device's key, the second the
 /// request is made, and the key's signature over both and over what is
 /// asked for — the code being spent, the device being dropped — or
-/// nothing (service/functions/worker.mjs, "who is asking").
+/// nothing (service/functions/worker.mjs).
 ///
 /// A key is public: it signs every event this device says at a table,
 /// and the relays hand those to anybody. So the service acts for a key

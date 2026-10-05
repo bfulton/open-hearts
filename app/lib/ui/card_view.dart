@@ -183,10 +183,8 @@ class CardBack extends StatelessWidget {
 }
 
 /// The place a card will land: the room it takes, and nothing drawn.
-/// The room is what keeps the trick from jumping as cards arrive; the
-/// outline each empty place used to draw was four rules on the felt
-/// before anything had been played, and a trick reads as a trick
-/// without them.
+/// The room is what keeps the trick from jumping as cards arrive, and a
+/// trick reads as a trick without outlines on the felt.
 class CardGhost extends StatelessWidget {
   const CardGhost({super.key, required this.width});
 

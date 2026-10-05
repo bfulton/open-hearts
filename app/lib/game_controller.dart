@@ -25,8 +25,8 @@ class GameController extends ChangeNotifier implements TableModel {
   }
 
   /// Fixes the shuffle, so [newGame] reshuffles the same way a test
-  /// expects: dealt by [Random] from it, as every game once was. Null in
-  /// the app, where every game is a fresh draw of a [DealSeed].
+  /// expects: dealt by [Random] from it. Null in the app, where every
+  /// game is a fresh draw of a [DealSeed].
   final int? seed;
 
   /// The score this game runs to, and every game after it on this
@@ -318,11 +318,8 @@ class GameController extends ChangeNotifier implements TableModel {
   /// every await point is a place the widget can be torn down.
   ///
   /// A timer the controller can cancel, rather than a delayed future,
-  /// which nothing can: a beat this table is in the middle of is a beat
-  /// still running after the page has gone. Nothing came of it, since
-  /// every step checks whether it is still alive; but a timer outliving
-  /// its widget is the sort of thing that is true until one day it is
-  /// expensive, and the live table already does it the other way.
+  /// which nothing can: a beat should not outlive the page it is
+  /// pacing. The live table cancels its own the same way.
   Future<bool> _wait(Duration d) async {
     if (d > Duration.zero) {
       final done = Completer<void>();

@@ -1,6 +1,6 @@
-/// Where a solo game's cards come from (docs/03-fair-deal.md, "Where
-/// the randomness comes from"): a player's game from a deal seed of its
-/// own, which its record carries; a test's from its int seed, as ever.
+/// Where a solo game's cards come from (docs/03-fair-deal.md): a
+/// player's game from a deal seed of its own, which its record carries;
+/// a test's from its int seed.
 library;
 
 import 'package:engine/engine.dart';
@@ -30,7 +30,7 @@ void main() {
     });
   });
 
-  test('a test\'s seed deals the game it always dealt', () {
+  test('a test\'s int seed deals the engine\'s game for that seed, with no deal seed', () {
     fakeAsync((async) {
       final c = GameController(seed: 4, paced: false, store: MemoryRecordStore());
       async.flushMicrotasks();

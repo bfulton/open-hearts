@@ -695,9 +695,7 @@ class _Games extends StatelessWidget {
 ///
 /// The ring is white, since which one you chose is what a thing is,
 /// not something to do (docs/05-form-factors.md); and it stands off the
-/// disc by a gap of felt, so it shows on every colour. It was gold and
-/// drawn on the disc's own edge, which on the amber disc was no ring at
-/// all.
+/// disc by a gap of felt, so it shows on every colour, amber included.
 class _Choice extends StatelessWidget {
   const _Choice({required this.label, required this.selected, required this.onTap, required this.color, this.child, this.size = 50});
 

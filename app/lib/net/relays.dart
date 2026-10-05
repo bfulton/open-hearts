@@ -30,9 +30,6 @@ const deployedRelays = [ourRelay];
 /// every table's rotation. All of a deployed list; none of a local one.
 int pinnedRelays(List<Uri> relays) => relays.takeWhile(RemoteConfig.ours).length;
 
-/// The relays presence talks on: the same as everything else's now.
-List<Uri> presenceRelays(List<Uri> relays) => relays;
-
 /// The local relay, where a build served from localhost looks.
 const localRelay = 'ws://127.0.0.1:7447';
 
@@ -46,8 +43,7 @@ const devRelay = String.fromEnvironment('OH_RELAYS');
 /// the config says — they are not on anyone's relays but their own.
 ///
 /// A phone build has no address it was served from, and is a deployed
-/// build like the site's: it was taken for a local one, and would have
-/// looked for a relay on the phone itself.
+/// build like the site's, not a local one.
 List<Uri> appRelays({Uri? base, RemoteConfig? config, bool web = kIsWeb}) {
   if (devRelay.isNotEmpty) return Relays.parse(devRelay);
   final host = (base ?? Uri.base).host;

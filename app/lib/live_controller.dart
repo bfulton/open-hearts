@@ -280,8 +280,8 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Whether this view has to work a seat's move out for itself. A bot
   /// seat is everyone's to compute — unless a juror holds it, and then
   /// its move arrives as a signed event like a person's and its hand
-  /// is not ours to see at all (docs/04-live-play.md, "Playing a seat
-  /// nobody holds"). Asked of the hand being shown, which runs behind
+  /// is not ours to see at all (docs/04-live-play.md). Asked of the
+  /// hand being shown, which runs behind
   /// the table's: a seat can be a person's in the hand on screen and a
   /// bot the jury holds in the one the table is already dealing.
   bool _worksOutMove(int seat) =>

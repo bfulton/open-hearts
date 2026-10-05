@@ -32,11 +32,6 @@ void main() {
     expect(pinnedRelays(const []), 0);
   });
 
-  test('presence talks to the same relay as everything else', () {
-    final deployed = appRelays(base: Uri.parse('https://openhearts.game/play/'), web: true);
-    expect(presenceRelays(deployed), deployed);
-  });
-
   test('a table, a pool, the results and presence each reach the object for their own tag', () {
     final deployed = appRelays(base: Uri.parse('https://openhearts.game/play/'), web: true);
     for (final tag in ['mf66d4537', 'queue:anyone', 'results', 'KP4T9MXR']) {

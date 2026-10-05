@@ -2,7 +2,7 @@
 {{flutter_build_config}}
 
 // Flutter's own loader, without Flutter's service worker: that one is
-// a stub now, which unregisters whatever is registered where it is —
+// a stub, which unregisters whatever is registered where it is —
 // ours included.
 _flutter.loader.load();
 

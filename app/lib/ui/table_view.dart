@@ -18,7 +18,7 @@ import '../l10n/l10n.dart';
 /// More height than a table is ever going to use, at which point where
 /// it sits in the felt stops being a rounding error and starts being a
 /// composition. Above a phone's own breathing room, so a phone's table
-/// is centred in its felt exactly as it was.
+/// is centred in its felt.
 const _roomToSpare = 240.0;
 
 /// The badges' inset from the felt's edge, and the gap every badge
@@ -159,8 +159,7 @@ class TableView extends StatelessWidget {
         // A badge hugs what it says, up to the room it has: the width
         // of the trick's own column for the seat across the felt and
         // your own, and the strip between a card and the felt's edge
-        // for the two at the sides. They used to fill that room, so a
-        // short name sat in a wide bar and a side seat in a tall box.
+        // for the two at the sides.
         final facing = trickBox.width;
 
         // A badge is laid out at a phone's scale and drawn at the
@@ -466,10 +465,8 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
                 // the card that took the trick, which is the one
                 // furthest towards its taker, so every card only ever
                 // moves the one way; and the pile is pulled off towards
-                // the taker, getting up to speed as it goes. It used to
-                // leave as a picture of four cards sliding off in
-                // formation. Solid while it is plainly on the felt, and
-                // gone by the end.
+                // the taker, getting up to speed as it goes. Solid
+                // while it is plainly on the felt, and gone by the end.
                 final go = Easing.standardAccelerate.transform(v);
                 final together = Curves.easeInOutCubic.transform((v / 0.7).clamp(0.0, 1.0));
                 final fade = Curves.easeIn.transform(((v - 0.4) / 0.6).clamp(0.0, 1.0));

@@ -395,7 +395,7 @@ void main() {
     await shopWith(productless);
     expect(canBuyHere, isFalse);
 
-    // And the web goes to Stripe, as it did, not to a store: here, to a
+    // And the web goes to Stripe, not to a store: here, to a
     // checkout handler the test binding answers 400 for.
     final wasCan = canLeaveForStripe;
     canLeaveForStripe = true;

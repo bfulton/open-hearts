@@ -20,7 +20,7 @@
     return Promise.resolve(legacy(text));
   }
 
-  // The old way, for a browser without the Clipboard API or one that
+  // The fallback, for a browser without the Clipboard API or one that
   // refuses it: a hidden text area, selected and copied.
   function legacy(text) {
     var area = document.createElement('textarea');

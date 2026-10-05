@@ -210,7 +210,7 @@ class Room extends ChangeNotifier {
   /// Whether this device can run the deal: whether it loaded
   /// (crypto/deal.dart), unless a test says. Every live table is
   /// sealed, and a device that cannot run the deal does not sit down
-  /// (docs/03-fair-deal.md, "As built") — nor start one, nor sit at a
+  /// (docs/03-fair-deal.md) — nor start one, nor sit at a
   /// start that is not sealed.
   final bool canDeal;
 
@@ -372,17 +372,12 @@ class Room extends ChangeNotifier {
         // again. One that seats this device and nobody here is held
         // for its sender's next beat, and dropped if none comes.
         //
-        // Except when the start says so itself. The fourth to arrive
-        // is the reason a room of four becomes a table, and that
-        // happens at once: its own first beat goes out, the leader
-        // counts four and starts, and the start can be back before any
-        // beat of the leader's has come round. There is no beat to
-        // wait for either — everyone else is at the table now and has
-        // stopped saying they are in the room — so the fourth would
-        // hold a start naming its own seat until it went stale, and
-        // sit in a room the table had left. A start that seats the
-        // device that sent it, made since this device came into the
-        // room, is that table and not a leftover of an older one.
+        // Except a start that seats the device that sent it, made since
+        // this device came into the room: that is this room's table,
+        // not a leftover. The fourth to arrive gets exactly that, before
+        // any beat of the leader's comes round — and none will, since
+        // everyone else is at the table and has stopped beating — so
+        // holding it would leave the fourth in a room the table has left.
         final seats = c['seats'] as List? ?? const [];
         bool holds(PublicKey? key) => seats.any((raw) => raw is Map && raw['key'] == key);
         final itsOwn = holds(e.pubkey) && at >= since - _skewMs;

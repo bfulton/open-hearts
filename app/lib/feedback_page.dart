@@ -12,7 +12,7 @@
 /// `feedback`): a page, or an address to mail. Until they say, it is
 /// the project's issues on GitHub, which anyone can read, and the page
 /// says so where the button is. A build that cannot open a page — the
-/// phone builds, for now — copies the report instead, and says where to.
+/// phone builds — copies the report instead, and says where to.
 library;
 
 import 'package:flutter/foundation.dart';

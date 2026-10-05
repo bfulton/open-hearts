@@ -2,13 +2,12 @@
 ///
 /// Two halves. The words: every translation carries the same blanks as
 /// the English it translates, every card and every rule has a name of
-/// its own in every language, and the English is what it was before
-/// there were other languages — the suites in e2e/ read the table by
-/// those words. And the screens: every page the app has, in every
-/// language, on a small phone and a large one, with nothing running off
-/// the edge and nothing cut short. German runs long and French is not
-/// far behind, and the place that finds out is here rather than a
-/// player's screen.
+/// its own in every language, and the English is pinned — the suites
+/// in e2e/ read the table by those words. And the screens: every page
+/// the app has, in every language, on a small phone and a large one,
+/// with nothing running off the edge and nothing cut short. German
+/// runs long and French is not far behind, and the place that finds
+/// out is here rather than a player's screen.
 library;
 
 import 'dart:convert';
@@ -120,7 +119,7 @@ void main() {
       }
     });
 
-    test('the English is the words the table said before it had any other language', () {
+    test('the English is the words the e2e suites read the table by', () {
       for (final card in engine.Card.deck) {
         expect(english.card(card), card.spoken, reason: 'what a screen reader, and the suites, call a card');
         expect(english.cardInSentence(card), 'the ${card.spoken}');

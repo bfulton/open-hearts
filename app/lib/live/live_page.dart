@@ -200,7 +200,7 @@ class _LivePageState extends State<LivePage> {
       if (_c.bootCountdownMs(seat) == null) continue;
       if (_c.canBoot(seat)) {
         // Sized to the line, which is thirty pixels: a button at its
-        // default height was clipped top and bottom.
+        // default height is clipped top and bottom.
         return TextButton.icon(
           onPressed: () => _c.boot(seat),
           icon: const Icon(Icons.timer_off_outlined, size: 15),

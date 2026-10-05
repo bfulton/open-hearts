@@ -1,6 +1,6 @@
 // Renders tool/icon.svg into every icon the app and the site ship: the
 // web app's (favicon, manifest, maskable), Android's launcher mipmaps,
-// iOS's and macOS's app icon sets, and the site's favicon. Run it after
+// iOS's app icon set, and the site's favicon. Run it after
 // changing the SVG:  node tool/icons.mjs   (from app/)
 //
 // Chromium draws it, so what is shipped is what a browser shows. A
@@ -28,8 +28,8 @@ const out = [
   ...Object.entries({ mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 })
     .map(([d, px]) => [`android/app/src/main/res/mipmap-${d}/ic_launcher.png`, px, svg]),
 ];
-// The iOS and macOS sets: every file their Contents.json names.
-for (const set of ['ios/Runner/Assets.xcassets/AppIcon.appiconset', 'macos/Runner/Assets.xcassets/AppIcon.appiconset']) {
+// The iOS set: every file its Contents.json names.
+for (const set of ['ios/Runner/Assets.xcassets/AppIcon.appiconset']) {
   const contents = JSON.parse(await readFile(new URL(`${set}/Contents.json`, app), 'utf8'));
   for (const img of contents.images) {
     if (!img.filename) continue;

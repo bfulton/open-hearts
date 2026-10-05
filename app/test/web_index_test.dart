@@ -28,9 +28,9 @@ void main() {
   });
 
   test('the page is held at its top, so a tap lands where it is drawn', () {
-    // A Home Screen app on an iPhone, turned and turned back, was left
-    // scrolled past its top by the status bar's 62 points, and every tap
-    // landed that far above the finger (web/hold_still.js).
+    // A Home Screen app on an iPhone, turned and turned back, can be
+    // left scrolled past its top by the status bar's 62 points, and
+    // every tap then lands that far above the finger (web/hold_still.js).
     final head = File('web/index.html').readAsStringSync();
     expect(head, contains('<script src="hold_still.js"></script>'));
     final script = File('web/hold_still.js').readAsStringSync();
@@ -52,7 +52,7 @@ void main() {
   });
 
   test('the page keeps the app for a load with no network, and Flutter\'s stub does not undo it', () {
-    // The bootstrap is ours (docs/01-dev-loop.md, "With no network"):
+    // The bootstrap is ours (docs/01-dev-loop.md):
     // it registers the worker that keeps the app, and it starts
     // Flutter's loader without the service worker settings that would
     // register Flutter's own — a stub that unregisters whatever is

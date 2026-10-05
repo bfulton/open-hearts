@@ -38,9 +38,8 @@ class Standing {
   /// waits for a relay to say it has it. A result stands only when a
   /// majority of the table's people published it — at a table of two,
   /// both (packages/table, results.dart) — so one that went nowhere
-  /// costs the game its rating, and nobody would know. It used to be
-  /// sent and the connection closed a moment later, whatever the relays
-  /// said. Tried again on a fresh connection after each of [retries]
+  /// costs the game its rating, and nobody would know. Tried again on a
+  /// fresh connection after each of [retries]
   /// while no relay has taken it; true once one has.
   static Future<bool> publish(
     List<Uri> relays,

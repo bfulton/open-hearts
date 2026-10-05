@@ -1,5 +1,5 @@
-/// What the app may be told without a new build (docs/06-service.md,
-/// "Remote config"): whether live play is open to anyone at all,
+/// What the app may be told without a new build (docs/06-service.md):
+/// whether live play is open to anyone at all,
 /// whether the paid tier is offered, which relays the tables meet on, a
 /// line across the front door, that this build is too old, and the
 /// clocks of the tables this device starts.
@@ -81,7 +81,7 @@ class AppWaits {
     this.meshAnswer = const Duration(seconds: 20),
   });
 
-  /// The build's own, which are what every device waited before.
+  /// The build's own.
   static const standard = AppWaits();
 
   /// Asking the service for this device's licence.

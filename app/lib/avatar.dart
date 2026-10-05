@@ -30,8 +30,8 @@ class Avatar {
   /// enough to ride a relay.
   static const side = 64;
 
-  /// The most a picture may be, in bytes: what a public relay carries
-  /// without complaint.
+  /// The most a picture may be, in bytes: what a relay carries without
+  /// complaint.
   static const maxPictureBytes = 12000;
 
   bool get isDefault => icon == null && color == null && picture == null;

@@ -1,5 +1,5 @@
 /// Where everything is (router.dart): an address opens its page over the
-/// home screen, back comes home, an older room link and a game reached by
+/// home screen, back comes home, a bad room link and a game reached by
 /// its address alone are sent where they belong, and the session's own
 /// parameters stay in the address wherever it goes.
 library;

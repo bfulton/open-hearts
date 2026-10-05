@@ -22,14 +22,14 @@ class _CopyableSelectionState extends State<CopyableSelection> {
 
   /// Where the toolbar and the handles are drawn. This sits above the
   /// app's navigator, whose overlay is below it, so it brings its own:
-  /// without one, a long press selected the words and then had nowhere
+  /// without one, a long press would select the words and have nowhere
   /// to show Copy.
   late final _entry = OverlayEntry(builder: (context) => _area());
 
   /// The area's own focus, out of the Tab order: it is there to select
   /// text, not to be tabbed to. And in the order, it is asked where it
   /// is when the browser says the window has focus — which can be before
-  /// the first frame is laid out, so it threw, every load.
+  /// the first frame is laid out, when asking throws.
   final _focus = FocusNode(debugLabel: 'selection', skipTraversal: true);
 
   @override
@@ -81,8 +81,7 @@ class _CopyableSelectionState extends State<CopyableSelection> {
 /// reload landing on a page over the front door, a game rejoined as the
 /// app starts) has text nobody has measured. The selection orders its
 /// text by where each piece is on the screen, every time any of it
-/// changes, and asking an unmeasured piece where it is throws: once a
-/// second while the front door under a table ticked its online count.
+/// changes, and asking an unmeasured piece where it is throws.
 ///
 /// Wraps the theme's own transitions (theme.dart), which every page
 /// route builds through; the same widget either way, so a page covered

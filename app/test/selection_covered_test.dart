@@ -2,10 +2,9 @@
 /// out (ui/selection.dart, SelectionWhileCurrent): a page opened by its
 /// address over the front door, or a table rejoined as the app starts.
 /// The selection orders its text by where each piece is on the screen,
-/// and asking the covered page's unmeasured text threw — from a
-/// microtask, which fails a test outright — once, or once a second
-/// while the door under a table ticked its online count. Under a theme
-/// without it, this same test fails on that error.
+/// and asking the covered page's unmeasured text throws — from a
+/// microtask, which fails a test outright. Under a theme without
+/// SelectionWhileCurrent, this test fails on that error.
 library;
 
 import 'package:flutter/material.dart';

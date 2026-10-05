@@ -564,9 +564,9 @@ void main() {
     // A bot seat's juror goes while the seat still owes a step of the
     // deal. Nobody else holds the key it deals with, so the table gives
     // the hand up undealt and deals the next (packages/table,
-    // undealt_hand_test.dart). The screen stayed in the old hand's
-    // deal, waiting for a lead that deal would never name, and never
-    // offered the pass the table then waited on.
+    // undealt_hand_test.dart). A screen that stayed in the old hand's
+    // deal would wait for a lead that deal never names, and never offer
+    // the pass the table then waits on.
     final crypto = await DealCrypto.load();
     final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: jurySize + 4);
     final c = live.controller;

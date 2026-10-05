@@ -28,7 +28,7 @@ import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' a
 /// What live play costs a year, as it is written on the front door
 /// (`pricePerYear`, l10n). The shape of the price is chosen by the fees
 /// — a year rather than a month, since a card's fixed thirty cents is
-/// paid once (doc 06).
+/// paid once (docs/06-service.md).
 const priceAmount = r'$5.99';
 
 /// The price as shown: the store's, in a store build, since it is the

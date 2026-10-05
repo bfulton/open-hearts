@@ -6,8 +6,8 @@
 /// A browser that says it is offline is in airplane mode or has no
 /// signal, and waiting forty seconds for a relay will not change that:
 /// the door says so at once instead. Off the web nothing here is told,
-/// and the device is taken to be online, which is the old behaviour:
-/// wait for a relay, and give up at the far deadline.
+/// and the device is taken to be online: it waits for a relay, and
+/// gives up at the far deadline.
 library;
 
 import 'network_io.dart' if (dart.library.js_interop) 'network_web.dart' as platform;

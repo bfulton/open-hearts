@@ -3,11 +3,11 @@
 // cannot.
 //
 // Solo play needs nothing but the device — the bots, the deal, the
-// records are all here — yet a page opened on a train, or from the
-// home screen in airplane mode, used to be the browser's own "no
-// internet" page: nothing kept the app, since Flutter's service worker
-// is now a stub that unregisters itself, and the entry points are
-// no-store (site/_headers) so that a deploy reaches a phone at once.
+// records are all here — but without this a page opened on a train, or
+// from the home screen in airplane mode, is the browser's own "no
+// internet" page: Flutter's service worker is a stub that unregisters
+// itself, and the entry points are no-store (site/_headers) so that a
+// deploy reaches a phone at once.
 //
 // So it is the network first, always, and this copy only when the
 // network fails. Online nothing changes: every file is asked for as it

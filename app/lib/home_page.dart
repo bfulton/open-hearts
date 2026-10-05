@@ -551,7 +551,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Every live table is sealed, and a device that cannot run the deal
-  /// does not sit down (docs/03-fair-deal.md, "As built"). It says so
+  /// does not sit down (docs/03-fair-deal.md). It says so
   /// here, at the door, rather than connecting to find out; true when
   /// it has.
   bool _withoutDeal() {
@@ -713,7 +713,7 @@ class _HomePageState extends State<HomePage> {
     setState(() => _closeLobby(address: false));
     // Online *and* at a table, which another table's draw prefers:
     // somebody mid-game has a reason to still be here in a minute
-    // (docs/04-live-play.md, "The sizing"). Cleared on the way back
+    // (docs/04-live-play.md). Cleared on the way back
     // to the front door, however the table ended.
     Duty.seated = true;
     unawaited(context.push<void>(located(livePath), extra: controller).whenComplete(() {
@@ -900,8 +900,8 @@ class _HomePageState extends State<HomePage> {
           menu: [
             // Once live play is open here, this is where the date on the
             // licence is. Shut, the door itself says what it costs and has
-            // the way to it, and the menu saying it again was a second way
-            // to the one page.
+            // the way to it, and the menu saying it again would be a
+            // second way to the one page.
             if (liveOpen)
               MenuAction(l10n.subscription, icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
             // Not subscribed here: a subscription bought on another
@@ -918,8 +918,8 @@ class _HomePageState extends State<HomePage> {
           label: l10n.yourProfile,
           onTap: _editProfile,
           // The ink is the tap a finger makes; the Semantics above is the
-          // one a screen reader does, so the ink says nothing of its own —
-          // it was a second, nameless button inside the first.
+          // one a screen reader does, so the ink says nothing of its own:
+          // otherwise it is a second, nameless button inside the first.
           child: ExcludeSemantics(
             child: InkWell(
               onTap: _editProfile,
@@ -1183,8 +1183,8 @@ class _Finishing extends StatelessWidget {
 /// Live play, not open here. The padlock is not the point: what live
 /// play is and what it costs is, and the way to it — gold, like every
 /// way on, but drawn rather than filled: Play solo is what the door is
-/// for, and two filled buttons of one gold on one screen asked the eye
-/// to choose before it had read either.
+/// for, and two filled buttons of one gold on one screen ask the eye
+/// to choose before it has read either.
 class _LiveLocked extends StatelessWidget {
   const _LiveLocked({required this.onTap});
 

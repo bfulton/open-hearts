@@ -54,7 +54,7 @@ abstract class TableModel implements Listenable {
   Avatar avatarOf(int seat);
 
   /// Milliseconds [seat] has left on its clock, once the grace on its
-  /// open decision is spent (docs/04, "Boot"); null while there is no
+  /// open decision is spent (docs/04-live-play.md); null while there is no
   /// clock to show — within the grace, off turn, a bot, or a solo
   /// table, which has none.
   int? clockMs(int seat);

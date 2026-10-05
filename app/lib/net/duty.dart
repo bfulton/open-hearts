@@ -43,11 +43,10 @@ class Duty {
     if (d != null && listEquals(d.relays, relays)) return d;
     d?.close();
     void Function(String)? logger = log ? (l) => debugPrint('duty: $l') : null;
-    // Presence prefers our own object, one per tag, and falls back to
-    // the relays when it does not answer (net/relays.dart). Only
-    // presence: a table's events go to the relays proper.
+    // Presence has a connection of its own; a table's events go on the
+    // table's.
     final presence = RelayPresence(
-      relays: presenceRelays(relays),
+      relays: relays,
       signer: signer,
       canServe: () => crypto != null && dealWorker != null && !dealWorker.dead,
       log: logger,
@@ -81,7 +80,7 @@ class Duty {
   /// Says whether this device is at a table, which presence carries so
   /// that another table's draw can prefer it: somebody mid-game has a
   /// reason to still be here in a minute where somebody in the lobby
-  /// has none (docs/04-live-play.md, "The sizing").
+  /// has none (docs/04-live-play.md).
   static set seated(bool v) {
     final p = _current?.presence;
     if (p != null) p.status = v ? RelayPresence.seated : 'online';

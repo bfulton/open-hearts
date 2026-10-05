@@ -3,8 +3,7 @@
 /// A phone build uses the system clipboard as any app does. The web
 /// build goes through the page (web/copy.js), because Safari refuses a
 /// clipboard write that does not happen during the tap itself, and the
-/// app's own handling of a tap ends too late for it: Copy on a selection
-/// did nothing in Safari, and so did every Copy button.
+/// app's own handling of a tap ends too late for it.
 library;
 
 import 'copy_io.dart' if (dart.library.js_interop) 'copy_web.dart' as platform;
