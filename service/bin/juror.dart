@@ -23,10 +23,9 @@
 /// deployment keeps the same keys across restarts, or fresh ones when
 /// no secret is set.
 ///
-/// Real keys so a public relay takes their events; the local one takes
-/// anything. Several relays, comma-separated or `--relay` repeated, are
-/// listened on together and written to one at a time (packages/table,
-/// relays.dart).
+/// Real keys, since the deployed relay takes nothing else. Several
+/// relays, comma-separated or `--relay` repeated, are listened on
+/// together and written to one at a time (packages/table, relays.dart).
 library;
 
 // A server's output is its log.

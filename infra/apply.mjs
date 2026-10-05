@@ -11,7 +11,7 @@
 // those are checked to exist and not compared). A dry run only reads.
 //
 // What it says comes in four kinds: `would …` is a change --apply makes;
-// `by hand:` is a difference only the owner (or a wrangler deploy) can
+// `by hand:` is a difference only the operator (or a wrangler deploy) can
 // fix — a secret this has no value for, a setting the API will not
 // take; `unread:` is something the credentials could not read, with
 // Cloudflare's or Stripe's own words; `ok` is a part that matches. No

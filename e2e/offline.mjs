@@ -227,7 +227,7 @@ flow('the network gone while finding players', async ({ context, open, relay }) 
   await look(page, 'finding-players-offline');
   // Bots take every seat still empty at ten seconds, but even the
   // seating this device hosts itself comes back to it off a relay: with
-  // none, the wait used to turn for ever.
+  // none, the wait must still end.
   await gone(page, /^Finding players$/, 50, 'the pool given up');
   await waitFor(page, noRelay, { timeout: 1000, what: 'why, at the door' });
   if (!(await pressable(page, /^Play live/))) throw new Error('Play live is still being opened');
@@ -243,8 +243,8 @@ flow('the network gone in a room', async ({ context, open, relay }) => {
   await waitFor(page, /^Share the link$/, { timeout: 60000, what: 'the room' });
   await context.setOffline(true);
   // A room waits for the link to be opened, for as long as it takes, so
-  // it does not give up; but it says why nobody can arrive, where it
-  // used to look like a room everyone else had left.
+  // it does not give up; but it says why nobody can arrive, rather than
+  // looking like a room everyone else has left.
   await within(page, noRelay, 3, 'said in the room');
   if (!(await has(page, /^Share the link$/))) throw new Error('the room went');
   await look(page, 'a-room-offline');

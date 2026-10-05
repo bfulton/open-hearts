@@ -57,7 +57,8 @@ Future<void> main(List<String> args) async {
     }
     // A bench of them, because a table with bot seats needs
     // juryToHoldBots online before a juror can hold one at all, and
-    // this is what answers when there is nobody else (doc 04).
+    // this is what answers when there is nobody else
+    // (docs/04-live-play.md).
     final bench = LastResortBench(
       signers: [for (var i = 0; i < juryToHoldBots; i++) SchnorrSigner.generate()],
       relays: [relay.url],

@@ -1,4 +1,4 @@
-// The worker's remote config (doc 06, "Remote config"), in node's own
+// The worker's remote config (docs/06-service.md), in node's own
 // test runner: node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

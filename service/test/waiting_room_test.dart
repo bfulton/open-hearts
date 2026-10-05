@@ -163,8 +163,8 @@ void main() {
     test('a device entering a pool is handed this round\'s seatings, not the pool\'s whole history', () async {
       // Every seating is stored, so that a room code's joiner finds the
       // room announced before it arrived; a pool's pile up with it, and
-      // a device pressing Play was handed every one the pool had ever
-      // carried. An hour of a busy pool's rounds, and one from now.
+      // a device pressing Play must not be handed every one the pool has
+      // ever carried. An hour of a busy pool's rounds, and one from now.
       // A socket a tag: on the deployed relay each tag is its own object.
       final sockets = <String, WebSocketChannel>{};
       final host = SchnorrSigner.generate();

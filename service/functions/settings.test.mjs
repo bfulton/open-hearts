@@ -1,4 +1,4 @@
-// The service's own settings (doc 06, "The service's settings"): one
+// The service's own settings (docs/06-service.md): one
 // row the operator writes, every number checked against its bounds, and
 // what the service then does by them. node --test service/functions
 import assert from 'node:assert/strict';
@@ -36,7 +36,7 @@ const kvWith = (row, counts = { get: 0 }) => ({
   },
 });
 
-test('no row is the defaults, which are what the service always ran by', () => {
+test('no row is the defaults', () => {
   assert.deepEqual(serviceSettingsOf(null), { ...SERVICE_DEFAULTS });
   assert.deepEqual(SERVICE_DEFAULTS, {
     licenceDays: 31,

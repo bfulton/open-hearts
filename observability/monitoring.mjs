@@ -29,7 +29,7 @@ export const synthetics = {
     // What a purchase needs: the store read, and Stripe answering the
     // service's key for the price (service/functions/worker.mjs, healthOf).
     { name: 'Service health', uri: 'https://openhearts.game/api/health', expect: '"ok":true' },
-    // The presence relay's worker, which also wakes the jurors of last
+    // The relay's worker, which also wakes the jurors of last
     // resort (service/do/worker.mjs).
     { name: 'Relay', uri: 'https://relay.openhearts.game/', expect: 'open hearts relay' },
   ],
@@ -42,7 +42,7 @@ export const synthetics = {
 /// to app/web/observability.js, which runs only on the production host,
 /// so a fork or a local build reports nothing to us.
 export const browser = {
-  // The web build's; the phone builds will be apps of their own.
+  // The web build's; a phone build is an app of its own.
   name: 'web',
   // Names it had, so apply.mjs renames it rather than making another.
   formerly: ['app'],

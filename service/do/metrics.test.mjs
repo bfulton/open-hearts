@@ -1,5 +1,5 @@
-// What the operator watches of the relay object (doc 06, "Watching it
-// run"): counts a minute, never who. node --test service/do
+// What the operator watches of the relay object (docs/06-service.md):
+// counts a minute, never who. node --test service/do
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -31,7 +31,7 @@ test('what became of each message is counted, and the counts are a line a minute
   await relay.message(a, JSON.stringify(['EVENT', one]));
   await relay.message(a, JSON.stringify(['EVENT', { ...one, sig: '00'.repeat(64) }]));
   await relay.message(a, 'not json');
-  // A kind this object does not carry: the relays proper keep those.
+  // A kind presence does not carry.
   await relay.message(a, JSON.stringify(['EVENT', await sign.event(keys[1], { kind: 1, content: 'stored', created_at: 1 })]));
   assert.equal(points.length, 0, 'inside the minute, nothing written');
   assert.deepEqual(

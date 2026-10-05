@@ -16,13 +16,12 @@
 // is its memory, so a socket carries its own subscriptions
 // (`serializeAttachment`) and they come back with it.
 //
-// And nothing is written down. Presence is ephemeral by definition —
-// forwarded to whoever is listening and forgotten — so this object has
-// no storage to pay for, none to read on the way back from
-// hibernation, and nothing that would ever need sweeping. A kind that
-// is not ephemeral is refused rather than quietly dropped, and the
-// client writes it to the relays that keep things (app/lib/net/
-// relays.dart): tables have not moved here.
+// And little is written down. Presence is ephemeral by definition —
+// forwarded to whoever is listening and forgotten — so its object has
+// no storage to pay for and nothing to sweep. A table's or a lobby's
+// tag keeps only the lobby kind tagged for it, in its object's own
+// storage, for a day (tag_store.mjs, docs/08-own-relays.md); anything
+// else that is not ephemeral is refused rather than quietly dropped.
 
 import wasm from '../../app/web/schnorr.wasm';
 

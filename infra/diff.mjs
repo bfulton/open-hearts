@@ -132,7 +132,7 @@ export function rulesPlan(want, have) {
 ///
 /// Returns { patch, lines, owner }: `patch` is the deployment_configs
 /// entry a PATCH of the project takes (null deletes), `lines` say what
-/// it changes, and `owner` what only the owner can do — a secret
+/// it changes, and `owner` what only the operator can do — a secret
 /// missing, which this has no value for. Secret values are never read:
 /// a secret is present or it is not.
 export function pagesEnvPlan(want, have, ids) {
@@ -323,7 +323,7 @@ export function wranglerBindings(toml) {
 }
 
 /// The live relay against its wrangler.toml and the definition's few
-/// additions. Every difference is the owner's (or a deploy's) to fix,
+/// additions. Every difference is the operator's (or a deploy's) to fix,
 /// so this returns lines, not changes.
 /// live = { settings, secrets: [names], domains: [{hostname, service, enabled}],
 ///          subdomain: {enabled}, namespaces: [{script, class}], containers: [{name, max_instances}] }

@@ -54,21 +54,30 @@ export const openHouse = (env, request) => !!env.OH_OPEN_HOUSE && isLocal(reques
 // The numbers the service runs by — how long a licence lasts, how many
 // devices a subscription carries, how long a code is good for, which
 // Stripe price a checkout sells — read from one row the operator
-// writes, `config|service` in OH_STORE (doc 06, "The service's
-// settings"). Not the app's row: nothing here is served to anybody.
+// writes, `config|service` in OH_STORE (docs/06-service.md). Not the
+// app's row: nothing here is served to anybody.
 // Each is checked against bounds before it is taken, and one that does
 // not check out is left at its default, so a typo in the row is never
 // worse than no row.
 
-/// The defaults, which are what the service ran by before the row.
+/// The defaults: what the service runs by when the row is absent.
 export const SERVICE_DEFAULTS = Object.freeze({
   licenceDays: 31,
   mostDevices: 5,
+  // How long a code is worth anything: long enough to walk a phone
+  // over, short enough that a photograph of the screen is not a key.
   ticketMinutes: 10,
+  // How long an outstanding code must still have to be handed out
+  // again rather than replaced.
   ticketReuseMinutes: 2,
   turnTtlS: 4 * 60 * 60,
+  // How far a request's second may be from ours: clocks drift, and a
+  // phone out by more than this is told so.
   requestToleranceS: 300,
+  // How old a webhook's own timestamp may be: a replay is not a payment.
   webhookToleranceS: 300,
+  // What one household may do in an hour: changes (a code, a claim, a
+  // drop) and readings of its list. Adding a phone takes a handful.
   householdChangesPerHour: 20,
   householdReadsPerHour: 60,
   stripePrice: null,
@@ -228,7 +237,6 @@ export async function mint(env, fetchImpl = fetch) {
 // subscription lives, so a cancellation needs no revocation list —
 // the last licence simply runs out.
 
-/// A licence's days. A month, and never past what has been paid for.
 const STATEMENT = 'oh-licence/1';
 const PLAN = 'year';
 
@@ -336,16 +344,16 @@ export async function signerOn(bytes) {
   };
 }
 
-/// The signer for this isolate, over the wasm the site already serves.
-/// What is kept is the promise of it rather than the signer, so a
-/// second request arriving while the first is still fetching gets the
-/// one the first built and not one of its own.
 /// The signature wasm as a compiled module, when the runtime imported
 /// one (service/functions/entry.mjs): Cloudflare will not compile wasm
 /// from bytes at run time, so on Cloudflare this is the only way in.
 let schnorrModule = null;
 export const useSchnorrModule = (module) => (schnorrModule = module);
 
+/// The signer for this isolate, over the wasm the site already serves.
+/// What is kept is the promise of it rather than the signer, so a
+/// second request arriving while the first is still fetching gets the
+/// one the first built and not one of its own.
 function signerFor(request, env) {
   if (schnorrModule) return (signing ??= signerOn(schnorrModule));
   return (signing ??= (async () => {
@@ -380,7 +388,7 @@ export async function licenceFor(key, until, { signer, secret, service }) {
 /// that row says the device has run out, which is once a renewal.
 ///
 /// In local mode a key nobody has heard of is entitled on the spot for
-/// a month (doc 06, local mode) — one branch, and it is never on in
+/// a month (docs/06-service.md) — one branch, and it is never on in
 /// production.
 export async function entitlementOf(store, key, { now = Date.now(), openHouse = false } = {}) {
   const today = dayOf(now);
@@ -447,9 +455,6 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
 
 const REQUEST = 'oh-request/1';
 
-/// How far a request's second may be from ours. Clocks drift; a phone
-/// whose clock is out by more than this is told so.
-
 /// The text a request's signature is over.
 export const requestStatement = (handler, key, at, what = '') => `${REQUEST}\n${handler}\n${key}\n${at}\n${what}`;
 
@@ -475,8 +480,8 @@ export async function askedBy(body, handler, what, signer, { now = Date.now() } 
 // Stripe Checkout in subscription mode, with the device's key in the
 // session. Nobody is asked to make an account: the key the buyer had
 // when they bought is what the entitlement is written against, and the
-// licence follows it. A phone will buy through its own store instead
-// (doc 06), which needs the app to be in one first.
+// licence follows it. A phone buys through its own store instead
+// (buying in a store, below).
 
 const STRIPE = 'https://api.stripe.com/v1';
 
@@ -489,9 +494,6 @@ const ENDED = new Set(['canceled', 'unpaid', 'incomplete_expired']);
 /// invoice is paid after all; these two do not, and neither does a
 /// subscription Stripe has deleted.
 const FINAL = new Set(['canceled', 'incomplete_expired']);
-
-/// How far out of date a webhook's own timestamp may be. Stripe signs
-/// the moment it sends; a replay from last week is not a payment.
 
 /// Where a buyer may be sent back to: this site, and nowhere else. The
 /// address rides in from the app, and an app is not what decides where
@@ -716,10 +718,10 @@ export async function dateSubscription(store, subscription, { source, txn_ref = 
     ...(final ? { final: true } : {}),
   });
   // The devices under it hold a copy of the date so that a licence is
-  // one read (doc 06). A renewal may leave those copies stale — they
-  // catch up by themselves, later is harmless. An ending may not: a
-  // copy that outlived its subscription would go on licensing a
-  // refunded device for as long as a year. Five rows, once.
+  // one read (docs/06-service.md). A renewal may leave those copies
+  // stale — they catch up by themselves, later is harmless. An ending
+  // may not: a copy that outlived its subscription would go on
+  // licensing a refunded device for as long as a year. Five rows, once.
   if (gone) {
     for (const sk of await store.under(`SUB#${subscription}`, 'DEVICE#')) {
       const key = sk.slice('DEVICE#'.length);
@@ -763,7 +765,7 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
   const auth = { authorization: `Bearer ${secret}` };
   let customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
   if (!customer) {
-    // Bought before the customer was kept: Stripe knows.
+    // No customer row for this subscription: Stripe knows.
     try {
       const res = await fetchImpl(`${STRIPE}/subscriptions/${encodeURIComponent(subscription)}`, { headers: auth });
       if (res.ok) customer = (await res.json())?.customer;
@@ -799,22 +801,16 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
 // ---- a subscription is a person's, not a device's ----------------------
 // Five devices to a subscription, and any of them can drop another.
 // Unbounded sharing is a subscription shared with the internet; five is
-// a household (doc 06).
+// a household (docs/06-service.md).
 //
 // A second device is brought in by a code: the subscribed device shows
 // one, the new device arrives carrying it, and it is spent. The code is
-// a random sixteen bytes and nothing else. The design has it carry the
-// subscription and an expiry under a signature; what is built keeps
-// both here instead, for two reasons that only showed up against a
-// camera. A code that has to be spent needs a row whatever it carries,
-// so a signature saves no lookup — and a code three times longer is a
-// QR three times denser, read across a table by a phone that is not
-// quite still. Keeping it here also keeps the subscription off the
-// wire, which a photograph of a screen would otherwise carry away.
-
-
-/// How long a code is worth anything. Long enough to walk a phone over,
-/// short enough that a photograph of the screen is not a key.
+// a random sixteen bytes and nothing else; the subscription and expiry
+// are kept here. A code that has to be spent needs a row whatever it
+// carries, so a signature would save no lookup — and a short code is a
+// sparse QR, read across a table by a phone that is not quite still.
+// It also keeps the subscription off the wire, which a photograph of a
+// screen would otherwise carry away.
 
 /// How long a code's row is kept, spent or not, before the store lets
 /// it go by itself: an hour, so that a late scan is told the code ran
@@ -837,14 +833,11 @@ export async function devicesOn(store, subscription) {
   return found.sort((a, b) => String(a.bound_at).localeCompare(String(b.bound_at)) || a.key.localeCompare(b.key));
 }
 
-/// How long an outstanding code must still have to be handed out again
-/// rather than replaced: enough to walk a phone over.
-
 /// A code for a new device to arrive with: {status, body}. The one
 /// already outstanding, while it is unspent and has time left: asking
 /// again is a read, not a new row and a listing of the household — a
 /// subscriber asking in a loop would otherwise spend the store's writes
-/// for everyone, Stripe's included (docs/security-review.md, 10).
+/// for everyone, Stripe's included (docs/security-review.md).
 export async function ticketFor(key, store, { now = Date.now() } = {}) {
   const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (!held) return { status: 402, body: { error: 'no subscription' } };
@@ -987,10 +980,9 @@ export async function backupsMade(subscription, email, store, mail, { now = Date
 }
 
 /// The codes, for a device bound to the subscription: made if there are
-/// none yet (a subscription from before them, or bought in a store),
-/// and replaced when [rotate]; with [send], the ones still good sent to
-/// [email], the payer's, when a device asks (the Email button) — and
-/// `emailed`, or `unsent` and why not, in the answer.
+/// none yet, and replaced when [rotate]; with [send], the ones still
+/// good sent to [email], the payer's, when a device asks (the Email
+/// button) — and `emailed`, or `unsent` and why not, in the answer.
 export async function backupsFor(key, store, mail, { rotate = false, send = false, email = null, why = null, now = Date.now() } = {}) {
   const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
   if (!held) return { status: 402, body: { error: 'no subscription' } };
@@ -1088,7 +1080,7 @@ export async function dropDevice(key, device, store, { now = Date.now() } = {}) 
 // A code made, a code spent, a device dropped, the list read: each reads
 // the household and writes it in separate calls, and KV has no
 // compare-and-set, so two at once could both find room for a fifth
-// device and make six (docs/security-review.md, 9). They run one after
+// device and make six (docs/security-review.md). They run one after
 // another per subscription instead: in a Durable Object per
 // subscription where the project binds one as HOUSEHOLD (one object,
 // one thread, wherever in the world the requests come from), and in
@@ -1096,10 +1088,6 @@ export async function dropDevice(key, device, store, { now = Date.now() } = {}) 
 // that land together on one isolate and no more. The same place keeps a
 // household to so many of them an hour, which is what keeps one
 // subscriber from spending the store's daily writes and lists.
-
-/// What one household may do in an hour: changes (a code, a claim, a
-/// drop) and readings of its list. A person adding a phone does a
-/// handful of each.
 
 /// One household's queue and its hour: everything asked of it runs in
 /// order, and what is over the hour's allowance is refused before it
@@ -1388,7 +1376,7 @@ async function devicesRoute(request, env) {
 // never the identifier: it is opaque but stable and joins to a real
 // account, so a leaked table has to join to nothing. And nothing on the
 // KEY# side leads back to the provider — the key is what public records
-// carry (doc 06).
+// carry (docs/06-service.md).
 
 const PROVIDERS = {
   apple: { iss: 'https://appleid.apple.com', jwks: 'https://appleid.apple.com/auth/keys', audience: 'OH_APPLE_AUDIENCE' },
@@ -1437,8 +1425,8 @@ const ALGS = {
 /// bind somebody else's account to the lifter's key.
 export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, { now = Date.now(), open = false } = {}) {
   // Local mode's own token: a subject and nothing else, taken only
-  // where the open house is (doc 06). One branch, never on in
-  // production, and the rest of the path below is the same path.
+  // where the open house is (docs/06-service.md). One branch, never on
+  // in production, and the rest of the path below is the same path.
   if (open && typeof token === 'string' && token.startsWith('local:')) {
     const sub = token.slice('local:'.length);
     return sub && PROVIDERS[provider] ? { provider, sub } : null;
@@ -1742,9 +1730,9 @@ async function turn(request, env) {
 
 // ---- Remote config ----------------------------------------------------
 
-/// What the app may be told without a new build (doc 06, "Remote
-/// config"): one row in the store, which the operator writes and every
-/// device reads at its start. What is here when there is no row — or a
+/// What the app may be told without a new build (docs/06-service.md):
+/// one row in the store, which the operator writes and every device
+/// reads at its start. What is here when there is no row — or a
 /// row this worker cannot read — is what the app does with no config at
 /// all, so a bad row is never worse than none.
 export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null, price: null });
@@ -1864,14 +1852,13 @@ function tableTimingOf(raw) {
 }
 
 // ---- is it up ----------------------------------------------------------
-// What an outside monitor asks every minute (docs/06-service.md,
-// "Watching it run"): not whether this worker answers — any page would
-// say that — but whether what a purchase needs does. The store is read,
-// and Stripe is asked for the price with the key the service holds,
-// which is the call that failed for an hour on 2 October, with the key
-// expired and the worker answering everything else. The answer is kept
-// for half a minute in this isolate, so asking in a loop does not put
-// the asker's load on Stripe.
+// What an outside monitor asks every minute (docs/06-service.md): not
+// whether this worker answers — any page would say that — but whether
+// what a purchase needs does. The store is read, and Stripe is asked
+// for the price with the key the service holds, which catches an
+// expired key while the worker answers everything else. The answer is
+// kept for half a minute in this isolate, so asking in a loop does not
+// put the asker's load on Stripe.
 
 const HEALTH_KEPT_MS = 30 * 1000;
 let health = null;
@@ -1934,12 +1921,9 @@ async function configRoute(request, env) {
   return json(request, 200, configOf(raw), { 'cache-control': 'public, max-age=60' });
 }
 
-// ---- Watching it run -------------------------------------------------
-
-/// The handlers by name, as /api/<name> asks for them.
 // ---- buying in a store -------------------------------------------------
-// On a phone, live play is the store's own subscription (doc 06, "Where
-// the money comes in"). The device buys, the store hands it a proof,
+// On a phone, live play is the store's own subscription
+// (docs/06-service.md). The device buys, the store hands it a proof,
 // and the device brings the proof here, signed as every request is:
 //
 //   App Store    a StoreKit 2 signed transaction: a JWS whose
@@ -2440,6 +2424,7 @@ async function playRoute(request, env) {
   return json(request, 200, { recorded });
 }
 
+/// The handlers by name, as /api/<name> asks for them.
 const ROUTES = {
   config: (request, env) => configRoute(request, env),
   health: (request, env) => healthRoute(request, env),
@@ -2460,13 +2445,15 @@ const ROUTES = {
   record: (request, env) => recordRoute(request, env),
 };
 
+// ---- Watching it run -------------------------------------------------
+
 /// A request out of how many is written down, by handler: one in ten
 /// for the config, which every open app asks for each quarter of an
 /// hour; every one of the rest, which are a person doing something.
 const SAMPLED = { config: 10, health: 10 };
 
-/// One line of numbers a request, for the operator (doc 06, "Watching
-/// it run"): which handler, what it answered and how long it took — and
+/// One line of numbers a request, for the operator (docs/06-service.md):
+/// which handler, what it answered and how long it took — and
 /// how many requests the line stands for, when only some are written.
 /// Never a key, an address or anything else about who asked. Written to
 /// the OH_METRICS dataset when the project binds one, and nowhere when

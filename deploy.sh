@@ -107,8 +107,8 @@ if [ -z "$LABEL" ]; then
 fi
 
 # Production without the service's key is a build with live play shut
-# for everyone, subscribers included (it trusts no licence). That went
-# out once, on 2 October; it is refused here rather than remembered.
+# for everyone, subscribers included (it trusts no licence), so it is
+# refused here.
 if [ "$LABEL" = main ] && ! [[ "${OH_SERVICE_KEY:-}" =~ ^[0-9a-f]{64}$ ]]; then
   echo "deploy: production needs OH_SERVICE_KEY, the service's public key (64 hex)" >&2
   exit 1

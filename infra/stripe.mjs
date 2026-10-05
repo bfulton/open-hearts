@@ -2,8 +2,8 @@
 // the customer portal, and the webhook to the service. apply.mjs makes
 // the account match it and, by default, only says what it would change.
 //
-// The Stripe account is Open Hearts' own (inside the owner's
-// organization), so its default portal configuration is ours; even so,
+// The Stripe account is Open Hearts' own, so its default portal
+// configuration is ours; even so,
 // apply.mjs reads only the product holding the price's lookup key and
 // the webhooks pointed at this app's hosts.
 //
@@ -21,8 +21,8 @@ export const stripe = {
   /// Hosts a webhook of ours points at; one elsewhere is not ours.
   hosts: ['openhearts.game', 'open-hearts.pages.dev'],
 
-  /// $5.99 a year, paid up front (docs/06-service.md, "What is paid
-  /// for"). Found by its lookup key, which is what the service is given
+  /// $5.99 a year, paid up front (docs/06-service.md). Found by its
+  /// lookup key, which is what the service is given
   /// (OH_STRIPE_PRICE): a new price takes the key over and nothing else
   /// changes. A price's amount cannot be edited, so a change to it here
   /// is a new price.

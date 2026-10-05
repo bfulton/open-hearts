@@ -1,5 +1,5 @@
-// The jurors of last resort, as a Cloudflare Container (docs/04-live-play.md,
-// "The jurors of last resort"; service/bench builds the image).
+// The jurors of last resort, as a Cloudflare Container
+// (docs/04-live-play.md; service/bench builds the image).
 //
 // A table with bot seats is dealt only to a jury that can hold them, and
 // on a quiet night there is nobody online to make one. The table then

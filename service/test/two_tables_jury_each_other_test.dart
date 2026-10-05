@@ -8,11 +8,9 @@
 /// at another, in one process, and the two tables can only finish
 /// together: a device that stops doing either stops both.
 ///
-/// That cell is the one that stalls in the browsers, and what stalls
-/// is never the same thing twice — once a juror that never made its
-/// seat's keys, once a person whose turn went unplayed. Here it is in
-/// Dart, over real sockets, so that a stall can be read rather than
-/// inferred from a screen.
+/// Here it is in Dart, over real sockets, so that a stall — a juror
+/// that never makes its seat's keys, a person whose turn goes unplayed
+/// — can be read rather than inferred from a screen.
 library;
 
 import 'dart:async';
@@ -84,17 +82,13 @@ void main() {
       c.start();
     }
     // Both games, to the end, held to two things. Neither table stands
-    // still for a minute: what this test has caught is a table that
-    // stopped — a juror that never made its seat's keys, a person
-    // whose turn went unplayed — and a stopped table stops moving long
+    // still for a minute: a stopped table — a juror that never made its
+    // seat's keys, a person whose turn went unplayed — stops moving long
     // before any clock on the whole game runs out. And a hand takes no
     // more than forty-five seconds on average, a person's wait at a
-    // screen. It used to be three minutes for the whole game, the
-    // browser suite's, but a game is as many hands as its deal takes
-    // to reach the target, and that is the deal's randomness: two to
-    // six hands, at thirty-odd seconds a hand here on either side of
-    // the change that had it failing, so a six-hand game failed and a
-    // four-hand one passed with nothing else different.
+    // screen. The bound is per hand, not per game, because a game is as
+    // many hands as its deal takes to reach the target: two to six, at
+    // thirty-odd seconds a hand here.
     final started = DateTime.now();
     final finishedAt = <String, Duration>{};
     final moved = {for (final c in clients) c.spec.id: DateTime.now()};

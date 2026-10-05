@@ -795,7 +795,7 @@ test('a dropped device does not come back on its next ask', async () => {
 // ---- who is asking ------------------------------------------------------
 // A key is public: it signs every event a device says at a table, and
 // the relays hand those to anybody. So a request that only names one
-// is anybody's, and each of these was answered for anybody before.
+// is anybody's.
 
 test('a key alone is nobody: a household is not listed, dropped from or joined by whoever can read a key', async () => {
   const now = Date.now();
@@ -863,7 +863,7 @@ test('how far a request\'s clock may be from ours is the service\'s setting', as
 
 test('TURN is for a device that holds a licence, and asks for it itself', async () => {
   // Credentials are a relay anybody can push anything through, billed
-  // to the project by the gigabyte: they were minted for any 64 hex.
+  // to the project by the gigabyte.
   const store = await household(Date.now(), ADA.public);
   const held = { ...env, OH_STORE: kvOf(store) };
   const send = (body) => new Request('https://dev.open-hearts.pages.dev/api/turn', { method: 'POST', body: JSON.stringify(body) });
@@ -883,8 +883,8 @@ test('TURN is for a device that holds a licence, and asks for it itself', async 
 });
 
 test('a checkout is opened only by the device it is for', async () => {
-  // Paying for somebody else's key moved their device onto a
-  // subscription the payer could then end.
+  // Paying for somebody else's key would move their device onto a
+  // subscription the payer can end.
   const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1' };
   const send = (body) => new Request('https://dev.open-hearts.pages.dev/api/checkout', { method: 'POST', body: JSON.stringify(body) });
   const realFetch = globalThis.fetch;
@@ -1226,7 +1226,7 @@ test('any device on a web subscription opens its portal, and comes back to this 
   assert.equal(stripe.calls[0].init.headers.authorization, 'Bearer sk_test');
 });
 
-test('a subscription bought before the customer was kept: Stripe is asked once, and it is kept', async () => {
+test('a subscription with no customer on record: Stripe is asked once, and it is kept', async () => {
   const now = Date.UTC(2026, 8, 16);
   const store = await household(now);
   const stripe = stripeFake({ customerOf: { sub_9: 'cus_Old' } });

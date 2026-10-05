@@ -1,9 +1,9 @@
 // A WebSocket server in the twenty or so rules of RFC 6455 that a
 // relay needs, because node has a WebSocket client and no server and
 // this repo has no dependency to add one. It is here so the JS relay
-// core (relay.mjs) can be driven by the suites that have always driven
-// the Dart relay: the same sockets, the same clients, a different
-// relay underneath.
+// core (relay.mjs) can be driven by the suites that drive the Dart
+// relay: the same sockets, the same clients, a different relay
+// underneath.
 //
 // What it does: the upgrade handshake, masked frames from the client,
 // unmasked frames back, fragmentation, ping and close. What it does

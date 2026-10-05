@@ -348,7 +348,7 @@ test('the object carries ephemeral kinds and refuses the rest, with the reason',
 test('the object reads nothing bigger than presence ever says, and sends nothing on for it', async () => {
   // Cloudflare hands an object messages of up to 32 MiB, and an event
   // that matches presence goes to every device listening: one message
-  // of a few megabytes was hundreds of megabytes out, and seconds of
+  // of a few megabytes would be hundreds of megabytes out, and seconds of
   // the one thread every device on the tag shares.
   const relay = objectRelay(verify);
   const [listener] = await listening(relay, 1);

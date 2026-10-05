@@ -94,9 +94,8 @@ async function main() {
     log(`the juror holding seat ${gone.seat} (${gone.key}) was taken off the air`);
 
     // She judges it gone and claims the seat for the escrow; the claim
-    // is settled on the record the way a boot is (docs/07-states.md,
-    // "The escrow on the record"), and the jurors that are left do the
-    // rest between themselves.
+    // is settled on the record the way a boot is (docs/07-states.md),
+    // and the jurors that are left do the rest between themselves.
     //
     // Either way of being gone. A juror taken off the air stops
     // speaking and stops playing at the same instant, and which of

@@ -12,7 +12,8 @@
 // drives them through the app's accessibility tree: host a table, join
 // it, play a hand over real WebRTC, then the departure cells that only
 // a real browser can show: one closed mid-hand, one stalled on its
-// turn and booted, one that leaves. Exit code is the verdict.
+// turn and booted, one gone off its turn and ruled on by the jury.
+// Exit code is the verdict.
 
 import { chromium } from './browser.mjs';
 import {
@@ -61,10 +62,10 @@ const handOver = (n) => {
 };
 
 /// How long a whole hand may take. Four browsers, a relay and a bench
-/// of jurors on a hosted runner's two cores took 172 and 173 s over the
-/// first cell's on two runs, and runners differ: one ran the table's
-/// suite 1.7 times slower than another (ci.yml), which makes that
-/// hand nearly five minutes.
+/// of jurors on a hosted runner's two cores take some 173 s over the
+/// first cell's, and runners differ: one runs the table's suite 1.7
+/// times slower than another (ci.yml), which makes that hand nearly
+/// five minutes.
 const aHand = 480000;
 
 async function main() {
@@ -258,7 +259,7 @@ async function main() {
     // Cell 3: Cara stops acting. On her turn the clock runs; at fifteen
     // seconds the others get the Boot button, and one press does it.
     // Her turn can be most of a trick away, and on two cores the whole
-    // of it took 69 s.
+    // of it can take 69 s.
     await playUntil(others, (p, i) => i === 2 || has(p, /^Boot Cara$/), { timeout: 180000, idle: [2] });
     await click(pages[0], /^Boot Cara$/);
     log('Ada pressed Boot');
@@ -266,7 +267,7 @@ async function main() {
     await waitFor(pages[2], /^A bot took your seat$/, { what: "Cara's replacement notice", timeout: 30000 });
     log('Cara booted, and told');
 
-    // Cell 5: two people left, and Bao's browser goes off his turn. Ada
+    // Cell 4: two people left, and Bao's browser goes off his turn. Ada
     // alone is no majority of two and claims nothing; her next play
     // waits on a vote that will never come, and the table asks the
     // jury — the service's juror of last resort, called for when this

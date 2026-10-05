@@ -3,8 +3,7 @@
 // anything that can send a string. The Cloudflare object
 // (worker.mjs) and a plain node host (host.mjs) both drive this file,
 // so what the app meets on Cloudflare is what the Dart suites — the
-// same ones that have always run against the Dart relay — run against
-// here.
+// same ones that run against the Dart relay — run against here.
 //
 // Nothing is imported: no node, no Cloudflare. Signatures are checked
 // by the wasm the app already carries (app/web/schnorr.wasm, built
@@ -53,7 +52,7 @@ export const objectLimits = Object.freeze({
 });
 
 /// How far the operator may move each of [objectLimits], from the row
-/// `config|relay` (doc 06, "The service's settings"). The edges are
+/// `config|relay` (docs/06-service.md). The edges are
 /// where a limit stops being a tuning: a REQ past 1,536 characters
 /// times eight no longer fits the 16 KiB a socket carries through
 /// hibernation, and a message past 256 KiB is a socket holding the
@@ -261,10 +260,10 @@ export function memoryStore(keep = 10000) {
 }
 
 /// The relay itself. [verify] checks a signature, [refuse] is a policy
-/// that may turn an event away with a reason — a public relay
-/// demanding proof of work, or an object that carries only the kinds
-/// it can carry for free — and [store] is where the kinds that are not
-/// ephemeral go, or null for a relay that keeps nothing at all.
+/// that may turn an event away with a reason — an object that carries
+/// only the kinds its tag may hold — and [store] is where the kinds
+/// that are not ephemeral go, or null for a relay that keeps nothing at
+/// all.
 ///
 /// A socket is anything with `send(text)`. The relay holds the set of
 /// them, so a host that wakes with sockets it did not open — a
@@ -491,8 +490,9 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 
 /// The relay the object runs (worker.mjs), built here so that what the
 /// tests build is that relay and not one set up to look like it:
-/// nothing written down, nothing but the ephemeral kinds, and every
-/// socket held to [objectLimits].
+/// presence keeps nothing and takes only the ephemeral kinds, a table's
+/// or a lobby's tag also keeps its lobby kind, and every socket is held
+/// to [objectLimits] or [tableLimits].
 export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null } = {}) {
   const presence = tag === presenceTag;
   const own = refusalFor(tag);
@@ -559,7 +559,7 @@ export const tableLimits = Object.freeze({
 });
 
 /// What one object has seen since it last said so, in the order the
-/// operator's query reads the numbers (doc 06, "Watching it run"):
+/// operator's query reads the numbers (docs/06-service.md):
 /// counts, never who.
 export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed'];
 

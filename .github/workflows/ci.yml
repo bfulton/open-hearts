@@ -1,8 +1,7 @@
 # Analyze, test, and prove the web build still builds.
 #
-# Pull requests and main only: the agent commits many times an hour on a
-# working branch, and a build on each one would be noise that costs
-# minutes.
+# Pull requests and main only: a build on every push to a working
+# branch would be noise that costs minutes.
 name: ci
 
 on:
@@ -10,14 +9,13 @@ on:
   push:
     branches: [main]
 
-# Jobs side by side where there was one: on a hosted runner the table's
-# suite alone takes about twenty-five minutes and the relay's two about
-# twelve, so one job running everything in turn ran out of time before it
-# reached the app. Each builds the Rust libraries its suites load over
-# FFI.
+# Jobs side by side: on a hosted runner the table's suite alone takes
+# about twenty-five minutes and the relay's two about twelve, too long
+# for one job to run everything in turn. Each builds the Rust libraries
+# its suites load over FFI.
 #
 # And with room for a slow machine. Runners differ: the same table suite
-# took 25 minutes on one and 43 on another, every test in it 1.6 to 1.8
+# takes 25 minutes on one and 43 on another, every test in it 1.6 to 1.8
 # times slower, so each limit here is well clear of the slow end.
 jobs:
   app:
@@ -36,7 +34,8 @@ jobs:
           workspaces: |
             crypto/deal
             crypto/schnorr
-      # The deal's cryptography (doc 03): the cdylib the VM tests load.
+      # The deal's cryptography (docs/03-fair-deal.md): the cdylib the VM
+      # tests load.
       # The browser's wasm is committed (app/web/deal.wasm).
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
         run: |

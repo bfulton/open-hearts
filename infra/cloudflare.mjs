@@ -2,7 +2,7 @@
 // clicks (apply.mjs makes the account match it, and by default only
 // says what it would change).
 //
-// The account holds other apps (altesc.*), so this keeps to its own:
+// The account may hold other apps, so this keeps to its own:
 // the two zones below, the Pages project, the KV namespaces, the R2
 // bucket, the relay worker and the account-level things named for this
 // app. Nothing else in the account is read for changes, let alone
@@ -46,15 +46,15 @@ export const pages = {
         OH_TURN_KEY_ID: 'd681af4e315018c9dc90b898de5f24be',
       },
       /// Encrypted: names only. apply.mjs checks each is set, and cannot
-      /// set one (it has no value to set), so a missing one is for the
-      /// owner: `npx wrangler pages secret put NAME --project-name open-hearts`.
+      /// set one (it has no value to set), so a missing one is set by
+      /// hand: `npx wrangler pages secret put NAME --project-name open-hearts`.
       secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN'],
       kv: { OH_STORE: 'open-hearts-store' },
       r2: { OH_RECORDS: 'open-hearts-records' },
       /// The household object lives in the relay worker (wrangler.toml).
       durableObjects: { HOUSEHOLD: { script: 'open-hearts-relay', class: 'Household' } },
-      /// None yet: OH_METRICS, when bound, is open_hearts_api
-      /// (docs/06-service.md, "Watching it run").
+      /// None: OH_METRICS, when bound, is open_hearts_api
+      /// (docs/06-service.md).
       analyticsEngine: {},
     },
     preview: {
@@ -121,11 +121,12 @@ export const relay = {
 
 // ---- the zones ------------------------------------------------------------
 
-/// Settings pinned to what they are. Only email_obfuscation was changed
-/// on purpose (off: it rewrote help@ on the site's pages and injected a
-/// script to put it back, docs/06-service.md); the rest are Cloudflare's
-/// defaults, pinned so a change to them shows here. SSL's mode is left
-/// to automatic mode (it chose Full), so `ssl` itself is not pinned.
+/// Settings pinned to what they are. Only email_obfuscation differs from
+/// Cloudflare's default (off: it rewrites help@ on the site's pages and
+/// injects a script to put it back, docs/06-service.md); the rest are
+/// Cloudflare's defaults, pinned so a change to them shows here. SSL's
+/// mode is left to automatic mode (it chose Full), so `ssl` itself is
+/// not pinned.
 const tls = {
   ssl_automatic_mode: 'auto',
   always_use_https: 'off',
@@ -186,7 +187,7 @@ export const zones = {
         },
       ],
     },
-    /// help@ forwards to the owner. Where to is OH_HELP_FORWARD, when set,
+    /// help@ forwards to the operator. Where to is OH_HELP_FORWARD, when set,
     /// and otherwise only checked to be a verified destination.
     emailRouting: {
       enabled: true,

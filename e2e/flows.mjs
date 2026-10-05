@@ -178,7 +178,7 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
   await sleep(500);
   const record = await page.evaluate('navigator.clipboard.readText()');
   // A game dealt from 256 bits of the secure generator, which the record
-  // names (docs/03-fair-deal.md, "Where the randomness comes from").
+  // names (docs/03-fair-deal.md).
   if (!/^oh2:[0-9a-f]{64}:/.test(record ?? '')) throw new Error(`the record does not look like one: ${JSON.stringify((record ?? '').slice(0, 80))}`);
   // And it is a record the tool can read: every trick, from the seed
   // and the player's own choices.

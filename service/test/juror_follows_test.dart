@@ -2,8 +2,8 @@
 /// sealed table on the local relay, the service's juror of last
 /// resort drawn for want of anyone else, summoned, and carried forward
 /// through a hand it never saw dealt. It has to keep heartbeating
-/// while it verifies everything it is handed — a juror that fell
-/// silent under the load was never carried to the hand it was needed
+/// while it verifies everything it is handed — a juror that falls
+/// silent under the load is never carried to the hand it is needed
 /// for — and reach the second hand as the players do.
 library;
 

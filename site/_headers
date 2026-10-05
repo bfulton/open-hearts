@@ -14,8 +14,7 @@
   Strict-Transport-Security: max-age=31536000
 
 # Never cached: these are how a new deploy reaches a phone that already
-# has the app open. The dev loop publishes on every commit and a stale
-# bootstrap makes the whole loop lie.
+# has the app open; a stale bootstrap would keep an old build running.
 /play/
   Cache-Control: no-store
 /play/index.html

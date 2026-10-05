@@ -2,8 +2,8 @@
 ///
 /// `service/do/relay.mjs` is the relay the Cloudflare object runs, and
 /// the whole point of it is that a client meets the same NIP-01 subset
-/// there as here. The way to know that is to run the tests that have
-/// always run against the Dart relay against the JS one instead, so
+/// there as here. The way to know that is to run the tests written
+/// against the Dart relay against the JS one instead, so
 /// this is that relay wearing the same class: a node process hosting
 /// the core (`service/do/host.mjs`), the same constructor the tests
 /// call, the same `url` to connect to.
