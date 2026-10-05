@@ -308,6 +308,12 @@ abstract class AppLocalizations {
   /// **'New game'**
   String get newGame;
 
+  /// At the end of a live game: another game, begun the way this one was — the same pool, or the same friends' room.
+  ///
+  /// In en, this message translates to:
+  /// **'Play again'**
+  String get playAgain;
+
   /// Title of the sheet after a hand.
   ///
   /// In en, this message translates to:

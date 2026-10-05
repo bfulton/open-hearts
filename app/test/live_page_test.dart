@@ -10,6 +10,7 @@ import 'dart:typed_data';
 import 'package:deal/deal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/live/live_page.dart';
 import 'package:open_hearts/avatar.dart';
@@ -37,6 +38,7 @@ class LiveHarness {
     Set<int> botSeats = const {},
     int jurors = 0,
     bool workers = false,
+    bool canPlayAgain = false,
   }) {
     // Each device's deal work in a worker of its own, taking a
     // browser's time over each job, as the app's does.
@@ -83,6 +85,7 @@ class LiveHarness {
           // door does off the relays (net/standing.dart).
           ratingOf: rated ? ledger.of : null,
           onResult: rated ? ledger.apply : null,
+          canPlayAgain: canPlayAgain,
         );
       } else {
         final client = TableClient(
@@ -223,6 +226,51 @@ void main() {
     final moved = change.after.shown - change.before.shown;
     expect(find.text('Rating 1500? → ${change.after.shown}?'), findsOneWidget);
     expect(find.text(moved > 0 ? '+$moved' : '$moved'), findsOneWidget);
+  });
+
+  // Opened as the front door opens it, by the router: what the sheet
+  // closes with is what the door is told.
+  Future<bool?> endThrough(WidgetTester tester, String tap) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final live = LiveHarness(target: 1, canPlayAgain: true);
+    late BuildContext door;
+    final router = GoRouter(routes: [
+      GoRoute(path: '/', builder: (_, _) => Builder(builder: (c) {
+        door = c;
+        return const SizedBox();
+      })),
+      GoRoute(path: '/live', builder: (_, state) => LivePage(controller: state.extra! as LiveController)),
+    ]);
+    await tester.pumpWidget(MaterialApp.router(theme: buildTheme(), routerConfig: router));
+    bool? told;
+    var closed = false;
+    unawaited(door.push<bool>('/live', extra: live.controller).then((v) {
+      told = v;
+      closed = true;
+    }));
+    await tester.pumpAndSettle();
+    for (var guard = 0; guard < 400 && !live.controller.gameOverDue; guard++) {
+      await act(tester, live);
+      await live.advance(tester, 500);
+    }
+    expect(find.text('Play again'), findsOneWidget, reason: 'the game is over, and another can begin the same way');
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('See the whole game'), findsOneWidget);
+    await tester.tap(find.text(tap));
+    await tester.pumpAndSettle();
+    expect(closed, isTrue, reason: 'the table is left either way');
+    return told;
+  }
+
+  testWidgets('Play again leaves the table telling the front door to begin another', (tester) async {
+    expect(await endThrough(tester, 'Play again'), isTrue);
+  });
+
+  testWidgets('Home beside it leaves the table for the front door, and nothing more', (tester) async {
+    expect(await endThrough(tester, 'Home'), isFalse);
   });
 
   testWidgets('an unrated game says nothing about ratings', (tester) async {

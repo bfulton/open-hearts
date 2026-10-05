@@ -34,6 +34,7 @@
   "stillOut": "{hearts, plural, =0{Nenhuma copa} =1{1 copa} other{{hearts} copas}}{queen, select, true{ e a dama} other{}} ainda por sair",
   "nextHand": "Próxima mão",
   "newGame": "Nova partida",
+  "playAgain": "Jogar de novo",
   "handNumber": "Mão {hand}",
   "youShotTheMoon": "Você atirou na lua",
   "shotTheMoon": "{name} atirou na lua",

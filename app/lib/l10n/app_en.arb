@@ -244,6 +244,10 @@
   "@newGame": {
     "description": "Button on the sheet after a game."
   },
+  "playAgain": "Play again",
+  "@playAgain": {
+    "description": "At the end of a live game: another game, begun the way this one was — the same pool, or the same friends' room."
+  },
   "handNumber": "Hand {hand}",
   "@handNumber": {
     "description": "Title of the sheet after a hand.",

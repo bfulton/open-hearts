@@ -34,6 +34,7 @@
   "stillOut": "{hearts, plural, =0{Ningún corazón} =1{1 corazón} other{{hearts} corazones}}{queen, select, true{ y la reina} other{}} sin salir",
   "nextHand": "Siguiente mano",
   "newGame": "Nueva partida",
+  "playAgain": "Jugar otra vez",
   "handNumber": "Mano {hand}",
   "youShotTheMoon": "Disparaste a la luna",
   "shotTheMoon": "{name} disparó a la luna",

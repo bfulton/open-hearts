@@ -34,6 +34,7 @@
   "stillOut": "{hearts, plural, =0{Kein Herz} =1{1 Herz} other{{hearts} Herz}}{queen, select, true{ und die Dame} other{}} noch im Spiel",
   "nextHand": "Nächste Runde",
   "newGame": "Neues Spiel",
+  "playAgain": "Nochmal spielen",
   "handNumber": "Runde {hand}",
   "youShotTheMoon": "Du hast den Durchmarsch geschafft",
   "shotTheMoon": "{name} hat den Durchmarsch geschafft",

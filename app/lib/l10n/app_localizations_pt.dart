@@ -197,6 +197,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get newGame => 'Nova partida';
 
   @override
+  String get playAgain => 'Jogar de novo';
+
+  @override
   String handNumber(int hand) {
     return 'Mão $hand';
   }

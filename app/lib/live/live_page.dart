@@ -364,8 +364,11 @@ class _LivePageState extends State<LivePage> {
                   avatars: _avatars,
                   mySeat: _c.mySeat,
                   rating: _c.ratingChange,
-                  action: context.l10n.home,
-                  onNewGame: () => Navigator.of(context).pop(),
+                  // Another game the way this one began, where the front
+                  // door knows how (home_page.dart); home beside it.
+                  action: _c.canPlayAgain ? context.l10n.playAgain : context.l10n.home,
+                  onNewGame: () => Navigator.of(context).pop(_c.canPlayAgain),
+                  onHome: _c.canPlayAgain ? () => Navigator.of(context).pop(false) : null,
                   // The game is kept as it ends (home_page.dart), and its
                   // address is the table's: in place of this one, so back
                   // is home either way.

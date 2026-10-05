@@ -34,6 +34,7 @@
   "stillOut": "{hearts, plural, =0{Aucun cœur} =1{1 cœur} other{{hearts} cœurs}}{queen, select, true{ et la dame} other{}} encore en jeu",
   "nextHand": "Donne suivante",
   "newGame": "Nouvelle partie",
+  "playAgain": "Rejouer",
   "handNumber": "Donne {hand}",
   "youShotTheMoon": "Vous avez fait le grand chelem",
   "shotTheMoon": "{name} a fait le grand chelem",

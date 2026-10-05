@@ -48,6 +48,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     this.onResult,
     this.pictures,
     this.paced = true,
+    this.canPlayAgain = false,
     TableJournal? journal,
   })  : _crypto = crypto,
         client = TableClient(
@@ -110,6 +111,11 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   /// Whether the view is paced. Tests turn it off.
   final bool paced;
+
+  /// Whether the front door knows how this game began, and so can begin
+  /// another the same way: the pool it was drawn from, or the room it
+  /// was started in. A table come back to after a reload does not.
+  final bool canPlayAgain;
 
   void _pictured() {
     if (!_disposed) notifyListeners();

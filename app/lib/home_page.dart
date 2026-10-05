@@ -602,7 +602,7 @@ class _HomePageState extends State<HomePage> {
         final picture = queue.pictures[h.key];
         avatars[s] = picture == null ? chosen : chosen.copyWith(picture: Avatar.fromJson({'picture': picture}).picture);
       }
-      _toTable(spec, queue.seatNames, avatars);
+      _toTable(spec, queue.seatNames, avatars, again: _play);
     });
     _waitClock = Timer.periodic(const Duration(seconds: 1), (_) {
       // Bots take every seat still empty at ten seconds, so a device
@@ -626,7 +626,10 @@ class _HomePageState extends State<HomePage> {
   /// The seated table has its own tag on the relays: a fresh transport
   /// there, WebRTC over it, and the live page over the front door — so
   /// leaving the table comes back here.
-  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars, {TableJournal? journal}) {
+  ///
+  /// [again] begins another game the way this one began, for the end
+  /// of game's Play again.
+  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars, {TableJournal? journal, VoidCallback? again}) {
     final signer = _signer!;
     final relays = _relays;
     final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays));
@@ -660,6 +663,7 @@ class _HomePageState extends State<HomePage> {
         }));
       },
       pictures: _pictures,
+      canPlayAgain: again != null,
       journal: _seats?.keep(spec, seatNames, seatAvatars, journal: journal),
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
@@ -716,21 +720,24 @@ class _HomePageState extends State<HomePage> {
     // (docs/04-live-play.md). Cleared on the way back
     // to the front door, however the table ended.
     Duty.seated = true;
-    unawaited(context.push<void>(located(livePath), extra: controller).whenComplete(() {
+    unawaited(context.push<bool>(located(livePath), extra: controller).whenComplete(() {
       Duty.seated = false;
       watch.close();
       // Off the table by choice: nothing to come back to.
       _seats?.clear();
+    }).then((playAgain) {
+      if (playAgain == true && mounted) again?.call();
     }));
   }
 
   /// Into the room this device arrived at by a link, or a new one of
   /// its own: nobody types a code, so a room is either started here or
   /// opened from a link someone sent. Whoever is there is the table,
-  /// and the first to arrive is nobody special.
-  Future<void> _enter() async {
+  /// and the first to arrive is nobody special. [same] is the room a
+  /// game just ended in, entered again for another.
+  Future<void> _enter({String? same}) async {
     if (livePaused || _withoutDeal()) return;
-    final code = widget.openRoom ?? Room.newCode();
+    final code = same ?? widget.openRoom ?? Room.newCode();
     final transport = await _connect(code, _Opening.friends);
     if (transport == null) return;
     try {
@@ -828,7 +835,8 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       room.removeListener(_onRoom);
-      _toTable(spec, room.seatNames, room.seatAvatars);
+      final code = room.code;
+      _toTable(spec, room.seatNames, room.seatAvatars, again: () => _enter(same: code));
       return;
     }
     setState(() {});
