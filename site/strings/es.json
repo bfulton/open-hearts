@@ -57,7 +57,7 @@
     },
     "help": {
       "title": "¿Necesitas ayuda?",
-      "text": "Usa <i>Dinos qué falla</i> en el menú del juego, consulta la <a href=\"{{base}}/support\">página de ayuda</a> o escribe a <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "text": "Consulta la <a href=\"{{base}}/support\">página de ayuda</a>, escribe a <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> o usa <i>Dinos qué falla</i> en el menú del juego.",
       "menuAlt": "El menú del juego, abierto, con el puntero sobre Dinos qué falla"
     }
   },

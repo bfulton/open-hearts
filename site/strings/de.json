@@ -57,7 +57,7 @@
     },
     "help": {
       "title": "Brauchst du Hilfe?",
-      "text": "Nutze <i>Sag uns, was kaputt ist</i> im Menü des Spiels, sieh auf der <a href=\"{{base}}/support\">Hilfeseite</a> nach oder schreib an <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "text": "Sieh auf der <a href=\"{{base}}/support\">Hilfeseite</a> nach, schreib an <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> oder nutze <i>Sag uns, was kaputt ist</i> im Menü des Spiels.",
       "menuAlt": "Das Menü des Spiels, geöffnet, mit dem Zeiger auf Sag uns, was kaputt ist"
     }
   },

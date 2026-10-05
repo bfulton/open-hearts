@@ -57,7 +57,7 @@
     },
     "help": {
       "title": "Need help?",
-      "text": "Use <i>Tell us what's broken</i> in the game's menu, see the <a href=\"{{base}}/support\">support page</a>, or email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "text": "See the <a href=\"{{base}}/support\">support page</a>, email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, or use <i>Tell us what's broken</i> in the game's menu.",
       "menuAlt": "The game's menu, open, with the pointer on Tell us what's broken"
     }
   },

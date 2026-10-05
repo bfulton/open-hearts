@@ -57,7 +57,7 @@
     },
     "help": {
       "title": "Besoin d'aide ?",
-      "text": "Utilisez <i>Signaler un problème</i> dans le menu du jeu, consultez la <a href=\"{{base}}/support\">page d'aide</a>, ou écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "text": "Consultez la <a href=\"{{base}}/support\">page d'aide</a>, écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> ou utilisez <i>Signaler un problème</i> dans le menu du jeu.",
       "menuAlt": "Le menu du jeu, ouvert, avec le pointeur sur Signaler un problème"
     }
   },

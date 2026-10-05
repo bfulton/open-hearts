@@ -57,7 +57,7 @@
     },
     "help": {
       "title": "Precisa de ajuda?",
-      "text": "Use <i>Conte o que está quebrado</i> no menu do jogo, veja a <a href=\"{{base}}/support\">página de suporte</a> ou escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "text": "Veja a <a href=\"{{base}}/support\">página de suporte</a>, escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> ou use <i>Conte o que está quebrado</i> no menu do jogo.",
       "menuAlt": "O menu do jogo, aberto, com o ponteiro sobre Conte o que está quebrado"
     }
   },
