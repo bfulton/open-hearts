@@ -81,11 +81,11 @@ export function render(page, language, words) {
     new RegExp(`(<nav[^>]*>[\\s\\S]*?<a href="${base(language.code)}${path}")`),
     '$1 aria-current="page"',
   );
-  // Stylesheets and scripts are cached for hours: each link carries its
-  // file's fingerprint, so a changed one is fetched at once.
-  html = html.replace(/(href|src)="\/([\w-]+\.(?:css|js))"/g, (_, attr, file) => {
+  // Stylesheets, scripts and pictures are cached for hours: each link
+  // carries its file's fingerprint, so a changed one is fetched at once.
+  html = html.replace(/(href|src|srcset)="\/([\w/-]+\.(?:css|js|png))/g, (_, attr, file) => {
     const hash = createHash('sha256').update(readFileSync(join(here, 'public', file))).digest('hex').slice(0, 10);
-    return `${attr}="/${file}?v=${hash}"`;
+    return `${attr}="/${file}?v=${hash}`;
   });
   return html;
 }

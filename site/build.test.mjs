@@ -36,11 +36,11 @@ test('a page links to its copy in each language, and to its own language\'s page
   assert.match(readFileSync(join(out, 'index.html'), 'utf8'), /<link rel="canonical" href="https:\/\/openhearts.game\/">/);
 });
 
-test('stylesheets and scripts are linked by their content, so a deploy reaches a cached browser', () => {
+test('stylesheets, scripts and pictures are linked by their content, so a deploy reaches a cached browser', () => {
   const out = mkdtempSync(join(tmpdir(), 'site-'));
   build(out);
   const home = readFileSync(join(out, 'index.html'), 'utf8');
-  for (const file of ['home.css', 'langs.css', 'lang.js', 'heart.js']) {
+  for (const file of ['home.css', 'langs.css', 'lang.js', 'heart.js', 'img/broken-en.png', 'favicon.png']) {
     assert.match(home, new RegExp(`"/${file.replace('.', '\\.')}\\?v=[0-9a-f]{10}"`), file);
   }
 });
