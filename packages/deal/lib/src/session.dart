@@ -1004,6 +1004,15 @@ class DealSession {
         checked = c;
       }
       _tokens.putIfAbsent(seat, () => {}).addAll(checked);
+      // This side's own batch, come back to it from outside — a client
+      // built again after a reload, reading its own steps back from its
+      // journal: what [myTokens] would have done next, it does now, so
+      // its own thirteen open. The seeds are the secret's, so these are
+      // the tokens it made the first time.
+      if (seat == mySeat && _secrets[seat] != null) {
+        _myTokens ??= _unb64(m['tokens']);
+        _tokensBy(seat, everyPosition: true);
+      }
       _openWhatCan();
       return true;
     } catch (_) {

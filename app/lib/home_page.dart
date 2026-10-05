@@ -49,6 +49,7 @@ import 'net/network.dart';
 import 'net/remote_config.dart';
 import 'net/relays.dart';
 import 'net/room.dart';
+import 'net/seat_store.dart';
 import 'net/share.dart';
 import 'net/standing.dart';
 import 'pace_store.dart';
@@ -374,6 +375,28 @@ class _HomePageState extends State<HomePage> {
     if (liveOpen && !livePaused && widget.openRoom != null) await _enter();
   }
 
+  /// The seat this device is playing in (net/seat_store.dart): kept as
+  /// the game goes, so that a reload comes back to it.
+  SeatStore? _seats;
+
+  /// Back from a reload in the middle of a game: straight back into the
+  /// seat, if it can still be this device's. The table may have given it
+  /// to a bot meanwhile, and then the table says so once it has caught
+  /// this device up (live/live_page.dart).
+  Future<void> _comeBack(Signer signer) async {
+    final seats = _seats = await SeatStore.open();
+    final kept = seats.load();
+    if (kept == null || !mounted) return;
+    if (kept.spec.seatOf(signer.publicKey) == null || (kept.spec.sealed && !dealReady)) return seats.clear();
+    // Over the front door once it has been drawn, not before: a page
+    // pushed over one never laid out leaves its text unmeasured, and the
+    // selection over the whole app (ui/selection.dart) asks every text
+    // where it is each time the door below changes.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _toTable(kept.spec, kept.names, kept.avatars, journal: kept.journal);
+  }
+
   /// Online from the front door, not only from a table: this device is
   /// a juror to draw on as soon as the app is open, and it sees who
   /// else is about.
@@ -381,6 +404,7 @@ class _HomePageState extends State<HomePage> {
     final signer = await Identity.signer();
     if (!mounted) return;
     setState(() => _signer = signer);
+    unawaited(_comeBack(signer));
     Duty.on(_relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
       if (mounted) setState(() => _listeningSinceMs = DateTime.now().millisecondsSinceEpoch);
     });
@@ -608,7 +632,7 @@ class _HomePageState extends State<HomePage> {
   /// The seated table has its own tag on the relays: a fresh transport
   /// there, WebRTC over it, and the live page over the front door — so
   /// leaving the table comes back here.
-  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars) {
+  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars, {TableJournal? journal}) {
     final signer = _signer!;
     final relays = _relays;
     final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays));
@@ -642,8 +666,21 @@ class _HomePageState extends State<HomePage> {
         }));
       },
       pictures: _pictures,
+      journal: _seats?.keep(spec, seatNames, seatAvatars, journal: journal),
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
+    // Kept for coming back to while the seat is this device's; let go
+    // once the game is over or the seat is not (net/seat_store.dart).
+    var hereAt = 0;
+    controller.addListener(() {
+      final seats = _seats;
+      if (seats == null) return;
+      if (controller.client.done || (controller.client.mySeat != null && !controller.client.amSeated)) return seats.clear();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - hereAt < 10000) return;
+      hereAt = now;
+      seats.here();
+    });
     // Anyone with the table's address can watch it being played: one
     // seated player's device answers them with what everyone at the
     // table sees (packages/table, watch.dart).
@@ -688,6 +725,8 @@ class _HomePageState extends State<HomePage> {
     unawaited(context.push<void>(located(livePath), extra: controller).whenComplete(() {
       Duty.seated = false;
       watch.close();
+      // Off the table by choice: nothing to come back to.
+      _seats?.clear();
     }));
   }
 

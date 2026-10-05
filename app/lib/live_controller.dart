@@ -48,6 +48,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     this.onResult,
     this.pictures,
     this.paced = true,
+    TableJournal? journal,
   })  : _crypto = crypto,
         client = TableClient(
             spec: spec,
@@ -56,7 +57,8 @@ class LiveController extends ChangeNotifier implements TableModel {
             clock: clock ?? WallClock(),
             presence: presence,
             crypto: crypto,
-            dealWorker: dealWorker) {
+            dealWorker: dealWorker,
+            journal: journal) {
     _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
     _shownHolders = List.of(spec.seats);
     _sub = client.changes.listen((_) => _onChange());

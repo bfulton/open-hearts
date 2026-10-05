@@ -132,6 +132,10 @@ class SimNetwork {
     }
   }
 
+  /// The peer's process comes back, as a page reloaded comes back: a
+  /// new client on a new link ([attach]), heard again by everyone.
+  void revive(PublicKey key) => _dead.remove(key);
+
   /// The peer's link goes silent both ways without the transport
   /// noticing — a tunnel, a backgrounded tab.
   void goOffline(PublicKey key) => _offline.add(key);

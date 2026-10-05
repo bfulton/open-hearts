@@ -491,8 +491,22 @@ two sides could deal the next hand two ways. So it is carried as a boot
 is, and each person backs one way out of a seat: a leave and a boot
 cannot both carry ([doc 07](07-states.md), "The leave on the record").
 
-There is no rejoining. Without persistent identity there is nothing to
-rejoin as, so a removed player goes back to matchmaking.
+**Coming back after a reload.** A seat that is still a person's can be
+come back to; one a bot has taken cannot, and its player goes back to
+matchmaking. A device keeps, as it plays, everything it signed at the
+table and each hand's deal secret (`packages/table`, `journal.dart`;
+the app's `net/seat_store.dart`), written before each event goes out.
+Reloaded, the app goes straight back to the table: the new client reads
+its own word back before it says anything — so it never signs against
+a move or a vote it already made — takes its keys from the kept secret,
+and is carried forward by the table like any peer behind. A closed
+connection used to leave a seat three seconds before it counted as
+silent, which no reload ever beat; it leaves twenty now
+(`reloadGraceMs`), still less than the turn's own clock, so a device
+really gone holds the table up no longer than a slow one there. Gone
+longer, the seat is removed at its next turn, and the device that comes
+back is caught up to its own removal and told so
+(`test/rejoin_test.dart`).
 
 ## Agreeing that somebody left
 

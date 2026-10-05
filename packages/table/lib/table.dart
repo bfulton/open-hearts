@@ -12,6 +12,7 @@ export 'src/clock.dart';
 export 'src/events.dart';
 export 'src/frame.dart';
 export 'src/game_record.dart';
+export 'src/journal.dart';
 export 'src/jury.dart';
 export 'src/juror_duty.dart';
 export 'src/matching.dart';

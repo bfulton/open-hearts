@@ -2,11 +2,13 @@
 /// the trace tool share.
 library;
 
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import '../client.dart';
+import '../journal.dart';
 import '../jury.dart';
 import '../signing.dart';
 import '../spec.dart';
@@ -46,7 +48,9 @@ class SimTable {
     bool workers = false,
     String? id,
     List<Signer>? keys,
-  })  : clock = VirtualClock(),
+    Map<int, TableJournal>? journals,
+  })  : journals = journals ?? {},
+        clock = VirtualClock(),
         // Fake keys unless told otherwise: a table played for a record
         // a real device will check needs real signatures.
         signers = keys ?? [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
@@ -100,12 +104,45 @@ class SimTable {
           presence: presence,
           crypto: crypto,
           dealWorker: workerFor(signers[i].publicKey),
+          journal: this.journals[i],
           random: Random(seed * 1000 + i));
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }
   }
 
   final int humans;
+
+  /// Journals for the people who keep one, by their place in [people]:
+  /// what a person's device needs to come back after a reload
+  /// ([TableJournal], [reload]).
+  final Map<int, TableJournal> journals;
+
+  /// Person [i]'s page reloaded: the process gone at once, as a tab
+  /// closing is, and after [awayMs] a new client built from the journal
+  /// alone, on a new link, with nothing else of the old one.
+  void reload(int i, {int awayMs = 5000, Random? random}) {
+    final old = people[i];
+    final key = old.client.signer.publicKey;
+    net.crash(key);
+    old.stop();
+    old.client.close();
+    old.gone = true;
+    clock.advance(awayMs);
+    net.revive(key);
+    final journal = TableJournal.parse(jsonDecode(jsonEncode(journals[i]!.toJson())))!;
+    journals[i] = journal;
+    final client = TableClient(
+        spec: spec,
+        signer: old.client.signer,
+        transport: net.attach(key),
+        clock: clock,
+        presence: presence,
+        crypto: crypto,
+        dealWorker: dealWorkers[key],
+        journal: journal,
+        random: random ?? Random(i + 7919));
+    people[i] = ScriptedHuman(client, net, clock, persona: old.persona)..start();
+  }
 
   /// The deal's primitives, at a sealed table.
   final DealCrypto? crypto;

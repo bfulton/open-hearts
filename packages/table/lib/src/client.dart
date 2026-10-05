@@ -67,6 +67,7 @@ import 'package:engine/engine.dart';
 
 import 'clock.dart';
 import 'events.dart';
+import 'journal.dart';
 import 'model.dart';
 import 'sealed_pass.dart';
 import 'signing.dart';
@@ -256,6 +257,7 @@ class TableClient {
     this.presence,
     this.crypto,
     this.dealWorker,
+    this.journal,
     Random? random,
   })  : _random = random,
         _silenceAfterMs = silenceAfterMs,
@@ -290,6 +292,11 @@ class TableClient {
 
   /// The deal's primitives, at a sealed table.
   final DealCrypto? crypto;
+
+  /// What this device has said here and the secrets its deal keys were
+  /// made from, written as it goes; and, for a client built again after
+  /// a reload, read back before it says anything new (journal.dart).
+  final TableJournal? journal;
 
   /// Where the deal's slow calls are made, when not on the thread this
   /// runs on: a Web Worker in the browser, an isolate on the VM
@@ -821,7 +828,18 @@ class TableClient {
     }
     _incoming = transport.incoming.listen((m) => _onMessage(m.from, m.message));
     _drops = transport.disconnected.listen(_onDisconnected);
-    _timers.add(clock.schedule(heartbeatMs, _heartbeat));
+    // Built again after a reload: this device's own word first, as if
+    // it had just heard itself, so that every turn it already spoke at
+    // has its move or its vote in place before anything opens there,
+    // and nothing is signed afresh against it.
+    final restored = journal?.saidSoFar ?? const <Map<String, Object?>>[];
+    for (final e in restored) {
+      _onMessage(signer.publicKey, e);
+    }
+    // Back from a reload, heard at once: the table has been counting
+    // this seat's silence since its connection closed, and a heartbeat
+    // is also what asks for the turns missed.
+    _timers.add(clock.schedule(restored.isEmpty ? heartbeatMs : 0, _heartbeat));
     _timers.add(clock.schedule(1000, _tick));
     _openHand();
     _notify();
@@ -951,6 +969,7 @@ class TableClient {
       return;
     }
     final event = TableEvent.sign(signer, table: spec.id, kind: kind, body: body);
+    journal?.said(event);
     if (kind != EventKind.heartbeat) _trace('emit ${kind.name} $body');
     transport.broadcast(event.toJson(), everywhere: everywhere);
     _accept(event);
@@ -1518,11 +1537,21 @@ class TableClient {
 
   void _onDisconnected(PublicKey key) {
     // A closed connection is silence the transport is sure of, so most
-    // of the allowance is already spent.
+    // of the allowance is already spent — all but [reloadGraceMs]: a
+    // page reloaded closes its connection too, and comes back to its
+    // seat from its journal (journal.dart) if it is still its seat.
+    // With three seconds left, as it was, nobody's reload was ever that
+    // quick, and the seat went to a bot at its next turn.
     if (_humans.contains(key)) {
-      _lastHeard[key] = clock.nowMs - silenceAfterMs + 3000;
+      _lastHeard[key] = clock.nowMs - silenceAfterMs + min(reloadGraceMs, silenceAfterMs);
     }
   }
+
+  /// How long a seat whose connection closed has to come back before
+  /// it counts as silent: a page reloaded, the app started again. Less
+  /// than the turn's own clock, so a device really gone holds the table
+  /// up for no longer than one that is there and slow.
+  static const reloadGraceMs = 20000;
 
   void _accept(TableEvent event) {
     if (!_seen.add(event.id)) return;
@@ -2761,12 +2790,16 @@ class TableClient {
       // nothing shuffled from the record's could be checked here: a
       // person whose table was sealed to another draw than it had built
       // against sat at the next shuffle (sealed_to_draw_test.dart).
-      mySecret: before != null && before.mySeat == me ? before.mySecret : null,
+      // And a client built again after a reload has the secret its keys
+      // for the hand were made from in its journal, kept for this.
+      mySecret: before != null && before.mySeat == me ? before.mySecret : (me != null && me == mySeat ? journal?.secretFor(game.handNumber) : null),
       myKey: signer.publicKey,
       wrap: signer.sharedSecretWith,
       random: _random,
     );
     _dealsByHand[game.handNumber] = _deal!;
+    final kept = _deal!.mySecret;
+    if (amSeated && me == mySeat && kept != null) journal?.keep(game.handNumber, kept);
     // Which juror holds which bot seat, said once as the deal is
     // built. It is no secret — the assignment is the hand's first
     // jury read in its drawn order, so every side works out the same

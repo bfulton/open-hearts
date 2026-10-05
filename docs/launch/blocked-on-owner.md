@@ -20,6 +20,11 @@ the bottom with the day.
 
 ## Accounts and identifiers
 
+- **Renew the Cloudflare API token before 9 October 2026**, when it
+  expires: deploys (`deploy.sh`, `wrangler deploy`) and the infra check
+  (`node infra/apply.mjs`) stop working without it. The same
+  permissions, set again as `CLOUDFLARE_API_TOKEN` in the environment.
+
 - **Apple Developer account and App Store Connect** — unblocks buying
   on iPhone (the code is built and tested against a stand-in chain):
   - the app's bundle id → `OH_APPLE_BUNDLE_ID` on the Pages project;

@@ -414,6 +414,52 @@ flow('a game watched as it is played, from the link a player shares', async ({ o
   if (bare.length) throw new Error(`cards with nobody's play to them, seen from outside: ${bare.join(', ')}`);
 });
 
+flow('a reload mid-hand comes back to the seat, and the hand plays on', async ({ open, relay }) => {
+  // The page keeps what it signed and its deal secret as it plays
+  // (app/lib/net/seat_store.dart); reloaded, it goes straight back to
+  // the table, is caught up by it, and plays the hand out in its own
+  // seat (packages/table, journal.dart).
+  await relay();
+  const ada = await open();
+  await waitFor(ada, /^Play live/, { what: 'live play open', timeout: 40000 });
+  await click(ada, /^Your profile$/);
+  await waitFor(ada, /^Rocket$/, { what: 'the profile' });
+  await type(ada, 'Your name', 'Ada');
+  await click(ada, /^Done$/);
+  await waitFor(ada, /^Play live/, { what: 'the home screen again' });
+  await click(ada, /^Play live/);
+  await waitFor(ada, /^1 of 1 here  ·  rated$/, { what: 'Ada alone with three bots', timeout: 60000 });
+  // Into the play: a few of her own cards down.
+  let played = 0;
+  const until = Date.now() + 240000;
+  while (Date.now() < until && played < 3) {
+    const before = (await texts(ada)).filter((t) => /^\w+ of \w+$/.test(t)).length;
+    await act(ada);
+    await sleep(400);
+    if ((await has(ada, /^Your (turn|lead)$/)) === false && before > 0) {
+      const after = (await texts(ada)).filter((t) => /^\w+ of \w+$/.test(t)).length;
+      if (after < before && !(await has(ada, /^Pass$/))) played++;
+    }
+  }
+  const hand = (await texts(ada)).find((t) => /^Hand \d/.test(t));
+  if (!hand) throw new Error(`not at the table: ${(await texts(ada)).join(' | ')}`);
+  log(`      reloading in "${hand}"`);
+  await ada.reload();
+  // Back at the table by itself, the seat still hers.
+  await waitFor(ada, /^Hand \d/, { what: 'back at the table after the reload', timeout: 60000 });
+  if (await has(ada, /bot (took|has) your seat|took over your seat/i)) throw new Error('a bot has the seat');
+  // And plays on: to the next hand, or the end.
+  const next = `Hand ${Number(hand.match(/^Hand (\d+)/)[1]) + 1}`;
+  const end = Date.now() + 300000;
+  while (Date.now() < end && !(await has(ada, new RegExp(`^${next} `))) && !(await has(ada, /^Home$/))) {
+    await act(ada);
+    await sleep(300);
+  }
+  if (!(await has(ada, new RegExp(`^${next} `))) && !(await has(ada, /^Home$/))) {
+    throw new Error(`the hand did not play out after the reload: ${(await texts(ada)).join(' | ')}`);
+  }
+});
+
 flow('a second device, brought in by the code the first one shows', async ({ open }) => {
   // A subscription is a person's, not a device's (docs/06-service.md).
   // The first device shows a code; the second arrives carrying it, and
@@ -508,7 +554,7 @@ async function main() {
     });
     contexts.push(ctx);
     const page = await ctx.newPage();
-    page.on('pageerror', (e) => log(`page error: ${e.message}`));
+    page.on('pageerror', (e) => log(`page error: ${e.message}\n${(e.stack || '').slice(0, 900)}`));
     await page.goto(url ?? `${app.url}/?e2e=1`);
     // For a flow that presses with the pointer, the nodes are read for
     // their labels and their geometry and take no clicks, so every
