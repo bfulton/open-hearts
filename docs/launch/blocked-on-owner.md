@@ -96,10 +96,6 @@ the bottom with the day.
   one rule; it is in place (below). Per-handler limits — `/api/ticket`,
   `/api/claim`, `/api/checkout`, `/api/turn` at about ten a minute
   (`docs/security-review.md`) — need Pro.
-- **Buy it once for real**: on https://openhearts.game/play, subscribe
-  with your own card, play a live table on two devices, open Manage
-  subscription, then cancel and refund it in Stripe. Everything short
-  of a payment has been checked on production (2 October).
 - **Revoke the temporary keys** given to set this up: the Stripe
   restricted key and the Cloudflare API token.
 - **A Stripe sandbox** (needs a computer: the dashboard's account
@@ -184,3 +180,4 @@ the bottom with the day.
   what watches the app now (observability/). altesc.game's left as it
   was.
 - **A contact email address** — help@openhearts.game, forwarded by Cloudflare Email Routing (4 October 2026).
+- **Bought once for real** on production with a real card, end to end (confirmed 5 October 2026).
