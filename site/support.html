@@ -105,9 +105,6 @@
   .pip.r { color: var(--red); }
   .pip.g { color: var(--gold); }
 
-  ul.plain { margin: 0 0 14px; padding-left: 20px; color: #CFDCD5; }
-  ul.plain li { margin-bottom: 8px; }
-  ul.plain b { color: var(--chrome); font-weight: 650; }
 
   footer.wrap {
     margin-top: 60px;
@@ -122,7 +119,6 @@
   footer a:hover { text-decoration: underline; }
   footer p { color: var(--chrome-dim); margin: 0; }
 
-  address { font-style: normal; color: #CFDCD5; margin: 0 0 14px; }
   a:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
   .skip {
     position: absolute; left: 12px; top: -60px;
@@ -139,7 +135,7 @@
     header { padding: 12px 0; border: 0; }
     .suits .r { color: #9b1c13; }
     .suits .b { color: #000; }
-    h1, h2, h3, p, li, b, code, a, address, .tagline, .updated, ul.points span, footer, footer p { color: #000 !important; }
+    h1, h2, h3, p, li, b, code, a, .tagline, .updated, ul.points span, footer, footer p { color: #000 !important; }
     .skip, .home { display: none; }
     main a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 90%; }
   }
@@ -168,33 +164,22 @@
         <span aria-hidden="true" class="pip g">♠</span>
         <div>
           <b>Something is broken</b>
-          <span>Open the game's menu and choose <i>Tell us what's broken</i>.
-          It shows you everything it would send before you send it, and opens
-          an issue on
-          <a href="https://github.com/bfulton/open-hearts/issues">GitHub</a>,
-          where you can also report a problem directly. Issues are public, so
-          put nothing private in one.</span>
+          <span>Choose <i>Tell us what's broken</i> in the game's menu, or
+          open an issue on
+          <a href="https://github.com/bfulton/open-hearts/issues">GitHub</a>.
+          Issues are public.</span>
         </div>
       </li>
       <li>
         <span aria-hidden="true" class="pip r">♥</span>
         <div>
           <b>Anything private</b>
-          <span>A subscription, a refund, a privacy request, or a player to
-          report: email help@openhearts.game, or write or call us.</span>
+          <span>Email <a href="mailto:help@openhearts.game">help@openhearts.game</a>,
+          or write or call us at the address in the
+          <a href="/terms#contact">terms</a>.</span>
         </div>
       </li>
     </ul>
-    <address style="margin-top:16px">
-      Open Hearts<br>
-      6650 Rivers Ave, Ste 105, PMB #804106<br>
-      North Charleston, SC 29406<br>
-      USA<br>
-      Phone: <a href="tel:+18438270686">+1 (843) 827-0686</a>
-    </address>
-    <p>
-      Email: <a href="mailto:help@openhearts.game">help@openhearts.game</a>
-    </p>
   </section>
 
   <section>
@@ -202,143 +187,64 @@
 
     <h3 id="play">How do I play?</h3>
     <p>
-      Open <a href="/play">openhearts.game/play</a> in any up-to-date
-      browser and tap <i>Play solo</i>. The rules are short and are
-      <a href="/#rules">on the front page</a>. If you tap a card you are not
-      allowed to play, the game tells you which rule stopped you. Each game
-      runs to fifty points, or a hundred if you choose the longer game; the
-      lowest score wins.
+      Open <a href="/play">openhearts.game/play</a> and tap <i>Play solo</i>.
+      The rules are <a href="/#rules">on the front page</a>.
     </p>
 
     <h3 id="stores">Is it in the App Store or Google Play?</h3>
     <p>
-      Not yet. Until it is, it plays in the browser on any phone, tablet or
-      computer. Add the page to your home screen or bookmark it to find it
-      again. Once the page has loaded, playing alone works without a
-      connection.
-    </p>
-
-    <h3 id="free">Is it really free?</h3>
-    <p>
-      Playing alone against the bots is free and always will be: no ads, no
-      account, nothing to buy. Only live play, against people, costs money.
-    </p>
-
-    <h3 id="live">How does live play work?</h3>
-    <p>
-      Live play is a subscription: $5.99 a year, paid up front. Tap
-      <i>Play live</i> and you are seated in seconds with whoever is waiting,
-      near your rating and your pace; seats nobody takes go to bots, which
-      always say they are bots. Or tap <i>Play friends</i> for a table of
-      your own and a link to send to three friends. Choose fifty points or a
-      hundred, rated or unrated, before you start. The cards are dealt
-      between the four devices, so no server, ours included, ever sees your
-      hand.
-    </p>
-    <p>
-      Today live play is bought and played in the browser. The phone apps
-      will offer it through the stores once they are there.
+      Not yet. Add the page to your home screen to keep it handy; playing
+      alone then works offline.
     </p>
 
     <h3 id="subscribe">How do I subscribe?</h3>
     <p>
-      In the browser, tap <i>Subscribe</i> under <i>Play live</i> on the
-      game's first screen. Payment is taken on Stripe's own page, which asks
-      for your email address and card. There is no account to make: the
-      subscription belongs to the device you bought it on, and to any you
-      add.
+      Tap <i>Subscribe</i> under <i>Play live</i>. Payment is on Stripe's
+      page. There is no account: the subscription belongs to the device,
+      and to any you add.
     </p>
 
     <h3 id="cancel">How do I cancel?</h3>
     <p>
-      Live play keeps working until the end of the year you paid for, and
-      the subscription renews each year until you cancel.
+      Open Live play and choose <i>Manage subscription</i>. Other ways, and
+      refunds, are in the <a href="/terms">terms</a>.
     </p>
-    <ul class="plain">
-      <li><b>Bought on the web:</b> open Live play in the game and choose
-      <b>Manage subscription</b>, on any device on the subscription. It
-      opens Stripe's billing page, where you can cancel, change the card
-      or see receipts. Lost every device? Write to us or call, with the
-      email address you paid with, and we will cancel it and confirm.</li>
-      <li><b>Bought in the App Store</b> (once it is there): Settings, then
-      your name, then Subscriptions.</li>
-      <li><b>Bought on Google Play</b> (once it is there): the Play Store,
-      your profile picture, then Payments &amp; subscriptions.</li>
-    </ul>
-    <p>Refunds are covered in the <a href="/terms">terms</a>.</p>
 
     <h3 id="devices">How do I add another device?</h3>
     <p>
-      On a subscribed device, open the live-play page and tap
-      <i>Add a device</i>. It shows a code. Point the other device's camera
-      at it, and the link it reads brings that device in; or tap <i>Send the
-      link instead</i> and open the link on the other device. A code works
-      once, for ten minutes. Up to five devices can share a subscription,
-      and any of them can drop another.
+      On a subscribed device, open Live play and tap <i>Add a device</i>,
+      then scan the code with the other device, or tap <i>Send the link
+      instead</i>. A code works once, for ten minutes.
     </p>
 
     <h3 id="lost">I lost my phone, or cleared my browser.</h3>
     <p>
-      The subscription is kept on each device, not in an account. If
-      another of your devices is still on it, use that one to add the new
-      device, and drop the lost one. If none is, contact us with the email
-      address you paid with and we will help.
-    </p>
-
-    <h3 id="bots">Who are the bots?</h3>
-    <p>
-      Characters named after famous lovers — Romeo, Juliet, Cyrano and more —
-      each with its own temperament, at nine strengths. At a live table the
-      bots near your rating take the empty seats, and their ratings move
-      with real results like everyone else's.
-    </p>
-
-    <h3 id="privacy">What happens to my data?</h3>
-    <p>
-      Playing alone, nothing leaves your device. There are no ads, no
-      analytics and no account. Live play is public on purpose: your name,
-      picture and results are published where anyone can read them, so pick
-      a name and picture you are happy for strangers to see. You can play
-      live with no picture, and hide anyone else's on your own device. The
-      details are in the <a href="/privacy">privacy policy</a>.
+      From another device on the subscription, add the new one and drop
+      the lost one. If you have none, email us with the address you paid
+      with.
     </p>
 
     <h3 id="accessibility">Can I play with a screen reader, or bigger text?</h3>
     <p>
-      Yes. Every card, seat, trick and score has a name, and who took a
-      trick and whose turn it is are said aloud. In a browser, a screen
-      reader first finds a button called <i>Enable accessibility</i>; press
-      it once. We have played whole hands this way in a browser, but not
-      yet with VoiceOver or TalkBack on a phone, so please tell us how it
-      goes.
-    </p>
-    <p>
-      To make everything bigger, use the browser's zoom: Ctrl and + on a
-      computer, ⌘ and + on a Mac. A tablet shows bigger cards than a phone.
+      Yes. In a browser, press <i>Enable accessibility</i>, the first
+      button a screen reader finds. For bigger text, use the browser's
+      zoom.
     </p>
 
-    <h3 id="languages">Which languages does it speak?</h3>
+    <h3 id="languages">Can I pick the language?</h3>
     <p>
-      English, <span lang="es">español</span>,
-      <span lang="pt-BR">português (Brasil)</span>,
-      <span lang="de">Deutsch</span> and <span lang="fr">français</span>,
-      chosen from your device's language. To pick one yourself, add
-      <code>?lang=es</code> (or <code>pt</code>, <code>de</code>,
-      <code>fr</code>, <code>en</code>) to the game's address. The
-      translations are new; corrections are welcome.
+      Add <code>?lang=es</code> (or <code>pt</code>, <code>de</code>,
+      <code>fr</code>, <code>en</code>) to the game's address.
     </p>
 
     <h3 id="fair">How do I know the deal is fair?</h3>
     <p>
-      At a live table every device shuffles in turn and proves it did, and
-      one honest shuffle makes the deal fair; anyone can check the whole
-      game afterwards. Alone, each deal comes from 256 bits of your device's
-      secure random generator, and <i>Copy record</i> at the end of a game
-      gives you everything needed to replay it. How it all works is written
-      up in the
-      <a href="https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md">project's
-      documentation</a>.
+      See <a href="https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md">how
+      the deal works</a>.
     </p>
+
+    <h3 id="privacy">What happens to my data?</h3>
+    <p>See the <a href="/privacy">privacy policy</a>.</p>
   </section>
 </main>
 

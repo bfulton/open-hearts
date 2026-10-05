@@ -113,7 +113,6 @@
   }
   h3 { font-size: 17px; margin: 22px 0 6px; color: var(--chrome); }
   p { margin: 0 0 14px; color: var(--body); }
-  .small { font-size: 14.5px; color: var(--chrome-dim); }
 
   ul.points { list-style: none; margin: 0; padding: 0; }
   ul.points li {
@@ -144,8 +143,8 @@
   .way ul { margin: 0 0 14px; padding-left: 18px; color: var(--body); font-size: 15px; }
   .way li { margin-bottom: 6px; }
 
-  ol.rules, ul.plain { margin: 0 0 14px; padding-left: 20px; color: var(--body); }
-  ol.rules li, ul.plain li { margin-bottom: 8px; }
+  ol.rules { margin: 0 0 14px; padding-left: 20px; color: var(--body); }
+  ol.rules li { margin-bottom: 8px; }
 
   .langs { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 8px; }
   .langs li {
@@ -153,7 +152,6 @@
     padding: 3px 12px; font-size: 14.5px; color: var(--chrome);
   }
 
-  address { font-style: normal; color: var(--body); margin: 0 0 14px; }
 
   footer.wrap {
     margin-top: 60px;
@@ -177,7 +175,7 @@
     header { padding: 16px 0; border: 0; }
     h1 .hearts, .suits .r, .pip.r { color: #9b1c13; }
     .suits .b { color: #000; }
-    h2, h3, b, .price, a, p, li, .tagline, .cta-note, .stores, ul.points .d, address, footer, footer p { color: #000 !important; }
+    h2, h3, b, .price, a, p, li, .tagline, .cta-note, .stores, ul.points .d, footer, footer p { color: #000 !important; }
     .cta { box-shadow: none; border: 2px solid #000; background: #fff; }
     .way { border-color: #999; }
     .langs li { border-color: #999; color: #000; }
@@ -200,25 +198,11 @@
     <p class="tagline">The card game you already know, built the way it deserves.</p>
     <a class="cta" href="/play">Play in your browser</a>
     <p class="cta-note">Free to play alone. No install, no ads, no sign-up.</p>
-    <p class="stores">Not in the App Store or Google Play yet. The phone apps are on their way; until then it plays in the browser on any phone, tablet or computer.</p>
+    <p class="stores">Phone apps are on their way. Until then it plays in any browser.</p>
   </div>
 </header>
 
 <main id="main" class="wrap">
-  <section aria-labelledby="what">
-    <h2 id="what">What this is</h2>
-    <p>
-      Hearts is a trick-taking game for four players where every heart costs you
-      a point, the queen of spades costs you thirteen, and the winner is whoever
-      finishes with the fewest. It has been played for a century and there is
-      still no version of it on a phone that is simply good.
-    </p>
-    <p>
-      Open Hearts is an attempt at one: fast, quiet, honest about its rules and
-      its opponents, and open source from the first commit.
-    </p>
-  </section>
-
   <section aria-labelledby="ways">
     <h2 id="ways">Two ways to play</h2>
     <div class="ways">
@@ -226,34 +210,22 @@
         <h3>Alone, against three bots</h3>
         <p class="price">Free, for good</p>
         <ul>
-          <li>No ads, no account, nothing to buy.</li>
-          <li>The bots have names and temperaments, and come at nine
-          strengths.</li>
-          <li>Once the page has loaded, it plays without a connection.</li>
-          <li>Nothing about a game alone leaves your device.</li>
+          <li>Nine strengths of bot.</li>
+          <li>Plays offline once loaded.</li>
+          <li>Nothing leaves your device.</li>
         </ul>
       </div>
       <div class="way">
         <h3>Live, with people</h3>
-        <p class="price">$5.99 a year, paid up front</p>
+        <p class="price">$5.99 a year</p>
         <ul>
-          <li><b>Play live</b> and you are seated in seconds with whoever is
-          waiting, or <b>Play friends</b> and send three friends a link.</li>
-          <li>A seat nobody takes goes to a bot, and a bot always says it is
-          one.</li>
-          <li>You are seated near your rating, and near your pace, so quick
-          players and careful ones each find their own.</li>
-          <li>Bots have real ratings too. Rated games move them, yours and
-          theirs, from results everyone at the table signs.</li>
-          <li>One subscription covers up to five of your devices.</li>
+          <li>Seated in seconds, or invite three friends with a link.</li>
+          <li>Matched by rating and pace.</li>
+          <li>Empty seats go to bots that say they are bots.</li>
+          <li>Up to five devices.</li>
         </ul>
       </div>
     </div>
-    <p class="small" style="margin-top:14px">
-      Live play is bought and played in the browser today. The phone apps
-      will get it through the stores' own subscriptions once they are in
-      the stores.
-    </p>
   </section>
 
   <section aria-labelledby="different">
@@ -262,70 +234,38 @@
       <li>
         <span class="pip g" aria-hidden="true">♠</span>
         <div>
-          <b>It respects your attention</b>
-          <span class="d">No ads, no daily streaks, no chips to buy. You open
-          it, you play a hand, you close it.</span>
+          <b>No streaks, no chips</b>
+          <span class="d">Open it, play a hand, close it.</span>
         </div>
       </li>
       <li>
         <span class="pip r" aria-hidden="true">♥</span>
         <div>
-          <b>It teaches while you play</b>
-          <span class="d">Tap a card you cannot play and it tells you which
-          rule stopped you, instead of just refusing.</span>
+          <b>It teaches</b>
+          <span class="d">Tap a card you can't play and it tells you why.</span>
         </div>
       </li>
       <li>
         <span class="pip g" aria-hidden="true">♣</span>
         <div>
-          <b>It does not pretend</b>
-          <span class="d">An empty seat is filled by a bot that says so, where
-          a name would go. No made-up usernames, ever.</span>
+          <b>A deal nobody can rig</b>
+          <span class="d">Every device shuffles and proves it. No player and
+          no server sees your hand.</span>
         </div>
       </li>
       <li>
         <span class="pip r" aria-hidden="true">♦</span>
         <div>
-          <b>Yours to read and fork</b>
-          <span class="d">One readable rules engine every player runs, MIT
-          licensed, developed in the open, and it will stay that way.</span>
+          <b>Open source</b>
+          <span class="d">MIT licensed, on
+          <a href="https://github.com/bfulton/open-hearts">GitHub</a>.</span>
         </div>
       </li>
     </ul>
   </section>
 
-  <section aria-labelledby="deal">
-    <h2 id="deal">A deal nobody can rig</h2>
-    <p>
-      At a live table there is no dealer to trust. Every device at the table
-      shuffles the deck in turn and proves it did so honestly, and one honest
-      shuffle is enough for a fair deal. The cards are dealt so that each hand
-      can be read by its player alone: no other player sees it, and no server
-      sees it, ours included. After the hand, anyone can check the whole game
-      against the deal. This is a technique called mental poker, built on a
-      published protocol and on research code that has not had a security
-      audit.
-    </p>
-    <p>
-      What it cannot stop is two players sharing their hands over the phone.
-      No card game can.
-    </p>
-    <p>
-      Alone, every deal comes from 256 bits of your device's secure random
-      generator, shuffled without bias, so every deal of the cards can come up
-      and none follows from the one before. Each game alone is kept as a
-      record you can copy and replay, trick by trick.
-    </p>
-  </section>
-
   <section aria-labelledby="everywhere">
     <h2 id="everywhere">Every screen, five languages</h2>
-    <p>
-      The same game on a phone held either way, a tablet, a foldable, and a
-      desktop browser. The table is laid out from the space it is given, so
-      bigger screens get bigger cards, and a turn or a fold mid-hand keeps the
-      game.
-    </p>
     <ul class="langs" aria-label="Languages">
       <li lang="en">English</li>
       <li lang="es">Español</li>
@@ -334,68 +274,32 @@
       <li lang="fr">Français</li>
     </ul>
     <p>
-      It speaks your device's language, and English otherwise. The
-      translations are a first pass, and corrections are welcome.
+      Phone, tablet or desktop. Works with a screen reader: in a browser,
+      press <i>Enable accessibility</i> first.
     </p>
-    <p>
-      It works with a screen reader: every card, seat, trick and score has a
-      name, and who took a trick is said aloud. We have played whole hands
-      that way in a browser, through its accessibility tree. It has not yet
-      been tried with VoiceOver or TalkBack on a phone, and we would like to
-      hear from anyone who plays that way. In a browser, press the
-      <i>Enable accessibility</i> button that a screen reader finds first on
-      the page.
-    </p>
-  </section>
-
-  <section aria-labelledby="privacy">
-    <h2 id="privacy">Privacy, briefly</h2>
-    <ul class="plain">
-      <li>Playing alone stays on your device. There is no account to make.</li>
-      <li>No ads, no trackers, no cookies from our pages. This
-      page loads nothing from anywhere else.</li>
-      <li>Live play is public on purpose: your name, picture and results go
-      through our relay, where anyone can read them.</li>
-      <li>In the browser, the game fetches an extra font from Google when it
-      has to draw an emoji or a name in a script it does not carry.</li>
-    </ul>
-    <p>The whole of it, in plain words: <a href="/privacy">the privacy policy</a>.</p>
   </section>
 
   <section aria-labelledby="rules">
     <h2 id="rules">How Hearts works</h2>
     <ol class="rules">
       <li>Four players, thirteen cards each.</li>
-      <li>Pass three cards — left, then right, then across, then no pass at all.</li>
-      <li>The two of clubs leads. Follow the suit that was led whenever you can.</li>
-      <li>No hearts and no queen of spades on the first trick, unless you have nothing else.</li>
-      <li>Hearts cannot be led until one has been played on some earlier trick.</li>
-      <li>Every heart is one point; the queen of spades is thirteen. Points are bad.</li>
-      <li>Take all twenty-six and you shoot the moon: everyone else takes them instead.</li>
-      <li>The game ends after the hand in which someone reaches fifty points, or a
-      hundred if you choose the longer game. Lowest score wins.</li>
+      <li>Pass three cards: left, right, across, then no pass.</li>
+      <li>The two of clubs leads. Follow suit if you can.</li>
+      <li>No points on the first trick, unless you have nothing else.</li>
+      <li>Hearts can't be led until one has been played.</li>
+      <li>Each heart is one point; the queen of spades is thirteen.</li>
+      <li>Take all twenty-six to shoot the moon: everyone else gets them.</li>
+      <li>Play to fifty or a hundred. Lowest score wins.</li>
     </ol>
   </section>
 
   <section aria-labelledby="contact">
-    <h2 id="contact">Help and contact</h2>
+    <h2 id="contact">Help</h2>
     <p>
-      Something broken? Use <i>Tell us what's broken</i> in the game's menu,
-      or open an issue on
-      <a href="https://github.com/bfulton/open-hearts/issues">GitHub</a>.
-      Issues are public, so put nothing private in one.
+      Use <i>Tell us what's broken</i> in the game's menu, see the
+      <a href="/support">support page</a>, or email
+      <a href="mailto:help@openhearts.game">help@openhearts.game</a>.
     </p>
-    <p>
-      For anything private — a privacy request, a subscription, a refund —
-      email <a href="mailto:help@openhearts.game">help@openhearts.game</a>, or write or call:
-    </p>
-    <address>
-      Open Hearts<br>
-      6650 Rivers Ave, Ste 105, PMB #804106<br>
-      North Charleston, SC 29406, USA<br>
-      <a href="tel:+18438270686">+1 (843) 827-0686</a>
-    </address>
-    <p>More answers on the <a href="/support">support page</a>.</p>
   </section>
 </main>
 
