@@ -157,6 +157,8 @@ jobs:
         run: cd app && flutter pub get && cd .. && ./e2e/build.sh
       - name: Handlers (the Pages worker, in node's test runner)
         run: node --test service/functions/*.test.mjs
+      - name: Infrastructure definitions (what infra/apply.mjs compares; no network)
+        run: node --test infra/*.test.mjs
       - name: The page's deal worker (in node's test runner, against the committed wasm)
         run: node --test e2e/deal_worker.test.mjs
       - name: The service worker that keeps the app for a load with no network (in node's test runner)

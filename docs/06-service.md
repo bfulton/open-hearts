@@ -353,6 +353,14 @@ for `checkout.session.completed`,
 `customer.subscription.*`. Without them the shop says it is not open
 yet, which is what a deployment with no keys should say.
 
+All of this — the Pages project's variables, secrets (by name) and
+bindings, the stores, the zones' DNS, rules and Email Routing, and on
+Stripe's side the price, the portal and the webhook — is written down in
+`infra/` and checked against both accounts by `node infra/apply.mjs`, a
+dry run unless given `--apply` (infra/README.md). The relay worker's own
+setup stays in `service/do/wrangler.toml`, which that run checks the
+deployed worker against.
+
 A web subscriber manages the subscription — cancels, changes the
 card, reads a receipt — in Stripe's billing portal: **manage** opens a
 portal session for the subscription's Stripe customer and the app goes
