@@ -12,9 +12,10 @@
          says it whatever the library does. -->
     <uses-permission android:name="com.android.vending.BILLING"/>
     <application
-        android:label="open_hearts"
+        android:label="Open Hearts"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:localeConfig="@xml/locales_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"

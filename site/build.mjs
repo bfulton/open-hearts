@@ -17,6 +17,7 @@
 //   {{langs}}       a link to each language's copy, the page's own marked
 //   {{langName}}    the page's language, by its own name
 //   {{> name}}      pages/_name.html, filled in the same way
+import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,6 +81,12 @@ export function render(page, language, words) {
     new RegExp(`(<nav[^>]*>[\\s\\S]*?<a href="${base(language.code)}${path}")`),
     '$1 aria-current="page"',
   );
+  // Stylesheets and scripts are cached for hours: each link carries its
+  // file's fingerprint, so a changed one is fetched at once.
+  html = html.replace(/(href|src)="\/([\w-]+\.(?:css|js))"/g, (_, attr, file) => {
+    const hash = createHash('sha256').update(readFileSync(join(here, 'public', file))).digest('hex').slice(0, 10);
+    return `${attr}="/${file}?v=${hash}"`;
+  });
   return html;
 }
 

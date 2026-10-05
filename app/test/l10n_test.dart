@@ -177,6 +177,16 @@ void main() {
       expect(languageInAddress(Uri.parse('https://x/play/')), isNull);
     });
 
+    test('the phones offer exactly the languages the app speaks, in their per-app setting', () {
+      final spoken = AppLocalizations.supportedLocales.map((l) => l.languageCode).toSet();
+      final android = File('android/app/src/main/res/xml/locales_config.xml').readAsStringSync();
+      expect(RegExp(r'android:name="([\w-]+)"').allMatches(android).map((m) => m.group(1)).toSet(), spoken);
+      final ios = File('ios/Runner/Info.plist').readAsStringSync();
+      final list = RegExp(r'<key>CFBundleLocalizations</key>\s*<array>([\s\S]*?)</array>').firstMatch(ios)!.group(1)!;
+      expect(RegExp(r'<string>([\w-]+)</string>').allMatches(list).map((m) => m.group(1)).toSet(), spoken);
+      expect(File('android/app/src/main/AndroidManifest.xml').readAsStringSync(), contains('android:localeConfig="@xml/locales_config"'));
+    });
+
     test('a chosen language is kept: the address\'s for next time, or the site\'s', () async {
       SharedPreferences.setMockInitialValues({});
       expect(await chosenLanguage(Uri.parse('https://x/play/')), isNull);
