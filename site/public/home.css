@@ -134,7 +134,7 @@ ul.points .d { color: var(--chrome-dim); font-size: 14.5px; }
 .langs a:hover { border-color: var(--chrome-dim); }
 .langs a[aria-current] { background: var(--gold); border-color: var(--gold); color: var(--felt-dark); font-weight: 650; }
 .lang-pick {
-  display: block; margin: 0 auto 12px;
+  display: block; margin: 0 auto;
   font: inherit; font-size: 13.5px; color: var(--chrome);
   background: var(--felt-dark); border: 1px solid var(--edge); border-radius: 8px;
   padding: 4px 10px;
@@ -153,7 +153,6 @@ footer.wrap {
 footer ul { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; }
 footer a { text-decoration: none; }
 footer a:hover { text-decoration: underline; }
-footer p { color: var(--chrome-dim); margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -163,7 +162,7 @@ footer p { color: var(--chrome-dim); margin: 0; }
   body, header, .way { background: #fff !important; color: #000; }
   header { padding: 16px 0; border: 0; }
   .heart { display: none; }
-  h2, h3, b, a, p, li, .tagline, ul.points .d, footer, footer p { color: #000 !important; }
+  h2, h3, b, a, p, li, .tagline, ul.points .d, footer { color: #000 !important; }
   .cta { box-shadow: none; border: 2px solid #000; background: #fff; }
   .way { border-color: #999; }
   .langs, .lang-pick { display: none; }
