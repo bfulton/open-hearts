@@ -1,5 +1,5 @@
 /// A whole hand's deal among four sessions in one process — two people
-/// and two bots, then four people — the way the table will drive it:
+/// and two bots, then four people — the way the table drives it:
 /// keys with their escrow, shuffles in order, tokens, hands, the lead
 /// declared; a pass; plays each opened for all; a seat gone and its
 /// hand rebuilt from the pieces the others and a juror hold; the audit;
@@ -445,7 +445,7 @@ void main() {
     }
 
     // A player hears every one of them and is no wiser. Holding a
-    // piece was never what it took to rebuild a secret — hearing
+    // piece is not what it takes to rebuild a secret — hearing
     // [escrowThreshold] of them is — so a piece said in the clear
     // would be a piece the players had too. A bot seat's go sealed to
     // the custodians, and the side the hand is hidden from cannot so
@@ -455,11 +455,9 @@ void main() {
     }
     expect(players[0].knowsSecret(3), isFalse, reason: 'every juror released and the table learned nothing');
 
-    // Among the jury it is any two, not two fixed halves — where the
-    // escrow used to want one from each half, and losing a half took
-    // the seat with it (docs/04-live-play.md, "The sizing"). Each
-    // juror holds one piece of its own, so one more opens the seat,
-    // whichever juror it comes from.
+    // Among the jury it is any two, not two fixed halves
+    // (docs/04-live-play.md). Each juror holds one piece of its own, so
+    // one more opens the seat, whichever juror it comes from.
     for (var mine = 0; mine < jury.length; mine++) {
       for (var other = 0; other < jury.length; other++) {
         if (other == mine) continue;
@@ -476,10 +474,8 @@ void main() {
   // Each piece is weighed by its custodian's place, and the pieces in
   // hand are summed. One that is not what its place says — a custodian
   // brought on from a redraw whose share was made at another place, or
-  // one that released something else — spoiled the sum, and the seat
-  // stayed shut however many good pieces came after it (sealed chaos
-  // seed 10 with nine strangers, at the verifier). Any two that agree,
-  // checked against the seat's key, are the secret.
+  // one that released something else — spoils the sum. Any two that
+  // agree, checked against the seat's key, are the secret.
   test('a piece that is not what its place says does not keep a bot seat shut: any two good ones open it', () {
     final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
     final seats = [
@@ -517,8 +513,7 @@ void main() {
     // Guessing it is worse than knowing nothing: this side would stop
     // awaiting the escrow and would never say the piece it holds, and
     // the jurors that could have opened the seat between them would
-    // wait for a release that was never coming. It cost the browser
-    // run every release in a hand.
+    // wait for a release that was never coming.
     final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
     final seats = [
       const HumanDealSeat('a'),

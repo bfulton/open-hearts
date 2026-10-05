@@ -50,9 +50,9 @@ void main() {
       }
     });
 
-    test('an int seed deals by Random, exactly as every game did before', () {
-      // From the engine as it was before there was a deal seed: the
-      // first hand of four seeds, one of them as large as the app drew.
+    test('an int seed deals by Random, exactly as pinned', () {
+      // The first hand of four int seeds, the largest a full 31 bits:
+      // what an `oh1` record replays from.
       expect(HeartsGame(seed: 42).dealSeed, isNull);
       final before = {
         0: [

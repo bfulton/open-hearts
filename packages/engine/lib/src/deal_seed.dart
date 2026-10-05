@@ -1,5 +1,4 @@
-/// Where a solo game's cards come from (docs/03-fair-deal.md, "Where the
-/// randomness comes from").
+/// Where a solo game's cards come from (docs/03-fair-deal.md).
 ///
 /// A new game draws 256 bits from the platform's secure generator, and
 /// every hand of it is computed from them: HMAC-SHA-256 keyed by the
@@ -15,9 +14,9 @@
 /// wider than 32 bits, which is as wide as JavaScript does bitwise
 /// arithmetic.
 ///
-/// Games before this were dealt by `dart:math`'s [Random] from a 31-bit
-/// seed, and still are wherever an int seed is given — every record made
-/// then, and the tests and tools that name a game by a small number.
+/// A game given an int seed instead is dealt by `dart:math`'s [Random]
+/// from it: `oh1` records, and the tests and tools that name a game by a
+/// small number.
 library;
 
 import 'dart:convert';

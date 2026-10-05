@@ -9,16 +9,17 @@
 /// rebuilt from the pieces it escrowed, and at the end every secret
 /// revealed so the whole hand can be checked by anyone.
 ///
-/// A bot seat has no secrets: its deal secret is a hash everyone can
-/// compute, so its keys, shuffle and tokens are computed by everyone
-/// rather than sent, and its hand is open to all — the interim doc 04
-/// names, until the bot plays inside the computation. A person's hand
-/// is known to that person alone until the audit; a person who leaves
-/// becomes a bot whose secret the others rebuild.
+/// A bot seat nobody holds — the solo game's — has no secrets: its
+/// deal secret is a hash everyone can compute, so its keys, shuffle and
+/// tokens are computed by everyone rather than sent, and its hand is
+/// open to all. A bot seat a juror holds has a secret of its own,
+/// escrowed to the jury. A person's hand is known to that person alone
+/// until the audit; a person who leaves becomes a bot whose secret the
+/// others rebuild.
 ///
 /// **Escrow.** Each person splits their secret in two: one piece to
 /// every other person at the table, one piece to every juror
-/// (docs/04-live-play.md, "the jury"), each copy wrapped in the secret
+/// (docs/04-live-play.md), each copy wrapped in the secret
 /// the two keys share. Any one person and any one juror can rebuild it
 /// once the table has removed the seat; all the people together hold
 /// noise without a juror's piece, and the jury holds noise without a
@@ -252,13 +253,12 @@ class DealSession {
   /// hand: both shares' tokens for every position it owes one for, and
   /// both parts of every seal made out to it.
   ///
-  /// Nothing of a departed seat opens until this holds. The whole
-  /// table above was built when a seat opened all at once — its secret
-  /// arrived and every position of it fell open together — and the
-  /// shares open it in stages, hand first and a seal whenever its
-  /// parts arrive. Letting those stages show turns one moment into
-  /// several, and a client that acted on the first found the rest
-  /// missing. Opening on the last of them keeps the moment whole.
+  /// Nothing of a departed seat opens until this holds. The table
+  /// expects a seat to open all at once, as it does when its secret
+  /// arrives, while the shares open it in stages — hand first, a seal
+  /// whenever its parts arrive. Opening on the last of them keeps the
+  /// moment whole, so a client acting on it never finds the rest
+  /// missing.
   bool _wholeForShares(int seat) {
     if (deck == null || _shareKeysOf[seat] == null) return false;
     final parts = _shareTokens[seat];
@@ -472,7 +472,7 @@ class DealSession {
       if (_thresholdEscrow(me, custodians)) {
         // A bot seat's secret is the jury's alone, and in shares any
         // [escrowThreshold] of which rebuild it: one juror is still
-        // nothing, and losing one no longer takes the seat with it.
+        // nothing, and losing one does not take the seat with it.
         // A share's index is its custodian's place in the list,
         // counted from one, which is what the coefficients need.
         final shares = crypto.shareBytes(secret, n: custodians.length, t: escrowThreshold, seed: _seed('escrow', me));
@@ -481,8 +481,7 @@ class DealSession {
         // theirs from these keys. It holds the whole secret besides,
         // which is no use to a newcomer: a newcomer's share is made from
         // the shares of whichever custodians are first still heard, and
-        // one of them holding no share left the set short for good —
-        // the parts came from the others and never from it.
+        // one of them holding no share would leave that set short.
         final mine = myKey == null ? -1 : custodians.indexOf(myKey!);
         for (var i = 0; i < custodians.length; i++) {
           final share = Uint8List.sublistView(shares, i * secret.length, (i + 1) * secret.length);
@@ -491,8 +490,7 @@ class DealSession {
         }
       } else {
         // A person's seat splits across the other people and the
-        // jury: one live juror of any answers it, which is not the
-        // shape that needed fixing.
+        // jury: one live juror of any answers it.
         final (sideA, sideB) = _escrowSides(me, custodians);
         final first = _draw();
         final second = _xor(secret, first);
@@ -943,8 +941,8 @@ class DealSession {
   /// the deck is dealt or without a seat.
   ///
   /// One batch with one argument, not thirty-nine tokens each carrying
-  /// a proof three times its own size: the proofs all said the same
-  /// thing about the same key, and a batch says it once
+  /// a proof three times its own size: the proofs would all say the
+  /// same thing about the same key, and a batch says it once
   /// ([DealCrypto.revealTokens]).
   Map<String, Object?>? myTokens() {
     final me = mySeat;
@@ -1037,8 +1035,8 @@ class DealSession {
         // A seal that yields no token leaves its position shut, and
         // only that position: opening one is arithmetic that the
         // primitives refuse on a point that is not one, and a throw
-        // from here used to take the whole session with it, so that
-        // nothing else opened either. Nothing settled gets this far —
+        // from here would take the whole session with it. Nothing
+        // settled gets this far —
         // every seal is checked before its pass is taken
         // ([verifyPass]) — so this is the belt to that brace.
         try {
@@ -1285,6 +1283,7 @@ class DealSession {
   /// A seat passes cards it was dealt, so every position here is its
   /// own at the deal: that is what the argument is about, and a pass of
   /// anything else is refused.
+  ///
   /// [from] for a juror that has come by a given-up seat's key and is
   /// making its pass: the seat acting is not this side's own.
   Map<String, Object?>? passMessage(int to, List<int> positions, {int? from}) {
@@ -1341,10 +1340,9 @@ class DealSession {
       if (!proofs.every((p) => p.length == tokenBytes - pointBytes)) return false;
       if (_pks[from] == null || _pks[to] == null) return false;
       // The argument each seal carries: what is sealed is the share
-      // [from]'s key owes for that card. Checked by everyone, which is
-      // the whole point of it — a receiver left with three cards it
-      // cannot open used to be nobody else's business
-      // (docs/03-fair-deal.md).
+      // [from]'s key owes for that card. Checked by everyone, so a
+      // receiver left with cards it cannot open is the table's
+      // business, not only its own (docs/03-fair-deal.md).
       for (var i = 0; i < positions.length; i++) {
         if (!crypto.verifySeal(_pks[from]!, _pks[to]!, _masked(positions[i]), sealed[i])) return false;
       }
@@ -1416,6 +1414,7 @@ class DealSession {
   /// This side's piece of a departed seat's secret, in the clear, for
   /// everyone: as a person or as a juror. Null when it holds none, or
   /// the seat is still here.
+  ///
   /// A person's seat opens to the table: its hand has to be played
   /// out where everyone can see it, and every side needs the key to
   /// work its moves out and check them. So that piece goes in the
@@ -1424,22 +1423,21 @@ class DealSession {
   /// A bot seat's opens to the jury and to nobody else — a piece to
   /// each custodian, sealed to it — because the whole reason a juror
   /// holds the seat is that nobody at the table may see its hand
-  /// (docs/04-live-play.md). Holding a piece was never what it took
-  /// to rebuild the secret: hearing [escrowThreshold] of them is, and
+  /// (docs/04-live-play.md). Holding a piece is not what it takes to
+  /// rebuild the secret: hearing [escrowThreshold] of them is, and
   /// a piece said in the clear is heard by the people playing.
   ///
   /// [inTheOpen] once the hand is over. The audit publishes every
   /// secret then, so there is nothing left to seal, and a piece the
   /// players could not read would leave a hand only the jury could
   /// check.
+  ///
   /// [only] narrows who it is sealed to, by custodian index. Every
   /// custodian already holds a piece of its own, so one more opens the
   /// seat: a piece needs to reach the custodian that will play the
   /// seat out, not all of them. The caller names the few it judges
   /// live, and says it again as that judgement changes — a piece
-  /// sealed to a custodian that has itself gone is bytes nobody reads,
-  /// and at a jury topped up to ten there were eight of them in every
-  /// release.
+  /// sealed to a custodian that has itself gone is bytes nobody reads.
   Map<String, Object?>? releaseShare(int seat, {bool inTheOpen = false, Set<int>? only}) {
     final piece = _myPieceOf[seat];
     final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
@@ -1652,12 +1650,10 @@ class DealSession {
         // One piece that is not what its place says spoils the sum of
         // them all: a custodian brought on from a redraw whose share was
         // made at another place than this side gives it, or one that
-        // released something else. The seat stayed shut for good with
-        // enough good pieces in hand to open it twice over (sealed chaos
-        // seed 10, nine strangers, at the verifier). Any [escrowThreshold]
-        // of them that agree are the secret, so each pair the new piece
-        // makes is tried in turn, each against the seat's key — the pairs
-        // among the rest were tried as they came.
+        // released something else. Any [escrowThreshold] of them that
+        // agree are the secret, so each pair the new piece makes is
+        // tried in turn, each against the seat's key — the pairs among
+        // the rest were tried as they came.
         if (!fresh || escrowThreshold != 2) return true;
         final mine = custodianKeys.indexOf(holder) + 1;
         if (mine < 1) return true;

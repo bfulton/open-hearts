@@ -17,7 +17,6 @@ import 'src/deal_binding.dart' if (dart.library.js_interop) 'src/deal_web.dart' 
 export 'src/session.dart';
 export 'src/work.dart';
 
-
 const deckSize = 52;
 const pointBytes = 32;
 const scalarBytes = 32;
@@ -29,13 +28,13 @@ const sealedBytes = 64;
 const sealProofBytes = 160;
 
 /// How many custodians have to answer to open a bot seat: any two of
-/// the jury, where it used to be one from each of two fixed halves.
+/// the jury.
 ///
 /// Two is the least that is still a secret — one juror alone is
 /// nothing, which is the whole point of a bot seat's hand being
 /// hidden from a player with one juror's help (docs/04-live-play.md).
-/// Above two it buys secrecy against a wider ring at the cost of the
-/// availability the threshold was for.
+/// Above two buys secrecy against a wider ring at the cost of
+/// availability.
 const escrowThreshold = 2;
 
 /// One argument for a batch of reveal tokens, however many
@@ -80,8 +79,8 @@ abstract class DealCrypto {
   /// bare tokens in the same order and then [batchProofBytes].
   ///
   /// A proof is three times a token, and the proofs beside a seat's
-  /// thirty-nine tokens at the deal all said the same thing about the
-  /// same key. One batch says it once — the tokens weighted by
+  /// thirty-nine tokens at the deal would all say the same thing about
+  /// the same key. One batch says it once — the tokens weighted by
   /// coefficients nobody chose, argued about together — and a seat
   /// that gets any one of them wrong fails the batch.
   Uint8List revealTokens(Uint8List secret, Uint8List cards, Uint8List seed);
@@ -89,7 +88,7 @@ abstract class DealCrypto {
 
   /// A seat's key split into [shares] pieces of [scalarBytes] each,
   /// so that a departed seat's cards can be opened without anyone
-  /// putting the key back together (docs/03-fair-deal.md, "Escrow").
+  /// putting the key back together (docs/03-fair-deal.md).
   /// [shareKey] of each aggregates to the seat's own public key, which
   /// is what says a split is a split of *that* key, and no smaller set
   /// of them is anything.
@@ -122,13 +121,12 @@ abstract class DealCrypto {
   /// in index order, [scalarBytes] each; a share's index is its place
   /// in the list counted from one, which is what [lagrange] takes.
   ///
-  /// What it buys is availability. "Every share of a side" is the
-  /// worst shape an escrow can have, and a hand's rests on the jurors
-  /// it was sealed to still being reachable when a bot seat has to be
-  /// opened (docs/04-live-play.md, "The sizing"). Any two of the jury
-  /// is the same secrecy — one holder alone is nothing — with room to
-  /// lose people. The key is still never anywhere: a share's token is
-  /// scaled by its public coefficient and the scaled tokens add.
+  /// What it buys is availability: a hand's escrow rests on the
+  /// jurors it was sealed to still being reachable when a bot seat has
+  /// to be opened (docs/04-live-play.md). Any two of the jury keeps one
+  /// holder alone from being anything, with room to lose people. The
+  /// key is still never anywhere: a share's token is scaled by its
+  /// public coefficient and the scaled tokens add.
   Uint8List splitThreshold(Uint8List secret, {required int n, required int t, required Uint8List seed});
 
   /// What the share at [index] is worth among the shares [have] holds,
@@ -184,7 +182,7 @@ abstract class DealCrypto {
 
   /// Whether a sealed token is the one [pkOwner] owes for [masked],
   /// sealed to [pkTo]. Checked by every seat, not only the one it is
-  /// for: that is what stops a passer sending three cards the receiver
+  /// for: that is what catches a passer sending cards the receiver
   /// can never open (docs/03-fair-deal.md).
   bool verifySeal(Uint8List pkOwner, Uint8List pkTo, Uint8List masked, Uint8List sealed);
 

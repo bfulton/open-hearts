@@ -47,12 +47,11 @@ void main() {
     }
   });
 
-  test('a record from before the deal seed replays exactly as it always did', () {
-    // Made and replayed by the engine as it was before there was a deal
-    // seed, the way the app made them: the bots drawn by Random from
-    // the seed, one game to fifty and one to a hundred. Records like
-    // these are on players' devices and pasted into issues; the log is
-    // every trick, every pass and every hand's score.
+  test('an oh1 record replays exactly as pinned', () {
+    // Int-seeded records with the bots drawn by Random from the seed,
+    // one game to fifty and one to a hundred. Records like these are on
+    // players' devices and pasted into issues; the log is every trick,
+    // every pass and every hand's score.
     _expectReplay(
       'oh1:1733949467:Shah Jahan,Catherine,Westley:KS.10C.9C|10C.AS.QH|AS.KC.QC|-:'
       'KC,2D,6S,4D,8S,AS,2H,6D,JH,8D,KH,JD,AD,AD,4S,AH,6D,5S,3H,8H,8S,9D,6H,4H,QD,8D,2C,7S,4C,QS,6H,3H,4D,2H,6D,8D,9D,JD,QD,AC,'
@@ -111,8 +110,8 @@ void main() {
     expect(back, isNotNull);
     expect(back!.target, longGameScore);
     expect(back.replay().game.target, longGameScore);
-    // A game to fifty is the line it always was, and one from before
-    // there was anything to say replays to fifty.
+    // A game to fifty writes no target, and a record without one
+    // replays to fifty.
     expect(SoloRecord(seed: 42, personas: ['', 'Romeo', 'Juliet', 'Cyrano']).encode(), endsWith(':'));
     expect(SoloRecord.parse('oh1:7:Romeo,Juliet,Cyrano:2C.3C.4C:')!.target, gameOverScore);
   });

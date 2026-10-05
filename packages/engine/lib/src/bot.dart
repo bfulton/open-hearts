@@ -1,11 +1,11 @@
 /// The computer opponents.
 ///
 /// A heuristic player, not a search: every decision is a named rule you
-/// can read, argue with, and unit-test. That is the point for now — a
-/// bot whose mistakes are legible is worth more during development than
-/// a stronger one whose mistakes are not. The interface is deliberately
-/// narrow ([choosePass] and [chooseCard] over a [BotView]) so a search
-/// player can replace the body later without touching the game or the UI.
+/// can read, argue with, and unit-test — a bot whose mistakes are
+/// legible is worth more than a stronger one whose mistakes are not.
+/// The interface is deliberately narrow ([choosePass] and [chooseCard]
+/// over a [BotView]), so the body can change without touching the game
+/// or the UI.
 ///
 /// What it knows is exactly what a seated human knows: its own hand, the
 /// cards on the table, and which cards have already been played. It does
@@ -28,8 +28,7 @@ import 'rules.dart';
 /// event carries this number, and a client whose number differs does
 /// not sit down. Bump it whenever a change to bot.dart, persona.dart
 /// or the pass and play rules they read could change a single card —
-/// or to what a table is: 6 is the sealed deal (docs/03), which an
-/// older build cannot take part in.
+/// or to what a table is (6: the sealed deal, docs/03-fair-deal.md).
 const botPolicyVersion = 6;
 
 /// The public information a bot decides from.
@@ -146,7 +145,6 @@ class Bot {
   }
 
   /// How much a card wants to leave the hand. Higher is more urgent.
-  /// Whole numbers throughout, so the circuit can carry them.
   int _passDanger(Card card, List<Card> hand) {
     // A first game passes its three highest cards and nothing cleverer.
     if (!persona.passesShape) return card.rank.value;
@@ -319,11 +317,10 @@ class Bot {
   /// spades it takes to try is [Persona.flushMinSmallSpades]. Otherwise
   /// the lowest card in the hand, whatever its suit, a heart included
   /// once hearts may be led: the one lead that cannot take the trick
-  /// unless everyone is void. It measured two points of tables better
-  /// than the lowest card of the shortest suit (the old default, chosen
-  /// for the void it works towards), three and a half better than the
-  /// longest suit's low card, and five better than the lowest card that
-  /// is not a heart (tool/knobs.dart, before those settings went).
+  /// unless everyone is void. It measures two points of tables better
+  /// than the lowest card of the shortest suit, three and a half better
+  /// than the longest suit's low card, and five better than the lowest
+  /// card that is not a heart.
   Card _lead(BotView view, List<Card> legal) {
     if (!view.queenGone) {
       final spades = legal.where((c) => c.suit == Suit.spades).toList();
@@ -424,10 +421,9 @@ class Bot {
 
     final hearts = legal.where((c) => c.suit == Suit.hearts).toList();
     // Any heart, from the top: a point handed to whoever takes the trick
-    // is worth more than a high side-suit card kept. This used to be a
-    // threshold a persona could set — throw only a heart this high —
-    // and every setting of it measured worse than none, by three points
-    // of tables at the old default of ten (tool/knobs.dart).
+    // is worth more than a high side-suit card kept. A threshold — throw
+    // only a heart this high — measures worse than none at every
+    // setting.
     if (persona.dumpsHearts && hearts.isNotEmpty) return _highest(hearts);
 
     final side = legal

@@ -20,8 +20,7 @@ library;
 /// wide margin, and every persona does it — see [Persona.shortSuitWeight].)
 ///
 /// Each style is a few numbers the pass scoring reads; the getters on
-/// [Persona] spell them out so the bot and its circuit read the same
-/// ones.
+/// [Persona] spell them out.
 enum PassStyle {
   /// The queen goes unless five spades stand behind her, and then she
   /// is worth about as much as a middling heart.
@@ -37,9 +36,8 @@ enum PassStyle {
 
 /// How long a bot appears to think. Rhythm, not strategy: the engine
 /// decides instantly and the table waits this long before showing it.
-/// How long a bot pretends to think. A person's own pace is a
-/// different thing entirely and lives in packages/table (pace.dart):
-/// that one is measured, this one is manners.
+/// A person's own pace is a different thing and lives in packages/table
+/// (pace.dart): that one is measured, this one is manners.
 enum BotPace {
   quick(400, 700),
   measured(600, 1100),
@@ -149,9 +147,9 @@ class Persona {
   /// games to fifty. The whole ladder spans about 170 points: a first
   /// game finishes ahead of the character itself in a little over one
   /// pair in four. The middle half of the characters at one rung sit
-  /// within about thirty points of each other. A game half as long is a
-  /// noisier one, which is what closed the ladder up from the 240
-  /// points it spanned over games to a hundred.
+  /// within about thirty points of each other. Shorter games are
+  /// noisier, which closes the ladder up: over games to a hundred it
+  /// spans about 240.
   static const priors = [1329, 1353, 1365, 1387, 1415, 1431, 1469, 1478, 1500];
 
   /// One line, in the table's voice, for the seat and the lobby.

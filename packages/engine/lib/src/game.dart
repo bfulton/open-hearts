@@ -53,9 +53,8 @@ const seatCount = 4;
 
 class HeartsGame {
   /// A game dealt from [dealSeed] — or, given an int [seed] instead, by
-  /// [Random] from it, the way every game was before there was a deal
-  /// seed: what a record from then replays, and what a test or a tool
-  /// asks for when it wants a game it can name by a number. Given
+  /// [Random] from it: what an `oh1` record replays, and what a test or
+  /// a tool asks for when it wants a game it can name by a number. Given
   /// neither, a game that deals itself draws a deal seed of its own.
   HeartsGame({int? seed, DealSeed? dealSeed, this.sealed = false, this.target = gameOverScore})
       : dealSeed = dealSeed ?? (seed == null && !sealed ? DealSeed.draw() : null),

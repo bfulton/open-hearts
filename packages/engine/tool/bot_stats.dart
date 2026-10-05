@@ -19,7 +19,6 @@ library;
 // A benchmark's entire output is its printing.
 // ignore_for_file: avoid_print
 
-
 import 'package:engine/engine.dart';
 
 import 'args.dart';

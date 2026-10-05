@@ -4,8 +4,8 @@
 ///
 /// The record is the line the app's Copy button produces; it holds the
 /// seed, the bots, and the human's own choices, and everything else is
-/// recomputed, from each seat's cards as dealt to every trick. A record
-/// from before the deal seed, `oh1:…`, replays the same way. Moon hands
+/// recomputed, from each seat's cards as dealt to every trick. An
+/// `oh1:…` record, seeded by a small int, replays the same way. Moon hands
 /// are flagged, since they are the usual reason to look.
 library;
 

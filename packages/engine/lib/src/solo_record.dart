@@ -9,9 +9,8 @@
 /// against it.
 ///
 /// Two versions, by the seed. `oh2` carries a [DealSeed], 256 bits as 64
-/// hex digits: every game the app has dealt since there was one. `oh1`
-/// carries an int for `dart:math`'s `Random`, which is how every game
-/// before that was dealt, and replays as it always did.
+/// hex digits: what the app deals from. `oh1` carries an int for
+/// `dart:math`'s `Random`, and replays from it.
 library;
 
 import 'bot.dart';
@@ -45,9 +44,8 @@ class SoloRecord {
   /// The seed an `oh2` game was dealt from; null in `oh1`.
   final DealSeed? dealSeed;
 
-  /// The score the game ran to. A game to fifty leaves the line it
-  /// always did — the field is only written when the table asked for
-  /// another target — so every record ever copied out still replays.
+  /// The score the game ran to. The field is only written when the
+  /// table asked for another target, so a game to fifty has no field.
   final int target;
 
   /// Persona name per seat; the human's seat holds an empty string.

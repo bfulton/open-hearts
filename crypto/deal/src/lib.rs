@@ -275,10 +275,9 @@ pub fn verify_token(pk: &[u8], masked: &[u8], token: &[u8]) -> bool {
 
 /// Tokens for many cards at once, with one argument for the lot.
 ///
-/// A token is 32 bytes and the proof beside it is 96, so a seat
-/// opening the other seats' thirty-nine positions at the deal sent
-/// three quarters proof — and every one of those proofs said the same
-/// thing about the same key. This says it once.
+/// A token is 32 bytes and the proof beside it is 96, and every one
+/// of those proofs says the same thing about the same key. A batch
+/// says it once.
 ///
 /// The standard batch: take public coefficients ρ_i that the prover
 /// cannot choose, from a hash of the whole statement, and argue about
@@ -391,21 +390,16 @@ fn batch_challenge(pk: &Affine, h: &Affine, b: &Affine, a1: &Affine, a2: &Affine
     Some(Scalar::from_le_bytes_mod_order(&Blake2b::digest(&bytes)))
 }
 
-/// Opens a masked card with every seat's token (each checked against
-/// its key): the card's index, 0 to 51, or none if a token is bad or
-/// the result is no card.
-/// A seat's key split in two, so that its cards can be opened without
-/// anyone putting the key back together (docs/04-live-play.md,
-/// "Playing a seat nobody holds"). The shares add to the key behind
-/// [secret]: neither alone is anything, and [share_key] of the two
-/// aggregates to the seat's own public key, which is what says a
-/// split is a split of *that* key.
+/// A seat's key split into additive shares, so that its cards can be
+/// opened without anyone putting the key back together
+/// (docs/04-live-play.md). The shares add to the key behind [secret]:
+/// no smaller set is anything, and [share_key] of them aggregates to
+/// the seat's own public key, which is what says a split is a split
+/// of *that* key.
 ///
-/// The escrow doc 03 describes splits the secret's bytes, which is
-/// enough to rebuild it and no use for anything else. This splits the
-/// key itself, in the field it lives in, and that is the difference
-/// between a departed seat's hand being opened to whoever rebuilds it
-/// and being opened to nobody.
+/// It splits the key itself, in the field it lives in, rather than the
+/// secret's bytes, so a departed seat's cards open position by
+/// position and its key is never rebuilt.
 pub fn split(secret: &[u8], shares: usize, seed: &[u8], out: &mut [u8]) -> Option<usize> {
     if shares < 2 || out.len() < shares * SCALAR {
         return None;
@@ -550,12 +544,10 @@ pub fn bytes_sum(parts: &[u8], len: usize, out: &mut [u8]) -> Option<usize> {
 /// [t] of which rebuild it — where [split] makes shares that are all
 /// needed at once.
 ///
-/// Why a threshold at all: a hand's escrow rests on the jurors it was
-/// sealed to still being reachable when a bot seat has to be opened,
-/// and "every share of a side" is the worst shape availability can
-/// have (docs/04-live-play.md, "The sizing"). "Any two of the jury"
-/// is the same secrecy — one holder alone is nothing — with room to
-/// lose people.
+/// A threshold because a hand's escrow rests on the jurors it was
+/// sealed to still being reachable when a bot seat has to be opened
+/// (docs/04-live-play.md). "Any two of the jury" keeps one holder
+/// alone from being anything, with room to lose people.
 ///
 /// The shares are f(1)..f(n) of a polynomial of degree t−1 whose
 /// constant term is the key, drawn from [seed]. Written in index
@@ -564,8 +556,7 @@ pub fn bytes_sum(parts: &[u8], len: usize, out: &mut [u8]) -> Option<usize> {
 ///
 /// Nothing here ever puts the key back together. A share's token is
 /// scaled by its (public) Lagrange coefficient and the scaled tokens
-/// *add*, exactly as the two halves of [split] add — which is the
-/// property the additive split was chosen for, and it survives.
+/// *add*, exactly as the shares of [split] add.
 pub fn split_threshold(secret: &[u8], n: usize, t: usize, seed: &[u8], out: &mut [u8]) -> Option<usize> {
     if t < 2 || n < t || n > 255 || out.len() < n * SCALAR {
         return None;
@@ -708,11 +699,11 @@ pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8]) -> Option<usize> {
 /// token. Writes [SEALED] bytes of ciphertext and then [SEAL_PROOF] of
 /// argument.
 ///
-/// Sealing hides the token from everyone but the seat it is for, which
-/// is the point, and which used to mean that nobody else could tell an
-/// honest seal from a bad one: a passer could send three cards the
-/// receiver would never open, and no third party could say whose fault
-/// it was (docs/03-fair-deal.md). The argument says, to anybody, that
+/// Sealing hides the token from everyone but the seat it is for, so
+/// without an argument nobody else could tell an honest seal from a
+/// bad one: a passer could send three cards the receiver would never
+/// open, and no third party could say whose fault it was
+/// (docs/03-fair-deal.md). The argument says, to anybody, that
 /// what is inside the ciphertext is the share the owner's key owes for
 /// that card — without saying what the share is.
 ///
@@ -1184,10 +1175,9 @@ mod tests {
         open(&secrets[2], &sealed, &mut wrong).unwrap();
         assert_ne!(wrong, token[..POINT]);
 
-        // And anybody can check that it is, without opening it. This
-        // is what closes the hole doc 03 left: a passer who sealed the
-        // receiver something else used to be indistinguishable from an
-        // honest one to every third party.
+        // And anybody can check that it is, without opening it, so a
+        // passer who seals the receiver something else is caught by
+        // every third party.
         assert!(verify_seal(&pks[..POINT], &pks[POINT..2 * POINT], masked, &sealed));
         assert!(!verify_seal(&pks[2 * POINT..3 * POINT], &pks[POINT..2 * POINT], masked, &sealed), "not another seat's token");
         assert!(!verify_seal(&pks[..POINT], &pks[2 * POINT..3 * POINT], masked, &sealed), "not sealed to another seat");
@@ -1222,6 +1212,7 @@ mod tests {
         assert_eq!(ab, ba);
         assert_ne!(ab, ac);
     }
+
     /// A token sealed to a seat opens from the shares of that seat's
     /// key too — which it has to, since a pass to a seat that then
     /// leaves is a ciphertext only that seat's key could open, and the
@@ -1299,9 +1290,7 @@ mod tests {
 
     /// A departed seat's card, opened by the holders of its key's two
     /// shares — without either of them, or anybody, ever holding the
-    /// key. This is what lets doc 04's computation mean anything: if
-    /// opening a position took the whole key back, the survivors would
-    /// learn the whole hand and there would be nothing left to hide.
+    /// key.
     #[test]
     fn a_split_key_opens_a_card_without_being_put_back_together() {
         let secrets: Vec<[u8; 32]> = (1..=4).map(seed).collect();
@@ -1371,7 +1360,6 @@ mod tests {
         short_pks.extend_from_slice(&pks[POINT..]);
         assert_eq!(unmask(&short_pks, &bare(&short), masked), None, "one share opens nothing");
     }
-
 }
 
 #[cfg(test)]
@@ -1397,10 +1385,9 @@ mod seal_tests {
 mod transcript_tests {
     use super::*;
 
-    /// The reference crate hashed a projective point's Jacobian
+    /// The reference crate hashes a projective point's Jacobian
     /// coordinates into its transcripts, which a serialisation round
-    /// trip does not preserve; the vendored copy normalises. This is
-    /// the regression test for that.
+    /// trip does not preserve; the vendored copy normalises them.
     #[test]
     fn a_key_proof_survives_its_bytes() {
         let f = fixed();
@@ -1434,9 +1421,6 @@ mod wire {
         s
     }
 
-    /// What the deck's m x n factorisation costs on the wire and in
-    /// the browser: the argument's bytes, and the time to make and
-    /// check one. Run with --nocapture, changing M and N above.
     /// The field bytes live in, on its own: that gf_mul and gf_inv are
     /// the field they claim to be, before anything is built on them.
     #[test]
@@ -1649,6 +1633,9 @@ mod wire {
         assert_eq!(split_threshold(&secrets[0], 2, 3, &seed(81), &mut shares), None, "nor more than there are shares");
     }
 
+    /// What the deck's m x n factorisation costs on the wire: the
+    /// argument's bytes, and the time to make and check one. Run with
+    /// --nocapture, changing M and N above.
     #[test]
     fn shuffle_argument_size() {
         let secrets: Vec<[u8; 32]> = (1..=4).map(seed).collect();
