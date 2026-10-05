@@ -67,9 +67,10 @@ export const pages = {
       // No Stripe on preview: the shop says it is not open yet.
       secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_TURN_API_TOKEN'],
       // Its own store, so a preview never writes production's rows; and
-      // no HOUSEHOLD, whose object reads production's store.
+      // no HOUSEHOLD, whose object reads production's store. Its own
+      // bucket too: a game played on a preview is no game of record.
       kv: { OH_STORE: 'open-hearts-store-preview' },
-      r2: { OH_RECORDS: 'open-hearts-records' },
+      r2: { OH_RECORDS: 'open-hearts-records-preview' },
       durableObjects: {},
       analyticsEngine: {},
     },
@@ -84,6 +85,13 @@ export const kv = ['open-hearts-store', 'open-hearts-store-preview'];
 export const r2 = [
   {
     name: 'open-hearts-records',
+    location: 'ENAM',
+    storageClass: 'Standard',
+    publicDevUrl: false,
+    customDomains: [],
+  },
+  {
+    name: 'open-hearts-records-preview',
     location: 'ENAM',
     storageClass: 'Standard',
     publicDevUrl: false,
