@@ -246,10 +246,9 @@ void main() {
     final honest = t.clients.where((c) => c != sealer).toList();
     t.start();
 
-    // Sealing three cards to nothing used to be nobody's business but
-    // the receiver's: only it could tell, and it had no way to say so
-    // that anyone could check. Every seat checks the argument beside a
-    // seal now (docs/03-fair-deal.md), so the pass is refused where it
+    // Sealing three cards to nothing is caught by every seat, not only
+    // the receiver: every seat checks the argument beside a seal
+    // (docs/03-fair-deal.md), so the pass is refused where it
     // is made — the seat is left at its own turn with nothing settled,
     // and the clock takes it there.
     expect(t.clock.runUntil(() => t.clients.skip(1).every((c) => c.holders[0] is BotSeat), limitMs: 300000), isTrue,

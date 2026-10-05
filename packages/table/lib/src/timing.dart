@@ -1,14 +1,13 @@
 /// The table's clocks: the deadlines and silences after which a seat
 /// proposes a transition the table settles — a boot, a held bot seat
-/// given to the escrow, the game ended for a lost quorum, a hand dealt
-/// with its bot seats in the open.
+/// given to the escrow, the game ended for a lost quorum.
 ///
 /// Every seat has to agree on them. A seat whose grace is shorter than
 /// the others' proposes boots the others will not back, and one whose
 /// jury deadline is longer backs nothing the others propose; either way
 /// the table is held up on a question its seats answer differently. So
 /// a table's timing is chosen once, by whoever starts it, from that
-/// device's remote config (docs/06-service.md, "Remote config"), and
+/// device's remote config (docs/06-service.md), and
 /// rides in the start event everyone signs, as the target does
 /// ([TableSpec.timing]).
 ///
@@ -16,7 +15,7 @@
 /// heartbeat, a carry, a top-up, how often a jury is proposed — and the
 /// proposer's own choice of candidates for a jury: none of it decides
 /// a state, and two seats pacing differently still agree about where
-/// the table is (docs/07-states.md, "The clocks that stay").
+/// the table is (docs/07-states.md).
 library;
 
 import 'time_bank.dart';
@@ -31,8 +30,8 @@ class TableTiming {
     this.jurorSilenceMs = 30000,
   });
 
-  /// The timing every table had before a table could have its own, and
-  /// still has unless the device that starts it is told otherwise.
+  /// The timing a table has unless the device that starts it is told
+  /// otherwise.
   static const standard = TableTiming();
 
   /// A person's clock: a grace per decision, a bank per hand
@@ -46,17 +45,11 @@ class TableTiming {
   /// what a person's seat gets instead.
   ///
   /// Fifteen seconds, measured on a slow machine rather than a fast
-  /// one. It was three: over six seeded hands a held bot seat answered
-  /// in 69 ms at the middle and 155 ms at the worst over a data
-  /// channel, 365 ms and 787 ms with a relay's latency under it, and
-  /// three was about four times the worst. On two cores shared by four
-  /// browsers — a hosted runner, nearer a cheap phone than a desk is —
-  /// a held pass took 4.3 s at the ninety-fifth percentile and a held
-  /// card 8.7 at the worst, and a juror that was working missed the
-  /// three in five runs of six there: its seat went to the escrow and
-  /// it was left out of the next draw. Fifteen is three and a half
-  /// times that 4.3, as a deal step's allowance is of its own, and 1.7
-  /// times the worst card.
+  /// one: on two cores shared by four browsers — nearer a cheap phone
+  /// than a desk is — a held pass takes 4.3 s at the ninety-fifth
+  /// percentile and a held card 8.7 at the worst. Fifteen is three and
+  /// a half times that 4.3, as a deal step's allowance is of its own,
+  /// and 1.7 times the worst card.
   final int botActsMs;
 
   /// And its deal steps. A deal step is slower and waits on more — a
@@ -68,14 +61,11 @@ class TableTiming {
   /// a seat given up with deal steps still to take gives the hand up
   /// undealt.
   ///
-  /// Forty seconds, measured on a slow machine rather than a fast one.
-  /// It was ten, three and a half times that 2.9 s. On two cores
-  /// shared by four browsers held seats' deal steps took 3.9 s at the
-  /// middle, 11.7 at the ninety-fifth percentile and 24.9 at the worst
-  /// of 187, one in eleven of them past ten; and a working juror that
-  /// missed the ten cost its table the whole hand, twice in four runs.
-  /// Forty is the same three and a half times, now of the slow
-  /// machine's 11.7, and 1.6 times the worst it did. A juror gone
+  /// Forty seconds, measured on a slow machine rather than a fast one:
+  /// on two cores shared by four browsers held seats' deal steps take
+  /// 3.9 s at the middle, 11.7 at the ninety-fifth percentile and 24.9
+  /// at the worst. Forty is three and a half times that 11.7, and 1.6
+  /// times the worst. A juror gone
   /// quiet is still let go at [jurorSilenceMs]; this is only how long
   /// one still heard from may sit on a step.
   final int botDealsMs;
@@ -83,18 +73,16 @@ class TableTiming {
   /// How long a table stopped at a seat nobody left can open waits,
   /// saying so, before the game ends. Those who could open it have not
   /// been heard from for [jurorSilenceMs] by then, so the game ends no
-  /// sooner than fifty seconds after the last of them was. It was two
-  /// minutes, the silence a person is given, and that was two minutes
-  /// of a stopped table in front of people who could do nothing about
-  /// it.
+  /// sooner than fifty seconds after the last of them was. Shorter than
+  /// the silence a person is given: it is time spent at a stopped table
+  /// by people who can do nothing about it.
   final int quorumLostMs;
 
   /// How long a person may be silent before a peer boots them at their
-  /// turn without waiting on their clock (docs/04-live-play.md,
-  /// "Leaving, through three doors"). Two minutes, longer than a bank a
-  /// stalled seat empties in under one; it was thirty seconds, until a
-  /// phone that switched apps for a moment came back to a bot in its
-  /// seat.
+  /// turn without waiting on their clock (docs/04-live-play.md). Two
+  /// minutes, longer than a bank a stalled seat empties in under one,
+  /// so that a phone that switches apps for a moment does not come back
+  /// to a bot in its seat.
   final int silenceMs;
 
   /// How long a juror may be silent before the table stops counting it

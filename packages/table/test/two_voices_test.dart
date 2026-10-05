@@ -12,10 +12,7 @@
 /// the jury breaks that, and the table must see that it has to rather
 /// than sit at the card for good.
 ///
-/// Found by `tool/explore.dart` in an earlier shape — the juror and a
-/// custodian each saying the card with nothing on the record, which
-/// putting the escrow there has closed. Pinned here in the shape still
-/// open, by holding the juror's card back until a custodian has said
+/// Set up by holding the juror's card back until a custodian has said
 /// its own and letting each person hear a different one first.
 library;
 

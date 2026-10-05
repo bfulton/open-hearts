@@ -13,32 +13,14 @@
 ///
 ///  - a juror will not publish its seat's keys until the record has
 ///    said which draw the deal is sealed to — the first person's keys,
-///    settled (`_checkSealed`). It used to wait two seconds for the
-///    draw to stand still instead (`_juryFirmMs`); the record costs
-///    a little over a tenth of a second more to the first card, 6.77 s
-///    against 6.60 at a jury of ten over twenty seeds;
+///    settled (`_checkSealed`);
 ///  - a hand with bot seats waits for a jury big enough to hold them
-///    (`_startDealWhenReady`, with no time limit), which on a table with jurors about
-///    is over as soon as the draw carries.
+///    (`_startDealWhenReady`, with no time limit), which on a table
+///    with jurors about is over as soon as the draw carries.
 ///
 /// The simulator's clock is virtual, so these are the protocol's own
 /// waits and latencies with no machine speed in them: the same seed
 /// gives the same milliseconds every time.
-///
-/// What it found, at a jury of ten and twenty seeds: neither of those
-/// two waits was what the time went on. The deal took 6.55 s when
-/// nothing went missing and 15.41 s — fourteen hands in twenty —
-/// when a juror was sent a bot seat's keys a moment before the jury
-/// that vouches for them, refused the keys for that reason, and threw
-/// them away. From there the only way back was somebody saying them
-/// again, which the carry window held off for eight seconds. Keeping
-/// the refused step and looking at it again when the jury lands
-/// (packages/table, client.dart, `_onAction`) took every one of the
-/// twenty to 6.6 s and, averaged over eight seeded hands, took
-/// between a fifth and nearly half off the wire as well
-/// (`tool/wire_in_sim.dart --seeds 8`): a peer that keeps what it was
-/// sent does not have to be carried, and carrying is the expensive
-/// thing.
 library;
 
 // A measurement's output is its log.

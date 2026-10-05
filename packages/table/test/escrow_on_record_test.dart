@@ -5,12 +5,8 @@
 /// the escrow at that turn, and the claim is carried the way a boot is:
 /// by a majority of them, or by the jury where they split. From there
 /// to the end of the hand the seat is played by the first of the
-/// escrow's jurors still about (docs/07-states.md, "Next").
-///
-/// It used to be each side's own judgement, from its own clocks, with
-/// nothing in the record: two sides could give the seat up at
-/// different turns, or one could and the other not, and nothing
-/// reconciled them.
+/// escrow's jurors still about (docs/07-states.md). Every side gives
+/// the seat up at the same turn, because the record says so.
 library;
 
 import 'package:deal/deal.dart';
@@ -391,12 +387,10 @@ void main() {
   // The same, with the juror's card reaching the jury and nobody at the
   // table. The escrow keeps a move said at its turn — a juror of the
   // hand's is good after it — so the custodian whose place it is to
-  // say the seat's move held one already, and said nothing; its author
-  // was out of earshot of the table, and a juror says only its own
-  // moves again. The hand stopped there for good (quiet_holder_test,
-  // once the jury's deal ran a little sooner). Now the custodian that
-  // speaks for the seat says the move it holds again, as the seat's
-  // juror would have.
+  // say the seat's move holds one already; its author is out of
+  // earshot of the table, and a juror says only its own moves again.
+  // So the custodian that speaks for the seat says the move it holds
+  // again, as the seat's juror would have.
   test('a held seat\'s card that reached only the jury is said to the table by the custodian speaking for the seat', () {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 2, target: 1);
     t.start();

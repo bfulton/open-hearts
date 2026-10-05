@@ -34,13 +34,11 @@ Set<R>? readByFrom<K, R>(Map<K, ({Set<R> reads, int at})> reads, int nowMs, int 
 /// null, nobody heard from yet), and when what they read is up on none
 /// of this writer's relays, the event goes to every relay that is up.
 ///
-/// The polarity matters. Narrowing by assumption is what silenced a
-/// live table: before any heartbeat has crossed, every client picked
-/// one relay of its own, and two clients that picked differently — a
-/// phone on the public relays, a client reading them through a bridge
-/// under another name — never heard each other, so the very heartbeats
-/// that would have told each where to write could not get through. A
-/// write that floods until it is told otherwise cannot fail that way.
+/// The polarity matters. Narrowing by assumption fails before any
+/// heartbeat has crossed: two clients that each pick a relay of their
+/// own, and pick differently, never hear each other, so the very
+/// heartbeats that would tell each where to write cannot get through.
+/// A write that floods until it is told otherwise cannot fail that way.
 bool floodWrite<R>(Iterable<R> up, Set<R>? readBy, {required bool everywhere}) {
   if (everywhere) return true;
   final upList = up is List<R> ? up : up.toList();

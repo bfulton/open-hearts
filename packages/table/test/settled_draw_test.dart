@@ -2,7 +2,7 @@
 ///
 /// A hand's escrow rests on the jurors it drew still being there when
 /// a bot seat has to be opened, and the lever on that is who is drawn
-/// rather than how many (docs/04-live-play.md, "The sizing"). A
+/// rather than how many (docs/04-live-play.md). A
 /// proposer may narrow its own candidates as it likes, because what
 /// the table checks of a proposal is that each juror is somebody *it*
 /// has seen lately, over a far wider window.

@@ -91,9 +91,6 @@ bool _sameList(List<Object?> a, List<Object?> b) {
   return true;
 }
 
-/// Walks [seed] to its end — sealed, with the verifiable deal run for
-/// real, when [crypto] is given — and returns the first invariant it
-/// broke, with the faults that led there, or null when every one held.
 /// Whether any two sides still following the table read a different
 /// juror for a bot seat, once everything has arrived.
 ///
@@ -140,6 +137,10 @@ String? disagreed(SimTable t) {
   return null;
 }
 
+/// Walks [seed] to its end — sealed, with the verifiable deal run for
+/// real, when [crypto] is given — and returns the first invariant it
+/// broke, with the faults that led there, or null when every one held.
+///
 /// [jurors] strangers to draw from, and with [sweep] each lets go of
 /// the table once it has served, as the duty does ([SimTable]); its
 /// clients' traces go to [jurorLog]. With [workers], every device
@@ -168,7 +169,7 @@ String? walkChaos(int seed,
   // And of those, the ones [c] can reach just now. A juror across a
   // partition is up and can do nothing for this side: nothing it says
   // arrives, and the side ends the game on exactly that silence, which
-  // it cannot tell from a crash (doc 04, "When quorum is lost anyway").
+  // it cannot tell from a crash (docs/04-live-play.md).
   Set<PublicKey> reachableFrom(TableClient c) =>
       {for (final k in upNow()) if (t.net.canReach(c.signer.publicKey, k)) k};
 
@@ -186,8 +187,9 @@ String? walkChaos(int seed,
   // still up can open: a held seat with its own juror not among them
   // and fewer of the jurors holding a piece of it than it takes to
   // rebuild it; a departed person's with none of the jury the deal
-  // was sealed to. The table stopped there says so (doc 03), no juror
-  // up could end it, and after long enough the game ends (doc 04):
+  // was sealed to. The table stopped there says so
+  // (docs/03-fair-deal.md), no juror up could end it, and after long
+  // enough the game ends (docs/04-live-play.md):
   // at a play, waiting for the jury; at the audit or a departed
   // seat's hand, stalled opening the hand. Judged here from who
   // really is up, not from what the table believes.
@@ -206,12 +208,12 @@ String? walkChaos(int seed,
   // Stopped where nobody really up could move the table: a seat nobody
   // up could open, or a turn put to the jury — split, or open while
   // the table waits for want of a majority — with none of the hand's
-  // jurors up to rule on it. The game ends there (doc 04), and only
-  // there.
+  // jurors up to rule on it. The game ends there
+  // (docs/04-live-play.md), and only there.
   // Waiting for a jury that can hold the bot seats, with too few
   // jurors up and in reach to make one: the hand is never dealt with
   // its bots in the open, so the table waits and says so, and only a
-  // juror coming up moves it (doc 04). With enough of them up, the
+  // juror coming up moves it (docs/04-live-play.md). With enough of them up, the
   // wait is a fault.
   bool starved(TableClient c) => c.shortOfJurors && reachableFrom(c).length < juryToHoldBots;
 
@@ -307,7 +309,7 @@ String? walkChaos(int seed,
     // two records, not a message in flight (docs/07-states.md). Not a
     // side whose game has ended for a lost quorum: it says nothing new,
     // and a claim it carried just before is one the others may never
-    // hear — over a game that is over, and unscored (sealed seed 2).
+    // hear — over a game that is over, and unscored.
     final playing = [
       for (final p in t.people)
         if (!p.gone && p.client.failure == null) p.client,
@@ -327,12 +329,10 @@ String? walkChaos(int seed,
     // And the way each person went, on every record that has it — the
     // jurors' beside the people's, those that have stopped serving and
     // those whose game ended for a lost quorum among them, since a
-    // record holds only what carried. A leave is carried as a boot is
-    // now, so a seat left on one record and booted on another is two
+    // record holds only what carried. A leave is carried as a boot is,
+    // so a seat left on one record and booted on another is two
     // majorities. The record's key for a removal names its turn and
-    // seat and not the door, and records compared alike with a leave on
-    // one and a boot on the other; the jurors kept theirs for as long as
-    // they served (chaos seed 43).
+    // seat and not the door, so the door is compared here.
     final records = [
       for (final p in t.people) p.client,
       for (final j in t.jurors)

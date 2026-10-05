@@ -1,16 +1,11 @@
 /// The leave on the record: its author's own word, carried as a boot is.
 ///
-/// A leave needed nobody's agreement, and took effect wherever it
-/// arrived before the seat was removed some other way. Where it crossed
-/// a boot — the leave reaching some sides only after the rest had
-/// booted the seat for its silence — a side that had booted the seat
-/// passed over the leave and one that had the leave passed over the
-/// boot, and the people and the jurors kept different exits for as long
-/// as they served (chaos seed 43). Now the people back a leave as it
-/// reaches them, a majority of them at its turn carries it with the
-/// leaver's own signature among them, and each person backs one way
-/// out of a seat: a leave and a boot cannot both carry
-/// (docs/07-states.md, "The leave on the record").
+/// Where a leave crosses a boot — the leave reaching some sides only
+/// after the rest have booted the seat for its silence — every record
+/// has to say the same exit. So the people back a leave as it reaches
+/// them, a majority of them at its turn carries it with the leaver's
+/// own signature among them, and each person backs one way out of a
+/// seat: a leave and a boot cannot both carry (docs/07-states.md).
 library;
 
 import 'package:engine/engine.dart';

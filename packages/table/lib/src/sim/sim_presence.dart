@@ -79,9 +79,8 @@ class SimPresence implements Presence {
   /// deal to put it in (`test/deal_before_the_deal_test.dart`).
   int summonsMs = 50;
 
-  /// Whether a summons carries the hand's draws. An app from before
-  /// they did sends none, and a juror then waits for the draws to be
-  /// carried to it like any other event.
+  /// Whether a summons carries the hand's draws. Without them a juror
+  /// waits for the draws to be carried to it like any other event.
   bool withDraws = true;
 
   @override

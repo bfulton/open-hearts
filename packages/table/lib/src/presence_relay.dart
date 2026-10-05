@@ -10,13 +10,11 @@
 /// of them, since who is online has to be seen by devices that can
 /// read only some of the relays (relays.dart).
 ///
-/// One of those relays may be ours and may keep an object per tag
-/// ([tagMark], docs/06-service.md), in which case the tag goes in the
-/// URL and presence puts its own there. The rest of the list is where
-/// presence keeps working when that one does not answer, which is why
-/// the announcements still go to all of them: a device is online for
-/// whoever can hear it, and what another device can hear is not ours
-/// to assume.
+/// A relay that keeps an object per tag ([tagMark], docs/06-service.md)
+/// takes the tag in its URL, and presence puts its own there. The
+/// announcements go to every relay in the list: a device is online for
+/// whoever can hear it, and what another device can hear is not
+/// assumed.
 library;
 
 import 'dart:async';
@@ -85,8 +83,8 @@ class Summons {
 /// and wants the tag in the URL: `wss://our.relay/{tag}`.
 ///
 /// It has to be marked and cannot be guessed at, in either direction.
-/// A public relay serves every tag on one socket at the root and would
-/// answer a path with a 404, so a client must not put a tag on one; a
+/// A relay that serves every tag on one socket at the root answers a
+/// path with a 404, so a client must not put a tag on one; a
 /// relay that shards has to be told which object to open before the
 /// first message crosses, so a client must put the tag on that one.
 /// Nobody else's URL carries the mark, so the list says which is which
@@ -286,7 +284,7 @@ class RelayPresence implements Presence {
   /// one again once it has forgotten its id, so an old `here` said again
   /// would make a device that left look online — long enough to be
   /// seated and booted — and an old `gone` would take a present one out
-  /// (docs/security-review.md, 14).
+  /// (docs/security-review.md).
   int get _freshS => (everyMs * 4 ~/ 1000).clamp(20, 120);
 
   /// How far ahead of this device's clock an event may be dated: clocks

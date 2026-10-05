@@ -14,8 +14,8 @@
 ///
 /// Two hosts with different views may seat someone twice. They take
 /// the seating with the lower table id, and the other table's empty
-/// seat is booted at its first turn and a bot takes it — the same
-/// fifteen seconds as a friend who joined and closed the app.
+/// seat is booted at its first turn and a bot takes it, as for a
+/// friend who joined and closed the app.
 library;
 
 import 'dart:async';
@@ -149,7 +149,7 @@ Plan plan(
 
 /// The relay's tag for a pool's waiting room. The score the game runs
 /// to is part of it, so that everyone who meets there wants the same
-/// game; a game to fifty keeps the tag it always had.
+/// game; a game to fifty has the plain pool tag.
 String poolTag(String pool, {int target = gameOverScore}) =>
     '${RelayTransport.poolPrefix}$pool${target == gameOverScore ? '' : ':$target'}';
 
@@ -201,7 +201,7 @@ class WaitingRoom {
   /// seating, and every seat takes it from there.
   final TableTiming timing;
 
-  /// Whether this device deals sealed tables (docs/03): the tables it
+  /// Whether this device deals sealed tables (docs/03-fair-deal.md): the tables it
   /// seats are sealed, and it sits only at sealed ones.
   final bool sealed;
   final int rating;
@@ -370,11 +370,9 @@ class WaitingRoom {
         // room code is handed the room announced before it got there
         // (nostr.dart); a pool is subscribed to the same way and with
         // no window on it, so a relay hands a device that comes back
-        // to the pool every seating it has ever carried there. One of
-        // those is this device's own, from the game it played an hour
-        // ago — and taking it put a person at a table with three
-        // people who had closed their apps, at seats that would never
-        // move.
+        // to the pool every seating it has ever carried there — this
+        // device's own from a game an hour ago among them, at a table
+        // whose people have long closed their apps.
         //
         // A round or two either side, and no more. Rounds are a
         // shared clock bucket and everything else here compares them

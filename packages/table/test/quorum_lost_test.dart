@@ -4,18 +4,17 @@
 /// [escrowThreshold] of the jurors holding a piece of its secret; a
 /// departed person's, by a person's piece and a juror's. With the
 /// jurors that hold them gone mid-hand, the seat cannot be opened by
-/// anyone at all, and the hand cannot go on. The table used to wait
-/// for them for good. Giving the hand up instead would throw away a
+/// anyone at all, and the hand cannot go on. Giving the hand up would throw away a
 /// hand whose cards have been seen, which enough jurors leaving
 /// together could do to order. So the game ends — a connection
 /// failure, "juror quorum lost", unscored — once the table has been
 /// stopped there for twenty seconds ([TableClient.quorumLostAfterMs];
-/// docs/04-live-play.md, "When quorum is lost anyway").
+/// docs/04-live-play.md).
 ///
 /// The same for a turn only the jury can settle — a play met by a
 /// boot, or a table of two with one of them gone — once none of its
-/// jurors is left to rule, where the table used to pause for the jury
-/// for good (docs/07-states.md, "Measured"). A side that hears too
+/// jurors is left to rule, rather than pausing for the jury for good
+/// (docs/07-states.md). A side that hears too
 /// little of the table to tell the jury gone from its own connection
 /// gone waits until everyone it cannot hear has been silent as long as
 /// a person is given. And the ending is said: the other side ends with
@@ -157,7 +156,7 @@ void main() {
     return (x: x, y: x == a ? b : a, turn: TurnId.play(a.game.handNumber, a.game.tricksPlayed * 4 + a.game.trick.length));
   }
 
-  // Seed 1 of the chaos walk, cut down: two people, the jury gone, and
+  // Two people, the jury gone, and
   // a play one of them never received, so booted by them — one vote
   // each, and only a juror can settle it.
   test('a play met by a boot with the whole jury gone: nobody can rule on it, and the game ends at both sides', () {
@@ -194,7 +193,7 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // Seed 72, cut down. The one left cannot tell the other gone from its
+  // The one left cannot tell the other gone from its
   // own connection gone, so it waits the silence a person is given:
   // were it the one cut off, that is how long the table would take to
   // go on without it.
@@ -218,7 +217,7 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // Chaos seed 8, cut down. The one left hears nobody, and a jury that
+  // The one left hears nobody, and a jury that
   // is cut off from it for a minute is not a jury gone: it may already
   // have ruled, as here, and its ruling is on its way.
   test('the last person at a table of two, cut off from a jury still there: it waits for the ruling, and plays on', () {
@@ -242,7 +241,7 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // Chaos seed 3, cut down. Cut off from each other, both people pause
+  // Cut off from each other, both people pause
   // for the jury — at a table of two that is who settles what one of
   // them cannot. Back in touch, the pause stays up until a decision
   // lands, but the turn is theirs to settle again: the play only wants
@@ -302,10 +301,10 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // Sealed seed 2 of the chaos walk, cut down. A juror left holding one
+  // A juror left holding one
   // piece of a seat that takes two follows a game that has ended: it
-  // hears the people say so and stops, where it used to wait until it
-  // had heard nobody for five minutes.
+  // hears the people say so and stops, rather than waiting until it
+  // has heard nobody for five minutes.
   test('the one juror left, when the game ends: the people say so, it stops, and they end together', () {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize);
     t.start();
@@ -336,9 +335,9 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // Sealed seed 8, cut down: the last person, stopped at a held seat,
+  // The last person, stopped at a held seat,
   // and one juror still heard who holds one piece of a seat that takes
-  // two. It could not open the seat, so it does not keep the game
+  // two. It cannot open the seat, so it does not keep the game
   // going.
   test('the last person, with one juror left who cannot open the seat: the game ends all the same', () {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize);
@@ -365,8 +364,8 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // Sealed seed 8, cut down: the juror left could not hear the people
-  // when they said it. An ended side says it again to whoever is still
+  // The juror left cannot hear the people
+  // when they say it. An ended side says it again to whoever is still
   // talking to it, as a side behind is carried forward.
   test('a juror cut off when the game ended: told once it is back', () {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize);

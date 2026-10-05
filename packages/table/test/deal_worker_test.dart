@@ -169,7 +169,7 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // The walks that found something in the sealed deal, again with
+  // The sealed walks of chaos_sealed_test.dart, again with
   // every device's slow calls taking a browser's time at a worker:
   // steps waiting on work are steps held back, and the chaos is what
   // shakes out what holding them back does.

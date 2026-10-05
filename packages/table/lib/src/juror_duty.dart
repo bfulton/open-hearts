@@ -52,19 +52,17 @@ class JurorDuty {
   /// ([TableClient.dealWorker]); one for all of them, as a device has.
   final DealWorker? dealWorker;
 
-  /// Relays at the front of [relays] kept primary — ours to run.
+  /// Relays at the front of [relays] kept primary.
   final int pinned;
 
   /// How a juror talks to the table it is summoned to. The default is
-  /// the relay it was summoned over, which is all a juror had for a
-  /// long time — and the reason the table copied every event there
-  /// (docs/02-multiplayer.md gives the relay signalling and a fallback
-  /// lane, not the play). An app hands over a mesh instead: the relay
-  /// under it for signalling, and a data channel to each seat, so a
-  /// juror is dialled like anybody else at the table.
+  /// the relay it was summoned over (docs/02-multiplayer.md). An app
+  /// hands over a mesh instead: the relay under it for signalling, and
+  /// a data channel to each seat, so a juror is dialled like anybody
+  /// else at the table.
   ///
   /// The service's own jurors keep the relay, having no WebRTC in the
-  /// VM to dial with — which is what the fallback lane is for.
+  /// VM to dial with.
   final Transport Function(TableSpec spec, RelayTransport relay)? dial;
 
   final Map<String, ({TableClient client, Transport transport})> _tables = {};
@@ -133,8 +131,7 @@ class JurorDuty {
       // And a table that has not moved for a minute, once a minute: the
       // whole of what this side sees of it — whose turn, what is open,
       // what it holds back — so a stall can be read off the log rather
-      // than guessed at (a live table stood still on 3 October with
-      // nothing else to go on).
+      // than guessed at.
       final was = _progress[e.key];
       if (was == null || was.hand != c.game.handNumber || was.step != c.step) {
         _progress[e.key] = (hand: c.game.handNumber, step: c.step, movedAt: now, toldAt: now);
@@ -198,8 +195,9 @@ class LetGo {
 /// Each seat on the bench is its own identity, its own presence and
 /// its own duty, so the draw takes them as it takes anyone: one bot
 /// seat each, and none of them holding enough of the deck to subtract
-/// the rest. They are all ours, which is the bend doc 04 names — ours
-/// rather than another player's, and only when the room is empty.
+/// the rest. They are all the service's, which docs/04-live-play.md
+/// allows: the service's rather than another player's, and only when
+/// the room is empty.
 class LastResortBench {
   LastResortBench({
     required List<Signer> signers,

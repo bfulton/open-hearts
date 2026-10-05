@@ -3,23 +3,18 @@
 ///
 /// The table settles a given-up seat's audit with nothing said: the
 /// seat's secret is out in the clear at the hand's end, and every side
-/// checks the hand for itself. The seat's juror, only late rather than
-/// gone, never judged its own seat given up; it said the seat's audit
-/// and waited for the others to witness it. They had settled that turn
-/// already and never would, and carrying the juror forward carries
-/// what was decided — which, for a turn settled with nothing said, is
-/// nothing. So the juror stayed at that audit while the table dealt the
-/// next hand without it, and in a later hand whose draw gave it a seat,
-/// the table sat waiting for that seat's keys with every juror
-/// heartbeating (sealed chaos seed 5).
+/// checks the hand for itself. A seat's juror that was only late
+/// rather than gone has to learn from the record that its seat was
+/// given up: one that says the seat's audit waits for witnesses that
+/// never come, since carrying it forward carries what was decided —
+/// for a turn settled with nothing said, nothing — and the table then
+/// waits on it for the keys of a seat it holds in a later hand.
 ///
-/// With the escrow on the record the same juror was stuck a step
-/// earlier, at the turn itself. Its card, said while it slept, went
-/// out when it woke and reached the people after the escrow, where a
-/// juror's move is as good as a custodian's, and they carried it. The
-/// juror had let the card go when the escrow reopened the turn, and
-/// every copy after that — its own, and the people's witnesses — was
-/// one it had already seen.
+/// The same holds a step earlier, at the turn itself: the juror's card,
+/// said while it slept, reaches the people after the escrow, where a
+/// juror's move is as good as a custodian's, and they carry it. The
+/// juror has to take it up too, although every copy of it is one it
+/// has already seen.
 library;
 
 import 'package:deal/deal.dart';
@@ -62,18 +57,12 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 10)));
 
-  // And the players among themselves. Given up to the escrow was once
-  // each side's own judgement: a juror's move that reached one person
-  // in time and the other late had the seat given up at one and not
-  // the other, and the table went on — the move was the same either
-  // way. Not the audit. The side that gave the seat up settled it from
-  // the escrow's pieces, with nothing said; the other waited for
-  // everyone to witness the juror's own audit, which the first never
-  // did. The table stopped there for good, or finished holding two
-  // records (explorer, topup scenario). Now the escrow is claimed at
-  // the seat's turn and carried or not like a boot, so the same timing
-  // is one race between the move and the claim, with one winner on
-  // every record — and the audit follows from it.
+  // And the players among themselves: a juror's move that reaches one
+  // person in time and the other late. The escrow is claimed at the
+  // seat's turn and carried or not like a boot, so the timing is one
+  // race between the move and the claim, with one winner on every
+  // record — and the audit, settled from the escrow's pieces or by the
+  // juror's own word, follows from it.
   test('a juror\'s move one person heard in time and the other did not: the move or the escrow, the same on both records', () {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize, target: 1);
     final a = t.clients.first;

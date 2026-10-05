@@ -1,5 +1,5 @@
 /// A table as agreed before the first card: who sits where, and the
-/// seed the deal comes from until the verifiable deal replaces it.
+/// seed an unsealed table's deal comes from.
 library;
 
 import 'dart:math';
@@ -47,7 +47,7 @@ class TableSpec {
 
   final String id;
 
-  /// Whether the cards come from the verifiable deal (docs/03) rather
+  /// Whether the cards come from the verifiable deal (docs/03-fair-deal.md) rather
   /// than the seed: every hand shuffled by every seat with proofs, each
   /// person's cards known to them alone. Every live table; solo play
   /// and most of the simulator deal from the seed.
@@ -88,7 +88,7 @@ class TableSpec {
         'sealed': sealed,
         'target': target,
         // Left out at the standard, so that an ordinary table's spec
-        // reads as it did before a table had timing of its own.
+        // carries no timing at all.
         if (timing != TableTiming.standard) 'timing': timing.toJson(),
         'seats': [
           for (final h in seats)

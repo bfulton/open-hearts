@@ -26,13 +26,13 @@
 ///   └──neither side can reach a majority──▶ split  (waits for the jury)
 /// ```
 ///
-/// A boot is claimed by the clock, fifteen seconds on turn, or for
-/// silence, two minutes unheard; both are votes in the same race,
+/// A boot is claimed by the clock, once the seat's grace and bank are spent, or for
+/// silence, two minutes unheard at the standard timing; both are votes in the same race,
 /// and a seat is only ever removed at its own turn or by its own signed
-/// leave (client.dart, "silence", says why). A turn stuck for want of a
+/// leave (client.dart says why). A turn stuck for want of a
 /// silent seat's vote is split. A settled turn never reopens; a split
 /// one settles when the jury rules — for the action or for the removal,
-/// the same two endings (client.dart, "the jury"). A turn nobody says
+/// the same two endings (client.dart). A turn nobody says
 /// anything at goes from open to settledSilently: a bot seat nobody
 /// holds, worked out by every side, and the audit of a held seat given
 /// to the escrow, opened from its pieces.
@@ -49,7 +49,7 @@
 /// seat's hand not yet opened from its escrow, or the lead card that
 /// nobody declared), or finished, or failed: stopped for twenty seconds
 /// at a seat nobody left could open, or at a turn put to a jury with
-/// none of its jurors left to rule (client.dart, "juror quorum lost").
+/// none of its jurors left to rule (client.dart, Failure).
 /// Failed is on the record where a majority of the people can say so
 /// at that turn ([TurnState.ended]), and decided here where they
 /// cannot: a split with the jury gone, a side that hears too little of
@@ -146,9 +146,7 @@ const seatTransitions = <SeatState, Set<SeatState>>{
 /// it reaches them and carried by a majority of the people there, the
 /// leaver's signature its own vote. Each person backs one way out of a
 /// seat, so where a leave and a boot cross only one of them carries,
-/// and every record says which (client.dart, _settleLeave). Until that,
-/// a leave needed nobody's agreement and the door was decided here, by
-/// whichever arrived first.
+/// and every record says which (client.dart, _settleLeave).
 const seatExits = <SeatState, Decided>{
   SeatState.booted: Decided.onRecord,
   SeatState.absent: Decided.onRecord,
@@ -177,7 +175,7 @@ enum Decided {
   /// By each side for itself, from its own clock or from whom it hears.
   /// Nothing in the record says so: two sides can decide it differently
   /// and nothing reconciles them, and a side that joins later has to
-  /// guess. These are what docs/07-states.md, "Decided here", lists.
+  /// guess. These are what docs/07-states.md lists as decided here.
   here,
 }
 
@@ -198,7 +196,7 @@ const heldSeatTransitions = <HeldSeatState, Map<HeldSeatState, Decided>>{
 /// **A hand**:
 ///
 /// ```
-/// awaitingJury ──a jury that holds the bot seats (or none, at 40 s)──▶ dealing
+/// awaitingJury ──a jury that holds the bot seats──▶ dealing
 /// dealing ──the declarations in──▶ passing ──every pass──▶ playing
 ///    │  │                           (or straight to playing, no pass)
 ///    │  └──nobody declared the lead card──▶ opening ──audits in──▶ givenUp
@@ -212,8 +210,8 @@ enum HandState { awaitingJury, dealing, passing, playing, auditing, opening, ove
 
 const handTransitions = <HandState, Map<HandState, Decided>>{
   // The draw a deal is sealed to is the one the first person's keys
-  // name, and none where they deal the bot seats in the open for want
-  // of a jury (client.dart, _checkSealed).
+  // name, or none where nobody at the table keys the hand (client.dart,
+  // _checkSealed).
   HandState.awaitingJury: {HandState.dealing: Decided.onRecord},
   HandState.dealing: {
     HandState.passing: Decided.fromRecord,
@@ -239,7 +237,7 @@ const handTransitions = <HandState, Map<HandState, Decided>>{
 /// it ([Wait.movers]); a side waiting on nobody, on somebody who will
 /// never act on it, or on somebody who waits on it in turn, is stuck,
 /// and that is a fact about the sides' states rather than about how
-/// long anything has taken (docs/07-states.md, "Stuck").
+/// long anything has taken (docs/07-states.md).
 enum WaitKind {
   /// A seat's move: from its person, its juror, or once the seat is the
   /// escrow's, a juror holding a piece of it.

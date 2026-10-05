@@ -5,13 +5,11 @@
 /// juror serves (juror_duty.dart), and a later summons starts a new
 /// client, which reads the record from the first hand. The record names
 /// its key as the holder of whatever bot seat its earlier client held;
-/// the new client took that as its own, drew fresh keys for a seat
-/// keyed hands ago, kept them over the ones on the record, and could
-/// verify nothing shuffled from them. It sat in that old hand to the end
-/// of the game, and every seat it was summoned to hold went to the
-/// escrow in its turn. Found over a real relay (the two-tables test in
-/// service/); the simulator never let go of a juror's client, so it
-/// could not see it until it did ([SimTable.sweepJurors]).
+/// a new client that took that as its own would draw fresh keys for a
+/// seat keyed hands ago, keep them over the ones on the record, and
+/// verify nothing shuffled from them. So it has no part in the hands
+/// before its first summons ([SimTable.sweepJurors] lets go of a
+/// juror's client as the duty does).
 library;
 
 import 'package:deal/deal.dart';

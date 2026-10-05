@@ -186,13 +186,12 @@ class ChaosScenario {
           // A departure turns a seat into a bot, and which seats are
           // bots is half of who holds them — so a departure still in
           // flight is two sides answering that differently, which is
-          // the race `_botSeatsAt` is there for. The walk had no way
-          // to make it: its departures reach everyone at once bar the
-          // ordinary latency, and a relay going half-deaf lasts tens
-          // of seconds rather than the second or two that puts one
-          // side a step behind another. So the leaver loses a link to
-          // a juror or two for a moment, and they hear it carried
-          // rather than said.
+          // the race `_botSeatsAt` is there for. Departures otherwise
+          // reach everyone at once bar the ordinary latency, and a
+          // relay going half-deaf lasts tens of seconds rather than the
+          // second or two that puts one side a step behind another. So
+          // the leaver loses a link to a juror or two for a moment, and
+          // they hear it carried rather than said.
           final late = rng.nextBool();
           t.clock.schedule(when, () {
             if (exits >= maxExits) return;

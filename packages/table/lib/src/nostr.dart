@@ -45,9 +45,8 @@ class NostrEvent {
     );
   }
 
-  /// Parses and checks. Null for anything malformed, misidentified or
-  /// not signed by its claimed author.
-  /// Parses and checks an event: its id is the hash of its content,
+  /// Parses and checks an event, or null for anything malformed or
+  /// misidentified or not signed by its author: its id is the hash of its content,
   /// and its signature holds — unless [verifySignature] is off, for an
   /// envelope whose contents are signed and checked on their own,
   /// since a signature is what an event costs to take.

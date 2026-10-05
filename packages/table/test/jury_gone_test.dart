@@ -5,12 +5,10 @@
 /// gives the seat to the escrow — the first custodian's still being
 /// heard from. A player never says one: the seat's pieces are sealed
 /// to the jury, and no player will ever hold its key. So with every
-/// juror gone the players reach the seat's turn and wait, and they
-/// waited in silence: no pause, nothing on the screen, a table that
-/// looked as if it were about to move and never did. The chaos walk
-/// ended two sealed seeds that way. A table waiting on a jury it does
-/// not have says so, as it does when nobody is online to draw one
-/// from (jury_test.dart), and goes on when a juror comes back.
+/// juror gone the players reach the seat's turn and wait. A table
+/// waiting on a jury it does not have says so, as it does when nobody
+/// is online to draw one from (jury_test.dart), and goes on when a
+/// juror comes back.
 library;
 
 import 'package:deal/deal.dart';

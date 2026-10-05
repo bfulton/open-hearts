@@ -1,7 +1,7 @@
 /// NIP-44 version 2: a message sealed to one key, readable by the two
 /// ends of a shared secret and nobody else.
 ///
-/// What a public relay carries of WebRTC signalling — an offer, an
+/// What a relay carries of WebRTC signalling — an offer, an
 /// answer, an ICE candidate with a player's address in it — is sealed
 /// this way to the recipient's table key (relay_transport.dart). The
 /// scheme is the one Nostr clients use for direct messages, so it is

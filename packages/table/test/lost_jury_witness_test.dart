@@ -1,16 +1,11 @@
 /// A witness to the jury, lost on its way to the one who proposed it.
 ///
-/// Found by `tool/explore.dart`, which loses one copy of one message
-/// at a time: at a table of two, the one copy of the first person's
-/// witness to the second's jury proposal. The proposer says its
-/// proposal again until it carries — but that is the same event, and
-/// a peer that has already backed it answered nothing, since its
-/// witness is said once. So the proposer waited for a jury the other
-/// was already dealing under, holding back its keys for it; the other
-/// booted it for them; the jury ruled the keys stood; and by then the
-/// proposer was a round ahead of the peer still waiting on its
-/// witnesses to the jurors' keys. Each waited on the other for as
-/// long as the run went on.
+/// At a table of two, the one copy of the first person's witness to
+/// the second's jury proposal is lost (as `tool/explore.dart` does, one
+/// copy of one message at a time). The proposer says its proposal
+/// again until it carries — the same event — and a peer that has
+/// already backed it answers with its witness again, or the proposer
+/// would wait for a jury the other is already dealing under.
 library;
 
 import 'package:deal/deal.dart';

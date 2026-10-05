@@ -2,19 +2,15 @@
 ///
 /// A dropped message is the ordinary reason a turn does not settle,
 /// and the ordinary answer is that whoever said it says it again. A
-/// seat has always done that ([TableClient] `_repeat`). A bot seat's
-/// holder is a juror, and a juror did not: the step it said went
-/// missing and the hand stopped at that turn for good — every peer
-/// heartbeating, nobody at fault, and no path back to it. Nothing
-/// else would have come to the rescue either: the holder skips a turn
-/// that already carries its own action, the carry-forward carries
-/// only what has settled somewhere, and a table waiting on a deal
-/// turn is neither split nor paused, so no appeal is made and no
-/// juror relays anything.
+/// seat does that ([TableClient] `_repeat`), and so does a juror for
+/// the bot seat it holds. Nothing else would come to the rescue: the
+/// holder skips a turn that already carries its own action, the
+/// carry-forward carries only what has settled somewhere, and a table
+/// waiting on a deal turn is neither split nor paused, so no appeal is
+/// made and no juror relays anything.
 ///
 /// One human and three bot seats, which is what matchmaking gives
-/// somebody who asks for a game alone, and the shape the browser
-/// suite stalls on.
+/// somebody who asks for a game alone.
 library;
 
 import 'package:deal/deal.dart';

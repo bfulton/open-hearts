@@ -17,8 +17,8 @@ void main() {
       ]);
       // The mark is a whole path segment, wherever it sits.
       expect(relaysForTag([Uri.parse('wss://ours/relay/$tagMark')], 'T1'), [Uri.parse('wss://ours/relay/T1')]);
-      // A relay with no mark is never given a path: on a public relay
-      // one would be a 404, and every tag is served at the root.
+      // A relay with no mark is never given a path: on a relay that
+      // serves every tag at the root, one would be a 404.
       expect(relaysForTag([Uri.parse('wss://ours/fixed')], 'online'), [Uri.parse('wss://ours/fixed')]);
       expect(relaysForTag(const [], 'online'), isEmpty);
     });

@@ -1,4 +1,4 @@
-/// Presence said again (docs/security-review.md, 14): every presence
+/// Presence said again (docs/security-review.md): every presence
 /// event is public, and any relay takes one again once it has forgotten
 /// its id. An old `here` must not make a device that left look online,
 /// nor an old `gone` take a present one out.

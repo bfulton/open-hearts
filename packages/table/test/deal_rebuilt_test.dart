@@ -4,16 +4,14 @@
 /// A juror brought on mid-hand reads the hand's redraw before the draw
 /// the deal was sealed to, fixes the bot seats from the wrong one, and
 /// builds its deal again when the right one comes (_refixHolders in
-/// client.dart). Building a deal takes up whatever was held back for
-/// it, and the rebuild did that before putting back the steps that had
-/// already settled: one held-back seat's keys went into a session that
-/// had none of the others', the round of keys closed there with the
-/// deal still at its keys, and nothing asked the deal to go on again —
-/// every turn of that round had settled, and the shuffles were waiting
-/// on it. The juror sat at the hand's keys to the end of the game.
+/// client.dart). The settled steps go back in before whatever was held
+/// back for the deal: the other way round, one held-back seat's keys
+/// would go into a session that has none of the others', the round of
+/// keys would close with the deal still at its keys, and nothing would
+/// ask the deal to go on again.
 ///
-/// Found by `tool/explore.dart` (topup scenario, with one witness's
-/// first copy lost); pinned here as that run.
+/// A run of `tool/explore.dart` (topup scenario, with one witness's
+/// first copy lost), pinned here.
 library;
 
 import 'package:deal/deal.dart';

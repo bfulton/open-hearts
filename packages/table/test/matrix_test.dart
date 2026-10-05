@@ -7,8 +7,7 @@
 /// and the table either finishes or — its survivors too few to carry a
 /// removal, and no jury to rule for them — pauses, says why, and once
 /// the departed have been silent as long as a person is given, ends:
-/// juror quorum lost (docs/04-live-play.md, "When quorum is lost
-/// anyway").
+/// juror quorum lost (docs/04-live-play.md).
 library;
 
 import 'package:engine/engine.dart';

@@ -5,7 +5,8 @@
 /// that held the seat and legal under the engine at that point, every
 /// removal must carry the majority the participants of the moment
 /// required, and every bot move is recomputed rather than read. The
-/// ratings fall out of the replay by doc 04's two rules.
+/// ratings fall out of the replay by the two rules of
+/// docs/04-live-play.md.
 library;
 
 import 'dart:convert';
@@ -671,7 +672,7 @@ Verification verifyRecord(
           // it cannot be opened to show anything. So the record goes
           // on to a later hand with this one's deal short, and that
           // is a hand over, not a deal left unfinished
-          // (docs/04-live-play.md, "When quorum is lost anyway").
+          // (docs/04-live-play.md).
           //
           // Only where the record gives a held seat to the escrow with
           // a step of the deal still owed. Every other step has
@@ -697,11 +698,10 @@ Verification verifyRecord(
         // is the hand played on with every card in the open, and it
         // cannot: the audits are where the hand ends.
         final givenUp = nextIsAudit();
-        // A newcomer's piece is released like any other, and one this
-        // side could not place was taken for nobody's: a seat given to
-        // the escrow, opened at the table from a topped-up juror's
-        // piece and another, was never opened here (sealed chaos seed
-        // 10, nine strangers).
+        // A newcomer's piece is released like any other, and has to be
+        // placed here as the table placed it, or a seat given to the
+        // escrow and opened at the table from a topped-up juror's piece
+        // would never open here.
         growCustodians(d, game.handNumber, index);
         feedSecrets(d, all: true);
         if (givenUp) {
@@ -900,8 +900,8 @@ Verification verifyRecord(
     // The last hand is audited too — after whatever the record removes
     // at its audits, which comes first at their position as at every
     // hand's. Taken straight to the audits, a claim for the escrow at
-    // one of them stopped the replay before any audit, and the hand's
-    // audits and that claim went unchecked.
+    // one of them would stop the replay before any audit, and leave the
+    // hand's audits and that claim unchecked.
     final why = takeRemovals();
     if (why != null) return fail(why);
     if (endedBy != null) return endedHere();

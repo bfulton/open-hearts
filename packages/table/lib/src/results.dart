@@ -9,10 +9,8 @@
 /// game; a bot that took over a leaver's seat has no stake, and a
 /// leaver finishes last.
 ///
-/// Until the verifiable deal and the juror exist (docs 03, 04) the deal
-/// is a seed everyone can read and a table of one human is attested by
-/// that one human, so these ratings are provisional: fine for a reward,
-/// not yet for a claim.
+/// A result is attested by the humans at the table alone, so a table
+/// of one human is attested by that one human.
 library;
 
 import 'dart:convert';

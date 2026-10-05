@@ -2,8 +2,8 @@
 /// on the virtual clock. Optionally with relays: events travel over a
 /// named relay rather than a single bus, each peer reaches some subset
 /// of them, and a relay can go out for a while — the layer where a
-/// table that could not hear itself was born, so the one the chaos
-/// walk needs to be able to break.
+/// table can stop hearing itself, so the one the chaos walk needs to
+/// be able to break.
 library;
 
 import 'dart:async';
@@ -61,8 +61,7 @@ class SimNetwork {
   /// The relays events travel over, in the order a writer prefers them.
   /// Empty is the classic single bus: every peer reaches everything,
   /// events go to all reachable peers, and the relay-aware paths below
-  /// are inert — so a table set up without relays behaves exactly as
-  /// it did before there were any.
+  /// are inert.
   List<String> relays = const [];
 
   /// How long a writer keeps a relay out of its own running after a

@@ -43,8 +43,8 @@ class SimDealWorker implements DealWorker {
 
   /// What each job takes in a browser on a desk: the medians of this
   /// build's deal.wasm in V8, the engine Chromium runs it in, on one
-  /// core of a server with nothing else on it (docs/03-fair-deal.md,
-  /// "Off the page's thread"). A batch of tokens goes by the card.
+  /// core of a server with nothing else on it (docs/03-fair-deal.md).
+  /// A batch of tokens goes by the card.
   static int browserMs(DealJob job) => switch (job) {
         InitialDeckJob() => 74,
         ShuffleJob() => 566,

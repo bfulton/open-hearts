@@ -15,8 +15,7 @@
 /// juror is out at the seat's turn, which gives the seat to the escrow
 /// once it carries, as a boot removes a person. And one more, outside
 /// the record: a person's word that the game has ended for them,
-/// stopped where nobody left could move it (client.dart, "juror
-/// quorum lost").
+/// stopped where nobody left could move it (client.dart).
 library;
 
 import 'dart:convert';
@@ -50,8 +49,8 @@ class TurnId {
   /// The deal's rounds: keys, shuffle, tokens, declare.
   static const dealRounds = 4;
 
-  /// Deal turns sit below zero, so a seeded table's indices are what
-  /// they always were.
+  /// Deal turns sit below zero, so a seeded table's turns, which have
+  /// no deal, still count from zero.
   static const dealBase = -(dealRounds * 4);
 
   bool get isDeal => index < 0;

@@ -1,11 +1,9 @@
 /// Several relays, one client: listening on all of them, writing to one.
 ///
-/// A public relay is volunteer infrastructure with rate limits and no
-/// uptime promise (docs/02-multiplayer.md), and one turned on a live
-/// table: six minutes into a game it began answering every event from
-/// the table with a proof-of-work demand, a play that was on its way
-/// reached nobody, and the seat was booted for silence. So a client
-/// holds a short list. It keeps a subscription open on every relay in
+/// Any relay can go down or start refusing a client's events, and a
+/// play that reaches nobody gets its seat booted for silence. So a
+/// client holds a short list (docs/08-own-relays.md). It keeps a
+/// subscription open on every relay in
 /// the list and writes each event to the first that has not refused it
 /// lately; a refusal moves the same event on to the next, and when
 /// every relay has refused, the client is told, so a table that is cut
@@ -37,9 +35,8 @@ abstract final class Relays {
   /// The relays past the first [pinned] begun at the entry a hash of
   /// [key] picks, the rest following in order: where a client writes
   /// first among the interchangeable relays is a function of the table,
-  /// so tables spread over them. The [pinned] at the front stay first —
-  /// a relay we run, primary while up, not spun out of place with the
-  /// volunteer ones.
+  /// so tables spread over them. The [pinned] at the front stay first:
+  /// a primary relay, not spun out of place with the rest.
   static List<Uri> turnedBy(List<Uri> relays, String key, {int pinned = 0}) {
     if (relays.length - pinned < 2) return relays;
     final tail = relays.sublist(pinned);

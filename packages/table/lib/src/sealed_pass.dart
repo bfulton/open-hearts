@@ -16,7 +16,7 @@ import 'package:engine/engine.dart';
 /// now that the deal can open it here. True when nothing stands in the
 /// way of seeing [seat]'s hand: no such pass yet, or its cards opened.
 /// False while the pass is sealed to a secret this side does not hold
-/// — or, from a passer who sealed garbage, for good (docs/03).
+/// — or, from a passer who sealed garbage, for good (docs/03-fair-deal.md).
 bool openPassInto(DealSession d, HeartsGame game, int seat) {
   if (game.phase != Phase.passing) return true;
   final from = (seat - game.passDirection.seatOffset) % seatCount;

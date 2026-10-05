@@ -1,16 +1,12 @@
 /// A juror that is heard from and does nothing.
 ///
-/// Silence was the only way a bot seat could be taken off its holder,
-/// and silence is not the only way a holder fails. A device whose
-/// clock runs and whose work does not — a tab starved of a processor,
-/// a phone in a pocket — goes on heartbeating while the seat in front
-/// of it never moves. The custodians that stopped hearing it gave
-/// their pieces up; the peers still hearing it went on waiting; and a
-/// hand sat at one turn with the seat's own device apparently present.
-///
-/// It is what the four-browser suite kept failing on, with four
-/// headless browsers and a relay sharing four cores. Heard from is
-/// not the same as playing.
+/// Silence is not the only way a holder fails. A device whose clock
+/// runs and whose work does not — a tab starved of a processor, a
+/// phone in a pocket — goes on heartbeating while the seat in front
+/// of it never moves. The custodians that stop hearing it give their
+/// pieces up; the peers still hearing it would go on waiting, the hand
+/// at one turn with the seat's own device apparently present. Heard
+/// from is not the same as playing.
 library;
 
 import 'package:deal/deal.dart';

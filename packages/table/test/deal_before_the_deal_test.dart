@@ -2,31 +2,19 @@
 /// in.
 ///
 /// The four round-0 steps go out once the table has a jury, and a
-/// juror holds its own back for the same moment counted from when it
-/// was told it is one — so the gap between the two is however long
-/// the summons took, and a summons slower than that hold puts the
-/// steps in a juror's hands before it has a deal to put them in.
+/// juror learns it is one from a summons that can be slower than
+/// that, so it can hold the steps before it has a deal to put them in.
 /// They are kept rather than dropped, a turn that is not open yet
-/// being no turn to be wrong for, and nothing used to come back to
-/// them: the drain runs when a turn settles, when a jury changes and
-/// when the assignment is fixed again, and the four steps this side
-/// needs to settle its first turn are exactly what it is short of.
-/// The client sat at the hand's first step with the whole hand
-/// piling up behind it, and the seat it held two hands later was
-/// never dealt.
+/// being no turn to be wrong for, and `_startDeal` drains them once
+/// it has opened the hand's turns: the other drains run when a turn
+/// settles, when a jury changes and when the assignment is fixed
+/// again, and these steps are what this side needs to settle its
+/// first turn.
 ///
-/// Seen in the browsers, where the summons crosses a relay: a juror
-/// deferred all four four hundred and seventy milliseconds before
-/// opening its turns, and three minutes later was still at
-/// `hand 0 dealing step 0`, `deferred 496`. `_startDeal` drains after
-/// opening now rather than the jury draining just before it.
-///
-/// **This test does not reproduce that.** It holds the invariant —
-/// every juror follows the table — with the summons slowed to open
-/// the window, and it passes with the drain and without it: the
-/// simulator recovers by some path the browser does not have, and I
-/// could not find which. So it is an invariant kept, not a fault
-/// caught, and whoever gets closer should say so here.
+/// The test holds the invariant — every juror follows the table —
+/// with the summons slowed to open the window. The simulator also
+/// recovers without that drain, by a path a browser lacks, so this
+/// guards the invariant rather than reproducing the fault.
 library;
 
 import 'package:deal/deal.dart';

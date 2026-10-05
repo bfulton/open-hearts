@@ -1,15 +1,13 @@
 /// The draw a hand's deal is sealed to, on the record.
 ///
-/// Each side used to read it for itself, from the juries it had heard,
-/// and a draw proposed from an earlier place could arrive after one
-/// proposed from a later place: a step settled on one draw at one side
-/// and on another at the next, and a hand was sealed to two draws
-/// (sealed chaos seed 2, nine strangers to draw from). Now every
-/// seat's keys name the draw they were sealed to, and the draw named by
-/// the first person whose keys settle is the hand's. A held seat's keys
-/// are taken only after that, naming the same draw, from the juror it
-/// names for the seat; its juror waits for it (_checkSealed in
-/// client.dart, sealedAt in record.dart).
+/// A draw proposed from an earlier place can arrive after one proposed
+/// from a later place, so sides reading the draw for themselves could
+/// settle steps on different draws. So every seat's keys name the draw
+/// they were sealed to, and the draw named by the first person whose
+/// keys settle is the hand's. A held seat's keys are taken only after
+/// that, naming the same draw, from the juror it names for the seat;
+/// its juror waits for it (_checkSealed in client.dart, sealedAt in
+/// record.dart).
 library;
 
 import 'package:deal/deal.dart';
@@ -81,13 +79,14 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 10)));
 
   test('a juror summoned into a redraw has the hand\'s draws from its summons', () {
-    // The explorer's topup scenario, as played: two of the jury holding
-    // no seat go quiet during the deal and the jury is drawn again, a
-    // hand's first draw at a play turn. Every carry says every jury,
-    // so the table had just said the first draw again, to the sides
-    // already there, a moment before the newcomers were; an event goes
-    // once per eight seconds whoever is asking, and they sat at the
-    // keys that long, reading the redraw for the hand's.
+    // The explore tool's topup scenario: two of the jury holding no
+    // seat go quiet during the deal and the jury is drawn again, a
+    // hand's first draw at a play turn. Every carry says every jury, so
+    // the table has just said the first draw again, to the sides
+    // already there, a moment before the newcomers are; an event goes
+    // once per eight seconds whoever is asking, so by carry alone they
+    // would sit at the keys that long, reading the redraw for the
+    // hand's.
     final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4, target: 1);
     t.net.minLatencyMs = 200;
     t.net.maxLatencyMs = 400;
@@ -101,7 +100,7 @@ void main() {
     final a = t.clients.first;
     final apart = <String>{};
     t.start();
-    // Read every quarter second, as the explorer reads every second.
+    // Read every quarter second, as the explore tool reads every second.
     void look() {
       for (final j in t.jurors) {
         final s = j.client?.sealedTo(0);
@@ -180,9 +179,8 @@ void main() {
 
   test('a person who hears of no jury waits for one, and never deals the bots in the open', () {
     // The first person hears nothing of the jury for a minute; the
-    // other two have a jury long before. It used to deal its bots in
-    // the open at forty seconds. Now it waits, and to the others it is
-    // a seat that has not taken its deal step: put out at the step's
+    // other two have a jury long before. It waits, and to the others it
+    // is a seat that has not taken its deal step: put out at the step's
     // clock like any other, while the hand is dealt to the jury.
     final t = SimTable(humans: 3, seed: 5, crypto: crypto, jurors: jurySize);
     final first = t.clients.first;

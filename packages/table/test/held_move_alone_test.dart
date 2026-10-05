@@ -4,9 +4,8 @@
 /// bot seats. When one person goes quiet, a held seat's move has the
 /// survivor's voice and nobody else's: one of the two it needs. The
 /// survivor appeals, and the jury rules as it does for a person's seat
-/// — the holder heard and moved, the move stands — or the hand stops
-/// at the seat for good. It did, on 3 October: the jurors heard the
-/// appeal and had no rule for it.
+/// — the holder heard and moved, the move stands — or the hand would
+/// stop at the seat for good.
 library;
 
 import 'package:deal/deal.dart';

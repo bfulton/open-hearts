@@ -181,7 +181,7 @@ void main() {
     // Nobody comes. The table cannot go on without a juror, and none
     // can be found: once the other person has been silent as long as a
     // person is given, the game ends rather than wait for good
-    // (docs/04-live-play.md, "When quorum is lost anyway").
+    // (docs/04-live-play.md).
     test('nobody online and no last resort: the table pauses and says why, then the game ends', () {
       final t = SimTable(humans: 2, seed: 68, withPresence: true);
       t.people[1]

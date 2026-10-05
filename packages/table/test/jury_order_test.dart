@@ -1,18 +1,11 @@
 /// A hand's juries, and which of them the verifier deals the seats to.
 ///
-/// The first jury drawn for a hand named each bot seat's holder, and a
-/// redraw later in the hand moved the jury without moving the seats.
-/// The table read "first" by where each draw was proposed; the verifier
-/// went by event id. A hand drawn again twice at one trick, with the
-/// lower id on a redraw of three — too few to hold anything — was then
-/// read by the verifier as having no jury able to hold its bot seats:
-/// it took their keys for anybody's to compute and turned down a record
-/// the table had played by the first draw (chaos, sealed seeds 1 and 2
-/// with nine strangers to draw from).
-///
-/// The draw is on the record now: the one the first person's keys name
-/// (sealed_to_draw_test.dart). A draw the hand carried besides, from
-/// whatever place and with whatever id, moves no seat for the verifier.
+/// The first jury drawn for a hand names each bot seat's holder, and a
+/// redraw later in the hand moves the jury without moving the seats.
+/// The draw is on the record: the one the first person's keys name
+/// (sealed_to_draw_test.dart). A draw the hand carried besides — a
+/// redraw too small to hold anything, with a lower id, say — moves no
+/// seat for the verifier, from whatever place and with whatever id.
 library;
 
 import 'package:deal/deal.dart';
