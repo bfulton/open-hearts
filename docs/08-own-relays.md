@@ -74,6 +74,17 @@ and answers a new subscriber with what it holds, as a relay does:
   from every result there has been. A result is about a kilobyte; four
   a game.
 
+**Watching, on the same object.** A table's tag also carries its
+watch lane, kind 24247, ephemeral like the rest (packages/table,
+`watch.dart`): whoever opens a table's address says every twenty
+seconds that it is watching, under a key made for the watching, and
+the seated player with the lowest key of those still here answers with
+the table as anyone at it sees it — names, scores, this hand's cards
+played, whose turn — after every move, for a minute after the last
+watcher spoke. Nothing hidden, nothing stored; a game nobody watches
+says nothing on it. Once the game is over the page fetches the record
+and checks it (`review_page.dart`).
+
 **3. The app's list is ours alone.** The public relays and the unbuilt
 `nostr.openhearts.game` leave the build. The remote config can still
 name relays (`relays`), which is the way back if ours ever needs help:

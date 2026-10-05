@@ -204,4 +204,9 @@ abstract final class TableKinds {
   /// every few seconds while they wait. Ephemeral: whoever is listening
   /// at the time is the whole audience.
   static const waiting = 24245;
+
+  /// Watching a table from outside it (watch.dart), tagged `t` with the
+  /// table id: a watcher saying it is there, or a seated player's view
+  /// of the table for whoever is.
+  static const watch = 24247;
 }

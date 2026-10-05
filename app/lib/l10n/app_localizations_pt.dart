@@ -1167,4 +1167,25 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get seeWholeGame => 'Ver a partida inteira';
+
+  @override
+  String get shareToWatch => 'Compartilhar link para assistir';
+
+  @override
+  String get liveNow => 'Ao vivo';
+
+  @override
+  String get watchingNote =>
+      'As mãos ficam ocultas até o jogo acabar; então o jogo inteiro estará aqui, verificado.';
+
+  @override
+  String get passingNow => 'Passando cartas';
+
+  @override
+  String get dealingNow => 'Distribuindo';
+
+  @override
+  String toPlayNow(String name) {
+    return 'Vez de $name';
+  }
 }

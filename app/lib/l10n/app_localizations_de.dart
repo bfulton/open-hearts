@@ -1176,4 +1176,25 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get seeWholeGame => 'Die ganze Partie ansehen';
+
+  @override
+  String get shareToWatch => 'Link zum Zuschauen teilen';
+
+  @override
+  String get liveNow => 'Live';
+
+  @override
+  String get watchingNote =>
+      'Die Karten bleiben verdeckt, bis das Spiel vorbei ist; dann steht hier das ganze Spiel, geprüft.';
+
+  @override
+  String get passingNow => 'Karten werden weitergegeben';
+
+  @override
+  String get dealingNow => 'Es wird gegeben';
+
+  @override
+  String toPlayNow(String name) {
+    return '$name ist am Zug';
+  }
 }

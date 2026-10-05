@@ -644,6 +644,23 @@ class _HomePageState extends State<HomePage> {
       pictures: _pictures,
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
+    // Anyone with the table's address can watch it being played: one
+    // seated player's device answers them with what everyone at the
+    // table sees (packages/table, watch.dart).
+    final words = context.l10n;
+    final watch = WatchBroadcast(
+      heard: relay.watch,
+      say: relay.sayWatch,
+      view: () => WatchedTable.of(controller.client, [
+        for (final (s, holder) in controller.client.holders.indexed)
+          switch (holder) {
+            BotSeat(:final persona) => persona.name,
+            HumanSeat() => seatNames[s] ?? words.seatNumber(s + 1),
+          },
+      ]),
+      answering: () => WatchBroadcast.answers(controller.client, signer.publicKey),
+    );
+    controller.addListener(watch.changed);
     // What this device measured of its own play goes on the device and
     // nowhere else (pace_store.dart). Folded when the table is done
     // with, since a game left early is still cards this player took
@@ -668,7 +685,10 @@ class _HomePageState extends State<HomePage> {
     // (docs/04-live-play.md, "The sizing"). Cleared on the way back
     // to the front door, however the table ended.
     Duty.seated = true;
-    unawaited(context.push<void>(located(livePath), extra: controller).whenComplete(() => Duty.seated = false));
+    unawaited(context.push<void>(located(livePath), extra: controller).whenComplete(() {
+      Duty.seated = false;
+      watch.close();
+    }));
   }
 
   /// Into the room this device arrived at by a link, or a new one of

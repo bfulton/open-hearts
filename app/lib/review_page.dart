@@ -1,4 +1,5 @@
-/// A finished game, hand by hand (router.dart, `/play/table/ID`).
+/// A table by its address (router.dart, `/play/table/ID`): the game
+/// being played, watched, or the finished game, hand by hand.
 ///
 /// The record is fetched by the table's id and checked here, on this
 /// device, before a card of it is shown: every signature, every step of
@@ -6,13 +7,21 @@
 /// The check runs off the page's thread (net/record_check.dart) and
 /// each hand is shown as its check is done, the rest said to be still
 /// in hand; a record that fails anywhere is shown as failing, whatever
-/// was on the screen before. What it shows is what the check replayed
-/// — every seat's thirteen as dealt, what was passed, each trick in
-/// order, and the scores — so it is the game as it was played, whoever
-/// kept the copy.
+/// was on the screen before.
+///
+/// A game still being played has no record yet: then the page watches
+/// it instead (net/watching.dart) — the scores and each card as it is
+/// played, as a seated player's device tells it — and when it is over,
+/// fetches the record and checks it like any other.
+///
+/// What it shows of a finished game is what the check replayed — every
+/// seat's thirteen as dealt, what was passed, each trick in order, and
+/// the scores — so it is the game as it was played, whoever kept the
+/// copy.
 library;
 
 import 'dart:async';
+import 'dart:math' show min;
 
 import 'package:engine/engine.dart' hide Replay;
 import 'package:flutter/material.dart' hide Card;
@@ -21,12 +30,13 @@ import 'package:table/table.dart';
 import 'l10n/l10n.dart';
 import 'net/game_records.dart';
 import 'net/record_check.dart';
+import 'net/watching.dart';
 import 'theme.dart';
 import 'ui/pip.dart';
 import 'ui/player_icon.dart';
 
 class ReviewPage extends StatefulWidget {
-  const ReviewPage({super.key, required this.table, this.load = gameOf, this.check});
+  const ReviewPage({super.key, required this.table, this.load = gameOf, this.check, this.watch});
 
   /// The table's id.
   final String table;
@@ -36,6 +46,15 @@ class ReviewPage extends StatefulWidget {
 
   /// How it is checked: [checkRecord] unless a test says otherwise.
   final Stream<RecordCheck> Function(GameRecord record)? check;
+
+  /// How a game still being played is watched: [watchTable] unless a
+  /// test says otherwise.
+  final Stream<WatchedTable> Function(String table)? watch;
+
+  /// How often a game just over is asked for again, and how many times,
+  /// while its players' devices send it to be kept.
+  static const recordAgain = Duration(seconds: 3);
+  static const recordTries = 20;
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
@@ -53,6 +72,11 @@ class _Checking extends _Shown {
 
 class _Nothing extends _Shown {
   const _Nothing();
+}
+
+class _Live extends _Shown {
+  const _Live(this.view);
+  final WatchedTable view;
 }
 
 class _Failed extends _Shown {
@@ -76,10 +100,12 @@ class _ReviewPageState extends State<ReviewPage> {
   _Shown _shown = const _Checking();
   int _hand = 0;
   StreamSubscription<RecordCheck>? _checking;
+  StreamSubscription<WatchedTable>? _watching;
 
   @override
   void dispose() {
     _checking?.cancel();
+    _watching?.cancel();
     super.dispose();
   }
 
@@ -94,13 +120,48 @@ class _ReviewPageState extends State<ReviewPage> {
     // player's device (home_page.dart): asked again a few times before
     // there is said to be none.
     var record = await widget.load(widget.table);
+    // None kept: a game still being played, perhaps — watched while the
+    // record is asked for a few more times, in case it is one just over.
+    if (record == null) _watch();
     for (var i = 0; record == null && i < 4 && mounted; i++) {
       await Future<void>.delayed(const Duration(seconds: 2));
       record = await widget.load(widget.table);
     }
     if (!mounted) return;
-    final kept = record;
-    if (kept == null) return setState(() => _shown = const _Nothing());
+    if (record == null) {
+      // Nothing yet; the watching goes on, and a game seen being played
+      // takes the page over when it is.
+      if (_shown is _Checking) setState(() => _shown = const _Nothing());
+      return;
+    }
+    _verify(record);
+  }
+
+  void _watch() {
+    _watching = (widget.watch ?? watchTable)(widget.table).listen((v) {
+      if (!mounted || _checking != null) return;
+      setState(() => _shown = _Live(v));
+      if (v.over) {
+        _watching?.cancel();
+        _awaitRecord();
+      }
+    });
+  }
+
+  /// The game is over: its record, once a player's device has sent it.
+  Future<void> _awaitRecord() async {
+    for (var i = 0; i < ReviewPage.recordTries && mounted && _checking == null; i++) {
+      await Future<void>.delayed(ReviewPage.recordAgain);
+      if (!mounted || _checking != null) return;
+      final record = await widget.load(widget.table);
+      if (record != null && mounted && _checking == null) return _verify(record);
+    }
+  }
+
+  void _verify(GameRecord kept) {
+    if (_checking != null) return;
+    _watching?.cancel();
+    setState(() => _shown = const _Checking());
     final hands = <int, TableReplayHand>{};
     List<TableReplayHand> inOrder() => [for (final n in hands.keys.toList()..sort()) hands[n]!];
     _checking = (widget.check ?? checkRecord)(kept).listen((c) {
@@ -127,6 +188,7 @@ class _ReviewPageState extends State<ReviewPage> {
           _Nothing() => _Note(l10n.noGameHere),
           _Failed(:final reason) => _Note(reason == null ? l10n.cantCheckGame : l10n.gameDoesNotCheck(reason), danger: true),
           _Game() && final g => _review(context, g),
+          _Live(:final view) => _live(context, view),
         },
       ),
     );
@@ -281,6 +343,102 @@ class _ReviewPageState extends State<ReviewPage> {
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// A game being played, as a seated player's device tells it: who is
+  /// at the table and their scores, whose turn it is, and this hand's
+  /// cards trick by trick. No hand is shown; nobody watching sees one.
+  Widget _live(BuildContext context, WatchedTable v) {
+    final l10n = context.l10n;
+    final tricks = [for (var i = 0; i < v.plays.length; i += seatCount) v.plays.sublist(i, min(i + seatCount, v.plays.length))];
+    final what = switch (v.phase) {
+      Phase.dealing => l10n.dealingNow,
+      Phase.passing => l10n.passingNow,
+      _ => v.toPlay == null ? null : l10n.toPlayNow(v.names[v.toPlay!]),
+    };
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: Palette.danger, borderRadius: BorderRadius.circular(4)),
+                child: Text(l10n.liveNow, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${l10n.handNumber(v.hand + 1)}  ·  ${l10n.passDirection(PassDirection.forHand(v.hand).name)}',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (var s = 0; s < seatCount; s++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  PlayerIcon(name: v.names[s], seed: v.names[s], size: 26),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      v.names[s],
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: v.winners.contains(s) ? Palette.win : (v.toPlay == s ? Palette.gold : Palette.chrome),
+                      ),
+                    ),
+                  ),
+                  if (v.taken[s] > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Text('+${v.taken[s]}', style: const TextStyle(fontSize: 13, color: Palette.danger)),
+                    ),
+                  Text('${v.totals[s]}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Palette.chrome)),
+                ],
+              ),
+            ),
+          if (what != null) ...[
+            const SizedBox(height: 10),
+            Text(what, style: const TextStyle(fontSize: 13.5, color: Palette.gold)),
+          ],
+          const SizedBox(height: 10),
+          for (final (i, trick) in tricks.indexed)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 74,
+                    child: Text(l10n.trickNumber(i + 1), style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
+                  ),
+                  for (final p in trick)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _Pip(card: p.card, by: v.names[p.seat], taken: trick.length == seatCount && p.seat == _takerOf(trick)),
+                    ),
+                  if (trick.length == seatCount)
+                    Expanded(
+                      child: Text(
+                        v.names[_takerOf(trick)],
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          Text(l10n.watchingNote, style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
         ],
       ),
     );

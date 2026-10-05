@@ -1627,6 +1627,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'See the whole game'**
   String get seeWholeGame;
+
+  /// Menu item at a live table: shares the address where others can watch the game.
+  ///
+  /// In en, this message translates to:
+  /// **'Share a link to watch'**
+  String get shareToWatch;
+
+  /// Marks a game being watched as it is played.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get liveNow;
+
+  /// Under a game being watched live: what a watcher can and cannot see.
+  ///
+  /// In en, this message translates to:
+  /// **'Hands stay hidden until the game is over; then the whole game is here, checked.'**
+  String get watchingNote;
+
+  /// A watched game is in its pass.
+  ///
+  /// In en, this message translates to:
+  /// **'Passing cards'**
+  String get passingNow;
+
+  /// A watched game's cards are being dealt.
+  ///
+  /// In en, this message translates to:
+  /// **'Dealing'**
+  String get dealingNow;
+
+  /// Whose card it is in a watched game.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} to play'**
+  String toPlayNow(String name);
 }
 
 class _AppLocalizationsDelegate

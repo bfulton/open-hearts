@@ -376,6 +376,44 @@ flow('a kept game, opened by its address: checked in the browser, then shown han
   if (new URL(nowhere.url()).pathname !== '/') throw new Error(`a bad table address stayed: ${nowhere.url()}`);
 });
 
+flow('a game watched as it is played, from the link a player shares', async ({ open, relay }) => {
+  // Ada alone in the pool is seated with three bots. Her menu shares the
+  // table's address; whoever opens it watches the game from outside it
+  // (packages/table, watch.dart): one seated player's device answers
+  // them with what everyone at the table sees, and no hand.
+  await relay();
+  const ada = await open();
+  await waitFor(ada, /^Play live/, { what: 'live play open', timeout: 40000 });
+  await click(ada, /^Your profile$/);
+  await waitFor(ada, /^Rocket$/, { what: 'the profile' });
+  await type(ada, 'Your name', 'Ada');
+  await click(ada, /^Done$/);
+  await waitFor(ada, /^Play live/, { what: 'the home screen again' });
+  await click(ada, /^Play live/);
+  await waitFor(ada, /^1 of 1 here  ·  rated$/, { what: 'Ada alone with three bots', timeout: 60000 });
+  await click(ada, /^Menu$/);
+  await waitFor(ada, /^Share a link to watch$/, { what: 'the table\'s menu' });
+  await click(ada, /^Share a link to watch$/);
+  await sleep(500);
+  const link = await ada.evaluate('navigator.clipboard.readText()');
+  if (!/\/table\/[0-9a-f]{32}$/.test(new URL(link).pathname)) throw new Error(`not a table's link: ${link}`);
+
+  const watcher = await open({ url: `${link}?e2e=1`, ready: /^The game$/ });
+  await waitFor(watcher, /^Live$/, { what: 'the game, live', timeout: 60000 });
+  // Ada plays on; the watcher sees the cards land, by name and player.
+  const until = Date.now() + 240000;
+  while (Date.now() < until && !(await has(watcher, /^\w+ of \w+, \S/))) {
+    await act(ada);
+    await sleep(300);
+  }
+  if (!(await has(watcher, /^\w+ of \w+, \S/))) throw new Error(`no card seen from outside\nAda saw: ${(await texts(ada)).join(' | ')}\nthe watcher saw: ${(await texts(watcher)).join(' | ')}`);
+  await waitFor(watcher, /^Trick 1$/, { what: 'the first trick' });
+  // Nothing of anybody's hand: a hand would be thirteen cards with no
+  // player to them, and every card here has one.
+  const bare = (await texts(watcher)).filter((t) => /^\w+ of \w+$/.test(t));
+  if (bare.length) throw new Error(`cards with nobody's play to them, seen from outside: ${bare.join(', ')}`);
+});
+
 flow('a second device, brought in by the code the first one shows', async ({ open }) => {
   // A subscription is a person's, not a device's (docs/06-service.md).
   // The first device shows a code; the second arrives carrying it, and

@@ -33,3 +33,4 @@ export 'src/spec.dart';
 export 'src/time_bank.dart';
 export 'src/timing.dart';
 export 'src/transport.dart';
+export 'src/watch.dart';

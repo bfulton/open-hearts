@@ -253,5 +253,11 @@
   "cantCheckGame": "Cet appareil ne peut pas vérifier la donne, il ne peut donc pas montrer la partie.",
   "trickNumber": "Pli {trick}",
   "seatPlayer": "Joueur {seat}",
-  "seeWholeGame": "Voir toute la partie"
+  "seeWholeGame": "Voir toute la partie",
+  "shareToWatch": "Partager un lien pour regarder",
+  "liveNow": "En direct",
+  "watchingNote": "Les mains restent cachées jusqu’à la fin de la partie ; ensuite toute la partie est ici, vérifiée.",
+  "passingNow": "Passe des cartes",
+  "dealingNow": "Distribution",
+  "toPlayNow": "À {name} de jouer"
 }

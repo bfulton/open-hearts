@@ -29,13 +29,23 @@ import 'transport.dart';
 
 class RelayTransport implements Transport {
   RelayTransport(
-      {required List<Uri> relays, required this.signer, required this.table, this.log, int pinned = 0, int refusalMs = RelayGroup.defaultRefusalMs})
+      {required List<Uri> relays,
+      required this.signer,
+      required this.table,
+      this.log,
+      int pinned = 0,
+      int refusalMs = RelayGroup.defaultRefusalMs,
+      bool watchOnly = false})
       : relays = Relays.turnedBy(relaysForTag(relays, table), table, pinned: pinned) {
+    final watch = const Filter(kinds: [TableKinds.watch]).toJson()..['#t'] = [table];
     _group = RelayGroup(
       urls: this.relays,
       refusalMs: refusalMs,
-      subscriptions: {
+      // Someone watching (watch.dart) reads the watch lane and nothing
+      // else: not the table's own traffic, which is not theirs to carry.
+      subscriptions: watchOnly ? {'watch': [watch]} : {
         'table': [
+          watch,
           const Filter(kinds: [TableKinds.table]).toJson()..['#t'] = [table],
           Filter(kinds: const [TableKinds.signal], tags: {
             'p': [signer.publicKey]
@@ -81,6 +91,7 @@ class RelayTransport implements Transport {
   final _disconnected = StreamController<PublicKey>.broadcast();
   final _signals = StreamController<Signal>.broadcast();
   final _lobby = StreamController<NostrEvent>.broadcast();
+  final _watch = StreamController<({PublicKey from, Map<String, Object?> content})>.broadcast();
 
   /// Resolves once some relay has acknowledged the subscription.
   Future<void> get ready => _group.ready;
@@ -111,6 +122,18 @@ class RelayTransport implements Transport {
   /// after that reads [lobbySoFar] first; what the other relays hold
   /// follows as it arrives.
   Stream<NostrEvent> get lobby => _lobby.stream;
+
+  /// The watch lane (watch.dart): a watcher saying it is there, a
+  /// player's view of the table — stamped with who signed it.
+  Stream<({PublicKey from, Map<String, Object?> content})> get watch => _watch.stream;
+
+  /// Says [content] on the watch lane, on every relay: a watcher reads
+  /// whichever it reaches.
+  void sayWatch(Map<String, Object?> content) {
+    _group.publish(NostrEvent.sign(signer, kind: TableKinds.watch, content: jsonEncode(content), tags: [
+      ['t', table],
+    ]), everywhere: true);
+  }
 
   /// Every lobby event received so far, in order.
   final List<NostrEvent> lobbySoFar = [];
@@ -212,7 +235,11 @@ class RelayTransport implements Transport {
       return true;
     }
     if (e.pubkey == signer.publicKey) return true;
-    if (e.kind == TableKinds.table) {
+    if (e.kind == TableKinds.watch) {
+      try {
+        _watch.add((from: e.pubkey, content: Map<String, Object?>.from(jsonDecode(e.content) as Map)));
+      } catch (_) {}
+    } else if (e.kind == TableKinds.table) {
       try {
         final message = Map<String, Object?>.from(jsonDecode(e.content) as Map);
         _incoming.add((from: e.pubkey, message: message));
@@ -243,6 +270,7 @@ class RelayTransport implements Transport {
     _disconnected.close();
     _signals.close();
     _lobby.close();
+    _watch.close();
   }
 }
 

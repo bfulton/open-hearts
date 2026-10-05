@@ -253,5 +253,11 @@
   "cantCheckGame": "Este dispositivo no puede comprobar el reparto, así que no puede mostrar la partida.",
   "trickNumber": "Baza {trick}",
   "seatPlayer": "Jugador {seat}",
-  "seeWholeGame": "Ver la partida entera"
+  "seeWholeGame": "Ver la partida entera",
+  "shareToWatch": "Compartir enlace para mirar",
+  "liveNow": "En directo",
+  "watchingNote": "Las manos quedan ocultas hasta que termine la partida; entonces la partida entera estará aquí, comprobada.",
+  "passingNow": "Pasando cartas",
+  "dealingNow": "Repartiendo",
+  "toPlayNow": "Juega {name}"
 }

@@ -1161,4 +1161,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get seeWholeGame => 'See the whole game';
+
+  @override
+  String get shareToWatch => 'Share a link to watch';
+
+  @override
+  String get liveNow => 'Live';
+
+  @override
+  String get watchingNote =>
+      'Hands stay hidden until the game is over; then the whole game is here, checked.';
+
+  @override
+  String get passingNow => 'Passing cards';
+
+  @override
+  String get dealingNow => 'Dealing';
+
+  @override
+  String toPlayNow(String name) {
+    return '$name to play';
+  }
 }

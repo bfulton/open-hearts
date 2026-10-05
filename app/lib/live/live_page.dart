@@ -22,6 +22,8 @@ import '../ui/hand_fan.dart';
 import '../ui/gone.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
+import '../net/copy.dart';
+import '../net/share.dart';
 import '../ui/reading_time.dart';
 import '../ui/table_layout.dart';
 import '../ui/table_view.dart';
@@ -69,6 +71,15 @@ class _LivePageState extends State<LivePage> {
     if (!_c.awaitingPlay) return;
     final refusal = _c.playCard(card);
     if (refusal != null) _say(refusal);
+  }
+
+  /// The table's own address, for somebody to watch it from: the game
+  /// as it is played, and the whole of it once it is over.
+  Future<void> _shareToWatch() async {
+    final link = tableLink(_c.client.spec.id);
+    if (await shareLink(link)) return;
+    await copyText(link.toString());
+    if (mounted) _say(context.l10n.linkCopied);
   }
 
   void _say(String message) {
@@ -294,6 +305,7 @@ class _LivePageState extends State<LivePage> {
                 header: TableHeader(
                   game: game,
                   menu: [
+                    MenuAction(context.l10n.shareToWatch, icon: Icons.visibility_outlined, onSelected: _shareToWatch),
                     MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _leave, danger: true),
                     MenuAction(context.l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
                     MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {

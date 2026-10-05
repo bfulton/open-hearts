@@ -6,10 +6,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:deal/deal.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Card;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
 import 'package:open_hearts/net/record_check.dart';
+import 'package:engine/engine.dart' show Card, Phase, twoOfClubs;
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:table/src/sim/sim.dart';
@@ -125,6 +126,71 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('does not check out'), findsOneWidget);
     expect(find.text('Trick 1'), findsNothing);
+    await checking.close();
+  });
+
+  testWidgets('a game still being played is watched: the scores and each card as it comes, no hand; over, the checked game takes its place', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 1600)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    GameRecord? kept;
+    final views = StreamController<WatchedTable>();
+    final hands = checked.whereType<HandChecked>().toList();
+    final verdict = checked.last as RecordChecked;
+    final checking = StreamController<RecordCheck>();
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: ReviewPage(
+        table: played.spec.id,
+        load: (_) async => kept,
+        watch: (_) => views.stream,
+        check: (_) => checking.stream,
+      ),
+    ));
+    await tester.pump();
+    WatchedTable view(int seq, Phase phase, List<({int seat, Card card})> plays, {int? toPlay, List<int> totals = const [0, 0, 0, 0]}) => WatchedTable(
+          table: played.spec.id,
+          target: 50,
+          seq: seq,
+          hand: 0,
+          phase: phase,
+          names: const ['Ada', 'Bao', 'Cy', 'Dee'],
+          totals: totals,
+          taken: const [0, 0, 0, 0],
+          plays: plays,
+          toPlay: toPlay,
+        );
+    views.add(view(10, Phase.playing, [(seat: 2, card: twoOfClubs)], toPlay: 3));
+    await tester.pump();
+    expect(find.text('Live'), findsOneWidget);
+    expect(find.text('Hand 1  ·  Pass left'), findsOneWidget);
+    expect(find.text('Dee to play'), findsOneWidget);
+    expect(find.text('Trick 1'), findsOneWidget);
+    expect(find.bySemanticsLabel('2 of clubs, Cy'), findsOneWidget);
+
+    // A card later: the same trick, one more card.
+    views.add(view(11, Phase.playing, [(seat: 2, card: twoOfClubs), (seat: 3, card: Card.parse('KC'))], toPlay: 0));
+    await tester.pump();
+    expect(find.text('Ada to play'), findsOneWidget);
+    expect(find.bySemanticsLabel('king of clubs, Dee'), findsOneWidget);
+
+    // Over: the record is asked for until it is kept, then checked and shown.
+    views.add(view(400, Phase.gameOver, const [], totals: const [12, 55, 30, 8]));
+    await tester.pump();
+    await tester.pump(ReviewPage.recordAgain);
+    kept = played;
+    await tester.pump(ReviewPage.recordAgain);
+    await tester.pump();
+    for (final h in hands) {
+      checking.add(h);
+    }
+    checking.add(verdict);
+    await tester.pumpAndSettle();
+    expect(find.text('Live'), findsNothing);
+    expect(find.widgetWithText(ChoiceChip, '4'), findsOneWidget, reason: 'the whole game, checked');
+    // Let go by the page once the game was over: closed, not waited on.
+    unawaited(views.close());
     await checking.close();
   });
 }

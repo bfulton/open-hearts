@@ -253,5 +253,11 @@
   "cantCheckGame": "Este dispositivo não consegue verificar a distribuição, por isso não pode mostrar a partida.",
   "trickNumber": "Vaza {trick}",
   "seatPlayer": "Jogador {seat}",
-  "seeWholeGame": "Ver a partida inteira"
+  "seeWholeGame": "Ver a partida inteira",
+  "shareToWatch": "Compartilhar link para assistir",
+  "liveNow": "Ao vivo",
+  "watchingNote": "As mãos ficam ocultas até o jogo acabar; então o jogo inteiro estará aqui, verificado.",
+  "passingNow": "Passando cartas",
+  "dealingNow": "Distribuindo",
+  "toPlayNow": "Vez de {name}"
 }

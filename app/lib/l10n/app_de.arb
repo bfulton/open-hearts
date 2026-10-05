@@ -253,5 +253,11 @@
   "cantCheckGame": "Dieses Gerät kann das Geben nicht prüfen und die Partie daher nicht zeigen.",
   "trickNumber": "Stich {trick}",
   "seatPlayer": "Spieler {seat}",
-  "seeWholeGame": "Die ganze Partie ansehen"
+  "seeWholeGame": "Die ganze Partie ansehen",
+  "shareToWatch": "Link zum Zuschauen teilen",
+  "liveNow": "Live",
+  "watchingNote": "Die Karten bleiben verdeckt, bis das Spiel vorbei ist; dann steht hier das ganze Spiel, geprüft.",
+  "passingNow": "Karten werden weitergegeben",
+  "dealingNow": "Es wird gegeben",
+  "toPlayNow": "{name} ist am Zug"
 }
