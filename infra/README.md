@@ -37,7 +37,7 @@ What Open Hearts has in Cloudflare and Stripe, defined here and checked
   their tests: `node --test infra/*.test.mjs` (no network, no keys).
 
 Each line it prints is one of four kinds: `would …`, a change `--apply`
-makes; `by hand:`, a difference only the owner can fix (below);
+makes; `by hand:`, a difference that has to be fixed by hand (below);
 `unread:`, something the credentials could not read, in the API's own
 words; `ok`, a part that matches. No secret is ever printed, nor an
 address: the variables holding them are named instead. The Stripe part

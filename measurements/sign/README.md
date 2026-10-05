@@ -31,8 +31,10 @@ Two hundred times. A turn at a table costs a peer one signature and
 six to eight verifications, so the JavaScript figure is close to a
 second of main-thread time per turn, on a fast machine, and the wasm
 figure is a couple of milliseconds. The web app signs and verifies
-through the wasm (`dart:js_interop`), with the Dart implementation as
-the reference it is checked against; the VM keeps `bip340`.
+through this wasm, committed as `app/web/schnorr.wasm` (`dart:js_interop`),
+which the relay worker also verifies with. The Dart VM uses
+`crypto/schnorr`, the same `k256` code as a native library, and falls
+back to `bip340` when that is not built.
 
 `check.mjs` proves the wasm against BIP-340's published test vectors —
 the signature is bit-identical to the reference, a good signature

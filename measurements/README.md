@@ -8,4 +8,4 @@ Numbers the design depends on, each with the code that produced it.
 | [`sign/`](sign/README.md) | How long do BIP-340 signatures take in a browser? | 100 ms in Dart compiled to JavaScript, 0.6 ms in wasm; the web app uses the wasm |
 
 The bots' strength is measured by `packages/engine/tool/knobs.dart` and
-`tool/arena.dart`.
+`packages/engine/tool/arena.dart`.
