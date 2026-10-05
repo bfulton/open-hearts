@@ -194,11 +194,16 @@ test('Pages: preview has its own store and no household', () => {
   const have = liveProduction();
   for (const k of ['OH_STRIPE_PRICE', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET']) delete have.env_vars[k];
   have.kv_namespaces.OH_STORE.namespace_id = 'ab41';
+  have.r2_buckets.OH_RECORDS.name = 'open-hearts-records-preview';
   delete have.durable_object_namespaces;
   assert.deepEqual(pagesEnvPlan(pages.environments.preview, have, ids), { patch: {}, lines: [], owner: [] });
   // And production's store on preview is a rebinding.
   have.kv_namespaces.OH_STORE.namespace_id = '5b65';
   assert.deepEqual(pagesEnvPlan(pages.environments.preview, have, ids).patch, { kv_namespaces: { OH_STORE: { namespace_id: 'ab41' } } });
+  // As is production's bucket: a game played on a preview is no game of record.
+  have.kv_namespaces.OH_STORE.namespace_id = 'ab41';
+  have.r2_buckets.OH_RECORDS.name = 'open-hearts-records';
+  assert.deepEqual(pagesEnvPlan(pages.environments.preview, have, ids).lines, ['rebind OH_RECORDS (r2_buckets) to open-hearts-records-preview']);
 });
 
 test('Pages: a plain variable is set, a stray one removed', () => {

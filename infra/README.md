@@ -8,8 +8,8 @@ What Open Hearts has in Cloudflare and Stripe, defined here and checked
   names of its secrets, and its bindings: KV `OH_STORE`, R2
   `OH_RECORDS`, the relay's `HOUSEHOLD` object on production only; no
   Web Analytics); the KV namespaces and the R2 buckets, production's and
-  preview's own (no r2.dev
-  address, no custom domain, no CORS); the Realtime TURN key; the zones
+  preview's own (no r2.dev address, no custom domain, no CORS); the
+  Realtime TURN key; the zones
   openhearts.game and openhearts.lol — their DNS records, the settings
   pinned (email obfuscation off, on purpose), Bot Fight Mode off, the
   redirect and rate-limit rules, Email Routing (help@ forwarded, no
