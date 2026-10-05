@@ -133,8 +133,13 @@ ul.points .d { color: var(--chrome-dim); font-size: 14.5px; }
 }
 .langs a:hover { border-color: var(--chrome-dim); }
 .langs a[aria-current] { background: var(--gold); border-color: var(--gold); color: var(--felt-dark); font-weight: 650; }
-footer .langs { justify-content: center; margin: 0 0 12px; }
-footer .langs a { font-size: 13px; padding: 1px 10px; }
+.lang-pick {
+  display: block; margin: 0 auto 12px;
+  font: inherit; font-size: 13.5px; color: var(--chrome);
+  background: var(--felt-dark); border: 1px solid var(--edge); border-radius: 8px;
+  padding: 4px 10px;
+}
+.lang-pick:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
 
 footer.wrap {
@@ -161,7 +166,7 @@ footer p { color: var(--chrome-dim); margin: 0; }
   h2, h3, b, a, p, li, .tagline, ul.points .d, footer, footer p { color: #000 !important; }
   .cta { box-shadow: none; border: 2px solid #000; background: #fff; }
   .way { border-color: #999; }
-  .langs { display: none; }
+  .langs, .lang-pick { display: none; }
   .skip { display: none; }
   main a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 90%; }
   section { break-inside: avoid-page; }

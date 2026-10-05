@@ -14,6 +14,7 @@
 //   {{url}}         the page's own address
 //   {{alternates}}  <link rel="alternate"> for each language's copy
 //   {{langs}}       a link to each language's copy, the page's own marked
+//   {{langOptions}} the same, as a <select>'s options
 //   {{> name}}      pages/_name.html, filled in the same way
 import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -58,6 +59,10 @@ export function render(page, language, words) {
     langs: languages
       .map((l) => `<li><a href="${base(l.code)}${path}" hreflang="${l.lang}" lang="${l.lang}"` +
         `${l.code === language.code ? ' aria-current="true"' : ''}>${l.name}</a></li>`)
+      .join('\n'),
+    langOptions: languages
+      .map((l) => `<option value="${base(l.code)}${path}" lang="${l.lang}"` +
+        `${l.code === language.code ? ' selected' : ''}>${l.name}</option>`)
       .join('\n'),
   };
   const fill = (text, depth = 0) => {

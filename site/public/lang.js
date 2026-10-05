@@ -1,5 +1,6 @@
-// The site's language. A language link keeps the choice under the app's
-// own name for it (app/lib/l10n/l10n.dart), so the game follows it too.
+// The site's language. A language link, or the footer's menu, keeps the
+// choice under the app's own name for it (app/lib/l10n/l10n.dart), so the
+// game follows it too.
 // With nothing chosen, an English page sends a visitor whose browser
 // prefers one of the others to that one, as the app does with a device's
 // language. A page in another language is never left: its address was
@@ -23,11 +24,21 @@
     }
   }
 
+  const keep = (lang) => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(lang.slice(0, 2)));
+    } catch {}
+  };
   document.addEventListener('click', (e) => {
     const link = e.target.closest('a[hreflang]');
-    if (!link) return;
-    try {
-      localStorage.setItem(KEY, JSON.stringify(link.hreflang.slice(0, 2)));
-    } catch {}
+    if (link) keep(link.hreflang);
+  });
+  // The footer's menu: the same choice, then the page in that language.
+  document.addEventListener('change', (e) => {
+    const pick = e.target.closest('select.lang-pick');
+    if (!pick) return;
+    const option = pick.selectedOptions[0];
+    keep(option.lang);
+    location.href = option.value;
   });
 })();

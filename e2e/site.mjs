@@ -1,6 +1,6 @@
 // The marketing site, built in every language (site/build.mjs) and served
 // the way Pages serves it: a page in a browser that prefers Spanish
-// becomes the Spanish page, a language link is a choice that sticks, and
+// becomes the Spanish page, a language picked is a choice that sticks, and
 // no page in any language is wider than a phone.
 //
 //   node e2e/site.mjs
@@ -51,7 +51,7 @@ try {
     check(new URL(page.url()).pathname === '/es/terms', 'a Spanish browser is sent to /es/terms');
 
     // English chosen: kept, and the English page stays English.
-    await page.click('footer a[hreflang="en"]');
+    await page.selectOption('footer select.lang-pick', { label: 'English' });
     await page.waitForURL(`${site}/terms`);
     await page.goto(`${site}/`);
     await page.waitForLoadState('load');
