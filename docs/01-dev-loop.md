@@ -15,7 +15,7 @@ Pages project `open-hearts`:
 
 | Path | What |
 |---|---|
-| `/` | `site/`, copied as is |
+| `/` | `site/`, built in each language by `site/build.mjs` |
 | `/api/` | the service's handlers, `service/functions/` published as `_worker.js` ([doc 06](06-service.md)) |
 | `/play/` | the Flutter web build, `--base-href /play/` |
 | `/measure/shuffle/` | the deal benchmark, when its wasm has been built ([measurements](../measurements/README.md)) |
@@ -40,7 +40,7 @@ also writes `play/build-info.json` with the same sha.
   returns to the foreground. If the published sha differs from its own,
   it shows a tap-to-reload pill. Local runs, tests and CI keep the
   placeholder, so the pill never appears there.
-- `site/_headers` marks the entry points `no-store`, so a cached
+- `site/public/_headers` marks the entry points `no-store`, so a cached
   bootstrap cannot load an old build.
 - A sha ending in `+` was deployed from a dirty tree.
 

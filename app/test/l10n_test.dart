@@ -176,6 +176,18 @@ void main() {
       expect(languageInAddress(Uri.parse('https://x/play/?lang=ja')), isNull);
       expect(languageInAddress(Uri.parse('https://x/play/')), isNull);
     });
+
+    test('a chosen language is kept: the address\'s for next time, or the site\'s', () async {
+      SharedPreferences.setMockInitialValues({});
+      expect(await chosenLanguage(Uri.parse('https://x/play/')), isNull);
+      expect(await chosenLanguage(Uri.parse('https://x/play/?lang=fr')), const Locale('fr'));
+      expect(await chosenLanguage(Uri.parse('https://x/play/')), const Locale('fr'));
+      // What site/lang.js keeps when a language link is followed.
+      SharedPreferences.setMockInitialValues({chosenLanguageKey: 'es'});
+      expect(await chosenLanguage(Uri.parse('https://x/play/')), const Locale('es'));
+      SharedPreferences.setMockInitialValues({chosenLanguageKey: 'ja'});
+      expect(await chosenLanguage(Uri.parse('https://x/play/')), isNull);
+    });
   });
 
   group('the screens', () {

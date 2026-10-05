@@ -6,7 +6,7 @@
 // records are all here — but without this a page opened on a train, or
 // from the home screen in airplane mode, is the browser's own "no
 // internet" page: Flutter's service worker is a stub that unregisters
-// itself, and the entry points are no-store (site/_headers) so that a
+// itself, and the entry points are no-store (site/public/_headers) so that a
 // deploy reaches a phone at once.
 //
 // So it is the network first, always, and this copy only when the

@@ -50,7 +50,7 @@ Future<void> main() async {
   await RemoteSettings.current.load();
   unawaited(RemoteSettings.current.refresh());
   _askAgain();
-  runApp(const OpenHeartsApp());
+  runApp(OpenHeartsApp(locale: await chosenLanguage()));
 }
 
 /// Asks for the config again after as long as it last said to wait.
@@ -70,7 +70,11 @@ void _askAgain() => Timer(waits.configEvery, () {
 /// or a dead link says nothing at all, which is why silence is still
 /// timed out.
 class OpenHeartsApp extends StatefulWidget {
-  const OpenHeartsApp({super.key});
+  const OpenHeartsApp({super.key, this.locale});
+
+  /// The language chosen in the address or on the site; null for the
+  /// device's own (l10n/l10n.dart).
+  final Locale? locale;
 
   @override
   State<OpenHeartsApp> createState() => _OpenHeartsAppState();
@@ -118,11 +122,11 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       // The device's language where the app speaks it, English where it
-      // does not; `?lang=` in the address chooses one instead, for a
-      // person on a borrowed browser and for the suites (l10n/l10n.dart).
+      // does not, unless one was chosen: `?lang=` in the address, or a
+      // language link on the site, either kept for next time.
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      locale: languageInAddress(),
+      locale: widget.locale,
       // Any words on any screen can be selected and copied: a name, a
       // rule, an error to send us.
       builder: (context, child) => TouchProbe(child: CopyableSelection(child: child ?? const SizedBox())),

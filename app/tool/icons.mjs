@@ -23,8 +23,8 @@ const out = [
   ['web/icons/Icon-512.png', 512, svg],
   ['web/icons/Icon-maskable-192.png', 192, maskable],
   ['web/icons/Icon-maskable-512.png', 512, maskable],
-  ['../site/icon-512.png', 512, svg],
-  ['../site/favicon.png', 64, svg],
+  ['../site/public/icon-512.png', 512, svg],
+  ['../site/public/favicon.png', 64, svg],
   ...Object.entries({ mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 })
     .map(([d, px]) => [`android/app/src/main/res/mipmap-${d}/ic_launcher.png`, px, svg]),
 ];

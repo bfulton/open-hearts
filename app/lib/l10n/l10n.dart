@@ -11,6 +11,7 @@ library;
 
 import 'package:engine/engine.dart';
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart' show Pace;
 
 import 'app_localizations.dart';
@@ -61,8 +62,27 @@ String flag(bool b) => b ? 'true' : 'false';
 
 /// The language the address asks for with `?lang=`, if the app speaks
 /// it; null leaves the choice to the device.
-Locale? languageInAddress([Uri? at]) {
-  final asked = (at ?? Uri.base).queryParameters['lang']?.toLowerCase();
+Locale? languageInAddress([Uri? at]) => _spoken((at ?? Uri.base).queryParameters['lang']);
+
+/// Where a chosen language is kept. The site's language links keep
+/// theirs under the same name (site/lang.js), so a language picked
+/// there is the app's too.
+const chosenLanguageKey = 'language';
+
+/// The language a person chose: the address's, kept for next time, or
+/// the one kept from before. Null leaves the choice to the device.
+Future<Locale?> chosenLanguage([Uri? at]) async {
+  final prefs = await SharedPreferences.getInstance();
+  final asked = languageInAddress(at);
+  if (asked != null) {
+    await prefs.setString(chosenLanguageKey, asked.languageCode);
+    return asked;
+  }
+  return _spoken(prefs.getString(chosenLanguageKey));
+}
+
+Locale? _spoken(String? code) {
+  final asked = code?.toLowerCase();
   if (asked == null) return null;
   for (final l in AppLocalizations.supportedLocales) {
     if (l.languageCode == asked) return l;

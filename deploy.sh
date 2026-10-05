@@ -3,7 +3,7 @@
 #
 # Assembles one directory and uploads it once:
 #
-#   /            the marketing site (site/, copied verbatim)
+#   /            the marketing site, in each of its languages (site/build.mjs)
 #   /api/        the service's handlers (service/functions/worker.mjs,
 #                published as _worker.js)
 #   /play/       the Flutter web build, base-href /play/
@@ -140,7 +140,7 @@ echo "==> building $BUILD_TAG -> $LABEL"
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
-cp -r site/. "$STAGE"/
+node site/build.mjs "$STAGE"
 # The service's handlers (docs/06-service.md) run as the Pages worker:
 # _worker.js/ at the root of what is published answers /api/…, and
 # hands everything else to the static assets. Its secrets — the TURN

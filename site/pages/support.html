@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+{{> head}}
+<title>{{support.meta.title}}</title>
+<meta name="description" content="{{support.meta.description}}">
+<meta property="og:title" content="{{support.meta.title}}">
+<meta property="og:description" content="{{support.meta.description}}">
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+
+<a class="skip" href="#main">{{common.skip}}</a>
+
+<header>
+  <div class="wrap">
+    <a class="home" href="{{base}}/">← Open Hearts</a>
+    <div class="suits" aria-hidden="true">
+      <span class="b">♣</span><span class="r">♦</span><span class="b">♠</span><span class="r">♥</span>
+    </div>
+    <h1>{{support.header.title}}</h1>
+    <p class="tagline">{{support.header.tagline}}</p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section>
+    <h2 id="help">{{support.help.title}}</h2>
+    <ul class="points">
+      <li>
+        <span aria-hidden="true" class="pip g">♠</span>
+        <div>
+          <b>{{support.help.p1}}</b>
+          <span>{{support.help.p2}}</span>
+        </div>
+      </li>
+      <li>
+        <span aria-hidden="true" class="pip r">♥</span>
+        <div>
+          <b>{{support.help.p3}}</b>
+          <span>{{support.help.p4}}</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 id="faq">{{support.faq.title}}</h2>
+
+    <h3 id="play">{{support.faq.p1}}</h3>
+    <p>{{support.faq.p2}}</p>
+
+    <h3 id="stores">{{support.faq.p3}}</h3>
+    <p>{{support.faq.p4}}</p>
+
+    <h3 id="subscribe">{{support.faq.p5}}</h3>
+    <p>{{support.faq.p6}}</p>
+
+    <h3 id="cancel">{{support.faq.p7}}</h3>
+    <p>{{support.faq.p8}}</p>
+
+    <h3 id="devices">{{support.faq.p9}}</h3>
+    <p>{{support.faq.p10}}</p>
+
+    <h3 id="lost">{{support.faq.p11}}</h3>
+    <p>{{support.faq.p12}}</p>
+
+    <h3 id="accessibility">{{support.faq.p13}}</h3>
+    <p>{{support.faq.p14}}</p>
+
+    <h3 id="languages">{{support.faq.p15}}</h3>
+    <p>{{support.faq.p16}}</p>
+
+    <h3 id="fair">{{support.faq.p17}}</h3>
+    <p>{{support.faq.p18}}</p>
+
+    <h3 id="privacy">{{support.faq.p19}}</h3>
+    <p>{{support.faq.p20}}</p>
+  </section>
+</main>
+
+{{> footer}}
+
+</body>
+</html>

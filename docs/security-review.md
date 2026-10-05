@@ -189,7 +189,7 @@ frame (`service/do/ws.test.mjs`).
 
 Every path is served with `Content-Security-Policy: frame-ancestors
 'none'`, `X-Frame-Options: DENY`, HSTS, `nosniff` and a strict referrer
-policy (`site/_headers`), so no other page can frame the app and steer
+policy (`site/public/_headers`), so no other page can frame the app and steer
 its one-tap buttons. The app loads no third-party script. Cloudflare's
 Web Analytics and email obfuscation are off, since both inject scripts.
 Open: a fuller CSP (`script-src`) has not been set. The Flutter build

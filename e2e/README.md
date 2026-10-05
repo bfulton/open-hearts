@@ -22,6 +22,7 @@ node e2e/offline.mjs                    # the network taken away a piece at a ti
 node e2e/offline.mjs --only "airplane"
 node e2e/shots.mjs                      # screenshots at docs/05's shapes, in app/build/shots/
 node e2e/longpress_copy.mjs             # long-press Copy on an iPhone user agent
+node e2e/site.mjs                       # the marketing site in each language: redirect, choice kept, fits a phone
 node --test e2e/deal_worker.test.mjs e2e/offline_worker.test.mjs
 ```
 

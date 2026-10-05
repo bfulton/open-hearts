@@ -19,7 +19,7 @@ private to the person holding it.
 | [`app/`](app/) | The Flutter app, one codebase for web, Android and iOS |
 | [`service/`](service/) | The Cloudflare worker's handlers (licences, the shop, TURN), the relay, the jurors of last resort, and a local relay for tests |
 | [`e2e/`](e2e/) | Browser suites that drive the built app through its accessibility tree |
-| [`site/`](site/) | The marketing site, static HTML |
+| [`site/`](site/) | The marketing site: page templates, their words in each language, and the build that joins them |
 | [`infra/`](infra/), [`observability/`](observability/) | Cloudflare, Stripe and New Relic configuration, checked and applied by script |
 | [`measurements/`](measurements/README.md) | Benchmarks behind the design's numbers |
 
