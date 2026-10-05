@@ -102,6 +102,7 @@ class GameOverSheet extends StatelessWidget {
     required this.onNewGame,
     this.onCopyRecord,
     this.onSeeGame,
+    this.onHome,
     this.seeds,
     this.avatars,
     this.rating,
@@ -139,6 +140,10 @@ class GameOverSheet extends StatelessWidget {
   /// is kept (review_page.dart). In place of the record to copy.
   final VoidCallback? onSeeGame;
 
+  /// Back to the front door, for a player done for now: beside the
+  /// record, where the button is another game.
+  final VoidCallback? onHome;
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -175,8 +180,13 @@ class GameOverSheet extends StatelessWidget {
       note: rating == null ? null : _RatingLine(change: rating!),
       action: action ?? l10n.newGame,
       onAction: onNewGame,
-      secondary: onSeeGame != null ? l10n.seeWholeGame : (onCopyRecord == null ? null : l10n.copyRecord),
-      onSecondary: onSeeGame ?? onCopyRecord,
+      quiet: [
+        if (onHome != null) (label: l10n.home, onPressed: onHome!),
+        if (onSeeGame != null)
+          (label: l10n.seeWholeGame, onPressed: onSeeGame!)
+        else if (onCopyRecord != null)
+          (label: l10n.copyRecord, onPressed: onCopyRecord!),
+      ],
     );
   }
 }
@@ -192,8 +202,7 @@ class _Sheet extends StatelessWidget {
     required this.onAction,
     this.subtitle,
     this.note,
-    this.secondary,
-    this.onSecondary,
+    this.quiet = const [],
   });
 
   final String title;
@@ -212,9 +221,8 @@ class _Sheet extends StatelessWidget {
   final String action;
   final VoidCallback onAction;
 
-  /// A quieter second action under the first, when there is one.
-  final String? secondary;
-  final VoidCallback? onSecondary;
+  /// Quieter actions under the first, side by side, when there are any.
+  final List<({String label, VoidCallback onPressed})> quiet;
 
   @override
   Widget build(BuildContext context) {
@@ -288,12 +296,19 @@ class _Sheet extends StatelessWidget {
                             fontSize: 15, fontWeight: FontWeight.w700)),
                   ),
                 ),
-                if (secondary != null) ...[
+                if (quiet.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  TextButton(
-                    onPressed: onSecondary,
-                    style: TextButton.styleFrom(foregroundColor: Palette.chromeDim),
-                    child: Text(secondary!, style: const TextStyle(fontSize: 13)),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    children: [
+                      for (final q in quiet)
+                        TextButton(
+                          onPressed: q.onPressed,
+                          style: TextButton.styleFrom(foregroundColor: Palette.chromeDim),
+                          child: Text(q.label, style: const TextStyle(fontSize: 13)),
+                        ),
+                    ],
                   ),
                 ],
               ],

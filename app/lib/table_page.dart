@@ -189,6 +189,7 @@ class _TablePageState extends State<TablePage> {
                   seeds: _seeds,
                   avatars: _avatars,
                   onNewGame: _controller.newGame,
+                  onHome: () => Navigator.of(context).maybePop(),
                   onCopyRecord: _copyRecord,
                 ),
 
