@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show Selectable, SelectionRegistrar;
 
 import '../net/copy.dart';
 
@@ -69,4 +70,56 @@ class _CopyableSelectionState extends State<CopyableSelection> {
       child: widget.child,
     );
   }
+}
+
+/// Every page's way into [CopyableSelection]: its text is selectable
+/// while its route is the one on top, and out of the selection while
+/// another covers it.
+///
+/// The selection sits above the navigator, so a page under another is
+/// still in it — and a page covered before it was ever laid out (a
+/// reload landing on a page over the front door, a game rejoined as the
+/// app starts) has text nobody has measured. The selection orders its
+/// text by where each piece is on the screen, every time any of it
+/// changes, and asking an unmeasured piece where it is throws: once a
+/// second while the front door under a table ticked its online count.
+///
+/// Wraps the theme's own transitions (theme.dart), which every page
+/// route builds through; the same widget either way, so a page covered
+/// and uncovered keeps its state.
+class SelectionWhileCurrent extends PageTransitionsBuilder {
+  const SelectionWhileCurrent(this.inner);
+
+  final PageTransitionsBuilder inner;
+
+  @override
+  Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation,
+          Animation<double> secondaryAnimation, Widget child) =>
+      inner.buildTransitions(route, context, animation, secondaryAnimation, _WhileCurrent(child: child));
+}
+
+class _WhileCurrent extends StatelessWidget {
+  const _WhileCurrent({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final outer = SelectionContainer.maybeOf(context);
+    if (outer == null) return child;
+    final current = ModalRoute.isCurrentOf(context) ?? true;
+    return SelectionRegistrarScope(registrar: current ? outer : const _Nobody(), child: child);
+  }
+}
+
+/// A registrar that takes nothing: a covered page's text, out of the
+/// selection.
+class _Nobody implements SelectionRegistrar {
+  const _Nobody();
+
+  @override
+  void add(Selectable selectable) {}
+
+  @override
+  void remove(Selectable selectable) {}
 }

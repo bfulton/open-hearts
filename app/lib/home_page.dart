@@ -388,12 +388,6 @@ class _HomePageState extends State<HomePage> {
     final kept = seats.load();
     if (kept == null || !mounted) return;
     if (kept.spec.seatOf(signer.publicKey) == null || (kept.spec.sealed && !dealReady)) return seats.clear();
-    // Over the front door once it has been drawn, not before: a page
-    // pushed over one never laid out leaves its text unmeasured, and the
-    // selection over the whole app (ui/selection.dart) asks every text
-    // where it is each time the door below changes.
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
     _toTable(kept.spec, kept.names, kept.avatars, journal: kept.journal);
   }
 

@@ -7,6 +7,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'ui/selection.dart';
+
 abstract final class Felt {
   static const dark = Color(0xFF06231A);
   static const mid = Color(0xFF0E3B2E);
@@ -55,6 +57,11 @@ ThemeData buildTheme() {
   final base = ThemeData.dark(useMaterial3: true);
   return base.copyWith(
     scaffoldBackgroundColor: Felt.dark,
+    // The platform's page transitions, each page's text in the app-wide
+    // selection only while it is the page on top (ui/selection.dart).
+    pageTransitionsTheme: PageTransitionsTheme(builders: {
+      for (final e in base.pageTransitionsTheme.builders.entries) e.key: SelectionWhileCurrent(e.value),
+    }),
     colorScheme: base.colorScheme.copyWith(
       primary: Palette.gold,
       surface: Felt.mid,
