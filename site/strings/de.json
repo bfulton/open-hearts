@@ -56,8 +56,9 @@
       }
     },
     "help": {
-      "title": "Hilfe",
-      "text": "Nutze <i>Sag uns, was kaputt ist</i> im Menü des Spiels, sieh auf der <a href=\"{{base}}/support\">Hilfeseite</a> nach oder schreib an <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
+      "title": "Brauchst du Hilfe?",
+      "text": "Nutze <i>Sag uns, was kaputt ist</i> im Menü des Spiels, sieh auf der <a href=\"{{base}}/support\">Hilfeseite</a> nach oder schreib an <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "menuAlt": "Das Menü des Spiels, geöffnet, mit dem Zeiger auf Sag uns, was kaputt ist"
     }
   },
   "support": {
@@ -100,7 +101,7 @@
       "p20": "Siehe die <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>."
     },
     "rules": {
-      "title": "So funktioniert Hearts",
+      "title": "Wie spielt man Hearts?",
       "r1": "Vier Spieler, je dreizehn Karten.",
       "r2": "Drei Karten weitergeben: nach links, nach rechts, gegenüber, dann kein Tausch.",
       "r3": "Die Kreuz 2 spielt aus. Bediene, wenn du kannst.",

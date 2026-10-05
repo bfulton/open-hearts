@@ -8,13 +8,14 @@
 // strings/<lang>.json; every language must have every key English has,
 // and no other. A string may use the placeholders below as well.
 //
+//   {{code}}        the page's language, as its path has it: en, es
 //   {{lang}}        the page's language, for <html lang>
 //   {{locale}}      the same, for og:locale
 //   {{base}}        '' in English, '/es' in Spanish: the start of a link
 //   {{url}}         the page's own address
 //   {{alternates}}  <link rel="alternate"> for each language's copy
 //   {{langs}}       a link to each language's copy, the page's own marked
-//   {{langOptions}} the same, as a <select>'s options
+//   {{langName}}    the page's language, by its own name
 //   {{> name}}      pages/_name.html, filled in the same way
 import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -48,6 +49,7 @@ const partial = (name) => readFileSync(join(here, 'pages', `_${name}.html`), 'ut
 export function render(page, language, words) {
   const path = pathOf(page);
   const builtins = {
+    code: language.code,
     lang: language.lang,
     locale: language.locale,
     base: base(language.code),
@@ -60,10 +62,7 @@ export function render(page, language, words) {
       .map((l) => `<li><a href="${base(l.code)}${path}" hreflang="${l.lang}" lang="${l.lang}"` +
         `${l.code === language.code ? ' aria-current="true"' : ''}>${l.name}</a></li>`)
       .join('\n'),
-    langOptions: languages
-      .map((l) => `<option value="${base(l.code)}${path}" lang="${l.lang}"` +
-        `${l.code === language.code ? ' selected' : ''}>${l.name}</option>`)
-      .join('\n'),
+    langName: language.name,
   };
   const fill = (text, depth = 0) => {
     if (depth > 4) throw new Error(`${page}: placeholders nested too deep`);

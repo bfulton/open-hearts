@@ -56,8 +56,9 @@
       }
     },
     "help": {
-      "title": "Ayuda",
-      "text": "Usa <i>Dinos qué falla</i> en el menú del juego, consulta la <a href=\"{{base}}/support\">página de ayuda</a> o escribe a <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
+      "title": "¿Necesitas ayuda?",
+      "text": "Usa <i>Dinos qué falla</i> en el menú del juego, consulta la <a href=\"{{base}}/support\">página de ayuda</a> o escribe a <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "menuAlt": "El menú del juego, abierto, con el puntero sobre Dinos qué falla"
     }
   },
   "support": {
@@ -100,7 +101,7 @@
       "p20": "Consulta la <a href=\"{{base}}/privacy\">política de privacidad</a>."
     },
     "rules": {
-      "title": "Cómo se juega a Corazones",
+      "title": "¿Cómo se juega a Corazones?",
       "r1": "Cuatro jugadores, trece cartas cada uno.",
       "r2": "Se pasan tres cartas: a la izquierda, a la derecha, al frente y luego sin pase.",
       "r3": "Sale el dos de tréboles. Sigue el palo si puedes.",

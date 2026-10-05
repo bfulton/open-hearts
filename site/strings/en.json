@@ -56,8 +56,9 @@
       }
     },
     "help": {
-      "title": "Help",
-      "text": "Use <i>Tell us what's broken</i> in the game's menu, see the <a href=\"{{base}}/support\">support page</a>, or email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
+      "title": "Need help?",
+      "text": "Use <i>Tell us what's broken</i> in the game's menu, see the <a href=\"{{base}}/support\">support page</a>, or email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "menuAlt": "The game's menu, open, with the pointer on Tell us what's broken"
     }
   },
   "support": {
@@ -100,7 +101,7 @@
       "p20": "See the <a href=\"{{base}}/privacy\">privacy policy</a>."
     },
     "rules": {
-      "title": "How Hearts works",
+      "title": "How do you play Hearts?",
       "r1": "Four players, thirteen cards each.",
       "r2": "Pass three cards: left, right, across, then no pass.",
       "r3": "The two of clubs leads. Follow suit if you can.",

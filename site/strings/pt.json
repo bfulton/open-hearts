@@ -56,8 +56,9 @@
       }
     },
     "help": {
-      "title": "Ajuda",
-      "text": "Use <i>Conte o que está quebrado</i> no menu do jogo, veja a <a href=\"{{base}}/support\">página de suporte</a> ou escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
+      "title": "Precisa de ajuda?",
+      "text": "Use <i>Conte o que está quebrado</i> no menu do jogo, veja a <a href=\"{{base}}/support\">página de suporte</a> ou escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "menuAlt": "O menu do jogo, aberto, com o ponteiro sobre Conte o que está quebrado"
     }
   },
   "support": {
@@ -100,7 +101,7 @@
       "p20": "Veja a <a href=\"{{base}}/privacy\">política de privacidade</a>."
     },
     "rules": {
-      "title": "Como funciona o Copas",
+      "title": "Como se joga Copas?",
       "r1": "Quatro jogadores, treze cartas cada um.",
       "r2": "Passe três cartas: para a esquerda, para a direita, para a frente e, depois, sem passe.",
       "r3": "O 2 de paus abre. Siga o naipe, se puder.",

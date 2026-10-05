@@ -8,7 +8,10 @@
       <li><a href="{{base}}/terms">{{common.terms}}</a></li>
     </ul>
   </nav>
-  <select class="lang-pick" aria-label="{{common.languages}}">
-{{langOptions}}
-  </select>
+  <details class="lang-pick">
+    <summary aria-label="{{common.languages}}: {{langName}}">{{langName}}</summary>
+    <ul class="langs">
+{{langs}}
+    </ul>
+  </details>
 </footer>

@@ -19,17 +19,17 @@ test('every page is built in every language, with nothing left unfilled', () => 
       const html = readFileSync(join(dir, `${p}.html`), 'utf8');
       assert.doesNotMatch(html, /\{\{|\}\}/, `${l.code}/${p}`);
       assert.match(html, new RegExp(`<html lang="${l.lang}">`), `${l.code}/${p}`);
-      assert.match(html, new RegExp(`lang="${l.lang}" selected>`), `${l.code}/${p}: its own language chosen in the menu`);
+      assert.match(html, /aria-current="true">/, `${l.code}/${p}: its own language marked`);
     }
   }
 });
 
-test('a page offers its copy in each language, and to its own language\'s pages', () => {
+test('a page links to its copy in each language, and to its own language\'s pages', () => {
   const out = mkdtempSync(join(tmpdir(), 'site-'));
   build(out);
   const terms = readFileSync(join(out, 'de', 'terms.html'), 'utf8');
   for (const l of languages) {
-    assert.match(terms, new RegExp(`<option value="${l.code === 'en' ? '' : `/${l.code}`}/terms" lang="${l.lang}"`));
+    assert.match(terms, new RegExp(`href="${l.code === 'en' ? '' : `/${l.code}`}/terms" hreflang="${l.lang}"`));
   }
   assert.match(terms, /<a href="\/de\/privacy"/);
   assert.match(terms, /<a href="\/de\/terms" aria-current="page"/);

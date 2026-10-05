@@ -56,8 +56,9 @@
       }
     },
     "help": {
-      "title": "Aide",
-      "text": "Utilisez <i>Signaler un problème</i> dans le menu du jeu, consultez la <a href=\"{{base}}/support\">page d'aide</a>, ou écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
+      "title": "Besoin d'aide ?",
+      "text": "Utilisez <i>Signaler un problème</i> dans le menu du jeu, consultez la <a href=\"{{base}}/support\">page d'aide</a>, ou écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>.",
+      "menuAlt": "Le menu du jeu, ouvert, avec le pointeur sur Signaler un problème"
     }
   },
   "support": {
@@ -100,7 +101,7 @@
       "p20": "Consultez la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
     },
     "rules": {
-      "title": "Les règles du jeu",
+      "title": "Comment jouer à la Dame de pique ?",
       "r1": "Quatre joueurs, treize cartes chacun.",
       "r2": "Passez trois cartes : à gauche, à droite, en face, puis pas de passe.",
       "r3": "Le 2 de trèfle entame. Fournissez la couleur demandée si vous le pouvez.",
