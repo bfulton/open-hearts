@@ -96,8 +96,7 @@ class BotView {
 /// A heuristic Hearts player. Stateless, and deterministic: the same
 /// cards and the same table always get the same play, which is what
 /// lets a game be replayed from a record of the deal and the human's
-/// choices alone (solo_record.dart), and what lets the oblivious
-/// circuit in oblivious.dart compute the same policy blind.
+/// choices alone (solo_record.dart).
 class Bot {
   Bot({this.persona = Persona.westley});
 

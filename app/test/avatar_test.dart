@@ -71,7 +71,7 @@ void main() {
 
   test('a picture keeps none of what the camera wrote in it: not where it was taken', () {
     // A phone's photograph carries its EXIF through the picker, and the
-    // picture goes to the relays for anyone to read (docs/launch/privacy.md).
+    // picture goes to the relays for anyone to read.
     final photo = img.Image(width: 200, height: 200);
     img.fill(photo, color: img.ColorRgb8(200, 10, 10));
     photo.exif.gpsIfd.setGpsLocation(latitude: 48.8584, longitude: 2.2945);

@@ -12,9 +12,7 @@
 /// rating means what a person's does.
 ///
 /// Nothing here is randomness. A persona is data, so a bot's play stays
-/// a computable consequence of its cards (docs/04-live-play.md), and the
-/// oblivious circuit in oblivious.dart takes the same settings as
-/// constants.
+/// a computable consequence of its cards (docs/04-live-play.md).
 library;
 
 /// What to do with the queen of spades in the pass. (What to do with a

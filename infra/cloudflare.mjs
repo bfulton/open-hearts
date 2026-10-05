@@ -29,7 +29,7 @@ export const pages = {
   /// Besides open-hearts.pages.dev, which every project has.
   domains: ['openhearts.game'],
   /// Cloudflare Web Analytics, which injects a beacon script into every
-  /// page, is off on purpose (docs/launch/blocked-on-owner.md, 3 October).
+  /// page, is off: the site promises no third-party scripts.
   webAnalytics: false,
   environments: {
     production: {
@@ -172,7 +172,7 @@ export const zones = {
           enabled: true,
         },
       ],
-      // The Free plan's one rate-limit rule (docs/launch/blocked-on-owner.md).
+      // The one rate-limit rule the Free plan allows.
       // Stores' and Stripe's webhooks are left out: their retries come in
       // bursts from few addresses.
       http_ratelimit: [
