@@ -56,17 +56,6 @@
         "title": "Translated into 5 languages"
       }
     },
-    "rules": {
-      "title": "How Hearts works",
-      "r1": "Four players, thirteen cards each.",
-      "r2": "Pass three cards: left, right, across, then no pass.",
-      "r3": "The two of clubs leads. Follow suit if you can.",
-      "r4": "No points on the first trick, unless you have nothing else.",
-      "r5": "Hearts can't be led until one has been played.",
-      "r6": "Each heart is one point; the queen of spades is thirteen.",
-      "r7": "Take all twenty-six to shoot the moon: everyone else gets them.",
-      "r8": "Play to fifty or a hundred. Lowest score wins."
-    },
     "help": {
       "title": "Help",
       "text": "Use <i>Tell us what's broken</i> in the game's menu, see the <a href=\"{{base}}/support\">support page</a>, or email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
@@ -91,7 +80,7 @@
     "faq": {
       "title": "Questions",
       "p1": "How do I play?",
-      "p2": "Open <a href=\"/play\">openhearts.game/play</a> and tap <i>Play solo</i>. The rules are <a href=\"{{base}}/#rules\">on the front page</a>.",
+      "p2": "Open <a href=\"/play\">openhearts.game/play</a> and tap <i>Play solo</i>.",
       "p3": "Is it in the App Store or Google Play?",
       "p4": "Not yet. Add the page to your home screen to keep it handy; playing alone then works offline.",
       "p5": "How do I subscribe?",
@@ -110,6 +99,17 @@
       "p18": "See <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">how the deal works</a>.",
       "p19": "What happens to my data?",
       "p20": "See the <a href=\"{{base}}/privacy\">privacy policy</a>."
+    },
+    "rules": {
+      "title": "How Hearts works",
+      "r1": "Four players, thirteen cards each.",
+      "r2": "Pass three cards: left, right, across, then no pass.",
+      "r3": "The two of clubs leads. Follow suit if you can.",
+      "r4": "No points on the first trick, unless you have nothing else.",
+      "r5": "Hearts can't be led until one has been played.",
+      "r6": "Each heart is one point; the queen of spades is thirteen.",
+      "r7": "Take all twenty-six to shoot the moon: everyone else gets them.",
+      "r8": "Play to fifty or a hundred. Lowest score wins."
     }
   },
   "privacy": {

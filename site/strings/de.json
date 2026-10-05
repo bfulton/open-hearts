@@ -56,17 +56,6 @@
         "title": "In 5 Sprachen übersetzt"
       }
     },
-    "rules": {
-      "title": "So funktioniert Hearts",
-      "r1": "Vier Spieler, je dreizehn Karten.",
-      "r2": "Drei Karten weitergeben: nach links, nach rechts, gegenüber, dann kein Tausch.",
-      "r3": "Die Kreuz 2 spielt aus. Bediene, wenn du kannst.",
-      "r4": "Keine Punkte im ersten Stich, außer du hast nichts anderes.",
-      "r5": "Herz darf erst ausgespielt werden, wenn schon eins gespielt wurde.",
-      "r6": "Jedes Herz zählt einen Punkt, die Pik-Dame dreizehn.",
-      "r7": "Nimm alle sechsundzwanzig für einen Durchmarsch: Dann bekommen sie alle anderen.",
-      "r8": "Gespielt wird bis fünfzig oder hundert. Die niedrigste Punktzahl gewinnt."
-    },
     "help": {
       "title": "Hilfe",
       "text": "Nutze <i>Sag uns, was kaputt ist</i> im Menü des Spiels, sieh auf der <a href=\"{{base}}/support\">Hilfeseite</a> nach oder schreib an <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
@@ -91,7 +80,7 @@
     "faq": {
       "title": "Fragen",
       "p1": "Wie spiele ich?",
-      "p2": "Öffne <a href=\"/play\">openhearts.game/play</a> und tippe auf <i>Allein spielen</i>. Die Regeln stehen <a href=\"{{base}}/#rules\">auf der Startseite</a>.",
+      "p2": "Öffne <a href=\"/play\">openhearts.game/play</a> und tippe auf <i>Allein spielen</i>.",
       "p3": "Gibt es das im App Store oder bei Google Play?",
       "p4": "Noch nicht. Leg die Seite auf deinen Startbildschirm, dann hast du sie immer zur Hand; allein spielen funktioniert dann auch offline.",
       "p5": "Wie abonniere ich?",
@@ -110,6 +99,17 @@
       "p18": "Sieh dir an, <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">wie das Austeilen funktioniert</a>.",
       "p19": "Was passiert mit meinen Daten?",
       "p20": "Siehe die <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>."
+    },
+    "rules": {
+      "title": "So funktioniert Hearts",
+      "r1": "Vier Spieler, je dreizehn Karten.",
+      "r2": "Drei Karten weitergeben: nach links, nach rechts, gegenüber, dann kein Tausch.",
+      "r3": "Die Kreuz 2 spielt aus. Bediene, wenn du kannst.",
+      "r4": "Keine Punkte im ersten Stich, außer du hast nichts anderes.",
+      "r5": "Herz darf erst ausgespielt werden, wenn schon eins gespielt wurde.",
+      "r6": "Jedes Herz zählt einen Punkt, die Pik-Dame dreizehn.",
+      "r7": "Nimm alle sechsundzwanzig für einen Durchmarsch: Dann bekommen sie alle anderen.",
+      "r8": "Gespielt wird bis fünfzig oder hundert. Die niedrigste Punktzahl gewinnt."
     }
   },
   "privacy": {

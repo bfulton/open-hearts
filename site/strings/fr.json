@@ -56,17 +56,6 @@
         "title": "Traduit en 5 langues"
       }
     },
-    "rules": {
-      "title": "Les règles du jeu",
-      "r1": "Quatre joueurs, treize cartes chacun.",
-      "r2": "Passez trois cartes : à gauche, à droite, en face, puis pas de passe.",
-      "r3": "Le 2 de trèfle entame. Fournissez la couleur demandée si vous le pouvez.",
-      "r4": "Pas de points au premier pli, sauf si vous n'avez rien d'autre.",
-      "r5": "On ne peut pas entamer à cœur tant qu'aucun cœur n'a été joué.",
-      "r6": "Chaque cœur vaut un point ; la dame de pique en vaut treize.",
-      "r7": "Prenez les vingt-six pour faire le grand chelem : ils vont à tous les autres.",
-      "r8": "Jouez en cinquante ou en cent points. Le score le plus bas gagne."
-    },
     "help": {
       "title": "Aide",
       "text": "Utilisez <i>Signaler un problème</i> dans le menu du jeu, consultez la <a href=\"{{base}}/support\">page d'aide</a>, ou écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
@@ -91,7 +80,7 @@
     "faq": {
       "title": "Questions",
       "p1": "Comment jouer ?",
-      "p2": "Ouvrez <a href=\"/play\">openhearts.game/play</a> et touchez <i>Jouer seul</i>. Les règles sont <a href=\"{{base}}/#rules\">sur la page d'accueil</a>.",
+      "p2": "Ouvrez <a href=\"/play\">openhearts.game/play</a> et touchez <i>Jouer seul</i>.",
       "p3": "Le jeu est-il sur l'App Store ou Google Play ?",
       "p4": "Pas encore. Ajoutez la page à votre écran d'accueil pour l'avoir sous la main ; le jeu en solo fonctionne alors hors ligne.",
       "p5": "Comment s'abonner ?",
@@ -110,6 +99,17 @@
       "p18": "Voyez <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">comment fonctionne la donne</a>.",
       "p19": "Que deviennent mes données ?",
       "p20": "Consultez la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
+    },
+    "rules": {
+      "title": "Les règles du jeu",
+      "r1": "Quatre joueurs, treize cartes chacun.",
+      "r2": "Passez trois cartes : à gauche, à droite, en face, puis pas de passe.",
+      "r3": "Le 2 de trèfle entame. Fournissez la couleur demandée si vous le pouvez.",
+      "r4": "Pas de points au premier pli, sauf si vous n'avez rien d'autre.",
+      "r5": "On ne peut pas entamer à cœur tant qu'aucun cœur n'a été joué.",
+      "r6": "Chaque cœur vaut un point ; la dame de pique en vaut treize.",
+      "r7": "Prenez les vingt-six pour faire le grand chelem : ils vont à tous les autres.",
+      "r8": "Jouez en cinquante ou en cent points. Le score le plus bas gagne."
     }
   },
   "privacy": {

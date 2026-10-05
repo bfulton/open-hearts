@@ -87,6 +87,8 @@ ul.points span { color: var(--chrome-dim); font-size: 14.5px; }
 .pip.r { color: var(--red); }
 .pip.g { color: var(--gold); }
 
+ol.rules { margin: 0 0 14px; padding-left: 20px; color: #CFDCD5; }
+ol.rules li { margin-bottom: 8px; }
 ul.plain { margin: 0 0 14px; padding-left: 20px; color: #CFDCD5; }
 ul.plain li { margin-bottom: 8px; }
 ul.plain b { color: var(--chrome); font-weight: 650; }

@@ -56,17 +56,6 @@
         "title": "Traduzido para 5 idiomas"
       }
     },
-    "rules": {
-      "title": "Como funciona o Copas",
-      "r1": "Quatro jogadores, treze cartas cada um.",
-      "r2": "Passe três cartas: para a esquerda, para a direita, para a frente e, depois, sem passe.",
-      "r3": "O 2 de paus abre. Siga o naipe, se puder.",
-      "r4": "Nada de pontos na primeira vaza, a não ser que você não tenha outra opção.",
-      "r5": "Ninguém pode sair com copas até que alguma copa tenha sido jogada.",
-      "r6": "Cada copa vale um ponto; a dama de espadas vale treze.",
-      "r7": "Leve todos os vinte e seis pontos para atirar na lua: eles vão para todos os outros.",
-      "r8": "Jogue até cinquenta ou cem. Vence a menor pontuação."
-    },
     "help": {
       "title": "Ajuda",
       "text": "Use <i>Conte o que está quebrado</i> no menu do jogo, veja a <a href=\"{{base}}/support\">página de suporte</a> ou escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
@@ -91,7 +80,7 @@
     "faq": {
       "title": "Perguntas",
       "p1": "Como eu jogo?",
-      "p2": "Abra <a href=\"/play\">openhearts.game/play</a> e toque em <i>Jogar sozinho</i>. As regras estão <a href=\"{{base}}/#rules\">na página inicial</a>.",
+      "p2": "Abra <a href=\"/play\">openhearts.game/play</a> e toque em <i>Jogar sozinho</i>.",
       "p3": "Está na App Store ou no Google Play?",
       "p4": "Ainda não. Adicione a página à tela inicial para tê-la sempre à mão; assim, jogar sozinho funciona offline.",
       "p5": "Como eu assino?",
@@ -110,6 +99,17 @@
       "p18": "Veja <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">como funciona a distribuição</a>.",
       "p19": "O que acontece com os meus dados?",
       "p20": "Veja a <a href=\"{{base}}/privacy\">política de privacidade</a>."
+    },
+    "rules": {
+      "title": "Como funciona o Copas",
+      "r1": "Quatro jogadores, treze cartas cada um.",
+      "r2": "Passe três cartas: para a esquerda, para a direita, para a frente e, depois, sem passe.",
+      "r3": "O 2 de paus abre. Siga o naipe, se puder.",
+      "r4": "Nada de pontos na primeira vaza, a não ser que você não tenha outra opção.",
+      "r5": "Ninguém pode sair com copas até que alguma copa tenha sido jogada.",
+      "r6": "Cada copa vale um ponto; a dama de espadas vale treze.",
+      "r7": "Leve todos os vinte e seis pontos para atirar na lua: eles vão para todos os outros.",
+      "r8": "Jogue até cinquenta ou cem. Vence a menor pontuação."
     }
   },
   "privacy": {

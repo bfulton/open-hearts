@@ -126,9 +126,6 @@ ul.points .d { color: var(--chrome-dim); font-size: 14.5px; }
 .way ul { margin: 0 0 14px; padding-left: 18px; color: var(--body); font-size: 15px; }
 .way li { margin-bottom: 6px; }
 
-ol.rules { margin: 0 0 14px; padding-left: 20px; color: var(--body); }
-ol.rules li { margin-bottom: 8px; }
-
 .langs { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .langs a {
   display: block; border: 1px solid var(--edge); border-radius: 999px;
