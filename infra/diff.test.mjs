@@ -104,7 +104,7 @@ test('DNS: a record whose content changed is updated in place, not made twice', 
   assert.equal(plan.update[0].id, 'r4');
 });
 
-test("DNS: one of Cloudflare's records missing is the owner's to put back", () => {
+test("DNS: one of Cloudflare's records missing is put back by hand", () => {
   const have = liveRecords().filter((r) => r.id !== 'mx1' && r.id !== 'w1');
   const plan = dnsPlan(game, have);
   assert.deepEqual(plan.missing.map((m) => `${m.type} ${m.name}`), ['MX openhearts.game', 'AAAA relay.openhearts.game']);
@@ -215,7 +215,7 @@ test('Pages: a plain variable is set, a stray one removed', () => {
   assert.deepEqual(plan.lines, ['set OH_STRIPE_PRICE: "price_old" -> "openhearts_annual"', 'remove variable OH_DEBUG, which is not defined']);
 });
 
-test('Pages: a missing secret is for the owner, and nothing is patched for it', () => {
+test('Pages: a missing secret is set by hand, and nothing is patched for it', () => {
   const have = liveProduction();
   delete have.env_vars.OH_ID_HMAC;
   have.env_vars.OH_SERVICE_SECRET = plain('oops');
