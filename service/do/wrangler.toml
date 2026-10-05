@@ -14,6 +14,15 @@ compatibility_date = "2025-01-01"
 # Where the apps find it (app/lib/net/relays.dart, homeTagRelay).
 routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 
+# The jurors of last resort's image is built from the repo on every
+# deploy (service/bench/build.sh): the juror compiled from the table
+# code as it is now, never a stage left over from a deploy before. A
+# deploy that skipped it shipped the bench an old protocol beside a new
+# app. Needs cargo and dart (flutter's bin) on the PATH.
+[build]
+command = "../bench/build.sh"
+cwd = "."
+
 # Logs, the worker's and the jurors' container's own output, kept seven
 # days in Workers Logs (docs: "How do Container logs work?"). Without
 # them a stalled table showed a running container and nothing else.
@@ -45,8 +54,8 @@ new_sqlite_classes = ["Household"]
 # The jurors of last resort, as a Cloudflare Container (bench.mjs; the
 # image is service/bench, built by its build.sh). The presence relay
 # above passes a table's call for a juror to it, and it runs only while
-# the bench is serving or waiting to be drawn. Run service/bench/build.sh
-# before deploying; the bench's identity is the secret OH_JUROR_SECRET
+# the bench is serving or waiting to be drawn. Built by [build] above on
+# every deploy; the bench's identity is the secret OH_JUROR_SECRET
 # (64 hex, kept, so the bench has the same four keys after every start).
 # standard-1 is half a vCPU and 4 GiB: a deal took 9 s at a whole vCPU
 # and 21 s at a quarter (service/tool/bench_check.dart), and the bench
