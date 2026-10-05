@@ -34,7 +34,6 @@
     --chrome-dim: #9FB3A9;
     --body: #CFDCD5;
     --red: #C1352B;
-    --red-text: #EF7468; /* the red, lifted to 3:1 on the lightest felt */
     --edge: rgba(232,239,234,.12);
   }
   * { box-sizing: border-box; }
@@ -78,7 +77,6 @@
     letter-spacing: -.03em;
     font-weight: 800;
   }
-  h1 .hearts { color: var(--red-text); }
   .tagline {
     margin: 0 auto 30px;
     max-width: 30ch;
@@ -173,7 +171,7 @@
   @media print {
     body, header, .way { background: #fff !important; color: #000; }
     header { padding: 16px 0; border: 0; }
-    h1 .hearts, .suits .r, .pip.r { color: #9b1c13; }
+    .suits .r, .pip.r { color: #9b1c13; }
     .suits .b { color: #000; }
     h2, h3, b, .price, a, p, li, .tagline, .cta-note, .stores, ul.points .d, footer, footer p { color: #000 !important; }
     .cta { box-shadow: none; border: 2px solid #000; background: #fff; }
@@ -194,7 +192,7 @@
     <div class="suits" aria-hidden="true">
       <span class="b">♣</span><span class="r">♦</span><span class="b">♠</span><span class="r">♥</span>
     </div>
-    <h1>Open <span class="hearts">Hearts</span></h1>
+    <h1>Open Hearts</h1>
     <p class="tagline">The card game you already know, built the way it deserves.</p>
     <a class="cta" href="/play">Play in your browser</a>
     <p class="cta-note">Free to play alone. No install, no ads, no sign-up.</p>
