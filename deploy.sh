@@ -106,11 +106,20 @@ if [ -z "$LABEL" ]; then
   LABEL=$([ "$(branch_of_git)" = main ] && echo main || echo dev)
 fi
 
+# What is not secret comes from config/openhearts.json, committed: the
+# service's public key and the sign-in providers' identifiers for the
+# build, and the whole file for the worker (service/functions/deployment.mjs).
+# A variable of the same name set here still wins, for a one-off build.
+config_of() { node -p "const c = require('./config/openhearts.json'); String(($1) ?? '')"; }
+OH_SERVICE_KEY=${OH_SERVICE_KEY:-$(config_of c.serviceKey)}
+OH_GOOGLE_CLIENT_ID=${OH_GOOGLE_CLIENT_ID:-$(config_of c.google?.webClientId)}
+OH_APPLE_SERVICE_ID=${OH_APPLE_SERVICE_ID:-$(config_of c.apple?.servicesId)}
+
 # Production without the service's key is a build with live play shut
 # for everyone, subscribers included (it trusts no licence), so it is
 # refused here.
 if [ "$LABEL" = main ] && ! [[ "${OH_SERVICE_KEY:-}" =~ ^[0-9a-f]{64}$ ]]; then
-  echo "deploy: production needs OH_SERVICE_KEY, the service's public key (64 hex)" >&2
+  echo "deploy: production needs the service's public key (64 hex), serviceKey in config/openhearts.json" >&2
   exit 1
 fi
 
@@ -150,6 +159,9 @@ node site/build.mjs "$STAGE"
 # compile wasm from bytes while running (service/functions/entry.mjs).
 mkdir -p "$STAGE/_worker.js"
 cp service/functions/entry.mjs "$STAGE/_worker.js/index.js"
+# The committed configuration, as a module the entry imports.
+node -e "process.stdout.write('export default ' + JSON.stringify(require('./config/openhearts.json')) + ';\n')" \
+  > "$STAGE/_worker.js/openhearts.config.mjs"
 # Every module the handlers import, not a list of them kept by hand:
 # one left off is a worker Cloudflare refuses at upload. Not the tests,
 # nor their fixtures.
@@ -168,16 +180,17 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
 # it, to its bridges. The build's identity comes from the generated
 # file above, not a flag.
 #
-# OH_SERVICE_KEY names the service this build will take a licence from,
-# and no other (docs/06-service.md, app/lib/net/licence.dart): the
-# public half of the pair `dart run bin/service_key.dart` mints, whose
-# secret is set on the Pages project as OH_SERVICE_SECRET and lives
-# nowhere else. A build published without it has live play shut, which
+# OH_SERVICE_KEY (serviceKey in the config) names the service this build
+# will take a licence from, and no other (docs/06-service.md,
+# app/lib/net/licence.dart): the public half of the pair `dart run
+# bin/service_key.dart` mints, whose secret is set on the Pages project as
+# OH_SERVICE_SECRET and lives nowhere else. A build published without it has live play shut, which
 # is the safe way round: the alternative is a build that would take a
 # licence from whoever answered first.
 #
-# OH_GOOGLE_CLIENT_ID and OH_APPLE_SERVICE_ID are the sign-in providers'
-# identifiers (docs/06-service.md, app/lib/net/provider_tokens.dart).
+# OH_GOOGLE_CLIENT_ID and OH_APPLE_SERVICE_ID (google.webClientId and
+# apple.servicesId in the config) are the sign-in providers' identifiers
+# (docs/06-service.md, app/lib/net/provider_tokens.dart).
 # Neither is a secret. A build without one offers no sign-in with that
 # provider.
 ( cd app && "$FLUTTER" build web \

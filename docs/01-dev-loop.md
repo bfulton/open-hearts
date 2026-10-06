@@ -24,8 +24,8 @@ The label names the Pages branch, and every branch gets a stable alias.
 It defaults to `dev` on any working branch, so the latest push is always
 at `https://dev.open-hearts.pages.dev/play`, and to `main` (production,
 `openhearts.game`) on `main`. A production deploy refuses to run without
-`OH_SERVICE_KEY`, since a build without it has live play shut for
-everyone. Before uploading, the script loads the staged worker, so a
+the service's public key (`serviceKey` in `config/openhearts.json`),
+since a build without it has live play shut for everyone. Before uploading, the script loads the staged worker, so a
 missing module fails locally instead of at Cloudflare.
 
 ## Knowing which build is running

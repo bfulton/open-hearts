@@ -20,6 +20,7 @@ private to the person holding it.
 | [`service/`](service/) | The Cloudflare worker's handlers (licences, the shop, TURN), the relay, the jurors of last resort, and a local relay for tests |
 | [`e2e/`](e2e/) | Browser suites that drive the built app through its accessibility tree |
 | [`site/`](site/) | The marketing site: page templates, their words in each language, and the build that joins them |
+| [`config/`](config/openhearts.json) | What is not secret about this deployment: the service's public key, store and sign-in identifiers, the Stripe price |
 | [`infra/`](infra/), [`observability/`](observability/) | Cloudflare, Stripe and New Relic configuration, checked and applied by script |
 | [`measurements/`](measurements/README.md) | Benchmarks behind the design's numbers |
 
@@ -97,11 +98,11 @@ stops. Debug builds need neither.
 Cloudflare Pages. It needs `CLOUDFLARE_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
 ([doc 01](docs/01-dev-loop.md)). A build accepts licences only from the
 service key it was compiled with. Mint the key pair once with
-`cd service && dart run bin/service_key.dart`, give the public half to
-`deploy.sh` as `OH_SERVICE_KEY`, and set the secret half as the Pages
-secret `OH_SERVICE_SECRET`. A build without the key has live play shut.
+`cd service && dart run bin/service_key.dart`, put the public half in
+`config/openhearts.json` as `serviceKey`, and set the secret half as the
+Pages secret `OH_SERVICE_SECRET`. A build without the key has live play shut.
 The relay deploys separately: `cd service/do && npx wrangler@4 deploy`.
-[Doc 06](docs/06-service.md) lists every variable and secret.
+Everything that is not secret is in `config/openhearts.json`; [doc 06](docs/06-service.md) lists the secrets.
 
 ### Languages
 

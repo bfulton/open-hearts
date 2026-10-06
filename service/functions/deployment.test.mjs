@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+import { configEnv, withConfig } from './deployment.mjs';
+
+const committed = JSON.parse(readFileSync(new URL('../../config/openhearts.json', import.meta.url), 'utf8'));
+
+test('the committed configuration is the one the service and the builds expect', () => {
+  assert.match(committed.serviceKey, /^[0-9a-f]{64}$/);
+  assert.match(committed.turnKeyId, /^[0-9a-f]{32}$/);
+  assert.equal(committed.apple.bundleId, 'game.openhearts');
+  assert.equal(committed.google.package, 'game.openhearts');
+});
+
+test('the file goes under the names the handlers read, a missing field stays missing', () => {
+  const env = configEnv({
+    serviceKey: 'k', stripePrice: 'p',
+    apple: { bundleId: 'game.openhearts', product: 'yearly', servicesId: 'game.openhearts.play' },
+    google: { package: 'game.openhearts', product: 'yearly', webClientId: null },
+  });
+  assert.equal(env.OH_SERVICE_KEY, 'k');
+  assert.equal(env.OH_APPLE_AUDIENCE, 'game.openhearts.play,game.openhearts', 'the web and the phone both');
+  assert.equal(env.OH_PLAY_PACKAGE, 'game.openhearts');
+  assert.ok(!('OH_GOOGLE_AUDIENCE' in env), 'no Google sign-in without its client');
+  assert.ok(!('OH_TURN_KEY_ID' in env));
+});
+
+test('a name set on the project, or by a test, wins over the file', () => {
+  const env = withConfig({ OH_STRIPE_PRICE: 'other', OH_STORE: 'kv' }, { stripePrice: 'openhearts_annual', serviceKey: 'k' });
+  assert.equal(env.OH_STRIPE_PRICE, 'other');
+  assert.equal(env.OH_SERVICE_KEY, 'k');
+  assert.equal(env.OH_STORE, 'kv');
+});

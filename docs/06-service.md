@@ -122,7 +122,7 @@ the Pub/Sub push's Google ID token), and for Play the purchase is
 fetched again. Neither store is ever final, since a lapsed subscription
 can come back.
 
-Without its variables (`OH_APPLE_*`, `OH_PLAY_*`) each store answers 503.
+Without its identifiers (`apple`, `google` in the configuration) each store answers 503.
 
 ### Households
 
@@ -154,14 +154,14 @@ billing portal.
   key. `supersede` moves the binding and its subscription to a new key;
   a device already on a paid-up subscription of its own keeps it, and
   only the account moves. Only an HMAC of the provider's subject
-  (`OH_ID_HMAC`) is stored. `OH_GOOGLE_AUDIENCE` and `OH_APPLE_AUDIENCE`
-  each take one audience or several, comma-separated: Apple's token
-  names the bundle id on an iPhone and the Services ID on the web.
+  (`OH_ID_HMAC`) is stored. Google's audience is `google.webClientId`;
+  Apple's are `apple.bundleId` and `apple.servicesId`, since Apple's
+  token names the bundle id on an iPhone and the Services ID on the web.
 
   The app (`app/lib/net/sign_in.dart`, `provider_tokens.dart`) offers
   Apple on iOS and the web and Google on Android and the web, each only
-  in a build compiled with its identifier (`OH_APPLE_SERVICE_ID`,
-  `OH_GOOGLE_CLIENT_ID`, passed through by `deploy.sh`); without them
+  in a build compiled with its identifier (`apple.servicesId`,
+  `google.webClientId`, compiled in by `deploy.sh`); without them
   there is no sign-in on the screen. On iOS it uses Sign in with Apple,
   on Android Credential Manager (through `google_sign_in_android`, not
   `google_sign_in`, whose web half loads Google's script into every
@@ -361,16 +361,23 @@ container. The image is built from the repository on every relay deploy
 
 | What | How |
 |---|---|
-| Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)), with `OH_SERVICE_KEY` |
+| Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)) |
 | Relay, Household, Bench | `cd service/do && npx wrangler@4 deploy` (`wrangler.toml`: the `TABLE` and `BENCH` objects, the `Household` class, the container, `OH_STORE`, `EMAIL`, the domain `relay.openhearts.game`) |
 | Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../infra/README.md)) |
 | Monitoring | `node observability/apply.mjs` |
 
 Pages secrets: `OH_SERVICE_SECRET`, `OH_ID_HMAC`, `OH_STRIPE_SECRET` (a
 restricted key), `OH_STRIPE_WEBHOOK_SECRET`, `OH_TURN_API_TOKEN`, and
-`OH_PLAY_SERVICE_ACCOUNT` once Play is set up. Variables:
-`OH_SERVICE_KEY`, `OH_STRIPE_PRICE`, `OH_TURN_KEY_ID`, and the store and
-sign-in settings. Bindings: `OH_STORE` (KV), `OH_RECORDS` (R2),
+`OH_PLAY_SERVICE_ACCOUNT` once Play is set up. Everything else that is
+not secret is in `config/openhearts.json`, committed: the service's
+public key, the TURN key's id, the Stripe price, and the store and
+sign-in identifiers (`apple.bundleId`, `product` and `servicesId`;
+`google.package`, `product`, `webClientId` and the Play push audience
+and email). `deploy.sh` compiles the build's from it and ships the file
+to the worker, which reads it beneath the project's settings
+(`service/functions/deployment.mjs`): a variable of the same name set on the
+project wins, as one set by a test does. A field left null is a feature
+left off. Bindings: `OH_STORE` (KV), `OH_RECORDS` (R2),
 `HOUSEHOLD` (production only) and optionally `OH_METRICS`. Previews have
 their own KV and bucket, and no Stripe. The relay's secret is
 `OH_JUROR_SECRET`. `cd service && dart run bin/service_key.dart` mints
