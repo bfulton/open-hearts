@@ -335,7 +335,7 @@
     "contact": {
       "title": "Contact",
       "p1": "Email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, or write to:",
-      "p2": "Open Hearts<br> 6650 Rivers Ave, Ste 105, PMB #804106<br> North Charleston, SC 29406<br> USA",
+      "p2": "Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p3": "Bug reports are welcome as issues at <a href=\"https://github.com/bfulton/open-hearts/issues\">github.com/bfulton/open-hearts/issues</a>, which are public. More help is on the <a href=\"{{base}}/support\">support page</a>."
     }
   }
