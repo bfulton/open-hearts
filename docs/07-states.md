@@ -249,9 +249,11 @@ Until the first person's keys have settled at a side:
 
 A seat's holder is then whoever's keys settled its first deal round.
 Keys that arrive before the draw they name has carried are kept and
-taken up when it carries. A summons carries the hand's draws with their
-witnesses, so a juror brought in reads the table's draw from the moment
-it is summoned (`sealed_to_draw_test.dart`).
+taken up when it carries; so is a verdict carrying a held seat's keys
+that arrives before the record has said which draw the hand is sealed
+to (`late_juror_verdict_test.dart`). A summons carries the hand's draws
+with their witnesses, so a juror brought in reads the table's draw from
+the moment it is summoned (`sealed_to_draw_test.dart`).
 
 ### The escrow's custodians
 

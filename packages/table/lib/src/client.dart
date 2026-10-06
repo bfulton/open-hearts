@@ -5755,12 +5755,27 @@ class TableClient {
       // step that nobody took would leave the turn open for good. Not
       // the audit of a seat already given to the escrow, which is its
       // pieces and nobody's move ([_isEscrowedAudit]).
-      if (event.side != 'action' || !_mayAct(seat, ruled.author, turn.hand)) return;
+      //
+      // A deal step it rules for is kept, as the step itself is
+      // ([_onAction]), where this side cannot take it yet: its juror a
+      // stranger here for a moment, or its keys naming a draw the
+      // record has not sealed the hand to here yet ([_checkSealed]).
+      // Dropped, the verdict would be a repeat ever after, and a side
+      // that needs it — a juror summoned late, the table split at the
+      // seat — would wait at the turn for good.
+      if (event.side != 'action') return;
+      if (!_mayAct(seat, ruled.author, turn.hand)) {
+        if (ruled.kind == EventKind.deal) _defer(event);
+        return;
+      }
       if (ruled.kind != EventKind.pass && ruled.kind != EventKind.play && ruled.kind != EventKind.deal) return;
       if (_isEscrowedAudit(turn, seat)) return;
       if (race.action?.id != ruled.id) {
         if (!_checkable(ruled)) return _defer(event, quietly: true);
-        if (!_valid(ruled, seat)) return;
+        if (!_valid(ruled, seat)) {
+          if (ruled.kind == EventKind.deal) _defer(event);
+          return;
+        }
         race.rivals.putIfAbsent(ruled.id, () => ruled);
         race.forRival.putIfAbsent(ruled.id, () => {ruled.author});
         race.adopt(ruled.id);
@@ -5773,7 +5788,11 @@ class TableClient {
       if (ruled.author != holder.key) return;
       if (ruled.kind != EventKind.pass && ruled.kind != EventKind.play && ruled.kind != EventKind.deal) return;
       if (!_checkable(ruled)) return _defer(event, quietly: true);
-      if (!_valid(ruled, seat)) return;
+      // A person's deal step can be early here too ([_validDeal]).
+      if (!_valid(ruled, seat)) {
+        if (ruled.kind == EventKind.deal) _defer(event);
+        return;
+      }
       race.action = ruled;
       race.forAction.add(ruled.author);
       _seen.add(ruled.id);
