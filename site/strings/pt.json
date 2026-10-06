@@ -87,16 +87,15 @@
       "p8": "Abra o menu, escolha <i>Assinatura</i> e depois <i>Gerenciar assinatura</i>. Outras formas, e os reembolsos, estão nos <a href=\"{{base}}/terms\">termos</a>.",
       "p9": "Como adiciono outro aparelho?",
       "p10": "Num aparelho com assinatura, abra o menu, escolha <i>Assinatura</i> e toque em <i>Adicionar um aparelho</i>; depois, escaneie o código com o outro aparelho, ou toque em <i>Enviar o link</i>. Um código vale uma vez só, por dez minutos.",
-      "p11": "Perdi meu celular, ou limpei os dados do navegador.",
-      "p12": "De outro aparelho da assinatura, adicione o novo e remova o perdido. Se você não tiver nenhum, mande um e-mail para a gente com o endereço que usou para pagar.",
+      "p11": "E se eu perder o celular, ou limpar os dados do navegador?",
+      "p12": "Se outro aparelho seu está na assinatura, adicione o novo a partir dele e remova o perdido. Se não, use um código de backup: no aparelho novo, abra o menu, escolha <i>Ativar assinatura</i> e digite o código. Qualquer aparelho da assinatura pode <i>Mostrar códigos de backup</i>, e os de uma assinatura pela web foram enviados por e-mail quando você assinou: guarde-os em lugar seguro. Comprou na App Store ou no Google Play? No celular novo, toque em <i>Assinar</i> e depois em <i>Restaurar compras</i>.",
       "p13": "Dá para jogar com leitor de tela, ou com letras maiores?",
-      "p14": "Sim. No navegador, aperte <i>Enable accessibility</i>, o primeiro botão que o leitor de tela encontra. Para letras maiores, use o zoom do navegador.",
+      "p14": "Sim. Cada carta, lugar, vaza e pontuação tem um nome que um leitor de tela consegue ler. No navegador, aperte <i>Enable accessibility</i>, o primeiro botão que o leitor de tela encontra, e use o zoom do navegador para aumentar o texto. Nos apps para celular, ative o VoiceOver (iPhone) ou o TalkBack (Android); o app segue o tamanho de texto do celular.",
       "p15": "Posso escolher o idioma?",
-      "p16": "Acrescente <code>?lang=es</code> (ou <code>pt</code>, <code>de</code>, <code>fr</code>, <code>en</code>) ao endereço do jogo.",
+      "p16": "O jogo segue o idioma do seu aparelho. Na web, escolha outro em <i>Idioma</i>, na página <i>Sobre</i> do jogo, ou no menu de idiomas no rodapé deste site. No celular, use o ajuste do próprio celular para cada app: no iPhone, Ajustes, depois Open Hearts, depois Idioma; no Android 13 ou mais recente, Configurações, depois Sistema, depois Idiomas, depois Idiomas dos apps.",
       "p17": "Como sei que a distribuição é justa?",
-      "p18": "Veja <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">como funciona a distribuição</a>.",
       "p19": "O que acontece com os meus dados?",
-      "p20": "Veja a <a href=\"{{base}}/privacy\">política de privacidade</a>."
+      "p20": "Jogando sozinho, nada sai do seu aparelho. Ao vivo, seu nome, imagem e resultados são públicos. Nada é vendido nem usado para anúncios. Mais na <a href=\"{{base}}/privacy\">política de privacidade</a>."
     },
     "rules": {
       "title": "Quais são as regras de Copas?",
@@ -110,7 +109,13 @@
       "r8": "Jogue até cinquenta ou cem. Vence a menor pontuação."
     },
     "cancelAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Gerenciar assinatura",
-    "addAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Adicionar um aparelho"
+    "addAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Adicionar um aparelho",
+    "fair": {
+      "random": "<b>Aleatório.</b> Numa mesa ao vivo, cada aparelho embaralha o baralho por vez e prova que embaralhou com honestidade, então basta um aparelho honesto para uma distribuição justa. Cada mão só se abre para o seu jogador: nenhum outro jogador a vê, nem servidor algum. Jogando sozinho, cada distribuição vem do gerador aleatório seguro do seu aparelho.",
+      "witness": "<b>Com testemunhas.</b> Cada mão sorteia jurados: desconhecidos escolhidos ao acaso entre outros jogadores online, sem nada em jogo na mesa. Eles jogam os lugares dos bots e guardam pedaços das chaves de cada jogador, para que a mão possa terminar se alguém sair sem que ninguém, sozinho, consiga abrir as cartas de outro.",
+      "audit": "<b>Auditado.</b> Depois de cada mão, cada aparelho publica o seu segredo, então a partida inteira pode ser refeita e cada embaralhada, carta e jogada conferida. Depois de uma partida ao vivo, <i>Ver a partida inteira</i> faz essa conferência por você; depois de uma partida sozinho, <i>Copiar registro</i> a guarda.",
+      "more": "Como tudo funciona está <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">nesta explicação</a>."
+    }
   },
   "privacy": {
     "meta": {

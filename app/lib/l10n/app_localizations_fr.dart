@@ -118,6 +118,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get about => 'À propos';
 
   @override
+  String get language => 'Langue';
+
+  @override
+  String get deviceLanguage => 'Celle de l\'appareil';
+
+  @override
   String get recordCopied => 'Relevé copié';
 
   @override

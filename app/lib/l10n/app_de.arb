@@ -18,6 +18,8 @@
   "menu": "Menü",
   "leaveTheTable": "Tisch verlassen",
   "about": "Über",
+  "language": "Sprache",
+  "deviceLanguage": "Wie auf diesem Gerät",
   "recordCopied": "Spielprotokoll kopiert",
   "choosePass": "{count, plural, =1{Noch 1 Karte zum Weitergeben wählen} other{Noch {count} Karten zum Weitergeben wählen}}",
   "passButton": "Geben",

@@ -50,7 +50,8 @@ Future<void> main() async {
   await RemoteSettings.current.load();
   unawaited(RemoteSettings.current.refresh());
   _askAgain();
-  runApp(OpenHeartsApp(locale: await chosenLanguage()));
+  appLanguage.value = await chosenLanguage();
+  runApp(const OpenHeartsApp());
 }
 
 /// Asks for the config again after as long as it last said to wait.
@@ -70,11 +71,7 @@ void _askAgain() => Timer(waits.configEvery, () {
 /// or a dead link says nothing at all, which is why silence is still
 /// timed out.
 class OpenHeartsApp extends StatefulWidget {
-  const OpenHeartsApp({super.key, this.locale});
-
-  /// The language chosen in the address or on the site; null for the
-  /// device's own (l10n/l10n.dart).
-  final Locale? locale;
+  const OpenHeartsApp({super.key});
 
   @override
   State<OpenHeartsApp> createState() => _OpenHeartsAppState();
@@ -117,20 +114,25 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Open Hearts',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      // The device's language where the app speaks it, English where it
-      // does not, unless one was chosen: `?lang=` in the address, or a
-      // language link on the site, either kept for next time.
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: widget.locale,
-      // Any words on any screen can be selected and copied: a name, a
-      // rule, an error to send us.
-      builder: (context, child) => TouchProbe(child: CopyableSelection(child: child ?? const SizedBox())),
-      routerConfig: _router,
+    // Redrawn in another language the moment one is chosen (l10n.dart).
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: appLanguage,
+      builder: (context, language, _) => MaterialApp.router(
+        title: 'Open Hearts',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        // The device's language where the app speaks it, English where it
+        // does not, unless one was chosen: `?lang=` in the address, a
+        // language link on the site, or the About page, each kept for
+        // next time.
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: language,
+        // Any words on any screen can be selected and copied: a name, a
+        // rule, an error to send us.
+        builder: (context, child) => TouchProbe(child: CopyableSelection(child: child ?? const SizedBox())),
+        routerConfig: _router,
+      ),
     );
   }
 }

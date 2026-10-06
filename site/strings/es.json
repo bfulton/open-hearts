@@ -87,16 +87,15 @@
       "p8": "Abre el menú, elige <i>Suscripción</i> y luego <i>Gestionar suscripción</i>. Las otras formas, y los reembolsos, están en los <a href=\"{{base}}/terms\">términos</a>.",
       "p9": "¿Cómo añado otro dispositivo?",
       "p10": "En un dispositivo suscrito, abre el menú, elige <i>Suscripción</i> y toca <i>Añadir un dispositivo</i>; luego escanea el código con el otro dispositivo, o toca <i>Enviar el enlace</i>. Cada código sirve una vez, durante diez minutos.",
-      "p11": "He perdido el teléfono, o he borrado los datos del navegador.",
-      "p12": "Desde otro dispositivo de la suscripción, añade el nuevo y quita el perdido. Si no tienes ninguno, escríbenos desde el correo con el que pagaste.",
+      "p11": "¿Y si pierdo el teléfono, o borro los datos del navegador?",
+      "p12": "Si otro de tus dispositivos está en la suscripción, añade el nuevo desde allí y quita el perdido. Si no, usa un código de respaldo: en el dispositivo nuevo, abre el menú, elige <i>Activar suscripción</i> e introdúcelo. Cualquier dispositivo de la suscripción puede <i>Mostrar códigos de respaldo</i>, y los de una suscripción web te llegaron por correo al suscribirte: guárdalos en un lugar seguro. ¿La compraste en la App Store o en Google Play? En el teléfono nuevo, toca <i>Suscribirse</i> y luego <i>Restaurar compras</i>.",
       "p13": "¿Puedo jugar con un lector de pantalla, o con el texto más grande?",
-      "p14": "Sí. En un navegador, pulsa <i>Enable accessibility</i>, el primer botón que encuentra un lector de pantalla. Para agrandar el texto, usa el zoom del navegador.",
+      "p14": "Sí. Cada carta, asiento, baza y puntuación tiene un nombre que un lector de pantalla puede leer. En un navegador, pulsa <i>Enable accessibility</i>, el primer botón que encuentra el lector de pantalla, y usa el zoom del navegador para agrandar el texto. En las apps para móvil, activa VoiceOver (iPhone) o TalkBack (Android); la app sigue el tamaño de texto del teléfono.",
       "p15": "¿Puedo elegir el idioma?",
-      "p16": "Añade <code>?lang=es</code> (o <code>pt</code>, <code>de</code>, <code>fr</code>, <code>en</code>) a la dirección del juego.",
+      "p16": "El juego sigue el idioma de tu dispositivo. En la web, elige otro en <i>Idioma</i>, en la página <i>Acerca de</i> del juego, o con el menú de idiomas al pie de este sitio. En un teléfono, usa el ajuste del propio teléfono para cada app: en un iPhone, Ajustes, luego Open Hearts, luego Idioma; en Android 13 o posterior, Ajustes, luego Sistema, luego Idiomas, luego Idiomas de las aplicaciones.",
       "p17": "¿Cómo sé que el reparto es justo?",
-      "p18": "Consulta <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">cómo funciona el reparto</a>.",
       "p19": "¿Qué pasa con mis datos?",
-      "p20": "Consulta la <a href=\"{{base}}/privacy\">política de privacidad</a>."
+      "p20": "Jugando solo, nada sale de tu dispositivo. En vivo, tu nombre, imagen y resultados son públicos. Nada se vende ni se usa para anuncios. Más en la <a href=\"{{base}}/privacy\">política de privacidad</a>."
     },
     "rules": {
       "title": "¿Cuáles son las reglas de Corazones?",
@@ -110,7 +109,13 @@
       "r8": "Se juega a cincuenta o a cien. Gana la puntuación más baja."
     },
     "cancelAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Gestionar suscripción",
-    "addAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Añadir un dispositivo"
+    "addAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Añadir un dispositivo",
+    "fair": {
+      "random": "<b>Aleatorio.</b> En una mesa en vivo, cada dispositivo baraja el mazo por turno y demuestra que barajó con honradez, así que basta con un dispositivo honrado para un reparto justo. Cada mano se abre solo para su jugador: ningún otro jugador la ve, ni ningún servidor. Jugando solo, cada reparto sale del generador aleatorio seguro de tu dispositivo.",
+      "witness": "<b>Con testigos.</b> Cada mano sortea jurados: desconocidos elegidos al azar entre otros jugadores en línea, sin nada en juego en la mesa. Juegan los asientos de los bots y guardan partes de las claves de cada jugador, para que la mano pueda terminar si alguien se va sin que nadie pueda abrir solo las cartas de otro.",
+      "audit": "<b>Auditado.</b> Tras cada mano, cada dispositivo publica su secreto, así que la partida entera se puede repetir y comprobar cada barajada, carta y jugada. Tras una partida en vivo, <i>Ver la partida entera</i> hace esa comprobación por ti; tras una partida a solas, <i>Copiar registro</i> la guarda.",
+      "more": "Todo el funcionamiento está en <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">la explicación</a>."
+    }
   },
   "privacy": {
     "meta": {

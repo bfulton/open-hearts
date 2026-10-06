@@ -136,6 +136,14 @@
   "@about": {
     "description": "Menu item and page title: about the app."
   },
+  "language": "Language",
+  "@language": {
+    "description": "On the About page, on the web: the language the app is in."
+  },
+  "deviceLanguage": "Same as this device",
+  "@deviceLanguage": {
+    "description": "The language choice that follows the device or browser."
+  },
   "recordCopied": "Record copied",
   "@recordCopied": {
     "description": "Shown briefly after the game's record is put on the clipboard."

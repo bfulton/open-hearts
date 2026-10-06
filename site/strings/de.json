@@ -87,16 +87,15 @@
       "p8": "Öffne das Menü, wähle <i>Abo</i> und dann <i>Abo verwalten</i>. Andere Wege und Erstattungen stehen in den <a href=\"{{base}}/terms\">Nutzungsbedingungen</a>.",
       "p9": "Wie füge ich ein weiteres Gerät hinzu?",
       "p10": "Öffne auf einem Gerät mit Abo das Menü, wähle <i>Abo</i> und tippe auf <i>Gerät hinzufügen</i>. Scanne dann den Code mit dem anderen Gerät oder tippe auf <i>Stattdessen den Link schicken</i>. Ein Code funktioniert einmal, zehn Minuten lang.",
-      "p11": "Ich habe mein Handy verloren oder meinen Browser geleert.",
-      "p12": "Füge von einem anderen Gerät mit dem Abo das neue hinzu und entferne das verlorene. Wenn du keins hast, schreib uns mit der E-Mail-Adresse, mit der du bezahlt hast.",
+      "p11": "Was, wenn ich mein Handy verliere oder meinen Browser leere?",
+      "p12": "Ist ein anderes deiner Geräte im Abo, füge das neue von dort hinzu und entferne das verlorene. Wenn nicht, nimm einen Backup-Code: Öffne auf dem neuen Gerät das Menü, wähle <i>Abo aktivieren</i> und gib ihn ein. Jedes Gerät im Abo kann <i>Backup-Codes zeigen</i>, und die eines Web-Abos kamen beim Abschluss per E-Mail: Bewahre sie sicher auf. Im App Store oder bei Google Play gekauft? Tippe auf dem neuen Handy auf <i>Abonnieren</i> und dann auf <i>Käufe wiederherstellen</i>.",
       "p13": "Kann ich mit einem Screenreader oder mit größerer Schrift spielen?",
-      "p14": "Ja. Drück im Browser auf <i>Enable accessibility</i>, die erste Schaltfläche, die ein Screenreader findet. Für größere Schrift nutze den Zoom des Browsers.",
+      "p14": "Ja. Jede Karte, jeder Platz, jeder Stich und jeder Punktestand hat einen Namen, den ein Screenreader vorlesen kann. Im Browser drückst du <i>Enable accessibility</i>, die erste Schaltfläche, die ein Screenreader findet, und nutzt für größere Schrift den Zoom des Browsers. In den Apps fürs Handy schaltest du VoiceOver (iPhone) oder TalkBack (Android) ein; die App folgt der Schriftgröße des Handys.",
       "p15": "Kann ich die Sprache wählen?",
-      "p16": "Häng <code>?lang=es</code> (oder <code>pt</code>, <code>de</code>, <code>fr</code>, <code>en</code>) an die Adresse des Spiels an.",
+      "p16": "Das Spiel folgt der Sprache deines Geräts. Im Web wählst du eine andere unter <i>Sprache</i> auf der Seite <i>Über</i> im Spiel, oder mit dem Sprachmenü unten auf dieser Website. Auf dem Handy nimmst du die Einstellung des Handys für jede App: auf dem iPhone Einstellungen, dann Open Hearts, dann Sprache; ab Android 13 Einstellungen, dann System, dann Sprachen, dann App-Sprachen.",
       "p17": "Woher weiß ich, dass das Austeilen fair ist?",
-      "p18": "Sieh dir an, <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">wie das Austeilen funktioniert</a>.",
       "p19": "Was passiert mit meinen Daten?",
-      "p20": "Siehe die <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>."
+      "p20": "Allein verlässt nichts dein Gerät. Live sind dein Name, dein Bild und deine Ergebnisse öffentlich. Nichts wird verkauft oder für Werbung genutzt. Mehr in der <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>."
     },
     "rules": {
       "title": "Was sind die Regeln von Hearts?",
@@ -110,7 +109,13 @@
       "r8": "Gespielt wird bis fünfzig oder hundert. Die niedrigste Punktzahl gewinnt."
     },
     "cancelAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Abo verwalten",
-    "addAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Gerät hinzufügen"
+    "addAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Gerät hinzufügen",
+    "fair": {
+      "random": "<b>Zufällig.</b> An einem Live-Tisch mischt jedes Gerät das Deck der Reihe nach und beweist, dass es ehrlich gemischt hat; ein ehrliches Gerät genügt für ein faires Geben. Jede Hand öffnet sich nur für ihren Spieler: Kein anderer Spieler sieht sie, und kein Server. Allein kommt jedes Geben aus dem sicheren Zufallsgenerator deines Geräts.",
+      "witness": "<b>Bezeugt.</b> Jede Hand lost Geschworene aus: Fremde, zufällig gewählt unter anderen Spielern, die online sind, ohne Einsatz am Tisch. Sie spielen die Plätze der Bots und verwahren Teile der Schlüssel jedes Spielers, damit eine Hand zu Ende gespielt werden kann, wenn jemand geht, ohne dass einer allein die Karten eines anderen öffnen kann.",
+      "audit": "<b>Geprüft.</b> Nach jeder Hand veröffentlicht jedes Gerät sein Geheimnis, sodass sich die ganze Partie nachspielen und jedes Mischen, jede Karte und jeder Zug prüfen lässt. Nach einer Live-Partie übernimmt <i>Die ganze Partie ansehen</i> diese Prüfung für dich; nach einer Partie allein bewahrt <i>Protokoll kopieren</i> sie auf.",
+      "more": "Wie alles funktioniert, steht in <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">der Beschreibung</a>."
+    }
   },
   "privacy": {
     "meta": {

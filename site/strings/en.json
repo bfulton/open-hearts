@@ -87,16 +87,15 @@
       "p8": "Open the menu, choose <i>Subscription</i>, then <i>Manage subscription</i>. Other ways, and refunds, are in the <a href=\"{{base}}/terms\">terms</a>.",
       "p9": "How do I add another device?",
       "p10": "On a subscribed device, open the menu, choose <i>Subscription</i> and tap <i>Add a device</i>, then scan the code with the other device, or tap <i>Send the link instead</i>. A code works once, for ten minutes.",
-      "p11": "I lost my phone, or cleared my browser.",
-      "p12": "From another device on the subscription, add the new one and drop the lost one. If you have none, email us with the address you paid with.",
+      "p11": "What if I lose my phone, or clear my browser?",
+      "p12": "If another of your devices is on the subscription, add the new one from there and drop the lost one. If not, use a backup code: on the new device, open the menu, choose <i>Activate subscription</i> and enter it. Any device on the subscription can <i>Show backup codes</i>, and a web subscription's were emailed when you subscribed: keep them somewhere safe. Bought in the App Store or Google Play? On the new phone, tap <i>Subscribe</i>, then <i>Restore purchases</i>.",
       "p13": "Can I play with a screen reader, or bigger text?",
-      "p14": "Yes. In a browser, press <i>Enable accessibility</i>, the first button a screen reader finds. For bigger text, use the browser's zoom.",
+      "p14": "Yes. Every card, seat, trick and score has a name a screen reader can read. In a browser, press <i>Enable accessibility</i>, the first button a screen reader finds, and use the browser's zoom for bigger text. In the phone apps, turn on VoiceOver (iPhone) or TalkBack (Android); the app follows the phone's text size.",
       "p15": "Can I pick the language?",
-      "p16": "Add <code>?lang=es</code> (or <code>pt</code>, <code>de</code>, <code>fr</code>, <code>en</code>) to the game's address.",
+      "p16": "The game follows your device's language. On the web, choose another under <i>Language</i> on the game's <i>About</i> page, or with the language menu at the foot of this site. On a phone, use the phone's own setting for each app: on an iPhone, Settings, then Open Hearts, then Language; on Android 13 and later, Settings, then System, then Languages, then App languages.",
       "p17": "How do I know the deal is fair?",
-      "p18": "See <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">how the deal works</a>.",
       "p19": "What happens to my data?",
-      "p20": "See the <a href=\"{{base}}/privacy\">privacy policy</a>."
+      "p20": "Alone, nothing leaves your device. Live play shows your name, picture and results publicly. Nothing is sold or used for ads. More in the <a href=\"{{base}}/privacy\">privacy policy</a>."
     },
     "rules": {
       "title": "What are the rules for Hearts?",
@@ -110,7 +109,13 @@
       "r8": "Play to fifty or a hundred. Lowest score wins."
     },
     "cancelAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Manage subscription",
-    "addAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Add a device"
+    "addAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Add a device",
+    "fair": {
+      "random": "<b>Random.</b> At a live table every device shuffles the deck in turn and proves it shuffled honestly, so one honest device is enough for a fair deal. Each hand opens for its own player alone: no other player sees it, and no server does. Alone, every deal comes from your device's secure random generator.",
+      "witness": "<b>Witnessed.</b> Each hand draws jurors: strangers picked at random from other players online, with no stake in the table. They play any seat a bot holds, and keep pieces of each player's keys, so a hand can finish when someone leaves while nobody alone can open another's cards.",
+      "audit": "<b>Audited.</b> After each hand every device publishes its secret, so the whole game can be replayed and every shuffle, card and play checked. After a live game, <i>See the whole game</i> does that check for you; after a game alone, <i>Copy record</i> keeps it.",
+      "more": "How it all works is in <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">the write-up</a>."
+    }
   },
   "privacy": {
     "meta": {

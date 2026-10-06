@@ -125,6 +125,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get about => 'Über';
 
   @override
+  String get language => 'Sprache';
+
+  @override
+  String get deviceLanguage => 'Wie auf diesem Gerät';
+
+  @override
   String get recordCopied => 'Spielprotokoll kopiert';
 
   @override

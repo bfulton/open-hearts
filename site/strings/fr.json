@@ -87,16 +87,15 @@
       "p8": "Ouvrez le menu, choisissez <i>Abonnement</i>, puis <i>Gérer l'abonnement</i>. Les autres moyens, et les remboursements, sont dans les <a href=\"{{base}}/terms\">conditions</a>.",
       "p9": "Comment ajouter un autre appareil ?",
       "p10": "Sur un appareil abonné, ouvrez le menu, choisissez <i>Abonnement</i> et touchez <i>Ajouter un appareil</i>, puis scannez le code avec l'autre appareil, ou touchez <i>Envoyer le lien à la place</i>. Un code ne sert qu'une fois, pendant dix minutes.",
-      "p11": "J'ai perdu mon téléphone, ou effacé les données de mon navigateur.",
-      "p12": "Depuis un autre appareil de l'abonnement, ajoutez le nouveau et retirez celui qui est perdu. Si vous n'en avez aucun, écrivez-nous en indiquant l'adresse e-mail avec laquelle vous avez payé.",
+      "p11": "Et si je perds mon téléphone, ou efface les données de mon navigateur ?",
+      "p12": "Si un autre de vos appareils est sur l'abonnement, ajoutez le nouveau depuis celui-ci et retirez celui que vous avez perdu. Sinon, utilisez un code de secours : sur le nouvel appareil, ouvrez le menu, choisissez <i>Activer l'abonnement</i> et saisissez-le. Tout appareil de l'abonnement peut <i>Afficher les codes de secours</i>, et ceux d'un abonnement web vous ont été envoyés par e-mail à l'abonnement : gardez-les en lieu sûr. Acheté sur l'App Store ou Google Play ? Sur le nouveau téléphone, touchez <i>S'abonner</i>, puis <i>Restaurer les achats</i>.",
       "p13": "Puis-je jouer avec un lecteur d'écran, ou avec un texte plus grand ?",
-      "p14": "Oui. Dans un navigateur, appuyez sur <i>Enable accessibility</i>, le premier bouton que trouve un lecteur d'écran. Pour agrandir le texte, utilisez le zoom du navigateur.",
+      "p14": "Oui. Chaque carte, place, pli et score a un nom qu'un lecteur d'écran peut lire. Dans un navigateur, appuyez sur <i>Enable accessibility</i>, le premier bouton que trouve le lecteur d'écran, et utilisez le zoom du navigateur pour agrandir le texte. Dans les applications mobiles, activez VoiceOver (iPhone) ou TalkBack (Android) ; l'application suit la taille de texte du téléphone.",
       "p15": "Puis-je choisir la langue ?",
-      "p16": "Ajoutez <code>?lang=es</code> (ou <code>pt</code>, <code>de</code>, <code>fr</code>, <code>en</code>) à l'adresse du jeu.",
+      "p16": "Le jeu suit la langue de votre appareil. Sur le web, choisissez-en une autre sous <i>Langue</i>, sur la page <i>À propos</i> du jeu, ou avec le menu des langues en bas de ce site. Sur un téléphone, utilisez le réglage du téléphone pour chaque application : sur un iPhone, Réglages, puis Open Hearts, puis Langue ; sur Android 13 et plus, Paramètres, puis Système, puis Langues, puis Langues des applications.",
       "p17": "Comment savoir que la donne est honnête ?",
-      "p18": "Voyez <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">comment fonctionne la donne</a>.",
       "p19": "Que deviennent mes données ?",
-      "p20": "Consultez la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
+      "p20": "En solo, rien ne quitte votre appareil. En direct, votre nom, votre image et vos résultats sont publics. Rien n'est vendu ni utilisé pour la publicité. Plus dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
     },
     "rules": {
       "title": "Quelles sont les règles de la Dame de pique ?",
@@ -110,7 +109,13 @@
       "r8": "Jouez en cinquante ou en cent points. Le score le plus bas gagne."
     },
     "cancelAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Gérer l'abonnement",
-    "addAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Ajouter un appareil"
+    "addAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Ajouter un appareil",
+    "fair": {
+      "random": "<b>Aléatoire.</b> À une table en direct, chaque appareil mélange le paquet à son tour et prouve qu'il l'a fait honnêtement : un seul appareil honnête suffit pour une donne équitable. Chaque main ne s'ouvre que pour son joueur : aucun autre joueur ne la voit, ni aucun serveur. En solo, chaque donne vient du générateur aléatoire sécurisé de votre appareil.",
+      "witness": "<b>Sous témoins.</b> Chaque main tire au sort des jurés : des inconnus choisis au hasard parmi les autres joueurs en ligne, sans enjeu à la table. Ils jouent les places des bots et gardent des morceaux des clés de chaque joueur, pour qu'une main puisse se terminer si quelqu'un part, sans que personne ne puisse seul ouvrir les cartes d'un autre.",
+      "audit": "<b>Vérifié.</b> Après chaque main, chaque appareil publie son secret : la partie entière peut être rejouée et chaque mélange, carte et coup vérifiés. Après une partie en direct, <i>Voir toute la partie</i> fait cette vérification pour vous ; après une partie en solo, <i>Copier le relevé</i> la conserve.",
+      "more": "Tout le fonctionnement est expliqué dans <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">la description</a>."
+    }
   },
   "privacy": {
     "meta": {

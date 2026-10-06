@@ -1,6 +1,7 @@
 /// What this is, and which build of it is running.
 library;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'build_info.dart';
@@ -14,7 +15,12 @@ final projectSource = Uri.parse('https://github.com/bfulton/open-hearts');
 final projectLicense = Uri.parse('https://github.com/bfulton/open-hearts/blob/main/LICENSE');
 
 class AboutPage extends StatelessWidget {
-  const AboutPage({super.key});
+  const AboutPage({super.key, this.languages = kIsWeb});
+
+  /// Whether the page offers a choice of language: on the web, where a
+  /// browser's language is all there is to go on. A phone has its own
+  /// setting for each app's language, and the app follows that.
+  final bool languages;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +55,10 @@ class AboutPage extends StatelessWidget {
                 _Taps(times: 5, onTaps: () => touchProbeOn.value = !touchProbeOn.value, child: _Line(label: context.l10n.build, value: buildTag)),
                 const SizedBox(height: 8),
                 _Line(label: context.l10n.published, value: buildDate),
+                if (languages) ...[
+                  const SizedBox(height: 8),
+                  const _LanguagePick(),
+                ],
                 const SizedBox(height: 24),
                 Wrap(
                   alignment: WrapAlignment.center,
@@ -89,6 +99,40 @@ class _Line extends StatelessWidget {
             fontFeatures: [FontFeature.tabularFigures()],
             color: Palette.chrome,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The language the app is drawn in: the browser's, or one chosen
+/// here, kept for next time and taken up at once (l10n/l10n.dart).
+class _LanguagePick extends StatelessWidget {
+  const _LanguagePick();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    // A wrap, so a long name in a narrow window goes under the label
+    // rather than off the side.
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      children: [
+        Text(l10n.language, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
+        DropdownButton<String?>(
+          value: appLanguage.value?.languageCode,
+          isDense: true,
+          underline: const SizedBox(),
+          dropdownColor: Felt.mid,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.chrome),
+          items: [
+            DropdownMenuItem(value: null, child: Text(l10n.deviceLanguage)),
+            for (final MapEntry(key: code, value: name) in languageNames.entries)
+              DropdownMenuItem(value: code, child: Text(name)),
+          ],
+          onChanged: (code) => choose(code == null ? null : Locale(code)),
         ),
       ],
     );

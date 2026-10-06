@@ -141,6 +141,9 @@ footer.wrap {
 footer ul { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; }
 footer a { text-decoration: none; }
 footer a:hover { text-decoration: underline; }
+/* The page you are on: said, not offered. */
+footer a[aria-current="page"] { color: var(--chrome); font-weight: 650; }
+footer a[aria-current="page"]:hover { text-decoration: none; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

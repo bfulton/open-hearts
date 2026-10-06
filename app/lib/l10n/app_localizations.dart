@@ -212,6 +212,18 @@ abstract class AppLocalizations {
   /// **'About'**
   String get about;
 
+  /// On the About page, on the web: the language the app is in.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get language;
+
+  /// The language choice that follows the device or browser.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as this device'**
+  String get deviceLanguage;
+
   /// Shown briefly after the game's record is put on the clipboard.
   ///
   /// In en, this message translates to:

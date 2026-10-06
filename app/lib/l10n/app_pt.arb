@@ -18,6 +18,8 @@
   "menu": "Menu",
   "leaveTheTable": "Sair da mesa",
   "about": "Sobre",
+  "language": "Idioma",
+  "deviceLanguage": "O mesmo do aparelho",
   "recordCopied": "Registro copiado",
   "choosePass": "{count, plural, =1{Escolha mais 1 carta para passar} other{Escolha mais {count} cartas para passar}}",
   "passButton": "Passar",

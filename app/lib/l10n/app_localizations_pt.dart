@@ -118,6 +118,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get about => 'Sobre';
 
   @override
+  String get language => 'Idioma';
+
+  @override
+  String get deviceLanguage => 'O mesmo do aparelho';
+
+  @override
   String get recordCopied => 'Registro copiado';
 
   @override

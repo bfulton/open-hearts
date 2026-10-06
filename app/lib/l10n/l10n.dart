@@ -81,6 +81,26 @@ Future<Locale?> chosenLanguage([Uri? at]) async {
   return _spoken(prefs.getString(chosenLanguageKey));
 }
 
+/// The language chosen, live: what the app is drawn in, null for the
+/// device's own. Set at start from [chosenLanguage], and by [choose].
+final ValueNotifier<Locale?> appLanguage = ValueNotifier(null);
+
+/// A language chosen here (the About page, on the web), kept for next
+/// time, and the app redrawn in it at once. Null goes back to the
+/// device's own.
+Future<void> choose(Locale? language) async {
+  final prefs = await SharedPreferences.getInstance();
+  if (language == null) {
+    await prefs.remove(chosenLanguageKey);
+  } else {
+    await prefs.setString(chosenLanguageKey, language.languageCode);
+  }
+  appLanguage.value = language;
+}
+
+/// Each language by its own name, as a list of them is read.
+const languageNames = {'en': 'English', 'es': 'Español', 'pt': 'Português', 'de': 'Deutsch', 'fr': 'Français'};
+
 Locale? _spoken(String? code) {
   final asked = code?.toLowerCase();
   if (asked == null) return null;
