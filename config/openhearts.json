@@ -14,5 +14,5 @@
     "playPushAudience": null,
     "playPushEmail": null
   },
-  "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "online": true, "onlineQuietMinutes": 60 }
+  "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "online": true, "onlineQuietMinutes": 60, "notOnline": ["ab6ce76c87d37564"] }
 }

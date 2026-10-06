@@ -35,10 +35,18 @@ export function alertsOf(env) {
     subscribed: env.OH_ALERT_SUBSCRIBED === 'on',
     online: env.OH_ALERT_ONLINE === 'on',
     quietMinutes: Number.isFinite(minutes) && minutes >= 1 ? minutes : 60,
+    notOnline: (env.OH_ALERT_NOT_ONLINE ?? '').split(',').filter((h) => /^[0-9a-f]{16}$/.test(h)),
   };
 }
 
 const short = (s) => String(s ?? '').slice(0, 8);
+
+/// How the config names a subscription without saying it, the repository
+/// being public: the first 16 hex of the SHA-256 of its id.
+export async function hashOf(subscription) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(subscription));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+}
 
 /// Sends [subject] and [text] to the alerts address, through the
 /// relay's object where the project binds one. Never throws: an alert
@@ -81,11 +89,14 @@ export async function alertSubscribed(env, store, { subscription, source, key = 
 }
 
 /// A device on [held]'s subscription asking for its licence: online,
-/// told at most once in the configured quiet time per subscription.
+/// told at most once in the configured quiet time per subscription, and
+/// never for one the config's `notOnline` names.
 export async function alertOnline(env, store, key, held, { now = Date.now() } = {}) {
   const alerts = alertsOf(env);
   if (!alerts?.online || !store || !held?.subscription) return false;
   const subscription = held.subscription;
+  // The operator's own, and anyone else they would rather not hear of.
+  if (alerts.notOnline.includes(await hashOf(subscription))) return false;
   if (!(await fresh(store, 'online', subscription, Math.max(60, Math.round(alerts.quietMinutes * 60))))) return false;
   const meta = await store.get(`SUB#${subscription}`, 'META');
   const devices = (await store.under(`SUB#${subscription}`, 'DEVICE#')).length;

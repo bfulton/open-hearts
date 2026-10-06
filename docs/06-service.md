@@ -340,7 +340,9 @@ While there are few subscribers, the operator is emailed about each one
   in 30 days, however often the webhook is delivered.
 - **A subscriber online:** a device on a subscription asks for its
   licence, which the app does when it opens. Told at most once per
-  subscription in `onlineQuietMinutes`.
+  subscription in `onlineQuietMinutes`. Never for a subscription
+  listed in `notOnline`, which names each by the first 16 hex of the
+  SHA-256 of its ID, because the repository is public.
 
 The mail says which store, the first characters of the subscription
 and device, and dates. It never includes an email address or name. It

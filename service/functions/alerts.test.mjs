@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 
-import { alertOnline, alertsOf, alertSubscribed, sendAlert } from './alerts.mjs';
+import { alertOnline, alertsOf, alertSubscribed, hashOf, sendAlert } from './alerts.mjs';
 import { configEnv } from './deployment.mjs';
 import worker, { Household, memoryStore, record, signerOn } from './worker.mjs';
 import { keys } from '../do/sign.mjs';
@@ -36,7 +36,7 @@ async function subscriber(store, now = Date.now()) {
 
 test('the config file turns alerts on, and its address is ours or nobody', () => {
   const config = JSON.parse('{"alerts":{"to":"alerts@openhearts.game","subscribed":true,"online":false,"onlineQuietMinutes":30}}');
-  assert.deepEqual(alertsOf(configEnv(config)), { to: 'alerts@openhearts.game', subscribed: true, online: false, quietMinutes: 30 });
+  assert.deepEqual(alertsOf(configEnv(config)), { to: 'alerts@openhearts.game', subscribed: true, online: false, quietMinutes: 30, notOnline: [] });
   assert.equal(alertsOf(configEnv({})), null);
   assert.equal(alertsOf({ ...on, OH_ALERTS_TO: 'someone@example.com' }), null);
 });
@@ -77,6 +77,17 @@ test('nothing is told when it is off, or with nobody to send it', async () => {
   assert.equal(await alertOnline({ ...on }, store, KEY, held), false, 'no HOUSEHOLD');
   assert.equal(await alertOnline({ ...on, HOUSEHOLD: relay(sent, { EMAIL: undefined }) }, memoryStore(), KEY, held), false, 'no EMAIL');
   assert.equal(sent.length, 0);
+});
+
+test('a subscription the config names is never told online, and others still are', async () => {
+  const sent = [];
+  const store = memoryStore();
+  const held = await subscriber(store);
+  const env = { ...on, OH_ALERT_NOT_ONLINE: `0123456789abcdef,${await hashOf('sub_9')}`, HOUSEHOLD: relay(sent) };
+  assert.equal(await alertOnline(env, store, KEY, held), false);
+  assert.equal(await alertOnline(env, store, KEY, { ...held, subscription: 'sub_10' }), true);
+  assert.equal(sent.length, 1);
+  assert.equal(await hashOf('sub_9'), (await import('node:crypto')).createHash('sha256').update('sub_9').digest('hex').slice(0, 16));
 });
 
 test('an alert that fails does not throw', async () => {
