@@ -1,5 +1,7 @@
 /// Ratings, as this device knows them: every result on the relays,
-/// folded into a ledger, and this device's own line in it.
+/// folded into a ledger, and this device's account's line in it. A
+/// rating is an account's, whichever of its devices played
+/// (packages/table, results.dart).
 library;
 
 import 'dart:async';
@@ -15,7 +17,9 @@ class Standing {
   Standing(this.ledger, this.me);
 
   final Ledger ledger;
-  final PublicKey me;
+
+  /// This device's account.
+  final String me;
 
   Rating get mine => ledger.of(me);
 
@@ -23,12 +27,12 @@ class Standing {
   /// a busy relay; instant on an empty one. Each relay holds the
   /// results written to it, so the fold waits for all of them, within
   /// reason.
-  static Future<Standing> load(List<Uri> relays, Signer signer) async {
+  static Future<Standing> load(List<Uri> relays, Signer signer, {required String account}) async {
     final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
     try {
       await t.ready.timeout(waits.standing);
       await t.allReady.timeout(waits.standingAll).catchError((_) {});
-      return Standing(Ledger.from(t.lobbySoFar, prior: prior), signer.publicKey);
+      return Standing(Ledger.from(t.lobbySoFar, prior: prior), account);
     } finally {
       t.close();
     }
@@ -65,7 +69,7 @@ class Standing {
   /// Where a bot with no results yet starts: its level's calibrated
   /// rating. A person starts fresh.
   static Rating? prior(String id) {
-    if (id.length == 64) return null; // a key
+    if (validAccount(id) || id.length == 64) return null; // an account, or a key
     try {
       return Rating(mu: Persona.named(id).level.let(Persona.priorRating).toDouble(), phi: 120);
     } catch (_) {

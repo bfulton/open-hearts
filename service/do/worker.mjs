@@ -16,6 +16,15 @@
 // is its memory, so a socket carries its own subscriptions
 // (`serializeAttachment`) and they come back with it.
 //
+// And nobody is carried on the service's say-so alone. Every socket is
+// asked who it is, and carried only for a device the service has given
+// a current activation — the device in use of an account with a
+// subscription — or for the bench (relay.mjs, serviceGate). The
+// account's own object (Household) is asked whether an activation is
+// still the one in use as a socket shows it, and tells this object to
+// close a device's sockets the moment another device of its account
+// takes the account up (`/revoke`, below).
+//
 // And little is written down. Presence is ephemeral by definition —
 // forwarded to whoever is listening and forgotten — so its object has
 // no storage to pay for and nothing to sweep. A table's or a lobby's
@@ -25,14 +34,14 @@
 
 import wasm from '../../app/web/schnorr.wasm';
 
-import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, tagOf, tally } from './relay.mjs';
+import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tagOf, tally } from './relay.mjs';
 import { tagStore } from './tag_store.mjs';
 import { callIn } from './bench.mjs';
 
-// One object per subscription, through which a household's codes,
-// claims and drops run one at a time (service/functions/worker.mjs,
-// "one household at a time"). It lives here because a Pages project
-// cannot define a Durable Object of its own, only bind one.
+// One object per account, through which its codes, claims, drops and
+// device in use run one at a time (service/functions/worker.mjs, "one
+// account at a time"). It lives here because a Pages project cannot
+// define a Durable Object of its own, only bind one.
 export { Household } from '../functions/worker.mjs';
 
 // The jurors of last resort, a Cloudflare Container started when a table
@@ -99,9 +108,48 @@ export class TagRelay {
       heard: (event) => this.heard(event),
       store: await kept.load(),
       kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
+      gate: this.gate(verify, tag),
     });
-    for (const socket of this.state.getWebSockets()) relay.open(socket, socket.deserializeAttachment());
+    for (const socket of this.state.getWebSockets()) {
+      const carried = socket.deserializeAttachment();
+      relay.open(socket, carried?.v === 2 ? carried.subs : carried, carried?.v === 2 ? carried.auth : null);
+    }
     return relay;
+  }
+
+  /// Who may use this object (relay.mjs, serviceGate): a device with a
+  /// current activation from the service whose key the deployment names
+  /// (OH_SERVICE_KEY), still its account's device in use as the
+  /// account's own object says — or the bench, by OH_JUROR_SECRET.
+  /// Without the service's key nobody is: a relay that carried anybody
+  /// would be live play without a subscription.
+  gate(verify, tag) {
+    const env = this.env;
+    const service = /^[0-9a-f]{64}$/.test(env.OH_SERVICE_KEY ?? '') ? env.OH_SERVICE_KEY : '0'.repeat(64);
+    return serviceGate({
+      service,
+      verify,
+      bench: env.OH_JUROR_SECRET ?? null,
+      seen: env.HOUSEHOLD
+        ? async (who) => {
+            try {
+              const stub = env.HOUSEHOLD.get(env.HOUSEHOLD.idFromName(who.account));
+              const answer = await (
+                await stub.fetch('https://household/', {
+                  method: 'POST',
+                  body: JSON.stringify({ op: 'seen', account: who.account, key: who.key, epoch: who.epoch, tag }),
+                })
+              ).json();
+              return answer.status === 409 ? answer.body?.error ?? 'superseded: another device of this account is in use' : null;
+            } catch {
+              // The account's object out of reach: the service's
+              // signature stands, until its hour is up or the object
+              // says otherwise.
+              return null;
+            }
+          }
+        : null,
+    });
   }
 
   /// A day's stored events gone; the relay in memory built again from
@@ -113,6 +161,15 @@ export class TagRelay {
 
   async fetch(request) {
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+      // The account's own object, telling this one that a device of the
+      // account has been superseded (Household, revokerOf). Only an
+      // object reaches here without a websocket: the worker below hands
+      // an object nothing else.
+      if (request.method === 'POST' && new URL(request.url).pathname === '/revoke') {
+        const { account, epoch } = await request.json();
+        if (typeof account === 'string' && Number.isSafeInteger(epoch)) (await this.ready()).revoke(account, epoch);
+        return new Response('ok\n');
+      }
       return new Response('this is a relay: open a websocket\n', { status: 426 });
     }
     // The tag this object is for, said once and kept: an object cannot
@@ -137,9 +194,9 @@ export class TagRelay {
     const relay = await this.ready();
     await relay.message(socket, message);
     // What this socket must remember if the object is evicted before
-    // its next message. Bounded by the relay itself, which holds a
-    // client to a few subscriptions.
-    socket.serializeAttachment(relay.subscriptionsOf(socket));
+    // its next message: its subscriptions, bounded by the relay itself,
+    // which holds a client to a few, and who it answered as.
+    socket.serializeAttachment({ v: 2, subs: relay.subscriptionsOf(socket), auth: relay.authOf(socket) });
   }
 
   async webSocketClose(socket) {
@@ -161,6 +218,11 @@ export default {
     if (path === '/') return new Response('open hearts relay: a relay lives at /<tag>\n', { status: 200 });
     const tag = tagOf(path);
     if (!tag) return new Response('a relay lives at /<tag>\n', { status: 404 });
+    // An object is handed websockets and nothing else: what it answers
+    // otherwise is for the account's own object alone.
+    if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+      return new Response('this is a relay: open a websocket\n', { status: 426 });
+    }
     // One object per tag, found by name: every client that asks for
     // this tag, wherever it is in the world, lands on this one object.
     return env.TABLE.get(env.TABLE.idFromName(tag)).fetch(request);

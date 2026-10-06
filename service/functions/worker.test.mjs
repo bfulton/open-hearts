@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import worker, {
+  activate,
+  activeInStore,
   allowedOrigin,
   askedBy,
   attest,
@@ -14,6 +16,7 @@ import worker, {
   dropDevice,
   entitlementOf,
   forgetProviderKeys,
+  householdOp,
   licence,
   licenceFor,
   manage,
@@ -225,11 +228,22 @@ test('the worker: local mode hands out its own TURN server, and a deployed origi
 
 // ---- the licence --------------------------------------------------------
 
-/// A store with the rows a paid-up subscription leaves.
+/// The account [subscription] belongs to, and the one [key] is a device of.
+const accountOfSub = async (store, subscription) => (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account;
+const accountOfKey = async (store, key) => (await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.account;
+
+/// The account the tests' stores are made with.
+const ACCT = '0a'.repeat(16);
+
+/// A store with the rows a paid-up subscription leaves: its account, the
+/// device on it.
 const subscribed = (key, { renews_at, licensed_until = renews_at, cancelled_at = null }) =>
   memoryStore({
-    [`KEY#${key}|ENTITLEMENT`]: JSON.stringify({ subscription: 'sub_1', licensed_until, at: '2026-01-01' }),
+    [`KEY#${key}|ENTITLEMENT`]: JSON.stringify({ account: ACCT, licensed_until, at: '2026-01-01' }),
+    [`ACCOUNT#${ACCT}|META`]: JSON.stringify({ subscription: 'sub_1', created_at: '2026-01-01' }),
+    [`ACCOUNT#${ACCT}|DEVICE#${key}`]: JSON.stringify({ bound_at: '2026-01-01' }),
     [`SUB#sub_1|META`]: JSON.stringify({ source: 'stripe', txn_ref: 'cs_1', renews_at, cancelled_at }),
+    [`SUB#sub_1|ACCOUNT`]: JSON.stringify({ account: ACCT }),
   });
 
 /// A configured service, whose store each test supplies.
@@ -273,9 +287,9 @@ test('days: an ISO date in UTC, and a month on from one', () => {
 
 test('a licence is signed over the statement the app checks, and only by its own key', async () => {
   const key = KEY;
-  const signed = await licenceFor(key, '2026-10-17', { signer, secret: SERVICE_SECRET, service: SERVICE_KEY });
-  assert.deepEqual({ ...signed, sig: typeof signed.sig }, { key, until: '2026-10-17', plan: 'year', sig: 'string' });
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`oh-licence/1\n${key}\n2026-10-17\nyear`));
+  const signed = await licenceFor(key, ACCT, '2026-10-17', { signer, secret: SERVICE_SECRET, service: SERVICE_KEY });
+  assert.deepEqual({ ...signed, sig: typeof signed.sig }, { key, account: ACCT, until: '2026-10-17', plan: 'year', sig: 'string' });
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`oh-licence/2\n${key}\n${ACCT}\n2026-10-17\nyear`));
   const digestHex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
   assert.equal(signer.verify(SERVICE_KEY, digestHex, signed.sig), true);
   // Another service's key does not verify it, which is the whole point
@@ -286,13 +300,13 @@ test('a licence is signed over the statement the app checks, and only by its own
 
 test('a secret and a public key that are not a pair is a refusal, not a licence nobody can read', async () => {
   const wrong = 'c90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b14e5c9';
-  assert.equal(await licenceFor(KEY, '2026-10-17', { signer, secret: wrong, service: SERVICE_KEY }), null);
+  assert.equal(await licenceFor(KEY, ACCT, '2026-10-17', { signer, secret: wrong, service: SERVICE_KEY }), null);
 });
 
 test('entitlement: one read while the device is paid up', async () => {
   const store = subscribed(KEY, { renews_at: '2027-01-01' });
   const held = await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 16) });
-  assert.equal(held.subscription, 'sub_1');
+  assert.equal(held.account, ACCT);
   assert.equal(held.licensed_until, '2027-01-01');
 });
 
@@ -328,10 +342,11 @@ test('entitlement: a key nobody has heard of gets nothing, unless it is local mo
   assert.equal(await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 16) }), null);
   const open = await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 16), openHouse: true });
   assert.equal(open.licensed_until, '2026-10-17');
-  assert.equal(open.subscription, `local-${KEY.slice(0, 16)}`);
-  // And it is a subscription with the device bound under it, like any
-  // other, rather than a special case further down.
-  assert.deepEqual(await store.get(`SUB#${open.subscription}`, `DEVICE#${KEY}`), { bound_at: '2026-09-16' });
+  // And it is an account with a subscription and the device bound under
+  // it, like any other, rather than a special case further down.
+  assert.match(open.account, /^[0-9a-f]{32}$/);
+  assert.deepEqual(await store.get(`ACCOUNT#${open.account}`, `DEVICE#${KEY}`), { bound_at: '2026-09-16' });
+  assert.equal((await store.get(`ACCOUNT#${open.account}`, 'META')).subscription, `local-${KEY.slice(0, 16)}`);
 });
 
 test('the licence: a month, and never past what was paid for', async () => {
@@ -369,8 +384,9 @@ test('the licence route: a key is required, and what comes back verifies', async
   assert.equal(res.headers.get('access-control-allow-origin'), 'https://dev.open-hearts.pages.dev');
   const { licence: signed } = await res.json();
   assert.equal(signed.key, ADA.public);
+  assert.equal(signed.account, ACCT);
   assert.equal(signed.plan, 'year');
-  const canonical = `oh-licence/1\n${signed.key}\n${signed.until}\n${signed.plan}`;
+  const canonical = `oh-licence/2\n${signed.key}\n${signed.account}\n${signed.until}\n${signed.plan}`;
   const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical)))]
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
@@ -456,7 +472,11 @@ test('a paid checkout binds the device; the subscription says how long for', asy
     store,
     { now },
   );
-  assert.deepEqual(await store.get('SUB#sub_9', `DEVICE#${KEY}`), { bound_at: '2026-09-16' });
+  // An account made for it, with the device that paid on it.
+  const account = await accountOfSub(store, 'sub_9');
+  assert.match(account, /^[0-9a-f]{32}$/);
+  assert.deepEqual(await store.get(`ACCOUNT#${account}`, `DEVICE#${KEY}`), { bound_at: '2026-09-16' });
+  assert.equal((await store.get(`KEY#${KEY}`, 'ENTITLEMENT')).account, account);
   assert.equal((await store.get(`KEY#${KEY}`, 'ENTITLEMENT')).licensed_until, null);
   // Nothing is licensed on a date nobody has given.
   assert.equal(await entitlementOf(store, KEY, { now }), null);
@@ -507,7 +527,7 @@ test('only a checkout this service made, and paid for, binds a device', async ()
   assert.equal(store.rows.size, 0);
   // And the delayed money, when it comes.
   const bound = await record({ type: 'checkout.session.async_payment_succeeded', data: { object: { mode: 'subscription', payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store);
-  assert.deepEqual(bound, { bound: KEY, subscription: 'sub_9' });
+  assert.deepEqual(bound, { bound: KEY, subscription: 'sub_9', account: await accountOfSub(store, 'sub_9') });
 });
 
 test('the webhook route: unsigned is refused, signed is recorded and acknowledged', async () => {
@@ -558,12 +578,15 @@ test('the webhook route: a checkout paid for makes the backup codes and emails t
   assert.equal((await hook()).status, 200);
   assert.equal(got.length, 1);
   assert.equal(got[0].to, 'payer@example.com');
-  const row = await store.get('SUB#sub_9', 'BACKUP');
+  const account = await accountOfSub(store, 'sub_9');
+  const row = await store.get(`ACCOUNT#${account}`, 'BACKUP');
   for (const c of row.codes) assert.match(got[0].text, new RegExp(c.code));
-  // Stripe delivers again: nothing new is made or sent.
+  // Stripe delivers again: nothing new is made or sent, and the account
+  // is the same one.
   assert.equal((await hook()).status, 200);
   assert.equal(got.length, 1);
-  assert.deepEqual((await store.get('SUB#sub_9', 'BACKUP')).codes, row.codes);
+  assert.equal(await accountOfSub(store, 'sub_9'), account);
+  assert.deepEqual((await store.get(`ACCOUNT#${account}`, 'BACKUP')).codes, row.codes);
 });
 
 test('the checkout route: the key, and somewhere on this site to come back to', async () => {
@@ -671,7 +694,7 @@ test('a code brings a second device in, and is spent doing it', async () => {
   const claimed = await claimWith(OTHER, made.body.ticket, store, { now });
   assert.equal(claimed.status, 200);
   assert.equal((await entitlementOf(store, OTHER, { now })).licensed_until, '2027-09-16');
-  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY, OTHER]);
+  assert.deepEqual((await devicesOn(store, await accountOfSub(store, 'sub_9'))).map((d) => d.key), [KEY, OTHER]);
 
   // Spent: a photograph of the screen a minute later is worth nothing.
   const again = await claimWith(THIRD, made.body.ticket, store, { now });
@@ -699,7 +722,7 @@ test('five devices is a household; a sixth is refused, and no code is made for o
     assert.equal(made.status, 200, `a code for ${key.slice(0, 4)}`);
     assert.equal((await claimWith(key, made.body.ticket, store, { now })).status, 200);
   }
-  assert.equal((await devicesOn(store, 'sub_9')).length, 5);
+  assert.equal((await devicesOn(store, await accountOfSub(store, 'sub_9'))).length, 5);
   const sixth = await ticketFor(KEY, store, { now });
   assert.equal(sixth.status, 409);
   assert.deepEqual(sixth.body, { error: 'five devices already', devices: 5, most: 5 });
@@ -716,7 +739,7 @@ test('a code made before the fifth device cannot let a sixth in', async () => {
   }
   const late = await claimWith(OTHER, early.body.ticket, store, { now });
   assert.equal(late.status, 409, 'the count is read where it is spent, not where it is made');
-  assert.equal((await devicesOn(store, 'sub_9')).length, 5);
+  assert.equal((await devicesOn(store, await accountOfSub(store, 'sub_9'))).length, 5);
 });
 
 test('any device can drop another, and the dropped one stops being licensed', async () => {
@@ -730,7 +753,7 @@ test('any device can drop another, and the dropped one stops being licensed', as
   const dropped = await dropDevice(OTHER, KEY, store, { now });
   assert.equal(dropped.status, 200);
   assert.equal(dropped.body.devices, 1);
-  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [OTHER]);
+  assert.deepEqual((await devicesOn(store, await accountOfSub(store, 'sub_9'))).map((d) => d.key), [OTHER]);
   assert.equal(await entitlementOf(store, KEY, { now: Date.UTC(2026, 8, 17) }), null);
   assert.equal((await entitlementOf(store, OTHER, { now })).licensed_until, '2027-09-16');
 
@@ -825,7 +848,7 @@ test('a key alone is nobody: a household is not listed, dropped from or joined b
   // Ada's key, as a stranger read it off the relay.
   assert.equal((await worker.fetch(send('devices', { key: ADA.public }), held)).status, 401, 'her devices are not listed to him');
   assert.equal((await worker.fetch(send('devices', { key: ADA.public, drop: ADA.public }), held)).status, 401);
-  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [ADA.public], 'nor is she dropped off what she paid for');
+  assert.deepEqual((await devicesOn(store, await accountOfSub(store, 'sub_9'))).map((d) => d.key), [ADA.public], 'nor is she dropped off what she paid for');
   assert.equal((await worker.fetch(send('ticket', { key: ADA.public }), held)).status, 401, 'nor is a code made against it');
   assert.equal((await worker.fetch(send('licence', { key: ADA.public }), held)).status, 401, 'nor is he told whether she pays');
 
@@ -930,7 +953,7 @@ test('a code does not take a device off a subscription somebody paid for, so a l
   const taken = await claimWith(KEY, his.body.ticket, store, { now });
   assert.equal(taken.status, 409);
   assert.match(taken.body.error, /another subscription/);
-  assert.equal((await entitlementOf(store, KEY, { now })).subscription, 'sub_9', 'still on her own');
+  assert.equal((await entitlementOf(store, KEY, { now })).account, await accountOfSub(store, 'sub_9'), 'still on her own');
   assert.equal((await dropDevice(THIRD, KEY, store, { now })).status, 404, 'and not his to drop');
   assert.deepEqual((await store.get(`TICKET#${his.body.ticket}`, 'META')).used_at, null, 'nor is his code spent on her');
 });
@@ -947,18 +970,18 @@ test('a device leaves a subscription by dropping itself, and one that has ended 
   await dropDevice(OTHER, OTHER, store, { now });
   const moving = await ticketFor(THIRD, store, { now });
   assert.equal((await claimWith(OTHER, moving.body.ticket, store, { now })).status, 200);
-  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY], 'gone from the first');
+  assert.deepEqual((await devicesOn(store, await accountOfSub(store, 'sub_9'))).map((d) => d.key), [KEY], 'gone from the first');
   // Bound the same day, so the tiebreak is the key: both are there,
   // whichever way round they sort.
-  assert.deepEqual((await devicesOn(store, 'sub_2')).map((d) => d.key).sort(), [OTHER, THIRD].sort());
-  assert.equal((await entitlementOf(store, OTHER, { now })).subscription, 'sub_2');
+  assert.deepEqual((await devicesOn(store, await accountOfSub(store, 'sub_2'))).map((d) => d.key).sort(), [OTHER, THIRD].sort());
+  assert.equal((await entitlementOf(store, OTHER, { now })).account, await accountOfSub(store, 'sub_2'));
 
   // A subscription that has ended keeps nobody.
   await record({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_9' } } }, store, { now });
   const after = Date.UTC(2026, 8, 18);
   const again = await ticketFor(THIRD, store, { now: after });
   assert.equal((await claimWith(KEY, again.body.ticket, store, { now: after })).status, 200);
-  assert.equal((await entitlementOf(store, KEY, { now: after })).subscription, 'sub_2');
+  assert.equal((await entitlementOf(store, KEY, { now: after })).account, await accountOfSub(store, 'sub_2'));
 
   // Nor does local mode's open house, which licenses any device that
   // asks and so is where every device in the browser suite starts.
@@ -967,7 +990,7 @@ test('a device leaves a subscription by dropping itself, and one that has ended 
   await entitlementOf(local, THIRD, { now, openHouse: true });
   const code = await ticketFor(THIRD, local, { now });
   assert.equal((await claimWith(OTHER, code.body.ticket, local, { now })).status, 200);
-  assert.equal((await entitlementOf(local, OTHER, { now })).subscription, `local-${THIRD.slice(0, 16)}`);
+  assert.equal((await entitlementOf(local, OTHER, { now })).account, await accountOfKey(local, THIRD));
 });
 
 test('a code\'s row is let go by the store, spent or not, rather than kept for ever', async () => {
@@ -1069,59 +1092,108 @@ test('the identifier is stored keyed, never raw, and only where there is a secre
   assert.equal(await loginRow(who, {}), null);
 });
 
-test('attest binds an account to one device, and says so when it is already on another', async () => {
-  const store = memoryStore();
-  const who = { provider: 'google', sub: 'sub-1' };
+test('a sign-in is linked to one account, and an account to one sign-in', async () => {
   const now = Date.UTC(2026, 8, 16);
-  assert.deepEqual(await attest(who, KEY, store, signedInAs, { now }), { status: 200, body: { attested: '2026-09-16' } });
-  assert.deepEqual(await store.get(await loginRow(who, signedInAs), 'IDENTITY'), { key: KEY, created_at: '2026-09-16' });
+  const store = await household(now);
+  const account = await accountOfSub(store, 'sub_9');
+  const who = { provider: 'google', sub: 'sub-1' };
+  const login = await loginRow(who, signedInAs);
+  assert.deepEqual(await attest(who, KEY, store, login, { now }), { status: 200, body: { attested: '2026-09-16', account } });
+  assert.deepEqual(await store.get(login, 'IDENTITY'), { account, created_at: '2026-09-16' });
+  assert.deepEqual(await store.get(`ACCOUNT#${account}`, 'LOGIN'), { provider: 'google', login, at: '2026-09-16' });
   // Nothing on the key's own side leads back to the provider's subject.
-  assert.deepEqual(await store.get(`KEY#${KEY}`, 'META'), { provider: 'google', attested_at: '2026-09-16' });
+  assert.equal(await store.get(`KEY#${KEY}`, 'META'), null);
 
-  // The same device again is the same binding, not a second one.
-  assert.equal((await attest(who, KEY, store, signedInAs, { now })).status, 200);
-  // Another device is a refusal: moving is supersede's to say.
-  assert.equal((await attest(who, OTHER, store, signedInAs, { now })).status, 409);
+  // Again, or from another device of the account: the same link.
+  assert.equal((await attest(who, KEY, store, login, { now })).status, 200);
+  await claimWith(OTHER, (await ticketFor(KEY, store, { now })).body.ticket, store, { now });
+  assert.equal((await attest(who, OTHER, store, login, { now })).status, 200);
+
+  // A device of another account, or another sign-in for this one: one
+  // person, one account, one sign-in.
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_2', metadata: { key: THIRD } } } }, store, { now });
+  assert.deepEqual((await attest(who, THIRD, store, login, { now })).body, { error: 'that sign-in is linked to another account' });
+  const other = await loginRow({ provider: 'apple', sub: '001234.abcd' }, signedInAs);
+  assert.deepEqual((await attest({ provider: 'apple', sub: '001234.abcd' }, KEY, store, other, { now })).body, { error: 'this account is linked to another sign-in' });
+  // And a device with no account has nothing to link.
+  assert.equal((await attest(who, 'aa'.repeat(32), store, login, { now })).status, 402);
 });
 
-test('supersede brings the subscription to the new device and takes the old one off it', async () => {
+test('signing in brings a device into the account the sign-in is linked to, as a backup code would', async () => {
   const now = Date.UTC(2026, 8, 16);
   const store = await household(now);
+  const account = await accountOfSub(store, 'sub_9');
+  const held = { OH_STORE: kvOf(store) };
   const who = { provider: 'google', sub: 'sub-1' };
-  await attest(who, KEY, store, signedInAs, { now });
+  const login = await loginRow(who, signedInAs);
+  await attest(who, KEY, store, login, { now });
 
-  const moved = await supersede(who, OTHER, store, signedInAs, { now: Date.UTC(2026, 9, 1) });
-  assert.deepEqual(moved.body, { superseded: KEY, at: '2026-10-01' });
-  assert.deepEqual(await store.get(`KEY#${OTHER}`, 'SUPERSEDES'), { predecessor: KEY, at: '2026-10-01' });
-  assert.equal((await entitlementOf(store, OTHER, { now })).subscription, 'sub_9');
-  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY, OTHER]);
-  // The login points at the new device from here, so the next sign-in
-  // on it is not a supersession of itself.
-  assert.deepEqual((await supersede(who, OTHER, store, signedInAs, { now })).body, { superseded: null, at: '2026-09-16' });
+  const joined = await supersede(who, OTHER, store, held, login, { now: Date.UTC(2026, 9, 1) });
+  assert.deepEqual(joined.body, { account, at: '2026-10-01' });
+  assert.equal((await entitlementOf(store, OTHER, { now })).account, account);
+  // A device the person still holds is not dropped by signing in on
+  // another: they are both the account's, one in use at a time.
+  assert.deepEqual((await devicesOn(store, account)).map((d) => d.key).sort(), [KEY, OTHER].sort());
+  assert.equal((await supersede(who, OTHER, store, held, login, { now })).status, 200, 'again is nothing new');
 });
 
-test('a full household superseded drops the device that was replaced, not somebody else\'s', async () => {
+test('a full account turns a sign-in away as it turns a code away', async () => {
   const now = Date.UTC(2026, 8, 16);
   const store = await household(now);
-  const keys = ['11', '22', '33', '44'].map((b) => b.repeat(32));
-  for (const key of keys) {
-    const made = await ticketFor(KEY, store, { now });
-    await claimWith(key, made.body.ticket, store, { now });
+  for (const key of ['11', '22', '33', '44'].map((b) => b.repeat(32))) {
+    await claimWith(key, (await ticketFor(KEY, store, { now })).body.ticket, store, { now });
   }
-  assert.equal((await devicesOn(store, 'sub_9')).length, 5);
   const who = { provider: 'google', sub: 'sub-1' };
-  await attest(who, KEY, store, signedInAs, { now });
-  await supersede(who, OTHER, store, signedInAs, { now });
-  const after = (await devicesOn(store, 'sub_9')).map((d) => d.key);
-  assert.equal(after.length, 5);
-  assert.equal(after.includes(OTHER), true, 'the new device is on it');
-  assert.equal(after.includes(KEY), false, 'the one it replaced is not');
-  for (const key of keys) assert.equal(after.includes(key), true, 'and nobody else was moved for it');
+  const login = await loginRow(who, signedInAs);
+  await attest(who, KEY, store, login, { now });
+  const turned = await supersede(who, OTHER, store, { OH_STORE: kvOf(store) }, login, { now });
+  assert.equal(turned.status, 409);
+  assert.equal(turned.body.error, 'five devices already');
 });
 
-test('supersede has nothing to move for an account nobody has signed in with', async () => {
+test('a sign-in linked to no account has nothing to bring a device into', async () => {
   const store = memoryStore();
-  assert.equal((await supersede({ provider: 'google', sub: 'nobody' }, KEY, store, signedInAs)).status, 404);
+  const who = { provider: 'google', sub: 'nobody' };
+  const said = await supersede(who, KEY, store, { OH_STORE: kvOf(store) }, await loginRow(who, signedInAs));
+  assert.deepEqual([said.status, said.body.error], [404, 'that sign-in is not linked to an account']);
+});
+
+test('a sign-in does not take a device off an account somebody paid for; once that has ended, it does', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const account = await accountOfSub(store, 'sub_9');
+  // OTHER bought its own, on the web.
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_mine', metadata: { key: OTHER } } } }, store, { now });
+  await record({ type: 'customer.subscription.created', data: { object: { id: 'sub_mine', current_period_end: Math.floor(Date.UTC(2027, 2, 1) / 1000) } } }, store, { now });
+  const mine = await accountOfSub(store, 'sub_mine');
+  const who = { provider: 'google', sub: 'sub-1' };
+  const login = await loginRow(who, signedInAs);
+  await attest(who, KEY, store, login, { now });
+  const held = { OH_STORE: kvOf(store) };
+
+  const refused = await supersede(who, OTHER, store, held, login, { now });
+  assert.equal(refused.status, 409);
+  assert.match(refused.body.error, /another subscription/);
+  assert.equal((await entitlementOf(store, OTHER, { now })).account, mine, 'what was bought here stays here');
+
+  await record({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_mine', status: 'canceled' } } }, store, { now });
+  const later = now + 86400000;
+  assert.equal((await supersede(who, OTHER, store, held, login, { now: later })).status, 200);
+  assert.equal((await entitlementOf(store, OTHER, { now: later })).account, account);
+  assert.deepEqual((await devicesOn(store, mine)).map((d) => d.key), [], 'not counted against both');
+});
+
+test('a sign-in linked before accounts, to a device, is that device\'s account', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  const account = await accountOfSub(store, 'sub_9');
+  const who = { provider: 'apple', sub: '001234.abcd' };
+  const login = await loginRow(who, signedInAs);
+  await store.put(login, 'IDENTITY', { key: KEY, created_at: '2026-01-01' });
+  assert.equal((await supersede(who, OTHER, store, { OH_STORE: kvOf(store) }, login, { now })).body.account, account);
+  // And linking it again names the account from here.
+  assert.equal((await attest(who, KEY, store, login, { now })).status, 200);
+  assert.equal((await store.get(login, 'IDENTITY')).account, account);
 });
 
 test('an audience may be several: Apple names the bundle on an iPhone and the Services ID on the web', async () => {
@@ -1145,37 +1217,7 @@ test('an audience may be several: Apple names the bundle on an iPhone and the Se
   assert.equal(await whoSignedIn('apple', any, KEY, { ...apple, OH_APPLE_AUDIENCE: ' , ' }, p.fetch), null);
 });
 
-test('supersede onto a device with a paid subscription of its own moves the account and leaves that subscription where it is', async () => {
-  const now = Date.UTC(2026, 8, 16);
-  const store = await household(now);
-  // OTHER bought its own, on the web, on another day.
-  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_mine', metadata: { key: OTHER } } } }, store, { now });
-  await record({ type: 'customer.subscription.created', data: { object: { id: 'sub_mine', current_period_end: Math.floor(Date.UTC(2027, 2, 1) / 1000) } } }, store, { now });
-  const who = { provider: 'google', sub: 'sub-1' };
-  await attest(who, KEY, store, signedInAs, { now });
-
-  const moved = await supersede(who, OTHER, store, signedInAs, { now });
-  assert.deepEqual(moved.body, { superseded: KEY, at: '2026-09-16' });
-  assert.equal((await entitlementOf(store, OTHER, { now })).subscription, 'sub_mine', 'what was bought here stays here');
-  assert.deepEqual((await devicesOn(store, 'sub_mine')).map((d) => d.key), [OTHER]);
-  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY], 'and nothing was taken off the other');
-  assert.equal((await store.get(await loginRow(who, signedInAs), 'IDENTITY')).key, OTHER, 'the account is here from now on');
-});
-
-test('supersede onto a device whose own subscription has ended brings the account\'s, and takes it off the old one', async () => {
-  const now = Date.UTC(2026, 8, 16);
-  const store = await household(now);
-  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_old', metadata: { key: OTHER } } } }, store, { now });
-  await record({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_old', status: 'canceled' } } }, store, { now: now - 86400000 });
-  const who = { provider: 'apple', sub: '001234.abcd' };
-  await attest(who, KEY, store, signedInAs, { now });
-
-  await supersede(who, OTHER, store, signedInAs, { now: now + 86400000 });
-  assert.equal((await entitlementOf(store, OTHER, { now: now + 86400000 })).subscription, 'sub_9');
-  assert.deepEqual((await devicesOn(store, 'sub_old')).map((d) => d.key), [], 'not counted against both');
-});
-
-test('local mode: a local: sign-in attests one device and brings its subscription to the next, end to end', async () => {
+test('local mode: a local: sign-in links one device\'s account and brings the next device into it, end to end', async () => {
   const store = memoryStore();
   const { held: base } = serving(store);
   const held = { ...base, ...signedInAs, OH_OPEN_HOUSE: '1' };
@@ -1187,19 +1229,18 @@ test('local mode: a local: sign-in attests one device and brings its subscriptio
   const attested = await first.json();
   assert.equal(attested.licence.key, ADA.public);
 
-  // A new phone: attest says the account is elsewhere, supersede brings it.
-  const refused = await worker.fetch(send('attest', await asking(BAO, 'attest', { provider: 'apple', token: 'local:ada' })), held);
-  assert.deepEqual([refused.status, (await refused.json()).error], [409, 'that account is already on another device']);
+  // A new phone signs in, and is a device of her account.
   const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'apple', token: 'local:ada' })), held);
   assert.equal(moved.status, 200);
   const said = await moved.json();
-  assert.equal(said.superseded, ADA.public);
+  assert.equal(said.account, attested.account);
   assert.equal(said.licence.key, BAO.public);
-  assert.equal((await entitlementOf(store, BAO.public)).subscription, (await entitlementOf(store, ADA.public)).subscription);
+  assert.equal(said.licence.account, attested.account);
+  assert.equal((await entitlementOf(store, BAO.public)).account, (await entitlementOf(store, ADA.public)).account);
 
-  // An account nobody has signed in with has nowhere to come from.
+  // A sign-in nobody has linked has nowhere to bring a device.
   const nowhere = await worker.fetch(send('supersede', await asking(CY, 'supersede', { provider: 'google', token: 'local:cy' })), held);
-  assert.deepEqual([nowhere.status, (await nowhere.json()).error], [404, 'that account is not on any device']);
+  assert.deepEqual([nowhere.status, (await nowhere.json()).error], [404, 'that sign-in is not linked to an account']);
 
   // And the same token anywhere but this machine is nobody.
   const away = new Request('https://dev.open-hearts.pages.dev/api/attest', { method: 'POST', body: JSON.stringify(await asking(CY, 'attest', { provider: 'google', token: 'local:cy' })) });
@@ -1227,12 +1268,15 @@ test('the sign-in route: a token that does not check out is 401, and one that do
     assert.equal(said.attested, dayOf(Date.now()));
     assert.equal(said.licence.key, ADA.public, 'a device that has just proved who it is does not ask twice');
 
-    // The same account on a new phone: attest refuses, supersede moves.
+    // The same person on a new phone: it has no account to link, and
+    // signing in brings it into hers.
     const theirs = await p.token({ sub: 'sub-1', nonce: await nonceFor(BAO.public) });
-    assert.equal((await worker.fetch(send('attest', await asking(BAO, 'attest', { provider: 'google', token: theirs })), held)).status, 409);
+    assert.equal((await worker.fetch(send('attest', await asking(BAO, 'attest', { provider: 'google', token: theirs })), held)).status, 402);
     const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'google', token: theirs })), held);
     assert.equal(moved.status, 200);
-    assert.equal((await moved.json()).licence.key, BAO.public);
+    const joined = await moved.json();
+    assert.equal(joined.licence.key, BAO.public);
+    assert.equal(joined.account, await accountOfSub(store, 'sub_9'));
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -1256,9 +1300,9 @@ test('a sign-in binds only a key that asked to be bound, so nobody\'s account is
     assert.equal(bound.status, 401, 'her key did not ask');
     const overMine = await p.token({ sub: 'mallory', nonce: await nonceFor(BAO.public) });
     const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'google', token: overMine })), held);
-    assert.equal(moved.status, 404, 'his account is on no device, so there is nothing to carry');
+    assert.equal(moved.status, 404, 'his sign-in is linked to no account, so there is nothing to come into');
     assert.equal(await entitlementOf(store, BAO.public, { now }), null);
-    assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [ADA.public]);
+    assert.deepEqual((await devicesOn(store, await accountOfSub(store, 'sub_9'))).map((d) => d.key), [ADA.public]);
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -1313,7 +1357,7 @@ test('a checkout keeps its customer, and so does a subscription event, for the p
   await record({ type: 'customer.subscription.updated', data: { object: { id: 'sub_7', customer: 'not a customer' } } }, store, { now });
   assert.equal(await store.get('SUB#sub_7', 'CUSTOMER'), null);
   // A household's devices are listed without it.
-  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY]);
+  assert.deepEqual((await devicesOn(store, await accountOfSub(store, 'sub_9'))).map((d) => d.key), [KEY]);
 });
 
 test('any device on a web subscription opens its portal, and comes back to this site', async () => {
@@ -1379,7 +1423,7 @@ test('the manage route: signed by the device, and back only to this site', async
   }
 });
 
-test('a game\'s record: sent by a player signed for its table, kept, and fetched by its id', async () => {
+test('a game\'s record: sent by a player signed for its table, kept, and shown only to an account\'s device in use', async () => {
   const kept = new Map();
   const bucket = {
     head: async (k) => (kept.has(k) ? {} : null),
@@ -1397,9 +1441,130 @@ test('a game\'s record: sent by a player signed for its table, kept, and fetched
   const sent = await worker.fetch(send('record', await asking(ADA, 'record', { what: table, table, record })), env);
   assert.equal(sent.status, 200);
   assert.deepEqual(await sent.json(), { kept: true });
-  const got = await worker.fetch(new Request(`https://dev.open-hearts.pages.dev/api/record/${table}`), env);
+
+  // Not by its address alone: looking at games is live play.
+  assert.equal((await worker.fetch(new Request(`https://dev.open-hearts.pages.dev/api/record/${table}`), env)).status, 404);
+  assert.equal((await worker.fetch(send('review', await asking(CY, 'review', { what: table, table })), env)).status, 402, 'no subscription');
+  // A device of an account, but not the one in use.
+  assert.equal((await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env)).status, 409);
+  await worker.fetch(send('activate', await asking(ADA, 'activate', { what: 'open ', want: 'open' })), env);
+  const got = await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env);
   assert.equal(got.status, 200);
   assert.equal(got.headers.get('content-encoding'), 'gzip');
   const { gunzipSync } = await import('node:zlib');
   assert.equal(gunzipSync(Buffer.from(await got.arrayBuffer())).toString(), record);
+
+  // Nor a game the account is at.
+  await worker.fetch(send('activate', await asking(ADA, 'activate', { what: `renew ${table}`, want: 'renew', seated: table })), env);
+  assert.equal((await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env)).status, 403);
+});
+
+// ---- one device at a time ------------------------------------------------
+
+/// [store] with ADA on sub_9 and BAO brought in by a code: one account,
+/// two devices.
+const twoDevices = async (now) => {
+  const store = await household(now, ADA.public);
+  await claimWith(BAO.public, (await ticketFor(ADA.public, store, { now })).body.ticket, store, { now });
+  return store;
+};
+
+test('the newest device to take an account up is the one in use, at once; the one before is superseded', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await twoDevices(now);
+  const account = await accountOfSub(store, 'sub_9');
+  const active = activeInStore(store);
+  const ask = (key, want, more = {}) => activate({ key, account, want, ...more }, store, active, { now });
+
+  assert.deepEqual((await ask(ADA.public, 'open')).body, { epoch: 1, licensed_until: '2027-09-16', took: false });
+  assert.equal((await ask(ADA.public, 'renew')).body.epoch, 1, 'still hers');
+  assert.equal((await ask(BAO.public, 'renew')).status, 409, 'a renewal takes nothing');
+
+  const took = await ask(BAO.public, 'open');
+  assert.deepEqual(took.body, { epoch: 2, licensed_until: '2027-09-16', took: true });
+  const superseded = await ask(ADA.public, 'renew');
+  assert.equal(superseded.status, 409);
+  assert.equal(superseded.body.superseded, true);
+
+  // Taken back, the same way: the newest to ask.
+  assert.equal((await ask(ADA.public, 'open')).body.epoch, 3);
+  // At a table, the other is asked first; told to, it takes it anyway.
+  const table = '0123456789abcdef0123456789abcdef';
+  assert.equal((await ask(ADA.public, 'renew', { seated: table })).status, 200);
+  assert.deepEqual((await ask(BAO.public, 'open')).body, { error: 'in a game on another device', seated: true });
+  assert.equal((await ask(BAO.public, 'take')).body.epoch, 4);
+  assert.equal((await ask(ADA.public, 'renew')).status, 409);
+  // A device at a table that has not been heard from for a while is not
+  // in use: the account is simply taken.
+  await ask(BAO.public, 'renew', { seated: table });
+  const later = await activate({ key: ADA.public, account, want: 'open' }, store, active, { now: now + 50 * 60000 });
+  assert.equal(later.body.epoch, 5);
+
+  // Nobody else's device, and no device without a subscription.
+  assert.equal((await ask(CY.public, 'take')).status, 402);
+  await record({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_9' } } }, store, { now });
+  assert.equal((await activate({ key: ADA.public, account, want: 'renew' }, store, active, { now: now + 2 * 86400000 })).status, 402);
+});
+
+test('the relay is told to close a superseded device\'s sockets where it has seen them, and a dropped device in use is cut off too', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await twoDevices(now);
+  const account = await accountOfSub(store, 'sub_9');
+  const told = [];
+  const revoke = async (tags, a, epoch) => told.push({ tags, account: a, epoch });
+  const op = (o) => householdOp({ account, ...o }, store, { now, revoke });
+
+  assert.equal((await op({ op: 'activate', key: ADA.public, want: 'open' })).body.epoch, 1);
+  assert.equal((await op({ op: 'seen', key: ADA.public, epoch: 1, tag: 'online' })).status, 200);
+  assert.equal((await op({ op: 'seen', key: ADA.public, epoch: 1, tag: 'queue:rated' })).status, 200);
+  assert.equal((await op({ op: 'seen', key: ADA.public, epoch: 1, tag: 'online' })).status, 200);
+  assert.equal(told.length, 0);
+
+  await op({ op: 'activate', key: BAO.public, want: 'open' });
+  assert.deepEqual(told, [{ tags: ['online', 'queue:rated'], account, epoch: 2 }]);
+  assert.equal((await op({ op: 'seen', key: ADA.public, epoch: 1, tag: 'online' })).status, 409, 'and the relay opens none for it');
+  assert.equal((await op({ op: 'seen', key: BAO.public, epoch: 2, tag: 'online' })).status, 200);
+
+  // The list says which is in use.
+  const listed = (await op({ op: 'list', key: ADA.public })).body.devices;
+  assert.deepEqual(listed.map((d) => [d.key, d.active ?? false]).sort(), [[ADA.public, false], [BAO.public, true]].sort());
+
+  // Dropped while in use: cut off now, not at the end of its hour.
+  told.length = 0;
+  assert.equal((await op({ op: 'drop', key: ADA.public, device: BAO.public })).status, 200);
+  assert.deepEqual(told, [{ tags: ['online'], account, epoch: 3 }]);
+  assert.equal((await op({ op: 'seen', key: BAO.public, epoch: 2, tag: 'online' })).status, 409);
+});
+
+test('the activation route: signed by the service, an hour and never past the day paid to; what is asked is signed', async () => {
+  const now = Date.now();
+  const store = await twoDevices(now);
+  const account = await accountOfSub(store, 'sub_9');
+  const { held, send } = serving(store);
+  const opened = await worker.fetch(send('activate', await asking(ADA, 'activate', { what: 'open ', want: 'open' })), held);
+  assert.equal(opened.status, 200);
+  const { activation } = await opened.json();
+  assert.deepEqual({ ...activation, sig: typeof activation.sig }, { account, key: ADA.public, epoch: 1, until: activation.until, sig: 'string' });
+  assert.ok(activation.until > now / 1000 + 3500 && activation.until <= now / 1000 + 3600, 'an hour');
+  const digest = await sha(`oh-active/1\n${account}\n${ADA.public}\n1\n${activation.until}`);
+  assert.equal(signer.verify(SERVICE_KEY, digest, activation.sig), true);
+
+  // Taking the account is the device's own word: a renewal is not
+  // replayed as a take, nor anybody's request made for another key.
+  const plain = await asking(BAO, 'activate', { what: 'renew ', want: 'renew' });
+  assert.equal((await worker.fetch(send('activate', { ...plain, want: 'take' }), held)).status, 401);
+  assert.equal((await worker.fetch(send('activate', await asking(BAO, 'activate', { what: 'nope ', want: 'nope' })), held)).status, 400);
+  const took = await worker.fetch(send('activate', await asking(BAO, 'activate', { what: 'take ', want: 'take' })), held);
+  assert.deepEqual([took.status, (await took.json()).took], [200, true]);
+  const old = await worker.fetch(send('activate', await asking(ADA, 'activate', { what: 'renew ', want: 'renew' })), held);
+  assert.equal(old.status, 409);
+  assert.match((await old.json()).error, /^superseded:/);
+
+  // A subscription paid to tomorrow gives no more than that.
+  const short = await household(now, CY.public);
+  await record({ type: 'customer.subscription.updated', data: { object: { id: 'sub_9', current_period_end: Math.floor(now / 1000) } } }, short, { now });
+  const { held: shortHeld } = serving(short);
+  const near = await worker.fetch(send('activate', await asking(CY, 'activate', { what: 'open ', want: 'open' })), shortHeld);
+  const until = (await near.json()).activation.until;
+  assert.ok(until <= Date.parse(`${dayOf(now)}T00:00:00Z`) / 1000 + 86400, 'not past the end of the day paid to');
 });

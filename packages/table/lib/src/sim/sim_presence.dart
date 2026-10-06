@@ -38,7 +38,17 @@ class SimPresence implements Presence {
 
   void register(SimJuror juror) {
     _jurors[juror.signer.publicKey] = juror;
+    if (juror.account case final account?) accounts[juror.signer.publicKey] = account;
   }
+
+  /// The account each key belongs to, where it is not an account of
+  /// its own: what a device's activation says in its presence
+  /// (presence_relay.dart). The players' as well as the jurors', so a
+  /// table can tell another device of a player's account.
+  final Map<PublicKey, String> accounts = {};
+
+  @override
+  String accountOf(PublicKey key) => accounts[key] ?? key;
 
   void start() {
     _tick();

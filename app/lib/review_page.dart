@@ -27,21 +27,26 @@ import 'package:engine/engine.dart' hide Replay;
 import 'package:flutter/material.dart' hide Card;
 import 'package:table/table.dart';
 
+import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/game_records.dart';
+import 'net/in_use.dart';
 import 'net/record_check.dart';
 import 'net/watching.dart';
+import 'subscribe_page.dart';
 import 'theme.dart';
 import 'ui/pip.dart';
 import 'ui/player_icon.dart';
 
 class ReviewPage extends StatefulWidget {
-  const ReviewPage({super.key, required this.table, this.load = gameOf, this.check, this.watch});
+  const ReviewPage({super.key, required this.table, this.load = gameShownHere, this.check, this.watch});
 
   /// The table's id.
   final String table;
 
   /// How the record is fetched: the service's, and a test's to replace.
+  /// Throws [GameNotShown] when the service will not show it here; then
+  /// the page watches nothing either.
   final Future<GameRecord?> Function(String table) load;
 
   /// How it is checked: [checkRecord] unless a test says otherwise.
@@ -79,6 +84,13 @@ class _Live extends _Shown {
   final WatchedTable view;
 }
 
+/// Not for this device to look at: no subscription, the account in use
+/// on another device, or the account's own game.
+class _NotHere extends _Shown {
+  const _NotHere(this.why);
+  final NotShown why;
+}
+
 class _Failed extends _Shown {
   const _Failed(this.reason);
   final String? reason;
@@ -106,26 +118,56 @@ class _ReviewPageState extends State<ReviewPage> {
   void dispose() {
     _checking?.cancel();
     _watching?.cancel();
+    InUse.current.removeListener(_inUse);
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
+    InUse.current.addListener(_inUse);
     _check();
+  }
+
+  /// Another device of the account took it up: watching stops, as all
+  /// live play here does (net/in_use.dart). A game already checked here
+  /// stays on the screen; it is this device's own copy.
+  void _inUse() {
+    if (!mounted || !InUse.current.elsewhere || _watching == null) return;
+    _watching?.cancel();
+    _watching = null;
+    if (_shown is _Live || _shown is _Nothing || _shown is _Checking) setState(() => _shown = const _NotHere(NotShown.elsewhere));
+  }
+
+  /// The record, or why this device is not shown it (null for none).
+  Future<GameRecord?> _load() async {
+    try {
+      return await widget.load(widget.table);
+    } on GameNotShown catch (e) {
+      if (mounted) setState(() => _shown = _NotHere(e.why));
+      rethrow;
+    }
   }
 
   Future<void> _check() async {
     // Opened as the game ends, the copy may still be on its way from a
     // player's device (home_page.dart): asked again a few times before
     // there is said to be none.
-    var record = await widget.load(widget.table);
-    // None kept: a game still being played, perhaps — watched while the
-    // record is asked for a few more times, in case it is one just over.
-    if (record == null) _watch();
-    for (var i = 0; record == null && i < 4 && mounted; i++) {
-      await Future<void>.delayed(const Duration(seconds: 2));
-      record = await widget.load(widget.table);
+    GameRecord? record;
+    try {
+      record = await _load();
+      // None kept: a game still being played, perhaps — watched while
+      // the record is asked for a few more times, in case it is one just
+      // over.
+      if (record == null) _watch();
+      for (var i = 0; record == null && i < 4 && mounted; i++) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        record = await _load();
+      }
+    } on GameNotShown {
+      _watching?.cancel();
+      _watching = null;
+      return;
     }
     if (!mounted) return;
     if (record == null) {
@@ -153,7 +195,12 @@ class _ReviewPageState extends State<ReviewPage> {
     for (var i = 0; i < ReviewPage.recordTries && mounted && _checking == null; i++) {
       await Future<void>.delayed(ReviewPage.recordAgain);
       if (!mounted || _checking != null) return;
-      final record = await widget.load(widget.table);
+      final GameRecord? record;
+      try {
+        record = await _load();
+      } on GameNotShown {
+        return;
+      }
       if (record != null && mounted && _checking == null) return _verify(record);
     }
   }
@@ -187,11 +234,31 @@ class _ReviewPageState extends State<ReviewPage> {
           _Checking() => _Note(l10n.checkingGame, busy: true),
           _Nothing() => _Note(l10n.noGameHere),
           _Failed(:final reason) => _Note(reason == null ? l10n.cantCheckGame : l10n.gameDoesNotCheck(reason), danger: true),
+          _NotHere(:final why) => _notHere(context, why),
           _Game() && final g => _review(context, g),
           _Live(:final view) => _live(context, view),
         },
       ),
     );
+  }
+
+  /// Why this device is not shown the game, and the way on from there:
+  /// a subscription, or taking the account back here.
+  Widget _notHere(BuildContext context, NotShown why) {
+    final l10n = context.l10n;
+    return switch (why) {
+      NotShown.noSubscription => _Note(l10n.reviewIsLivePlay, action: (l10n.subscribe, () => showSubscribe(context))),
+      NotShown.elsewhere => _Note(l10n.liveOpenElsewhere, action: (l10n.useItHere, _useItHere)),
+      NotShown.ownGame => _Note(l10n.reviewOwnGame),
+    };
+  }
+
+  /// Takes the account up here (net/in_use.dart), and looks again.
+  Future<void> _useItHere() async {
+    await InUse.current.open(await Identity.signer());
+    if (!mounted || InUse.current.standing != Use.here) return;
+    setState(() => _shown = const _Checking());
+    await _check();
   }
 
   Widget _review(BuildContext context, _Game g) {
@@ -203,7 +270,7 @@ class _ReviewPageState extends State<ReviewPage> {
     };
     String seedOf(int seat) => switch (spec.seats[seat]) {
       BotSeat(:final persona) => persona.name,
-      HumanSeat(:final key) => key,
+      HumanSeat(:final account) => account,
     };
     final hands = g.hands;
     if (hands.isEmpty) return _Note(l10n.checkingGame, busy: true);
@@ -495,11 +562,14 @@ class _Pip extends StatelessWidget {
 }
 
 class _Note extends StatelessWidget {
-  const _Note(this.text, {this.busy = false, this.danger = false});
+  const _Note(this.text, {this.busy = false, this.danger = false, this.action});
 
   final String text;
   final bool busy;
   final bool danger;
+
+  /// A way on from here, as its label and what it does.
+  final (String, VoidCallback)? action;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -514,6 +584,19 @@ class _Note extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: danger ? Palette.danger : Palette.chrome),
           ),
+          if (action case (final label, final onPressed)) ...[
+            const SizedBox(height: 18),
+            OutlinedButton(
+              onPressed: onPressed,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Palette.gold,
+                side: const BorderSide(color: Palette.gold, width: 1.4),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            ),
+          ],
         ],
       ),
     ),

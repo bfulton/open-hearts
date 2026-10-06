@@ -192,14 +192,15 @@ class LiveController extends ChangeNotifier implements TableModel {
     final rating = ratingOf;
     final seat = client.mySeat;
     final holder = seat == null ? null : client.spec.seats[seat];
-    final key = holder is HumanSeat ? holder.key : null;
-    if (rating == null || key == null) {
+    // A rating is the account's, whichever of its devices played.
+    final account = holder is HumanSeat ? holder.account : null;
+    if (rating == null || account == null) {
       onResult?.call(result);
       return;
     }
-    final before = rating(key);
+    final before = rating(account);
     onResult?.call(result);
-    final after = rating(key);
+    final after = rating(account);
     if (after.mu != before.mu) ratingChange = (before: before, after: after);
   }
 
@@ -555,7 +556,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     final r = ratingOf;
     if (r == null) return _plainName(seat);
     final id = switch (client.spec.seats[seat]) {
-      HumanSeat(:final key) => key,
+      HumanSeat(:final account) => account,
       BotSeat(:final persona) => persona.id,
     };
     return '${_plainName(seat)} ${r(id).shown}';
@@ -688,18 +689,19 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   @override
   String iconSeedOf(int seat) => switch (_shownHolders[seat]) {
-        HumanSeat(:final key) => key,
+        HumanSeat(:final account) => account,
         BotSeat(:final persona) => persona.name,
       };
 
   @override
   Avatar avatarOf(int seat) => switch (_shownHolders[seat]) {
-        HumanSeat(:final key) => _asShown(key, seatAvatars[seat] ?? Avatar.none),
+        HumanSeat(:final account) => _asShown(account, seatAvatars[seat] ?? Avatar.none),
         BotSeat(:final persona) => Avatar.forBot(persona.name),
       };
 
   /// The avatar as this device will draw it: the icon and the colour
-  /// they chose, and their picture only if it is allowed here.
+  /// they chose, and their picture only if it is allowed here — kept
+  /// off by the account, whichever of its devices it comes from.
   Avatar _asShown(String key, Avatar avatar) {
     final picture = avatar.picture;
     final pictures = this.pictures;
@@ -717,10 +719,10 @@ class LiveController extends ChangeNotifier implements TableModel {
     final picture = (seatAvatars[seat] ?? Avatar.none).picture;
     if (picture == null) return null;
     return (
-      key: holder.key,
+      key: holder.account,
       name: names[seat],
-      hidden: pictures.isHidden(holder.key),
-      flagged: pictures.wasFlagged(holder.key, picture),
+      hidden: pictures.isHidden(holder.account),
+      flagged: pictures.wasFlagged(holder.account, picture),
     );
   }
   void boot(int seat) {

@@ -16,6 +16,7 @@ import 'package:deal/deal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:table/table.dart';
 
+import 'in_use.dart';
 import 'mesh_transport.dart';
 import 'relays.dart';
 
@@ -49,8 +50,15 @@ class Duty {
       relays: relays,
       signer: signer,
       canServe: () => crypto != null && dealWorker != null && !dealWorker.dead,
+      // Whose device this is, said with every beat: no table draws it
+      // as a juror where its account sits, and another device of the
+      // account hears that it has been superseded (net/in_use.dart).
+      activation: () => InUse.current.activation,
       log: logger,
     );
+    // Another device of the account heard taking it up: this one steps
+    // back, and the duty with it.
+    presence.superseded.listen((_) => InUse.current.stepBack());
     final juror = JurorDuty(
       relays: relays,
       signer: signer,
@@ -72,7 +80,15 @@ class Duty {
         log: logger == null ? null : (l) => logger('mesh: $l'),
       ),
     )..start();
-    return _current = Duty._(relays, presence, juror);
+    final duty = _current = Duty._(relays, presence, juror);
+    InUse.current.addListener(duty._steppedBack);
+    return duty;
+  }
+
+  /// Another device of the account took it up: this one is no juror and
+  /// online to nobody from now on (net/in_use.dart).
+  void _steppedBack() {
+    if (InUse.current.elsewhere) close();
   }
 
   static Duty? get current => _current;
@@ -100,6 +116,7 @@ class Duty {
   }
 
   void close() {
+    InUse.current.removeListener(_steppedBack);
     // One last word before the sockets go, so that no table waits out
     // a heartbeat to learn this device is not a juror any more.
     presence.leaving();

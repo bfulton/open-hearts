@@ -51,6 +51,14 @@ new_sqlite_classes = ["TagRelay"]
 tag = "v2"
 new_sqlite_classes = ["Household"]
 
+# The relay asks an account's object whether a device's activation is
+# still the one in use as the device opens a socket, and the account's
+# object tells the relay's to close a superseded device's sockets
+# (docs/06-service.md, "One device at a time").
+[[durable_objects.bindings]]
+name = "HOUSEHOLD"
+class_name = "Household"
+
 # The jurors of last resort, as a Cloudflare Container (bench.mjs; the
 # image is service/bench, built by its build.sh). The presence relay
 # above passes a table's call for a juror to it, and it runs only while
@@ -87,6 +95,10 @@ name = "EMAIL"
 
 [vars]
 OH_MAIL_FROM = "noreply@openhearts.game"
+# The service's public key, as config/openhearts.json names it (a test
+# holds the two equal): the relay carries a device only on an activation
+# this key signed. Not a secret.
+OH_SERVICE_KEY = "8031cb2192987148c1af19ebe8338a15ffec1745e3974508932e1e403323a46b"
 
 # What the operator watches (docs/06-service.md): a
 # line of counts a minute from each object in use — connections,

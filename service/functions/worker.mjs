@@ -16,17 +16,17 @@
 // Without the secrets the handler says so (503) and the app falls back
 // to STUN alone.
 //
-// licence: POST /api/licence answers {"licence": {key, until, plan,
-// sig}} — a month, signed by the service key (OH_SERVICE_SECRET, with
-// OH_SERVICE_KEY beside it as the public half the app has baked in), or
-// 402 when no subscription stands behind the key. What is read is one
-// row, and the second only around a renewal.
+// licence: POST /api/licence answers {"licence": {key, account, until,
+// plan, sig}} — a month, signed by the service key (OH_SERVICE_SECRET,
+// with OH_SERVICE_KEY beside it as the public half the app has baked
+// in), or 402 when no subscription stands behind the key. What is read
+// is one row, and the others only around a renewal.
 //
 // No imports, so nothing is bundled: the file is the worker. The curve
 // is the one the whole project signs on, so the signing is the app's
 // own wasm, fetched from the static assets this worker serves.
 
-import { keepRecord, recordMost, recordResponse } from './records.mjs';
+import { keepRecord, recordMost, recordResponse, tableIdShape } from './records.mjs';
 
 const UPSTREAM = 'https://rtc.live.cloudflare.com/v1/turn/keys';
 
@@ -76,10 +76,15 @@ export const SERVICE_DEFAULTS = Object.freeze({
   requestToleranceS: 300,
   // How old a webhook's own timestamp may be: a replay is not a payment.
   webhookToleranceS: 300,
-  // What one household may do in an hour: changes (a code, a claim, a
+  // What one account may do in an hour: changes (a code, a claim, a
   // drop) and readings of its list. Adding a phone takes a handful.
   householdChangesPerHour: 20,
   householdReadsPerHour: 60,
+  // What one account's devices may ask of the account's turn in an hour
+  // to be the one in use, or the relay on their behalf: an opening, a
+  // renewal every twenty minutes, a word at each table sat at, and the
+  // relay asking at every socket a device opens.
+  activationsPerHour: 600,
   stripePrice: null,
 });
 
@@ -98,6 +103,7 @@ export const SERVICE_BOUNDS = Object.freeze({
   webhookToleranceS: [60, 900],
   householdChangesPerHour: [5, 500],
   householdReadsPerHour: [10, 2000],
+  activationsPerHour: [60, 6000],
 });
 
 /// The row, checked: every field that checks out, the default for the
@@ -236,11 +242,13 @@ export async function mint(env, fetchImpl = fetch) {
 // ---- the licence -------------------------------------------------------
 // What a subscribed device holds instead of a receipt: a short signed
 // statement it checks against a key baked into its build
-// (app/lib/net/licence.dart). Short, and renewed while the
+// (packages/table, licence.dart). Short, and renewed while the
 // subscription lives, so a cancellation needs no revocation list —
-// the last licence simply runs out.
+// the last licence simply runs out. It names the device's key and the
+// account the device is one of, which is what every peer at a table
+// checks a seat by: the key signs the moves, the account is who sat.
 
-const STATEMENT = 'oh-licence/1';
+const STATEMENT = 'oh-licence/2';
 const PLAN = 'year';
 
 const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -254,6 +262,10 @@ export const dayAfter = (at, days) => dayOf(new Date(at).getTime() + days * 8640
 /// The earlier of two days, which is how a licence is kept inside what
 /// was paid for.
 const earlier = (a, b) => (a < b ? a : b);
+
+/// An account's id: 32 hex, random (docs/06-service.md).
+export const isAccount = (a) => typeof a === 'string' && /^[0-9a-f]{32}$/.test(a);
+export const newAccount = () => hex(crypto.getRandomValues(new Uint8Array(16)));
 
 /// Everything the service keeps, as one key-value table
 /// (docs/06-service.md): a lookup by key, never a scan. Cloudflare KV in
@@ -374,25 +386,32 @@ async function digestOf(text) {
   return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))));
 }
 
-/// The statement, signed. Null when the service's two halves do not
-/// match: a signature this service cannot verify against the key every
-/// app has baked in is one no device would take, and a loud refusal
-/// beats a quiet one nobody can debug.
-export async function licenceFor(key, until, { signer, secret, service }) {
-  const canonical = `${STATEMENT}\n${key}\n${until}\n${PLAN}`;
+/// [canonical], signed by the service. Null when the service's two
+/// halves do not match: a signature this service cannot verify against
+/// the key every app has baked in is one no device would take, and a
+/// loud refusal beats a quiet one nobody can debug.
+async function serviceSigned(canonical, { signer, secret, service }) {
   const digest = await digestOf(canonical);
   const sig = signer.sign(secret, digest);
   if (!sig || !signer.verify(service, digest, sig)) return null;
-  return { key, until, plan: PLAN, sig };
+  return sig;
 }
 
-/// How far this key is paid up to, and what it is paid under. One read
-/// of the device's own row; a second of the subscription's only when
-/// that row says the device has run out, which is once a renewal.
+/// The statement, signed: this device, its account, the last day.
+export async function licenceFor(key, account, until, keys) {
+  const sig = await serviceSigned(`${STATEMENT}\n${key}\n${account}\n${until}\n${PLAN}`, keys);
+  return sig ? { key, account, until, plan: PLAN, sig } : null;
+}
+
+/// How far this key is paid up to, and the account it is a device of.
+/// One read of the device's own row; the account's and its
+/// subscription's only when that row says the device has run out,
+/// which is once a renewal. A device whose row is from before accounts
+/// has its account found first ([deviceAccount]).
 ///
 /// In local mode a key nobody has heard of is entitled on the spot for
-/// a month (docs/06-service.md) — one branch, and it is never on in
-/// production.
+/// a month (docs/06-service.md), on an account of its own — one branch,
+/// and it is never on in production.
 export async function entitlementOf(store, key, { now = Date.now(), openHouse = false } = {}) {
   const today = dayOf(now);
   const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
@@ -401,44 +420,259 @@ export async function entitlementOf(store, key, { now = Date.now(), openHouse = 
     const subscription = `local-${key.slice(0, 16)}`;
     const renews_at = dayAfter(now, S().licenceDays);
     await store.put(`SUB#${subscription}`, 'META', { source: 'local', txn_ref: null, renews_at, cancelled_at: null });
-    await store.put(`SUB#${subscription}`, `DEVICE#${key}`, { bound_at: today });
-    const made = { subscription, licensed_until: renews_at, at: today };
-    await store.put(`KEY#${key}`, 'ENTITLEMENT', made);
-    return made;
+    await paidFor(store, subscription, key, { now });
+    return store.get(`KEY#${key}`, 'ENTITLEMENT');
   }
+  if (!isAccount(row.account)) return null;
   if (row.licensed_until && row.licensed_until >= today) return row;
   // Run out as this row has it, or never written: a checkout binds the
   // device before Stripe has told us when the subscription runs to.
-  // The subscription itself is the authority, and a renewal moves it
-  // on without touching the devices under it.
-  const sub = await store.get(`SUB#${row.subscription}`, 'META');
+  // The account's subscription is the authority, and a renewal moves
+  // it on without touching the devices under it.
+  const subscription = (await store.get(`ACCOUNT#${row.account}`, 'META'))?.subscription;
+  const sub = subscription ? await store.get(`SUB#${subscription}`, 'META') : null;
   if (!sub || !sub.renews_at || sub.renews_at < today) return null;
   const caught = { ...row, licensed_until: sub.renews_at, at: today };
   await store.put(`KEY#${key}`, 'ENTITLEMENT', caught);
   return caught;
 }
 
-/// The licence handler's status and body.
-export async function licence(key, env, { signer, now = Date.now(), open = false } = {}) {
+/// The service's two halves, when both are set and look like keys.
+function serviceKeys(env) {
   const secret = env.OH_SERVICE_SECRET;
   const service = env.OH_SERVICE_KEY;
-  if (!/^[0-9a-f]{64}$/.test(secret ?? '') || !/^[0-9a-f]{64}$/.test(service ?? '')) {
-    return { status: 503, body: { error: 'licensing not configured' } };
-  }
+  if (!/^[0-9a-f]{64}$/.test(secret ?? '') || !/^[0-9a-f]{64}$/.test(service ?? '')) return null;
+  return { secret, service };
+}
+
+/// The licence handler's status and body.
+export async function licence(key, env, { signer, now = Date.now(), open = false } = {}) {
+  const keys = serviceKeys(env);
+  if (!keys) return { status: 503, body: { error: 'licensing not configured' } };
   const store = storeOf(env);
   if (!store) return { status: 503, body: { error: 'licensing not configured' } };
+  await deviceAccount(env, store, key, { now });
   const held = await entitlementOf(store, key, { now, openHouse: open });
   if (!held) return { status: 402, body: { error: 'no subscription' } };
   const until = earlier(dayAfter(now, S().licenceDays), held.licensed_until);
-  const signed = await licenceFor(key, until, { signer, secret, service });
+  const signed = await licenceFor(key, held.account, until, { signer, ...keys });
   if (!signed) return { status: 503, body: { error: 'the service key does not match its secret' } };
   return { status: 200, body: { licence: signed } };
+}
+
+// ---- accounts ----------------------------------------------------------
+// What a subscription buys is an account (docs/06-service.md): made
+// when the subscription is first paid for, with an id of its own, and
+// every device brought in — the one that paid, one shown a code, one
+// given a backup code, one signed in — is one of its devices. A device
+// keeps its own key; the licence says whose device it is.
+//
+// A subscription from before accounts is given one the first time it is
+// touched — by any of its devices, its store or Stripe — in the
+// subscription's own turn, so it is given exactly one: its devices and
+// its backup codes move under it, and nobody's subscription is lost.
+// `node service/tool/accounts.mjs` walks them all at a deploy instead.
+
+/// [subscription]'s account: the one it has; for a subscription from
+/// before accounts, one made now with everything moved under it; and
+/// otherwise, when [make], the account of [buyer] — the device paying —
+/// when it has one with nothing else paid up under it, or a new one.
+/// Null for a subscription with none and nothing to make one for. Run
+/// in the subscription's own turn ([inSubscription]).
+export async function accountFor(store, subscription, { buyer = null, make = false, now = Date.now() } = {}) {
+  const today = dayOf(now);
+  const known = (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account;
+  if (isAccount(known)) {
+    await adoptLegacy(store, subscription, known);
+    return known;
+  }
+  const legacy = (await store.under(`SUB#${subscription}`, 'DEVICE#')).length > 0 || !!(await store.get(`SUB#${subscription}`, 'BACKUP'));
+  if (!legacy && !make) return null;
+  let account = null;
+  if (!legacy && buyer) {
+    const theirs = (await store.get(`KEY#${buyer}`, 'ENTITLEMENT'))?.account;
+    const was = isAccount(theirs) ? await store.get(`ACCOUNT#${theirs}`, 'META') : null;
+    // The buyer's own account takes the new subscription where it has
+    // nothing else paid up: a lapsed subscriber buying again is the same
+    // person, with the same name, rating and devices.
+    if (was && !(await paidUp(store, was.subscription, today))) account = theirs;
+  }
+  account ??= newAccount();
+  const meta = await store.get(`ACCOUNT#${account}`, 'META');
+  await store.put(`ACCOUNT#${account}`, 'META', { subscription, created_at: meta?.created_at ?? today });
+  await store.put(`SUB#${subscription}`, 'ACCOUNT', { account });
+  await adoptLegacy(store, subscription, account);
+  return account;
+}
+
+/// Whatever a subscription from before accounts still holds, moved
+/// under [account]: its devices, each device's row naming the account,
+/// and its backup codes. Every step can be taken twice, so a move that
+/// stopped half way finishes the next time.
+async function adoptLegacy(store, subscription, account) {
+  for (const sk of await store.under(`SUB#${subscription}`, 'DEVICE#')) {
+    const key = sk.slice('DEVICE#'.length);
+    const bound = await store.get(`SUB#${subscription}`, sk);
+    if (!(await store.get(`ACCOUNT#${account}`, sk))) await store.put(`ACCOUNT#${account}`, sk, { bound_at: bound?.bound_at ?? null });
+    const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+    if (row && !row.account && row.subscription === subscription) {
+      await store.put(`KEY#${key}`, 'ENTITLEMENT', { account, licensed_until: row.licensed_until ?? null, at: row.at ?? null });
+    }
+    await store.del(`SUB#${subscription}`, sk);
+  }
+  const backups = await store.get(`SUB#${subscription}`, 'BACKUP');
+  if (backups) {
+    if (!(await store.get(`ACCOUNT#${account}`, 'BACKUP'))) await store.put(`ACCOUNT#${account}`, 'BACKUP', backups);
+    for (const c of backups.codes ?? []) await store.put(await backupRow(c.code), 'META', { account });
+    await store.del(`SUB#${subscription}`, 'BACKUP');
+  }
+  await store.del(`SUB#${subscription}`, 'TICKET');
+}
+
+/// The account [key] is a device of, found for a device from before
+/// accounts in its subscription's turn; null for none.
+export async function deviceAccount(env, store, key, { now = Date.now() } = {}) {
+  const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  if (!row) return null;
+  if (isAccount(row.account)) return row.account;
+  if (typeof row.subscription !== 'string') return null;
+  const made = await inSubscription(env, row.subscription, { op: 'account', subscription: row.subscription, now });
+  return isAccount(made.body?.account) ? made.body.account : null;
+}
+
+/// A subscription just paid for by [key]: its account — the buyer's,
+/// or a new one ([accountFor]) — with the buyer on it, moved from
+/// whatever it was on: the device that paid may. {status, body}.
+export async function paidFor(store, subscription, key, { now = Date.now() } = {}) {
+  const account = await accountFor(store, subscription, { buyer: key, make: true, now });
+  return joinAccount(key, account, store, { now, moving: true });
+}
+
+/// Whether [account] has a subscription that is somebody's purchase and
+/// still paid up on [today].
+async function accountPaidUp(store, account, today) {
+  if (!isAccount(account)) return false;
+  return paidUp(store, (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription, today);
+}
+
+// ---- one device at a time ------------------------------------------------
+// An account is a person, and a person plays on one device at a time
+// (docs/06-service.md). Which one is the service's to say, in the
+// account's own turn ([inHousehold]): the newest device to take the
+// account up is the one in use, at once, and the one before it is
+// superseded. What the device in use is given is an activation: the
+// account, the device, how many times the account has been taken up
+// (the epoch) and when it runs out, signed by the service. The relay
+// holds every socket to one (service/do/relay.mjs): it carries no
+// device without a current activation, asks the account's turn whether
+// one is still current when a socket shows it, and is told by the
+// account's turn to close a device's sockets the moment it is
+// superseded.
+
+/// How long an activation is good for, in seconds. The app asks again
+/// every twenty minutes while it is open, and at every table.
+export const ACTIVATION_S = 60 * 60;
+
+/// How long the device in use is taken to still be in use without
+/// asking again: two renewals and some.
+export const IN_USE_MS = 45 * 60 * 1000;
+
+/// How long a device's word that it is at a table counts for.
+export const SEATED_MS = 3 * 60 * 60 * 1000;
+
+/// How many relay objects one activation is remembered at: what is told
+/// to close when it is superseded. A device opens a socket for
+/// presence, a pool or a room, a table and its results; past this the
+/// oldest are forgotten, and their sockets last out their activation's
+/// hour.
+const MOST_TAGS = 32;
+
+const ACTIVE = 'oh-active/1';
+
+/// The activation, signed: {account, key, epoch, until, sig}.
+export async function activationFor(account, key, epoch, until, keys) {
+  const sig = await serviceSigned(`${ACTIVE}\n${account}\n${key}\n${epoch}\n${until}`, keys);
+  return sig ? { account, key, epoch, until, sig } : null;
+}
+
+/// Where the account's device in use is written down: in the account's
+/// own object's storage where it runs in one (Household, below), and in
+/// the store otherwise.
+export const activeInStore = (store) => ({
+  get: (account) => store.get(`ACCOUNT#${account}`, 'ACTIVE'),
+  put: (account, row) => store.put(`ACCOUNT#${account}`, 'ACTIVE', row),
+});
+
+/// A device asking to be the account's in use, in the account's turn:
+/// {status, body}. [op.want] is `open` — the app coming up: take the
+/// account, unless the device in use is at a table, which is asked
+/// about first — `take` — the person said so: whatever the other is
+/// doing — or `renew` — still in use: never takes anything. [op.seated]
+/// is the table the device is at, or null for none, when it says.
+/// [revoke] tells the relay objects the superseded device was seen at.
+export async function activate(op, store, active, { now = Date.now(), revoke = null } = {}) {
+  const { key, account } = op;
+  const held = await entitlementOf(store, key, { now });
+  if (!held || held.account !== account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) {
+    return { status: 402, body: { error: 'no subscription' } };
+  }
+  const seated = op.seated === undefined ? undefined : typeof op.seated === 'string' && /^[0-9a-f]{32}$/.test(op.seated) ? op.seated : null;
+  const was = (await active.get(account)) ?? { key: null, epoch: 0, tags: [] };
+  if (was.key === key) {
+    await active.put(account, { ...was, at: now, ...(seated !== undefined ? { seated, seated_at: now } : {}) });
+    return { status: 200, body: { epoch: was.epoch, licensed_until: held.licensed_until } };
+  }
+  if (op.want === 'renew') return { status: 409, body: { error: 'superseded: another device of this account is in use', superseded: true } };
+  const inUse = was.key !== null && now - (was.at ?? 0) < IN_USE_MS;
+  const playing = inUse && !!was.seated && now - (was.seated_at ?? 0) < SEATED_MS;
+  if (op.want !== 'take' && playing) return { status: 409, body: { error: 'in a game on another device', seated: true } };
+  const epoch = (was.epoch ?? 0) + 1;
+  await active.put(account, { key, epoch, at: now, seated: seated ?? null, seated_at: now, tags: [] });
+  if (was.tags?.length) await revoke?.(was.tags, account, epoch);
+  return { status: 200, body: { epoch, licensed_until: held.licensed_until, took: was.key !== null } };
+}
+
+/// The relay asking whether [op.key] is still the account's device in
+/// use at [op.epoch], as it opens a socket for it on [op.tag]: yes, and
+/// the tag is remembered, to be told when that ends; or no.
+export async function seenAt(op, active) {
+  const was = await active.get(op.account);
+  if (!was || was.key !== op.key || was.epoch !== op.epoch) {
+    return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
+  }
+  if (typeof op.tag === 'string' && op.tag && !(was.tags ?? []).includes(op.tag)) {
+    await active.put(op.account, { ...was, tags: [...(was.tags ?? []), op.tag].slice(-MOST_TAGS) });
+  }
+  return { status: 200, body: { ok: true } };
+}
+
+/// Whether [op.key] is the account's device in use, and not seated at
+/// [op.table]: who a finished game's record is shown to (records.mjs).
+export async function inUse(op, active, { now = Date.now() } = {}) {
+  const was = await active.get(op.account);
+  if (!was || was.key !== op.key) return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
+  if (op.table && was.seated === op.table && now - (was.seated_at ?? 0) < SEATED_MS) {
+    return { status: 403, body: { error: 'not a game your own account is playing' } };
+  }
+  return { status: 200, body: { ok: true } };
+}
+
+/// A device dropped from its account while it was the one in use: no
+/// device is, from here, and the relay closes its sockets now rather
+/// than at the end of its activation's hour.
+async function dropActive(account, device, active, revoke) {
+  const was = await active.get(account);
+  if (!was || was.key !== device) return;
+  const epoch = (was.epoch ?? 0) + 1;
+  await active.put(account, { key: null, epoch, at: null, seated: null, tags: [] });
+  if (was.tags?.length) await revoke?.(was.tags, account, epoch);
 }
 
 // ---- who is asking -----------------------------------------------------
 // A handler asked with a key acts for that key: it licenses it, mints
 // it TURN, makes a code against what it paid for, binds it, lists its
-// household and drops devices off it. And a key is public — it signs
+// account's devices and drops them, makes it the account's device in
+// use. And a key is public — it signs
 // every event a device says at a table, and the relays hand those to
 // anybody — so naming one proves nothing. The device signs what it
 // asks for, with the key it names (app/lib/net/licence.dart):
@@ -481,10 +715,10 @@ export async function askedBy(body, handler, what, signer, { now = Date.now() } 
 
 // ---- buying, on the web ------------------------------------------------
 // Stripe Checkout in subscription mode, with the device's key in the
-// session. Nobody is asked to make an account: the key the buyer had
-// when they bought is what the entitlement is written against, and the
-// licence follows it. A phone buys through its own store instead
-// (buying in a store, below).
+// session. Nobody is asked for an email or a password: the account is
+// made when the subscription is paid for, with the paying device on it
+// ([paidFor]), and the licence follows. A phone buys through its own
+// store instead (buying in a store, below).
 
 const STRIPE = 'https://api.stripe.com/v1';
 
@@ -662,15 +896,9 @@ export async function record(event, store, { now = Date.now() } = {}) {
     if (!/^[0-9a-f]{64}$/.test(key ?? '') || !subscription) return null;
     // The date is the subscription's to say, and its own event may not
     // have arrived yet: bound now, dated on the first ask after it has.
-    const known = await store.get(`SUB#${subscription}`, 'META');
-    await store.put(`SUB#${subscription}`, `DEVICE#${key}`, { bound_at: today });
     await keepCustomer(store, subscription, object.customer);
-    await store.put(`KEY#${key}`, 'ENTITLEMENT', {
-      subscription,
-      licensed_until: known?.renews_at ?? null,
-      at: today,
-    });
-    return { bound: key, subscription };
+    const paid = await paidFor(store, subscription, key, { now });
+    return { bound: key, subscription, account: paid.body?.account ?? null };
   }
   if (event?.type?.startsWith('customer.subscription.')) {
     const subscription = object.id;
@@ -724,12 +952,17 @@ export async function dateSubscription(store, subscription, { source, txn_ref = 
   // one read (docs/06-service.md). A renewal may leave those copies
   // stale — they catch up by themselves, later is harmless. An ending
   // may not: a copy that outlived its subscription would go on
-  // licensing a refunded device for as long as a year. Five rows, once.
+  // licensing a refunded device for as long as a year. Five rows, once:
+  // the devices of its account, if this is still the account's
+  // subscription, or of the subscription itself, from before accounts.
   if (gone) {
-    for (const sk of await store.under(`SUB#${subscription}`, 'DEVICE#')) {
+    const account = (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account;
+    const current = isAccount(account) && (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription === subscription;
+    const under = current ? `ACCOUNT#${account}` : `SUB#${subscription}`;
+    for (const sk of await store.under(under, 'DEVICE#')) {
       const key = sk.slice('DEVICE#'.length);
       const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-      if (row?.subscription !== subscription) continue;
+      if (current ? row?.account !== account : row?.subscription !== subscription) continue;
       await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...row, licensed_until: today, at: today });
     }
   }
@@ -750,21 +983,22 @@ async function keepCustomer(store, subscription, customer) {
 // A web subscriber cancels, changes card or reads an invoice in Stripe's
 // own billing portal: the service opens a session for the subscription's
 // customer and the device goes there, as it went to the checkout. Any
-// device on the subscription may, as any may drop another: a household
-// that lost the phone that paid still has to be able to cancel. A
+// device of the account may, as any may drop another: an account that
+// lost the phone that paid still has to be able to cancel. A
 // subscription bought in a store is managed in the store, and local
 // mode's open house was never bought at all.
 
-/// A billing portal session for the subscription [key] is on: {status, body}.
+/// A billing portal session for the subscription of the account [key]
+/// is a device of: {status, body}.
 export async function manage(key, back, store, env, fetchImpl = fetch) {
   const secret = env.OH_STRIPE_SECRET;
   if (!secret) return { status: 503, body: { error: 'the shop is not open yet' } };
-  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  const subscription = held?.subscription;
+  const account = (await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.account;
+  // Bound to it, not merely once on it: a dropped device keeps no say.
+  if (!isAccount(account) || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
+  const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   if (!subscription) return { status: 402, body: { error: 'no subscription' } };
   if (!subscription.startsWith('sub_')) return { status: 409, body: { error: 'not a web subscription' } };
-  // Bound to it, not merely once on it: a dropped device keeps no say.
-  if (!(await store.get(`SUB#${subscription}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
   const auth = { authorization: `Bearer ${secret}` };
   let customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
   if (!customer) {
@@ -801,18 +1035,19 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
   return { status: 200, body: { url: session.url } };
 }
 
-// ---- a subscription is a person's, not a device's ----------------------
-// Five devices to a subscription, and any of them can drop another.
-// Unbounded sharing is a subscription shared with the internet; five is
-// a household (docs/06-service.md).
+// ---- an account is a person's, not a device's ----------------------------
+// Five devices to an account, and any of them can drop another. They
+// are one person's: one of them is in use at a time (one device at a
+// time, above), and unbounded sharing would be an account shared with
+// the internet (docs/06-service.md).
 //
 // A second device is brought in by a code: the subscribed device shows
 // one, the new device arrives carrying it, and it is spent. The code is
-// a random sixteen bytes and nothing else; the subscription and expiry
-// are kept here. A code that has to be spent needs a row whatever it
+// a random sixteen bytes and nothing else; the account and expiry are
+// kept here. A code that has to be spent needs a row whatever it
 // carries, so a signature would save no lookup — and a short code is a
 // sparse QR, read across a table by a phone that is not quite still.
-// It also keeps the subscription off the wire, which a photograph of a
+// It also keeps the account off the wire, which a photograph of a
 // screen would otherwise carry away.
 
 /// How long a code's row is kept, spent or not, before the store lets
@@ -825,40 +1060,46 @@ const TICKET_BYTES = 16;
 
 const nonce = () => hex(crypto.getRandomValues(new Uint8Array(TICKET_BYTES)));
 
-/// The devices on a subscription, oldest binding first.
-export async function devicesOn(store, subscription) {
+/// The devices of an account, oldest binding first.
+export async function devicesOn(store, account) {
   const found = [];
-  for (const sk of await store.under(`SUB#${subscription}`, 'DEVICE#')) {
+  for (const sk of await store.under(`ACCOUNT#${account}`, 'DEVICE#')) {
     const key = sk.slice('DEVICE#'.length);
-    const row = await store.get(`SUB#${subscription}`, sk);
+    const row = await store.get(`ACCOUNT#${account}`, sk);
     found.push({ key, bound_at: row?.bound_at ?? null });
   }
   return found.sort((a, b) => String(a.bound_at).localeCompare(String(b.bound_at)) || a.key.localeCompare(b.key));
 }
 
+/// The account [key] is a device of, by its own row; null for none.
+const accountOfKey = async (store, key) => {
+  const account = (await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.account;
+  return isAccount(account) ? account : null;
+};
+
 /// A code for a new device to arrive with: {status, body}. The one
 /// already outstanding, while it is unspent and has time left: asking
-/// again is a read, not a new row and a listing of the household — a
+/// again is a read, not a new row and a listing of the account — a
 /// subscriber asking in a loop would otherwise spend the store's writes
 /// for everyone, Stripe's included (docs/security-review.md).
 export async function ticketFor(key, store, { now = Date.now() } = {}) {
-  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (!held) return { status: 402, body: { error: 'no subscription' } };
-  const out = await store.get(`SUB#${held.subscription}`, 'TICKET');
+  const account = await accountOfKey(store, key);
+  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  const out = await store.get(`ACCOUNT#${account}`, 'TICKET');
   if (out && Date.parse(out.expires_at) - now >= S().ticketReuseMinutes * 60000) {
     const ticket = await store.get(`TICKET#${out.code}`, 'META');
     if (ticket && !ticket.used_at) {
       return { status: 200, body: { ticket: out.code, expires_at: out.expires_at, devices: out.devices, most: S().mostDevices } };
     }
   }
-  const devices = await devicesOn(store, held.subscription);
+  const devices = await devicesOn(store, account);
   if (devices.length >= S().mostDevices) {
     return { status: 409, body: { error: 'five devices already', devices: devices.length, most: S().mostDevices } };
   }
   const code = nonce();
   const expires_at = new Date(now + S().ticketMinutes * 60000).toISOString();
-  await store.put(`TICKET#${code}`, 'META', { subscription: held.subscription, expires_at, used_at: null, made_by: key }, { ttl: TICKET_KEPT_S });
-  await store.put(`SUB#${held.subscription}`, 'TICKET', { code, expires_at, devices: devices.length }, { ttl: TICKET_KEPT_S });
+  await store.put(`TICKET#${code}`, 'META', { account, expires_at, used_at: null, made_by: key }, { ttl: TICKET_KEPT_S });
+  await store.put(`ACCOUNT#${account}`, 'TICKET', { code, expires_at, devices: devices.length }, { ttl: TICKET_KEPT_S });
   return { status: 200, body: { ticket: code, expires_at, devices: devices.length, most: S().mostDevices } };
 }
 
@@ -868,26 +1109,28 @@ export async function ticketFor(key, store, { now = Date.now() } = {}) {
 export async function claimWith(key, code, store, { now = Date.now() } = {}) {
   if (typeof code !== 'string' || !/^[0-9a-f]{2,64}$/.test(code)) return { status: 400, body: { error: 'not a code' } };
   const ticket = await store.get(`TICKET#${code}`, 'META');
-  if (!ticket) return { status: 404, body: { error: 'no such code' } };
+  if (!ticket || !isAccount(ticket.account)) return { status: 404, body: { error: 'no such code' } };
   if (ticket.used_at) return { status: 409, body: { error: 'that code has been used' } };
   if (Date.parse(ticket.expires_at) <= now) return { status: 410, body: { error: 'that code has run out' } };
   const today = dayOf(now);
-  return joinSubscription(key, ticket.subscription, store, {
+  return joinAccount(key, ticket.account, store, {
     now,
     spend: () => store.put(`TICKET#${code}`, 'META', { ...ticket, used_at: today, used_by: key }, { ttl: TICKET_KEPT_S }),
   });
 }
 
 // ---- backup codes ----------------------------------------------------------
-// A code on the screen of a device already on the subscription is good
-// for ten minutes; a backup code is good until it is used or replaced.
-// It is for the day there is no such screen: a phone lost, a new one in
-// hand. Five to a subscription, each good once, kept with the
-// subscription and shown on any device bound to it; replaced all five
-// at once from any of them, which spends the old ones. The person who
-// paid on the web is sent them by email when the subscription is made
-// and again when they are replaced — to the address Stripe holds, read
-// from Stripe when it is needed and not kept here.
+// A code on the screen of a device already on the account is good for
+// ten minutes; a backup code is good until it is used or replaced. It
+// is the account's recovery secret, for the day there is no such
+// screen: a phone lost, a new one in hand. Entered on any device, it
+// brings that device into the account — the same account, with its
+// name, its rating and its games. Five to an account, each good once,
+// kept with the account and shown on any device of it; replaced all
+// five at once from any of them, which spends the old ones. The person
+// who paid on the web is sent them by email when the subscription is
+// made and again when they are replaced — to the address Stripe holds,
+// read from Stripe when it is needed and not kept here.
 //
 // Sixteen characters of Crockford's base32, eighty bits, read and typed
 // by a person: no I, L, O or U, case and dashes ignored, and an O, I or
@@ -929,19 +1172,19 @@ export function backupCodeOf(text) {
 
 const backupRow = async (code) => `BACKUP#${await digestOf(`oh-backup/1\n${code}`)}`;
 
-/// Five new codes for [subscription], replacing any it had: their rows
-/// go, so an old one is no such code. Returns the household's row.
-async function makeBackups(store, subscription, { now }) {
-  const old = await store.get(`SUB#${subscription}`, 'BACKUP');
+/// Five new codes for [account], replacing any it had: their rows go,
+/// so an old one is no such code. Returns the account's row.
+async function makeBackups(store, account, { now }) {
+  const old = await store.get(`ACCOUNT#${account}`, 'BACKUP');
   for (const c of old?.codes ?? []) await store.del(await backupRow(c.code), 'META');
   const codes = [];
   while (codes.length < BACKUP_CODES) {
     const code = backupCode();
     if (!codes.some((c) => c.code === code)) codes.push({ code, used_at: null });
   }
-  for (const c of codes) await store.put(await backupRow(c.code), 'META', { subscription });
+  for (const c of codes) await store.put(await backupRow(c.code), 'META', { account });
   const row = { codes, made_at: new Date(now).toISOString(), emailed_at: null };
-  await store.put(`SUB#${subscription}`, 'BACKUP', row);
+  await store.put(`ACCOUNT#${account}`, 'BACKUP', row);
   return row;
 }
 
@@ -952,109 +1195,110 @@ const backupsShown = (row) => ({ codes: row.codes.map((c) => ({ code: c.code, us
 /// {row, unsent}, [unsent] null when it went and otherwise why not —
 /// `no address`, `no mail` (Email Sending not bound here), `no codes`
 /// (all used) or `failed`. Every one that did not go is logged; the
-/// codes are on every device on the subscription regardless.
-async function mailBackups(store, subscription, row, email, mail, { now, why = null }) {
+/// codes are on every device of the account regardless.
+async function mailBackups(store, account, row, email, mail, { now, why = null }) {
   const codes = row.codes.filter((c) => c.used_at === null).map((c) => c.code);
   const unsent = !mail ? 'no mail' : typeof email !== 'string' || !email.includes('@') ? 'no address' : codes.length === 0 ? 'no codes' : null;
   if (unsent) {
-    console.log(`backup codes for ${subscription}: not sent: ${unsent}${why ? ` (${String(why).slice(0, 200)})` : ''}`);
+    console.log(`backup codes for ${account}: not sent: ${unsent}${why ? ` (${String(why).slice(0, 200)})` : ''}`);
     return { row, unsent };
   }
   try {
     await mail(email, codes);
   } catch (e) {
-    console.log(`backup codes for ${subscription}: not sent: ${e?.code ?? ''} ${e?.message ?? e}`);
+    console.log(`backup codes for ${account}: not sent: ${e?.code ?? ''} ${e?.message ?? e}`);
     return { row, unsent: 'failed' };
   }
-  console.log(`backup codes for ${subscription}: sent`);
+  console.log(`backup codes for ${account}: sent`);
   const sent = { ...row, emailed_at: new Date(now).toISOString() };
-  await store.put(`SUB#${subscription}`, 'BACKUP', sent);
+  await store.put(`ACCOUNT#${account}`, 'BACKUP', sent);
   return { row: sent, unsent: null };
 }
 
-/// A subscription just paid for: its codes, made once, and sent to the
+/// An account just paid for: its codes, made once, and sent to the
 /// payer once. A webhook delivered twice finds them made, and sends
 /// only if the first send did not go.
-export async function backupsMade(subscription, email, store, mail, { now = Date.now() } = {}) {
-  let row = await store.get(`SUB#${subscription}`, 'BACKUP');
-  if (!row) row = await makeBackups(store, subscription, { now });
-  if (!row.emailed_at) ({ row } = await mailBackups(store, subscription, row, email, mail, { now }));
+export async function backupsMade(account, email, store, mail, { now = Date.now() } = {}) {
+  let row = await store.get(`ACCOUNT#${account}`, 'BACKUP');
+  if (!row) row = await makeBackups(store, account, { now });
+  if (!row.emailed_at) ({ row } = await mailBackups(store, account, row, email, mail, { now }));
   return { status: 200, body: { made_at: row.made_at, emailed: row.emailed_at !== null } };
 }
 
-/// The codes, for a device bound to the subscription: made if there are
-/// none yet, and replaced when [rotate]; with [send], the ones still
-/// good sent to [email], the payer's, when a device asks (the Email
-/// button) — and `emailed`, or `unsent` and why not, in the answer.
+/// The codes, for a device of the account: made if there are none yet,
+/// and replaced when [rotate]; with [send], the ones still good sent to
+/// [email], the payer's, when a device asks (the Email button) — and
+/// `emailed`, or `unsent` and why not, in the answer.
 export async function backupsFor(key, store, mail, { rotate = false, send = false, email = null, why = null, now = Date.now() } = {}) {
-  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (!held) return { status: 402, body: { error: 'no subscription' } };
-  if (!(await store.get(`SUB#${held.subscription}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
-  let row = await store.get(`SUB#${held.subscription}`, 'BACKUP');
-  if (!row || rotate) row = await makeBackups(store, held.subscription, { now });
+  const account = await accountOfKey(store, key);
+  if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
+  let row = await store.get(`ACCOUNT#${account}`, 'BACKUP');
+  if (!row || rotate) row = await makeBackups(store, account, { now });
   if (!send) return { status: 200, body: { ...backupsShown(row), emailed: false } };
-  const mailed = await mailBackups(store, held.subscription, row, email, mail, { now, why });
+  const mailed = await mailBackups(store, account, row, email, mail, { now, why });
   return { status: 200, body: { ...backupsShown(mailed.row), emailed: mailed.unsent === null, ...(mailed.unsent ? { unsent: mailed.unsent } : {}) } };
 }
 
-/// A device arriving with a backup code. Spent only by a join that
-/// goes through: a code turned down for a full household is still good
-/// once a device is dropped.
+/// A device arriving with a backup code: into the account the code is
+/// for. Spent only by a join that goes through: a code turned down for
+/// a full account is still good once a device is dropped.
 export async function redeemBackup(key, code, store, { now = Date.now() } = {}) {
   const at = await store.get(await backupRow(code), 'META');
-  if (!at) return { status: 404, body: { error: 'no such code' } };
-  const row = await store.get(`SUB#${at.subscription}`, 'BACKUP');
+  if (!at || !isAccount(at.account)) return { status: 404, body: { error: 'no such code' } };
+  const row = await store.get(`ACCOUNT#${at.account}`, 'BACKUP');
   const mine = row?.codes.find((c) => c.code === code);
   if (!mine) return { status: 404, body: { error: 'no such code' } };
   if (mine.used_at) return { status: 409, body: { error: 'that code has been used' } };
   const today = dayOf(now);
-  return joinSubscription(key, at.subscription, store, {
+  return joinAccount(key, at.account, store, {
     now,
     spend: () =>
-      store.put(`SUB#${at.subscription}`, 'BACKUP', {
+      store.put(`ACCOUNT#${at.account}`, 'BACKUP', {
         ...row,
         codes: row.codes.map((c) => (c.code === code ? { ...c, used_at: today } : c)),
       }),
   });
 }
 
-/// [key] onto [subscription], by the household's rules: no more devices
-/// than it carries, and not off another subscription that is still paid
-/// up unless [moving] — which only the device that paid for this one
-/// is. [spend] runs once those are met and before anything is written:
-/// a code is used up then, and not by a join that was refused.
-export async function joinSubscription(key, subscription, store, { now = Date.now(), moving = false, spend = null } = {}) {
-  const devices = await devicesOn(store, subscription);
+/// [key] into [account], by the account's rules: no more devices than
+/// it carries, and not off another account with a subscription still
+/// paid up unless [moving] — which only the device that paid is. [spend]
+/// runs once those are met and before anything is written: a code is
+/// used up then, and not by a join that was refused.
+export async function joinAccount(key, account, store, { now = Date.now(), moving = false, spend = null } = {}) {
+  if (!isAccount(account)) return { status: 404, body: { error: 'no such account' } };
+  const devices = await devicesOn(store, account);
   const already = devices.some((d) => d.key === key);
   if (!already && devices.length >= S().mostDevices) {
     return { status: 409, body: { error: 'five devices already', devices: devices.length, most: S().mostDevices } };
   }
   const today = dayOf(now);
-  // A device on another subscription that is still paid up stays on
-  // it. A code arrives in a link, so a link from a stranger with a
-  // subscription of his own would otherwise take a device off the one
-  // its owner paid for, onto one where he can drop it. Leaving is the
-  // device's own to do, by dropping itself first — or by buying a
-  // subscription of its own, which is as plain a word as it can say. A
-  // subscription that has ended holds nothing, and neither does local
+  // A device of another account that is still paid up stays in it. A
+  // code arrives in a link, so a link from a stranger with an account
+  // of his own would otherwise take a device out of the one its owner
+  // paid for, into one where he can drop it. Leaving is the device's
+  // own to do, by dropping itself first — or by buying a subscription
+  // of its own, which is as plain a word as it can say. An account
+  // whose subscription has ended holds nothing, and neither does local
   // mode's open house, which licenses every device that asks and was
   // never anybody's purchase.
-  const was = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (was && was.subscription !== subscription && !moving && (await paidUp(store, was.subscription, today))) {
+  const was = await accountOfKey(store, key);
+  if (was && was !== account && !moving && (await accountPaidUp(store, was, today))) {
     return { status: 409, body: { error: 'this device is on another subscription: drop it there first' } };
   }
   if (spend) await spend();
-  // A device that was on another subscription leaves it rather than
-  // counting against both.
-  if (was && was.subscription !== subscription) await store.del(`SUB#${was.subscription}`, `DEVICE#${key}`);
-  const sub = await store.get(`SUB#${subscription}`, 'META');
-  if (!already) await store.put(`SUB#${subscription}`, `DEVICE#${key}`, { bound_at: today });
+  // A device that was of another account leaves it rather than counting
+  // against both.
+  if (was && was !== account) await store.del(`ACCOUNT#${was}`, `DEVICE#${key}`);
+  const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
+  const sub = subscription ? await store.get(`SUB#${subscription}`, 'META') : null;
+  if (!already) await store.put(`ACCOUNT#${account}`, `DEVICE#${key}`, { bound_at: today });
   await store.put(`KEY#${key}`, 'ENTITLEMENT', {
-    subscription,
+    account,
     licensed_until: sub?.renews_at ?? null,
     at: today,
   });
-  return { status: 200, body: { subscription } };
+  return { status: 200, body: { account } };
 }
 
 /// Whether [subscription] is somebody's purchase and still paid up on
@@ -1062,41 +1306,47 @@ export async function joinSubscription(key, subscription, store, { now = Date.no
 /// Local mode's open house licenses every device that asks and was
 /// never anybody's purchase, so it holds nobody.
 async function paidUp(store, subscription, today) {
+  if (typeof subscription !== 'string') return false;
   const sub = await store.get(`SUB#${subscription}`, 'META');
   return !!sub && sub.source !== 'local' && !!sub.renews_at && sub.renews_at >= today;
 }
 
-/// Dropping a device: any device on the subscription can drop any
-/// other, its own self included — which is how a device is handed on.
-export async function dropDevice(key, device, store, { now = Date.now() } = {}) {
-  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (!held) return { status: 402, body: { error: 'no subscription' } };
-  const devices = await devicesOn(store, held.subscription);
+/// Dropping a device: any device of the account can drop any other, its
+/// own self included — which is how a device is handed on. A device
+/// dropped while it was the one in use is cut off at the relay at once.
+export async function dropDevice(key, device, store, { now = Date.now(), active = null, revoke = null } = {}) {
+  const account = await accountOfKey(store, key);
+  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  const devices = await devicesOn(store, account);
   if (!devices.some((d) => d.key === device)) return { status: 404, body: { error: 'not a device on this subscription' } };
-  await store.del(`SUB#${held.subscription}`, `DEVICE#${device}`);
+  await store.del(`ACCOUNT#${account}`, `DEVICE#${device}`);
   // And the entitlement that device holds, which is gone rather than
   // run out: a licence is one read, and a row saying it is paid up to
   // next year would be that read. Its own copy of the date is not the
   // only thing that would say so — a row dated today falls through to
-  // the subscription on the next ask, and the subscription is still
-  // paid up. It is the binding that ended, so the binding is what goes.
+  // the account on the next ask, and the account is still paid up. It
+  // is the binding that ended, so the binding is what goes.
   const theirs = await store.get(`KEY#${device}`, 'ENTITLEMENT');
-  if (theirs?.subscription === held.subscription) await store.del(`KEY#${device}`, 'ENTITLEMENT');
-  return { status: 200, body: { devices: (await devicesOn(store, held.subscription)).length, most: S().mostDevices } };
+  if (theirs?.account === account) await store.del(`KEY#${device}`, 'ENTITLEMENT');
+  if (active) await dropActive(account, device, active, revoke);
+  return { status: 200, body: { devices: (await devicesOn(store, account)).length, most: S().mostDevices } };
 }
 
-// ---- one household at a time ------------------------------------------
-// A code made, a code spent, a device dropped, the list read: each reads
-// the household and writes it in separate calls, and KV has no
-// compare-and-set, so two at once could both find room for a fifth
-// device and make six (docs/security-review.md). They run one after
-// another per subscription instead: in a Durable Object per
-// subscription where the project binds one as HOUSEHOLD (one object,
-// one thread, wherever in the world the requests come from), and in
-// this isolate's own queue where it does not — which covers requests
-// that land together on one isolate and no more. The same place keeps a
-// household to so many of them an hour, which is what keeps one
-// subscriber from spending the store's daily writes and lists.
+// ---- one account at a time ----------------------------------------------
+// A code made, a code spent, a device dropped, the list read, a device
+// taking the account up: each reads the account and writes it in
+// separate calls, and KV has no compare-and-set, so two at once could
+// both find room for a fifth device and make six
+// (docs/security-review.md), or both be the device in use. They run one
+// after another per account instead: in a Durable Object per account
+// where the project binds one as HOUSEHOLD (one object, one thread,
+// wherever in the world the requests come from), and in this isolate's
+// own queue where it does not — which covers requests that land
+// together on one isolate and no more. The same place keeps an account
+// to so many of them an hour, which is what keeps one subscriber from
+// spending the store's daily writes and lists. A subscription's own
+// turn — its account found or made — is an object of its own, named
+// `sub:` and the subscription.
 
 /// One household's queue and its hour: everything asked of it runs in
 /// order, and what is over the hour's allowance is refused before it
@@ -1107,8 +1357,8 @@ export function sequencer({ now = Date.now } = {}) {
   return (kind, work) => {
     const run = queue.then(async () => {
       const t = now();
-      const recent = (done[kind] = done[kind].filter((at) => t - at < 3600000));
-      const most = kind === 'read' ? S().householdReadsPerHour : S().householdChangesPerHour;
+      const recent = (done[kind] = (done[kind] ?? []).filter((at) => t - at < 3600000));
+      const most = kind === 'read' ? S().householdReadsPerHour : kind === 'active' ? S().activationsPerHour : S().householdChangesPerHour;
       if (recent.length >= most) return { status: 429, body: { error: 'too many at once: try again in a while' } };
       recent.push(t);
       return work();
@@ -1118,8 +1368,11 @@ export function sequencer({ now = Date.now } = {}) {
   };
 }
 
-/// What a household is asked: {op: 'ticket' | 'claim' | 'drop' | 'list', ...}.
-export async function householdOp(op, store, { now = Date.now(), mail = null } = {}) {
+/// What an account's turn is asked: {op: 'ticket' | 'claim' | 'drop' |
+/// 'list' | 'activate' | …, ...}. [active] is where the account's device
+/// in use is written ([activeInStore]); [revoke] tells relay objects a
+/// device there is superseded.
+export async function householdOp(op, store, { now = Date.now(), mail = null, active = activeInStore(store), revoke = null } = {}) {
   switch (op.op) {
     case 'ticket':
       return ticketFor(op.key, store, { now });
@@ -1127,25 +1380,70 @@ export async function householdOp(op, store, { now = Date.now(), mail = null } =
       return claimWith(op.key, op.code, store, { now });
     case 'redeem':
       return redeemBackup(op.key, op.code, store, { now });
+    case 'join':
+      return joinAccount(op.key, op.account, store, { now });
     case 'backups':
       return backupsFor(op.key, store, mail, { rotate: op.rotate === true, send: op.send === true, email: op.email ?? null, why: op.why ?? null, now });
     case 'made':
-      return backupsMade(op.subscription, op.email ?? null, store, mail, { now });
+      return backupsMade(op.account, op.email ?? null, store, mail, { now });
     case 'bind':
       return bindPurchase(op, store, { now });
-    case 'drop':
-      return dropDevice(op.key, op.device, store, { now });
-    case 'list': {
-      const held = await store.get(`KEY#${op.key}`, 'ENTITLEMENT');
-      if (!held) return { status: 402, body: { error: 'no subscription' } };
-      return { status: 200, body: { devices: await devicesOn(store, held.subscription), most: S().mostDevices } };
+    case 'account': {
+      const account = await accountFor(store, op.subscription, { now });
+      return account ? { status: 200, body: { account } } : { status: 404, body: { error: 'no such subscription' } };
     }
+    case 'drop':
+      return dropDevice(op.key, op.device, store, { now, active, revoke });
+    case 'list': {
+      const account = await accountOfKey(store, op.key);
+      if (!account) return { status: 402, body: { error: 'no subscription' } };
+      const inUseNow = (await active.get(account))?.key ?? null;
+      const devices = (await devicesOn(store, account)).map((d) => ({ ...d, ...(d.key === inUseNow ? { active: true } : {}) }));
+      return { status: 200, body: { devices, most: S().mostDevices } };
+    }
+    case 'attest':
+      return attest(op.who, op.key, store, op.login, { now });
+    case 'activate':
+      return activate(op, store, active, { now, revoke });
+    case 'seen':
+      return seenAt(op, active);
+    case 'inUse':
+      return inUse(op, active, { now });
     default:
       return { status: 400, body: { error: 'not a household operation' } };
   }
 }
 
-const kindOf = (op) => (op.op === 'list' || (op.op === 'backups' && op.rotate !== true) ? 'read' : 'change');
+const kindOf = (op) =>
+  op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
+    ? 'active'
+    : op.op === 'list' || (op.op === 'backups' && op.rotate !== true)
+      ? 'read'
+      : 'change';
+
+/// Tells the relay's object for each of [tags] that [account]'s device
+/// in use is now the one of [epoch], so it closes the sockets of any
+/// device of the account before it (service/do/relay.mjs). Through
+/// [env]'s TABLE, which the account's object has where it runs beside
+/// the relay; nothing where it does not.
+export function revokerOf(env) {
+  if (!env.TABLE) return null;
+  return async (tags, account, epoch) => {
+    await Promise.all(
+      tags.map(async (tag) => {
+        try {
+          await env.TABLE.get(env.TABLE.idFromName(tag)).fetch('https://relay/revoke', {
+            method: 'POST',
+            body: JSON.stringify({ account, epoch }),
+          });
+        } catch {
+          // An object that cannot be reached closes nothing: its
+          // sockets run to the end of their activation's hour.
+        }
+      }),
+    );
+  };
+}
 
 /// How backup codes are emailed where [env] can: Cloudflare's Email
 /// Sending, bound as EMAIL to the worker the household runs in, from
@@ -1172,15 +1470,15 @@ export function backupMailText(codes) {
     '',
     ...codes.map((c) => `  ${c}`),
     '',
-    'Each one brings one device onto your subscription, once. On the',
-    'device: menu, Activate subscription, and type or paste a code.',
+    'Each one brings one device into your account, once. On the device:',
+    'menu, Activate subscription, and type or paste a code.',
     '',
-    'Any device on the subscription shows these codes under Subscription,',
-    'can email them here again, and can replace them with new ones, after',
+    'Any device of the account shows these codes under Subscription, can',
+    'email them here again, and can replace them with new ones, after',
     'which the codes above stop working.',
     '',
-    'Keep them private: anyone with a code can join a device to your',
-    'subscription. Replies to this email are not read; for help, see',
+    'Keep them private: anyone with a code can bring a device into your',
+    'account. Replies to this email are not read; for help, see',
     'https://openhearts.game/support',
     '',
     'Open Hearts — https://openhearts.game',
@@ -1197,22 +1495,30 @@ export function backupMailHtml(codes) {
     '<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1b1b1b">',
     '<p>Your Open Hearts backup codes:</p>',
     `<div style="margin:12px 0 16px 0">${codes.map(code).join('')}</div>`,
-    '<p>Each one brings one device onto your subscription, once. On the device: menu, <b>Activate subscription</b>, and type or paste a code.</p>',
-    '<p>Any device on the subscription shows these codes under Subscription, can email them here again, and can replace them with new ones, after which the codes above stop working.</p>',
-    '<p>Keep them private: anyone with a code can join a device to your subscription. Replies to this email are not read; for help, see <a href="https://openhearts.game/support">openhearts.game/support</a>.</p>',
+    '<p>Each one brings one device into your account, once. On the device: menu, <b>Activate subscription</b>, and type or paste a code.</p>',
+    '<p>Any device of the account shows these codes under Subscription, can email them here again, and can replace them with new ones, after which the codes above stop working.</p>',
+    '<p>Keep them private: anyone with a code can bring a device into your account. Replies to this email are not read; for help, see <a href="https://openhearts.game/support">openhearts.game/support</a>.</p>',
     '<p style="color:#666">Open Hearts — <a href="https://openhearts.game">openhearts.game</a></p>',
     '</body></html>',
   ].join('\n');
 }
 
-/// The Durable Object a household runs in, one per subscription, named
-/// by it. Exported from the relay's worker beside TagRelay
-/// (service/do/worker.mjs), bound to the Pages project as HOUSEHOLD;
-/// it reads and writes the same OH_STORE.
+/// The Durable Object an account's turn runs in, one per account, named
+/// by it — or by `sub:` and a subscription, for a subscription's own
+/// turn. Exported from the relay's worker beside TagRelay
+/// (service/do/worker.mjs), bound to the Pages project and to the relay
+/// as HOUSEHOLD; it reads and writes the same OH_STORE. The account's
+/// device in use is kept in the object's own storage, which is read
+/// back as it was written, and closes sockets at the relay through the
+/// relay worker's TABLE.
 export class Household {
   constructor(state, env) {
     this.env = env;
     this.next = sequencer();
+    this.active = {
+      get: () => state.storage.get('active'),
+      put: (_, row) => state.storage.put('active', row),
+    };
   }
 
   async fetch(request) {
@@ -1220,26 +1526,33 @@ export class Household {
     await settle(this.env);
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: { error: 'licensing not configured' } });
-    return Response.json(await this.next(kindOf(op), () => householdOp(op, store, { mail: mailerOf(this.env) })));
+    return Response.json(
+      await this.next(kindOf(op), () => householdOp(op, store, { mail: mailerOf(this.env), active: this.active, revoke: revokerOf(this.env) })),
+    );
   }
 }
 
-/// This isolate's queues, by subscription, for a project with no
-/// HOUSEHOLD bound.
+/// This isolate's queues, by account, for a project with no HOUSEHOLD
+/// bound.
 const households = new Map();
 
-/// [op] run in [subscription]'s household, in its turn: {status, body}.
-export async function inHousehold(env, subscription, op) {
+/// [op] run in [name]'s turn — an account's, or `sub:` and a
+/// subscription — : {status, body}.
+export async function inHousehold(env, name, op) {
   if (env.HOUSEHOLD) {
-    const stub = env.HOUSEHOLD.get(env.HOUSEHOLD.idFromName(subscription));
+    const stub = env.HOUSEHOLD.get(env.HOUSEHOLD.idFromName(name));
     const answer = await stub.fetch('https://household/', { method: 'POST', body: JSON.stringify(op) });
     return answer.json();
   }
   const store = storeOf(env);
   if (!store) return { status: 503, body: { error: 'licensing not configured' } };
-  if (!households.has(subscription)) households.set(subscription, sequencer());
-  return households.get(subscription)(kindOf(op), () => householdOp(op, store, { mail: mailerOf(env) }));
+  if (!households.has(name)) households.set(name, sequencer());
+  return households.get(name)(kindOf(op), () => householdOp(op, store, { mail: mailerOf(env) }));
 }
+
+/// [op] in [subscription]'s own turn: where its account is found, or
+/// made once and once only.
+export const inSubscription = (env, subscription, op) => inHousehold(env, `sub:${subscription}`, op);
 
 /// Forgets this isolate's queues, for a test that starts afresh.
 export const forgetHouseholds = () => households.clear();
@@ -1252,10 +1565,19 @@ async function ticketRoute(request, env) {
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const held = await store.get(`KEY#${asked.key}`, 'ENTITLEMENT');
-  if (!held) return json(request, 402, { error: 'no subscription' });
-  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'ticket', key: asked.key });
+  const account = await deviceAccount(env, store, asked.key);
+  if (!account) return json(request, 402, { error: 'no subscription' });
+  const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key: asked.key });
   return json(request, status, out);
+}
+
+/// The account a code's row is for: its own, or — a row from before
+/// accounts — its subscription's.
+async function accountOfRow(env, row) {
+  if (isAccount(row?.account)) return row.account;
+  if (typeof row?.subscription !== 'string') return null;
+  const made = await inSubscription(env, row.subscription, { op: 'account', subscription: row.subscription });
+  return isAccount(made.body?.account) ? made.body.account : null;
 }
 
 async function claimRoute(request, env) {
@@ -1269,21 +1591,25 @@ async function claimRoute(request, env) {
   const { key, body, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  // In the household the code is for, which the code's row says; a code
+  // In the account the code is for, which the code's row says; a code
   // nobody made is said so here, without queueing anybody.
   // A backup code, typed by a person, or a code off another device's
   // screen: sixteen characters of one alphabet, or thirty-two hex.
+  // The device's own account first, if it is from before accounts: a
+  // code never takes a device off an account still paid up.
+  await deviceAccount(env, store, key);
   const backup = backupCodeOf(body.ticket);
   let claimed;
   if (backup) {
-    const at = await store.get(await backupRow(backup), 'META');
-    if (!at) return json(request, 404, { error: 'no such code' });
-    claimed = await inHousehold(env, at.subscription, { op: 'redeem', key, code: backup });
+    const account = await accountOfRow(env, await store.get(await backupRow(backup), 'META'));
+    if (!account) return json(request, 404, { error: 'no such code' });
+    claimed = await inHousehold(env, account, { op: 'redeem', key, code: backup });
   } else {
     if (typeof body.ticket !== 'string' || !/^[0-9a-f]{2,64}$/.test(body.ticket)) return json(request, 400, { error: 'not a code' });
     const ticket = await store.get(`TICKET#${body.ticket}`, 'META');
-    if (!ticket) return json(request, 404, { error: 'no such code' });
-    claimed = await inHousehold(env, ticket.subscription, { op: 'claim', key, code: body.ticket });
+    // A code made before accounts was for ten minutes: long gone.
+    if (!isAccount(ticket?.account)) return json(request, 404, { error: 'no such code' });
+    claimed = await inHousehold(env, ticket.account, { op: 'claim', key, code: body.ticket });
   }
   if (claimed.status !== 200) return json(request, claimed.status, claimed.body);
   // Straight back with the licence it was claimed for, so the device
@@ -1293,7 +1619,8 @@ async function claimRoute(request, env) {
 }
 
 /// The email Stripe holds for the customer behind [subscription], or
-/// null: read when backup codes are sent, and not kept.
+/// null: read when backup codes are sent, and not kept. The account's
+/// subscription, for an account.
 export async function payerEmail(store, subscription, env, fetchImpl = fetch) {
   return (await payerLookup(store, subscription, env, fetchImpl)).email;
 }
@@ -1329,13 +1656,69 @@ async function backupsRoute(request, env) {
   const { key, body } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, { error: 'licensing not configured' });
-  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (!held) return json(request, 402, { error: 'no subscription' });
+  const account = await deviceAccount(env, store, key);
+  if (!account) return json(request, 402, { error: 'no subscription' });
   const rotate = body.rotate === true;
   const send = !rotate && body.send === true;
-  const payer = send ? await payerLookup(store, held.subscription, env) : { email: null, why: null };
-  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'backups', key, rotate, send, email: payer.email, why: payer.why });
+  const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
+  const payer = send ? await payerLookup(store, subscription, env) : { email: null, why: null };
+  const { status, body: out } = await inHousehold(env, account, { op: 'backups', key, rotate, send, email: payer.email, why: payer.why });
   return json(request, status, out);
+}
+
+/// A finished game's record, for a device to look at (records.mjs):
+/// signed for the table, and shown only to the device in use of an
+/// account with a subscription — looking at games is live play — and
+/// not of a game its account is at.
+async function reviewRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'review', (body) => (typeof body.table === 'string' ? body.table : ''));
+  if (asked instanceof Response) return asked;
+  const { key, body } = asked;
+  if (typeof body.table !== 'string' || !tableIdShape.test(body.table)) return json(request, 400, { error: 'a table id, 32 hex' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  const account = await deviceAccount(env, store, key);
+  if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
+  const ok = await inHousehold(env, account, { op: 'inUse', key, account, table: body.table });
+  if (ok.status !== 200) return json(request, ok.status, ok.body);
+  return recordResponse(env.OH_RECORDS, body.table, cors(request));
+}
+
+/// A device taking its account up, or saying it still has it
+/// (one device at a time, above): the activation, signed, or why not.
+async function activateRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  // What is asked is signed: nobody else's request makes this device
+  // take its account from the one in use.
+  const asked = await signedFor(request, env, 'activate', (body) => `${body.want ?? ''} ${body.seated ?? ''}`);
+  if (asked instanceof Response) return asked;
+  const { key, body, signer } = asked;
+  if (!['open', 'take', 'renew'].includes(body.want)) return json(request, 400, { error: 'want: open, take or renew' });
+  const keys = serviceKeys(env);
+  const store = storeOf(env);
+  if (!keys || !store) return json(request, 503, { error: 'licensing not configured' });
+  const open = openHouse(env, request);
+  const now = Date.now();
+  // In local mode a device nobody has heard of is licensed, and so has
+  // an account, as it asks.
+  if (open) await entitlementOf(store, key, { now, openHouse: true });
+  const account = await deviceAccount(env, store, key, { now });
+  if (!account) return json(request, 402, { error: 'no subscription' });
+  const seated = body.seated === undefined ? undefined : body.seated;
+  const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(seated !== undefined ? { seated } : {}) });
+  if (took.status !== 200) return json(request, took.status, took.body);
+  // An hour, and never past the end of the day the subscription is paid
+  // to.
+  const paidTo = took.body.licensed_until ? Date.parse(`${took.body.licensed_until}T00:00:00Z`) / 1000 + 86400 : 0;
+  const until = Math.floor(Math.min(now / 1000 + ACTIVATION_S, paidTo || now / 1000 + ACTIVATION_S));
+  const activation = await activationFor(account, key, took.body.epoch, until, { signer, ...keys });
+  if (!activation) return json(request, 503, { error: 'the service key does not match its secret' });
+  return json(request, 200, { activation, ...(took.body.took ? { took: true } : {}) });
 }
 
 /// A finished game's record, sent by one of its players' devices to be
@@ -1365,21 +1748,24 @@ async function devicesRoute(request, env) {
   if (!store) return json(request, 503, { error: 'licensing not configured' });
   const drop = body.drop;
   if (typeof drop === 'string' && !/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
-  const held = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (!held) return json(request, 402, { error: 'no subscription' });
+  const account = await deviceAccount(env, store, key);
+  if (!account) return json(request, 402, { error: 'no subscription' });
   if (typeof drop === 'string') {
-    const { status, body: out } = await inHousehold(env, held.subscription, { op: 'drop', key, device: drop });
+    const { status, body: out } = await inHousehold(env, account, { op: 'drop', key, device: drop });
     if (status !== 200) return json(request, status, out);
   }
-  const { status, body: out } = await inHousehold(env, held.subscription, { op: 'list', key });
+  const { status, body: out } = await inHousehold(env, account, { op: 'list', key });
   return json(request, status, out);
 }
 
 // ---- who this is, where a provider will say ----------------------------
-// A subscription follows a person. A code (above) is how the person
-// brings their own second device in; a provider account is how they
-// come back to one they no longer have — a phone in a river is not a
-// phone that can show a code.
+// An account is a person. A code (above) is how the person brings their
+// own second device in, and a backup code how they come back without
+// one; a sign-in with Apple or Google is the same as a backup code that
+// is never used up — a phone in a river is not a phone that can show a
+// code. One sign-in is linked to one account, and one account to one
+// sign-in ([attest]); signing in on any device brings it into that
+// account ([supersede], by its old name).
 //
 // What is stored of the provider is an HMAC of its subject identifier,
 // never the identifier: it is opaque but stable and joins to a real
@@ -1512,63 +1898,51 @@ export async function loginRow(who, env) {
   return `LOGIN#${who.provider}#${mac}`;
 }
 
-/// Binds a sign-in to [key], once. A login already bound to another
-/// device is a refusal rather than a second binding: moving to a new
-/// device is [supersede], which says what it is replacing.
-export async function attest(who, key, store, env, { now = Date.now() } = {}) {
-  const login = await loginRow(who, env);
-  if (!login) return { status: 503, body: { error: 'sign-in is not configured' } };
-  const today = dayOf(now);
+/// The account a sign-in is linked to, or null: its own row, or — a row
+/// from before accounts, which named a device — that device's account.
+async function linkedAccount(store, login) {
   const held = await store.get(login, 'IDENTITY');
-  if (held && held.key !== key) return { status: 409, body: { error: 'that account is already on another device' } };
-  if (!held) await store.put(login, 'IDENTITY', { key, created_at: today });
-  // What the key's own row carries is that it was attested and when —
-  // never by whom. The key is what public records carry.
-  await store.put(`KEY#${key}`, 'META', { provider: who.provider, attested_at: today });
-  return { status: 200, body: { attested: today } };
+  if (!held) return null;
+  if (isAccount(held.account)) return held.account;
+  return typeof held.key === 'string' ? accountOfKey(store, held.key) : null;
 }
 
-/// The same account on a new device: the entitlement of the key the
-/// login was on comes forward to this one, so a licence stays one read,
-/// and the login points at the new key from here.
-export async function supersede(who, key, store, env, { now = Date.now() } = {}) {
-  const login = await loginRow(who, env);
+/// Links the sign-in at [login] to the account [key] is a device of,
+/// once, in the account's turn. A sign-in linked to another account, or
+/// an account linked to another sign-in, is a refusal rather than a
+/// second link: one person, one account, one sign-in.
+export async function attest(who, key, store, login, { now = Date.now() } = {}) {
   if (!login) return { status: 503, body: { error: 'sign-in is not configured' } };
-  const held = await store.get(login, 'IDENTITY');
-  if (!held) return { status: 404, body: { error: 'that account is not on any device' } };
   const today = dayOf(now);
-  if (held.key === key) return { status: 200, body: { superseded: null, at: today } };
-  const was = held.key;
-  await store.put(login, 'IDENTITY', { key, created_at: held.created_at, moved_at: today });
-  await store.put(`KEY#${key}`, 'META', { provider: who.provider, attested_at: today });
-  await store.put(`KEY#${key}`, 'SUPERSEDES', { predecessor: was, at: today });
-  // The subscription the old device was on takes this one in its place.
-  // A device the person still holds is not dropped by somebody else
-  // signing in on a new one — but the one that was superseded is, since
-  // it is the one that is gone.
-  //
-  // Unless this device is on a subscription of its own that is still
-  // paid up: the account moves, and the subscription bought here stays
-  // here, rather than being swapped for whatever the old device held.
-  const theirs = await store.get(`KEY#${was}`, 'ENTITLEMENT');
-  const mine = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  const keeps = mine && theirs && mine.subscription !== theirs.subscription && (await paidUp(store, mine.subscription, today));
-  if (theirs && !keeps) {
-    const devices = await devicesOn(store, theirs.subscription);
-    if (!devices.some((d) => d.key === key)) {
-      if (devices.length >= S().mostDevices) await store.del(`SUB#${theirs.subscription}`, `DEVICE#${was}`);
-      await store.put(`SUB#${theirs.subscription}`, `DEVICE#${key}`, { bound_at: today });
-    }
-    // Off the one it was on, which has run out, rather than counting
-    // against both.
-    if (mine && mine.subscription !== theirs.subscription) await store.del(`SUB#${mine.subscription}`, `DEVICE#${key}`);
-    await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...theirs, at: today });
-  }
-  return { status: 200, body: { superseded: was, at: today } };
+  const account = await accountOfKey(store, key);
+  if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
+  const linked = await linkedAccount(store, login);
+  if (linked && linked !== account) return { status: 409, body: { error: 'that sign-in is linked to another account' } };
+  const mine = await store.get(`ACCOUNT#${account}`, 'LOGIN');
+  if (mine && mine.login !== login) return { status: 409, body: { error: 'this account is linked to another sign-in' } };
+  const held = await store.get(login, 'IDENTITY');
+  if (!isAccount(held?.account)) await store.put(login, 'IDENTITY', { account, created_at: held?.created_at ?? today });
+  // What the account carries is which provider, and the row's own
+  // name, an HMAC: never who. The key carries nothing of it at all.
+  if (!mine) await store.put(`ACCOUNT#${account}`, 'LOGIN', { provider: who.provider, login, at: today });
+  return { status: 200, body: { attested: today, account } };
+}
+
+/// Signing in on a device: it comes into the account the sign-in is
+/// linked to, as a backup code would bring it — by the same rules, in
+/// the account's turn. {status, body}, with the account.
+export async function supersede(who, key, store, env, login, { now = Date.now() } = {}) {
+  if (!login) return { status: 503, body: { error: 'sign-in is not configured' } };
+  const account = await linkedAccount(store, login);
+  if (!account) return { status: 404, body: { error: 'that sign-in is not linked to an account' } };
+  const joined = await inHousehold(env, account, { op: 'join', key, account, now });
+  if (joined.status !== 200) return joined;
+  return { status: 200, body: { account, at: dayOf(now) } };
 }
 
 /// attest and supersede are one route: the same proof, and which of the
-/// two it is depends on whether the account has been somewhere before.
+/// two it is depends on whether the person is linking the account they
+/// are in, or coming into the one they linked.
 async function signInRoute(request, env, move) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -1584,7 +1958,16 @@ async function signInRoute(request, env, move) {
   if (!store) return json(request, 503, { error: 'licensing not configured' });
   const who = await whoSignedIn(body.provider, body.token, key, env, fetch, { open: openHouse(env, request) });
   if (!who) return json(request, 401, { error: 'that sign-in does not check out' });
-  const { status, body: out } = await (move ? supersede : attest)(who, key, store, env);
+  const login = await loginRow(who, env);
+  // In local mode a device nobody has heard of has an account, as it
+  // asks for anything.
+  if (openHouse(env, request)) await entitlementOf(store, key, { openHouse: true });
+  const mine = await deviceAccount(env, store, key);
+  const { status, body: out } = move
+    ? await supersede(who, key, store, env, login)
+    : mine
+      ? await inHousehold(env, mine, { op: 'attest', who, key, login })
+      : { status: 402, body: { error: 'no subscription' } };
   if (status !== 200) return json(request, status, out);
   // Straight back with the licence it is owed, if any: a device that
   // has just proved who it is should not have to ask twice.
@@ -1639,11 +2022,11 @@ async function stripeRoute(request, env) {
     return json(request, 400, { error: 'not json' });
   }
   const done = await record(event, store);
-  // A subscription just paid for: its backup codes, sent to the email
-  // the checkout was paid with. Not kept: it is on the event.
-  if (done?.bound) {
+  // A subscription just paid for: its account's backup codes, sent to
+  // the email the checkout was paid with. Not kept: it is on the event.
+  if (done?.bound && done.account) {
     const email = event.data?.object?.customer_details?.email ?? null;
-    await inHousehold(env, done.subscription, { op: 'made', subscription: done.subscription, email });
+    await inHousehold(env, done.account, { op: 'made', account: done.account, email });
   }
   // Anything not ours is still a delivery taken: a webhook that gets an
   // error back is a webhook Stripe keeps sending.
@@ -2002,8 +2385,8 @@ async function configRoute(request, env) {
 //                days.
 //
 // A subscription bought in a store is `apple:<original transaction>` or
-// `google:<hash of the purchase token>`, with its devices, its date and
-// its household like any other. Renewals, lapses and refunds arrive the
+// `google:<hash of the purchase token>`, with its account, its date and
+// its devices like any other. Renewals, lapses and refunds arrive the
 // way Stripe's do, pushed: App Store Server Notifications V2 at
 // /api/apple, Play's Real-time Developer Notifications at /api/play.
 //
@@ -2012,8 +2395,8 @@ async function configRoute(request, env) {
 // from its key (storeAccountOf). The device that paid may move onto
 // what it paid for from wherever it was. Any other device bringing the
 // same proof — the same Apple or Google account restoring it on a new
-// phone — joins as a code would let it, within the household's count
-// and not off another paid-up subscription.
+// phone — joins its account as a code would let it, within the
+// account's count and not out of another paid-up one.
 
 /// What the store's record holds for the device with [key]: Play's
 /// obfuscated account id (64 hex) and Apple's appAccountToken (a UUID
@@ -2352,9 +2735,13 @@ export async function pushedByPlay(token, env, fetchImpl = fetch, { now = Date.n
   return claims.email === env.OH_PLAY_PUSH_EMAIL && claims.email_verified === true;
 }
 
-/// A checked purchase written down and [op.key] put on it, in its
-/// household's turn: dated first, whatever it says, and joined only if
-/// it is paid up. {status, body}.
+/// A checked purchase written down and [op.key] put into its account,
+/// in the subscription's own turn: dated first, whatever it says, and
+/// joined only if it is paid up. The device that paid moves onto what
+/// it paid for, and its account with it where nothing else is paid up
+/// there ([accountFor]); any other device bringing the same proof — a
+/// restore on a new phone — joins the account as a code would let it.
+/// {status, body}.
 export async function bindPurchase(op, store, { now = Date.now() } = {}) {
   await dateSubscription(store, op.subscription, {
     source: op.source,
@@ -2365,7 +2752,9 @@ export async function bindPurchase(op, store, { now = Date.now() } = {}) {
     now,
   });
   if (op.gone || !op.paid || !(op.until > now)) return { status: 402, body: { error: 'not paid' } };
-  return joinSubscription(op.key, op.subscription, store, { now, moving: op.buyer === true });
+  if (op.buyer === true) return paidFor(store, op.subscription, op.key, { now });
+  const account = await accountFor(store, op.subscription, { buyer: op.key, make: true, now });
+  return joinAccount(op.key, account, store, { now });
 }
 
 async function storeRoute(request, env) {
@@ -2394,7 +2783,8 @@ async function storeRoute(request, env) {
     bought = { source: 'google', ...p, created: null, buyer: p.account === mine.google };
   }
   const { account: _, ...op } = bought;
-  const bound = await inHousehold(env, bought.subscription, { op: 'bind', key, ...op });
+  await deviceAccount(env, store, key, { now });
+  const bound = await inSubscription(env, bought.subscription, { op: 'bind', key, ...op });
   if (bound.status !== 200) return json(request, bound.status, bound.body);
   const { status, body: out } = await licence(key, env, { signer, now });
   return json(request, status, out);
@@ -2508,7 +2898,9 @@ const ROUTES = {
   devices: (request, env) => devicesRoute(request, env),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),
+  activate: (request, env) => activateRoute(request, env),
   record: (request, env) => recordRoute(request, env),
+  review: (request, env) => reviewRoute(request, env),
 };
 
 // ---- Watching it run -------------------------------------------------
@@ -2554,8 +2946,6 @@ export default {
     const url = new URL(request.url);
     const name = url.pathname.startsWith('/api/') ? url.pathname.slice('/api/'.length) : null;
     if (name === null) return env.ASSETS.fetch(appPage(url) ? new Request(new URL('/play/', url), request) : request);
-    // A finished game's record, by its table's id (records.mjs).
-    if (name.startsWith('record/') && request.method === 'GET') return recordResponse(env.OH_RECORDS, name.slice('record/'.length), cors(request));
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await settle(env);

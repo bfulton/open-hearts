@@ -2,7 +2,7 @@
 ///
 /// Nobody who watches sits at the table or reaches its players: a
 /// watcher says on the table's tag that it is watching ([TableKinds
-/// .watch], `{"watching": true}`), and one seated player's device
+/// .watch], `{"watching": true, "licence": …}`), and one seated player's device
 /// answers with what anyone at the table can see — the names, the
 /// scores, the cards played this hand, whose turn it is — as a
 /// [WatchedTable], again after every move while anyone has said so in the
@@ -12,6 +12,13 @@
 /// the proof is the record, checked when the game is over (record.dart,
 /// game_record.dart). So it is read strictly — a view that does not
 /// parse is dropped — and believed only as far as a scoreboard is.
+///
+/// Watching is live play, which is a subscription's: a watcher says it
+/// with its own device's key and licence, and is answered only where
+/// the licence holds for that key and names an account not seated at
+/// the table — nobody watches their own game from another device
+/// (docs/04-live-play.md). The relay carries no device the service has
+/// not vouched for in the first place (docs/06-service.md).
 library;
 
 import 'dart:async';
@@ -20,6 +27,7 @@ import 'package:engine/engine.dart';
 
 import 'client.dart';
 import 'events.dart';
+import 'licence.dart';
 import 'signing.dart';
 import 'spec.dart';
 
@@ -168,10 +176,11 @@ class WatchBroadcast {
     required this.say,
     required this.view,
     required this.answering,
+    this.seated = const {},
     int Function()? now,
   }) : _now = now ?? (() => DateTime.now().millisecondsSinceEpoch) {
     _sub = heard.listen((m) {
-      if (m.content['watching'] != true) return;
+      if (m.content['watching'] != true || !admits(m.from, m.content)) return;
       final at = _now();
       _watchedAt = at;
       // Someone new gets the table now, not at the next move — however
@@ -192,6 +201,18 @@ class WatchBroadcast {
 
   /// Whether this device is the one to answer now ([answers]).
   final bool Function() answering;
+
+  /// The accounts at the table: none of them is answered as a watcher.
+  final Set<String> seated;
+
+  /// Whether a watcher keyed [from] saying [content] is one to answer:
+  /// licensed for that key where accounts are checked, and not of an
+  /// account seated here.
+  bool admits(PublicKey from, Map<String, Object?> content) {
+    final licence = Licence.parse(content['licence']);
+    if (!licenceFits(licence, from, at: DateTime.now())) return false;
+    return !seated.contains(licence?.account ?? from) && !seated.contains(from);
+  }
 
   final int Function() _now;
   late final StreamSubscription<void> _sub;

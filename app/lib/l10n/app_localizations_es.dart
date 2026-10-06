@@ -475,8 +475,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'storeNotSetUp': 'La compra en la tienda aún no está abierta.',
       'signInRefused':
           'No se pudo comprobar ese inicio de sesión. Vuelve a intentarlo.',
-      'accountElsewhere': 'Esa cuenta ya está en otro dispositivo.',
-      'accountNowhere': 'Nunca se ha iniciado sesión aquí con esa cuenta.',
+      'accountElsewhere': 'Ese inicio de sesión está vinculado a otra cuenta.',
+      'accountNowhere':
+          'Ese inicio de sesión aún no está vinculado a ninguna cuenta.',
+      'otherSignIn': 'Esta cuenta ya está vinculada a otro inicio de sesión.',
       'signInNotSetUp': 'El inicio de sesión aún no está abierto.',
       'other': 'El servicio lo rechazó.',
     });
@@ -521,7 +523,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get subscriptionIsYours =>
-      'Una suscripción es tuya, no de un dispositivo. Añade otro mostrándole este código — solo necesita su cámara — y quita uno cuando quieras.';
+      'Una suscripción es tu cuenta, no la de un dispositivo, y se juega en un dispositivo a la vez. Añade otro mostrándole este código — solo necesita su cámara — y quita uno cuando quieras.';
 
   @override
   String get yourDevices => 'Tus dispositivos';
@@ -1210,11 +1212,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get signInToKeep =>
-      'Inicia sesión y, en un teléfono nuevo o en un navegador que haya olvidado este, recuperarás la suscripción iniciando sesión de la misma manera. De la cuenta solo se guarda una forma irreconocible de su número: ni nombre ni correo.';
+      'Inicia sesión y, en un teléfono nuevo o en un navegador que haya olvidado este, volverás a esta cuenta iniciando sesión de la misma manera. Del inicio de sesión solo se guarda una forma irreconocible de su número: ni nombre ni correo.';
 
   @override
   String get signInToBringBack =>
-      '¿Ya tienes suscripción e iniciaste sesión en ese dispositivo? Inicia sesión de la misma manera para traerla aquí.';
+      '¿Ya tienes suscripción e iniciaste sesión en tu otro dispositivo? Inicia sesión de la misma manera para traer este a tu cuenta.';
 
   @override
   String signedInWith(String provider) {
@@ -1245,19 +1247,53 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get accountElsewhere =>
-      'Esa cuenta tiene la sesión iniciada en otro dispositivo. ¿La traes aquí? Un dispositivo nuevo recuperará entonces esta suscripción, y el otro conserva lo que tiene.';
+      'Ese inicio de sesión está vinculado a otra cuenta de Open Hearts. ¿Usar esa cuenta en este dispositivo? Este dispositivo sale de la cuenta en la que está ahora.';
 
   @override
-  String get moveAccountHere => 'Traerla aquí';
+  String get moveAccountHere => 'Usar esa cuenta aquí';
 
   @override
   String get signedIn => 'Sesión iniciada.';
 
   @override
   String get signedInNoSubscription =>
-      'Sesión iniciada. Esa cuenta aún no tiene suscripción.';
+      'Sesión iniciada. Ese inicio de sesión aún no está vinculado a ninguna cuenta: suscríbete y luego inicia sesión desde la página de la suscripción.';
 
   @override
   String get signInFailed =>
       'El inicio de sesión no terminó. Vuelve a intentarlo en un momento.';
+
+  @override
+  String get openElsewhereTitle =>
+      'Open Hearts está abierto ahora en otro dispositivo';
+
+  @override
+  String get openElsewhereBody =>
+      'Tu cuenta juega en un dispositivo a la vez, y gana el último que se abre. Este se ha hecho a un lado: fuera de la mesa, del jurado y de la espera. Úsalo aquí y será el otro el que se haga a un lado.';
+
+  @override
+  String get inGameElsewhereTitle => 'Estás en una partida en otro dispositivo';
+
+  @override
+  String get inGameElsewhereBody => '¿Seguir aquí? Esa partida se perderá.';
+
+  @override
+  String get continueHere => 'Seguir aquí';
+
+  @override
+  String get useItHere => 'Usarlo aquí';
+
+  @override
+  String get liveOpenElsewhere => 'Tu cuenta está en uso en otro dispositivo.';
+
+  @override
+  String get deviceInUse => 'en uso';
+
+  @override
+  String get reviewIsLivePlay =>
+      'Ver una partida, y repasar una ya jugada, es parte del juego en vivo.';
+
+  @override
+  String get reviewOwnGame =>
+      'Esta es tu propia partida y aún se está jugando. Estará aquí cuando termine.';
 }

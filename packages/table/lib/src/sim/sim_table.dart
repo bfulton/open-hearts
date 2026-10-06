@@ -10,6 +10,7 @@ import 'package:engine/engine.dart';
 import '../client.dart';
 import '../journal.dart';
 import '../jury.dart';
+import '../licence.dart';
 import '../signing.dart';
 import '../spec.dart';
 import '../time_bank.dart';
@@ -49,6 +50,7 @@ class SimTable {
     String? id,
     List<Signer>? keys,
     Map<int, TableJournal>? journals,
+    Licence? Function(PublicKey key)? licenceOf,
   })  : journals = journals ?? {},
         clock = VirtualClock(),
         // Fake keys unless told otherwise: a table played for a record
@@ -90,7 +92,8 @@ class SimTable {
       seats: [
         for (var s = 0; s < seatCount; s++)
           if (botsFirst ? s >= seatCount - humans : s < humans)
-            HumanSeat(signers[botsFirst ? s - (seatCount - humans) : s].publicKey)
+            HumanSeat(signers[botsFirst ? s - (seatCount - humans) : s].publicKey,
+                licence: licenceOf?.call(signers[botsFirst ? s - (seatCount - humans) : s].publicKey))
           else
             BotSeat(Persona.roster[(s + seed) % Persona.roster.length]),
       ],

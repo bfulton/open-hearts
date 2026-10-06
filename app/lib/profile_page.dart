@@ -24,6 +24,7 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import 'avatar.dart';
+import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/network.dart';
@@ -156,7 +157,8 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       _name.text = name ?? '';
       _avatar = avatar;
-      _seed = widget.seed ?? signer.publicKey;
+      // The account's colour, the one every table shows it in.
+      _seed = widget.seed ?? Entitlement.current.licence?.account ?? signer.publicKey;
     });
   }
 

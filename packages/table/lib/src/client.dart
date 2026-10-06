@@ -345,6 +345,15 @@ class TableClient {
   /// Every human who sat down.
   final Set<PublicKey> _humans;
 
+  /// The accounts that sat down here (spec.dart), whichever of their
+  /// devices sat: a jury is drawn from nobody of theirs, since another
+  /// device of a player's account is the player (docs/04-live-play.md).
+  late final Set<String> _seatedAccounts = spec.accounts;
+
+  /// Whether [key] is a device of an account seated here, as presence
+  /// says whose each key is.
+  bool _ofThisTable(PublicKey key) => _humans.contains(key) || _seatedAccounts.contains(presence?.accountOf(key) ?? key);
+
   /// The humans still at the table.
   Set<PublicKey> get participants => _humans.difference(_removedAt.keys.toSet());
 
@@ -5213,7 +5222,7 @@ class TableClient {
     // it ([_letGo]): heard from is not the same as playing, and drawn
     // again it would hold a seat again and cost the table the hand.
     final quiet = _jurorsOf(hand).difference(_liveJurors(hand)).union(_letGo);
-    final here = p.online(withinMs: 15000).difference(_humans).difference(quiet);
+    final here = p.online(withinMs: 15000).where((k) => !_ofThisTable(k)).toSet().difference(quiet);
     // What this table needs a jury for. Escrow needs somebody; bot
     // seats need enough jurors that a seat survives its holder going
     // (jury.dart, [juryToHoldBots]), and short of that the hand is not
@@ -5233,7 +5242,7 @@ class TableClient {
     // ([_acceptableJury]). So this needs no agreement and cannot
     // deadlock — and where the settled are too few, the draw is from
     // everyone, since a jury of whoever is there beats none.
-    final steady = p.settled(withinMs: 15000, forMs: jurySettledMs).difference(_humans).difference(quiet);
+    final steady = p.settled(withinMs: 15000, forMs: jurySettledMs).where((k) => !_ofThisTable(k)).toSet().difference(quiet);
     final candidates = steady.length >= wanted ? steady : here;
     if (candidates.length < wanted) {
       if (clock.nowMs - _lastCalledAt >= 10000) {
@@ -5319,13 +5328,14 @@ class TableClient {
   }
 
   /// Whether to back a proposal: the draw is what the snapshot gives,
-  /// the snapshot holds nobody at this table, every juror is someone
-  /// this peer has seen online too, and this peer is not already
-  /// behind another live proposal for the hand.
+  /// the snapshot holds nobody at this table — no device of an account
+  /// seated here, as far as this peer's presence knows whose each key
+  /// is — every juror is someone this peer has seen online too, and
+  /// this peer is not already behind another live proposal for the hand.
   bool _acceptableJury(TableEvent e) {
     final snapshot = e.snapshot;
     final jurors = e.jurors;
-    if (jurors.isEmpty || snapshot.any(_humans.contains)) return false;
+    if (jurors.isEmpty || snapshot.any(_ofThisTable)) return false;
     final drawn = drawJury(spec.seed, e.hand, snapshot);
     if (drawn.length != jurors.length || !Iterable.generate(jurors.length).every((i) => drawn[i] == jurors[i])) return false;
     final p = presence;

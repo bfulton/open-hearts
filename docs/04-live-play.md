@@ -8,8 +8,9 @@ honest is [doc 03](03-fair-deal.md); every state and transition, named,
 is [doc 07](07-states.md).
 
 Solo play is free; live play is a subscription, so everyone at a live
-table holds a licence ([doc 06](06-service.md)). The protocol is
-`packages/table` — chiefly `client.dart`, `jury.dart`,
+table holds a licence and sits as an account, on one device at a time
+([doc 06](06-service.md), and [Identity](#identity) below). The protocol
+is `packages/table` — chiefly `client.dart`, `jury.dart`,
 `juror_duty.dart`, `matching.dart` and `record.dart`, the verifier —
 driven by `app/lib/live_controller.dart` and `app/lib/net/`.
 
@@ -24,15 +25,15 @@ online.
 
 ### Matchmaking
 
-There is no matchmaker (`packages/table/lib/src/matching.dart`).
-Players who want a game say so on the relay every couple of seconds, in
-a pool whose tag names the target score and whether it is rated, with
-their rating, pace and how long they have waited. Time is cut into
-rounds of five seconds; in each, the lowest key present acts as host,
-runs the seating rule over everyone it has heard from, and publishes one
-signed start event per table. If the host says nothing, the next key
-steps in: a host can waste five seconds but cannot forge a play. A
-device entering a pool reads the last minute of seatings.
+There is no matchmaker (`packages/table/lib/src/matching.dart`). Players
+who want a game say so on the relay every couple of seconds, in a pool
+whose tag names the target score and whether it is rated, with their
+rating, pace, how long they have waited and their licence. Time is cut
+into rounds of five seconds; in each, the lowest key present acts as
+host, runs the seating rule over everyone it has heard from, and
+publishes one signed start event per table. If the host says nothing,
+the next key steps in: a host can waste five seconds but cannot forge a
+play. A device entering a pool reads the last minute of seatings.
 
 The rule:
 
@@ -47,6 +48,10 @@ The rule:
 Two hosts with different views may seat someone twice. Everyone takes
 the seating with the lower table id, and the other table's empty seat is
 booted at its first turn.
+
+A seating names each seat's licence. Nobody sits at one where a seat's
+licence is not the service's word for that seat's key, or where an
+account sits twice, and a waiter without one is not seated by anyone.
 
 **Pace**, seconds a card, is matched because three fast players and one
 slow one make a bad evening for all four. It is a device's own account
@@ -72,8 +77,10 @@ on *Start now*. A start counts only from someone present and only if
 recent, since the relay keeps them and codes get reused.
 
 The signed start event names everything the seats must agree on — the
-seats, the target score, whether it is rated, the table's clocks — since
-seats that disagreed on any of them would fork.
+seats with their licences, the target score, whether it is rated, the
+table's clocks — since seats that disagreed on any of them would fork.
+A room's members say their licences in their beats, and a start whose
+seats do not check out is not sat at.
 
 ## Bots
 
@@ -119,26 +126,33 @@ sees every card land (`live_controller.dart`).
 ## Ratings
 
 **One rule for people and bots** (`rating.dart`, `results.dart`). A
-finished rated game is one Glicko rating period with three opponents,
-scored pairwise by final total: the lower total wins the pair, equal
-totals halve. A bot that sat down at the deal is rated like a person,
-one rating per persona per rung, so any edge a person finds against the
-bots is priced in rather than farmed. A bot that took over a leaver's
-seat has no stake; the leaver finishes last. A rating is provisional
-while its deviation is above 150.
+person is an account: whichever of its devices played, the rating is the
+account's. A finished rated game is one Glicko rating period with three
+opponents, scored pairwise by final total: the lower total wins the
+pair, equal totals halve. A bot that sat down at the deal is rated like
+a person, one rating per persona per rung, so any edge a person finds
+against the bots is priced in rather than farmed. A bot that took over a
+leaver's seat has no stake; the leaver finishes last. A rating is
+provisional while its deviation is above 150.
 
 **Results are signed and public.** At the end of a rated game every
 person at the table publishes the same result — the table, the seats,
 the totals, who was there from the deal and who left — signed with
-their key, under one tag on the relay. A result stands when a majority
-of the people who sat down published the same one; a stranger's word
-counts for nothing. At a table of two that is both, so each device
+their device's key, under one tag on the relay (`standings`). Each
+person's line names the account and carries the licence that says the
+key it sat with is one of the account's devices, so anyone folding
+results checks whose it is. A result stands when a majority of the
+accounts that sat down published the same one, each by the device it
+sat with; a stranger's word, or the account's other device's, counts
+for nothing. At a table of two that is both, so each device
 waits for the relay to acknowledge its copy, and retries on a fresh
 connection after five seconds, twenty and a minute while none has
 (`app/lib/net/standing.dart`).
 
 Anyone can fold every standing result, oldest first, into every rating
-(`Ledger`); the app does so when it reaches the relay. The score sheet
+(`Ledger`); the app does so when it reaches the relay. Ratings began
+again with accounts: the results from before, keyed by device and under
+the old `results` tag, are not folded. The score sheet
 of a rated game shows what it did — "1500 → 1516" — by folding the
 device's own result into the ledger it holds. A rating stated in a pool
 only decides who you sit with. Every live table is sealed
@@ -340,23 +354,32 @@ would be levers an attacker could optimise.
 ### Presence
 
 Every open app that can deal announces itself on the `online` tag every
-five seconds (`presence_relay.dart`, `app/lib/net/duty.dart`) and serves
-as a juror when drawn, without the player noticing. One whose deal
+five seconds (`presence_relay.dart`, `app/lib/net/duty.dart`), with its
+activation — whose device it is ([doc 06](06-service.md)) — and serves
+as a juror when drawn, without the player noticing. Of two devices of
+one account, only the later activation is online. One whose deal
 failed to load announces nothing, since it could serve no sealed table.
 A device says when it is going — leaving the app or the page — so a
 table need not wait out a missed heartbeat.
 
 ### The draw
 
-At each hand the lowest key among the participants heard lately
-proposes a jury: a snapshot of who is online (nobody at this table) and
-the draw, a deterministic function of the deal's seed, the hand and the
-snapshot (`drawJury`). The others back it when the draw is what the
-snapshot gives and every juror is somebody they too have seen in the
-last five minutes; a majority carries it. It is kept beside the record,
-not in it. The proposer repeats it every ten seconds until it carries
-(every half minute after three tries), and a peer that already backed
-it repeats its witness. Nobody inside or outside the table can steer the
+At each hand the lowest key among the participants heard lately proposes
+a jury: a snapshot of who is online and the draw, a deterministic
+function of the deal's seed, the hand and the snapshot (`drawJury`). The
+snapshot holds no device of an account seated at the table, by whichever
+of its devices: a player's laptop online while their phone sits at the
+table is the player, and as a juror would see a held bot's cards or
+judge its own game. The others back the proposal when the draw is what
+the snapshot gives, nothing in the snapshot is of an account seated here
+as far as their own presence knows, and every juror is somebody they too
+have seen in the last five minutes; a majority carries it. A device
+summoned to a table its account sits at does not serve it. Presence is
+not on the record, so the verifier cannot check whose each juror was;
+the backing majority does. The jury is kept beside the record, not in
+it. The proposer repeats it every ten seconds until it carries (every
+half minute after three tries), and a peer that already backed it
+repeats its witness. Nobody inside or outside the table can steer the
 draw. The proposer prefers the **settled** — keys announced for at least
 a minute (`jurySettledMs`), or seated at a table with a game to finish —
 and draws from everyone when too few are; this needs no agreement, since
@@ -560,11 +583,14 @@ it matters, with the collusion arranged in advance.
 ## Watching a live game
 
 A table can be watched from its address (`/play/table/ID`; `watch.dart`,
-`app/lib/net/watching.dart`). Under a throwaway key, a watcher says on
-the table's watch lane that it is watching, and one seated player's
-device answers with what anyone at the table can see — names, scores,
-this hand's cards, whose turn — after every move while anyone has asked
-in the last minute. Nothing hidden is in it. A view is a player's signed
+`app/lib/net/watching.dart`). Watching is live play, so it is a
+subscription's: the watcher's device, its account's device in use, says
+on the table's watch lane that it is watching, with its licence, and
+one seated player's device answers with what anyone at the table can
+see — names, scores, this hand's cards, whose turn — after every move
+while anyone has asked in the last minute. A watcher of an account
+seated at the table is not answered: nobody watches their own game from
+another device. Nothing hidden is in it. A view is a player's signed
 account, believed only as far as a scoreboard is.
 
 ## Game records
@@ -574,8 +600,11 @@ When a game is over, each player's device sends its record to be kept
 `record` handler, [doc 06](06-service.md)). The first copy is kept, so
 the others cost nothing. A record is the table's spec, every decision
 with the signed events behind it, the juries that carried, and the
-escrow pieces released for seats that left. Whoever opens a game fetches
-it by table id and verifies it before showing a card
+escrow pieces released for seats that left. Each seat in it carries its
+licence, so the record says whose each seat was. Whoever opens a game
+— a device with a subscription, its account's device in use, and not
+one of the game's own players while it is being played — fetches it by
+table id and verifies it before showing a card
 (`app/lib/review_page.dart`): a copy that verifies is the game, whoever
 kept it. Names are kept beside the record unsigned, shown as what each
 device said it was called.
@@ -594,12 +623,22 @@ picture on this device for good.
 
 ## Identity
 
-An identity is a keypair made on the device when first needed
+A device's identity is a keypair made on the device when first needed
 (`app/lib/identity.dart`): an x-only secp256k1 key with BIP-340 Schnorr
 signatures (`signing.dart`; on the web through the wasm in
-[measurements](../measurements/README.md)). The public key appears in
-every public record and says nothing about who you are. How a key is
-licensed and carried to a new device is [doc 06](06-service.md). The
+[measurements](../measurements/README.md)). The key signs every move and
+never leaves the device. A person is an **account**, made when they
+subscribe ([doc 06](06-service.md)), with up to five devices. The
+service's licence names a device's key beside its account's id, and
+every peer checks it against the service's key compiled into its build
+(`licence.dart`): a seat whose licence is not the service's word for its
+key, or an account seated twice, is not a table anyone sits at, serves
+or believes. A seat, with its name, rating and result, is the
+account's, and so are the pictures a device keeps off and the jury's
+exclusions. An account plays on one device at a time:
+the newest to take it up wins, and the one before leaves every table,
+jury, pool and watch it was at; a seat it leaves is a departure like
+any other, a bot in the seat and, at a rated table, a leave. The
 service never holds a card, signs a play or adjudicates anything, and a
 table under way needs nothing from it.
 
@@ -611,7 +650,10 @@ table under way needs nothing from it.
   throws random faults at simulated tables — jurors gone, relays out,
   loss — and checks that no two survivors ever disagree, that every
   record names the same exit for each seat, and that no table is left
-  stopped where nobody up could move it.
+  stopped where nobody up could move it. With `--twins` it takes
+  jurors' and seated players' accounts up on new devices as it walks,
+  and checks that no jury draws a device of a seated account and no
+  account is at a table on two devices at once.
 - The explorer (`packages/table/tool/explore.dart`) replays a short
   sealed game once per event, peer and change — one copy lost, or
   delivered late — and holds each run to what the table owes.

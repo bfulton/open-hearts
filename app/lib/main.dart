@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
+import 'package:table/table.dart' show licenceService, relayCredentials, relayTurnedAway;
 
 import 'crypto/deal.dart';
 import 'crypto/schnorr.dart';
@@ -11,10 +12,13 @@ import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/duty.dart';
+import 'net/in_use.dart';
+import 'net/licence.dart' show serviceKey;
 import 'net/remote_config.dart';
 import 'router.dart';
 import 'net/store_buying.dart';
 import 'theme.dart';
+import 'ui/in_use_screen.dart';
 import 'ui/selection.dart';
 import 'ui/touch_probe.dart';
 
@@ -31,6 +35,15 @@ Future<void> main() async {
   }
   await installFastSchnorr();
   await loadDeal();
+  // The service whose word makes a seat an account's, at every table
+  // this device sits at, serves or looks at (packages/table,
+  // licence.dart); and what this device shows a relay that asks who it
+  // is, and hears when one turns it away for another device of its
+  // account (net/in_use.dart).
+  licenceService = serviceKey;
+  relayCredentials = InUse.current.credentials;
+  relayTurnedAway = InUse.current.turnedAway;
+  Entitlement.current.addListener(InUse.current.licenceChanged);
   // What this device may do, before the front door is drawn: read off
   // the device, so a device that cannot reach us answers anyway, and
   // asked of the service behind the first frame (docs/06-service.md).
@@ -83,6 +96,9 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
       switch (state) {
         case AppLifecycleState.resumed:
           Duty.back();
+          // Back from the background, perhaps after a long sleep: still
+          // the device in use, or not.
+          unawaited(InUse.current.renew());
         // Hidden is a tab switched away from or a phone's home button:
         // timers throttle, sockets may go, and this device is not
         // answering a summons until it is back. Detached is the page
@@ -130,7 +146,7 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
         locale: language,
         // Any words on any screen can be selected and copied: a name, a
         // rule, an error to send us.
-        builder: (context, child) => TouchProbe(child: CopyableSelection(child: child ?? const SizedBox())),
+        builder: (context, child) => TouchProbe(child: CopyableSelection(child: InUseScreen(child: child ?? const SizedBox()))),
         routerConfig: _router,
       ),
     );

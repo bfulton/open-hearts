@@ -1,7 +1,7 @@
 /// What a device holds instead of a receipt (docs/06-service.md).
 ///
 /// A licence is a short statement signed by the service's key —
-/// this device's key, a date, and the plan — which the app checks
+/// this device's key, its account, a date, and the plan — which the app checks
 /// against a key baked into the build, the same way it checks
 /// everything else it is told. Three things follow.
 ///
@@ -38,106 +38,9 @@ import 'remote_config.dart' show waits;
 /// licensed by whoever asks first.
 const serviceKey = String.fromEnvironment('OH_SERVICE_KEY');
 
-class Licence {
-  const Licence({required this.key, required this.until, required this.plan, required this.signature});
-
-  /// What the signed text begins with, so a signature over one kind of
-  /// statement can never be read as a signature over another.
-  static const statement = 'oh-licence/1';
-
-  /// The device the licence is for. A licence is a device's; a
-  /// subscription is a person's, and carries several
-  /// (docs/06-service.md).
-  final PublicKey key;
-
-  /// The last day this licence is good for, at midnight UTC. It runs to
-  /// the end of that day: see [goodAt].
-  final DateTime until;
-
-  /// What was bought. There is one plan.
-  final String plan;
-
-  /// The service's signature over [digest].
-  final String signature;
-
-  /// A day as the statement spells it: an ISO date, UTC.
-  static String dayOf(DateTime at) {
-    final d = at.toUtc();
-    return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-  }
-
-  /// Midnight UTC on [day], or null when it is not a day.
-  static DateTime? dayFrom(String day) {
-    final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(day);
-    if (m == null) return null;
-    final at = DateTime.utc(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
-    // A date that does not exist — the thirty-first of February —
-    // rolls over rather than failing, so it is caught by spelling it
-    // back out.
-    return dayOf(at) == day ? at : null;
-  }
-
-  /// The text the service signs. A line each, and none of the four can
-  /// hold a newline, so there is one way to read it.
-  String get canonical => '$statement\n$key\n${dayOf(until)}\n$plan';
-
-  String get digest => sha256Hex(utf8.encode(canonical));
-
-  /// Signed by the holder of [service].
-  ///
-  /// The curve itself, never [verify]: that one also takes a simulated
-  /// table's fake signature, which is a hash of the signer's *public*
-  /// key and so is forgeable by anyone who can read one. A fake table
-  /// can afford that; the one statement that says what was paid for
-  /// cannot.
-  bool signedBy(PublicKey service) {
-    if (service.length != 64 || signature.length != 128) return false;
-    try {
-      return schnorrVerifier(service, digest, signature);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /// Still good at [at]: the date is the last day, so it runs to the
-  /// end of that day.
-  bool goodAt(DateTime at) => at.toUtc().isBefore(until.add(const Duration(days: 1)));
-
-  /// Everything at once, which is the only question the front door
-  /// asks: this device's, this service's, and not run out.
-  bool holdsFor(PublicKey device, {String service = serviceKey, DateTime? at}) =>
-      key == device && signedBy(service) && goodAt(at ?? DateTime.now());
-
-  Map<String, Object?> toJson() => {'key': key, 'until': dayOf(until), 'plan': plan, 'sig': signature};
-
-  /// The licence as it travels and as it is kept on the device.
-  String get encoded => jsonEncode(toJson());
-
-  /// A licence off the wire or off the device; null when what is there
-  /// is not one. Nothing here trusts it — [holdsFor] does the trusting.
-  static Licence? parse(Object? json) {
-    if (json is String) {
-      try {
-        return parse(jsonDecode(json));
-      } catch (_) {
-        return null;
-      }
-    }
-    if (json is! Map) return null;
-    final key = json['key'];
-    final until = json['until'];
-    final plan = json['plan'];
-    final sig = json['sig'];
-    if (key is! String || until is! String || plan is! String || sig is! String) return null;
-    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(key)) return null;
-    final day = dayFrom(until);
-    if (day == null) return null;
-    return Licence(key: key, until: day, plan: plan, signature: sig);
-  }
-
-  @override
-  String toString() => 'Licence(${key.substring(0, 8)}… to ${dayOf(until)}, $plan)';
-}
+// The licence itself — this device's key, its account, a date and the
+// plan, signed by the service — is the table package's (licence.dart
+// there): every peer at a table checks every seat's by it.
 
 /// Where the service's handlers are, by name: the origin this app was
 /// served by, which is the site the worker runs beside. Over http as

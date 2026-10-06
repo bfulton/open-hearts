@@ -481,9 +481,11 @@ class AppLocalizationsDe extends AppLocalizations {
       'storeNotSetUp': 'Kaufen im Store ist noch nicht geöffnet.',
       'signInRefused':
           'Diese Anmeldung ließ sich nicht prüfen. Versuch es noch einmal.',
-      'accountElsewhere': 'Dieses Konto ist schon auf einem anderen Gerät.',
-      'accountNowhere':
-          'Mit diesem Konto hat sich hier noch niemand angemeldet.',
+      'accountElsewhere':
+          'Diese Anmeldung ist mit einem anderen Konto verknüpft.',
+      'accountNowhere': 'Mit dieser Anmeldung ist noch kein Konto verknüpft.',
+      'otherSignIn':
+          'Dieses Konto ist schon mit einer anderen Anmeldung verknüpft.',
       'signInNotSetUp': 'Die Anmeldung ist noch nicht geöffnet.',
       'other': 'Der Dienst hat abgelehnt.',
     });
@@ -527,7 +529,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get subscriptionIsYours =>
-      'Ein Abo gehört dir, nicht einem Gerät. Füge ein weiteres hinzu, indem du ihm diesen Code zeigst — es braucht nur seine Kamera — und entferne eines, wann du willst.';
+      'Ein Abo ist dein Konto, nicht das eines Geräts, und gespielt wird auf einem Gerät zur Zeit. Füge ein weiteres hinzu, indem du ihm diesen Code zeigst — es braucht nur seine Kamera — und entferne eines, wann du willst.';
 
   @override
   String get yourDevices => 'Deine Geräte';
@@ -1218,11 +1220,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get signInToKeep =>
-      'Melde dich an, und ein neues Handy oder ein Browser, der dieses Gerät vergessen hat, bekommt das Abo zurück, wenn du dich dort genauso anmeldest. Vom Konto wird nur eine unkenntlich gemachte Form seiner Nummer aufbewahrt: kein Name, keine E-Mail.';
+      'Melde dich an, und ein neues Handy oder ein Browser, der dieses Gerät vergessen hat, kommt in dieses Konto zurück, wenn du dich dort genauso anmeldest. Von der Anmeldung wird nur eine unkenntlich gemachte Form ihrer Nummer aufbewahrt: kein Name, keine E-Mail.';
 
   @override
   String get signInToBringBack =>
-      'Schon ein Abo, und auf jenem Gerät angemeldet? Melde dich genauso an, um es hierher zu holen.';
+      'Schon ein Abo, und auf deinem anderen Gerät angemeldet? Melde dich genauso an, um dieses Gerät in dein Konto zu holen.';
 
   @override
   String signedInWith(String provider) {
@@ -1253,19 +1255,56 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get accountElsewhere =>
-      'Dieses Konto ist auf einem anderen Gerät angemeldet. Hierher holen? Ein neues Gerät bekommt dann dieses Abo zurück, und das andere behält, was es hat.';
+      'Diese Anmeldung ist mit einem anderen Open-Hearts-Konto verknüpft. Dieses Konto auf diesem Gerät nutzen? Das Gerät verlässt dann das Konto, in dem es jetzt ist.';
 
   @override
-  String get moveAccountHere => 'Hierher holen';
+  String get moveAccountHere => 'Dieses Konto hier nutzen';
 
   @override
   String get signedIn => 'Angemeldet.';
 
   @override
   String get signedInNoSubscription =>
-      'Angemeldet. Auf diesem Konto gibt es noch kein Abo.';
+      'Angemeldet. Mit dieser Anmeldung ist noch kein Konto verknüpft: Schließ ein Abo ab und melde dich dann auf der Abo-Seite an.';
 
   @override
   String get signInFailed =>
       'Die Anmeldung wurde nicht abgeschlossen. Versuch es gleich noch einmal.';
+
+  @override
+  String get openElsewhereTitle =>
+      'Open Hearts ist jetzt auf einem anderen Gerät offen';
+
+  @override
+  String get openElsewhereBody =>
+      'Dein Konto spielt auf einem Gerät zur Zeit, und das zuletzt geöffnete gilt. Dieses ist zurückgetreten: weg vom Tisch, aus der Jury und aus der Warteschlange. Nutze es hier, dann tritt das andere zurück.';
+
+  @override
+  String get inGameElsewhereTitle =>
+      'Du bist in einer Partie auf einem anderen Gerät';
+
+  @override
+  String get inGameElsewhereBody =>
+      'Hier weitermachen? Diese Partie geht dann verloren.';
+
+  @override
+  String get continueHere => 'Hier weitermachen';
+
+  @override
+  String get useItHere => 'Hier nutzen';
+
+  @override
+  String get liveOpenElsewhere =>
+      'Dein Konto wird auf einem anderen Gerät genutzt.';
+
+  @override
+  String get deviceInUse => 'in Gebrauch';
+
+  @override
+  String get reviewIsLivePlay =>
+      'Einer Partie zuschauen und eine gespielte ansehen gehört zum Live-Spiel.';
+
+  @override
+  String get reviewOwnGame =>
+      'Das ist deine eigene Partie, sie läuft noch. Sie ist hier, sobald sie vorbei ist.';
 }

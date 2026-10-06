@@ -259,6 +259,97 @@ export function memoryStore(keep = 10000) {
   };
 }
 
+// ---- who may use it ---------------------------------------------------
+// Live play is a subscription's, and an account is played on one device
+// at a time (docs/06-service.md). So the relay carries a device only on
+// the service's word that it is the account's device in use now: the
+// activation the service signed for it (packages/table, licence.dart).
+// It asks for one on every socket, before anything else (NIP-42's AUTH:
+// a challenge, answered by an event the device's key signs with the
+// activation in its tags), holds whatever the socket says until the
+// answer is in, and carries nothing for a socket without one. A
+// device's activation names its account and an epoch, the count of
+// times the account has been taken up: the relay closes the socket of
+// any device of an account the moment a later epoch of that account is
+// shown to it, or the account's turn tells it one was given
+// ([createRelay], `revoke`), and opens none for an earlier one. Asking
+// a device to stop would leave a modified one going; refusing it does
+// not.
+
+/// The kind of a device's answer to the relay's challenge (NIP-42).
+export const authKind = 22242;
+
+const toHex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+async function sha256Hex(text) {
+  return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(text))));
+}
+
+/// The activation [raw] says, as {account, key, epoch, until}, when the
+/// service ([service], its public key) signed it and it has not run out
+/// at [nowS]; null otherwise. The statement is the service's
+/// (service/functions/worker.mjs, activationFor).
+export async function activationOf(raw, service, verify, nowS) {
+  if (!raw || typeof raw !== 'object' || !hex64.test(service ?? '')) return null;
+  const { account, key, epoch, until, sig } = raw;
+  if (typeof account !== 'string' || !/^[0-9a-f]{32}$/.test(account) || typeof key !== 'string' || !hex64.test(key)) return null;
+  if (!Number.isSafeInteger(epoch) || epoch < 0 || !Number.isSafeInteger(until) || typeof sig !== 'string') return null;
+  if (until <= nowS) return null;
+  const digest = await sha256Hex(`oh-active/1\n${account}\n${key}\n${epoch}\n${until}`);
+  return verify(service, digest, sig) ? { account, key, epoch, until } : null;
+}
+
+/// The mark a juror of last resort shows instead of an activation: an
+/// HMAC of its key under the bench's own secret (OH_JUROR_SECRET), which
+/// the relay holds too. The bench belongs to no account; it is the
+/// service's (docs/04-live-play.md).
+export async function benchMark(secret, key) {
+  const k = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return toHex(new Uint8Array(await crypto.subtle.sign('HMAC', k, encoder.encode(`oh-bench/1\n${key}`))));
+}
+
+/// How long the bench's mark is taken for, in seconds, before it is
+/// asked again.
+const benchSeconds = 24 * 60 * 60;
+
+/// The gate a relay holds its sockets to ([createRelay], `gate`): a
+/// fresh challenge per socket, and who answered it — {account, key,
+/// epoch, until} — or {refused: reason}. [service] is the service's
+/// public key, [bench] the bench's secret, or null for no bench; [seen]
+/// asks the account's turn whether an activation is still the one in
+/// use, answering a reason when it is not, or null.
+export function serviceGate({ service, verify, bench = null, seen = null, now = Date.now }) {
+  return {
+    challenge: () => toHex(crypto.getRandomValues(new Uint8Array(16))),
+    async admit(event) {
+      const said = (name) => event.tags.find((t) => t[0] === name)?.[1];
+      const mark = said('bench');
+      if (mark !== undefined) {
+        if (!bench || mark !== (await benchMark(bench, event.pubkey))) return { refused: 'restricted: not one of the bench' };
+        return { account: null, key: event.pubkey, epoch: 0, until: Math.floor(now() / 1000) + benchSeconds };
+      }
+      let raw = null;
+      try {
+        raw = JSON.parse(said('activation') ?? 'null');
+      } catch {
+        // Not one.
+      }
+      const who = await activationOf(raw, service, verify, Math.floor(now() / 1000));
+      if (!who || who.key !== event.pubkey) return { refused: 'auth-required: this device has no current activation' };
+      const why = await seen?.(who);
+      return why ? { refused: why } : who;
+    },
+  };
+}
+
+/// How many messages a socket may say before its answer to the
+/// challenge is in: a client sends its subscriptions at once, and maybe
+/// an event; past this it is not a client waiting for an answer.
+const heldMost = 32;
+
+/// How old a device's answer to the challenge may be, in seconds.
+const answerFreshS = 600;
+
 /// The relay itself. [verify] checks a signature, [refuse] is a policy
 /// that may turn an event away with a reason — an object that carries
 /// only the kinds its tag may hold — and [store] is where the kinds
@@ -275,7 +366,11 @@ export function memoryStore(keep = 10000) {
 /// the rate is measured by. [count], if given, is told what became of
 /// each message — `count('events')`, `count('delivered', n)` — and
 /// nothing about who sent it: what the operator watches (worker.mjs).
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null }) {
+///
+/// [gate], when given, is who may use it ([serviceGate]): every socket
+/// is asked, and carried nothing until it has answered. A socket may
+/// then also have `close()`, for the relay to end it.
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -288,6 +383,11 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
   const seen = new Set();
   /// socket -> {tokens, at}: what it may still publish under [limits].
   const buckets = new Map();
+  /// socket -> {challenge, who, held, refused}: what the gate asked it,
+  /// who answered, what it said meanwhile, and why it is refused.
+  const auths = new Map();
+  /// account -> the newest epoch this relay has seen of it.
+  const epochs = new Map();
 
   const sendText = (socket, text) => {
     try {
@@ -297,6 +397,115 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
   };
   const send = (socket, message) => sendText(socket, JSON.stringify(message));
+
+  const nowS = () => Math.floor(now() / 1000);
+
+  /// Whether [socket] may be carried now: no gate, or an answer that has
+  /// not run out.
+  const admitted = (socket) => {
+    if (!gate) return true;
+    const who = auths.get(socket)?.who;
+    return !!who && who.until > nowS();
+  };
+
+  /// A fresh challenge for [socket], whose answer ran out or never came.
+  function challenge(socket) {
+    const a = { challenge: gate.challenge(), who: null, held: [], refused: null };
+    auths.set(socket, a);
+    send(socket, ['AUTH', a.challenge]);
+    return a;
+  }
+
+  /// [socket] cut off for [why]: nothing more carried to it or from it,
+  /// and the socket ended where the host lets it be.
+  function cutOff(socket, why) {
+    const a = auths.get(socket);
+    if (a) {
+      a.who = null;
+      a.refused = why;
+      a.held = [];
+    }
+    sockets.get(socket)?.clear();
+    send(socket, ['NOTICE', why]);
+    try {
+      socket.close?.(4001, why.slice(0, 120));
+    } catch {
+      // Gone already.
+    }
+  }
+
+  /// Every socket of [account] from before [epoch] closed, and [epoch]
+  /// kept as the newest of it.
+  function supersede(account, epoch) {
+    if ((epochs.get(account) ?? -1) < epoch) epochs.set(account, epoch);
+    for (const [socket, a] of auths) {
+      if (a.who?.account === account && a.who.epoch < epoch) {
+        count?.('superseded');
+        log?.(`superseded a device of ${account.slice(0, 6)}`);
+        cutOff(socket, 'superseded: another device of this account is in use');
+      }
+    }
+  }
+
+  /// [socket]'s answer to its challenge.
+  async function authenticate(socket, json) {
+    const a = auths.get(socket);
+    if (!gate || !a) return send(socket, ['NOTICE', 'this relay asks nobody who they are']);
+    const event = await checkEvent(json, verify);
+    const id = event?.id ?? (json && typeof json === 'object' && typeof json.id === 'string' ? json.id : '');
+    let who = null;
+    let why = null;
+    if (!event || event.kind !== authKind || !a.challenge || !event.tags.some((t) => t[0] === 'challenge' && t[1] === a.challenge)) {
+      why = 'auth-required: not an answer to this relay\'s challenge';
+    } else if (Math.abs(nowS() - event.created_at) > answerFreshS) {
+      why = 'auth-required: an old answer';
+    } else {
+      const said = await gate.admit(event);
+      if (said.refused) why = said.refused;
+      else if (said.account && said.epoch < (epochs.get(said.account) ?? -1)) why = 'superseded: another device of this account is in use';
+      else who = said;
+    }
+    const held = a.held;
+    a.held = [];
+    if (!who) {
+      count?.('refused');
+      log?.(`turned away ${event?.pubkey?.slice(0, 6) ?? '?'}: ${why}`);
+      a.refused = why;
+      send(socket, ['OK', id, false, why]);
+      for (const raw of held) await handle(socket, raw);
+      if (why.startsWith('superseded:') || why.startsWith('restricted:')) cutOff(socket, why);
+      return;
+    }
+    if (who.account) supersede(who.account, who.epoch);
+    a.who = who;
+    a.challenge = null;
+    a.refused = null;
+    send(socket, ['OK', id, true, '']);
+    for (const raw of held) await handle(socket, raw);
+  }
+
+  /// Whether [message] from [socket] waits for its answer, or is
+  /// refused for want of one; false when the socket may say it.
+  function heldBack(socket, message, raw) {
+    if (admitted(socket)) return false;
+    let a = auths.get(socket);
+    // An answer that ran out is asked for again: the device answers with
+    // the activation it has been given since.
+    if (a?.who) a = challenge(socket);
+    if (a && !a.refused) {
+      if (a.held.length >= heldMost) return send(socket, ['NOTICE', 'auth-required: answer the challenge first']), true;
+      a.held.push(raw);
+      return true;
+    }
+    const why = a?.refused ?? 'auth-required: answer the challenge first';
+    if (message[0] === 'EVENT') {
+      const id = message[1] && typeof message[1] === 'object' && typeof message[1].id === 'string' ? message[1].id : '';
+      send(socket, ['OK', id, false, why]);
+    } else if (message[0] === 'REQ') {
+      send(socket, ['CLOSED', typeof message[1] === 'string' ? message[1] : '', why]);
+    }
+    return true;
+  }
 
   /// Whether [socket] may publish one more event now, taking it if so.
   /// The bucket refills with time; a socket that went quiet has its
@@ -361,6 +570,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     const wire = JSON.stringify(event);
     let delivered = 0;
     for (const [socket, subscriptions] of sockets) {
+      if (gate && !admitted(socket)) continue;
       for (const [id, sub] of subscriptions) {
         if (sub.filters.some((f) => matches(f, event))) {
           sendText(socket, `["EVENT",${JSON.stringify(id)},${wire}]`);
@@ -410,6 +620,8 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       count?.('malformed');
       return send(socket, ['NOTICE', 'not a message']);
     }
+    if (message[0] === 'AUTH') return authenticate(socket, message[1]);
+    if (gate && (message[0] === 'EVENT' || message[0] === 'REQ' || message[0] === 'CLOSE') && heldBack(socket, message, raw)) return;
     switch (message[0]) {
       case 'EVENT':
         if (message.length !== 2) {
@@ -438,8 +650,10 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 
   return {
     /// A socket the host has accepted, with the subscriptions it was
-    /// already carrying if it is one that woke from hibernation.
-    open(socket, carried = null) {
+    /// already carrying if it is one that woke from hibernation — and
+    /// who it had answered as, [auth], which stands while it has not
+    /// run out.
+    open(socket, carried = null, auth = null) {
       const subscriptions = new Map();
       for (const [id, raw] of Object.entries(carried ?? {})) {
         const filters = [];
@@ -450,6 +664,13 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
         if (filters.length) subscriptions.set(id, { raw, filters });
       }
       sockets.set(socket, subscriptions);
+      if (gate) {
+        if (auth && auth.until > nowS() && !(auth.account && auth.epoch < (epochs.get(auth.account) ?? -1))) {
+          auths.set(socket, { challenge: null, who: auth, held: [], refused: null });
+        } else {
+          challenge(socket);
+        }
+      }
       log?.(`connected (${sockets.size})`);
     },
 
@@ -468,7 +689,20 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       sockets.delete(socket);
       turns.delete(socket);
       buckets.delete(socket);
+      auths.delete(socket);
       log?.(`closed (${sockets.size})`);
+    },
+
+    /// [account]'s device in use is now the one of [epoch]: the sockets
+    /// of any device of it from before are closed, and none is opened
+    /// for one (the account's turn says so, service/functions/worker.mjs).
+    revoke(account, epoch) {
+      supersede(account, epoch);
+    },
+
+    /// Who [socket] answered as, for it to carry through hibernation.
+    authOf(socket) {
+      return auths.get(socket)?.who ?? null;
     },
 
     /// What [socket] must carry to survive hibernation, as JSON.
@@ -493,12 +727,13 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// presence keeps nothing and takes only the ephemeral kinds, a table's
 /// or a lobby's tag also keeps its lobby kind, and every socket is held
 /// to [objectLimits] or [tableLimits].
-export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null } = {}) {
+export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null, gate = null } = {}) {
   const presence = tag === presenceTag;
   const own = refusalFor(tag);
   return createRelay({
     heard,
     verify,
+    gate,
     // Presence keeps nothing; a table's tag keeps its lobby.
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
     kept: presence ? null : kept,
@@ -561,7 +796,7 @@ export const tableLimits = Object.freeze({
 /// What one object has seen since it last said so, in the order the
 /// operator's query reads the numbers (docs/06-service.md):
 /// counts, never who.
-export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed'];
+export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed', 'superseded'];
 
 /// A tally kept in memory and written as one line of numbers a minute
 /// at most, to [sink] — an Analytics Engine dataset, or nothing. A line

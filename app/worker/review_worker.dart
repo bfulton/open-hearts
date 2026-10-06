@@ -2,7 +2,7 @@
 ///
 /// Compiled on its own to `review_worker.js` beside the app (deploy.sh,
 /// e2e/build.sh): a Web Worker with its own deal.wasm and schnorr.wasm,
-/// fetched from beside it. The page sends the record as JSON; the
+/// fetched from beside it. The page sends the record and the service's key as JSON; the
 /// worker answers each hand as its check is done, `{hand: …}`, and then
 /// the verdict, `{done: {ok, reason, winners}}` — or `{error: why}` when
 /// it could not check at all. The page's screen never waits on it.
@@ -39,7 +39,11 @@ Future<void> _check(String text) async {
   try {
     await installFastSchnorr();
     final crypto = await DealCrypto.load();
-    final record = GameRecord.parse(jsonDecode(text));
+    final asked = jsonDecode(text) as Map<String, Object?>;
+    // The service the page checks seats' licences by (packages/table,
+    // licence.dart): the page's own, handed over with the record.
+    if (asked['service'] case final String service when RegExp(r'^[0-9a-f]{64}$').hasMatch(service)) licenceService = service;
+    final record = GameRecord.parse(asked['record']);
     if (record == null) return _say({'error': 'not a record'});
     final v = verifyRecord(
       record.spec,

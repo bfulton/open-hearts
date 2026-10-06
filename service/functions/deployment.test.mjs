@@ -12,6 +12,14 @@ test('the committed configuration is the one the service and the builds expect',
   assert.equal(committed.google.package, 'game.openhearts');
 });
 
+test('the relay holds devices to the same service key the builds and the worker name', () => {
+  // The relay carries a device only on an activation that key signed
+  // (service/do/relay.mjs, serviceGate): one out of step with the
+  // service would carry nobody.
+  const toml = readFileSync(new URL('../do/wrangler.toml', import.meta.url), 'utf8');
+  assert.equal(/^OH_SERVICE_KEY = "([0-9a-f]{64})"$/m.exec(toml)?.[1], committed.serviceKey);
+});
+
 test('the file goes under the names the handlers read, a missing field stays missing', () => {
   const env = configEnv({
     serviceKey: 'k', stripePrice: 'p',

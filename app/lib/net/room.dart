@@ -30,9 +30,14 @@ import '../crypto/deal.dart';
 import '../l10n/l10n.dart';
 
 class RoomMember {
-  const RoomMember(this.key, this.name, {this.since = 0, this.avatar = Avatar.none});
+  const RoomMember(this.key, this.name, {this.since = 0, this.avatar = Avatar.none, this.licence});
   final PublicKey key;
   final String name;
+
+  /// The service's word that [key] is a device of an account
+  /// (packages/table, licence.dart), from their beats and into the
+  /// start: every seat checks every other's.
+  final Licence? licence;
 
   /// When they arrived, by their own clock (ms): the seat order.
   final int since;
@@ -85,6 +90,10 @@ enum RoomRefusal {
 
   /// This device cannot run the deal.
   noDeal,
+
+  /// The start names a seat the service has not vouched for: one whose
+  /// key no licence names, or an account seated twice.
+  unlicensed,
 }
 
 class Room extends ChangeNotifier {
@@ -98,6 +107,7 @@ class Room extends ChangeNotifier {
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
     this.startAfterMs = 10000,
+    this.licence,
     int Function()? nowMs,
     Random? random,
     bool? canDeal,
@@ -134,6 +144,7 @@ class Room extends ChangeNotifier {
     int target = gameOverScore,
     TableTiming timing = TableTiming.standard,
     Duration startAfter = Room.startAfter,
+    Licence? licence,
   }) =>
       Room(
         channel: RelayRoomChannel(relay),
@@ -143,6 +154,7 @@ class Room extends ChangeNotifier {
         target: target,
         timing: timing,
         startAfterMs: startAfter.inMilliseconds,
+        licence: licence,
       );
 
   static const startAfter = Duration(seconds: 10);
@@ -189,6 +201,11 @@ class Room extends ChangeNotifier {
   final TableTiming timing;
 
   final int heartbeatMs;
+
+  /// This device's licence, said with every beat and carried into the
+  /// start. Where accounts are checked, a member without one is not
+  /// seated, and a start that seats one is not sat at.
+  final Licence? licence;
 
   /// A member not heard from for this long has left.
   final int staleMs;
@@ -252,7 +269,7 @@ class Room extends ChangeNotifier {
   List<RoomMember> get members {
     final now = _nowMs();
     final all = [
-      RoomMember(me, myName, since: since, avatar: myAvatar),
+      RoomMember(me, myName, since: since, avatar: myAvatar, licence: licence),
       for (final p in _others.values)
         if (now - p.lastHeard <= staleMs) _withPicture(p.member),
     ];
@@ -275,7 +292,7 @@ class Room extends ChangeNotifier {
 
   RoomMember _withPicture(RoomMember m) {
     final picture = _pictures[m.key];
-    return picture == null ? m : RoomMember(m.key, m.name, since: m.since, avatar: m.avatar.copyWith(picture: picture));
+    return picture == null ? m : RoomMember(m.key, m.name, since: m.since, avatar: m.avatar.copyWith(picture: picture), licence: m.licence);
   }
 
   void _say() {
@@ -287,6 +304,7 @@ class Room extends ChangeNotifier {
       'since': since,
       'policy': botPolicyVersion,
       'avatar': myAvatar.toJson(withPicture: false),
+      if (licence != null) 'licence': licence!.toJson(),
     }, ephemeral: true);
     _lastSaid = _nowMs();
   }
@@ -340,8 +358,14 @@ class Room extends ChangeNotifier {
         }
       case 'here':
         if (spec != null) return;
+        // In the room only on the service's word that the key is an
+        // account's device, and never this device's own account again.
+        final licence = Licence.parse(c['licence']);
+        if (!licenceFits(licence, e.pubkey, at: DateTime.fromMillisecondsSinceEpoch(now))) return;
+        if (licence != null && licence.account == this.licence?.account) return;
         final p = _others[e.pubkey];
-        final member = RoomMember(e.pubkey, c['name'] as String? ?? 'Someone', since: c['since'] as int? ?? now, avatar: Avatar.fromJson(c['avatar']));
+        final member = RoomMember(e.pubkey, c['name'] as String? ?? 'Someone',
+            since: c['since'] as int? ?? now, avatar: Avatar.fromJson(c['avatar']), licence: licence);
         if (p == null || now - p.lastHeard > staleMs) {
           // New, or back after going quiet: an arrival either way, and
           // the countdown starts over.
@@ -403,7 +427,12 @@ class Room extends ChangeNotifier {
     final seats = <Map<String, Object?>>[];
     for (var s = 0; s < seatCount; s++) {
       if (s < here.length) {
-        seats.add({'key': here[s].key, 'name': here[s].name, 'avatar': here[s].avatar.toJson(withPicture: false)});
+        seats.add({
+          'key': here[s].key,
+          'name': here[s].name,
+          'avatar': here[s].avatar.toJson(withPicture: false),
+          if (here[s].licence != null) 'licence': here[s].licence!.toJson(),
+        });
       } else {
         seats.add({'bot': draw[s].id});
       }
@@ -427,7 +456,7 @@ class Room extends ChangeNotifier {
 
   /// A refusal as the player is told it.
   static String said(RoomRefusal refusal, [AppLocalizations? words]) => switch (refusal) {
-        RoomRefusal.otherBuild => (words ?? english).roomOtherBuild,
+        RoomRefusal.otherBuild || RoomRefusal.unlicensed => (words ?? english).roomOtherBuild,
         RoomRefusal.noDeal => noDeal(words),
       };
 
@@ -458,7 +487,7 @@ class Room extends ChangeNotifier {
           seats.add(BotSeat(Persona.named(m['bot'] as String)));
         } else {
           final key = m['key'] as String;
-          seats.add(HumanSeat(key));
+          seats.add(HumanSeat(key, licence: m['licence'] == null ? null : Licence.parse(m['licence']) ?? (throw const FormatException('licence'))));
           names[s] = m['name'] as String? ?? 'Someone';
           final chosen = key == me ? myAvatar : Avatar.fromJson(m['avatar']);
           final picture = key == me ? myAvatar.picture : _pictures[key];
@@ -498,7 +527,7 @@ class Room extends ChangeNotifier {
       if (mine) refusal = RoomRefusal.otherBuild;
       return;
     }
-    spec = TableSpec(
+    final made = TableSpec(
       id: id,
       seed: seed,
       seats: seats,
@@ -510,6 +539,13 @@ class Room extends ChangeNotifier {
       // one out of bounds is too, at every seat alike.
       timing: TableTiming.parse(c['timing']),
     );
+    // Every seat an account's by the service's word, each account once:
+    // a start that is not is not a table to sit at.
+    if (made.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(_nowMs())) != null) {
+      if (mine) refusal = RoomRefusal.unlicensed;
+      return;
+    }
+    spec = made;
     seatNames = names;
     seatAvatars = avatars;
   }

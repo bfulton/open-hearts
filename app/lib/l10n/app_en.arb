@@ -572,7 +572,7 @@
   "@codeNotForThisDevice": {
     "description": "Shown when a code from another device's screen was made for a different device."
   },
-  "serviceRefusal": "{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device's clock is out. Set it right and try again.} notAStore{That is not a store the service knows.} noProof{The store gave nothing to show for the purchase.} notFromStore{That purchase did not come from the store.} notPaid{The store says that purchase is not paid for.} storeNotAnswering{The store is not answering. Try again in a moment.} storeNotSetUp{Buying in the store is not open yet.} signInRefused{That sign-in did not check out. Try again.} accountElsewhere{That account is already on another device.} accountNowhere{That account has not been signed in with here before.} signInNotSetUp{Signing in is not open yet.} other{The service turned that down.}}",
+  "serviceRefusal": "{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device's clock is out. Set it right and try again.} notAStore{That is not a store the service knows.} noProof{The store gave nothing to show for the purchase.} notFromStore{That purchase did not come from the store.} notPaid{The store says that purchase is not paid for.} storeNotAnswering{The store is not answering. Try again in a moment.} storeNotSetUp{Buying in the store is not open yet.} signInRefused{That sign-in did not check out. Try again.} accountElsewhere{That sign-in is linked to another account.} accountNowhere{No account is linked to that sign-in yet.} otherSignIn{This account is already linked to another sign-in.} signInNotSetUp{Signing in is not open yet.} other{The service turned that down.}}",
   "@serviceRefusal": {
     "description": "Why the server turned down a request about a subscription's devices.",
     "placeholders": {
@@ -622,7 +622,7 @@
   "@storeSubscriptionLater": {
     "description": "Under the Subscribe button, on a device that cannot buy yet."
   },
-  "subscriptionIsYours": "A subscription is yours, not a device's. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.",
+  "subscriptionIsYours": "A subscription is your account, not a device's, and it plays on one device at a time. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.",
   "@subscriptionIsYours": {
     "description": "On the Live play page once it is bought, above the list of devices."
   },
@@ -1381,7 +1381,7 @@
   "@checkingGame": {
     "description": "Shown while the finished game's record is fetched and checked."
   },
-  "stillCheckingGame": "Checking the rest of the game\u2026",
+  "stillCheckingGame": "Checking the rest of the game…",
   "@stillCheckingGame": {
     "description": "Shown above the hands already checked while the rest of a finished game is still being checked."
   },
@@ -1457,11 +1457,11 @@
   "@yourAccount": {
     "description": "Heading on the Subscription page, over signing in with Apple or Google."
   },
-  "signInToKeep": "Sign in, and a new phone or a browser that has forgotten this one gets the subscription back by signing in the same way. All that is kept of the account is a scrambled form of its number: no name, no email.",
+  "signInToKeep": "Sign in, and a new phone or a browser that has forgotten this one comes back into this account by signing in the same way. All that is kept of the sign-in is a scrambled form of its number: no name, no email.",
   "@signInToKeep": {
     "description": "On a subscriber's Subscription page, above the sign-in buttons: why to sign in, and what is kept of the account."
   },
-  "signInToBringBack": "Subscribed already, and signed in on that device? Sign in the same way to bring the subscription here.",
+  "signInToBringBack": "Subscribed already, and signed in on your other device? Sign in the same way to bring this one into your account.",
   "@signInToBringBack": {
     "description": "On the Subscription page before buying, above the sign-in buttons: signing in brings back a subscription from another device."
   },
@@ -1492,11 +1492,11 @@
       }
     }
   },
-  "accountElsewhere": "That account is signed in on another device. Move it here? A new device then gets back this subscription, and the other device keeps what it has.",
+  "accountElsewhere": "That sign-in is linked to another Open Hearts account. Use that account on this device? This device leaves the one it is in now.",
   "@accountElsewhere": {
     "description": "Shown when the account just signed in with is already on another device, above a button that moves it here."
   },
-  "moveAccountHere": "Move it here",
+  "moveAccountHere": "Use that account here",
   "@moveAccountHere": {
     "description": "Button: move the signed-in account to this device."
   },
@@ -1504,12 +1504,52 @@
   "@signedIn": {
     "description": "Shown once a subscribed device has signed in."
   },
-  "signedInNoSubscription": "Signed in. There is no subscription on that account yet.",
+  "signedInNoSubscription": "Signed in. No account is linked to that sign-in yet: subscribe, then sign in from the subscription page.",
   "@signedInNoSubscription": {
     "description": "Shown once an unsubscribed device has signed in with an account that has no subscription."
   },
   "signInFailed": "Signing in did not finish. Try again in a moment.",
   "@signInFailed": {
     "description": "Shown when Apple or Google could not finish signing in."
+  },
+  "openElsewhereTitle": "Open Hearts is now open on another device",
+  "@openElsewhereTitle": {
+    "description": "Over everything on a device whose account another of its devices has taken up: one device at a time."
+  },
+  "openElsewhereBody": "Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table, the jury and the waiting list. Use it here, and the other one steps back instead.",
+  "@openElsewhereBody": {
+    "description": "Under openElsewhereTitle."
+  },
+  "inGameElsewhereTitle": "You're in a game on another device",
+  "@inGameElsewhereTitle": {
+    "description": "Asked before this device takes the account from another device of it that is at a live table."
+  },
+  "inGameElsewhereBody": "Continue here? That game will be lost.",
+  "@inGameElsewhereBody": {
+    "description": "Under inGameElsewhereTitle."
+  },
+  "continueHere": "Continue here",
+  "@continueHere": {
+    "description": "Button under inGameElsewhereBody: takes the account here, and the game on the other device is lost."
+  },
+  "useItHere": "Use it here",
+  "@useItHere": {
+    "description": "Button: takes the account back on this device, and the other device steps back."
+  },
+  "liveOpenElsewhere": "Your account is in use on another device.",
+  "@liveOpenElsewhere": {
+    "description": "Where live play would be, on a device that stepped back for another device of its account."
+  },
+  "deviceInUse": "in use",
+  "@deviceInUse": {
+    "description": "Beside a device in the account's list: the one in use now."
+  },
+  "reviewIsLivePlay": "Watching a game, and looking at one played, is part of live play.",
+  "@reviewIsLivePlay": {
+    "description": "A game's address opened on a device with no subscription."
+  },
+  "reviewOwnGame": "This is your own game, still being played. It is here once it is over.",
+  "@reviewOwnGame": {
+    "description": "A game's address opened while the account is playing it."
   }
 }

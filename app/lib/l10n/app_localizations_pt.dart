@@ -474,8 +474,9 @@ class AppLocalizationsPt extends AppLocalizations {
       'storeNotSetUp': 'A compra na loja ainda não está aberta.',
       'signInRefused':
           'Não foi possível confirmar essa entrada. Tente de novo.',
-      'accountElsewhere': 'Essa conta já está em outro aparelho.',
-      'accountNowhere': 'Ninguém entrou aqui com essa conta antes.',
+      'accountElsewhere': 'Esse login está vinculado a outra conta.',
+      'accountNowhere': 'Esse login ainda não está vinculado a nenhuma conta.',
+      'otherSignIn': 'Esta conta já está vinculada a outro login.',
       'signInNotSetUp': 'Entrar com uma conta ainda não está aberto.',
       'other': 'O serviço recusou.',
     });
@@ -519,7 +520,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get subscriptionIsYours =>
-      'Uma assinatura é sua, não de um aparelho. Adicione outro mostrando este código — só precisa da câmera dele — e remova um quando quiser.';
+      'Uma assinatura é a sua conta, não a de um aparelho, e joga em um aparelho por vez. Adicione outro mostrando este código — só precisa da câmera dele — e remova um quando quiser.';
 
   @override
   String get yourDevices => 'Seus aparelhos';
@@ -1208,11 +1209,11 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get signInToKeep =>
-      'Entre com sua conta e, num celular novo ou num navegador que esqueceu este, você recupera a assinatura entrando do mesmo jeito. Da conta só se guarda uma forma embaralhada do número dela: nem nome, nem e-mail.';
+      'Entre com sua conta e, num celular novo ou num navegador que esqueceu este, você volta a esta conta entrando do mesmo jeito. Do login só se guarda uma forma embaralhada do número dele: nem nome, nem e-mail.';
 
   @override
   String get signInToBringBack =>
-      'Já assina e entrou com sua conta naquele aparelho? Entre do mesmo jeito para trazer a assinatura para cá.';
+      'Já assina e entrou com sua conta no seu outro aparelho? Entre do mesmo jeito para trazer este para a sua conta.';
 
   @override
   String signedInWith(String provider) {
@@ -1243,19 +1244,54 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get accountElsewhere =>
-      'Essa conta está conectada em outro aparelho. Trazer para cá? Um aparelho novo então recupera esta assinatura, e o outro fica com o que tem.';
+      'Esse login está vinculado a outra conta do Open Hearts. Usar essa conta neste aparelho? Este aparelho sai da conta em que está agora.';
 
   @override
-  String get moveAccountHere => 'Trazer para cá';
+  String get moveAccountHere => 'Usar essa conta aqui';
 
   @override
   String get signedIn => 'Conectado.';
 
   @override
   String get signedInNoSubscription =>
-      'Conectado. Essa conta ainda não tem assinatura.';
+      'Conectado. Esse login ainda não está vinculado a nenhuma conta: assine e depois entre pela página da assinatura.';
 
   @override
   String get signInFailed =>
       'A entrada não terminou. Tente de novo daqui a pouco.';
+
+  @override
+  String get openElsewhereTitle =>
+      'O Open Hearts está aberto agora em outro aparelho';
+
+  @override
+  String get openElsewhereBody =>
+      'Sua conta joga em um aparelho por vez, e vale o último aberto. Este saiu de cena: da mesa, do júri e da espera. Use-o aqui, e quem sai de cena é o outro.';
+
+  @override
+  String get inGameElsewhereTitle => 'Você está numa partida em outro aparelho';
+
+  @override
+  String get inGameElsewhereBody =>
+      'Continuar aqui? Aquela partida será perdida.';
+
+  @override
+  String get continueHere => 'Continuar aqui';
+
+  @override
+  String get useItHere => 'Usar aqui';
+
+  @override
+  String get liveOpenElsewhere => 'Sua conta está em uso em outro aparelho.';
+
+  @override
+  String get deviceInUse => 'em uso';
+
+  @override
+  String get reviewIsLivePlay =>
+      'Assistir a uma partida, e rever uma já jogada, faz parte do jogo ao vivo.';
+
+  @override
+  String get reviewOwnGame =>
+      'Esta é a sua própria partida, ainda em andamento. Ela fica aqui quando terminar.';
 }

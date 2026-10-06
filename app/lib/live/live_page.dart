@@ -23,6 +23,7 @@ import '../ui/gone.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
 import '../net/copy.dart';
+import '../net/in_use.dart';
 import '../net/share.dart';
 import '../ui/reading_time.dart';
 import '../ui/table_layout.dart';
@@ -44,6 +45,18 @@ class _LivePageState extends State<LivePage> {
   void initState() {
     super.initState();
     _c.addListener(_changed);
+    InUse.current.addListener(_steppedBack);
+  }
+
+  /// Another device of the account took it up, at this table's expense
+  /// (net/in_use.dart): this device leaves the seat — its own word, by
+  /// whatever path is still open to it; the relay has already cut it
+  /// off — and the table gives the seat to a bot, as for anyone who
+  /// leaves. The screen saying why is over everything.
+  void _steppedBack() {
+    if (!InUse.current.elsewhere || !mounted) return;
+    InUse.current.removeListener(_steppedBack);
+    _leave();
   }
 
   /// The controller names the player and says what the deal is doing
@@ -61,6 +74,7 @@ class _LivePageState extends State<LivePage> {
 
   @override
   void dispose() {
+    InUse.current.removeListener(_steppedBack);
     _c.removeListener(_changed);
     _c.dispose();
     super.dispose();

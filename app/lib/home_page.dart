@@ -44,6 +44,7 @@ import 'net/buying.dart';
 import 'net/duty.dart';
 import 'net/game_records.dart';
 import 'net/household.dart';
+import 'net/in_use.dart';
 import 'net/mesh_transport.dart';
 import 'net/network.dart';
 import 'net/remote_config.dart';
@@ -66,8 +67,10 @@ import 'ui/update_pill.dart';
 
 /// Whether live play is open on this device: whether it holds a
 /// licence the service signed and the date on it has not passed
-/// (entitlement.dart, docs/06-service.md). Solo play never asks.
-bool get liveOpen => Entitlement.current.live;
+/// (entitlement.dart, docs/06-service.md) — and it has not stepped back
+/// for another device of its account (net/in_use.dart). Solo play
+/// never asks.
+bool get liveOpen => Entitlement.current.live && !InUse.current.elsewhere;
 
 /// Whether the operator has shut live play's doors for everyone, for
 /// now: the remote config's kill switch (net/remote_config.dart).
@@ -198,6 +201,7 @@ class _HomePageState extends State<HomePage> {
     // answer for — and when it does the door opens with it.
     Entitlement.current.addListener(_licensed);
     RemoteSettings.current.addListener(_configured);
+    InUse.current.addListener(_inUse);
     // A device that cannot play live has no business in the count of
     // who is here, or in a jury — nor one whose live play the operator
     // has paused.
@@ -324,6 +328,26 @@ class _HomePageState extends State<HomePage> {
     if (widget.online && liveOpen && !livePaused && Duty.current == null) _goOnline();
   }
 
+  /// Another device of the account took it up, or this one took it back
+  /// (net/in_use.dart). Stepped back, nothing live is left open here: the
+  /// pool or the room goes, and the duty and any table go with their own
+  /// listeners (net/duty.dart, live/live_page.dart). Taken back, this
+  /// device comes online again.
+  void _inUse() {
+    if (!mounted) return;
+    if (InUse.current.elsewhere) {
+      setState(() {
+        _closeLobby();
+        _listeningSinceMs = null;
+        _onlineClock?.cancel();
+        _onlineClock = null;
+      });
+      return;
+    }
+    setState(() {});
+    if (widget.online && liveOpen && !livePaused && Duty.current == null && InUse.current.standing == Use.here) _goOnline();
+  }
+
   /// The operator said something new. A pause shuts the doors from here
   /// on and leaves whatever is already under way alone: a device that is
   /// online stays a juror to the tables that drew it until the app is
@@ -394,14 +418,22 @@ class _HomePageState extends State<HomePage> {
   /// Online from the front door, not only from a table: this device is
   /// a juror to draw on as soon as the app is open, and it sees who
   /// else is about.
+  ///
+  /// First, this device takes its account up (net/in_use.dart): the
+  /// relay carries only the account's device in use, and one at a time.
+  /// Asked to wait — the account is in a game on another device — it
+  /// waits for the person's word, on the screen that asks for it.
   Future<void> _goOnline() async {
     final signer = await Identity.signer();
     if (!mounted) return;
     setState(() => _signer = signer);
+    if (InUse.current.standing != Use.here) await InUse.current.open(signer);
+    if (!mounted || InUse.current.elsewhere || Duty.current != null) return;
     unawaited(_comeBack(signer));
     Duty.on(_relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
       if (mounted) setState(() => _listeningSinceMs = DateTime.now().millisecondsSinceEpoch);
     });
+    _onlineClock?.cancel();
     _onlineClock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -428,7 +460,7 @@ class _HomePageState extends State<HomePage> {
   /// address nobody has confirmed.
   Future<void> _loadStanding(List<Uri> relays, Signer signer) async {
     try {
-      final standing = await Standing.load(relays, signer);
+      final standing = await Standing.load(relays, signer, account: Entitlement.current.licence?.account ?? signer.publicKey);
       if (mounted) setState(() => _standing = standing);
     } catch (_) {
       // The rating shows next time.
@@ -440,6 +472,7 @@ class _HomePageState extends State<HomePage> {
     _router?.routerDelegate.removeListener(_moved);
     Entitlement.current.removeListener(_licensed);
     RemoteSettings.current.removeListener(_configured);
+    InUse.current.removeListener(_inUse);
     _closeLobby(address: false);
     _onlineClock?.cancel();
     _refusalSub?.cancel();
@@ -497,6 +530,14 @@ class _HomePageState extends State<HomePage> {
     RelayTransport? transport;
     try {
       final signer = _signer ??= await Identity.signer();
+      // The relay carries the account's device in use and no other: this
+      // one, before anything is opened — unless the service has just
+      // not answered, and then the relay says what it will.
+      if (InUse.current.standing != Use.here && InUse.current.worthAsking) await InUse.current.open(signer);
+      if (!mounted || InUse.current.elsewhere) {
+        setState(() => _opening = null);
+        return null;
+      }
       transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
       _refusalSub?.cancel();
       _refusalSub = transport.refusals.listen((r) {
@@ -580,6 +621,9 @@ class _HomePageState extends State<HomePage> {
       // with people who play at about its speed (pace_store.dart).
       pace: _pace.stated,
       botRating: Standing.botPicker(ledger),
+      // Whose device this is, by the service's word: a seating names
+      // every seat's account with it, and every seat checks them all.
+      licence: Entitlement.current.licence,
       sealed: true,
       // The tables this device hosts keep its remote config's clocks.
       timing: RemoteSettings.current.config.table,
@@ -694,6 +738,8 @@ class _HomePageState extends State<HomePage> {
           },
       ]),
       answering: () => WatchBroadcast.answers(controller.client, signer.publicKey),
+      // Nobody of an account seated here watches it: their own game.
+      seated: spec.accounts,
     );
     controller.addListener(watch.changed);
     // What this device measured of its own play goes on the device and
@@ -718,10 +764,14 @@ class _HomePageState extends State<HomePage> {
     // Online *and* at a table, which another table's draw prefers:
     // somebody mid-game has a reason to still be here in a minute
     // (docs/04-live-play.md). Cleared on the way back
-    // to the front door, however the table ended.
+    // to the front door, however the table ended. And said to the
+    // service: another device of the account asks before taking the
+    // account from a game (net/in_use.dart).
     Duty.seated = true;
+    InUse.current.seatedAt(spec.id);
     unawaited(context.push<bool>(located(livePath), extra: controller).whenComplete(() {
       Duty.seated = false;
+      if (!InUse.current.elsewhere) InUse.current.seatedAt(null);
       watch.close();
       // Off the table by choice: nothing to come back to.
       _seats?.clear();
@@ -748,6 +798,7 @@ class _HomePageState extends State<HomePage> {
         avatar: _avatar,
         target: _options.target,
         timing: RemoteSettings.current.config.table,
+        licence: Entitlement.current.licence,
         // Ten seconds, unless the address asks for longer and is
         // allowed to (net/address.dart).
         startAfter: roomWait(Uri.base, standard: waits.roomStart),
@@ -936,7 +987,12 @@ class _HomePageState extends State<HomePage> {
                 width: 48,
                 height: _chromeHeight,
                 child: Center(
-                  child: PlayerIcon(name: _name.isEmpty ? '?' : _name, seed: _signer?.publicKey ?? '', avatar: _avatar, size: 32),
+                  child: PlayerIcon(
+                      name: _name.isEmpty ? '?' : _name,
+                      // The account's colour, the one the table shows.
+                      seed: Entitlement.current.licence?.account ?? _signer?.publicKey ?? '',
+                      avatar: _avatar,
+                      size: 32),
                 ),
               ),
             ),
@@ -967,6 +1023,11 @@ class _HomePageState extends State<HomePage> {
         ] else if (liveOpen) ...[
           const SizedBox(height: 16),
           _live(),
+        ] else if (Entitlement.current.live && InUse.current.elsewhere) ...[
+          // Live play is this account's, and open on another device:
+          // the way to take it back.
+          const SizedBox(height: 16),
+          _LiveElsewhere(onTap: () async => InUse.current.open(await Identity.signer())),
         ] else if (_finishing || _paidWaiting) ...[
           const SizedBox(height: 16),
           _Finishing(waiting: _finishing),
@@ -1239,6 +1300,42 @@ class _LiveLocked extends StatelessWidget {
   }
 }
 
+/// Live play, open on another device of the account (net/in_use.dart):
+/// said where the buttons were, with the way to take it back here.
+class _LiveElsewhere extends StatelessWidget {
+  const _LiveElsewhere({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l10n.livePlay,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+          const SizedBox(height: 4),
+          Text(l10n.liveOpenElsewhere, style: const TextStyle(fontSize: 12, height: 1.4, color: Palette.chromeDim)),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: onTap,
+            style: _HomePageState._secondary(),
+            child: Text(l10n.useItHere, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Live play, paused by the operator for everyone (the remote config's
 /// kill switch): said where the buttons were, with what is still open.
 class _LivePaused extends StatelessWidget {
@@ -1394,7 +1491,7 @@ class RoomView extends StatelessWidget {
             child: Row(
               children: [
                 i < members.length
-                    ? PlayerIcon(name: members[i].name, seed: members[i].key, avatar: members[i].avatar, size: 30)
+                    ? PlayerIcon(name: members[i].name, seed: members[i].licence?.account ?? members[i].key, avatar: members[i].avatar, size: 30)
                     : const SizedBox(width: 30, height: 30, child: Icon(Icons.smart_toy_outlined, size: 20, color: Palette.chromeDim)),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1412,7 +1509,8 @@ class RoomView extends StatelessWidget {
                 // What they are rated, from the results everyone at
                 // their tables signed. A rating nobody has played
                 // enough games to settle carries its question mark.
-                if (i < members.length && ledger != null) _Rated(rating: ledger!.of(members[i].key)),
+                // A rating is the account's, whichever device it is in.
+                if (i < members.length && ledger != null) _Rated(rating: ledger!.of(members[i].licence?.account ?? members[i].key)),
               ],
             ),
           ),

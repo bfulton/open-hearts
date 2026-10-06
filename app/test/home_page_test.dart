@@ -17,7 +17,6 @@ import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
-import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/table_page.dart';
@@ -43,10 +42,11 @@ Future<void> licenceThisDevice({int days = 30}) async {
   final device = (await Identity.signer()).publicKey;
   final day = DateTime.now().toUtc().add(Duration(days: days));
   final until = DateTime.utc(day.year, day.month, day.day);
-  final unsigned = Licence(key: device, until: until, plan: 'year', signature: '');
+  final unsigned = Licence(key: device, account: '0a' * 16, until: until, plan: 'year', signature: '');
   await Entitlement.current.load(device);
   await Entitlement.current.adopt(Licence(
     key: device,
+    account: '0a' * 16,
     until: until,
     plan: 'year',
     signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest),
@@ -328,9 +328,9 @@ void main() {
     final other = SchnorrSigner.generate().publicKey;
     final until = DateTime.now().toUtc().add(const Duration(days: 30));
     final day = DateTime.utc(until.year, until.month, until.day);
-    final unsigned = Licence(key: other, until: day, plan: 'year', signature: '');
+    final unsigned = Licence(key: other, account: '0b' * 16, until: day, plan: 'year', signature: '');
     final signed = Licence(
-        key: other, until: day, plan: 'year', signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest));
+        key: other, account: '0b' * 16, until: day, plan: 'year', signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest));
     expect(await Entitlement.current.adopt(signed), isFalse);
     expect(Entitlement.current.live, isFalse);
 

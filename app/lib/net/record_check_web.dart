@@ -51,7 +51,9 @@ Stream<RecordCheck> checkRecord(GameRecord record) {
         }).toJS;
         // The worker's script not served, or broken: not checked here.
         w.onerror = ((JSAny? _) => end(const RecordChecked(ok: false))).toJS;
-        w.postMessage(jsonEncode(record.toJson()).toJS);
+        // With the service whose word makes each seat an account's: the
+        // worker is a program of its own, and checks the seats by it.
+        w.postMessage(jsonEncode({'record': record.toJson(), 'service': licenceService}).toJS);
       } catch (_) {
         end(const RecordChecked(ok: false));
       }

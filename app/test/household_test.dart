@@ -70,9 +70,10 @@ Stand standUp() {
 Map<String, Object?> signedFor(PublicKey device, {int days = 30}) {
   final day = DateTime.now().toUtc().add(Duration(days: days));
   final until = DateTime.utc(day.year, day.month, day.day);
-  final unsigned = Licence(key: device, until: until, plan: 'year', signature: '');
+  final unsigned = Licence(key: device, account: '0a' * 16, until: until, plan: 'year', signature: '');
   return Licence(
     key: device,
+    account: '0a' * 16,
     until: until,
     plan: 'year',
     signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest),

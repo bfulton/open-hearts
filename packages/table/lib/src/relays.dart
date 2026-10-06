@@ -21,6 +21,39 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'nostr.dart';
+import 'signing.dart';
+
+/// What a device shows a relay that asks who it is (NIP-42), as tags
+/// beside the relay's challenge in an event its key signs: the
+/// activation the service gave it (licence.dart), or for the bench of
+/// jurors of last resort the mark the relay knows it by. Set once at
+/// startup by whatever holds them; null, or null for a key, and a
+/// challenge goes unanswered — a relay that asks will not carry that
+/// device, which is right for one the service has not vouched for.
+List<List<String>>? Function(PublicKey key)? relayCredentials;
+
+/// Told when a relay turns this device away for good, with the
+/// relay's reason: `superseded:` — another device of the account is the
+/// one in use now — or `restricted:` — not admitted at all. The relay
+/// has closed or will close the socket, and retrying will not change
+/// its mind (docs/06-service.md, "One device at a time").
+void Function(String reason)? relayTurnedAway;
+
+/// How [signer] answers a relay's challenge: the AUTH event, or null
+/// when this process has nothing to show for it.
+NostrEvent? Function(Uri relay, String challenge) relayAuthFor(Signer signer) => (relay, challenge) {
+      final shown = relayCredentials?.call(signer.publicKey);
+      if (shown == null) return null;
+      return NostrEvent.sign(signer, kind: TableKinds.auth, content: '', tags: [
+        ['relay', '$relay'],
+        ['challenge', challenge],
+        ...shown,
+      ]);
+    };
+
+/// Whether a relay's reason is one it will not change its mind about
+/// for this device: a superseded device, or one not admitted.
+bool turnedAway(String reason) => reason.startsWith('superseded:') || reason.startsWith('restricted:');
 
 /// The list itself: parsed from text, turned by a key.
 abstract final class Relays {
@@ -57,11 +90,19 @@ abstract final class Relays {
 /// nothing at all for [quietMs] after publishing, when this client's
 /// own events should be coming back on it.
 class RelayConnection {
-  RelayConnection({required this.url, required this.subscriptions, required this.onMessage, this.log}) {
+  RelayConnection({required this.url, required this.subscriptions, required this.onMessage, this.log, this.auth}) {
     _connect();
   }
 
   final Uri url;
+
+  /// How this connection answers the relay's challenge, if it asks
+  /// ([relayAuthFor]). A relay that asks holds whatever was said before
+  /// the answer until it has checked it, so nothing here waits.
+  final NostrEvent? Function(Uri relay, String challenge)? auth;
+
+  /// Turned away for good ([turnedAway]): not connected again.
+  bool _refused = false;
 
   /// Subscription id to filters, as JSON; sent on every connection.
   final Map<String, List<Map<String, Object?>>> subscriptions;
@@ -117,7 +158,7 @@ class RelayConnection {
   }
 
   void _connect() {
-    if (_closed) return;
+    if (_closed || _refused) return;
     final ch = WebSocketChannel.connect(url);
     _channel = ch;
     ch.stream.listen((m) => _onMessage(ch, m), onDone: () => _onDropped(ch), onError: (_) => _onDropped(ch));
@@ -157,7 +198,40 @@ class RelayConnection {
     }
     if (m.isEmpty) return;
     if (m[0] == 'EOSE' && !_ready.isCompleted) _ready.complete();
+    if (m[0] == 'AUTH' && m.length > 1 && m[1] is String) {
+      final answer = auth?.call(url, m[1] as String);
+      if (answer != null) {
+        _authId = answer.id;
+        try {
+          ch.sink.add(jsonEncode(['AUTH', answer.toJson()]));
+        } catch (_) {}
+      }
+      return;
+    }
+    // The answer to this connection's own AUTH is the relay's to give,
+    // and its refusal for good is the device's to hear.
+    if (m[0] == 'OK' && m.length > 3 && m[1] == _authId) {
+      if (m[2] == true) return;
+      final reason = '${m[3]}';
+      if (turnedAway(reason)) return _turnedAway(reason);
+      // Not now — an activation run out, say, while the device slept:
+      // a fresh socket in a few seconds answers with whatever it holds
+      // by then.
+      log?.call('$url: not carried yet: $reason');
+      Future<void>.delayed(const Duration(seconds: 5), remake);
+      return;
+    }
+    if ((m[0] == 'NOTICE' || m[0] == 'CLOSED') && m.length > 1 && turnedAway('${m.last}')) _turnedAway('${m.last}');
     onMessage(this, m);
+  }
+
+  String? _authId;
+
+  void _turnedAway(String reason) {
+    if (!turnedAway(reason)) return;
+    log?.call('$url: turned away: $reason');
+    _refused = true;
+    relayTurnedAway?.call(reason);
   }
 
   void close() {
@@ -172,10 +246,11 @@ class RelayConnection {
 /// A client's relays: its subscriptions on all of them, each of its
 /// events written to one.
 class RelayGroup {
-  RelayGroup({required List<Uri> urls, required this.subscriptions, required this.onEvent, this.log, this.refusalMs = defaultRefusalMs}) {
+  RelayGroup(
+      {required List<Uri> urls, required this.subscriptions, required this.onEvent, this.log, this.refusalMs = defaultRefusalMs, this.auth}) {
     if (urls.isEmpty) throw ArgumentError('a relay group needs a relay');
     for (final u in urls) {
-      connections.add(RelayConnection(url: u, subscriptions: subscriptions, onMessage: _onMessage, log: log));
+      connections.add(RelayConnection(url: u, subscriptions: subscriptions, onMessage: _onMessage, log: log, auth: auth));
     }
     ready = Future.any([for (final c in connections) c.ready]);
     allReady = Future.wait([for (final c in connections) c.ready]);
@@ -190,6 +265,9 @@ class RelayGroup {
   /// not remembered, so the real one under that id still gets in.
   final bool Function(Map<String, Object?> raw) onEvent;
   final void Function(String line)? log;
+
+  /// How each connection answers a relay that asks who it is.
+  final NostrEvent? Function(Uri relay, String challenge)? auth;
 
   final List<RelayConnection> connections = [];
 

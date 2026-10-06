@@ -87,6 +87,9 @@ class Verification {
 /// departed seats: a seat's secret the audits do not vouch for — one
 /// removed at its own audit turn, after the others audited — is
 /// rebuilt from them, a person's piece and a juror's.
+///
+/// Where accounts are checked (licence.dart), every person's seat must
+/// carry a licence the service signed for its key, naming its account.
 Verification verifyRecord(
   TableSpec spec,
   List<Decision> record, {
@@ -114,6 +117,12 @@ Verification verifyRecord(
   Verification fail(String why) => Verification(ok: false, reason: why, winners: const [], ratings: const {}, finalHolders: holders);
 
   if (spec.sealed && crypto == null) return fail('a sealed record needs the deal\'s cryptography to check');
+  // Every seat an account's, by the service's word that its key is one
+  // of the account's devices (licence.dart): what makes the names, the
+  // ratings and the result the accounts'. No clock to hold a licence's
+  // date to: a record is read long after it ran out.
+  final unlicensed = spec.licenceProblem();
+  if (unlicensed != null) return fail(unlicensed);
 
   Verification partial() =>
       Verification(ok: true, reason: 'verified so far', winners: const [], ratings: const {}, finalHolders: holders, complete: false);

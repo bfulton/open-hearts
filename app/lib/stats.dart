@@ -14,6 +14,7 @@ library;
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
+import 'entitlement.dart';
 import 'net/standing.dart' as net;
 import 'pace_store.dart';
 import 'record_store.dart';
@@ -179,8 +180,9 @@ Tally soloTally(Iterable<String> records) => soloGames(records).tally;
   );
 }
 
-/// The live half: what a standing from the relays says about a key.
-PlayerStats fromStanding(PlayerStats onto, net.Standing standing, PublicKey me) =>
+/// The live half: what a standing from the relays says about an
+/// account.
+PlayerStats fromStanding(PlayerStats onto, net.Standing standing, String me) =>
     onto.withLive(rating: standing.mine, ratedGames: standing.ledger.gamesOf(me), live: Tally.of(me, standing.ledger.standing));
 
 /// Both halves, as they come. The device's own games are read first
@@ -197,13 +199,13 @@ Stream<PlayerStats> playerStats({required RecordStore store, required Signer sig
   stats = stats.withAlone(alone.tally, alone.history);
   yield stats.withAsking(standing == null && relays != null);
   if (standing != null) {
-    yield fromStanding(stats, standing, signer.publicKey);
+    yield fromStanding(stats, standing, standing.me);
     return;
   }
   if (relays == null) return;
   try {
-    final loaded = await net.Standing.load(relays, signer);
-    yield fromStanding(stats, loaded, signer.publicKey);
+    final loaded = await net.Standing.load(relays, signer, account: Entitlement.current.licence?.account ?? signer.publicKey);
+    yield fromStanding(stats, loaded, loaded.me);
   } catch (_) {
     // No relay answered. The games played alone still stand, and the
     // rest is said to be missing rather than still coming.

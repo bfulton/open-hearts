@@ -23,6 +23,13 @@
 /// deployment keeps the same keys across restarts, or fresh ones when
 /// no secret is set.
 ///
+/// The relay carries them on the bench's own mark, an HMAC of each key
+/// under OH_JUROR_SECRET, which the relay holds too (service/do/relay.mjs,
+/// benchMark); without the secret there is no mark, and only a relay
+/// that asks nobody who they are carries them — a local one. With
+/// OH_SERVICE_KEY they hold every seat to its licence (packages/table,
+/// licence.dart), as every device does.
+///
 /// Real keys, since the deployed relay takes nothing else. Several
 /// relays, comma-separated or `--relay` repeated, are listened on
 /// together and written to one at a time (packages/table, relays.dart).
@@ -34,6 +41,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' show Hmac, sha256;
 import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 
@@ -52,6 +60,15 @@ Future<void> main(List<String> args) async {
   final native = await installNativeSchnorr();
   if (!native) print('schnorr: no native library (crypto/schnorr/build.sh); signatures in Dart, seventeen milliseconds each');
   final secret = Platform.environment['OH_JUROR_SECRET'];
+  final service = Platform.environment['OH_SERVICE_KEY'] ?? '';
+  if (RegExp(r'^[0-9a-f]{64}$').hasMatch(service)) licenceService = service;
+  // The bench's mark, for a relay that asks who it is.
+  if (secret != null && secret.isNotEmpty) {
+    final mac = Hmac(sha256, utf8.encode(secret));
+    relayCredentials = (key) => [
+          ['bench', mac.convert(utf8.encode('oh-bench/1\n$key')).toString()],
+        ];
+  }
   // One key per seat on the bench. Derived rather than the secret
   // itself, so that one secret in the environment gives the whole
   // bench and every restart brings the same keys back.

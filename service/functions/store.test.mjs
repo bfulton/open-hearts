@@ -209,8 +209,9 @@ test('the device that bought it is licensed on it; another restoring it joins th
   // The same Apple account restoring it on another phone.
   const restored = await worker.fetch(send('store', await bring(BAO, 'apple', proof)), env);
   assert.equal(restored.status, 200);
-  assert.deepEqual((await devicesOn(store, 'apple:2000000000000001')).map((d) => d.key).sort(), [ADA.public, BAO.public].sort());
-  assert.equal((await entitlementOf(store, BAO.public, { now })).subscription, 'apple:2000000000000001');
+  const account = (await store.get('SUB#apple:2000000000000001', 'ACCOUNT')).account;
+  assert.deepEqual((await devicesOn(store, account)).map((d) => d.key).sort(), [ADA.public, BAO.public].sort());
+  assert.equal((await entitlementOf(store, BAO.public, { now })).account, account, 'one account, two devices');
 });
 
 test('the proof is what is signed, and a proof Apple did not sign is refused', async () => {
@@ -257,8 +258,11 @@ test('the buyer moves onto what it paid for; anyone else does not leave a paid-u
   const proof = await appleJws(transaction({ appAccountToken: (await storeAccountOf(ADA.public)).apple }));
   assert.equal((await worker.fetch(send('store', await bring(BAO, 'apple', proof)), env)).status, 409, 'not the buyer');
   assert.equal((await worker.fetch(send('store', await bring(ADA, 'apple', proof)), env)).status, 200, 'the buyer');
-  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [BAO.public]);
-  assert.equal((await entitlementOf(store, ADA.public, { now })).subscription, 'apple:2000000000000001');
+  const web = (await store.get('SUB#sub_9', 'ACCOUNT')).account;
+  const apple = (await store.get('SUB#apple:2000000000000001', 'ACCOUNT')).account;
+  assert.notEqual(web, apple, 'an account with a subscription paid up keeps it; the new one is an account of its own');
+  assert.deepEqual((await devicesOn(store, web)).map((d) => d.key), [BAO.public]);
+  assert.equal((await entitlementOf(store, ADA.public, { now })).account, apple);
 });
 
 test('a store subscription carries no more devices than any other', async () => {
