@@ -6,7 +6,7 @@
 //
 // Needs NEW_RELIC_API_KEY (a User key), NEW_RELIC_ACCOUNT_ID and
 // NEW_RELIC_REGION (US or EU) in the environment, and OH_ALERT_EMAIL for
-// who is told. Talks to NerdGraph, New Relic's GraphQL API.
+// who is told (unset, the destination already made is kept as it is). Talks to NerdGraph, New Relic's GraphQL API.
 //
 // What it owns is what carries the app's key: monitors tagged
 // `app: <key>` and named with the app's prefix, the policy, destination,
@@ -219,8 +219,11 @@ async function applyCondition(policyId) {
 }
 
 async function applyNotifications(policyId) {
-  const email = process.env[alerts.emailFrom];
-  if (!email || !email.includes('@')) throw new Error(`set ${alerts.emailFrom} to the address alerts go to`);
+  // Unset, the address is not compared: the destination already made is
+  // kept as it is, as infra/ treats it (this repository is public, and
+  // the address need not be in every environment that runs this).
+  const given = process.env[alerts.emailFrom];
+  const email = given && given.includes('@') ? given : null;
   // Where: an email destination.
   const dests = await graph(
     `query($a: Int!, $n: String!) { actor { account(id: $a) { aiNotifications {
@@ -230,7 +233,8 @@ async function applyNotifications(policyId) {
   let dest = dests.actor.account.aiNotifications.destinations.entities.find((d) => d.name === notifyName);
   // Until the address is verified (New Relic emails it a link) it is
   // held as `link_sent_email` rather than `email`.
-  const sameAddress = dest?.properties?.some((p) => (p.key === 'email' || p.key === 'link_sent_email') && p.value === email);
+  if (!dest && !email) throw new Error(`no email destination "${notifyName}" yet: set ${alerts.emailFrom} to the address alerts go to`);
+  const sameAddress = !email || dest?.properties?.some((p) => (p.key === 'email' || p.key === 'link_sent_email') && p.value === email);
   if (!dest || !sameAddress) {
     say(`${dest ? 'update' : 'create'} email destination "${notifyName}"`);
     if (write) {

@@ -19,7 +19,8 @@ rather than set up by hand.
       node observability/apply.mjs --apply    # change it
 
   Needs `NEW_RELIC_API_KEY` (a User key), `NEW_RELIC_ACCOUNT_ID`,
-  `NEW_RELIC_REGION` and `OH_ALERT_EMAIL` in the environment.
+  `NEW_RELIC_REGION` in the environment, and `OH_ALERT_EMAIL` for who is
+  told. Unset, the email destination already made is kept as it is.
 
 The account may hold other apps. On New Relic's free edition an
 organization has one account, so this app keeps to its own within it:
