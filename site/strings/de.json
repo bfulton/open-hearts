@@ -159,7 +159,7 @@
     "alone": {
       "title": "Allein spielen",
       "p1": "Ein Spiel gegen die Bots läuft vollständig auf deinem Gerät. Nichts davon wird irgendwohin gesendet.",
-      "p2": "In den Handy-Apps gibt es Live-Spiel noch nicht, und bis es so weit ist, bauen die Apps von sich aus keine Netzwerkverbindungen auf. Wenn Live-Spiel in die Apps kommt, funktioniert es wie unten beschrieben, und diese Seite wird das sagen."
+      "p2": "Die Handy-Apps tun beim Start dasselbe wie das Spiel im Web: Sie fragen unseren Dienst nach den aktuellen Einstellungen des Spiels, was nichts über dich verrät, und machen die unten beschriebene Lizenzprüfung. Live-Spiel funktioniert in ihnen wie unten beschrieben. Sie nutzen weder New Relic noch die Schriftserver von Google."
     },
     "web": {
       "title": "Das Spiel im Web öffnen",

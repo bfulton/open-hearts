@@ -159,7 +159,7 @@
     "alone": {
       "title": "Playing alone",
       "p1": "A game against the bots is played entirely on your device. Nothing about it is sent anywhere.",
-      "p2": "In the phone apps, live play is not available yet, and until it is the apps make no network connections of their own. When live play comes to them it will work as described below, and this page will say so."
+      "p2": "The phone apps do what the game on the web does when it starts: they ask our service for the game's current settings, which says nothing about you, and make the licence check below. Live play in them works as described below. They do not use New Relic or Google's font servers."
     },
     "web": {
       "title": "Opening the game on the web",

@@ -159,7 +159,7 @@
     "alone": {
       "title": "Jouer seul",
       "p1": "Une partie contre les bots se joue entièrement sur votre appareil. Rien la concernant n'est envoyé nulle part.",
-      "p2": "Dans les applications pour téléphone, le jeu en direct n'est pas encore disponible, et d'ici là elles n'établissent aucune connexion réseau d'elles-mêmes. Quand le jeu en direct y arrivera, il fonctionnera comme décrit ci-dessous, et cette page l'indiquera."
+      "p2": "Les applications pour téléphone font au démarrage la même chose que le jeu sur le web : elles demandent à notre service les réglages actuels du jeu, ce qui ne dit rien de vous, et font la vérification de licence décrite plus bas. Le jeu en direct y fonctionne comme décrit plus bas. Elles n'utilisent ni New Relic ni les serveurs de polices de Google."
     },
     "web": {
       "title": "Ouvrir le jeu sur le web",

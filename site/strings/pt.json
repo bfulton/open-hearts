@@ -159,7 +159,7 @@
     "alone": {
       "title": "Jogar sozinho",
       "p1": "Uma partida contra os bots é jogada inteiramente no seu aparelho. Nada sobre ela é enviado a lugar nenhum.",
-      "p2": "Nos apps para celular, o jogo ao vivo ainda não está disponível e, até estar, os apps não fazem nenhuma conexão de rede por conta própria. Quando o jogo ao vivo chegar a eles, vai funcionar como descrito abaixo, e esta página vai dizer isso."
+      "p2": "Os apps para celular fazem ao abrir o mesmo que o jogo na web: pedem ao nosso serviço as configurações atuais do jogo, o que não diz nada sobre você, e fazem a verificação de licença explicada abaixo. O jogo ao vivo neles funciona como descrito abaixo. Eles não usam o New Relic nem os servidores de fontes do Google."
     },
     "web": {
       "title": "Abrir o jogo na web",
