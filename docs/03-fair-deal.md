@@ -174,15 +174,17 @@ to settle when its seal can open, not when it arrives.
 
 ## Verification
 
-The verifier replays a sealed record through the deal. It checks every
-key's proof, every shuffle's argument against the deck before it, every
-token and the lead declaration. Then the audit's secrets open every
-card. Each play's token must open the card it named, and each play is
-checked against the hand it came from. Until a hand's audit is in, its
-plays are checked as far as the rules allow and the result is marked
-incomplete. A seat the record gave to the escrow is not audited, since
-its released pieces stand in for its audit. A record that continues past
-the end of the game is rejected.
+The verifier first holds every person's seat to its licence: one the
+service signed for that seat's key, naming its account, and no account
+seated twice ([doc 06](06-service.md)). Then it replays a sealed record
+through the deal. It checks every key's proof, every shuffle's argument
+against the deck before it, every token and the lead declaration. Then
+the audit's secrets open every card. Each play's token must open the
+card it named, and each play is checked against the hand it came from.
+Until a hand's audit is in, its plays are checked as far as the rules
+allow and the result is marked incomplete. A seat the record gave to the
+escrow is not audited, since its released pieces stand in for its audit.
+A record that continues past the end of the game is rejected.
 
 ## Cost, and keeping it off the page
 

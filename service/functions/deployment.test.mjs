@@ -12,6 +12,20 @@ test('the committed configuration is the one the service and the builds expect',
   assert.equal(committed.google.package, 'game.openhearts');
 });
 
+test('the relay holds devices to the same service key the builds and the worker name', () => {
+  // The relay carries a device only on an activation that key signed
+  // (service/do/relay.mjs, serviceGate): one out of step with the
+  // service would carry nobody.
+  // It reads the one file; a copy in its own settings would be a second
+  // place to change, and one would be forgotten.
+  const relay = readFileSync(new URL('../do/worker.mjs', import.meta.url), 'utf8');
+  assert.match(relay, /^import config from '\.\.\/\.\.\/config\/openhearts\.json';$/m);
+  assert.match(relay, /this\.env = withConfig\(env, config\)/);
+  assert.match(relay, /super\(state, withConfig\(env, config\)\)/);
+  const toml = readFileSync(new URL('../do/wrangler.toml', import.meta.url), 'utf8');
+  assert.doesNotMatch(toml, /^OH_SERVICE_KEY\s*=/m);
+});
+
 test('the file goes under the names the handlers read, a missing field stays missing', () => {
   const env = configEnv({
     serviceKey: 'k', stripePrice: 'p',

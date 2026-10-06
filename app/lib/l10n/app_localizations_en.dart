@@ -471,8 +471,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'storeNotAnswering': 'The store is not answering. Try again in a moment.',
       'storeNotSetUp': 'Buying in the store is not open yet.',
       'signInRefused': 'That sign-in did not check out. Try again.',
-      'accountElsewhere': 'That account is already on another device.',
-      'accountNowhere': 'That account has not been signed in with here before.',
+      'accountElsewhere': 'That sign-in is linked to another account.',
+      'accountNowhere': 'No account is linked to that sign-in yet.',
+      'otherSignIn': 'This account is already linked to another sign-in.',
       'signInNotSetUp': 'Signing in is not open yet.',
       'other': 'The service turned that down.',
     });
@@ -516,7 +517,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get subscriptionIsYours =>
-      'A subscription is yours, not a device\'s. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.';
+      'A subscription is your account, not a device\'s, and it plays on one device at a time. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.';
 
   @override
   String get yourDevices => 'Your devices';
@@ -1201,11 +1202,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signInToKeep =>
-      'Sign in, and a new phone or a browser that has forgotten this one gets the subscription back by signing in the same way. All that is kept of the account is a scrambled form of its number: no name, no email.';
+      'Sign in, and a new phone or a browser that has forgotten this one comes back into this account by signing in the same way. All that is kept of the sign-in is a scrambled form of its number: no name, no email.';
 
   @override
   String get signInToBringBack =>
-      'Subscribed already, and signed in on that device? Sign in the same way to bring the subscription here.';
+      'Subscribed already, and signed in on your other device? Sign in the same way to bring this one into your account.';
 
   @override
   String signedInWith(String provider) {
@@ -1236,19 +1237,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountElsewhere =>
-      'That account is signed in on another device. Move it here? A new device then gets back this subscription, and the other device keeps what it has.';
+      'That sign-in is linked to another Open Hearts account. Use that account on this device? This device leaves the one it is in now.';
 
   @override
-  String get moveAccountHere => 'Move it here';
+  String get moveAccountHere => 'Use that account here';
 
   @override
   String get signedIn => 'Signed in.';
 
   @override
   String get signedInNoSubscription =>
-      'Signed in. There is no subscription on that account yet.';
+      'Signed in. No account is linked to that sign-in yet: subscribe, then sign in from the subscription page.';
 
   @override
   String get signInFailed =>
       'Signing in did not finish. Try again in a moment.';
+
+  @override
+  String get openElsewhereTitle => 'Open Hearts is now open on another device';
+
+  @override
+  String get openElsewhereBody =>
+      'Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table, the jury and the waiting list. Use it here, and the other one steps back instead.';
+
+  @override
+  String get inGameElsewhereTitle => 'You\'re in a game on another device';
+
+  @override
+  String get inGameElsewhereBody => 'Continue here? That game will be lost.';
+
+  @override
+  String get continueHere => 'Continue here';
+
+  @override
+  String get useItHere => 'Use it here';
+
+  @override
+  String get liveOpenElsewhere => 'Your account is in use on another device.';
+
+  @override
+  String get deviceInUse => 'in use';
+
+  @override
+  String get reviewIsLivePlay =>
+      'Watching a game, and looking at one played, is part of live play.';
+
+  @override
+  String get reviewOwnGame =>
+      'This is your own game, still being played. It is here once it is over.';
 }

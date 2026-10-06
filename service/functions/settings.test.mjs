@@ -48,6 +48,7 @@ test('no row is the defaults', () => {
     webhookToleranceS: 300,
     householdChangesPerHour: 20,
     householdReadsPerHour: 60,
+    activationsPerHour: 600,
     stripePrice: null,
   });
   for (const raw of [[], 'x', 7]) assert.deepEqual(serviceSettingsOf(raw), { ...SERVICE_DEFAULTS });

@@ -102,6 +102,12 @@ abstract class Presence {
   /// an assumption until there is a population to measure.
   Set<PublicKey> settled({required int withinMs, required int forMs});
 
+  /// The account [key] belongs to, as its presence says: a table draws
+  /// no juror from an account it seats, by whichever of the account's
+  /// devices (docs/04-live-play.md). The key itself where nothing names
+  /// one — an account of one device.
+  String accountOf(PublicKey key);
+
   /// Asks [juror] to follow a table: the summons carries the table's
   /// spec and the hand.
   void summon(PublicKey juror, Map<String, Object?> summons);

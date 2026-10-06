@@ -66,6 +66,14 @@ back. All three exits are on the record.
 | human | booted, absent | on the record: votes in the seat's own turn, settled as it is |
 | human | left | on the record: the leaver's word at the turn they stood at, carried by a majority of the people there |
 
+A seat is an account's, and an account plays on one device at a time
+([doc 06](06-service.md)). Another device taking the account up while
+it sits here is no new transition: the device at the seat leaves, by
+its own signed leave where any path is still open to it, and otherwise
+falls silent, cut off by the relay — one of the three exits above. The
+account's new device is never one of the table's jurors. A juror whose
+account is taken up elsewhere is a juror gone.
+
 ### A held bot seat, for one hand
 
 `held` by its juror → `escrowed`, played from then on by a juror holding
@@ -339,21 +347,25 @@ event in flight is ordinary.
 cd packages/table
 dart run tool/chaos.dart --seeds 250 --sealed 14 --structure
 dart run tool/chaos.dart --seeds 100 --sealed 14 --jurors 9 --sweep
+dart run tool/chaos.dart --seeds 150 --sealed 6 --jurors 9 --sweep --twins
 dart run tool/explore.dart --scenario topup --structure
 ```
 
 The chaos walk (`sim/chaos_walk.dart`) throws random faults at simulated
 tables; `--jurors 9` draws from more strangers than a jury, and
 `--sweep` lets each juror go once it has served, as the duty does, and
-summons it again later. It fails a seed on any broken invariant, on a
-table left stopped where nobody up could move it, on sides still apart
-on the escrow once the faults have stopped and the network has healed
-(sides that ended the game for themselves aside), and on any two records
-— the people's and every juror's that followed the table — naming
-different exits for one seat. The explorer (`tool/explore.dart`, with
-scenarios `deal`, `two`, `leave`, `summons` and `topup`) replays a
-short sealed game once per event, peer and change — the first copy lost,
-or every copy late — and holds each run to what the table owes.
+summons it again later; `--twins` takes jurors' and seated players'
+accounts up on new devices as it walks. It fails a seed on any broken
+invariant, on two devices of one account at the table at once, on a jury
+drawn from an account seated at it, on a table left stopped where nobody
+up could move it, on sides still apart on the escrow once the faults
+have stopped and the network has healed (sides that ended the game for
+themselves aside), and on any two records — the people's and every
+juror's that followed the table — naming different exits for one seat.
+The explorer (`tool/explore.dart`, with scenarios `deal`, `two`,
+`leave`, `summons` and `topup`) replays a short sealed game once per
+event, peer and change — the first copy lost, or every copy late — and
+holds each run to what the table owes.
 
 With every transition above on the record, nothing stuck and nothing
 apart is read at the end among sides still playing, except where one

@@ -23,7 +23,6 @@ import 'l10n/l10n.dart';
 import 'net/copy.dart';
 import 'net/buying.dart';
 import 'net/household.dart';
-import 'net/licence.dart';
 import 'net/provider_tokens.dart';
 import 'net/remote_config.dart';
 import 'net/share.dart';
@@ -247,11 +246,10 @@ class _SubscribePageState extends State<SubscribePage> {
     }
   }
 
-  /// A provider has answered. On a subscribed device the account is put
-  /// here, so the subscription can be got back by it; on one that is
-  /// not, the account is brought here from wherever it was, with what it
-  /// was subscribed to — and an account never signed in with before is
-  /// put here, so a subscription bought here will follow it.
+  /// A provider has answered. On a subscribed device the sign-in is
+  /// linked to its account, so the account can be got back by it; on one
+  /// that is not, this device comes into the account the sign-in is
+  /// linked to, as a backup code would bring it.
   Future<void> _signInWith(Provider provider, Asked asked) async {
     final me = _me;
     final token = asked.token;
@@ -279,13 +277,21 @@ class _SubscribePageState extends State<SubscribePage> {
       }
     } else {
       said = await supersedeWith(me, provider, token, service: service);
-      if (said.refusal?.reason == 'accountNowhere') said = await attestWith(me, provider, token, service: service);
+      if (said.refusal?.reason == 'accountNowhere') {
+        // Nothing is linked to it yet: a sign-in is linked from a
+        // subscriber's page, once there is an account to link it to.
+        if (!mounted) return;
+        setState(() => _working = false);
+        _say(context.l10n.signedInNoSubscription);
+        return;
+      }
     }
     await _signedInAs(said);
   }
 
-  /// The account moved here from the device it was on. A subscription
-  /// this device has of its own stays (the service sees to that).
+  /// This device into the account the sign-in is linked to, out of the
+  /// one it is in: refused while that one is still paid for (the
+  /// service sees to that).
   Future<void> _moveHere() async {
     final me = _me;
     final elsewhere = _elsewhere;
@@ -758,8 +764,15 @@ class _DeviceLine extends StatelessWidget {
                     fontWeight: isThisOne ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
-                if (device.boundAt != null)
-                  Text(context.l10n.deviceSince(device.boundAt!), style: const TextStyle(fontSize: 11, color: Palette.chromeDim)),
+                if (device.boundAt != null || device.inUse)
+                  Text(
+                      [
+                        if (device.boundAt != null) context.l10n.deviceSince(device.boundAt!),
+                        // The account's device in use now: one at a time
+                        // (net/in_use.dart).
+                        if (device.inUse) context.l10n.deviceInUse,
+                      ].join(' · '),
+                      style: const TextStyle(fontSize: 11, color: Palette.chromeDim)),
               ],
             ),
           ),

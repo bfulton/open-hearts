@@ -6,10 +6,11 @@ The service is deliberately small. The game is peer to peer
 players' own business on the relay ([doc 04](04-live-play.md)). What runs
 on our side:
 
-- **The Pages worker** (`service/functions/`): licences, the shop,
-  households, TURN credentials, remote config and game records.
+- **The Pages worker** (`service/functions/`): accounts, licences, the
+  shop, TURN credentials, remote config and game records.
 - **The relay worker** (`service/do/`): a Durable Object per tag
-  ([doc 08](08-own-relays.md)), the `Household` object, and the bench of
+  ([doc 08](08-own-relays.md)), which carries only an account's device
+  in use; the `Household` object, one per account; and the bench of
   jurors of last resort (`service/bin/juror.dart` in a container).
 
 None of it is in a game's latency path.
@@ -21,20 +22,22 @@ None of it is in a game's latency path.
 
 | Handler | Method | What it does |
 |---|---|---|
-| `licence` | POST, signed | the device's current licence, or 402 if no subscription stands behind it |
+| `licence` | POST, signed | the device's current licence, naming its account, or 402 if no subscription stands behind it |
+| `activate` | POST, signed | makes the device its account's device in use, or says it still is: an activation, or 409 |
 | `checkout` | POST, signed | opens a Stripe Checkout session (subscription mode) for this device |
-| `stripe` | POST, Stripe-signed | Stripe's webhook: binds the paying device and dates the subscription |
+| `stripe` | POST, Stripe-signed | Stripe's webhook: makes the account, binds the paying device and dates the subscription |
 | `manage` | POST, signed | opens Stripe's billing portal for a web subscription (409 for a store one) |
 | `store` | POST, signed | takes an App Store signed transaction or a Play purchase token and returns a licence |
 | `apple` | POST | App Store Server Notifications V2 |
 | `play` | POST | Play real-time developer notifications (Pub/Sub push) |
-| `ticket` | POST, signed | a one-use code another device can join the household with |
-| `claim` | POST, signed | spends a code (a household code or a backup code), binds the device, returns its licence |
-| `devices` | POST, signed | lists the household's devices and can drop one |
-| `backups` | POST, signed | shows, replaces or emails the subscription's backup codes |
-| `attest`, `supersede` | POST, signed | binds an Apple/Google sign-in to a device key, or moves it to a new key |
+| `ticket` | POST, signed | a one-use code another device can join the account with |
+| `claim` | POST, signed | spends a code (a household code or a backup code), brings the device into the account, returns its licence |
+| `devices` | POST, signed | lists the account's devices, which one is in use, and can drop one |
+| `backups` | POST, signed | shows, replaces or emails the account's backup codes |
+| `attest`, `supersede` | POST, signed | links an Apple/Google sign-in to the device's account, or brings the device into the account a sign-in is linked to |
 | `turn` | POST, signed | Cloudflare Realtime TURN credentials for a subscribed device |
-| `record` | POST, signed / GET `record/<table id>` | keeps a finished game's record, and serves it |
+| `record` | POST, signed | keeps a finished game's record |
+| `review` | POST, signed | a finished game's record, for an account's device in use that is not at that table |
 | `config` | GET | the remote config ([below](#remote-config)) |
 | `health` | GET | whether the store is readable and Stripe answers for the price, for the monitors |
 
@@ -59,15 +62,22 @@ short. The statement's hash is pinned in tests on both sides.
 
 ### Licence
 
-A device holds a **licence**, not a receipt or an account. It is a
-four-line statement (a tag `oh-licence/1`, the key, the last day it is
-good for, and the plan), hashed and signed with BIP-340 by the service
-key (`OH_SERVICE_SECRET`). The app checks it against `OH_SERVICE_KEY`,
-the public half compiled into the build (`app/lib/net/licence.dart`,
-`app/lib/entitlement.dart`). A licence for another key, past its day, or
-signed by anything else is not a licence. A build compiled without a
-service key treats every device as unlicensed, never as licensed by
-whoever answers.
+A device holds a **licence**, not a receipt. It is a five-line
+statement (a tag `oh-licence/2`, the device's key, its account's id, the
+last day it is good for, and the plan), hashed and signed with BIP-340
+by the service key (`OH_SERVICE_SECRET`). The app checks it against
+`OH_SERVICE_KEY`, the public half compiled into the build
+(`packages/table/lib/src/licence.dart`, `app/lib/entitlement.dart`). A
+licence for another key, past its day, or signed by anything else is not
+a licence. A build compiled without a service key treats every device as
+unlicensed, never as licensed by whoever answers.
+
+The licence is also how every peer knows whose a device is. A device's
+key never leaves it and none is held for it; the licence vouches that
+the key is one of an account's devices. It rides in every seat of a
+start event, in a waiter's and a room member's beats, in a watcher's
+request and in each line of a result, and every peer checks it against
+the same compiled key ([doc 04](04-live-play.md)).
 
 A licence lasts a month (`licenceDays`), never past what was paid for,
 and is renewed while the subscription lives, so an ended subscription
@@ -114,9 +124,10 @@ The subscription id is `apple:<original transaction id>` or
 `google:<hash of token>`. The app tags each purchase with a name derived
 from its key, `sha256("oh-store/1\n" + key)`: Play's obfuscated account
 id is that hash in hex, and Apple's `appAccountToken` is a v4 UUID made
-from its first 16 bytes. The paying device moves onto what it paid for.
-Another device presenting the same proof (a restore on a new phone)
-joins within the household's limit. Renewals, lapses and refunds arrive
+from its first 16 bytes. The paying device moves onto what it paid for,
+with its account where nothing else is paid up there. Another device
+presenting the same proof (a restore on a new phone) joins that account
+within its limit. Renewals, lapses and refunds arrive
 at `apple` and `play`, where each notification is verified (for Play,
 the Pub/Sub push's Google ID token), and for Play the purchase is
 fetched again. Neither store is ever final, since a lapsed subscription
@@ -124,11 +135,18 @@ can come back.
 
 Without its identifiers (`apple`, `google` in the configuration) each store answers 503.
 
-### Households
+### Accounts
 
-A subscription belongs to a person, not a device. It carries up to five
-devices (`mostDevices`), and any of them can drop another or open the
-billing portal.
+A subscription buys an **account**: an id of 32 random hex characters,
+made when the subscription is first paid for (a Stripe checkout, an App
+Store or Play purchase), with the paying device on it. The account is
+the person: a seat, a name, a rating and a result are the account's,
+whichever of its devices played. Solo play needs none. A subscriber
+whose subscription lapses and who buys again, with nothing else paid up
+on the account, gets the same account back.
+
+An account carries up to five devices (`mostDevices`), and any of them
+can drop another or open the billing portal.
 
 - **A household code.** `ticket` makes a one-use code of sixteen
   random bytes, good for ten minutes. It is shown as a QR of a link into
@@ -137,26 +155,32 @@ billing portal.
   port on the web), or types it. Asking again while a code has two
   minutes left returns the same code. The household's size is checked
   when the code is spent. The row expires from KV after an hour.
-- **Backup codes.** Five per subscription, each good for one join, in
+- **Backup codes.** Five per account, each good for one join, in
   the form `XXXX-XXXX-XXXX-XXXX` (Crockford base32, 80 bits; case and
-  dashes are ignored, and O, I and L read as 0 and 1). They are made
-  when the subscription is paid for and emailed to the checkout's
-  address, which is read from Stripe and not kept. Any device on the
-  subscription can show them, replace all five, or email them again.
-  Email goes through Cloudflare Email Sending (`EMAIL`, from
-  `OH_MAIL_FROM`, no reply-to). A store subscription has no address, so
-  its codes are only shown. Rows are keyed by a digest of the code.
-- **Sign-in.** `attest` checks an Apple or Google ID token against the
+  dashes are ignored, and O, I and L read as 0 and 1). They are the
+  account's recovery secret: one entered on any device brings it into
+  the same account. They are made when the account is paid for and
+  emailed to the checkout's address, which is read from Stripe and not
+  kept. Any device of the account can show them, replace all five, or
+  email them again. Email goes through Cloudflare Email Sending
+  (`EMAIL`, from `OH_MAIL_FROM`, no reply-to). A store subscription has
+  no address, so its codes are only shown. Rows are keyed by a digest
+  of the code.
+- **Sign-in.** A sign-in with Apple or Google is linked to one account,
+  and an account to one sign-in; it is a backup code that is never used
+  up. Both handlers check an Apple or Google ID token against the
   provider's published keys: issuer, audience, expiry, allow-listed
   algorithm, and a nonce equal to the hash of the device's key
   (`sha256("oh-signin/1\n" + key)`, pinned in tests on both sides). The
-  request is also signed by the key. It binds the account to that one
-  key. `supersede` moves the binding and its subscription to a new key;
-  a device already on a paid-up subscription of its own keeps it, and
-  only the account moves. Only an HMAC of the provider's subject
-  (`OH_ID_HMAC`) is stored. Google's audience is `google.webClientId`;
-  Apple's are `apple.bundleId` and `apple.servicesId`, since Apple's
-  token names the bundle id on an iPhone and the Services ID on the web.
+  request is also signed by the key. `attest` links the sign-in to the
+  account the device is in (409 if it is linked to another account, or
+  the account to another sign-in). `supersede` brings the device into
+  the account the sign-in is linked to, by a backup code's rules (404
+  if it is linked to none). No key moves. Only an HMAC of the provider's
+  subject (`OH_ID_HMAC`) is stored. Google's audience is
+  `google.webClientId`; Apple's are `apple.bundleId` and
+  `apple.servicesId`, since Apple's token names the bundle id on an
+  iPhone and the Services ID on the web.
 
   The app (`app/lib/net/sign_in.dart`, `provider_tokens.dart`) offers
   Apple on iOS and the web and Google on Android and the web, each only
@@ -167,27 +191,99 @@ billing portal.
   `google_sign_in`, whose web half loads Google's script into every
   page), and on the web Apple's JS popup and Google's own button, whose
   scripts are fetched only when a sign-in is on the screen. On the
-  Subscription page a subscriber is offered a sign-in, which attests
-  the account here; an account already on another device is moved only
-  when the subscriber says so. A device with no subscription signs in to
-  get one back: `supersede`, or `attest` for an account never signed in
-  with. The device keeps only which provider it signed in with.
+  Subscription page a subscriber is offered a sign-in, which links it to
+  the account; a sign-in linked to another account brings this device
+  into that one only when the subscriber says so. A device with no
+  subscription signs in to come into its account. The device keeps only
+  which provider it signed in with.
 
-A code never takes a device off another subscription that is still paid
-up. The app asks "Join this subscription?" before spending one. To move,
-a device drops itself first. A device whose subscription has ended is
-free to join. Dropping a device deletes its binding and its entitlement
-row. The licence it already holds runs out on its own within the month.
-When a subscription ends, its devices' entitlement rows are written
-down too, so a refund takes effect at each device's next ask.
+A code or a sign-in never takes a device out of another account whose
+subscription is still paid up. The app asks "Join this subscription?"
+before spending a code. To move, a device drops itself first. A device
+whose subscription has ended is free to join. Dropping a device deletes
+its binding and its entitlement row, and cuts it off at the relay if it
+was the device in use. The licence it already holds runs out on its own
+within the month. When a subscription ends, its account's devices'
+entitlement rows are written down too, so a refund takes effect at each
+device's next ask.
 
-**One household at a time.** KV has no compare-and-set, so every change
-to a household, and its device list, goes through one **Household**
-Durable Object per subscription, which handles them one at a time. It is
-exported from the relay worker and bound to the Pages project as
-`HOUSEHOLD` (production only). Without the binding, as in the tests and
-previews, an in-memory queue in the isolate does the same. A household
-is limited to 20 changes and 60 reads an hour.
+**One account at a time.** KV has no compare-and-set, so every change
+to an account — a code, a claim, a drop, its device list, its device in
+use — goes through one **Household** Durable Object per account, which
+handles them one at a time. A subscription has a turn of its own, the
+object named `sub:` and its id, where its account is found or made
+exactly once. The class is exported from the relay worker and bound to
+the Pages project as `HOUSEHOLD` (production only) and to the relay
+worker under the same name. Without the binding, as in the tests and
+previews, an in-memory queue in the isolate does the same. An account
+is limited to 20 changes, 60 reads and 600 activations an hour.
+
+**Before accounts.** A subscription from before accounts is made an
+account the first time any of its devices, its store or Stripe is heard
+from, in the subscription's own turn: its devices, their rows and its
+backup codes move under a new account, and every licence after that
+names it. `node service/tool/accounts.mjs --apply` (Cloudflare API
+token and account id in the environment) does all of them at the deploy
+that brings accounts in; it is run before the new worker goes live, and
+the worker moves anything the old one added in between. Nobody's
+subscription is lost. A sign-in linked before accounts named a device;
+it is read as that device's account. Codes made before are for ten
+minutes, and are gone.
+
+### One device at a time
+
+An account plays on one device at a time, and the newest device to take
+it up wins at once. The app takes the account up when it opens, and
+again on the person's *Use it here*; each is `activate` with `want:
+open` (or `take`), and a renewal every twenty minutes is `want: renew`.
+In the account's turn, the device asking is made the one in use and the
+account's **epoch**, the count of times it has been taken up, goes up by
+one; a renewal by any device but the one in use is a 409. Taking the
+account from a device that said it is at a table (its renewals carry
+the table, `seated`) is asked about first: `open` answers 409
+`seated`, the app asks "You're in a game on another device. Continue
+here? That game will be lost.", and only `take` goes through.
+
+The device in use is given an **activation**: `oh-active/1`, the
+account, the device's key, the epoch and when it runs out (an hour, and
+never past the day the subscription is paid to), signed by the service
+key (`activationFor`; `Activation` in
+`packages/table/lib/src/licence.dart`).
+
+**The relay enforces it, rather than asking.** A device told to stop
+could be a modified one that does not. So the relay asks every socket
+who it is (NIP-42: a challenge, answered by a kind-22242 event the
+device's key signs, carrying its activation), holds whatever the socket
+sends until the answer is in, and carries nothing for a socket without a
+current one (`serviceGate` in `service/do/relay.mjs`). Three things keep
+a superseded device off it:
+
+- each relay object keeps the newest epoch it has seen of each account,
+  so showing a later activation closes every socket of that account's
+  earlier one there, and an earlier one is refused;
+- as a socket answers, the object asks the account's own object whether
+  that activation is still the one in use, and the account's object
+  remembers which relay objects the device was seen at; when the account
+  is taken up it tells each of them (`/revoke`) to close the old
+  device's sockets — at once, wherever the old device is: presence, a
+  pool, a table, a watch;
+- an activation runs out within the hour, and an answer that has run
+  out is asked for again.
+
+The device itself hears it sooner where it can: the relay's
+`superseded:` notice, a 409 at its renewal, or the other device's
+presence, which carries the later activation. It then leaves the relays,
+any table it sits at (its signed leave goes by whatever channel is
+still open; the table's ordinary handling — a bot in the seat, scored
+as a leave in a rated game — takes the seat however it goes), juror
+duty, the pool and anything it was watching, and shows "Open Hearts is
+now open on another device" with *Use it here*. The service is the
+authority because it is the one party every device of an account
+already trusts and already asks; an activation is the account's turn's
+word, so two devices can never both hold the current one. The bench of
+jurors of last resort answers the challenge with an HMAC of its key
+under `OH_JUROR_SECRET`, which the relay holds too; it belongs to no
+account.
 
 ### TURN
 
@@ -203,37 +299,43 @@ learns another's address ([doc 02](02-multiplayer.md)).
 A player at a finished table can `POST` its record. The worker checks
 that the sender's key holds a seat in the record, that the table id is
 32 hex characters, and that the record is at most 2 MiB. The first copy
-is kept, gzipped, in R2 (`OH_RECORDS`). `GET /api/record/<id>` serves it
-as immutable. The worker vouches for nothing else. Every viewer replays
-the record through the verifier before showing a card.
+is kept, gzipped, in R2 (`OH_RECORDS`). Looking at one is live play:
+`review` serves it only to a device with a subscription that is its
+account's device in use, and not while the account sits at that table.
+The worker vouches for nothing else. Every viewer replays the record
+through the verifier before showing a card, seats' licences included.
 
 ## Storage
 
 Everything the worker keeps is in one KV namespace, `OH_STORE`, one key
 per row as `PK|SK`, behind `get`, `put`, `del` and `under` (the rows under
-one partition key, at most a household's devices). Tests and local mode
+one partition key, at most an account's devices). Tests and local mode
 use a `Map` behind the same calls (`memoryStore`).
 
 ```
 PK                         SK              holds
-KEY#<key>                  ENTITLEMENT     subscription, licensed_until, at
-KEY#<key>                  META            provider, attested_at, attestation
-KEY#<key>                  SUPERSEDES      predecessor, link, at
+KEY#<key>                  ENTITLEMENT     account, licensed_until, at
+ACCOUNT#<account>          META            subscription, created_at
+ACCOUNT#<account>          DEVICE#<key>    bound_at
+ACCOUNT#<account>          TICKET          the outstanding code (expires)
+ACCOUNT#<account>          BACKUP          the five backup codes, used or not
+ACCOUNT#<account>          LOGIN           provider, the linked sign-in's row, at
+ACCOUNT#<account>          ACTIVE          device in use, epoch, at, seated, relay tags (without HOUSEHOLD)
 SUB#<subscription>         META            source, txn_ref, renews_at, cancelled_at, event time
-SUB#<subscription>         DEVICE#<key>    bound_at
+SUB#<subscription>         ACCOUNT         account
 SUB#<subscription>         CUSTOMER        Stripe customer, for the portal
-SUB#<subscription>         TICKET          the outstanding code (expires)
-SUB#<subscription>         BACKUP          the five backup codes, used or not
-TICKET#<code>              META            subscription, expires_at, used_at (expires)
-BACKUP#<digest>            META            subscription
-LOGIN#<provider>#<hmac>    IDENTITY        key, created_at
+TICKET#<code>              META            account, expires_at, used_at (expires)
+BACKUP#<digest>            META            account
+LOGIN#<provider>#<hmac>    IDENTITY        account, created_at
 config|app, config|service                 the operator's rows (below)
 ```
 
-A provider's identifier is stored only as an HMAC, and nothing on the
-`KEY#` side leads back to a provider. Entitlement is copied to each
-device so a licence is one read. Cards, plays, game state, ratings and
-email addresses are not stored.
+Where the `Household` object runs, the account's device in use is kept
+in that object's own storage instead of `ACTIVE`. A provider's
+identifier is stored only as an HMAC, and nothing on the `KEY#` side
+leads back to a provider. Entitlement is copied to each device so a
+licence is one read. Cards, plays, game state, ratings and email
+addresses are not stored.
 
 ## Remote config
 
@@ -295,6 +397,7 @@ most once a minute per isolate:
 | `requestToleranceS` | 30–900 | 300 |
 | `webhookToleranceS` | 60–900 | 300 |
 | `householdChangesPerHour`, `householdReadsPerHour` | 5–500, 10–2,000 | 20, 60 |
+| `activationsPerHour`: an account's activations and the relay's asking | 60–6,000 | 600 |
 
 `config|relay` is read by each presence object when it wakes (through
 the relay worker's own `OH_STORE` binding):
@@ -384,7 +487,8 @@ container. The image is built from the repository on every relay deploy
 | What | How |
 |---|---|
 | Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)) |
-| Relay, Household, Bench | `cd service/do && npx wrangler@4 deploy` (`wrangler.toml`: the `TABLE` and `BENCH` objects, the `Household` class, the container, `OH_STORE`, `EMAIL`, the domain `relay.openhearts.game`) |
+| Relay, Household, Bench | `cd service/do && npx wrangler@4 deploy` (`wrangler.toml`: the `TABLE`, `HOUSEHOLD` and `BENCH` objects, the container, `OH_STORE`, `EMAIL`, `OH_SERVICE_KEY`, the domain `relay.openhearts.game`) |
+| Accounts from before | `node service/tool/accounts.mjs`, a dry run unless given `--apply`; once, before the deploy that brings accounts in |
 | Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../infra/README.md)) |
 | Monitoring | `node observability/apply.mjs` |
 
@@ -397,14 +501,16 @@ sign-in identifiers (`apple.bundleId`, `product` and `servicesId`;
 `google.package`, `product`, `webClientId` and the Play push audience
 and email). `deploy.sh` compiles the build's from it and ships the file
 to the worker, which reads it beneath the project's settings
-(`service/functions/deployment.mjs`): a variable of the same name set on the
-project wins, as one set by a test does. A field left null is a feature
-left off. Bindings: `OH_STORE` (KV), `OH_RECORDS` (R2),
+(`service/functions/deployment.mjs`): a variable of the same name set on
+the project wins, as one set by a test does. A field left null is a
+feature left off. Bindings: `OH_STORE` (KV), `OH_RECORDS` (R2),
 `HOUSEHOLD` (production only) and optionally `OH_METRICS`. Previews have
 their own KV and bucket, and no Stripe. The relay's secret is
-`OH_JUROR_SECRET`. `cd service && dart run bin/service_key.dart` mints
-the service key pair and writes the secret half to `service.secret`,
-which is ignored by version control.
+`OH_JUROR_SECRET`; its `OH_SERVICE_KEY` is a var in `wrangler.toml`,
+held equal to `config/openhearts.json` by a test, and without it the
+relay carries nobody. `cd service && dart run bin/service_key.dart`
+mints the service key pair and writes the secret half to
+`service.secret`, which is ignored by version control.
 
 A deployment with no keys degrades safely: no service key means live
 play is shut, no Stripe means the shop says it is not open, and no TURN
@@ -414,12 +520,16 @@ means tables play over the relay.
 
 **Local mode.** The browser suites run the worker in-process over a
 `Map` with `OH_OPEN_HOUSE` set. In that mode any key that asks is written
-a subscription and licensed for a month, and `local:<subject>` tokens
-are accepted as sign-ins. The flag is honoured only for requests to
-`localhost` or `127.0.0.1`, so setting it in production does nothing.
+a subscription and an account of its own and licensed for a month, and
+`local:<subject>` tokens are accepted as sign-ins. The flag is honoured
+only for requests to `localhost` or `127.0.0.1`, so setting it in
+production does nothing.
 `e2e/build.sh` compiles the app against BIP-340's published test key
 pair, so the suites exercise the real handlers, signatures and licence
-check. With `OH_TURN_LOCAL` set as well, `turn` hands out that local TURN
+check. The suites' relay is the local Dart one, which asks nobody who
+they are: one device at a time is seen there by presence, and the
+relay's own refusal is proved in `node --test service/do`. With
+`OH_TURN_LOCAL` set as well, `turn` hands out that local TURN
 server with fixed credentials; the rig points it at a coturn it starts
 on 127.0.0.1, so channels in the suites go through TURN as they do in
 production.

@@ -93,13 +93,17 @@ export async function alertSubscribed(env, store, { subscription, source, key = 
 /// never for one the config's `notOnline` names.
 export async function alertOnline(env, store, key, held, { now = Date.now() } = {}) {
   const alerts = alertsOf(env);
-  if (!alerts?.online || !store || !held?.subscription) return false;
-  const subscription = held.subscription;
+  if (!alerts?.online || !store || !held) return false;
+  // A device's row names its account, whose subscription is the one
+  // told of; a row from before accounts names the subscription itself.
+  const account = typeof held.account === 'string' ? held.account : null;
+  const subscription = account ? (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription : held.subscription;
+  if (!subscription) return false;
   // The operator's own, and anyone else they would rather not hear of.
   if (alerts.notOnline.includes(await hashOf(subscription))) return false;
   if (!(await fresh(store, 'online', subscription, Math.max(60, Math.round(alerts.quietMinutes * 60))))) return false;
   const meta = await store.get(`SUB#${subscription}`, 'META');
-  const devices = (await store.under(`SUB#${subscription}`, 'DEVICE#')).length;
+  const devices = (await store.under(account ? `ACCOUNT#${account}` : `SUB#${subscription}`, 'DEVICE#')).length;
   return tell(env, alerts, 'Open Hearts: a subscriber is online', [
     `Device ${short(key)}… on subscription ${short(subscription)}… opened the app at ${new Date(now).toISOString()}.`,
     `${meta?.source ?? 'unknown'} subscription, ${devices} device${devices === 1 ? '' : 's'}, paid up to ${meta?.renews_at ?? held.licensed_until ?? 'unknown'}.`,

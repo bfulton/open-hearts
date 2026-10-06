@@ -126,13 +126,13 @@ void main() {
     expect((await attestWith(me, Provider.apple, 'local:ada', service: _service)).answer!.licence, isNull);
   });
 
-  test('supersede: the account moves here and brings the subscription of the device it was on', () async {
+  test('supersede: this device comes into the account the sign-in is linked to', () async {
     final stand = standUp();
     final me = SchnorrSigner.generate();
-    final old = SchnorrSigner.generate().publicKey;
-    stand.says('supersede', {'superseded': old, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
+    final account = '0a' * 16;
+    stand.says('supersede', {'account': account, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
     final said = await supersedeWith(me, Provider.google, 'local:ada', service: _service);
-    expect(said.answer!.superseded, old);
+    expect(said.answer!.account, account);
     expect(said.answer!.licence!.holdsFor(me.publicKey, service: _service), isTrue);
     final asked = sentTo(stand, 'supersede');
     expect(schnorrVerifier(me.publicKey, requestDigest('supersede', me.publicKey, asked['at'] as int), asked['sig'] as String), isTrue,
@@ -144,8 +144,9 @@ void main() {
     final me = FakeSigner('one');
     for (final (handler, status, said, shown) in [
       ('attest', 401, 'that sign-in does not check out', 'That sign-in did not check out. Try again.'),
-      ('attest', 409, 'that account is already on another device', 'That account is already on another device.'),
-      ('supersede', 404, 'that account is not on any device', 'That account has not been signed in with here before.'),
+      ('attest', 409, 'that sign-in is linked to another account', 'That sign-in is linked to another account.'),
+      ('attest', 409, 'this account is linked to another sign-in', 'This account is already linked to another sign-in.'),
+      ('supersede', 404, 'that sign-in is not linked to an account', 'No account is linked to that sign-in yet.'),
       ('attest', 503, 'sign-in is not configured', 'Signing in is not open yet.'),
       ('attest', 401, "this device's clock is out by more than five minutes", "This device's clock is out. Set it right and try again."),
     ]) {
@@ -180,7 +181,7 @@ void main() {
     expect(find.text('Your account'), findsNothing);
   });
 
-  testWidgets('not subscribed: signing in brings the subscription here from the device the account was on', (tester) async {
+  testWidgets('not subscribed: signing in brings this device into the account the sign-in is linked to', (tester) async {
     final stand = standUp();
     final tokens = offering([Provider.apple, Provider.google]);
     final me = await Identity.signer();
@@ -189,7 +190,7 @@ void main() {
     expect(find.text('Sign in with Apple'), findsOneWidget);
     expect(find.text('Sign in with Google'), findsOneWidget);
 
-    stand.says('supersede', {'superseded': 'cd' * 32, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
+    stand.says('supersede', {'account': '0a' * 16, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
     stand.says('devices', {
       'devices': [
         {'key': me.publicKey, 'bound_at': '2026-10-06'},
@@ -207,7 +208,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('not subscribed, and an account never signed in with: it is put here, and said to have nothing on it', (tester) async {
+  testWidgets('not subscribed, and a sign-in linked to no account: nothing to come into, and said so', (tester) async {
     final stand = standUp();
     offering([Provider.google]);
     final me = await Identity.signer();
@@ -215,18 +216,18 @@ void main() {
     await openPage(tester);
     expect(find.text('Sign in with Apple'), findsNothing);
 
-    stand.says('supersede', {'error': 'that account is not on any device'}, status: 404);
-    stand.says('attest', {'attested': '2026-10-06'});
+    stand.says('supersede', {'error': 'that sign-in is not linked to an account'}, status: 404);
     await press(tester, 'Sign in with Google');
-    expect(stand.seen.map((s) => s.split(' ').first), ['/api/supersede', '/api/attest']);
-    expect(find.text('Signed in. There is no subscription on that account yet.'), findsOneWidget);
-    expect(find.textContaining('A subscription bought here stays with your account.'), findsOneWidget);
-    expect(find.text('Sign in with Google'), findsNothing);
+    expect(stand.seen.map((s) => s.split(' ').first), ['/api/supersede'], reason: 'there is no account here to link it to');
+    expect(find.text('Signed in. No account is linked to that sign-in yet: subscribe, then sign in from the subscription page.'),
+        findsOneWidget);
+    expect(find.text('Sign in with Google'), findsOneWidget, reason: 'nothing was linked, so it can be done again');
+    expect(await signedInWith(), isNull);
     expect(Entitlement.current.live, isFalse);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('subscribed: signing in keeps the subscription with the account, and an account elsewhere is moved only when asked', (tester) async {
+  testWidgets('subscribed: signing in links the sign-in to the account, and a sign-in linked elsewhere is used here only when asked', (tester) async {
     final stand = standUp();
     offering([Provider.google]);
     final me = await Identity.signer();
@@ -240,16 +241,16 @@ void main() {
     await openPage(tester);
     expect(find.text('Your account'), findsOneWidget);
 
-    stand.says('attest', {'error': 'that account is already on another device'}, status: 409);
+    stand.says('attest', {'error': 'that sign-in is linked to another account'}, status: 409);
     await press(tester, 'Sign in with Google');
-    expect(find.textContaining('That account is signed in on another device.'), findsOneWidget);
+    expect(find.textContaining('That sign-in is linked to another Open Hearts account.'), findsOneWidget);
     expect(stand.seen.where((s) => s.startsWith('/api/supersede')), isEmpty, reason: 'nothing moved yet');
 
-    stand.says('supersede', {'superseded': 'cd' * 32, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
-    await press(tester, 'Move it here');
+    stand.says('supersede', {'account': '0a' * 16, 'at': '2026-10-06', 'licence': signedFor(me.publicKey)});
+    await press(tester, 'Use that account here');
     expect(sentTo(stand, 'supersede')['provider'], 'google');
     expect(find.textContaining('Signed in with Google.'), findsOneWidget);
-    expect(find.text('Move it here'), findsNothing);
+    expect(find.text('Use that account here'), findsNothing);
     expect(Entitlement.current.live, isTrue);
     expect(tester.takeException(), isNull);
   });

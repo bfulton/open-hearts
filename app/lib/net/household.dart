@@ -1,6 +1,7 @@
-/// A subscription is a person's, not a device's (docs/06-service.md).
+/// A subscription buys an account, and an account is a person's, not a
+/// device's (docs/06-service.md).
 ///
-/// So a second device has to be able to hold the same licence. The way
+/// So a second device has to be able to come into the same account. The way
 /// that costs nothing to type: the subscribed device shows a code, and
 /// the other device arrives carrying it. The code goes in a link and
 /// the link goes in a QR, so the phone's own camera can be the scanner;
@@ -23,12 +24,15 @@ import 'licence.dart';
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 import 'remote_config.dart' show waits;
 
-/// A device on a subscription, as the service lists them.
+/// A device of the account, as the service lists them.
 class Device {
-  const Device({required this.key, this.boundAt});
+  const Device({required this.key, this.boundAt, this.inUse = false});
 
   final PublicKey key;
   final String? boundAt;
+
+  /// Whether it is the account's device in use now (net/in_use.dart).
+  final bool inUse;
 
   /// Enough of the key to tell two devices apart at a glance, which is
   /// all anyone can do: a device has no name here and is not asked for
@@ -53,7 +57,7 @@ class Household {
     return Household(
       devices: [
         for (final d in list)
-          if (d is Map && d['key'] is String) Device(key: d['key'] as String, boundAt: d['bound_at'] as String?),
+          if (d is Map && d['key'] is String) Device(key: d['key'] as String, boundAt: d['bound_at'] as String?, inUse: d['active'] == true),
       ],
       most: most,
     );
@@ -200,8 +204,9 @@ class Refused {
     "this device's clock is out by more than five minutes": 'clockOff',
     // A sign-in brought to the service (sign_in.dart).
     'that sign-in does not check out': 'signInRefused',
-    'that account is already on another device': 'accountElsewhere',
-    'that account is not on any device': 'accountNowhere',
+    'that sign-in is linked to another account': 'accountElsewhere',
+    'that sign-in is not linked to an account': 'accountNowhere',
+    'this account is linked to another sign-in': 'otherSignIn',
     'sign-in is not configured': 'signInNotSetUp',
     // A store's purchase brought to the service (store_buying.dart).
     'not a store': 'notAStore',

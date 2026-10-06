@@ -30,9 +30,20 @@ import 'package:table/table.dart';
 import 'relay.dart';
 
 class JsRelay implements Relay {
-  JsRelay({this.keep = 10000, this.log, String? Function(NostrEvent event)? refuse, this.object = false}) {
+  JsRelay({this.keep = 10000, this.log, String? Function(NostrEvent event)? refuse, this.object = false, this.gate}) {
     _refuse = refuse;
   }
+
+  /// The service's key, to ask every socket who it is by, as the
+  /// deployed relay does (service/do/relay.mjs, serviceGate); null asks
+  /// nobody.
+  final String? gate;
+
+  /// Tells the relay that [account]'s device in use is now the one of
+  /// [epoch], as the account's own object tells the deployed one.
+  void revoke(String account, int epoch) => _tell({
+        'revoke': {'account': account, 'epoch': epoch},
+      });
 
   /// How many stored events the host holds before the oldest go.
   final int keep;
@@ -95,6 +106,7 @@ class JsRelay implements Relay {
       '--stats', _counts!.path,
       '--control',
       if (object) '--object',
+      if (gate != null) ...['--gate', gate!],
       if (log == null) '--quiet',
     ]);
     _host = host;

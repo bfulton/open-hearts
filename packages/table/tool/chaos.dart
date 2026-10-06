@@ -6,6 +6,7 @@
 ///     dart run tool/chaos.dart --seeds 250 --sealed 14 --structure
 ///     dart run tool/chaos.dart --seeds 100 --sealed 14 --jurors 9 --sweep
 ///     dart run tool/chaos.dart --seeds 0 --sealed 14 --jurors 9 --workers
+///     dart run tool/chaos.dart --seeds 150 --sealed 6 --jurors 9 --sweep --twins
 ///
 /// The second walks just the sealed seeds named — the ones a longer
 /// walk said broke, again after a fix, without the hour in between.
@@ -15,7 +16,10 @@
 /// served, as the duty does, and summoned again later. The fifth has
 /// every device make the deal's slow calls in a worker that takes a
 /// browser's time over them, as the app does (packages/deal,
-/// work.dart), where otherwise they take none.
+/// work.dart), where otherwise they take none. The sixth puts accounts
+/// on two devices as it walks: a juror's or a seated player's account
+/// taken up on a new device, which supersedes the old one
+/// (lib/src/sim/scenarios.dart).
 ///
 /// Prints every broken invariant with the faults that led there, and
 /// exits non-zero if there was one.
@@ -58,6 +62,7 @@ Future<void> main(List<String> args) async {
   final jurors = _intArg(args, 'jurors', 4);
   final sweep = args.contains('--sweep');
   final workers = args.contains('--workers');
+  final twins = args.contains('--twins');
   final saidBefore = <String, int>{};
   void jurorLog(String line) {
     final at = line.indexOf('over before this side was summoned: ');
@@ -94,7 +99,7 @@ Future<void> main(List<String> args) async {
 
   for (var seed = 0; seed < seeds; seed++) {
     final s = log();
-    final why = walkChaos(seed, structure: s, jurors: jurors, sweep: sweep, jurorLog: sweep ? jurorLog : null);
+    final why = walkChaos(seed, structure: s, jurors: jurors, sweep: sweep, twins: twins, jurorLog: sweep ? jurorLog : null);
     report('seed $seed', s);
     if (why != null) {
       failed++;
@@ -105,7 +110,8 @@ Future<void> main(List<String> args) async {
   }
   for (final seed in sealedSeeds) {
     final s = log();
-    final why = walkChaos(seed, crypto: crypto, structure: s, jurors: jurors, sweep: sweep, workers: workers, jurorLog: sweep ? jurorLog : null);
+    final why = walkChaos(seed,
+        crypto: crypto, structure: s, jurors: jurors, sweep: sweep, workers: workers, twins: twins, jurorLog: sweep ? jurorLog : null);
     report('sealed seed $seed', s);
     print(why == null ? 'sealed seed $seed held' : 'sealed seed $seed: $why');
     if (why != null) failed++;

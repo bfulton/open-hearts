@@ -67,6 +67,8 @@ export class Bench {
         enableInternet: true,
         env: {
           ...(this.env.OH_JUROR_SECRET ? { OH_JUROR_SECRET: this.env.OH_JUROR_SECRET } : {}),
+          // The service's public key, to check the seats' licences by.
+          ...(this.env.OH_SERVICE_KEY ? { OH_SERVICE_KEY: this.env.OH_SERVICE_KEY } : {}),
           ...(this.env.OH_BENCH_RELAYS ? { OH_RELAYS: this.env.OH_BENCH_RELAYS } : {}),
           ...(this.env.OH_BENCH_PRESENCE_RELAYS ? { OH_PRESENCE_RELAYS: this.env.OH_BENCH_PRESENCE_RELAYS } : {}),
         },

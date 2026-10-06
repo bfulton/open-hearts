@@ -88,6 +88,7 @@ class JurorDuty {
 
   void _onSummons(Summons s) {
     var t = _tables[s.spec.id];
+    if (t == null && !_mayServe(s.spec)) return;
     if (t == null && letGo.stale(s.spec.id, s.hand)) {
       log?.call('summoned to ${s.spec.id} for hand ${s.hand}, which it had followed past: stale');
       return;
@@ -114,6 +115,25 @@ class JurorDuty {
       log?.call('summoned to ${s.spec.id} for hand ${s.hand} by ${s.from.substring(0, 6)}');
     }
     t.client.serveFor(s.hand, s.jurors, juryId: s.juryId, first: s.first, draws: s.draws);
+  }
+
+  /// Whether this device may follow [spec] as a juror at all: never a
+  /// table its own account sits at — by whichever of its devices, since
+  /// a juror there would be the player judging their own game — and
+  /// never one whose seats are not the accounts they say they are
+  /// (spec.dart, licence.dart).
+  bool _mayServe(TableSpec spec) {
+    final mine = presence.accountOf(signer.publicKey);
+    if (spec.accounts.contains(mine)) {
+      log?.call('summoned to ${spec.id}, where this device\'s own account sits: not served');
+      return false;
+    }
+    final wrong = spec.licenceProblem(at: DateTime.now());
+    if (wrong != null) {
+      log?.call('summoned to ${spec.id}, whose seats do not check out ($wrong): not served');
+      return false;
+    }
+    return true;
   }
 
   /// Where each table followed last moved, and when the juror last

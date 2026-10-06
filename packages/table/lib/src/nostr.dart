@@ -208,4 +208,9 @@ abstract final class TableKinds {
   /// table id: a watcher saying it is there, or a seated player's view
   /// of the table for whoever is.
   static const watch = 24247;
+
+  /// A device answering a relay that asks who it is (NIP-42's kind):
+  /// the relay's challenge, and what the service gave the device to
+  /// show — its activation — signed by its key (relays.dart).
+  static const auth = 22242;
 }

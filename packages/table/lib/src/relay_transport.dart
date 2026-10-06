@@ -41,6 +41,7 @@ class RelayTransport implements Transport {
     _group = RelayGroup(
       urls: this.relays,
       refusalMs: refusalMs,
+      auth: relayAuthFor(signer),
       // Someone watching (watch.dart) reads the watch lane and nothing
       // else: not the table's own traffic, which is not theirs to carry.
       subscriptions: watchOnly ? {'watch': [watch]} : {

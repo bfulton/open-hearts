@@ -24,6 +24,7 @@ import 'dart:math';
 
 import 'package:engine/engine.dart';
 
+import 'licence.dart';
 import 'nostr.dart';
 import 'pace.dart';
 import 'relay_transport.dart';
@@ -33,10 +34,18 @@ import 'timing.dart';
 
 /// Someone waiting, as the others see them.
 class Waiter {
-  Waiter({required this.key, required this.name, required this.rating, required this.since, this.avatar, this.pace = 0});
+  Waiter({required this.key, required this.name, required this.rating, required this.since, this.avatar, this.pace = 0, this.licence});
 
   final PublicKey key;
   final String name;
+
+  /// The service's word that [key] is one of an account's devices
+  /// (licence.dart), carried into the seating: a table is the
+  /// accounts at it, and every seat checks every other's.
+  final Licence? licence;
+
+  /// Who is waiting: the account, or the key where nothing names one.
+  AccountId get account => licence?.account ?? key;
 
   /// How they chose to look, as they said it — the app's business;
   /// the table carries it to the seating unread.
@@ -175,6 +184,7 @@ class WaitingRoom {
     this.picture,
     this.target = gameOverScore,
     this.timing = TableTiming.standard,
+    this.licence,
   }) : since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
     _random = random ?? Random.secure();
     for (final e in List.of(relay.lobbySoFar)) {
@@ -216,6 +226,11 @@ class WaitingRoom {
 
   /// A picture of this player, base64, sent once; null for none.
   final String? picture;
+
+  /// This device's licence, said with every heartbeat and carried into
+  /// every seating it is in. Where accounts are checked (licence.dart)
+  /// a waiter without one is not seated by anyone.
+  final Licence? licence;
   final int roundMs;
   final int botsAfterMs;
   final int heartbeatMs;
@@ -262,7 +277,7 @@ class WaitingRoom {
   List<Waiter> get present {
     final now = _now;
     final all = [
-      Waiter(key: me, name: name, rating: rating, since: since, avatar: avatar)..lastSeen = now,
+      Waiter(key: me, name: name, rating: rating, since: since, avatar: avatar, licence: licence)..lastSeen = now,
       ..._others.values.where((w) => now - w.lastSeen <= staleMs),
     ];
     all.sort((a, b) => a.key.compareTo(b.key));
@@ -275,7 +290,15 @@ class WaitingRoom {
   void _say() {
     if (spec != null) return;
     relay.announce(
-        {'kind': 'wait', 'name': name, 'rating': rating, if (pace > 0) 'pace': pace, 'since': since, if (avatar != null) 'avatar': avatar},
+        {
+          'kind': 'wait',
+          'name': name,
+          'rating': rating,
+          if (pace > 0) 'pace': pace,
+          'since': since,
+          if (avatar != null) 'avatar': avatar,
+          if (licence != null) 'licence': licence!.toJson(),
+        },
         ephemeral: true);
     _lastSaid = _now;
   }
@@ -315,7 +338,12 @@ class WaitingRoom {
       final seats = <Map<String, Object?>>[];
       for (var s = 0; s < seatCount; s++) {
         if (s < humans.length) {
-          seats.add({'key': humans[s].key, 'name': humans[s].name, if (humans[s].avatar != null) 'avatar': humans[s].avatar});
+          seats.add({
+            'key': humans[s].key,
+            'name': humans[s].name,
+            if (humans[s].avatar != null) 'avatar': humans[s].avatar,
+            if (humans[s].licence != null) 'licence': humans[s].licence!.toJson(),
+          });
         } else {
           seats.add({'bot': bots[s - humans.length].id});
         }
@@ -350,6 +378,12 @@ class WaitingRoom {
         if (jpeg is String && jpeg.length <= 20000) pictures[e.pubkey] = jpeg;
       case 'wait':
         if (e.kind != TableKinds.waiting || e.pubkey == me) return;
+        // A waiter is seated only with the service's word that its key
+        // is an account's device — and never beside this device's own
+        // account, which is one person on two devices.
+        final licence = Licence.parse(c['licence']);
+        if (!licenceFits(licence, e.pubkey, at: DateTime.fromMillisecondsSinceEpoch(_now))) return;
+        if (licence != null && licence.account == this.licence?.account) return;
         final w = _others.putIfAbsent(
           e.pubkey,
           () => Waiter(
@@ -359,6 +393,7 @@ class WaitingRoom {
             pace: switch (c['pace']) { final int p when p > 0 && p <= 120 => p, _ => 0 },
             since: c['since'] as int? ?? _now,
             avatar: c['avatar'] is Map ? Map<String, Object?>.from(c['avatar'] as Map) : null,
+            licence: licence,
           ),
         );
         w.lastSeen = _now;
@@ -409,7 +444,7 @@ class WaitingRoom {
         } else {
           final key = m['key'] as String;
           if (key == me) mine = true;
-          seats.add(HumanSeat(key));
+          seats.add(HumanSeat(key, licence: m['licence'] == null ? null : Licence.parse(m['licence']) ?? (throw const FormatException('licence'))));
           names[s] = m['name'] as String? ?? 'Someone';
           if (m['avatar'] is Map) avatars[s] = Map<String, Object?>.from(m['avatar'] as Map);
         }
@@ -418,8 +453,7 @@ class WaitingRoom {
       // A table is named by its id, and its id is its address: one that
       // could be guessed, or shared with another table, is not taken.
       if (!mine || seats.length != seatCount || c['table'] is! String || !validTableId(c['table'] as String)) return;
-      _offers.add((
-        TableSpec(
+      final offered = TableSpec(
             id: c['table'] as String,
             seed: c['seed'] as int,
             seats: seats,
@@ -428,10 +462,15 @@ class WaitingRoom {
             target: target,
             // The host's clocks, not this device's; a host on an older
             // build says none, which is the standard table.
-            timing: TableTiming.parse(c['timing'])),
-        names,
-        avatars,
-      ));
+            timing: TableTiming.parse(c['timing']));
+      // Every seat an account's, by the service's word, and each
+      // account once: a seating that is not is no table to sit at.
+      final wrong = offered.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(_now));
+      if (wrong != null) {
+        log?.call('$pool: a seating refused: $wrong');
+        return;
+      }
+      _offers.add((offered, names, avatars));
     } catch (_) {
       return;
     }

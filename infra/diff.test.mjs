@@ -301,7 +301,7 @@ test("toml: the relay's own wrangler.toml reads", () => {
   assert.deepEqual(wrangler.routes, [{ pattern: 'relay.openhearts.game', custom_domain: true }]);
   assert.deepEqual(
     wranglerBindings(wrangler).map((b) => `${b.type}:${b.name}`).sort(),
-    ['durable_object_namespace:BENCH', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'send_email:EMAIL'],
+    ['durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'send_email:EMAIL'],
   );
 });
 
@@ -313,6 +313,7 @@ const liveRelay = () => ({
     bindings: [
       { class_name: 'Bench', name: 'BENCH', namespace_id: 'fba6', type: 'durable_object_namespace' },
       { name: 'EMAIL', type: 'send_email' },
+      { class_name: 'Household', name: 'HOUSEHOLD', namespace_id: 'a1c3', type: 'durable_object_namespace' },
       { name: 'OH_JUROR_SECRET', type: 'secret_text' },
       { name: 'OH_MAIL_FROM', text: 'noreply@openhearts.game', type: 'plain_text' },
       { name: 'OH_STORE', namespace_id: '5b65151de63341dc9f7a9d417c9b6a4e', type: 'kv_namespace' },

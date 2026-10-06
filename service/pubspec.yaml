@@ -10,6 +10,8 @@ dependencies:
   # For minting the service's signing pair (bin/service_key.dart): the
   # only place here that needs a public key derived from a secret.
   bip340: ^0.3.1
+  # The bench's mark at the relay (bin/juror.dart): an HMAC.
+  crypto: ^3.0.6
   web_socket_channel: ^3.0.3
   table:
     path: ../packages/table

@@ -85,7 +85,9 @@ test('a subscription the config names is never told online, and others still are
   const held = await subscriber(store);
   const env = { ...on, OH_ALERT_NOT_ONLINE: `0123456789abcdef,${await hashOf('sub_9')}`, HOUSEHOLD: relay(sent) };
   assert.equal(await alertOnline(env, store, KEY, held), false);
-  assert.equal(await alertOnline(env, store, KEY, { ...held, subscription: 'sub_10' }), true);
+  const other = 'cd'.repeat(16);
+  await store.put(`ACCOUNT#${other}`, 'META', { subscription: 'sub_10' });
+  assert.equal(await alertOnline(env, store, KEY, { ...held, account: other }), true);
   assert.equal(sent.length, 1);
   assert.equal(await hashOf('sub_9'), (await import('node:crypto')).createHash('sha256').update('sub_9').digest('hex').slice(0, 16));
 });

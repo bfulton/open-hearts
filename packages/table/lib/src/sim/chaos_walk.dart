@@ -137,6 +137,38 @@ String? disagreed(SimTable t) {
   return null;
 }
 
+/// A juror drawn by the table from an account seated at it — another
+/// device of a player — or two devices of one account following the
+/// table at once: what accounts and one device at a time are there to
+/// stop (docs/04-live-play.md). A device that has gone does not count.
+String? accountTwice(SimTable t) {
+  final p = t.presence;
+  if (p == null) return null;
+  final seated = t.spec.accounts;
+  for (final c in [...t.clients, for (final j in t.jurors) if (j.client != null) j.client!]) {
+    for (final d in c.juries) {
+      for (final k in d.event.jurors) {
+        if (seated.contains(p.accountOf(k))) return 'a jury drew ${k.substring(0, 4)}, a device of an account seated at the table';
+      }
+    }
+  }
+  final following = <String, int>{};
+  for (final person in t.people) {
+    if (person.gone || !person.client.amSeated) continue;
+    final a = p.accountOf(person.client.signer.publicKey);
+    following[a] = (following[a] ?? 0) + 1;
+  }
+  for (final j in t.jurors) {
+    if (j.gone || j.client == null) continue;
+    final a = p.accountOf(j.signer.publicKey);
+    following[a] = (following[a] ?? 0) + 1;
+  }
+  for (final e in following.entries) {
+    if (e.value > 1) return '${e.key.substring(0, 4)} is at the table on ${e.value} devices at once';
+  }
+  return null;
+}
+
 /// Walks [seed] to its end — sealed, with the verifiable deal run for
 /// real, when [crypto] is given — and returns the first invariant it
 /// broke, with the faults that led there, or null when every one held.
@@ -151,8 +183,9 @@ String? walkChaos(int seed,
     int jurors = 4,
     bool sweep = false,
     bool workers = false,
+    bool twins = false,
     void Function(String line)? jurorLog}) {
-  final sc = ChaosScenario(seed, crypto: crypto, jurors: jurors, sweepJurors: sweep, workers: workers);
+  final sc = ChaosScenario(seed, crypto: crypto, jurors: jurors, sweepJurors: sweep, workers: workers, twins: twins);
   final t = sc.table;
   for (final j in t.jurors) {
     j.log = jurorLog;
@@ -233,6 +266,8 @@ String? walkChaos(int seed,
   String? check(String when) {
     // Read only: what each side waits for, for docs/07-states.md.
     structure?.take(t);
+    final twice = accountTwice(t);
+    if (twice != null) return '$when: $twice';
     final survivors = t.survivors.toList();
     for (final c in survivors) {
       if (c.failure == null || !judged.add(c)) continue;

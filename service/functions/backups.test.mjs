@@ -1,6 +1,7 @@
-// Backup codes: five to a subscription, each good once, shown on the
-// devices bound to it, replaced all at once, and emailed to the payer
-// when made and when replaced. node --test service/functions
+// Backup codes: five to an account, each good once, shown on its
+// devices, replaced all at once, and emailed to the payer when made and
+// when replaced; a code brings a device into the same account.
+// node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -30,6 +31,8 @@ async function household() {
   return store;
 }
 
+const accountOf = async (store) => (await store.get(`KEY#${KEY}`, 'ENTITLEMENT')).account;
+
 const mailbox = () => {
   const sent = [];
   const mail = async (to, codes) => sent.push({ to, codes });
@@ -49,7 +52,7 @@ test('a backup code is read the way a person types it', () => {
 test('made once when the subscription is paid for, and emailed once', async () => {
   const store = await household();
   const { sent, mail } = mailbox();
-  const first = await backupsMade('sub_9', 'payer@example.com', store, mail, { now });
+  const first = await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now });
   assert.deepEqual(first.body.emailed, true);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].to, 'payer@example.com');
@@ -57,7 +60,7 @@ test('made once when the subscription is paid for, and emailed once', async () =
   for (const c of sent[0].codes) assert.match(c, /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/);
   assert.equal(new Set(sent[0].codes).size, BACKUP_CODES);
   // A webhook delivered again makes nothing new and sends nothing.
-  await backupsMade('sub_9', 'payer@example.com', store, mail, { now });
+  await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now });
   assert.equal(sent.length, 1);
   const shown = await backupsFor(KEY, store, mail, { now });
   assert.deepEqual(shown.body.codes.map((c) => c.code), sent[0].codes, 'the device shows the codes that were sent');
@@ -73,9 +76,9 @@ test('a send that failed is tried again by the next delivery', async () => {
     if (fail) throw Object.assign(new Error('nope'), { code: 'E_RATE_LIMIT_EXCEEDED' });
     sent.push({ to, codes });
   };
-  assert.equal((await backupsMade('sub_9', 'payer@example.com', store, mail, { now })).body.emailed, false);
+  assert.equal((await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now })).body.emailed, false);
   fail = false;
-  assert.equal((await backupsMade('sub_9', 'payer@example.com', store, mail, { now })).body.emailed, true);
+  assert.equal((await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now })).body.emailed, true);
   assert.equal(sent.length, 1);
 });
 
@@ -85,6 +88,8 @@ test('a code brings one device in, once', async () => {
   const code = codes[0].code;
   const joined = await redeemBackup(device(1), code, store, { now });
   assert.equal(joined.status, 200);
+  assert.equal(joined.body.account, await accountOf(store), 'the same account, not one of its own');
+  assert.equal((await entitlementOf(store, device(1), { now })).account, await accountOf(store));
   assert.equal((await entitlementOf(store, device(1), { now })).licensed_until, '2027-10-02');
   assert.equal((await redeemBackup(device(2), code, store, { now })).status, 409, 'spent');
   const after = (await backupsFor(KEY, store, null, { now })).body.codes;
@@ -96,7 +101,7 @@ test('a code turned away by a full household is still good', async () => {
   const store = await household();
   const codes = (await backupsFor(KEY, store, null, { now })).body.codes.map((c) => c.code);
   for (let i = 1; i <= 4; i++) assert.equal((await redeemBackup(device(i), codes[i - 1], store, { now })).status, 200);
-  assert.equal((await devicesOn(store, 'sub_9')).length, 5);
+  assert.equal((await devicesOn(store, await accountOf(store))).length, 5);
   assert.notEqual((await redeemBackup(device(6), codes[4], store, { now })).status, 200, 'five devices already');
   assert.equal((await backupsFor(KEY, store, null, { now })).body.codes[4].used, false);
 });
@@ -137,7 +142,7 @@ test('sent when a device asks: the codes still good, to the payer, and why not w
   assert.equal(sent.length, 2);
 });
 
-test('only a device bound to the subscription sees its codes', async () => {
+test('only a device of the account sees its codes', async () => {
   const store = await household();
   assert.equal((await backupsFor(device(7), store, null, { now })).status, 402);
 });

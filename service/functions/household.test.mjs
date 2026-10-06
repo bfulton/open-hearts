@@ -40,7 +40,10 @@ const kvOf = (store, counts = { put: 0, list: 0 }) => ({
   },
 });
 
-/// A subscriber on sub_9 with [n] devices, KEY among them.
+/// A subscriber on sub_9 with [n] devices, KEY among them; its account
+/// is [accountOf] it.
+const accountOf = async (store) => (await store.get(`KEY#${KEY}`, 'ENTITLEMENT')).account;
+
 async function household(n = 1) {
   const store = memoryStore();
   await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_9', metadata: { key: KEY } } } }, store, { now });
@@ -56,7 +59,7 @@ function householdNamespace(env) {
   return {
     idFromName: (name) => name,
     get(id) {
-      if (!objects.has(id)) objects.set(id, new Household({}, env));
+      if (!objects.has(id)) objects.set(id, new Household({ storage: new Map() }, env));
       const object = objects.get(id);
       return { fetch: (url, init) => object.fetch(new Request(url, init)) };
     },
@@ -69,10 +72,11 @@ for (const where of ['in this isolate', 'in a Durable Object']) {
     const store = await household(4);
     const env = { OH_STORE: kvOf(store) };
     if (where === 'in a Durable Object') env.HOUSEHOLD = householdNamespace({ OH_STORE: env.OH_STORE });
+    const account = await accountOf(store);
     const code = (await ticketFor(KEY, store, { now })).body.ticket;
-    const both = await Promise.all(['77', '88'].map((b) => inHousehold(env, 'sub_9', { op: 'claim', key: b.repeat(32), code })));
+    const both = await Promise.all(['77', '88'].map((b) => inHousehold(env, account, { op: 'claim', key: b.repeat(32), code })));
     assert.deepEqual(both.map((c) => c.status).sort(), [200, 409], 'one code, one device');
-    assert.equal((await devicesOn(store, 'sub_9')).length, 5);
+    assert.equal((await devicesOn(store, account)).length, 5);
   });
 
   test(`${where}: two codes spent at once into the last place let one device in`, async () => {
@@ -82,16 +86,17 @@ for (const where of ['in this isolate', 'in a Durable Object']) {
     if (where === 'in a Durable Object') env.HOUSEHOLD = householdNamespace({ OH_STORE: env.OH_STORE });
     // Two codes made before either is spent: the reuse hands out the
     // outstanding one, so the second is made by hand.
+    const account = await accountOf(store);
     const first = (await ticketFor(KEY, store, { now })).body.ticket;
-    store.rows.delete('SUB#sub_9|TICKET');
+    store.rows.delete(`ACCOUNT#${account}|TICKET`);
     const second = (await ticketFor(KEY, store, { now })).body.ticket;
     assert.notEqual(first, second);
     const both = await Promise.all([
-      inHousehold(env, 'sub_9', { op: 'claim', key: '77'.repeat(32), code: first }),
-      inHousehold(env, 'sub_9', { op: 'claim', key: '88'.repeat(32), code: second }),
+      inHousehold(env, account, { op: 'claim', key: '77'.repeat(32), code: first }),
+      inHousehold(env, account, { op: 'claim', key: '88'.repeat(32), code: second }),
     ]);
     assert.deepEqual(both.map((c) => c.status).sort(), [200, 409]);
-    assert.equal((await devicesOn(store, 'sub_9')).length, 5, 'five, not six');
+    assert.equal((await devicesOn(store, account)).length, 5, 'five, not six');
   });
 }
 
@@ -101,11 +106,12 @@ test('asking for a code again is a read: the one outstanding, while it has time'
   const kv = kvOf(store, counts);
   const env = { OH_STORE: kv };
   forgetHouseholds();
-  const first = await inHousehold(env, 'sub_9', { op: 'ticket', key: KEY });
+  const account = await accountOf(store);
+  const first = await inHousehold(env, account, { op: 'ticket', key: KEY });
   const writes = counts.put;
   const lists = counts.list;
   for (let i = 0; i < 5; i++) {
-    const again = await inHousehold(env, 'sub_9', { op: 'ticket', key: KEY });
+    const again = await inHousehold(env, account, { op: 'ticket', key: KEY });
     assert.equal(again.body.ticket, first.body.ticket);
   }
   assert.equal(counts.put, writes, 'no writes');

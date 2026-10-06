@@ -641,7 +641,7 @@ abstract class AppLocalizations {
   /// Why the server turned down a request about a subscription's devices.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device\'s clock is out. Set it right and try again.} notAStore{That is not a store the service knows.} noProof{The store gave nothing to show for the purchase.} notFromStore{That purchase did not come from the store.} notPaid{The store says that purchase is not paid for.} storeNotAnswering{The store is not answering. Try again in a moment.} storeNotSetUp{Buying in the store is not open yet.} signInRefused{That sign-in did not check out. Try again.} accountElsewhere{That account is already on another device.} accountNowhere{That account has not been signed in with here before.} signInNotSetUp{Signing in is not open yet.} other{The service turned that down.}}'**
+  /// **'{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device\'s clock is out. Set it right and try again.} notAStore{That is not a store the service knows.} noProof{The store gave nothing to show for the purchase.} notFromStore{That purchase did not come from the store.} notPaid{The store says that purchase is not paid for.} storeNotAnswering{The store is not answering. Try again in a moment.} storeNotSetUp{Buying in the store is not open yet.} signInRefused{That sign-in did not check out. Try again.} accountElsewhere{That sign-in is linked to another account.} accountNowhere{No account is linked to that sign-in yet.} otherSignIn{This account is already linked to another sign-in.} signInNotSetUp{Signing in is not open yet.} other{The service turned that down.}}'**
   String serviceRefusal(String reason);
 
   /// Shown when live play cannot be bought on this device.
@@ -701,7 +701,7 @@ abstract class AppLocalizations {
   /// On the Live play page once it is bought, above the list of devices.
   ///
   /// In en, this message translates to:
-  /// **'A subscription is yours, not a device\'s. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.'**
+  /// **'A subscription is your account, not a device\'s, and it plays on one device at a time. Bring another in by showing it this code — its camera is all it needs — and drop one whenever you like.'**
   String get subscriptionIsYours;
 
   /// Heading of the list of devices on the subscription.
@@ -1691,13 +1691,13 @@ abstract class AppLocalizations {
   /// On a subscriber's Subscription page, above the sign-in buttons: why to sign in, and what is kept of the account.
   ///
   /// In en, this message translates to:
-  /// **'Sign in, and a new phone or a browser that has forgotten this one gets the subscription back by signing in the same way. All that is kept of the account is a scrambled form of its number: no name, no email.'**
+  /// **'Sign in, and a new phone or a browser that has forgotten this one comes back into this account by signing in the same way. All that is kept of the sign-in is a scrambled form of its number: no name, no email.'**
   String get signInToKeep;
 
   /// On the Subscription page before buying, above the sign-in buttons: signing in brings back a subscription from another device.
   ///
   /// In en, this message translates to:
-  /// **'Subscribed already, and signed in on that device? Sign in the same way to bring the subscription here.'**
+  /// **'Subscribed already, and signed in on your other device? Sign in the same way to bring this one into your account.'**
   String get signInToBringBack;
 
   /// On a subscriber's Subscription page once this device has signed in.
@@ -1721,13 +1721,13 @@ abstract class AppLocalizations {
   /// Shown when the account just signed in with is already on another device, above a button that moves it here.
   ///
   /// In en, this message translates to:
-  /// **'That account is signed in on another device. Move it here? A new device then gets back this subscription, and the other device keeps what it has.'**
+  /// **'That sign-in is linked to another Open Hearts account. Use that account on this device? This device leaves the one it is in now.'**
   String get accountElsewhere;
 
   /// Button: move the signed-in account to this device.
   ///
   /// In en, this message translates to:
-  /// **'Move it here'**
+  /// **'Use that account here'**
   String get moveAccountHere;
 
   /// Shown once a subscribed device has signed in.
@@ -1739,7 +1739,7 @@ abstract class AppLocalizations {
   /// Shown once an unsubscribed device has signed in with an account that has no subscription.
   ///
   /// In en, this message translates to:
-  /// **'Signed in. There is no subscription on that account yet.'**
+  /// **'Signed in. No account is linked to that sign-in yet: subscribe, then sign in from the subscription page.'**
   String get signedInNoSubscription;
 
   /// Shown when Apple or Google could not finish signing in.
@@ -1747,6 +1747,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Signing in did not finish. Try again in a moment.'**
   String get signInFailed;
+
+  /// Over everything on a device whose account another of its devices has taken up: one device at a time.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Hearts is now open on another device'**
+  String get openElsewhereTitle;
+
+  /// Under openElsewhereTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account plays on one device at a time, and the newest one opened wins. This one has stepped back: off the table, the jury and the waiting list. Use it here, and the other one steps back instead.'**
+  String get openElsewhereBody;
+
+  /// Asked before this device takes the account from another device of it that is at a live table.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re in a game on another device'**
+  String get inGameElsewhereTitle;
+
+  /// Under inGameElsewhereTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue here? That game will be lost.'**
+  String get inGameElsewhereBody;
+
+  /// Button under inGameElsewhereBody: takes the account here, and the game on the other device is lost.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue here'**
+  String get continueHere;
+
+  /// Button: takes the account back on this device, and the other device steps back.
+  ///
+  /// In en, this message translates to:
+  /// **'Use it here'**
+  String get useItHere;
+
+  /// Where live play would be, on a device that stepped back for another device of its account.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is in use on another device.'**
+  String get liveOpenElsewhere;
+
+  /// Beside a device in the account's list: the one in use now.
+  ///
+  /// In en, this message translates to:
+  /// **'in use'**
+  String get deviceInUse;
+
+  /// A game's address opened on a device with no subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Watching a game, and looking at one played, is part of live play.'**
+  String get reviewIsLivePlay;
+
+  /// A game's address opened while the account is playing it.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your own game, still being played. It is here once it is over.'**
+  String get reviewOwnGame;
 }
 
 class _AppLocalizationsDelegate

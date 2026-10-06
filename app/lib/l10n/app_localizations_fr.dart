@@ -472,9 +472,9 @@ class AppLocalizationsFr extends AppLocalizations {
           'La boutique ne répond pas. Réessayez dans un instant.',
       'storeNotSetUp': 'L\'achat dans la boutique n\'est pas encore ouvert.',
       'signInRefused': 'Cette connexion n\'a pas pu être vérifiée. Réessayez.',
-      'accountElsewhere': 'Ce compte est déjà sur un autre appareil.',
-      'accountNowhere':
-          'Personne ne s\'est encore connecté ici avec ce compte.',
+      'accountElsewhere': 'Cette connexion est liée à un autre compte.',
+      'accountNowhere': 'Aucun compte n\'est encore lié à cette connexion.',
+      'otherSignIn': 'Ce compte est déjà lié à une autre connexion.',
       'signInNotSetUp': 'La connexion n\'est pas encore ouverte.',
       'other': 'Le service a refusé.',
     });
@@ -519,7 +519,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get subscriptionIsYours =>
-      'Un abonnement est à vous, pas à un appareil. Ajoutez-en un autre en lui montrant ce code — son appareil photo suffit — et retirez-en un quand vous voulez.';
+      'Un abonnement est votre compte, pas celui d\'un appareil, et il se joue sur un appareil à la fois. Ajoutez-en un autre en lui montrant ce code — son appareil photo suffit — et retirez-en un quand vous voulez.';
 
   @override
   String get yourDevices => 'Vos appareils';
@@ -1210,11 +1210,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get signInToKeep =>
-      'Connectez-vous, et un nouveau téléphone ou un navigateur qui a tout oublié récupère l\'abonnement en se connectant de la même façon. Du compte, seule une forme brouillée de son numéro est gardée : ni nom, ni e-mail.';
+      'Connectez-vous, et un nouveau téléphone ou un navigateur qui a tout oublié revient dans ce compte en se connectant de la même façon. De la connexion, seule une forme brouillée de son numéro est gardée : ni nom, ni e-mail.';
 
   @override
   String get signInToBringBack =>
-      'Déjà abonné, et connecté sur cet appareil-là ? Connectez-vous de la même façon pour ramener l\'abonnement ici.';
+      'Déjà abonné, et connecté sur votre autre appareil ? Connectez-vous de la même façon pour amener celui-ci dans votre compte.';
 
   @override
   String signedInWith(String provider) {
@@ -1245,19 +1245,55 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get accountElsewhere =>
-      'Ce compte est connecté sur un autre appareil. Le déplacer ici ? Un nouvel appareil récupère alors cet abonnement, et l\'autre garde ce qu\'il a.';
+      'Cette connexion est liée à un autre compte Open Hearts. Utiliser ce compte sur cet appareil ? Cet appareil quitte alors le compte où il est maintenant.';
 
   @override
-  String get moveAccountHere => 'Le déplacer ici';
+  String get moveAccountHere => 'Utiliser ce compte ici';
 
   @override
   String get signedIn => 'Connecté.';
 
   @override
   String get signedInNoSubscription =>
-      'Connecté. Ce compte n\'a pas encore d\'abonnement.';
+      'Connecté. Aucun compte n\'est encore lié à cette connexion : abonnez-vous, puis connectez-vous depuis la page de l\'abonnement.';
 
   @override
   String get signInFailed =>
       'La connexion n\'a pas abouti. Réessayez dans un instant.';
+
+  @override
+  String get openElsewhereTitle =>
+      'Open Hearts est maintenant ouvert sur un autre appareil';
+
+  @override
+  String get openElsewhereBody =>
+      'Votre compte joue sur un appareil à la fois, et le dernier ouvert l\'emporte. Celui-ci s\'est retiré : de la table, du jury et de l\'attente. Utilisez-le ici, et c\'est l\'autre qui se retire.';
+
+  @override
+  String get inGameElsewhereTitle =>
+      'Vous êtes dans une partie sur un autre appareil';
+
+  @override
+  String get inGameElsewhereBody => 'Continuer ici ? Cette partie sera perdue.';
+
+  @override
+  String get continueHere => 'Continuer ici';
+
+  @override
+  String get useItHere => 'L\'utiliser ici';
+
+  @override
+  String get liveOpenElsewhere =>
+      'Votre compte est utilisé sur un autre appareil.';
+
+  @override
+  String get deviceInUse => 'en cours d’utilisation';
+
+  @override
+  String get reviewIsLivePlay =>
+      'Regarder une partie, et en revoir une déjà jouée, fait partie du jeu en direct.';
+
+  @override
+  String get reviewOwnGame =>
+      'C\'est votre propre partie, toujours en cours. Elle sera ici une fois terminée.';
 }

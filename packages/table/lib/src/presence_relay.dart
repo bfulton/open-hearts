@@ -21,6 +21,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'jury.dart';
+import 'licence.dart';
 import 'nostr.dart';
 import 'relays.dart';
 import 'signing.dart';
@@ -108,9 +109,16 @@ List<Uri> relaysForTag(List<Uri> relays, String tag) => [
 
 class RelayPresence implements Presence {
   RelayPresence(
-      {required List<Uri> relays, required this.signer, this.status = 'online', this.everyMs = 5000, this.canServe, this.log})
+      {required List<Uri> relays,
+      required this.signer,
+      this.status = 'online',
+      this.everyMs = 5000,
+      this.canServe,
+      this.activation,
+      this.log})
       : relays = Relays.turnedBy(relaysForTag(relays, topic), signer.publicKey) {
     _group = RelayGroup(
+      auth: relayAuthFor(signer),
       urls: this.relays,
       subscriptions: {
         'online': [const Filter(kinds: [TableKinds.presence]).toJson()..['#t'] = [topic]],
@@ -146,6 +154,14 @@ class RelayPresence implements Presence {
   /// everyone within one. Null is always.
   final bool Function()? canServe;
   final void Function(String line)? log;
+
+  /// This device's activation, as the service last gave it
+  /// (licence.dart): said with every beat, so that everyone hears whose
+  /// device this is — a table draws no juror from an account it seats —
+  /// and another device of the same account hears that it has been
+  /// superseded. Read at every beat; null says no account, which only
+  /// the bench of jurors of last resort may do on our relay.
+  final Activation? Function()? activation;
 
   static const topic = 'online';
 
@@ -184,6 +200,31 @@ class RelayPresence implements Presence {
   /// Summonses addressed to this key.
   Stream<Summons> get summonses => _summonses.stream;
 
+  /// The account each key belongs to, as its activation says, and that
+  /// activation's epoch.
+  final Map<PublicKey, ({AccountId account, int epoch})> _accounts = {};
+
+  /// The newest epoch heard for each account, and from which key.
+  final Map<AccountId, ({PublicKey key, int epoch})> _newestOf = {};
+
+  final _superseded = StreamController<Activation>.broadcast();
+
+  /// A later activation of this device's own account, heard from
+  /// another device: this one is no longer the account's in use
+  /// (docs/06-service.md). The relay closes a superseded device's
+  /// sockets itself; this is how a device hears it on a relay that does
+  /// not, and sooner where it does.
+  Stream<Activation> get superseded => _superseded.stream;
+
+  @override
+  AccountId accountOf(PublicKey key) {
+    if (key == signer.publicKey) {
+      final mine = activation?.call();
+      if (mine != null) return mine.account;
+    }
+    return _accounts[key]?.account ?? key;
+  }
+
   /// Tables that said they had nobody to draw from.
   Stream<String> get calls => _calls.stream;
 
@@ -205,7 +246,7 @@ class RelayPresence implements Presence {
     final now = _nowMs;
     return {
       for (final e in _seen.entries)
-        if (now - e.value < withinMs && !_went.contains(e.key)) e.key,
+        if (now - e.value < withinMs && !_went.contains(e.key) && !_outdone(e.key)) e.key,
       if (!_silent && _able) signer.publicKey,
     };
   }
@@ -260,6 +301,15 @@ class RelayPresence implements Presence {
     ]), everywhere: true);
   }
 
+  /// Whether [key] is a device whose account has since been taken up by
+  /// another: it is not online, whatever it last said.
+  bool _outdone(PublicKey key) {
+    final a = _accounts[key];
+    if (a == null) return false;
+    final newest = _newestOf[a.account];
+    return newest != null && newest.key != key && newest.epoch > a.epoch;
+  }
+
   void _announce() {
     if (_silent || _closed) return;
     if (!_able) {
@@ -270,9 +320,32 @@ class RelayPresence implements Presence {
       return;
     }
     _announced = true;
-    _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'here', 'status': status}), tags: [
-      ['t', topic],
-    ]), everywhere: true);
+    final mine = activation?.call();
+    _group.publish(
+        NostrEvent.sign(signer,
+            kind: TableKinds.presence,
+            content: jsonEncode({'kind': 'here', 'status': status, if (mine != null) 'activation': mine.toJson()}),
+            tags: [
+              ['t', topic],
+            ]),
+        everywhere: true);
+  }
+
+  /// What [key]'s beat says of its account: taken where it holds
+  /// ([accountFrom]), and the newest epoch of each account kept, so a
+  /// device superseded is out of [online] from the moment its successor
+  /// is heard, and this device hears when it is the one superseded.
+  void _account(PublicKey key, Object? said) {
+    final act = Activation.parse(said);
+    final account = accountFrom(act, key);
+    if (act == null || account == null) return;
+    _accounts[key] = (account: account, epoch: act.epoch);
+    final newest = _newestOf[account];
+    if (newest == null || act.epoch > newest.epoch || (act.epoch == newest.epoch && newest.key == key)) {
+      _newestOf[account] = (key: key, epoch: act.epoch);
+    }
+    final mine = activation?.call();
+    if (mine != null && key != signer.publicKey && act.supersedes(mine) && !_superseded.isClosed) _superseded.add(act);
   }
 
   /// The newest presence each key has said, by its own clock, in
@@ -318,6 +391,7 @@ class RelayPresence implements Presence {
     }
     switch (c['kind']) {
       case 'here':
+        _account(e.pubkey, c['activation']);
         final now = _nowMs;
         if (now - (_seen[e.pubkey] ?? -_gapMs * 2) > _gapMs) _since[e.pubkey] = now;
         _seen[e.pubkey] = now;
@@ -342,5 +416,6 @@ class RelayPresence implements Presence {
     _group.close();
     _summonses.close();
     _calls.close();
+    _superseded.close();
   }
 }

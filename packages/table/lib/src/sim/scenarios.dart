@@ -64,7 +64,8 @@ class MatrixCell {
 /// A random walk: departures, partitions, blips, loss and latency at
 /// random times over the first few minutes, then quiet.
 class ChaosScenario {
-  ChaosScenario(this.seed, {this.jurors = 4, DealCrypto? crypto, bool sweepJurors = false, bool workers = false}) : rng = Random(seed) {
+  ChaosScenario(this.seed, {this.jurors = 4, DealCrypto? crypto, bool sweepJurors = false, bool workers = false, this.twins = false})
+      : rng = Random(seed) {
     humans = 2 + rng.nextInt(3);
     table = SimTable(
         humans: humans, seed: 100 + seed, netSeed: seed, jurors: jurors, crypto: crypto, sweepJurors: sweepJurors, workers: workers);
@@ -81,6 +82,17 @@ class ChaosScenario {
   /// Strangers online to draw a jury from; zero for the players' own
   /// protocol alone.
   final int jurors;
+
+  /// Accounts on two devices: as it walks, a juror's account or a
+  /// seated player's is taken up on a new device, which supersedes the
+  /// old one — the old one cut off by the relay where it stands
+  /// (docs/06-service.md, "One device at a time"). A player's new
+  /// device is online, drawable by any table but this one, and the
+  /// seat it left is the table's to take as a departure.
+  final bool twins;
+
+  /// New devices made so far, for their names.
+  int _twinsMade = 0;
 
   final int seed;
   final Random rng;
@@ -102,7 +114,12 @@ class ChaosScenario {
     for (var f = 0; f < count; f++) {
       final when = at;
       final base = jurors > 0 ? 8 : 6;
-      final kind = rng.nextInt(base + 4);
+      final kind = rng.nextInt(base + (twins ? 6 : 4));
+      if (kind >= base + 4) {
+        _twin(when, player: kind == base + 5, exitsLeft: () => exits < maxExits, exited: () => exits++);
+        at += 3000 + rng.nextInt(30000);
+        continue;
+      }
       if (kind == base + 2) {
         // One event eaten where it is said, and only one. Loss as a
         // rate finds the peer that is repeated at until something
@@ -275,6 +292,46 @@ class ChaosScenario {
       at += 3000 + rng.nextInt(30000);
     }
     quietAt = at + 70000;
+  }
+
+  /// At [when], an account taken up on a new device: a seated player's
+  /// with [player], else a juror's. The new device is online at once;
+  /// the old one is superseded, and the relay drops it — a crash, as
+  /// far as anyone else can tell. A player's counts against the
+  /// table's departures ([exitsLeft], [exited]), as any other way out
+  /// of a seat does.
+  void _twin(int when, {required bool player, required bool Function() exitsLeft, required void Function() exited}) {
+    final t = table;
+    final p = t.presence;
+    if (p == null) return;
+    t.clock.schedule(when, () {
+      final String account;
+      final void Function() supersede;
+      final String was;
+      if (player) {
+        if (!exitsLeft()) return;
+        final live = t.people.where((x) => !x.gone).toList();
+        if (live.length < 2) return;
+        final who = live[rng.nextInt(live.length)];
+        account = p.accountOf(who.client.signer.publicKey);
+        was = 'seat ${who.client.mySeat}';
+        exited();
+        supersede = () => who.depart(Exit.crash);
+      } else {
+        final up = t.jurors.where((j) => !j.gone && !p.lastResorts.contains(j)).toList();
+        if (up.isEmpty) return;
+        final old = up[rng.nextInt(up.length)];
+        account = p.accountOf(old.signer.publicKey);
+        was = 'juror ${old.signer.publicKey.substring(0, 4)}';
+        supersede = () => old.depart(Exit.crash);
+      }
+      final signer = FakeSigner('twin${_twinsMade++}-$seed');
+      final device = SimJuror(signer, t.net, t.clock, crypto: t.crypto, account: account)..sweeps = t.jurors.isNotEmpty && t.jurors.first.sweeps;
+      t.jurors.add(device);
+      p.register(device);
+      supersede();
+      faults.add('$was\'s account taken up on ${signer.publicKey.substring(0, 4)} at ${t.clock.nowMs}');
+    });
   }
 
   /// Ends every fault that is not a departure for good.

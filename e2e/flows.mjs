@@ -504,6 +504,59 @@ flow('a second device, brought in by the code the first one shows', async ({ ope
   await waitFor(first, /^2 of 5$/, { what: 'both devices on the subscription, after a reload', timeout: 40000 });
 });
 
+flow('one device at a time: the newest opened wins, and the other takes it back — asked first when it is at a table', async ({ open, relay }) => {
+  // An account plays on one device at a time (docs/06-service.md). The
+  // second device comes into the first one's account by its code, and
+  // opening it is taking the account up: the first steps back, off the
+  // relays, and says so. Taken back, the second does. And a device at a
+  // table is asked about before its game is lost.
+  await relay();
+  const first = await open();
+  await waitFor(first, /^Play live/, { what: 'live play open on the first device', timeout: 40000 });
+  await click(first, /^Your profile$/);
+  await waitFor(first, /^Rocket$/, { what: 'the profile' });
+  await type(first, 'Your name', 'Ada');
+  await click(first, /^Done$/);
+  await click(first, /^Menu$/);
+  await waitFor(first, /^Subscription$/, { what: 'the menu' });
+  await click(first, /^Subscription$/);
+  await waitFor(first, /^Add a device$/, { what: 'the subscription page' });
+  await click(first, /^Add a device$/);
+  await waitFor(first, /^A code to scan$/, { what: 'the code' });
+  await click(first, /^Send the link instead$/);
+  await sleep(500);
+  const link = await first.evaluate('navigator.clipboard.readText()');
+  await click(first, /^Back$/);
+  await waitFor(first, /^Play solo$/, { what: 'the front door' });
+
+  const second = await open({ url: link, ready: /^Join this subscription\?$/ });
+  await click(second, /^Join$/);
+  // Opened, and in the account: it takes the account up, and the first
+  // hears so and steps back.
+  await waitFor(first, /^Open Hearts is now open on another device$/, { what: 'the first device stepping back', timeout: 40000 });
+  await waitFor(second, /^Play live/, { what: 'live play open on the second device', timeout: 40000 });
+  if (await has(second, /^Open Hearts is now open on another device$/)) throw new Error('both devices say the other is in use');
+
+  // Taken back on the first.
+  await click(first, /^Use it here$/);
+  await waitGone(first, /^Open Hearts is now open on another device$/, { what: 'the first device in use again', timeout: 20000 });
+  await waitFor(second, /^Open Hearts is now open on another device$/, { what: 'the second device stepping back', timeout: 40000 });
+
+  // The first sits down at a table; the second, asked to take the
+  // account, says the game would be lost, and on the word does it.
+  await waitFor(first, /^Play live/, { what: 'live play on the first device', timeout: 40000 });
+  await click(first, /^Play live/);
+  await waitFor(first, /^1 of 1 here  ·  rated$/, { what: 'Ada at a table with three bots', timeout: 60000 });
+  await click(second, /^Use it here$/);
+  await waitFor(second, /^You're in a game on another device$/, { what: 'the question first', timeout: 20000 });
+  await waitFor(second, /^Continue here\? That game will be lost\.$/, { what: 'and what it costs' });
+  if (await has(first, /^Open Hearts is now open on another device$/)) throw new Error('the first device stepped back before anybody said so');
+  await click(second, /^Continue here$/);
+  await waitFor(first, /^Open Hearts is now open on another device$/, { what: 'the first device leaving its table', timeout: 40000 });
+  await waitGone(second, /^You're in a game on another device$/, { what: 'the second device in use', timeout: 20000 });
+  if (await has(first, /^1 of 1 here/)) throw new Error('the first device is still at its table');
+});
+
 // ---- the runner ----------------------------------------------------------
 
 /// Plays for the thumb until [done], through the semantics tree —

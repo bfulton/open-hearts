@@ -108,7 +108,9 @@ export async function startRelay({ apart = false } = {}) {
 /// process is one juror.
 function startJuror(relay, secret, relayLog, size) {
   const juror = spawn('dart', ['run', join('bin', 'juror.dart'), '--relay', relay, '--jurors', `${size}`],
-      { cwd: join(root, 'service'), env: { ...process.env, OH_JUROR_SECRET: secret } });
+      // The rig's service key, to hold every seat to its licence as a
+      // device does (packages/table, licence.dart).
+      { cwd: join(root, 'service'), env: { ...process.env, OH_JUROR_SECRET: secret, OH_SERVICE_KEY: localService.key } });
   const said = [];
   let named;
   const key = new Promise((resolve) => { named = resolve; });
