@@ -259,7 +259,7 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get tagline => 'Open source, sans pub, plus de cœur.';
+  String get tagline => 'Jeu de cartes Dame de pique open source, sans pub';
 
   @override
   String get playSolo => 'Jouer seul';

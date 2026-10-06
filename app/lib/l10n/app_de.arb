@@ -48,7 +48,7 @@
   "copyRecord": "Protokoll kopieren",
   "ratingNow": "Wertung {rating}",
   "ratingMoved": "Wertung {before} → {after}",
-  "tagline": "Open Source, keine Werbung, mehr Herz.",
+  "tagline": "Open-Source-Kartenspiel Hearts, ohne Werbung",
   "playSolo": "Allein spielen",
   "stillLookingForRelay": "Suche noch ein Relay…",
   "noRelayTakesEvents": "Kein Relay nimmt die Nachrichten dieses Geräts an: {reason}",

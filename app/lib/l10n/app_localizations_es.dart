@@ -259,7 +259,8 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get tagline => 'Código abierto, sin anuncios, más corazón.';
+  String get tagline =>
+      'Juego de cartas Corazones de código abierto, sin anuncios';
 
   @override
   String get playSolo => 'Jugar solo';

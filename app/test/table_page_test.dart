@@ -597,7 +597,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AboutPage), findsOneWidget);
     expect(find.text('dev'), findsWidgets, reason: 'the build tag, and its date');
-    expect(find.text('Open source, no ads, more heart.'), findsOneWidget, reason: 'the home page\'s tagline');
+    expect(find.text('Open source Hearts card game, no ads'), findsOneWidget, reason: 'the home page\'s tagline');
     for (final link in ['Code', 'License', 'Privacy', 'Terms']) {
       expect(find.widgetWithText(TextButton, link), findsOneWidget, reason: link);
     }

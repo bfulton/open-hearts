@@ -50,7 +50,7 @@ h1 {
 }
 .tagline {
   margin: 0 auto 30px;
-  max-width: 30ch;
+  text-wrap: balance;
   font-size: clamp(17px, 4.4vw, 20px);
   color: var(--chrome-dim);
 }

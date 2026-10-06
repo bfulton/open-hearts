@@ -68,7 +68,7 @@ flow('the front door', async ({ open }) => {
   // Everything before a game is on this one screen: who you are, the
   // game being asked for, and the three ways in.
   for (const want of [
-    /^Open source, no ads, more heart\.$/,
+    /^Open source Hearts card game, no ads$/,
     /^Menu$/,
     /^Your profile$/,
     /^Play solo$/,

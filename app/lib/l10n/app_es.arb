@@ -48,7 +48,7 @@
   "copyRecord": "Copiar registro",
   "ratingNow": "Clasificación {rating}",
   "ratingMoved": "Clasificación {before} → {after}",
-  "tagline": "Código abierto, sin anuncios, más corazón.",
+  "tagline": "Juego de cartas Corazones de código abierto, sin anuncios",
   "playSolo": "Jugar solo",
   "stillLookingForRelay": "Todavía buscando un relé…",
   "noRelayTakesEvents": "Ningún relé acepta los mensajes de este dispositivo: {reason}",
