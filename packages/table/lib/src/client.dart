@@ -5683,11 +5683,29 @@ class TableClient {
   /// A verdict, by a juror of the hand as this peer knows the jury,
   /// about a turn open here: the side it names wins, with the event it
   /// carries.
+  ///
+  /// One about a turn still to come here is kept for that turn, before
+  /// asking whose it is: a peer carried forward is sent every removal
+  /// in the record with its verdict, wherever it is ([_catchUp]), and
+  /// one far behind — a juror summoned late, reading from the first
+  /// hand — hears a removal's verdict long before the jury of its hand.
+  /// Asked then, the juror would be nobody it knows, and the verdict
+  /// dropped once is never read again: every copy after it is a repeat.
+  /// The peer would stop at that removal for good, still counting the
+  /// seat a person's, and read every later hand's bot seats a seat
+  /// short of everyone else (docs/04-live-play.md, "Appeals and
+  /// verdicts").
   void _onVerdict(TableEvent event) {
     final turn = event.turn;
-    if (!_jurorsOf(turn.hand).contains(event.author) && !_orderFor(turn.hand).contains(event.author)) return;
     final where = _compare(turn);
     if (where > 0) return _defer(event);
+    if (!_jurorsOf(turn.hand).contains(event.author) && !_orderFor(turn.hand).contains(event.author)) {
+      // And one by a juror not yet known here, at a turn this peer has
+      // reached, is not taken as seen: the draw that brought the juror
+      // in may still be on its way, and a copy after it is read afresh.
+      _seen.remove(event.id);
+      return;
+    }
     final race = _races[turn];
     if (where < 0 || (race?.settled ?? false)) {
       // The escrow ruled for at a turn settled here by the seat's move

@@ -413,7 +413,11 @@ any peer behind, and the seats dial it.
   five seconds more.
 - **The verdict** carries the winning event whole, so it settles the
   turn the same way wherever it lands, and travels with the turn when a
-  peer behind is carried forward. The verifier checks each verdict
+  peer behind is carried forward. A removal's verdict travels with every
+  carry, so a peer far behind — a juror summoned hands in, reading from
+  the first — hears it before the jury that gave it; it keeps the
+  verdict for its turn, and asks whose it is there, not on arrival
+  (`late_juror_verdict_test.dart`). The verifier checks each verdict
   against the jury in force for the hand, the turn, the seat and the
   event.
 
