@@ -175,12 +175,19 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
 # nowhere else. A build published without it has live play shut, which
 # is the safe way round: the alternative is a build that would take a
 # licence from whoever answered first.
+#
+# OH_GOOGLE_CLIENT_ID and OH_APPLE_SERVICE_ID are the sign-in providers'
+# identifiers (docs/06-service.md, app/lib/net/provider_tokens.dart).
+# Neither is a secret. A build without one offers no sign-in with that
+# provider.
 ( cd app && "$FLUTTER" build web \
     --release \
     --no-web-resources-cdn \
     --base-href /play/ \
     --dart-define=OH_RELAYS="${OH_RELAYS:-}" \
-    --dart-define=OH_SERVICE_KEY="${OH_SERVICE_KEY:-}" )
+    --dart-define=OH_SERVICE_KEY="${OH_SERVICE_KEY:-}" \
+    --dart-define=OH_GOOGLE_CLIENT_ID="${OH_GOOGLE_CLIENT_ID:-}" \
+    --dart-define=OH_APPLE_SERVICE_ID="${OH_APPLE_SERVICE_ID:-}" )
 FLUTTER="$FLUTTER" app/worker/build.sh app/build/web
 
 mkdir -p "$STAGE/play"

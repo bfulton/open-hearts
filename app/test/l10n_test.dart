@@ -29,6 +29,7 @@ import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/live/options_sheet.dart';
 import 'package:open_hearts/net/remote_config.dart';
+import 'package:open_hearts/net/sign_in.dart' show Provider;
 import 'package:open_hearts/net/store_buying.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/stats.dart';
@@ -40,6 +41,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart' show Pace, Tally;
 
 import 'home_page_test.dart' show licenceThisDevice;
+import 'sign_in_test.dart' show offering;
 import 'store_buying_test.dart' show FakeStore, paid, shopWith;
 
 const _service = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
@@ -382,6 +384,8 @@ void main() {
           await tester.pumpAndSettle();
           cut.addAll(_cut(tester, 'feedback'));
 
+          // With every sign-in offered, which is the most the page says.
+          offering([Provider.apple, Provider.google]);
           await Entitlement.current.load((await Identity.signer()).publicKey);
           await tester.pumpWidget(_inLanguage(locale, const SubscribePage()));
           await tester.pumpAndSettle();

@@ -89,7 +89,7 @@
   "noDealBuild": "Diese Version kann das Austeilen, das die Karten ehrlich hält, nicht ausführen und darum an keinem Live-Tisch sitzen.",
   "serviceUnreachable": "Der Dienst ist nicht erreichbar. Versuch es gleich noch einmal.",
   "codeNotForThisDevice": "Dieser Code ist nicht für dieses Gerät.",
-  "serviceRefusal": "{reason, select, noSubscription{Kein Abo.} fiveDevices{Dieses Abo hat schon so viele Geräte, wie es tragen kann.} notACode{Das ist kein Code.} noSuchCode{Diesen Code gibt es nicht.} codeUsed{Dieser Code wurde schon benutzt.} codeRunOut{Dieser Code ist abgelaufen.} notADevice{Dieses Gerät gehört nicht zu diesem Abo.} onAnotherSubscription{Dieses Gerät gehört zu einem anderen Abo. Entferne es dort zuerst.} clockOff{Die Uhr dieses Geräts geht falsch. Stell sie richtig und versuch es noch einmal.} notAStore{Diesen Store kennt der Dienst nicht.} noProof{Der Store hat keinen Beleg für den Kauf geliefert.} notFromStore{Dieser Kauf kommt nicht aus dem Store.} notPaid{Laut Store ist dieser Kauf nicht bezahlt.} storeNotAnswering{Der Store antwortet nicht. Versuch es gleich noch einmal.} storeNotSetUp{Kaufen im Store ist noch nicht geöffnet.} other{Der Dienst hat abgelehnt.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Kein Abo.} fiveDevices{Dieses Abo hat schon so viele Geräte, wie es tragen kann.} notACode{Das ist kein Code.} noSuchCode{Diesen Code gibt es nicht.} codeUsed{Dieser Code wurde schon benutzt.} codeRunOut{Dieser Code ist abgelaufen.} notADevice{Dieses Gerät gehört nicht zu diesem Abo.} onAnotherSubscription{Dieses Gerät gehört zu einem anderen Abo. Entferne es dort zuerst.} clockOff{Die Uhr dieses Geräts geht falsch. Stell sie richtig und versuch es noch einmal.} notAStore{Diesen Store kennt der Dienst nicht.} noProof{Der Store hat keinen Beleg für den Kauf geliefert.} notFromStore{Dieser Kauf kommt nicht aus dem Store.} notPaid{Laut Store ist dieser Kauf nicht bezahlt.} storeNotAnswering{Der Store antwortet nicht. Versuch es gleich noch einmal.} storeNotSetUp{Kaufen im Store ist noch nicht geöffnet.} signInRefused{Diese Anmeldung ließ sich nicht prüfen. Versuch es noch einmal.} accountElsewhere{Dieses Konto ist schon auf einem anderen Gerät.} accountNowhere{Mit diesem Konto hat sich hier noch niemand angemeldet.} signInNotSetUp{Die Anmeldung ist noch nicht geöffnet.} other{Der Dienst hat abgelehnt.}}",
   "buyingNotOpen": "Auf diesem Gerät kann man noch nicht kaufen.",
   "shopUnreachable": "Der Shop ist nicht erreichbar. Versuch es gleich noch einmal.",
   "shopNotOpen": "Der Shop ist noch nicht geöffnet.",
@@ -262,5 +262,16 @@
   "watchingNote": "Die Karten bleiben verdeckt, bis das Spiel vorbei ist; dann steht hier das ganze Spiel, geprüft.",
   "passingNow": "Karten werden weitergegeben",
   "dealingNow": "Es wird gegeben",
-  "toPlayNow": "{name} ist am Zug"
+  "toPlayNow": "{name} ist am Zug",
+  "yourAccount": "Dein Konto",
+  "signInToKeep": "Melde dich an, und ein neues Handy oder ein Browser, der dieses Gerät vergessen hat, bekommt das Abo zurück, wenn du dich dort genauso anmeldest. Vom Konto wird nur eine unkenntlich gemachte Form seiner Nummer aufbewahrt: kein Name, keine E-Mail.",
+  "signInToBringBack": "Schon ein Abo, und auf jenem Gerät angemeldet? Melde dich genauso an, um es hierher zu holen.",
+  "signedInWith": "{provider, select, apple{Mit Apple angemeldet.} other{Mit Google angemeldet.}} Melde dich auf einem neuen Handy oder in einem anderen Browser genauso an, und dieses Abo kommt mit.",
+  "signedInBeforeBuying": "{provider, select, apple{Mit Apple angemeldet.} other{Mit Google angemeldet.}} Ein hier gekauftes Abo bleibt bei deinem Konto.",
+  "signInWith": "{provider, select, apple{Mit Apple anmelden} other{Mit Google anmelden}}",
+  "accountElsewhere": "Dieses Konto ist auf einem anderen Gerät angemeldet. Hierher holen? Ein neues Gerät bekommt dann dieses Abo zurück, und das andere behält, was es hat.",
+  "moveAccountHere": "Hierher holen",
+  "signedIn": "Angemeldet.",
+  "signedInNoSubscription": "Angemeldet. Auf diesem Konto gibt es noch kein Abo.",
+  "signInFailed": "Die Anmeldung wurde nicht abgeschlossen. Versuch es gleich noch einmal."
 }

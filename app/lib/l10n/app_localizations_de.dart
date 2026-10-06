@@ -479,6 +479,12 @@ class AppLocalizationsDe extends AppLocalizations {
       'storeNotAnswering':
           'Der Store antwortet nicht. Versuch es gleich noch einmal.',
       'storeNotSetUp': 'Kaufen im Store ist noch nicht geöffnet.',
+      'signInRefused':
+          'Diese Anmeldung ließ sich nicht prüfen. Versuch es noch einmal.',
+      'accountElsewhere': 'Dieses Konto ist schon auf einem anderen Gerät.',
+      'accountNowhere':
+          'Mit diesem Konto hat sich hier noch niemand angemeldet.',
+      'signInNotSetUp': 'Die Anmeldung ist noch nicht geöffnet.',
       'other': 'Der Dienst hat abgelehnt.',
     });
     return '$_temp0';
@@ -1206,4 +1212,60 @@ class AppLocalizationsDe extends AppLocalizations {
   String toPlayNow(String name) {
     return '$name ist am Zug';
   }
+
+  @override
+  String get yourAccount => 'Dein Konto';
+
+  @override
+  String get signInToKeep =>
+      'Melde dich an, und ein neues Handy oder ein Browser, der dieses Gerät vergessen hat, bekommt das Abo zurück, wenn du dich dort genauso anmeldest. Vom Konto wird nur eine unkenntlich gemachte Form seiner Nummer aufbewahrt: kein Name, keine E-Mail.';
+
+  @override
+  String get signInToBringBack =>
+      'Schon ein Abo, und auf jenem Gerät angemeldet? Melde dich genauso an, um es hierher zu holen.';
+
+  @override
+  String signedInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Mit Apple angemeldet.',
+      'other': 'Mit Google angemeldet.',
+    });
+    return '$_temp0 Melde dich auf einem neuen Handy oder in einem anderen Browser genauso an, und dieses Abo kommt mit.';
+  }
+
+  @override
+  String signedInBeforeBuying(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Mit Apple angemeldet.',
+      'other': 'Mit Google angemeldet.',
+    });
+    return '$_temp0 Ein hier gekauftes Abo bleibt bei deinem Konto.';
+  }
+
+  @override
+  String signInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Mit Apple anmelden',
+      'other': 'Mit Google anmelden',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get accountElsewhere =>
+      'Dieses Konto ist auf einem anderen Gerät angemeldet. Hierher holen? Ein neues Gerät bekommt dann dieses Abo zurück, und das andere behält, was es hat.';
+
+  @override
+  String get moveAccountHere => 'Hierher holen';
+
+  @override
+  String get signedIn => 'Angemeldet.';
+
+  @override
+  String get signedInNoSubscription =>
+      'Angemeldet. Auf diesem Konto gibt es noch kein Abo.';
+
+  @override
+  String get signInFailed =>
+      'Die Anmeldung wurde nicht abgeschlossen. Versuch es gleich noch einmal.';
 }

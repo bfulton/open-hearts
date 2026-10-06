@@ -641,7 +641,7 @@ abstract class AppLocalizations {
   /// Why the server turned down a request about a subscription's devices.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device\'s clock is out. Set it right and try again.} notAStore{That is not a store the service knows.} noProof{The store gave nothing to show for the purchase.} notFromStore{That purchase did not come from the store.} notPaid{The store says that purchase is not paid for.} storeNotAnswering{The store is not answering. Try again in a moment.} storeNotSetUp{Buying in the store is not open yet.} other{The service turned that down.}}'**
+  /// **'{reason, select, noSubscription{No subscription.} fiveDevices{This subscription has all the devices it can take.} notACode{Not a code.} noSuchCode{No such code.} codeUsed{That code has been used.} codeRunOut{That code has run out.} notADevice{Not a device on this subscription.} onAnotherSubscription{This device is on another subscription. Drop it there first.} clockOff{This device\'s clock is out. Set it right and try again.} notAStore{That is not a store the service knows.} noProof{The store gave nothing to show for the purchase.} notFromStore{That purchase did not come from the store.} notPaid{The store says that purchase is not paid for.} storeNotAnswering{The store is not answering. Try again in a moment.} storeNotSetUp{Buying in the store is not open yet.} signInRefused{That sign-in did not check out. Try again.} accountElsewhere{That account is already on another device.} accountNowhere{That account has not been signed in with here before.} signInNotSetUp{Signing in is not open yet.} other{The service turned that down.}}'**
   String serviceRefusal(String reason);
 
   /// Shown when live play cannot be bought on this device.
@@ -1681,6 +1681,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{name} to play'**
   String toPlayNow(String name);
+
+  /// Heading on the Subscription page, over signing in with Apple or Google.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account'**
+  String get yourAccount;
+
+  /// On a subscriber's Subscription page, above the sign-in buttons: why to sign in, and what is kept of the account.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in, and a new phone or a browser that has forgotten this one gets the subscription back by signing in the same way. All that is kept of the account is a scrambled form of its number: no name, no email.'**
+  String get signInToKeep;
+
+  /// On the Subscription page before buying, above the sign-in buttons: signing in brings back a subscription from another device.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribed already, and signed in on that device? Sign in the same way to bring the subscription here.'**
+  String get signInToBringBack;
+
+  /// On a subscriber's Subscription page once this device has signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider, select, apple{Signed in with Apple.} other{Signed in with Google.}} Sign in the same way on a new phone or in another browser, and this subscription comes with you.'**
+  String signedInWith(String provider);
+
+  /// On the Subscription page before buying, once this device has signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider, select, apple{Signed in with Apple.} other{Signed in with Google.}} A subscription bought here stays with your account.'**
+  String signedInBeforeBuying(String provider);
+
+  /// A sign-in button's label.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider, select, apple{Sign in with Apple} other{Sign in with Google}}'**
+  String signInWith(String provider);
+
+  /// Shown when the account just signed in with is already on another device, above a button that moves it here.
+  ///
+  /// In en, this message translates to:
+  /// **'That account is signed in on another device. Move it here? A new device then gets back this subscription, and the other device keeps what it has.'**
+  String get accountElsewhere;
+
+  /// Button: move the signed-in account to this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Move it here'**
+  String get moveAccountHere;
+
+  /// Shown once a subscribed device has signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in.'**
+  String get signedIn;
+
+  /// Shown once an unsubscribed device has signed in with an account that has no subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in. There is no subscription on that account yet.'**
+  String get signedInNoSubscription;
+
+  /// Shown when Apple or Google could not finish signing in.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in did not finish. Try again in a moment.'**
+  String get signInFailed;
 }
 
 class _AppLocalizationsDelegate

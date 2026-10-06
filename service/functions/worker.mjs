@@ -1040,11 +1040,8 @@ export async function joinSubscription(key, subscription, store, { now = Date.no
   // mode's open house, which licenses every device that asks and was
   // never anybody's purchase.
   const was = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (was && was.subscription !== subscription && !moving) {
-    const theirs = await store.get(`SUB#${was.subscription}`, 'META');
-    if (theirs && theirs.source !== 'local' && theirs.renews_at && theirs.renews_at >= today) {
-      return { status: 409, body: { error: 'this device is on another subscription: drop it there first' } };
-    }
+  if (was && was.subscription !== subscription && !moving && (await paidUp(store, was.subscription, today))) {
+    return { status: 409, body: { error: 'this device is on another subscription: drop it there first' } };
   }
   if (spend) await spend();
   // A device that was on another subscription leaves it rather than
@@ -1058,6 +1055,15 @@ export async function joinSubscription(key, subscription, store, { now = Date.no
     at: today,
   });
   return { status: 200, body: { subscription } };
+}
+
+/// Whether [subscription] is somebody's purchase and still paid up on
+/// [today]: what a device on it is not moved off without saying so.
+/// Local mode's open house licenses every device that asks and was
+/// never anybody's purchase, so it holds nobody.
+async function paidUp(store, subscription, today) {
+  const sub = await store.get(`SUB#${subscription}`, 'META');
+  return !!sub && sub.source !== 'local' && !!sub.renews_at && sub.renews_at >= today;
 }
 
 /// Dropping a device: any device on the subscription can drop any
@@ -1435,13 +1441,15 @@ export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, 
     return sub && PROVIDERS[provider] ? { provider, sub } : null;
   }
   const known = PROVIDERS[provider];
-  const audience = known && env[known.audience];
-  if (!known || !audience) return null;
+  // One audience or several, comma-separated: Apple's token names the
+  // bundle on an iPhone and the Services ID on the web, and both are us.
+  const audiences = known ? String(env[known.audience] ?? '').split(',').map((a) => a.trim()).filter(Boolean) : [];
+  if (!audiences.length) return null;
   const claims = await jwtOf(provider, token, fetchImpl, { now });
   if (!claims) return null;
   if (claims.iss !== known.iss) return null;
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!aud.includes(audience)) return null;
+  if (!aud.some((a) => audiences.includes(a))) return null;
   if (!(typeof claims.exp === 'number') || claims.exp * 1000 <= now) return null;
   if (typeof claims.sub !== 'string' || !claims.sub) return null;
   if (claims.nonce !== (await digestOf(`oh-signin/1\n${key}`))) return null;
@@ -1538,13 +1546,22 @@ export async function supersede(who, key, store, env, { now = Date.now() } = {})
   // A device the person still holds is not dropped by somebody else
   // signing in on a new one — but the one that was superseded is, since
   // it is the one that is gone.
+  //
+  // Unless this device is on a subscription of its own that is still
+  // paid up: the account moves, and the subscription bought here stays
+  // here, rather than being swapped for whatever the old device held.
   const theirs = await store.get(`KEY#${was}`, 'ENTITLEMENT');
-  if (theirs) {
+  const mine = await store.get(`KEY#${key}`, 'ENTITLEMENT');
+  const keeps = mine && theirs && mine.subscription !== theirs.subscription && (await paidUp(store, mine.subscription, today));
+  if (theirs && !keeps) {
     const devices = await devicesOn(store, theirs.subscription);
     if (!devices.some((d) => d.key === key)) {
       if (devices.length >= S().mostDevices) await store.del(`SUB#${theirs.subscription}`, `DEVICE#${was}`);
       await store.put(`SUB#${theirs.subscription}`, `DEVICE#${key}`, { bound_at: today });
     }
+    // Off the one it was on, which has run out, rather than counting
+    // against both.
+    if (mine && mine.subscription !== theirs.subscription) await store.del(`SUB#${mine.subscription}`, `DEVICE#${key}`);
     await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...theirs, at: today });
   }
   return { status: 200, body: { superseded: was, at: today } };

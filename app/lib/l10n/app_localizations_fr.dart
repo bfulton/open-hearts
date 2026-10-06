@@ -471,6 +471,11 @@ class AppLocalizationsFr extends AppLocalizations {
       'storeNotAnswering':
           'La boutique ne répond pas. Réessayez dans un instant.',
       'storeNotSetUp': 'L\'achat dans la boutique n\'est pas encore ouvert.',
+      'signInRefused': 'Cette connexion n\'a pas pu être vérifiée. Réessayez.',
+      'accountElsewhere': 'Ce compte est déjà sur un autre appareil.',
+      'accountNowhere':
+          'Personne ne s\'est encore connecté ici avec ce compte.',
+      'signInNotSetUp': 'La connexion n\'est pas encore ouverte.',
       'other': 'Le service a refusé.',
     });
     return '$_temp0';
@@ -1199,4 +1204,60 @@ class AppLocalizationsFr extends AppLocalizations {
   String toPlayNow(String name) {
     return 'À $name de jouer';
   }
+
+  @override
+  String get yourAccount => 'Votre compte';
+
+  @override
+  String get signInToKeep =>
+      'Connectez-vous, et un nouveau téléphone ou un navigateur qui a tout oublié récupère l\'abonnement en se connectant de la même façon. Du compte, seule une forme brouillée de son numéro est gardée : ni nom, ni e-mail.';
+
+  @override
+  String get signInToBringBack =>
+      'Déjà abonné, et connecté sur cet appareil-là ? Connectez-vous de la même façon pour ramener l\'abonnement ici.';
+
+  @override
+  String signedInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Connecté avec Apple.',
+      'other': 'Connecté avec Google.',
+    });
+    return '$_temp0 Connectez-vous de la même façon sur un nouveau téléphone ou dans un autre navigateur, et cet abonnement vous suit.';
+  }
+
+  @override
+  String signedInBeforeBuying(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Connecté avec Apple.',
+      'other': 'Connecté avec Google.',
+    });
+    return '$_temp0 Un abonnement acheté ici reste lié à votre compte.';
+  }
+
+  @override
+  String signInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Se connecter avec Apple',
+      'other': 'Se connecter avec Google',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get accountElsewhere =>
+      'Ce compte est connecté sur un autre appareil. Le déplacer ici ? Un nouvel appareil récupère alors cet abonnement, et l\'autre garde ce qu\'il a.';
+
+  @override
+  String get moveAccountHere => 'Le déplacer ici';
+
+  @override
+  String get signedIn => 'Connecté.';
+
+  @override
+  String get signedInNoSubscription =>
+      'Connecté. Ce compte n\'a pas encore d\'abonnement.';
+
+  @override
+  String get signInFailed =>
+      'La connexion n\'a pas abouti. Réessayez dans un instant.';
 }

@@ -45,6 +45,13 @@ dependencies:
   in_app_purchase_android: ^0.5.3
   mobile_scanner: ^7.4.2
   go_router: ^18.0.2
+  # Signing in, so a subscription follows the person (net/sign_in.dart).
+  # Apple on an iPhone and the web; Google on Android through its own
+  # plugin, not google_sign_in, whose web half would load Google's
+  # script into every page (net/provider_tokens_io.dart).
+  sign_in_with_apple: ^8.2.0
+  google_sign_in_android: ^7.2.17
+  google_sign_in_platform_interface: ^3.1.0
 
 dev_dependencies:
   flutter_test:

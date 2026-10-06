@@ -198,6 +198,11 @@ class Refused {
     'not a device on this subscription': 'notADevice',
     'this device is on another subscription: drop it there first': 'onAnotherSubscription',
     "this device's clock is out by more than five minutes": 'clockOff',
+    // A sign-in brought to the service (sign_in.dart).
+    'that sign-in does not check out': 'signInRefused',
+    'that account is already on another device': 'accountElsewhere',
+    'that account is not on any device': 'accountNowhere',
+    'sign-in is not configured': 'signInNotSetUp',
     // A store's purchase brought to the service (store_buying.dart).
     'not a store': 'notAStore',
     'no proof': 'noProof',

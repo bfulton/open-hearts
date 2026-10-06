@@ -89,7 +89,7 @@
   "noDealBuild": "Esta versión no puede ejecutar el reparto que mantiene honestas las cartas, así que no puede sentarse a una mesa en vivo.",
   "serviceUnreachable": "No se pudo contactar con el servicio. Inténtalo de nuevo en un momento.",
   "codeNotForThisDevice": "Ese código no es para este dispositivo.",
-  "serviceRefusal": "{reason, select, noSubscription{No hay suscripción.} fiveDevices{Esta suscripción ya tiene todos los dispositivos que admite.} notACode{Eso no es un código.} noSuchCode{Ese código no existe.} codeUsed{Ese código ya se usó.} codeRunOut{Ese código ha caducado.} notADevice{Ese dispositivo no está en esta suscripción.} onAnotherSubscription{Este dispositivo está en otra suscripción. Quítalo de allí primero.} clockOff{El reloj de este dispositivo va desfasado. Ajústalo y vuelve a intentarlo.} notAStore{Esa no es una tienda que el servicio conozca.} noProof{La tienda no dio ningún comprobante de la compra.} notFromStore{Esa compra no viene de la tienda.} notPaid{La tienda dice que esa compra no está pagada.} storeNotAnswering{La tienda no responde. Vuelve a intentarlo en un momento.} storeNotSetUp{La compra en la tienda aún no está abierta.} other{El servicio lo rechazó.}}",
+  "serviceRefusal": "{reason, select, noSubscription{No hay suscripción.} fiveDevices{Esta suscripción ya tiene todos los dispositivos que admite.} notACode{Eso no es un código.} noSuchCode{Ese código no existe.} codeUsed{Ese código ya se usó.} codeRunOut{Ese código ha caducado.} notADevice{Ese dispositivo no está en esta suscripción.} onAnotherSubscription{Este dispositivo está en otra suscripción. Quítalo de allí primero.} clockOff{El reloj de este dispositivo va desfasado. Ajústalo y vuelve a intentarlo.} notAStore{Esa no es una tienda que el servicio conozca.} noProof{La tienda no dio ningún comprobante de la compra.} notFromStore{Esa compra no viene de la tienda.} notPaid{La tienda dice que esa compra no está pagada.} storeNotAnswering{La tienda no responde. Vuelve a intentarlo en un momento.} storeNotSetUp{La compra en la tienda aún no está abierta.} signInRefused{No se pudo comprobar ese inicio de sesión. Vuelve a intentarlo.} accountElsewhere{Esa cuenta ya está en otro dispositivo.} accountNowhere{Nunca se ha iniciado sesión aquí con esa cuenta.} signInNotSetUp{El inicio de sesión aún no está abierto.} other{El servicio lo rechazó.}}",
   "buyingNotOpen": "Todavía no se puede comprar en este dispositivo.",
   "shopUnreachable": "No se pudo contactar con la tienda. Inténtalo de nuevo en un momento.",
   "shopNotOpen": "La tienda aún no está abierta.",
@@ -262,5 +262,16 @@
   "watchingNote": "Las manos quedan ocultas hasta que termine la partida; entonces la partida entera estará aquí, comprobada.",
   "passingNow": "Pasando cartas",
   "dealingNow": "Repartiendo",
-  "toPlayNow": "Juega {name}"
+  "toPlayNow": "Juega {name}",
+  "yourAccount": "Tu cuenta",
+  "signInToKeep": "Inicia sesión y, en un teléfono nuevo o en un navegador que haya olvidado este, recuperarás la suscripción iniciando sesión de la misma manera. De la cuenta solo se guarda una forma irreconocible de su número: ni nombre ni correo.",
+  "signInToBringBack": "¿Ya tienes suscripción e iniciaste sesión en ese dispositivo? Inicia sesión de la misma manera para traerla aquí.",
+  "signedInWith": "{provider, select, apple{Sesión iniciada con Apple.} other{Sesión iniciada con Google.}} Inicia sesión igual en un teléfono nuevo o en otro navegador y esta suscripción irá contigo.",
+  "signedInBeforeBuying": "{provider, select, apple{Sesión iniciada con Apple.} other{Sesión iniciada con Google.}} Una suscripción comprada aquí se queda con tu cuenta.",
+  "signInWith": "{provider, select, apple{Iniciar sesión con Apple} other{Iniciar sesión con Google}}",
+  "accountElsewhere": "Esa cuenta tiene la sesión iniciada en otro dispositivo. ¿La traes aquí? Un dispositivo nuevo recuperará entonces esta suscripción, y el otro conserva lo que tiene.",
+  "moveAccountHere": "Traerla aquí",
+  "signedIn": "Sesión iniciada.",
+  "signedInNoSubscription": "Sesión iniciada. Esa cuenta aún no tiene suscripción.",
+  "signInFailed": "El inicio de sesión no terminó. Vuelve a intentarlo en un momento."
 }

@@ -472,6 +472,11 @@ class AppLocalizationsPt extends AppLocalizations {
       'storeNotAnswering':
           'A loja não está respondendo. Tente de novo daqui a pouco.',
       'storeNotSetUp': 'A compra na loja ainda não está aberta.',
+      'signInRefused':
+          'Não foi possível confirmar essa entrada. Tente de novo.',
+      'accountElsewhere': 'Essa conta já está em outro aparelho.',
+      'accountNowhere': 'Ninguém entrou aqui com essa conta antes.',
+      'signInNotSetUp': 'Entrar com uma conta ainda não está aberto.',
       'other': 'O serviço recusou.',
     });
     return '$_temp0';
@@ -1197,4 +1202,60 @@ class AppLocalizationsPt extends AppLocalizations {
   String toPlayNow(String name) {
     return 'Vez de $name';
   }
+
+  @override
+  String get yourAccount => 'Sua conta';
+
+  @override
+  String get signInToKeep =>
+      'Entre com sua conta e, num celular novo ou num navegador que esqueceu este, você recupera a assinatura entrando do mesmo jeito. Da conta só se guarda uma forma embaralhada do número dela: nem nome, nem e-mail.';
+
+  @override
+  String get signInToBringBack =>
+      'Já assina e entrou com sua conta naquele aparelho? Entre do mesmo jeito para trazer a assinatura para cá.';
+
+  @override
+  String signedInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Conectado com a Apple.',
+      'other': 'Conectado com o Google.',
+    });
+    return '$_temp0 Entre do mesmo jeito num celular novo ou em outro navegador, e esta assinatura vai junto.';
+  }
+
+  @override
+  String signedInBeforeBuying(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Conectado com a Apple.',
+      'other': 'Conectado com o Google.',
+    });
+    return '$_temp0 Uma assinatura comprada aqui fica com a sua conta.';
+  }
+
+  @override
+  String signInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Entrar com a Apple',
+      'other': 'Entrar com o Google',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get accountElsewhere =>
+      'Essa conta está conectada em outro aparelho. Trazer para cá? Um aparelho novo então recupera esta assinatura, e o outro fica com o que tem.';
+
+  @override
+  String get moveAccountHere => 'Trazer para cá';
+
+  @override
+  String get signedIn => 'Conectado.';
+
+  @override
+  String get signedInNoSubscription =>
+      'Conectado. Essa conta ainda não tem assinatura.';
+
+  @override
+  String get signInFailed =>
+      'A entrada não terminou. Tente de novo daqui a pouco.';
 }

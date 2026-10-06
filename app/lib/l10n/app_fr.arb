@@ -89,7 +89,7 @@
   "noDealBuild": "Cette version ne peut pas exécuter la donne qui garantit des cartes honnêtes, et ne peut donc pas s'asseoir à une table en direct.",
   "serviceUnreachable": "Impossible de joindre le service. Réessayez dans un instant.",
   "codeNotForThisDevice": "Ce code n'est pas pour cet appareil.",
-  "serviceRefusal": "{reason, select, noSubscription{Aucun abonnement.} fiveDevices{Cet abonnement a déjà tous les appareils qu'il peut avoir.} notACode{Ce n'est pas un code.} noSuchCode{Ce code n'existe pas.} codeUsed{Ce code a déjà servi.} codeRunOut{Ce code a expiré.} notADevice{Cet appareil ne fait pas partie de cet abonnement.} onAnotherSubscription{Cet appareil fait partie d'un autre abonnement. Retirez-le d'abord de celui-ci.} clockOff{L'horloge de cet appareil n'est pas à l'heure. Réglez-la et réessayez.} notAStore{Le service ne connaît pas cette boutique.} noProof{La boutique n'a fourni aucune preuve de l'achat.} notFromStore{Cet achat ne vient pas de la boutique.} notPaid{D'après la boutique, cet achat n'est pas payé.} storeNotAnswering{La boutique ne répond pas. Réessayez dans un instant.} storeNotSetUp{L'achat dans la boutique n'est pas encore ouvert.} other{Le service a refusé.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Aucun abonnement.} fiveDevices{Cet abonnement a déjà tous les appareils qu'il peut avoir.} notACode{Ce n'est pas un code.} noSuchCode{Ce code n'existe pas.} codeUsed{Ce code a déjà servi.} codeRunOut{Ce code a expiré.} notADevice{Cet appareil ne fait pas partie de cet abonnement.} onAnotherSubscription{Cet appareil fait partie d'un autre abonnement. Retirez-le d'abord de celui-ci.} clockOff{L'horloge de cet appareil n'est pas à l'heure. Réglez-la et réessayez.} notAStore{Le service ne connaît pas cette boutique.} noProof{La boutique n'a fourni aucune preuve de l'achat.} notFromStore{Cet achat ne vient pas de la boutique.} notPaid{D'après la boutique, cet achat n'est pas payé.} storeNotAnswering{La boutique ne répond pas. Réessayez dans un instant.} storeNotSetUp{L'achat dans la boutique n'est pas encore ouvert.} signInRefused{Cette connexion n'a pas pu être vérifiée. Réessayez.} accountElsewhere{Ce compte est déjà sur un autre appareil.} accountNowhere{Personne ne s'est encore connecté ici avec ce compte.} signInNotSetUp{La connexion n'est pas encore ouverte.} other{Le service a refusé.}}",
   "buyingNotOpen": "L'achat n'est pas encore possible sur cet appareil.",
   "shopUnreachable": "Impossible de joindre la boutique. Réessayez dans un instant.",
   "shopNotOpen": "La boutique n'est pas encore ouverte.",
@@ -262,5 +262,16 @@
   "watchingNote": "Les mains restent cachées jusqu’à la fin de la partie ; ensuite toute la partie est ici, vérifiée.",
   "passingNow": "Passe des cartes",
   "dealingNow": "Distribution",
-  "toPlayNow": "À {name} de jouer"
+  "toPlayNow": "À {name} de jouer",
+  "yourAccount": "Votre compte",
+  "signInToKeep": "Connectez-vous, et un nouveau téléphone ou un navigateur qui a tout oublié récupère l'abonnement en se connectant de la même façon. Du compte, seule une forme brouillée de son numéro est gardée : ni nom, ni e-mail.",
+  "signInToBringBack": "Déjà abonné, et connecté sur cet appareil-là ? Connectez-vous de la même façon pour ramener l'abonnement ici.",
+  "signedInWith": "{provider, select, apple{Connecté avec Apple.} other{Connecté avec Google.}} Connectez-vous de la même façon sur un nouveau téléphone ou dans un autre navigateur, et cet abonnement vous suit.",
+  "signedInBeforeBuying": "{provider, select, apple{Connecté avec Apple.} other{Connecté avec Google.}} Un abonnement acheté ici reste lié à votre compte.",
+  "signInWith": "{provider, select, apple{Se connecter avec Apple} other{Se connecter avec Google}}",
+  "accountElsewhere": "Ce compte est connecté sur un autre appareil. Le déplacer ici ? Un nouvel appareil récupère alors cet abonnement, et l'autre garde ce qu'il a.",
+  "moveAccountHere": "Le déplacer ici",
+  "signedIn": "Connecté.",
+  "signedInNoSubscription": "Connecté. Ce compte n'a pas encore d'abonnement.",
+  "signInFailed": "La connexion n'a pas abouti. Réessayez dans un instant."
 }

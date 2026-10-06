@@ -473,6 +473,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'storeNotAnswering':
           'La tienda no responde. Vuelve a intentarlo en un momento.',
       'storeNotSetUp': 'La compra en la tienda aún no está abierta.',
+      'signInRefused':
+          'No se pudo comprobar ese inicio de sesión. Vuelve a intentarlo.',
+      'accountElsewhere': 'Esa cuenta ya está en otro dispositivo.',
+      'accountNowhere': 'Nunca se ha iniciado sesión aquí con esa cuenta.',
+      'signInNotSetUp': 'El inicio de sesión aún no está abierto.',
       'other': 'El servicio lo rechazó.',
     });
     return '$_temp0';
@@ -1199,4 +1204,60 @@ class AppLocalizationsEs extends AppLocalizations {
   String toPlayNow(String name) {
     return 'Juega $name';
   }
+
+  @override
+  String get yourAccount => 'Tu cuenta';
+
+  @override
+  String get signInToKeep =>
+      'Inicia sesión y, en un teléfono nuevo o en un navegador que haya olvidado este, recuperarás la suscripción iniciando sesión de la misma manera. De la cuenta solo se guarda una forma irreconocible de su número: ni nombre ni correo.';
+
+  @override
+  String get signInToBringBack =>
+      '¿Ya tienes suscripción e iniciaste sesión en ese dispositivo? Inicia sesión de la misma manera para traerla aquí.';
+
+  @override
+  String signedInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Sesión iniciada con Apple.',
+      'other': 'Sesión iniciada con Google.',
+    });
+    return '$_temp0 Inicia sesión igual en un teléfono nuevo o en otro navegador y esta suscripción irá contigo.';
+  }
+
+  @override
+  String signedInBeforeBuying(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Sesión iniciada con Apple.',
+      'other': 'Sesión iniciada con Google.',
+    });
+    return '$_temp0 Una suscripción comprada aquí se queda con tu cuenta.';
+  }
+
+  @override
+  String signInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Iniciar sesión con Apple',
+      'other': 'Iniciar sesión con Google',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get accountElsewhere =>
+      'Esa cuenta tiene la sesión iniciada en otro dispositivo. ¿La traes aquí? Un dispositivo nuevo recuperará entonces esta suscripción, y el otro conserva lo que tiene.';
+
+  @override
+  String get moveAccountHere => 'Traerla aquí';
+
+  @override
+  String get signedIn => 'Sesión iniciada.';
+
+  @override
+  String get signedInNoSubscription =>
+      'Sesión iniciada. Esa cuenta aún no tiene suscripción.';
+
+  @override
+  String get signInFailed =>
+      'El inicio de sesión no terminó. Vuelve a intentarlo en un momento.';
 }

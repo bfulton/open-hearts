@@ -51,8 +51,8 @@ The request is therefore also signed by the key. Otherwise a stranger
 could bind his own account to a subscriber's key with `attest`, then
 `supersede` it onto his own key and carry her subscription with it.
 Tokens are verified against the provider's fixed JWKS URL with
-allow-listed algorithms (RS256, ES256), checking issuer, audience,
-expiry, subject and nonce. A malformed token is a 401, never a 500. Only
+allow-listed algorithms (RS256, ES256), checking issuer, audience
+(one of a configured list), expiry, subject and nonce. A malformed token is a 401, never a 500. Only
 an HMAC of the subject (`OH_ID_HMAC`) is stored.
 
 ## Licences

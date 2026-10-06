@@ -12,6 +12,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart' show SignInWithAppleButton, SignInWithAppleButtonStyle;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:table/table.dart';
 
@@ -23,8 +24,10 @@ import 'net/copy.dart';
 import 'net/buying.dart';
 import 'net/household.dart';
 import 'net/licence.dart';
+import 'net/provider_tokens.dart';
 import 'net/remote_config.dart';
 import 'net/share.dart';
+import 'net/sign_in.dart';
 import 'net/store_buying.dart';
 import 'pages.dart';
 import 'theme.dart';
@@ -59,6 +62,13 @@ class _SubscribePageState extends State<SubscribePage> {
   /// The backup codes, once asked for: not on the screen until then.
   BackupCodes? _backups;
 
+  /// The provider this device signed in with, once it has.
+  Provider? _signedIn;
+
+  /// A sign-in the service turned away because the account is on
+  /// another device, kept while the page asks whether to move it here.
+  ({Provider provider, String token})? _elsewhere;
+
   @override
   void initState() {
     super.initState();
@@ -87,8 +97,14 @@ class _SubscribePageState extends State<SubscribePage> {
 
   Future<void> _load() async {
     final me = await Identity.signer();
+    final signedIn = await signedInWith();
     if (!mounted) return;
-    setState(() => _me = me);
+    setState(() {
+      _me = me;
+      _signedIn = signedIn;
+    });
+    final offered = providerTokens.offered;
+    if (signedIn == null && offered.isNotEmpty) providerTokens.prepare(offered);
     if (!Entitlement.current.live) return;
     await _list(me);
   }
@@ -231,6 +247,81 @@ class _SubscribePageState extends State<SubscribePage> {
     }
   }
 
+  /// A provider has answered. On a subscribed device the account is put
+  /// here, so the subscription can be got back by it; on one that is
+  /// not, the account is brought here from wherever it was, with what it
+  /// was subscribed to — and an account never signed in with before is
+  /// put here, so a subscription bought here will follow it.
+  Future<void> _signInWith(Provider provider, Asked asked) async {
+    final me = _me;
+    final token = asked.token;
+    if (me == null || _working) return;
+    if (token == null) {
+      if (asked.failed) setState(() => _refusal = context.l10n.signInFailed);
+      return;
+    }
+    setState(() {
+      _working = true;
+      _refusal = null;
+      _elsewhere = null;
+    });
+    final service = Entitlement.current.service;
+    Said<SignedIn> said;
+    if (Entitlement.current.live) {
+      said = await attestWith(me, provider, token, service: service);
+      if (said.refusal?.reason == 'accountElsewhere') {
+        if (!mounted) return;
+        setState(() {
+          _working = false;
+          _elsewhere = (provider: provider, token: token);
+        });
+        return;
+      }
+    } else {
+      said = await supersedeWith(me, provider, token, service: service);
+      if (said.refusal?.reason == 'accountNowhere') said = await attestWith(me, provider, token, service: service);
+    }
+    await _signedInAs(said);
+  }
+
+  /// The account moved here from the device it was on. A subscription
+  /// this device has of its own stays (the service sees to that).
+  Future<void> _moveHere() async {
+    final me = _me;
+    final elsewhere = _elsewhere;
+    if (me == null || elsewhere == null || _working) return;
+    setState(() {
+      _working = true;
+      _refusal = null;
+    });
+    await _signedInAs(await supersedeWith(me, elsewhere.provider, elsewhere.token, service: Entitlement.current.service));
+  }
+
+  Future<void> _signedInAs(Said<SignedIn> said) async {
+    if (!mounted) return;
+    final done = said.answer;
+    if (done == null) {
+      setState(() {
+        _working = false;
+        _refusal = said.refusal?.say(context.l10n);
+      });
+      return;
+    }
+    await rememberSignIn(done.provider);
+    final wasLive = Entitlement.current.live;
+    if (done.licence case final licence?) await Entitlement.current.adopt(licence);
+    if (!mounted) return;
+    final l10n = context.l10n;
+    setState(() {
+      _working = false;
+      _signedIn = done.provider;
+      _elsewhere = null;
+    });
+    _say(Entitlement.current.live ? (wasLive ? l10n.signedIn : l10n.activated) : l10n.signedInNoSubscription);
+    // The household this device is on may be another one now.
+    if (wasLive && Entitlement.current.live && _me != null) unawaited(_list(_me!));
+  }
+
   Future<void> _copy(String text) async {
     await copyText(text);
     if (mounted) _say(context.l10n.copied);
@@ -347,6 +438,7 @@ class _SubscribePageState extends State<SubscribePage> {
                       ),
                     const SizedBox(height: 6),
                     TextButton(onPressed: waiting ? null : () => showActivate(context), child: Text(l10n.haveACode)),
+                    ..._account(subscribed: false, waiting: waiting),
                   ] else
                     ..._yours(),
                   const SizedBox(height: 14),
@@ -474,6 +566,7 @@ class _SubscribePageState extends State<SubscribePage> {
         OutlinedButton(onPressed: _working ? null : _replaceBackups, style: _outlined(), child: Text(l10n.replaceCodes)),
       ] else
         OutlinedButton(onPressed: _working ? null : _showBackups, style: _outlined(), child: Text(l10n.showBackupCodes)),
+      ..._account(subscribed: true, waiting: _leaving),
       // A web subscription is managed in Stripe's portal; one bought in
       // a store, in the store's own settings, which is the only place it
       // can be.
@@ -503,6 +596,48 @@ class _SubscribePageState extends State<SubscribePage> {
           ),
           child: Text(l10n.manageSubscription),
         ),
+      ],
+    ];
+  }
+
+  /// Signing in, where this build offers it: on a subscriber's page, so
+  /// the subscription can be got back on a device that has lost it; on
+  /// the page before buying, to get one back here. Nothing at all in a
+  /// build that names no provider.
+  List<Widget> _account({required bool subscribed, required bool waiting}) {
+    final offered = providerTokens.offered;
+    final me = _me;
+    if (offered.isEmpty || me == null) return const [];
+    final l10n = context.l10n;
+    final signedIn = _signedIn;
+    final elsewhere = _elsewhere;
+    const hint = TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim);
+    return [
+      SizedBox(height: subscribed ? 26 : 18),
+      if (subscribed) ...[_Heading(l10n.yourAccount), const SizedBox(height: 8)],
+      if (signedIn != null)
+        Text(subscribed ? l10n.signedInWith(signedIn.name) : l10n.signedInBeforeBuying(signedIn.name),
+            textAlign: subscribed ? TextAlign.start : TextAlign.center, style: hint)
+      else ...[
+        Text(subscribed ? l10n.signInToKeep : l10n.signInToBringBack,
+            textAlign: subscribed ? TextAlign.start : TextAlign.center, style: hint),
+        const SizedBox(height: 12),
+        for (final provider in offered) ...[
+          _SignInButton(
+            provider: provider,
+            nonce: signInNonce(me.publicKey),
+            label: l10n.signInWith(provider.name),
+            enabled: !_working && !waiting,
+            onAsked: (asked) => unawaited(_signInWith(provider, asked)),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ],
+      if (elsewhere != null) ...[
+        const SizedBox(height: 4),
+        Text(l10n.accountElsewhere, style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chrome)),
+        const SizedBox(height: 10),
+        OutlinedButton(onPressed: _working ? null : _moveHere, style: _outlined(), child: Text(l10n.moveAccountHere)),
       ],
     ];
   }
@@ -537,6 +672,46 @@ class _SubscribePageState extends State<SubscribePage> {
         padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       );
+}
+
+/// One provider's button: the provider's own where it insists on
+/// drawing it (Google's, on the web), and otherwise one drawn here —
+/// Apple's to Apple's own rules, Google's in the page's style.
+class _SignInButton extends StatelessWidget {
+  const _SignInButton({required this.provider, required this.nonce, required this.label, required this.enabled, required this.onAsked});
+
+  final Provider provider;
+  final String nonce;
+  final String label;
+  final bool enabled;
+  final void Function(Asked asked) onAsked;
+
+  Future<void> _ask() async => onAsked(await providerTokens.ask(provider, nonce));
+
+  @override
+  Widget build(BuildContext context) {
+    final own = providerTokens.ownButton(provider, nonce, onAsked);
+    if (own != null) return IgnorePointer(ignoring: !enabled, child: own);
+    return switch (provider) {
+      Provider.apple => SignInWithAppleButton(
+          onPressed: enabled ? () => unawaited(_ask()) : null,
+          text: label,
+          style: SignInWithAppleButtonStyle.white,
+          borderRadius: const BorderRadius.all(Radius.circular(22)),
+        ),
+      Provider.google => OutlinedButton.icon(
+          onPressed: enabled ? () => unawaited(_ask()) : null,
+          icon: const Icon(Icons.account_circle_outlined, size: 20),
+          label: Text(label),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Palette.chrome,
+            minimumSize: const Size.fromHeight(44),
+            side: BorderSide(color: Palette.chrome.withValues(alpha: 0.5)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          ),
+        ),
+    };
+  }
 }
 
 class _Heading extends StatelessWidget {

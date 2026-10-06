@@ -89,7 +89,7 @@
   "noDealBuild": "Esta versão não consegue rodar a distribuição que mantém as cartas honestas, então não pode sentar a uma mesa ao vivo.",
   "serviceUnreachable": "Não foi possível falar com o serviço. Tente de novo daqui a pouco.",
   "codeNotForThisDevice": "Esse código não é para este aparelho.",
-  "serviceRefusal": "{reason, select, noSubscription{Nenhuma assinatura.} fiveDevices{Esta assinatura já tem todos os aparelhos que pode ter.} notACode{Isso não é um código.} noSuchCode{Esse código não existe.} codeUsed{Esse código já foi usado.} codeRunOut{Esse código expirou.} notADevice{Esse aparelho não está nesta assinatura.} onAnotherSubscription{Este aparelho está em outra assinatura. Remova-o de lá primeiro.} clockOff{O relógio deste aparelho está errado. Acerte-o e tente de novo.} notAStore{Essa não é uma loja que o serviço conheça.} noProof{A loja não deu nenhum comprovante da compra.} notFromStore{Essa compra não veio da loja.} notPaid{A loja diz que essa compra não foi paga.} storeNotAnswering{A loja não está respondendo. Tente de novo daqui a pouco.} storeNotSetUp{A compra na loja ainda não está aberta.} other{O serviço recusou.}}",
+  "serviceRefusal": "{reason, select, noSubscription{Nenhuma assinatura.} fiveDevices{Esta assinatura já tem todos os aparelhos que pode ter.} notACode{Isso não é um código.} noSuchCode{Esse código não existe.} codeUsed{Esse código já foi usado.} codeRunOut{Esse código expirou.} notADevice{Esse aparelho não está nesta assinatura.} onAnotherSubscription{Este aparelho está em outra assinatura. Remova-o de lá primeiro.} clockOff{O relógio deste aparelho está errado. Acerte-o e tente de novo.} notAStore{Essa não é uma loja que o serviço conheça.} noProof{A loja não deu nenhum comprovante da compra.} notFromStore{Essa compra não veio da loja.} notPaid{A loja diz que essa compra não foi paga.} storeNotAnswering{A loja não está respondendo. Tente de novo daqui a pouco.} storeNotSetUp{A compra na loja ainda não está aberta.} signInRefused{Não foi possível confirmar essa entrada. Tente de novo.} accountElsewhere{Essa conta já está em outro aparelho.} accountNowhere{Ninguém entrou aqui com essa conta antes.} signInNotSetUp{Entrar com uma conta ainda não está aberto.} other{O serviço recusou.}}",
   "buyingNotOpen": "Ainda não dá para comprar neste aparelho.",
   "shopUnreachable": "Não foi possível falar com a loja. Tente de novo daqui a pouco.",
   "shopNotOpen": "A loja ainda não abriu.",
@@ -262,5 +262,16 @@
   "watchingNote": "As mãos ficam ocultas até o jogo acabar; então o jogo inteiro estará aqui, verificado.",
   "passingNow": "Passando cartas",
   "dealingNow": "Distribuindo",
-  "toPlayNow": "Vez de {name}"
+  "toPlayNow": "Vez de {name}",
+  "yourAccount": "Sua conta",
+  "signInToKeep": "Entre com sua conta e, num celular novo ou num navegador que esqueceu este, você recupera a assinatura entrando do mesmo jeito. Da conta só se guarda uma forma embaralhada do número dela: nem nome, nem e-mail.",
+  "signInToBringBack": "Já assina e entrou com sua conta naquele aparelho? Entre do mesmo jeito para trazer a assinatura para cá.",
+  "signedInWith": "{provider, select, apple{Conectado com a Apple.} other{Conectado com o Google.}} Entre do mesmo jeito num celular novo ou em outro navegador, e esta assinatura vai junto.",
+  "signedInBeforeBuying": "{provider, select, apple{Conectado com a Apple.} other{Conectado com o Google.}} Uma assinatura comprada aqui fica com a sua conta.",
+  "signInWith": "{provider, select, apple{Entrar com a Apple} other{Entrar com o Google}}",
+  "accountElsewhere": "Essa conta está conectada em outro aparelho. Trazer para cá? Um aparelho novo então recupera esta assinatura, e o outro fica com o que tem.",
+  "moveAccountHere": "Trazer para cá",
+  "signedIn": "Conectado.",
+  "signedInNoSubscription": "Conectado. Essa conta ainda não tem assinatura.",
+  "signInFailed": "A entrada não terminou. Tente de novo daqui a pouco."
 }

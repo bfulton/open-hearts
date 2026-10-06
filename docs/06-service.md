@@ -148,12 +148,30 @@ billing portal.
   its codes are only shown. Rows are keyed by a digest of the code.
 - **Sign-in.** `attest` checks an Apple or Google ID token against the
   provider's published keys: issuer, audience, expiry, allow-listed
-  algorithm, and a nonce equal to the hash of the device's key. The
+  algorithm, and a nonce equal to the hash of the device's key
+  (`sha256("oh-signin/1\n" + key)`, pinned in tests on both sides). The
   request is also signed by the key. It binds the account to that one
-  key. `supersede` moves the binding and its subscription to a new key.
-  Only an HMAC of the provider's subject (`OH_ID_HMAC`) is stored. The
-  app does not use this yet; it needs `OH_GOOGLE_AUDIENCE` and
-  `OH_APPLE_AUDIENCE`.
+  key. `supersede` moves the binding and its subscription to a new key;
+  a device already on a paid-up subscription of its own keeps it, and
+  only the account moves. Only an HMAC of the provider's subject
+  (`OH_ID_HMAC`) is stored. `OH_GOOGLE_AUDIENCE` and `OH_APPLE_AUDIENCE`
+  each take one audience or several, comma-separated: Apple's token
+  names the bundle id on an iPhone and the Services ID on the web.
+
+  The app (`app/lib/net/sign_in.dart`, `provider_tokens.dart`) offers
+  Apple on iOS and the web and Google on Android and the web, each only
+  in a build compiled with its identifier (`OH_APPLE_SERVICE_ID`,
+  `OH_GOOGLE_CLIENT_ID`, passed through by `deploy.sh`); without them
+  there is no sign-in on the screen. On iOS it uses Sign in with Apple,
+  on Android Credential Manager (through `google_sign_in_android`, not
+  `google_sign_in`, whose web half loads Google's script into every
+  page), and on the web Apple's JS popup and Google's own button, whose
+  scripts are fetched only when a sign-in is on the screen. On the
+  Subscription page a subscriber is offered a sign-in, which attests
+  the account here; an account already on another device is moved only
+  when the subscriber says so. A device with no subscription signs in to
+  get one back: `supersede`, or `attest` for an account never signed in
+  with. The device keeps only which provider it signed in with.
 
 A code never takes a device off another subscription that is still paid
 up. The app asks "Join this subscription?" before spending one. To move,

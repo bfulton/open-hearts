@@ -470,6 +470,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'notPaid': 'The store says that purchase is not paid for.',
       'storeNotAnswering': 'The store is not answering. Try again in a moment.',
       'storeNotSetUp': 'Buying in the store is not open yet.',
+      'signInRefused': 'That sign-in did not check out. Try again.',
+      'accountElsewhere': 'That account is already on another device.',
+      'accountNowhere': 'That account has not been signed in with here before.',
+      'signInNotSetUp': 'Signing in is not open yet.',
       'other': 'The service turned that down.',
     });
     return '$_temp0';
@@ -1191,4 +1195,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String toPlayNow(String name) {
     return '$name to play';
   }
+
+  @override
+  String get yourAccount => 'Your account';
+
+  @override
+  String get signInToKeep =>
+      'Sign in, and a new phone or a browser that has forgotten this one gets the subscription back by signing in the same way. All that is kept of the account is a scrambled form of its number: no name, no email.';
+
+  @override
+  String get signInToBringBack =>
+      'Subscribed already, and signed in on that device? Sign in the same way to bring the subscription here.';
+
+  @override
+  String signedInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Signed in with Apple.',
+      'other': 'Signed in with Google.',
+    });
+    return '$_temp0 Sign in the same way on a new phone or in another browser, and this subscription comes with you.';
+  }
+
+  @override
+  String signedInBeforeBuying(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Signed in with Apple.',
+      'other': 'Signed in with Google.',
+    });
+    return '$_temp0 A subscription bought here stays with your account.';
+  }
+
+  @override
+  String signInWith(String provider) {
+    String _temp0 = intl.Intl.selectLogic(provider, {
+      'apple': 'Sign in with Apple',
+      'other': 'Sign in with Google',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get accountElsewhere =>
+      'That account is signed in on another device. Move it here? A new device then gets back this subscription, and the other device keeps what it has.';
+
+  @override
+  String get moveAccountHere => 'Move it here';
+
+  @override
+  String get signedIn => 'Signed in.';
+
+  @override
+  String get signedInNoSubscription =>
+      'Signed in. There is no subscription on that account yet.';
+
+  @override
+  String get signInFailed =>
+      'Signing in did not finish. Try again in a moment.';
 }

@@ -1018,6 +1018,11 @@ const nonceFor = async (key) =>
 
 const signedInAs = { OH_GOOGLE_AUDIENCE: 'oh.apps.googleusercontent.com', OH_ID_HMAC: 'pepper' };
 
+test('the nonce a token carries is the hash the app makes of its key', async () => {
+  // The same figure is pinned on the app's side (app/test/sign_in_test.dart).
+  assert.equal(await nonceFor(KEY), '584421408c2fc1b0fffb975b25e2ba2dd1b547b6760dfa23e0985ff7bf1789f2');
+});
+
 test('a sign-in token is read only when the provider signed it, for us, for this device, and not yet run out', async () => {
   forgetProviderKeys();
   const p = await provider({ iss: 'https://accounts.google.com', aud: signedInAs.OH_GOOGLE_AUDIENCE });
@@ -1117,6 +1122,88 @@ test('a full household superseded drops the device that was replaced, not somebo
 test('supersede has nothing to move for an account nobody has signed in with', async () => {
   const store = memoryStore();
   assert.equal((await supersede({ provider: 'google', sub: 'nobody' }, KEY, store, signedInAs)).status, 404);
+});
+
+test('an audience may be several: Apple names the bundle on an iPhone and the Services ID on the web', async () => {
+  forgetProviderKeys();
+  const apple = { OH_APPLE_AUDIENCE: 'game.openhearts.web, game.openhearts.app', OH_ID_HMAC: 'pepper' };
+  const p = await provider({ iss: 'https://appleid.apple.com' });
+  const nonce = await nonceFor(KEY);
+  for (const aud of ['game.openhearts.web', 'game.openhearts.app']) {
+    forgetProviderKeys();
+    const token = await p.token({ sub: '001234.abcd', nonce, aud });
+    assert.deepEqual(await whoSignedIn('apple', token, KEY, apple, p.fetch), { provider: 'apple', sub: '001234.abcd' }, aud);
+  }
+  for (const aud of ['game.openhearts', 'game.openhearts.web, game.openhearts.app', '']) {
+    forgetProviderKeys();
+    const token = await p.token({ sub: '001234.abcd', nonce, aud });
+    assert.equal(await whoSignedIn('apple', token, KEY, apple, p.fetch), null, `not ours: ${JSON.stringify(aud)}`);
+  }
+  // An audience that is only commas and spaces is none.
+  forgetProviderKeys();
+  const any = await p.token({ sub: '001234.abcd', nonce, aud: '' });
+  assert.equal(await whoSignedIn('apple', any, KEY, { ...apple, OH_APPLE_AUDIENCE: ' , ' }, p.fetch), null);
+});
+
+test('supersede onto a device with a paid subscription of its own moves the account and leaves that subscription where it is', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  // OTHER bought its own, on the web, on another day.
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_mine', metadata: { key: OTHER } } } }, store, { now });
+  await record({ type: 'customer.subscription.created', data: { object: { id: 'sub_mine', current_period_end: Math.floor(Date.UTC(2027, 2, 1) / 1000) } } }, store, { now });
+  const who = { provider: 'google', sub: 'sub-1' };
+  await attest(who, KEY, store, signedInAs, { now });
+
+  const moved = await supersede(who, OTHER, store, signedInAs, { now });
+  assert.deepEqual(moved.body, { superseded: KEY, at: '2026-09-16' });
+  assert.equal((await entitlementOf(store, OTHER, { now })).subscription, 'sub_mine', 'what was bought here stays here');
+  assert.deepEqual((await devicesOn(store, 'sub_mine')).map((d) => d.key), [OTHER]);
+  assert.deepEqual((await devicesOn(store, 'sub_9')).map((d) => d.key), [KEY], 'and nothing was taken off the other');
+  assert.equal((await store.get(await loginRow(who, signedInAs), 'IDENTITY')).key, OTHER, 'the account is here from now on');
+});
+
+test('supersede onto a device whose own subscription has ended brings the account\'s, and takes it off the old one', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = await household(now);
+  await record({ type: 'checkout.session.completed', data: { object: { payment_status: 'paid', subscription: 'sub_old', metadata: { key: OTHER } } } }, store, { now });
+  await record({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_old', status: 'canceled' } } }, store, { now: now - 86400000 });
+  const who = { provider: 'apple', sub: '001234.abcd' };
+  await attest(who, KEY, store, signedInAs, { now });
+
+  await supersede(who, OTHER, store, signedInAs, { now: now + 86400000 });
+  assert.equal((await entitlementOf(store, OTHER, { now: now + 86400000 })).subscription, 'sub_9');
+  assert.deepEqual((await devicesOn(store, 'sub_old')).map((d) => d.key), [], 'not counted against both');
+});
+
+test('local mode: a local: sign-in attests one device and brings its subscription to the next, end to end', async () => {
+  const store = memoryStore();
+  const { held: base } = serving(store);
+  const held = { ...base, ...signedInAs, OH_OPEN_HOUSE: '1' };
+  const send = (what, body) => new Request(`http://127.0.0.1:8788/api/${what}`, { method: 'POST', body: JSON.stringify(body) });
+
+  // Ada's device is licensed by the open house, and she signs in on it.
+  const first = await worker.fetch(send('attest', await asking(ADA, 'attest', { provider: 'apple', token: 'local:ada' })), held);
+  assert.equal(first.status, 200);
+  const attested = await first.json();
+  assert.equal(attested.licence.key, ADA.public);
+
+  // A new phone: attest says the account is elsewhere, supersede brings it.
+  const refused = await worker.fetch(send('attest', await asking(BAO, 'attest', { provider: 'apple', token: 'local:ada' })), held);
+  assert.deepEqual([refused.status, (await refused.json()).error], [409, 'that account is already on another device']);
+  const moved = await worker.fetch(send('supersede', await asking(BAO, 'supersede', { provider: 'apple', token: 'local:ada' })), held);
+  assert.equal(moved.status, 200);
+  const said = await moved.json();
+  assert.equal(said.superseded, ADA.public);
+  assert.equal(said.licence.key, BAO.public);
+  assert.equal((await entitlementOf(store, BAO.public)).subscription, (await entitlementOf(store, ADA.public)).subscription);
+
+  // An account nobody has signed in with has nowhere to come from.
+  const nowhere = await worker.fetch(send('supersede', await asking(CY, 'supersede', { provider: 'google', token: 'local:cy' })), held);
+  assert.deepEqual([nowhere.status, (await nowhere.json()).error], [404, 'that account is not on any device']);
+
+  // And the same token anywhere but this machine is nobody.
+  const away = new Request('https://dev.open-hearts.pages.dev/api/attest', { method: 'POST', body: JSON.stringify(await asking(CY, 'attest', { provider: 'google', token: 'local:cy' })) });
+  assert.deepEqual([(await worker.fetch(away, held)).status], [401]);
 });
 
 test('the sign-in route: a token that does not check out is 401, and one that does comes back with the licence', async () => {
