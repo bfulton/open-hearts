@@ -10,7 +10,8 @@
 /// The file's fields as the env names the handlers read. A field left
 /// null is left out, so a handler finds it missing, as before.
 export function configEnv(config) {
-  const { apple = {}, google = {} } = config ?? {};
+  const { apple = {}, google = {}, alerts = {} } = config ?? {};
+  const on = (flag) => (flag === true ? 'on' : null);
   const named = {
     OH_SERVICE_KEY: config?.serviceKey,
     OH_TURN_KEY_ID: config?.turnKeyId,
@@ -25,6 +26,11 @@ export function configEnv(config) {
     OH_GOOGLE_AUDIENCE: google.webClientId,
     OH_PLAY_PUSH_AUDIENCE: google.playPushAudience,
     OH_PLAY_PUSH_EMAIL: google.playPushEmail,
+    // The operator's own alerts (alerts.mjs).
+    OH_ALERTS_TO: alerts.to,
+    OH_ALERT_SUBSCRIBED: on(alerts.subscribed),
+    OH_ALERT_ONLINE: on(alerts.online),
+    OH_ALERT_QUIET_MINUTES: alerts.onlineQuietMinutes == null ? null : String(alerts.onlineQuietMinutes),
   };
   return Object.fromEntries(Object.entries(named).filter(([, v]) => typeof v === 'string' && v));
 }

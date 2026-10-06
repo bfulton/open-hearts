@@ -178,10 +178,15 @@ export const zones = {
       ],
     },
     /// help@ forwards to the operator. Where to is OH_HELP_FORWARD, when set,
-    /// and otherwise only checked to be a verified destination.
+    /// and otherwise only checked to be a verified destination. alerts@,
+    /// the service's own word to the operator (service/functions/alerts.mjs),
+    /// goes to the same place: help@'s, when OH_HELP_FORWARD is unset.
     emailRouting: {
       enabled: true,
-      forwards: [{ to: 'help@openhearts.game', destinationFrom: 'OH_HELP_FORWARD' }],
+      forwards: [
+        { to: 'help@openhearts.game', destinationFrom: 'OH_HELP_FORWARD' },
+        { to: 'alerts@openhearts.game', destinationFrom: 'OH_HELP_FORWARD', sameAs: 'help@openhearts.game' },
+      ],
       catchAll: false,
     },
     /// Email Sending (the relay's send_email binding, EMAIL): the zone

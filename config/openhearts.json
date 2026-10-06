@@ -13,5 +13,6 @@
     "webClientId": null,
     "playPushAudience": null,
     "playPushEmail": null
-  }
+  },
+  "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "online": true, "onlineQuietMinutes": 60 }
 }

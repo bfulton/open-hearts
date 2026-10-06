@@ -330,6 +330,26 @@ dataset in `service/do/wrangler.toml`. External ping monitors watch the
 site, the app, `/api/health` and the relay
 ([observability/](../observability/README.md)).
 
+### The operator's alerts
+
+While there are few subscribers, the operator is emailed about each one
+(`service/functions/alerts.mjs`, `alerts` in `config/openhearts.json`):
+
+- **A new subscription:** from the Stripe webhook, or the first
+  store purchase bound for a subscription. Told once per subscription
+  in 30 days, however often the webhook is delivered.
+- **A subscriber online:** a device on a subscription asks for its
+  licence, which the app does when it opens. Told at most once per
+  subscription in `onlineQuietMinutes`.
+
+The mail says which store, the first characters of the subscription
+and device, and dates. It never includes an email address or name. It
+goes to `alerts@openhearts.game`, which forwards to where help@ goes
+(`infra/`). It is sent from the relay worker, which holds the `EMAIL`
+binding, through a Household object named `operator-alerts`, which
+mails only `@openhearts.game`. A failed alert never fails the request.
+Set either flag to `false` and deploy to stop it.
+
 ## The relay and the bench
 
 The relay's core ([doc 08](08-own-relays.md)), `service/do/relay.mjs`,

@@ -27,6 +27,7 @@
 // own wasm, fetched from the static assets this worker serves.
 
 import { keepRecord, recordMost, recordResponse } from './records.mjs';
+import { alertOnline, alertSubscribed, sendAlert } from './alerts.mjs';
 
 const UPSTREAM = 'https://rtc.live.cloudflare.com/v1/turn/keys';
 
@@ -1217,6 +1218,8 @@ export class Household {
 
   async fetch(request) {
     const op = await request.json();
+    // The operator's alerts (alerts.mjs) only borrow the binding.
+    if (op?.op === 'alert') return Response.json(await sendAlert(op, this.env));
     await settle(this.env);
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: { error: 'licensing not configured' } });
@@ -1622,7 +1625,7 @@ async function manageRoute(request, env) {
   return json(request, status, body);
 }
 
-async function stripeRoute(request, env) {
+async function stripeRoute(request, env, ctx) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
   const raw = await textOf(request, MOST_EVENT);
   if (raw === null) return json(request, 413, { error: 'too big' });
@@ -1639,6 +1642,7 @@ async function stripeRoute(request, env) {
     return json(request, 400, { error: 'not json' });
   }
   const done = await record(event, store);
+  if (done?.bound) await after(ctx, alertSubscribed(env, store, { subscription: done.subscription, source: 'stripe', key: done.bound }));
   // A subscription just paid for: its backup codes, sent to the email
   // the checkout was paid with. Not kept: it is on the event.
   if (done?.bound) {
@@ -1720,7 +1724,7 @@ function preflight(request, methods) {
   });
 }
 
-async function licenceRoute(request, env) {
+async function licenceRoute(request, env, ctx) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
@@ -1728,7 +1732,13 @@ async function licenceRoute(request, env) {
   // else: whether a key pays, and until when, is the key's business.
   const asked = await signedFor(request, env, 'licence');
   if (asked instanceof Response) return asked;
-  const { status, body } = await licence(asked.key, env, { signer: asked.signer, open: openHouse(env, request) });
+  const open = openHouse(env, request);
+  const { status, body } = await licence(asked.key, env, { signer: asked.signer, open });
+  // A subscriber opening the app, for the operator (alerts.mjs).
+  if (status === 200 && !open) {
+    const store = storeOf(env);
+    await after(ctx, store.get(`KEY#${asked.key}`, 'ENTITLEMENT').then((held) => alertOnline(env, store, asked.key, held)));
+  }
   return json(request, status, body);
 }
 
@@ -2368,7 +2378,7 @@ export async function bindPurchase(op, store, { now = Date.now() } = {}) {
   return joinSubscription(op.key, op.subscription, store, { now, moving: op.buyer === true });
 }
 
-async function storeRoute(request, env) {
+async function storeRoute(request, env, ctx) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
@@ -2394,8 +2404,10 @@ async function storeRoute(request, env) {
     bought = { source: 'google', ...p, created: null, buyer: p.account === mine.google };
   }
   const { account: _, ...op } = bought;
+  const known = await store.get(`SUB#${bought.subscription}`, 'META');
   const bound = await inHousehold(env, bought.subscription, { op: 'bind', key, ...op });
   if (bound.status !== 200) return json(request, bound.status, bound.body);
+  if (!known) await after(ctx, alertSubscribed(env, store, { subscription: bought.subscription, source: bought.source, key, now }));
   const { status, body: out } = await licence(key, env, { signer, now });
   return json(request, status, out);
 }
@@ -2490,16 +2502,23 @@ async function playRoute(request, env) {
   return json(request, 200, { recorded });
 }
 
+/// [work] finished after the answer has gone, where the runtime lets
+/// it (ctx.waitUntil); awaited where it does not, as in the tests.
+async function after(ctx, work) {
+  if (ctx?.waitUntil) ctx.waitUntil(work);
+  else await work;
+}
+
 /// The handlers by name, as /api/<name> asks for them.
 const ROUTES = {
   config: (request, env) => configRoute(request, env),
   health: (request, env) => healthRoute(request, env),
   turn: (request, env) => turn(request, env),
-  licence: (request, env) => licenceRoute(request, env),
+  licence: (request, env, ctx) => licenceRoute(request, env, ctx),
   checkout: (request, env) => checkoutRoute(request, env),
-  stripe: (request, env) => stripeRoute(request, env),
+  stripe: (request, env, ctx) => stripeRoute(request, env, ctx),
   manage: (request, env) => manageRoute(request, env),
-  store: (request, env) => storeRoute(request, env),
+  store: (request, env, ctx) => storeRoute(request, env, ctx),
   apple: (request, env) => appleRoute(request, env),
   play: (request, env) => playRoute(request, env),
   ticket: (request, env) => ticketRoute(request, env),
@@ -2550,7 +2569,7 @@ export function appPage(url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const name = url.pathname.startsWith('/api/') ? url.pathname.slice('/api/'.length) : null;
     if (name === null) return env.ASSETS.fetch(appPage(url) ? new Request(new URL('/play/', url), request) : request);
@@ -2559,7 +2578,7 @@ export default {
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await settle(env);
-    const response = route ? await route(request, env) : json(request, 404, { error: 'no such handler' });
+    const response = route ? await route(request, env, ctx) : json(request, 404, { error: 'no such handler' });
     measure(env, route ? name : 'unknown', response.status, Date.now() - started);
     return response;
   },

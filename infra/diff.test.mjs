@@ -359,6 +359,7 @@ const liveRouting = () => ({
   settings: { enabled: true },
   rules: [
     { id: 'h', matchers: [{ type: 'literal', field: 'to', value: 'help@openhearts.game' }], actions: [{ type: 'forward', value: [ADDRESS] }], enabled: true },
+    { id: 'a', matchers: [{ type: 'literal', field: 'to', value: 'alerts@openhearts.game' }], actions: [{ type: 'forward', value: [ADDRESS] }], enabled: true },
     { id: 'c', matchers: [{ type: 'all' }], actions: [{ type: 'drop' }], enabled: false },
   ],
   catchAll: { id: 'c', matchers: [{ type: 'all' }], actions: [{ type: 'drop' }], enabled: false },
@@ -373,7 +374,10 @@ test('Email Routing: as it is, with the destination known or not', () => {
 
 test('Email Routing: a different destination is changed, and never named', () => {
   const plan = emailRoutingPlan(routing, liveRouting(), [...verified, { email: 'new@example.com', verified: true }], () => 'new@example.com');
-  assert.deepEqual(plan.rules, [{ op: 'update', id: 'h', to: 'help@openhearts.game', dest: 'new@example.com' }]);
+  assert.deepEqual(plan.rules, [
+    { op: 'update', id: 'h', to: 'help@openhearts.game', dest: 'new@example.com' },
+    { op: 'update', id: 'a', to: 'alerts@openhearts.game', dest: 'new@example.com' },
+  ]);
   assert.doesNotMatch([...plan.lines, ...plan.owner].join('\n'), /example\.com/);
 });
 
@@ -391,6 +395,15 @@ test('Email Routing: no rule and no destination known is for the owner; catch-al
   const plan = emailRoutingPlan(routing, have, verified, () => null);
   assert.match(plan.owner.join(), /no rule forwards help@openhearts.game: set OH_HELP_FORWARD/);
   assert.deepEqual(plan.catchAll, { enabled: false });
+});
+
+test('Email Routing: alerts@ is made to go where help@ goes, with no destination given', () => {
+  const have = liveRouting();
+  have.rules = have.rules.filter((r) => r.id !== 'a');
+  const plan = emailRoutingPlan(routing, have, verified, () => null);
+  assert.deepEqual(plan.rules, [{ op: 'create', to: 'alerts@openhearts.game', dest: ADDRESS }]);
+  assert.deepEqual(plan.lines, ['create a rule forwarding alerts@openhearts.game to where help@openhearts.game goes']);
+  assert.deepEqual(plan.owner, []);
 });
 
 test('Email Routing: a stray rule is deleted; off where it is defined off', () => {

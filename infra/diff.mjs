@@ -398,13 +398,15 @@ export function emailRoutingPlan(want, have, destinations, forwardTo) {
   const ours = (have.rules ?? []).filter((r) => !r.matchers?.some((m) => m.type === 'all'));
   for (const f of want.forwards) {
     const rule = ours.find((r) => literal(r) === f.to);
-    const dest = forwardTo(f);
+    // Where another address goes, for one that goes there too.
+    const alike = f.sameAs ? ours.find((r) => literal(r) === f.sameAs)?.actions?.find((a) => a.type === 'forward')?.value?.[0] : null;
+    const dest = forwardTo(f) ?? alike ?? null;
     const forward = rule?.actions?.find((a) => a.type === 'forward');
     const targets = forward?.value ?? [];
     if (!rule) {
       if (dest) {
         rules.push({ op: 'create', to: f.to, dest });
-        lines.push(`create a rule forwarding ${f.to} to $${f.destinationFrom}`);
+        lines.push(`create a rule forwarding ${f.to} to ${forwardTo(f) ? `$${f.destinationFrom}` : `where ${f.sameAs} goes`}`);
       } else owner.push(`no rule forwards ${f.to}: set ${f.destinationFrom} to where it should go, and run this again`);
     } else {
       if (dest && (targets.length !== 1 || targets[0] !== dest)) {

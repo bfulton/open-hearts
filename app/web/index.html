@@ -15,7 +15,7 @@
        fails the people who need it to be (WCAG 1.4.4). This one says
        what that one will, so nothing changes when it is swapped. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <meta name="description" content="Open source, no ads. Play alone or live.">
+  <meta name="description" content="Open source Hearts card game, no ads">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -23,8 +23,11 @@
   <meta name="apple-mobile-web-app-title" content="Open Hearts">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <!-- Favicon. The query is the icon's own: a browser keeps a site's
+       icon for a long time, and one from before the heart was the icon
+       is let go only for an address it has not seen. -->
+  <link rel="icon" href="favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/png" href="favicon.png?v=heart"/>
 
   <!-- The felt, so the address bar and the boot screen do not flash
        white before the app paints — and the page itself, so what a
