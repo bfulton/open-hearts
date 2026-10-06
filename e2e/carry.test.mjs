@@ -84,7 +84,9 @@ test('at play.openhearts.game with no key: asks openhearts.game/carry, and only 
   assert.equal(frame.src, 'https://openhearts.game/carry');
   assert.equal(frame.style.display, 'none');
   assert.deepEqual(JSON.parse(JSON.stringify(frame.contentWindow.asked)), [{ data: { type: 'oh-carry/ask' }, origin: 'https://openhearts.game' }]);
-  assert.equal(page.timers[0].ms, 1500);
+  // Ten seconds for the page to arrive; once it has, two to answer.
+  assert.deepEqual(page.timers.map((t) => t.ms), [10000, 2000]);
+  assert.equal(page.timers[0].fn, null, 'the wait for the page ends when it loads');
   page.expire();
   assert.equal(await page.window.ohCarried, 'timed out');
 });

@@ -69,8 +69,8 @@ The app used to be at `openhearts.game/play/`, and a browser that played
 there keeps its device — key, licence, name, records, settings — in that
 origin's storage. On its first load at `play.openhearts.game` with no key,
 `app/web/carry.js` asks a hidden frame of `openhearts.game/carry` for
-those entries and writes them before the app starts, waiting 1.5 s at
-most ([doc 06](06-service.md#the-device-carried-over)). The old origin
+those entries and writes them before the app starts, waiting 10 s at
+most for that page and 2 s for its answer ([doc 06](06-service.md#the-device-carried-over)). The old origin
 keeps its copy, so rolling back to serving the app at `/play/` loses
 nobody. `node e2e/move.mjs` drives the redirect, the carry and a preview
 in a browser, on the rig's stand-ins for the two hosts

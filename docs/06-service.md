@@ -118,9 +118,12 @@ over, once, in the browser:
    one), never over an entry already there, marks the carry done
    (`oh.carried`), and starts the app. `flutter_bootstrap.js` waits on
    this, and on nothing else.
-4. It waits 1.5 s at most. A carry that does not answer in time is not
+4. It waits up to 10 s for the old origin's page to load, then up to
+   2 s for its answer. A carry that does not answer in time is not
    marked done and the app boots: it makes a key of its own, and with a
-   key there the carry is never tried again.
+   key there the carry is never tried again — so the wait for the
+   network is long, and costs only a slow first load; a page with
+   nothing to carry answers in milliseconds.
 
 The two hosts are one site (same scheme, same registrable domain), so
 the frame reads `openhearts.game`'s own storage, not a copy partitioned

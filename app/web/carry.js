@@ -28,7 +28,15 @@
   'use strict';
   const KEY = 'flutter.identity_secret';
   const DONE = 'oh.carried';
-  const WAIT_MS = 1500;
+  // How long the old origin's page may take to arrive, and then how long
+  // it may take to answer. Giving up early costs a subscriber their
+  // device — the app makes a key of its own, and with a key here the
+  // carry is never tried again — while waiting costs only a slow first
+  // load: a page that has nothing to carry answers in a few dozen
+  // milliseconds after it loads. So the network gets long, and the
+  // answer, once the page is there, does not.
+  const LOAD_MS = 10000;
+  const ANSWER_MS = 2000;
 
   // Where the app used to be, for where it is now: production's own,
   // spelled out, and the browser rig's stand-in for it (e2e/drive.mjs).
@@ -82,13 +90,17 @@
       window.addEventListener('message', heard);
       // Asked once the frame has loaded, and addressed to the old
       // origin: a frame that ended up anywhere else is never told.
-      frame.addEventListener('load', () => frame.contentWindow?.postMessage({ type: 'oh-carry/ask' }, site));
+      frame.addEventListener('load', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => finish('timed out'), ANSWER_MS);
+        frame.contentWindow?.postMessage({ type: 'oh-carry/ask' }, site);
+      });
       frame.setAttribute('aria-hidden', 'true');
       frame.tabIndex = -1;
       frame.title = '';
       frame.style.display = 'none';
       frame.src = `${site}/carry`;
-      timer = setTimeout(() => finish('timed out'), WAIT_MS);
+      timer = setTimeout(() => finish('timed out'), LOAD_MS);
       (document.body ?? document.documentElement).appendChild(frame);
     });
   }
