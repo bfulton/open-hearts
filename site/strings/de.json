@@ -80,9 +80,9 @@
     "faq": {
       "title": "Fragen",
       "p1": "Wie spiele ich?",
-      "p2": "Öffne <a href=\"/play\">openhearts.game/play</a> und tippe auf <i>Allein spielen</i>. Die Apps fürs Handy kommen bald in den {{appStore}} und zu {{googlePlay}}.",
+      "p2": "Geh auf <a href=\"/play\">openhearts.game/play</a>, oder such (demnächst) im {{appStore}} oder bei {{googlePlay}} nach „Open Hearts“.",
       "p5": "Wie abonniere ich?",
-      "p6": "Tippe unter <i>Live spielen</i> auf <i>Abonnieren</i>. Im Web bezahlst du auf der Seite von Stripe, in den Apps fürs Handy über den App Store oder Google Play, die das Abo abrechnen und verlängern. Es gibt kein Konto: Das Abo gehört dem Gerät und allen Geräten, die du hinzufügst, ob Handy oder Web.",
+      "p6": "Tippe unter <i>Live spielen</i> auf <i>Abonnieren</i>. Im <a href=\"/play/subscription\">Web</a> bezahlst du auf der Seite von Stripe. In den Apps fürs Handy läuft es über den App Store oder Google Play, die das Abo abrechnen und verlängern. Bist du nicht angemeldet, gehört das Abo dem Gerät und allen weiteren, die du hinzufügst (bis zu 5).",
       "p7": "Wie kündige ich?",
       "p8": "Öffne das Menü, wähle <i>Abo</i> und dann <i>Abo verwalten</i>. Andere Wege und Erstattungen stehen in den <a href=\"{{base}}/terms\">Nutzungsbedingungen</a>.",
       "p9": "Wie füge ich ein weiteres Gerät hinzu?",
@@ -106,7 +106,9 @@
       "r5": "Herz darf erst ausgespielt werden, wenn schon eins gespielt wurde.",
       "r6": "Jedes Herz zählt einen Punkt, die Pik-Dame dreizehn.",
       "r7": "Nimm alle sechsundzwanzig für einen Durchmarsch: Dann bekommen sie alle anderen.",
-      "r8": "Gespielt wird bis fünfzig oder hundert. Die niedrigste Punktzahl gewinnt."
+      "r8": "Gespielt wird bis fünfzig oder hundert. Die niedrigste Punktzahl gewinnt.",
+      "more": "Mehr zu den Regeln und zur Geschichte des Spiels steht bei <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
+      "wikipedia": "https://de.wikipedia.org/wiki/Hearts"
     },
     "cancelAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Abo verwalten",
     "addAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Gerät hinzufügen",

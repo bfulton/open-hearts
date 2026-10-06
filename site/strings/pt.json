@@ -80,9 +80,9 @@
     "faq": {
       "title": "Perguntas",
       "p1": "Como eu jogo?",
-      "p2": "Abra <a href=\"/play\">openhearts.game/play</a> e toque em <i>Jogar sozinho</i>. Os apps para celular chegam em breve à {{appStore}} e ao {{googlePlay}}.",
+      "p2": "Acesse <a href=\"/play\">openhearts.game/play</a> ou (em breve) procure “Open Hearts” na {{appStore}} ou no {{googlePlay}}.",
       "p5": "Como eu assino?",
-      "p6": "Toque em <i>Assinar</i>, em <i>Jogar ao vivo</i>. Na web, o pagamento é feito na página da Stripe; nos apps para celular, pela App Store ou pelo Google Play, que cobram e renovam a assinatura. Não existe conta: a assinatura pertence ao aparelho, e a qualquer outro que você adicionar, celular ou web.",
+      "p6": "Toque no botão <i>Assinar</i>, em <i>Jogar ao vivo</i>. Na <a href=\"/play/subscription\">web</a>, o pagamento é feito na página da Stripe. Nos apps para celular, é pela App Store ou pelo Google Play, que cobram e renovam a assinatura. Se você não entrou com uma conta, a assinatura pertence ao aparelho, e aos outros que você adicionar (até 5).",
       "p7": "Como eu cancelo?",
       "p8": "Abra o menu, escolha <i>Assinatura</i> e depois <i>Gerenciar assinatura</i>. Outras formas, e os reembolsos, estão nos <a href=\"{{base}}/terms\">termos</a>.",
       "p9": "Como adiciono outro aparelho?",
@@ -106,7 +106,9 @@
       "r5": "Ninguém pode sair com copas até que alguma copa tenha sido jogada.",
       "r6": "Cada copa vale um ponto; a dama de espadas vale treze.",
       "r7": "Leve todos os vinte e seis pontos para atirar na lua: eles vão para todos os outros.",
-      "r8": "Jogue até cinquenta ou cem. Vence a menor pontuação."
+      "r8": "Jogue até cinquenta ou cem. Vence a menor pontuação.",
+      "more": "Para mais detalhes sobre as regras e a história do jogo, veja a <a href=\"{{support.rules.wikipedia}}\">Wikipédia</a>.",
+      "wikipedia": "https://pt.wikipedia.org/wiki/Copas_(jogo_de_cartas)"
     },
     "cancelAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Gerenciar assinatura",
     "addAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Adicionar um aparelho",

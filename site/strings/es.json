@@ -80,9 +80,9 @@
     "faq": {
       "title": "Preguntas",
       "p1": "¿Cómo se juega?",
-      "p2": "Abre <a href=\"/play\">openhearts.game/play</a> y toca <i>Jugar solo</i>. Las apps para móvil llegarán pronto a la {{appStore}} y a {{googlePlay}}.",
+      "p2": "Ve a <a href=\"/play\">openhearts.game/play</a> o (próximamente) busca «Open Hearts» en la {{appStore}} o en {{googlePlay}}.",
       "p5": "¿Cómo me suscribo?",
-      "p6": "Toca <i>Suscribirse</i> en <i>Jugar en vivo</i>. En la web, el pago se hace en la página de Stripe; en las apps para móvil, a través de la App Store o Google Play, que la cobran y la renuevan. No hay cuenta: la suscripción pertenece al dispositivo, y a los que añadas, sea móvil o web.",
+      "p6": "Toca el botón <i>Suscribirse</i> en <i>Jugar en vivo</i>. En la <a href=\"/play/subscription\">web</a>, el pago se hace en la página de Stripe. En las apps para móvil, a través de la App Store o Google Play, que la cobran y la renuevan. Si no has iniciado sesión, la suscripción pertenece al dispositivo, y a los otros que añadas (hasta 5).",
       "p7": "¿Cómo cancelo?",
       "p8": "Abre el menú, elige <i>Suscripción</i> y luego <i>Gestionar suscripción</i>. Las otras formas, y los reembolsos, están en los <a href=\"{{base}}/terms\">términos</a>.",
       "p9": "¿Cómo añado otro dispositivo?",
@@ -106,7 +106,9 @@
       "r5": "No se puede salir con corazones hasta que se haya jugado uno.",
       "r6": "Cada corazón vale un punto; la reina de picas, trece.",
       "r7": "Llévate los veintiséis para disparar a la luna: se los llevan todos los demás.",
-      "r8": "Se juega a cincuenta o a cien. Gana la puntuación más baja."
+      "r8": "Se juega a cincuenta o a cien. Gana la puntuación más baja.",
+      "more": "Para más detalles sobre las reglas y la historia del juego, consulta la <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
+      "wikipedia": "https://es.wikipedia.org/wiki/Corazones_(juego)"
     },
     "cancelAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Gestionar suscripción",
     "addAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Añadir un dispositivo",

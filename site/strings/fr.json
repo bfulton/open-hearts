@@ -80,9 +80,9 @@
     "faq": {
       "title": "Questions",
       "p1": "Comment jouer ?",
-      "p2": "Ouvrez <a href=\"/play\">openhearts.game/play</a> et touchez <i>Jouer seul</i>. Les applications mobiles arrivent bientôt sur l'{{appStore}} et {{googlePlay}}.",
+      "p2": "Allez sur <a href=\"/play\">openhearts.game/play</a>, ou (bientôt) cherchez « Open Hearts » sur l'{{appStore}} ou {{googlePlay}}.",
       "p5": "Comment s'abonner ?",
-      "p6": "Touchez <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le web, le paiement se fait sur la page de Stripe ; dans les applications mobiles, par l'App Store ou Google Play, qui le facturent et le renouvellent. Il n'y a pas de compte : l'abonnement appartient à l'appareil, et à ceux que vous y ajoutez, mobile ou web.",
+      "p6": "Touchez le bouton <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le <a href=\"/play/subscription\">web</a>, le paiement se fait sur la page de Stripe. Dans les applications mobiles, il passe par l'App Store ou Google Play, qui le facturent et le renouvellent. Si vous n'êtes pas connecté, l'abonnement appartient à l'appareil, et aux autres que vous ajoutez (jusqu'à 5).",
       "p7": "Comment résilier ?",
       "p8": "Ouvrez le menu, choisissez <i>Abonnement</i>, puis <i>Gérer l'abonnement</i>. Les autres moyens, et les remboursements, sont dans les <a href=\"{{base}}/terms\">conditions</a>.",
       "p9": "Comment ajouter un autre appareil ?",
@@ -106,7 +106,9 @@
       "r5": "On ne peut pas entamer à cœur tant qu'aucun cœur n'a été joué.",
       "r6": "Chaque cœur vaut un point ; la dame de pique en vaut treize.",
       "r7": "Prenez les vingt-six pour faire le grand chelem : ils vont à tous les autres.",
-      "r8": "Jouez en cinquante ou en cent points. Le score le plus bas gagne."
+      "r8": "Jouez en cinquante ou en cent points. Le score le plus bas gagne.",
+      "more": "Pour en savoir plus sur les règles et l'histoire du jeu, voir <a href=\"{{support.rules.wikipedia}}\">Wikipédia</a>.",
+      "wikipedia": "https://fr.wikipedia.org/wiki/Dame_de_pique_(jeu)"
     },
     "cancelAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Gérer l'abonnement",
     "addAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Ajouter un appareil",

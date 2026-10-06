@@ -16,7 +16,7 @@
 //   {{alternates}}  <link rel="alternate"> for each language's copy
 //   {{langs}}       a link to each language's copy, the page's own marked
 //   {{langName}}    the page's language, by its own name
-//   {{appStore}}, {{googlePlay}}  the store, linked once its listing is live
+//   {{appStore}}, {{googlePlay}}  the store, linked to the listing once it is live
 //   {{appStoreBadge}}, {{googlePlayBadge}}  a badge's link, or inactive
 //   {{> name}}      pages/_name.html, filled in the same way
 import { createHash } from 'node:crypto';
@@ -27,10 +27,12 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const origin = 'https://openhearts.game';
 
-/// The apps' store listings, once they are live. Until then the site
-/// names the stores without linking them, and its badges do nothing.
+/// The apps' store listings, once they are live. Until then the site's
+/// mentions of a store link to the store itself, and its badges do
+/// nothing.
 export const stores = { appStore: null, googlePlay: null };
-const storeLink = (url, name) => (url ? `<a href="${url}">${name}</a>` : name);
+const storeFronts = { appStore: 'https://www.apple.com/app-store/', googlePlay: 'https://play.google.com/store/apps' };
+const storeLink = (store, name) => `<a href="${stores[store] ?? storeFronts[store]}">${name}</a>`;
 const storeBadge = (url) => (url ? `href="${url}"` : 'aria-disabled="true"');
 
 export const languages = [
@@ -72,8 +74,8 @@ export function render(page, language, words) {
         `${l.code === language.code ? ' aria-current="true"' : ''}>${l.name}</a></li>`)
       .join('\n'),
     langName: language.name,
-    appStore: storeLink(stores.appStore, 'App Store'),
-    googlePlay: storeLink(stores.googlePlay, 'Google Play'),
+    appStore: storeLink('appStore', 'App Store'),
+    googlePlay: storeLink('googlePlay', 'Google Play'),
     appStoreBadge: storeBadge(stores.appStore),
     googlePlayBadge: storeBadge(stores.googlePlay),
   };

@@ -80,9 +80,9 @@
     "faq": {
       "title": "Questions",
       "p1": "How do I play?",
-      "p2": "Open <a href=\"/play\">openhearts.game/play</a> and tap <i>Play solo</i>. The phone apps are coming soon to the {{appStore}} and {{googlePlay}}.",
+      "p2": "Go to <a href=\"/play\">openhearts.game/play</a>, or (coming soon) search for “Open Hearts” in the {{appStore}} or {{googlePlay}}.",
       "p5": "How do I subscribe?",
-      "p6": "Tap <i>Subscribe</i> under <i>Play live</i>. On the web, payment is on Stripe's page; in the phone apps, it is through the App Store or Google Play, which bill and renew it. There is no account: the subscription belongs to the device, and to any you add, phone or web.",
+      "p6": "Tap the <i>Subscribe</i> button under <i>Play live</i>. On the <a href=\"/play/subscription\">web</a>, payment is on Stripe's page. In the phone apps, it is through the App Store or Google Play, which bill and renew it. If you're not signed in, the subscription belongs to the device, and any others you add (up to 5).",
       "p7": "How do I cancel?",
       "p8": "Open the menu, choose <i>Subscription</i>, then <i>Manage subscription</i>. Other ways, and refunds, are in the <a href=\"{{base}}/terms\">terms</a>.",
       "p9": "How do I add another device?",
@@ -106,7 +106,9 @@
       "r5": "Hearts can't be led until one has been played.",
       "r6": "Each heart is one point; the queen of spades is thirteen.",
       "r7": "Take all twenty-six to shoot the moon: everyone else gets them.",
-      "r8": "Play to fifty or a hundred. Lowest score wins."
+      "r8": "Play to fifty or a hundred. Lowest score wins.",
+      "more": "For more detail on rules and game history, see <a href=\"{{support.rules.wikipedia}}\">Wikipedia</a>.",
+      "wikipedia": "https://en.wikipedia.org/wiki/Hearts_(card_game)"
     },
     "cancelAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Manage subscription",
     "addAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Add a device",
