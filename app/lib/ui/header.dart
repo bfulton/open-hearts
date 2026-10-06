@@ -78,7 +78,7 @@ class TableHeader extends StatelessWidget {
 }
 
 /// The menu: one semantics node, "Menu", a tap opening the entries
-/// under the button.
+/// below the button, and a tap on it again shutting them.
 class MenuButton extends StatelessWidget {
   const MenuButton({super.key, required this.menu, this.height = TableHeader.height});
 
@@ -91,9 +91,12 @@ class MenuButton extends StatelessWidget {
   Future<void> _open(BuildContext context) async {
     final button = context.findRenderObject()! as RenderBox;
     final overlay = Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+    // Down from the button's foot rather than over it: the button stays
+    // in sight, and a tap on it again shuts the menu (the tap lands on
+    // the menu's barrier, which is what a tap anywhere off it does).
     final position = RelativeRect.fromRect(
       Rect.fromPoints(
-        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(button.size.bottomLeft(Offset.zero), ancestor: overlay),
         button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
       ),
       Offset.zero & overlay.size,
