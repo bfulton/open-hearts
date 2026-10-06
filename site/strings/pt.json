@@ -82,7 +82,7 @@
       "p1": "Como eu jogo?",
       "p2": "Abra <a href=\"/play\">openhearts.game/play</a> e toque em <i>Jogar sozinho</i>. Os apps para celular chegam em breve à {{appStore}} e ao {{googlePlay}}.",
       "p5": "Como eu assino?",
-      "p6": "Toque em <i>Assinar</i>, em <i>Jogar ao vivo</i>. O pagamento é feito na página da Stripe. Não existe conta: a assinatura pertence ao aparelho, e a qualquer outro que você adicionar.",
+      "p6": "Toque em <i>Assinar</i>, em <i>Jogar ao vivo</i>. Na web, o pagamento é feito na página da Stripe; nos apps para celular, pela App Store ou pelo Google Play, que cobram e renovam a assinatura. Não existe conta: a assinatura pertence ao aparelho, e a qualquer outro que você adicionar, celular ou web.",
       "p7": "Como eu cancelo?",
       "p8": "Abra o Jogo ao vivo e escolha <i>Gerenciar assinatura</i>. Outras formas, e os reembolsos, estão nos <a href=\"{{base}}/terms\">termos</a>.",
       "p9": "Como adiciono outro aparelho?",

@@ -82,7 +82,7 @@
       "p1": "How do I play?",
       "p2": "Open <a href=\"/play\">openhearts.game/play</a> and tap <i>Play solo</i>. The phone apps are coming soon to the {{appStore}} and {{googlePlay}}.",
       "p5": "How do I subscribe?",
-      "p6": "Tap <i>Subscribe</i> under <i>Play live</i>. Payment is on Stripe's page. There is no account: the subscription belongs to the device, and to any you add.",
+      "p6": "Tap <i>Subscribe</i> under <i>Play live</i>. On the web, payment is on Stripe's page; in the phone apps, it is through the App Store or Google Play, which bill and renew it. There is no account: the subscription belongs to the device, and to any you add, phone or web.",
       "p7": "How do I cancel?",
       "p8": "Open Live play and choose <i>Manage subscription</i>. Other ways, and refunds, are in the <a href=\"{{base}}/terms\">terms</a>.",
       "p9": "How do I add another device?",

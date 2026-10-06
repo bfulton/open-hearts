@@ -82,7 +82,7 @@
       "p1": "¿Cómo se juega?",
       "p2": "Abre <a href=\"/play\">openhearts.game/play</a> y toca <i>Jugar solo</i>. Las apps para móvil llegarán pronto a la {{appStore}} y a {{googlePlay}}.",
       "p5": "¿Cómo me suscribo?",
-      "p6": "Toca <i>Suscribirse</i> en <i>Jugar en vivo</i>. El pago se hace en la página de Stripe. No hay cuenta: la suscripción pertenece al dispositivo, y a los que añadas.",
+      "p6": "Toca <i>Suscribirse</i> en <i>Jugar en vivo</i>. En la web, el pago se hace en la página de Stripe; en las apps para móvil, a través de la App Store o Google Play, que la cobran y la renuevan. No hay cuenta: la suscripción pertenece al dispositivo, y a los que añadas, sea móvil o web.",
       "p7": "¿Cómo cancelo?",
       "p8": "Abre Juego en vivo y elige <i>Gestionar suscripción</i>. Las otras formas, y los reembolsos, están en los <a href=\"{{base}}/terms\">términos</a>.",
       "p9": "¿Cómo añado otro dispositivo?",

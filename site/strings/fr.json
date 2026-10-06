@@ -82,7 +82,7 @@
       "p1": "Comment jouer ?",
       "p2": "Ouvrez <a href=\"/play\">openhearts.game/play</a> et touchez <i>Jouer seul</i>. Les applications mobiles arrivent bientôt sur l'{{appStore}} et {{googlePlay}}.",
       "p5": "Comment s'abonner ?",
-      "p6": "Touchez <i>S'abonner</i> sous <i>Jouer en direct</i>. Le paiement se fait sur la page de Stripe. Il n'y a pas de compte : l'abonnement appartient à l'appareil, et à ceux que vous y ajoutez.",
+      "p6": "Touchez <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le web, le paiement se fait sur la page de Stripe ; dans les applications mobiles, par l'App Store ou Google Play, qui le facturent et le renouvellent. Il n'y a pas de compte : l'abonnement appartient à l'appareil, et à ceux que vous y ajoutez, mobile ou web.",
       "p7": "Comment résilier ?",
       "p8": "Ouvrez Jeu en direct et choisissez <i>Gérer l'abonnement</i>. Les autres moyens, et les remboursements, sont dans les <a href=\"{{base}}/terms\">conditions</a>.",
       "p9": "Comment ajouter un autre appareil ?",
