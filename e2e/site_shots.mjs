@@ -6,6 +6,7 @@
 //   cancel-<lang>.png  the same menu, the pointer on "Subscription",
 //                      over the subscription page's "Manage
 //                      subscription", the pointer on that
+//   add-<lang>.png     the same, to the page's "Add a device"
 //
 // Run after a change to either, from the repository root, with the e2e
 // build:
@@ -93,7 +94,8 @@ try {
     await page.screenshot({ path: out(`broken-${code}.png`), clip: await menu() });
     await unhover(page);
 
-    // To cancel: the menu's Subscription, then the page's button.
+    // To cancel, and to add a device: the menu's Subscription, then a
+    // button on the page it opens, with the line above it.
     await hover(page, exactly(w.subscription));
     const shown1 = await menu();
     const step1 = await page.screenshot({ clip: shown1 });
@@ -101,22 +103,28 @@ try {
     await click(page, exactly(w.subscription));
     await waitFor(page, exactly(w.manageSubscription));
     await page.waitForTimeout(600);
-    const manage = await rectOf(page, exactly(w.manageSubscription));
-    const hint = await rectOf(page, exactly(w.manageSubscriptionHint));
-    await hover(page, exactly(w.manageSubscription), 130);
-    const shown2 = around([hint, manage], 12);
-    const step2 = await page.screenshot({ clip: shown2 });
-    const png = (b) => `data:image/png;base64,${b.toString('base64')}`;
-    const sheet = await browser.newPage({ deviceScaleFactor: 2 });
-    await sheet.setContent(`<body style="margin:0">
-      <div id="both" style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:8px">
-        <img src="${png(step1)}" style="width:${shown1.width}px;border-radius:12px">
-        <svg style="margin-left:24px" width="20" height="26" viewBox="0 0 20 26" fill="none" stroke="#E4B363" stroke-width="2.5"
-          stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v20M3 15l7 7 7-7"/></svg>
-        <img src="${png(step2)}" style="width:${shown2.width}px;border-radius:12px">
-      </div></body>`);
-    await sheet.locator('#both').screenshot({ path: out(`cancel-${code}.png`), omitBackground: true });
-    await sheet.close();
+    for (const [name, label, above] of [
+      ['cancel', w.manageSubscription, w.manageSubscriptionHint],
+      ['add', w.addDevice, null],
+    ]) {
+      const target = await rectOf(page, exactly(label));
+      const boxes = above ? [await rectOf(page, exactly(above)), target] : [target];
+      await hover(page, exactly(label), 130);
+      const shown2 = around(boxes, 12);
+      const step2 = await page.screenshot({ clip: shown2 });
+      await unhover(page);
+      const png = (b) => `data:image/png;base64,${b.toString('base64')}`;
+      const sheet = await browser.newPage({ deviceScaleFactor: 2 });
+      await sheet.setContent(`<body style="margin:0">
+        <div id="both" style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:8px">
+          <img src="${png(step1)}" style="width:${shown1.width}px;border-radius:12px">
+          <svg style="margin-left:24px" width="20" height="26" viewBox="0 0 20 26" fill="none" stroke="#E4B363" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v20M3 15l7 7 7-7"/></svg>
+          <img src="${png(step2)}" style="width:${shown2.width}px;border-radius:12px">
+        </div></body>`);
+      await sheet.locator('#both').screenshot({ path: out(`${name}-${code}.png`), omitBackground: true });
+      await sheet.close();
+    }
     log(code);
     await page.close();
   }

@@ -109,7 +109,8 @@
       "r7": "Nimm alle sechsundzwanzig für einen Durchmarsch: Dann bekommen sie alle anderen.",
       "r8": "Gespielt wird bis fünfzig oder hundert. Die niedrigste Punktzahl gewinnt."
     },
-    "cancelAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Abo verwalten"
+    "cancelAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Abo verwalten",
+    "addAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Gerät hinzufügen"
   },
   "privacy": {
     "meta": {

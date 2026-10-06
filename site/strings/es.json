@@ -109,7 +109,8 @@
       "r7": "Llévate los veintiséis para disparar a la luna: se los llevan todos los demás.",
       "r8": "Se juega a cincuenta o a cien. Gana la puntuación más baja."
     },
-    "cancelAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Gestionar suscripción"
+    "cancelAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Gestionar suscripción",
+    "addAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Añadir un dispositivo"
   },
   "privacy": {
     "meta": {

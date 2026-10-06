@@ -109,7 +109,8 @@
       "r7": "Leve todos os vinte e seis pontos para atirar na lua: eles vão para todos os outros.",
       "r8": "Jogue até cinquenta ou cem. Vence a menor pontuação."
     },
-    "cancelAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Gerenciar assinatura"
+    "cancelAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Gerenciar assinatura",
+    "addAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Adicionar um aparelho"
   },
   "privacy": {
     "meta": {

@@ -109,7 +109,8 @@
       "r7": "Prenez les vingt-six pour faire le grand chelem : ils vont à tous les autres.",
       "r8": "Jouez en cinquante ou en cent points. Le score le plus bas gagne."
     },
-    "cancelAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Gérer l'abonnement"
+    "cancelAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Gérer l'abonnement",
+    "addAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Ajouter un appareil"
   },
   "privacy": {
     "meta": {

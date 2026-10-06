@@ -109,7 +109,8 @@
       "r7": "Take all twenty-six to shoot the moon: everyone else gets them.",
       "r8": "Play to fifty or a hundred. Lowest score wins."
     },
-    "cancelAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Manage subscription"
+    "cancelAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Manage subscription",
+    "addAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Add a device"
   },
   "privacy": {
     "meta": {
