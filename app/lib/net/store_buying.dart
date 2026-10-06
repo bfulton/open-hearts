@@ -54,7 +54,7 @@ enum StoreKind {
 
 /// The app's id in Google Play, which its subscriptions page wants
 /// alongside the product's.
-const playPackage = String.fromEnvironment('OH_PLAY_PACKAGE', defaultValue: 'com.openhearts.open_hearts');
+const playPackage = String.fromEnvironment('OH_PLAY_PACKAGE', defaultValue: 'game.openhearts');
 
 /// What a purchase is recorded against in each store, made from the
 /// device's key: Google Play's obfuscated account id, and the App

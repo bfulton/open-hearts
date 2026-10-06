@@ -133,7 +133,7 @@ void main() {
   test('the store\'s own subscription page is where a store subscriber is sent to manage it', () {
     expect(StoreKind.apple.manage.toString(), 'https://apps.apple.com/account/subscriptions');
     expect(StoreKind.google.manage.toString(),
-        'https://play.google.com/store/account/subscriptions?sku=live_play_yearly&package=com.openhearts.open_hearts');
+        'https://play.google.com/store/account/subscriptions?sku=live_play_yearly&package=game.openhearts');
   });
 
   test('the proof is shown to the service signed over, and comes back a licence for this device', () async {

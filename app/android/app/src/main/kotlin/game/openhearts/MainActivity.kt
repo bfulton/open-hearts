@@ -1,4 +1,4 @@
-package com.openhearts.open_hearts
+package game.openhearts
 
 import io.flutter.embedding.android.FlutterActivity
 
