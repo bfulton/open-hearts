@@ -72,10 +72,10 @@
     },
     "help": {
       "title": "Como conseguir ajuda",
-      "p1": "Alguma coisa está quebrada",
+      "p1": "Reportar um bug",
       "p2": "Escolha <i>Conte o que está quebrado</i> no menu do jogo, ou abra uma issue no <a href=\"https://github.com/bfulton/open-hearts/issues\">GitHub</a>. As issues são públicas.",
-      "p3": "Qualquer assunto privado",
-      "p4": "Escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, ou mande uma carta para o endereço que está nos <a href=\"{{base}}/terms#contact\">termos</a>."
+      "p3": "Mande um e-mail",
+      "p4": "Para relatar um problema privado, ou para qualquer outra coisa, escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>."
     },
     "faq": {
       "title": "Perguntas",
