@@ -171,13 +171,10 @@ const plain = (value) => ({ type: 'plain_text', value });
 const liveProduction = () => ({
   env_vars: {
     OH_ID_HMAC: secret,
-    OH_SERVICE_KEY: plain(pages.environments.production.vars.OH_SERVICE_KEY),
     OH_SERVICE_SECRET: secret,
-    OH_STRIPE_PRICE: plain('openhearts_annual'),
     OH_STRIPE_SECRET: secret,
     OH_STRIPE_WEBHOOK_SECRET: secret,
     OH_TURN_API_TOKEN: secret,
-    OH_TURN_KEY_ID: plain(pages.environments.production.vars.OH_TURN_KEY_ID),
   },
   kv_namespaces: { OH_STORE: { namespace_id: '5b65' } },
   durable_object_namespaces: { HOUSEHOLD: { namespace_id: 'fcae' } },
@@ -192,7 +189,7 @@ test('Pages: production as it is matches', () => {
 
 test('Pages: preview has its own store and no household', () => {
   const have = liveProduction();
-  for (const k of ['OH_STRIPE_PRICE', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET']) delete have.env_vars[k];
+  for (const k of ['OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET']) delete have.env_vars[k];
   have.kv_namespaces.OH_STORE.namespace_id = 'ab41';
   have.r2_buckets.OH_RECORDS.name = 'open-hearts-records-preview';
   delete have.durable_object_namespaces;
@@ -206,11 +203,15 @@ test('Pages: preview has its own store and no household', () => {
   assert.deepEqual(pagesEnvPlan(pages.environments.preview, have, ids).lines, ['rebind OH_RECORDS (r2_buckets) to open-hearts-records-preview']);
 });
 
+// The project holds no plain variables today (config/openhearts.json);
+// the planning for one is still checked, against a definition that has one.
+const withVar = { ...pages.environments.production, vars: { OH_STRIPE_PRICE: 'openhearts_annual' } };
+
 test('Pages: a plain variable is set, a stray one removed', () => {
   const have = liveProduction();
   have.env_vars.OH_STRIPE_PRICE = plain('price_old');
   have.env_vars.OH_DEBUG = plain('1');
-  const plan = pagesEnvPlan(pages.environments.production, have, ids);
+  const plan = pagesEnvPlan(withVar, have, ids);
   assert.deepEqual(plan.patch.env_vars, { OH_STRIPE_PRICE: plain('openhearts_annual'), OH_DEBUG: null });
   assert.deepEqual(plan.lines, ['set OH_STRIPE_PRICE: "price_old" -> "openhearts_annual"', 'remove variable OH_DEBUG, which is not defined']);
 });
@@ -232,7 +233,7 @@ test("Pages: a secret's value is never in a line", () => {
   const have = liveProduction();
   have.env_vars.OH_STRAY = { type: 'secret_text', value: 'hunter2' };
   have.env_vars.OH_STRIPE_PRICE = { type: 'secret_text', value: 'hunter3' };
-  const plan = pagesEnvPlan(pages.environments.production, have, ids);
+  const plan = pagesEnvPlan(withVar, have, ids);
   assert.doesNotMatch(plan.lines.join('\n'), /hunter/);
   assert.deepEqual(plan.lines, ['set OH_STRIPE_PRICE as plain text (it is secret_text)', 'remove secret OH_STRAY, which is not defined']);
 });

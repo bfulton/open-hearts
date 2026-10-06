@@ -35,16 +35,9 @@ export const pages = {
     production: {
       compatibilityDate: '2026-09-09',
       compatibilityFlags: [],
-      /// Plain text: config, public by nature (docs/06-service.md).
-      vars: {
-        // The service's public key, the half every build is compiled to
-        // trust (deploy.sh, OH_SERVICE_KEY).
-        OH_SERVICE_KEY: '8031cb2192987148c1af19ebe8338a15ffec1745e3974508932e1e403323a46b',
-        // The price checkout sells, by lookup key (infra/stripe.mjs).
-        OH_STRIPE_PRICE: 'openhearts_annual',
-        // The Realtime TURN key's id (turnKeys, below), not its secret.
-        OH_TURN_KEY_ID: 'd681af4e315018c9dc90b898de5f24be',
-      },
+      /// None: what is not secret is in config/openhearts.json, which
+      /// the deploy ships with the worker (docs/06-service.md).
+      vars: {},
       /// Encrypted: names only. apply.mjs checks each is set, and cannot
       /// set one (it has no value to set), so a missing one is set by
       /// hand: `npx wrangler pages secret put NAME --project-name open-hearts`.
@@ -60,10 +53,7 @@ export const pages = {
     preview: {
       compatibilityDate: '2026-09-09',
       compatibilityFlags: [],
-      vars: {
-        OH_SERVICE_KEY: '8031cb2192987148c1af19ebe8338a15ffec1745e3974508932e1e403323a46b',
-        OH_TURN_KEY_ID: 'd681af4e315018c9dc90b898de5f24be',
-      },
+      vars: {},
       // No Stripe on preview: the shop says it is not open yet.
       secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_TURN_API_TOKEN'],
       // Its own store, so a preview never writes production's rows; and
