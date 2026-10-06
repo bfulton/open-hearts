@@ -84,9 +84,9 @@
       "p5": "¿Cómo me suscribo?",
       "p6": "Toca <i>Suscribirse</i> en <i>Jugar en vivo</i>. En la web, el pago se hace en la página de Stripe; en las apps para móvil, a través de la App Store o Google Play, que la cobran y la renuevan. No hay cuenta: la suscripción pertenece al dispositivo, y a los que añadas, sea móvil o web.",
       "p7": "¿Cómo cancelo?",
-      "p8": "Abre Juego en vivo y elige <i>Gestionar suscripción</i>. Las otras formas, y los reembolsos, están en los <a href=\"{{base}}/terms\">términos</a>.",
+      "p8": "Abre el menú, elige <i>Suscripción</i> y luego <i>Gestionar suscripción</i>. Las otras formas, y los reembolsos, están en los <a href=\"{{base}}/terms\">términos</a>.",
       "p9": "¿Cómo añado otro dispositivo?",
-      "p10": "En un dispositivo suscrito, abre Juego en vivo y toca <i>Añadir un dispositivo</i>; luego escanea el código con el otro dispositivo, o toca <i>Enviar el enlace</i>. Cada código sirve una vez, durante diez minutos.",
+      "p10": "En un dispositivo suscrito, abre el menú, elige <i>Suscripción</i> y toca <i>Añadir un dispositivo</i>; luego escanea el código con el otro dispositivo, o toca <i>Enviar el enlace</i>. Cada código sirve una vez, durante diez minutos.",
       "p11": "He perdido el teléfono, o he borrado los datos del navegador.",
       "p12": "Desde otro dispositivo de la suscripción, añade el nuevo y quita el perdido. Si no tienes ninguno, escríbenos desde el correo con el que pagaste.",
       "p13": "¿Puedo jugar con un lector de pantalla, o con el texto más grande?",
@@ -108,7 +108,8 @@
       "r6": "Cada corazón vale un punto; la reina de picas, trece.",
       "r7": "Llévate los veintiséis para disparar a la luna: se los llevan todos los demás.",
       "r8": "Se juega a cincuenta o a cien. Gana la puntuación más baja."
-    }
+    },
+    "cancelAlt": "El menú del juego con el puntero sobre Suscripción, y luego la página de la suscripción con el puntero sobre Gestionar suscripción"
   },
   "privacy": {
     "meta": {

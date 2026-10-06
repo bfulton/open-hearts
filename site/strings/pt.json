@@ -84,9 +84,9 @@
       "p5": "Como eu assino?",
       "p6": "Toque em <i>Assinar</i>, em <i>Jogar ao vivo</i>. Na web, o pagamento é feito na página da Stripe; nos apps para celular, pela App Store ou pelo Google Play, que cobram e renovam a assinatura. Não existe conta: a assinatura pertence ao aparelho, e a qualquer outro que você adicionar, celular ou web.",
       "p7": "Como eu cancelo?",
-      "p8": "Abra o Jogo ao vivo e escolha <i>Gerenciar assinatura</i>. Outras formas, e os reembolsos, estão nos <a href=\"{{base}}/terms\">termos</a>.",
+      "p8": "Abra o menu, escolha <i>Assinatura</i> e depois <i>Gerenciar assinatura</i>. Outras formas, e os reembolsos, estão nos <a href=\"{{base}}/terms\">termos</a>.",
       "p9": "Como adiciono outro aparelho?",
-      "p10": "Num aparelho com assinatura, abra o Jogo ao vivo e toque em <i>Adicionar um aparelho</i>; depois, escaneie o código com o outro aparelho, ou toque em <i>Enviar o link</i>. Um código vale uma vez só, por dez minutos.",
+      "p10": "Num aparelho com assinatura, abra o menu, escolha <i>Assinatura</i> e toque em <i>Adicionar um aparelho</i>; depois, escaneie o código com o outro aparelho, ou toque em <i>Enviar o link</i>. Um código vale uma vez só, por dez minutos.",
       "p11": "Perdi meu celular, ou limpei os dados do navegador.",
       "p12": "De outro aparelho da assinatura, adicione o novo e remova o perdido. Se você não tiver nenhum, mande um e-mail para a gente com o endereço que usou para pagar.",
       "p13": "Dá para jogar com leitor de tela, ou com letras maiores?",
@@ -108,7 +108,8 @@
       "r6": "Cada copa vale um ponto; a dama de espadas vale treze.",
       "r7": "Leve todos os vinte e seis pontos para atirar na lua: eles vão para todos os outros.",
       "r8": "Jogue até cinquenta ou cem. Vence a menor pontuação."
-    }
+    },
+    "cancelAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Gerenciar assinatura"
   },
   "privacy": {
     "meta": {

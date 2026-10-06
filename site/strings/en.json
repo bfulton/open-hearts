@@ -84,9 +84,9 @@
       "p5": "How do I subscribe?",
       "p6": "Tap <i>Subscribe</i> under <i>Play live</i>. On the web, payment is on Stripe's page; in the phone apps, it is through the App Store or Google Play, which bill and renew it. There is no account: the subscription belongs to the device, and to any you add, phone or web.",
       "p7": "How do I cancel?",
-      "p8": "Open Live play and choose <i>Manage subscription</i>. Other ways, and refunds, are in the <a href=\"{{base}}/terms\">terms</a>.",
+      "p8": "Open the menu, choose <i>Subscription</i>, then <i>Manage subscription</i>. Other ways, and refunds, are in the <a href=\"{{base}}/terms\">terms</a>.",
       "p9": "How do I add another device?",
-      "p10": "On a subscribed device, open Live play and tap <i>Add a device</i>, then scan the code with the other device, or tap <i>Send the link instead</i>. A code works once, for ten minutes.",
+      "p10": "On a subscribed device, open the menu, choose <i>Subscription</i> and tap <i>Add a device</i>, then scan the code with the other device, or tap <i>Send the link instead</i>. A code works once, for ten minutes.",
       "p11": "I lost my phone, or cleared my browser.",
       "p12": "From another device on the subscription, add the new one and drop the lost one. If you have none, email us with the address you paid with.",
       "p13": "Can I play with a screen reader, or bigger text?",
@@ -108,7 +108,8 @@
       "r6": "Each heart is one point; the queen of spades is thirteen.",
       "r7": "Take all twenty-six to shoot the moon: everyone else gets them.",
       "r8": "Play to fifty or a hundred. Lowest score wins."
-    }
+    },
+    "cancelAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Manage subscription"
   },
   "privacy": {
     "meta": {

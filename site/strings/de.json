@@ -84,9 +84,9 @@
       "p5": "Wie abonniere ich?",
       "p6": "Tippe unter <i>Live spielen</i> auf <i>Abonnieren</i>. Im Web bezahlst du auf der Seite von Stripe, in den Apps fürs Handy über den App Store oder Google Play, die das Abo abrechnen und verlängern. Es gibt kein Konto: Das Abo gehört dem Gerät und allen Geräten, die du hinzufügst, ob Handy oder Web.",
       "p7": "Wie kündige ich?",
-      "p8": "Öffne Live spielen und wähle <i>Abo verwalten</i>. Andere Wege und Erstattungen stehen in den <a href=\"{{base}}/terms\">Nutzungsbedingungen</a>.",
+      "p8": "Öffne das Menü, wähle <i>Abo</i> und dann <i>Abo verwalten</i>. Andere Wege und Erstattungen stehen in den <a href=\"{{base}}/terms\">Nutzungsbedingungen</a>.",
       "p9": "Wie füge ich ein weiteres Gerät hinzu?",
-      "p10": "Öffne auf einem Gerät mit Abo Live spielen und tippe auf <i>Gerät hinzufügen</i>. Scanne dann den Code mit dem anderen Gerät oder tippe auf <i>Stattdessen den Link schicken</i>. Ein Code funktioniert einmal, zehn Minuten lang.",
+      "p10": "Öffne auf einem Gerät mit Abo das Menü, wähle <i>Abo</i> und tippe auf <i>Gerät hinzufügen</i>. Scanne dann den Code mit dem anderen Gerät oder tippe auf <i>Stattdessen den Link schicken</i>. Ein Code funktioniert einmal, zehn Minuten lang.",
       "p11": "Ich habe mein Handy verloren oder meinen Browser geleert.",
       "p12": "Füge von einem anderen Gerät mit dem Abo das neue hinzu und entferne das verlorene. Wenn du keins hast, schreib uns mit der E-Mail-Adresse, mit der du bezahlt hast.",
       "p13": "Kann ich mit einem Screenreader oder mit größerer Schrift spielen?",
@@ -108,7 +108,8 @@
       "r6": "Jedes Herz zählt einen Punkt, die Pik-Dame dreizehn.",
       "r7": "Nimm alle sechsundzwanzig für einen Durchmarsch: Dann bekommen sie alle anderen.",
       "r8": "Gespielt wird bis fünfzig oder hundert. Die niedrigste Punktzahl gewinnt."
-    }
+    },
+    "cancelAlt": "Das Menü des Spiels mit dem Zeiger auf Abo, dann die Abo-Seite mit dem Zeiger auf Abo verwalten"
   },
   "privacy": {
     "meta": {

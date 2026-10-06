@@ -84,9 +84,9 @@
       "p5": "Comment s'abonner ?",
       "p6": "Touchez <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le web, le paiement se fait sur la page de Stripe ; dans les applications mobiles, par l'App Store ou Google Play, qui le facturent et le renouvellent. Il n'y a pas de compte : l'abonnement appartient à l'appareil, et à ceux que vous y ajoutez, mobile ou web.",
       "p7": "Comment résilier ?",
-      "p8": "Ouvrez Jeu en direct et choisissez <i>Gérer l'abonnement</i>. Les autres moyens, et les remboursements, sont dans les <a href=\"{{base}}/terms\">conditions</a>.",
+      "p8": "Ouvrez le menu, choisissez <i>Abonnement</i>, puis <i>Gérer l'abonnement</i>. Les autres moyens, et les remboursements, sont dans les <a href=\"{{base}}/terms\">conditions</a>.",
       "p9": "Comment ajouter un autre appareil ?",
-      "p10": "Sur un appareil abonné, ouvrez Jeu en direct et touchez <i>Ajouter un appareil</i>, puis scannez le code avec l'autre appareil, ou touchez <i>Envoyer le lien à la place</i>. Un code ne sert qu'une fois, pendant dix minutes.",
+      "p10": "Sur un appareil abonné, ouvrez le menu, choisissez <i>Abonnement</i> et touchez <i>Ajouter un appareil</i>, puis scannez le code avec l'autre appareil, ou touchez <i>Envoyer le lien à la place</i>. Un code ne sert qu'une fois, pendant dix minutes.",
       "p11": "J'ai perdu mon téléphone, ou effacé les données de mon navigateur.",
       "p12": "Depuis un autre appareil de l'abonnement, ajoutez le nouveau et retirez celui qui est perdu. Si vous n'en avez aucun, écrivez-nous en indiquant l'adresse e-mail avec laquelle vous avez payé.",
       "p13": "Puis-je jouer avec un lecteur d'écran, ou avec un texte plus grand ?",
@@ -108,7 +108,8 @@
       "r6": "Chaque cœur vaut un point ; la dame de pique en vaut treize.",
       "r7": "Prenez les vingt-six pour faire le grand chelem : ils vont à tous les autres.",
       "r8": "Jouez en cinquante ou en cent points. Le score le plus bas gagne."
-    }
+    },
+    "cancelAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Gérer l'abonnement"
   },
   "privacy": {
     "meta": {
