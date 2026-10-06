@@ -82,20 +82,22 @@
       "p1": "Comment jouer ?",
       "p2": "Allez sur <a href=\"/play\">openhearts.game/play</a>, ou (bientôt) cherchez « Open Hearts » sur l'{{appStore}} ou {{googlePlay}}.",
       "p5": "Comment s'abonner ?",
-      "p6": "Touchez le bouton <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le <a href=\"/play/subscription\">web</a>, le paiement se fait sur la page de Stripe. Dans les applications mobiles, il passe par l'App Store ou Google Play, qui le facturent et le renouvellent. Si vous n'êtes pas connecté, l'abonnement appartient à l'appareil, et aux autres que vous ajoutez (jusqu'à 5).",
+      "p6": "Touchez le bouton <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le <a href=\"/play/subscription\">web</a>, le paiement se fait sur la page de Stripe. Dans les applications mobiles, il passe par l'App Store ou Google Play, qui le facturent et le renouvellent. S'abonner crée votre compte : votre nom, votre classement et vos parties le suivent sur tout appareil que vous ajoutez (jusqu'à 5).",
       "p7": "Comment résilier ?",
       "p8": "Ouvrez le menu, choisissez <i>Abonnement</i>, puis <i>Gérer l'abonnement</i>. Les autres moyens, et les remboursements, sont dans les <a href=\"{{base}}/terms\">conditions</a>.",
       "p9": "Comment ajouter un autre appareil ?",
-      "p10": "Sur un appareil abonné, ouvrez le menu, choisissez <i>Abonnement</i> et touchez <i>Ajouter un appareil</i>, puis scannez le code avec l'autre appareil, ou touchez <i>Envoyer le lien à la place</i>. Un code ne sert qu'une fois, pendant dix minutes.",
+      "p10": "Sur un appareil de votre compte, ouvrez le menu, choisissez <i>Abonnement</i> et touchez <i>Ajouter un appareil</i>, puis scannez le code avec l'autre appareil, ou touchez <i>Envoyer le lien à la place</i>. Un code ne sert qu'une fois, pendant dix minutes.",
       "p11": "Et si je perds mon téléphone, ou efface les données de mon navigateur ?",
-      "p12": "Si un autre de vos appareils est sur l'abonnement, ajoutez le nouveau depuis celui-ci et retirez celui que vous avez perdu. Sinon, utilisez un code de secours : sur le nouvel appareil, ouvrez le menu, choisissez <i>Activer l'abonnement</i> et saisissez-le. Tout appareil de l'abonnement peut <i>Afficher les codes de secours</i>, et ceux d'un abonnement web vous ont été envoyés par e-mail à l'abonnement : gardez-les en lieu sûr. Acheté sur l'App Store ou Google Play ? Sur le nouveau téléphone, touchez <i>S'abonner</i>, puis <i>Restaurer les achats</i>.",
+      "p12": "Si un autre de vos appareils est dans votre compte, ajoutez le nouveau depuis celui-ci et retirez celui que vous avez perdu. Sinon, utilisez un code de secours : sur le nouvel appareil, ouvrez le menu, choisissez <i>Activer l'abonnement</i> et saisissez-le, et l'appareil rejoint le même compte, avec votre classement et vos parties. Connecté avec Apple ou Google ? Connectez-vous de la même façon sur le nouvel appareil. Tout appareil du compte peut <i>Afficher les codes de secours</i>, et ceux d'un abonnement web vous ont été envoyés par e-mail à l'abonnement : gardez-les en lieu sûr. Acheté sur l'App Store ou Google Play ? Sur le nouveau téléphone, touchez <i>S'abonner</i>, puis <i>Restaurer les achats</i>.",
+      "p21": "Pourquoi est-il écrit qu'Open Hearts est ouvert sur un autre appareil ?",
+      "p22": "Votre compte joue en direct sur un appareil à la fois, et celui qui est utilisé est le dernier ouvert. L'autre se retire : il quitte la table où il était et cesse de jouer en direct, mais vous pouvez toujours y jouer en solo. Touchez <i>L'utiliser ici</i> pour reprendre le compte. Si votre compte est dans une partie sur l'autre appareil, on vous le demande d'abord, car cette partie sera perdue : un bot termine votre place, et une partie classée compte comme abandonnée.",
       "p13": "Puis-je jouer avec un lecteur d'écran, ou avec un texte plus grand ?",
       "p14": "Oui. Chaque carte, place, pli et score a un nom qu'un lecteur d'écran peut lire. Dans un navigateur, appuyez sur <i>Enable accessibility</i>, le premier bouton que trouve le lecteur d'écran, et utilisez le zoom du navigateur pour agrandir le texte. Dans les applications mobiles, activez VoiceOver (iPhone) ou TalkBack (Android) ; l'application suit la taille de texte du téléphone.",
       "p15": "Puis-je choisir la langue ?",
       "p16": "Le jeu suit la langue de votre appareil. Sur le web, choisissez-en une autre sous <i>Langue</i>, sur la page <i>À propos</i> du jeu, ou avec le menu des langues en bas de ce site. Sur un téléphone, utilisez le réglage du téléphone pour chaque application : sur un iPhone, Réglages, puis Open Hearts, puis Langue ; sur Android 13 et plus, Paramètres, puis Système, puis Langues, puis Langues des applications.",
       "p17": "Comment savoir que la donne est honnête ?",
       "p19": "Que deviennent mes données ?",
-      "p20": "En solo, rien ne quitte votre appareil. En direct, votre nom, votre image et vos résultats sont publics. Rien n'est vendu ni utilisé pour la publicité. Plus dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
+      "p20": "En solo, rien ne quitte votre appareil. En direct, votre nom, votre image, votre numéro de compte et vos résultats sont publics. Rien n'est vendu ni utilisé pour la publicité. Plus dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
     },
     "rules": {
       "title": "Quelles sont les règles de la Dame de pique ?",
@@ -127,18 +129,18 @@
     "header": {
       "title": "Confidentialité",
       "tagline": "Ce qu'Open Hearts fait de ce que vous lui confiez, en termes simples.",
-      "updated": "Dernière mise à jour : 5 octobre 2026"
+      "updated": "Dernière mise à jour : 6 octobre 2026"
     },
     "short": {
       "title": "En bref",
       "p1": "Le jeu en solo reste sur votre appareil",
       "p2": "Votre nom, votre image et vos parties contre les bots sont conservés sur l'appareil sur lequel vous jouez, et ne sont envoyés nulle part.",
       "p3": "Le jeu en direct est public, et c'est voulu",
-      "p4": "Pour jouer avec d'autres, votre nom, votre image et vos résultats passent par notre relais, où quiconque les demande peut les lire. Les salles et les images sont conservées un jour ; les résultats sont conservés pour les classements.",
-      "p5": "Pas de pub, pas de compte",
-      "p6": "Rien n'est vendu, loué ni utilisé pour la publicité. Il n'y a aucun traceur dans l'application ni sur ce site, et aucun compte à créer.",
+      "p4": "Pour jouer avec d'autres, votre nom, votre image, le numéro de votre compte et vos résultats passent par notre relais, où quiconque les demande peut les lire. Les salles et les images sont conservées un jour ; les résultats sont conservés pour les classements.",
+      "p5": "Un compte, mais ni e-mail ni mot de passe",
+      "p6": "Rien n'est vendu, loué ni utilisé pour la publicité. Il n'y a aucun traceur dans l'application ni sur ce site. S'abonner crée un compte : un nombre aléatoire que notre service vous donne, sous lequel jouent vos appareils. Il n'y a pas de mot de passe, et nous ne conservons aucune adresse e-mail.",
       "p7": "Le paiement, c'est l'affaire de Stripe",
-      "p8": "Sur le web, un abonnement s'achète via Stripe, qui a votre adresse e-mail et votre carte. Nous gardons une note indiquant que votre appareil est à jour de paiement. Nous ne voyons jamais votre numéro de carte."
+      "p8": "Sur le web, un abonnement s'achète via Stripe, qui a votre adresse e-mail et votre carte. Nous gardons une note indiquant le compte qu'il paie et les appareils de ce compte. Nous ne voyons jamais votre numéro de carte."
     },
     "who": {
       "title": "Qui nous sommes",
@@ -147,12 +149,12 @@
     "device": {
       "title": "Sur votre appareil",
       "p1": "L'application conserve ce qui suit sur l'appareil sur lequel vous jouez — dans le stockage du navigateur pour ce site, ou dans le stockage propre de l'application sur un téléphone :",
-      "p2": "<b>Une clé que votre appareil crée lui-même.</b> C'est un long nombre aléatoire, avec une moitié publique et une moitié secrète. La moitié publique est votre identité à une table en direct. La moitié secrète ne quitte jamais l'appareil.",
+      "p2": "<b>Une clé que votre appareil crée lui-même.</b> C'est un long nombre aléatoire, avec une moitié publique et une moitié secrète. La moitié publique représente cet appareil à une table en direct ; si vous êtes abonné, votre licence la relie à votre compte. La moitié secrète ne quitte jamais l'appareil.",
       "p3": "<b>Votre nom et votre apparence</b> : une icône et une couleur, ou une image à vous. L'image est réduite à 64 sur 64 pixels sur votre appareil, et seule cette petite copie est conservée. La photo d'origine n'est ni stockée ni envoyée.",
       "p4": "<b>Vos trente dernières parties contre les bots</b>, que votre profil comptabilise. Elles ne quittent l'appareil que si vous touchez <i>Copier le relevé</i>.",
-      "p5": "<b>Votre rythme de jeu</b>, vos options de partie, la langue que vous avez choisie, votre licence si vous êtes abonné, et les joueurs dont vous avez choisi de masquer l'image.",
+      "p5": "<b>Votre rythme de jeu</b>, vos options de partie, la langue que vous avez choisie, votre licence et le numéro de votre compte si vous êtes abonné, et les joueurs dont vous avez choisi de masquer l'image.",
       "p6": "<b>La partie en direct en cours</b>, tant que vous y êtes : la table, chaque coup et chaque vote que votre appareil y a signés, et les secrets avec lesquels il a distribué vos cartes, pour qu'une page rechargée en cours de partie puisse reprendre sa place. Tout cela est effacé quand la partie se termine ou que vous la quittez, ou deux minutes après votre dernier passage.",
-      "p7": "Pour tout supprimer, effacez les données de ce site dans votre navigateur, ou supprimez l'application. Cela supprime aussi votre clé : vous revenez alors comme un nouveau joueur."
+      "p7": "Pour tout supprimer, effacez les données de ce site dans votre navigateur, ou supprimez l'application. Cela supprime aussi votre clé : l'appareil revient alors comme un nouveau joueur, jusqu'à ce qu'un code de secours ou votre connexion le ramène dans votre compte."
     },
     "alone": {
       "title": "Jouer seul",
@@ -163,7 +165,7 @@
       "title": "Ouvrir le jeu sur le web",
       "p1": "<b>Cloudflare</b> héberge ce site et le jeu, et voit donc chaque requête de votre navigateur : votre adresse IP, votre navigateur et l'adresse demandée. Nous n'ajoutons aucune journalisation de notre côté.",
       "p2": "<b>Les serveurs de polices de Google, parfois.</b> Le jeu embarque sa propre police, mais quand il doit afficher un caractère qu'elle ne contient pas — un emoji, une flèche, ou un nom écrit dans une écriture comme le chinois ou l'arabe — la boîte à outils avec laquelle il est conçu télécharge la police manquante depuis <code>fonts.gstatic.com</code>. Dans ce cas, Google reçoit votre adresse IP et apprend que vous visitez ce site.",
-      "p3": "<b>Une vérification de licence.</b> À chaque démarrage, le jeu envoie la clé publique de votre appareil à notre service pour demander si elle a un abonnement. Si ce n'est pas le cas, rien n'est conservé.",
+      "p3": "<b>Une vérification de licence.</b> À chaque démarrage, le jeu envoie la clé publique de votre appareil à notre service pour demander si elle a un abonnement. Si c'est le cas, le service note aussi que cet appareil est celui que votre compte utilise maintenant, depuis quand, et à quelle table en direct il se trouve, s'il est à une table ; cette note est remplacée la prochaine fois que l'un de vos appareils ouvre le jeu. Si ce n'est pas le cas, rien n'est conservé.",
       "p4": "<b>Votre page de profil</b> demande les résultats des parties à notre relais pour afficher votre classement. Elle ne publie rien sur vous.",
       "p5": "<b>New Relic</b> nous signale quand le jeu plante ou est lent pour vous sur le web, à openhearts.game. La page du jeu lui envoie les erreurs rencontrées, son temps de chargement, les adresses des appels qu'elle fait à notre service (sans ce qui suit un « ? »), ainsi que votre navigateur, votre type d'appareil et votre localisation approximative. Votre adresse IP sert à cette localisation et est effacée dans la journée. Il ne dépose aucun cookie, n'enregistre ni l'écran ni la session, et ne lit rien de ce que vous tapez. Selon les <a href=\"https://newrelic.com/termsandconditions/services-notices\">avis de confidentialité de New Relic</a>."
     },
@@ -171,10 +173,10 @@
       "title": "Jeu en direct",
       "p1": "Ce que tout le monde peut voir",
       "p2": "Une partie en direct se joue entre appareils, via notre relais, <code>relay.openhearts.game</code>, un serveur qui transmet les messages entre les applications. Il est ouvert : quiconque lui demande une salle, une table ou les résultats peut lire ce qu'il y transporte, et une partie en est conservée. En jeu en direct :",
-      "p3": "<b>Conservé, et lisible par quiconque le demande :</b> votre nom, votre icône et votre couleur, et votre clé publique, chaque fois que vous êtes placé à une table ; votre image, si vous en avez choisi une ; et le résultat de chaque partie en direct que vous jouez, classée ou non — la table, la clé et le score final de chaque place, et qui est parti. Les classements sont calculés à partir de ces résultats par qui veut s'en donner la peine, et c'est tout l'intérêt : personne n'a à nous croire sur parole pour un classement. Les noms, icônes, clés et images sont conservés un jour ; les résultats, aussi longtemps que les classements.",
-      "p4": "<b>Conservé, et lisible par quiconque a l'adresse de la partie :</b> l'intégralité de chaque partie en direct une fois terminée — la clé de chaque place et le nom sous lequel elle a joué, chaque carte distribuée, passée et jouée, et les signatures qui le prouvent. L'appareil d'un joueur l'envoie à notre service à la fin de la partie, et elle est conservée définitivement, pour qu'on puisse la consulter et la vérifier ensuite. Son adresse est un long code aléatoire que personne ne peut deviner ; elle est partagée par quiconque la partage.",
-      "p5": "<b>Transmis mais non conservé :</b> pendant que vous attendez une partie, votre nom, votre classement, votre icône et votre couleur, et le nombre de secondes que vous prenez d'habitude pour jouer une carte, toutes les deux secondes environ ; et tant que l'application est ouverte, le fait que votre appareil est en ligne ou à une table. Le relais les transmet à qui écoute à ce moment-là et ne garde rien — mais quiconque écoute pourrait les enregistrer.",
-      "p6": "<b>Transmis, tant que quelqu'un regarde :</b> une partie en direct peut être regardée pendant qu'elle se joue par quiconque a son adresse. Tant que quelqu'un regarde, l'appareil d'un des joueurs envoie, après chaque coup, ce que toute la table peut déjà voir — les noms, les scores, les cartes jouées jusque-là dans cette donne et à qui c'est le tour — et jamais une main encore en jeu. Le relais le transmet et ne garde rien. Regarder n'envoie rien sur le spectateur : l'application regarde sous une clé qu'elle crée pour l'occasion puis oublie.",
+      "p3": "<b>Conservé, et lisible par quiconque le demande :</b> votre nom, votre icône et votre couleur, le numéro de votre compte, et la clé publique de votre appareil avec la licence qui relie les deux, chaque fois que vous êtes placé à une table ; votre image, si vous en avez choisi une ; et le résultat de chaque partie en direct que vous jouez, classée ou non — la table, le compte, la clé, la licence et le score final de chaque place, et qui est parti. Les classements appartiennent aux comptes et sont calculés à partir de ces résultats par qui veut s'en donner la peine, et c'est tout l'intérêt : personne n'a à nous croire sur parole pour un classement. Les noms, icônes, clés, numéros de compte et images sont conservés un jour ; les résultats, aussi longtemps que les classements.",
+      "p4": "<b>Conservé, et lisible par tout abonné qui a l'adresse de la partie :</b> l'intégralité de chaque partie en direct une fois terminée — le compte et la clé de chaque place, la licence qui les relie, le nom sous lequel elle a joué, chaque carte distribuée, passée et jouée, et les signatures qui le prouvent. L'appareil d'un joueur l'envoie à notre service à la fin de la partie, et elle est conservée définitivement, pour qu'on puisse la consulter et la vérifier ensuite, depuis l'appareil qu'utilise le compte d'un abonné. Son adresse est un long code aléatoire que personne ne peut deviner ; elle est partagée par quiconque la partage.",
+      "p5": "<b>Transmis mais non conservé :</b> pendant que vous attendez une partie, votre nom, votre classement, votre icône et votre couleur, et le nombre de secondes que vous prenez d'habitude pour jouer une carte, toutes les deux secondes environ ; et tant que l'application est ouverte, le fait que votre appareil est en ligne ou à une table, avec le numéro de votre compte et une note de courte durée de notre service indiquant que c'est l'appareil qu'utilise votre compte. Le relais les transmet à qui écoute à ce moment-là et ne garde rien — mais quiconque écoute pourrait les enregistrer.",
+      "p6": "<b>Transmis, tant que quelqu'un regarde :</b> une partie en direct peut être regardée pendant qu'elle se joue par tout abonné qui a son adresse. Tant que quelqu'un regarde, l'appareil d'un des joueurs envoie, après chaque coup, ce que toute la table peut déjà voir — les noms, les scores, les cartes jouées jusque-là dans cette donne et à qui c'est le tour — et jamais une main encore en jeu. Le relais le transmet et ne garde rien. Si vous regardez, c'est sous la clé et la licence de votre propre appareil : l'appareil du joueur qui répond voit donc le numéro de votre compte ; il ne répond à personne dont le compte joue à cette table.",
       "p7": "Une table entre amis n'est privée qu'en un sens : des inconnus ne peuvent pas s'y asseoir. Ce qu'elle publie est aussi public que pour n'importe quelle autre table.",
       "p8": "Où cela va",
       "p9": "Uniquement à notre relais, qui tourne sur Cloudflare. Chaque message est signé par l'appareil qui l'a envoyé, si bien que quiconque en garde une copie peut prouver qu'il est authentique ; nous ne pouvons pas supprimer une copie faite par quelqu'un d'autre.",
@@ -185,10 +187,11 @@
     "subscribing": {
       "title": "S'abonner",
       "p1": "Le jeu en direct est un abonnement. Sur le web, il s'achète via <a href=\"https://stripe.com/privacy\">Stripe</a>, sur la page de Stripe : Stripe demande votre adresse e-mail, votre carte et les informations de facturation dont il a besoin, selon sa propre politique de confidentialité.",
-      "p2": "Nous donnons à Stripe la clé publique de votre appareil pour que le paiement puisse être associé à votre appareil. En retour, notre service garde un court relevé : quelle clé est sur quel abonnement, quand elle a été ajoutée, et jusqu'à quelles dates court l'abonnement. Dans Stripe, nous voyons votre adresse e-mail, votre nom, votre pays, la marque de votre carte, ses quatre derniers chiffres et vos paiements.",
-      "p3": "Nous pourrions donc relier l'adresse e-mail d'un abonné à sa clé, et ainsi au nom et aux résultats publiés sous cette clé. Nous ne publions pas ce lien, et nous ne l'utilisons que pour gérer votre abonnement.",
-      "p4": "Si vous ajoutez un autre appareil à votre abonnement, notre service garde une trace du code à usage unique que vous avez créé, et des appareils qui l'ont créé et utilisé. Tout appareil d'un abonnement peut voir les clés des autres et les retirer.",
-      "p5": "Un abonnement a aussi cinq codes de secours, conservés par notre service avec l'abonnement et affichés sur ses appareils, avec une note indiquant lesquels ont servi. Si vous vous êtes abonné sur le web, nous les envoyons à l'adresse e-mail avec laquelle vous avez payé au moment de l'abonnement, puis chaque fois qu'un appareil de l'abonnement nous le demande. Pour cela, nous lisons l'adresse dans Stripe à ce moment-là et la transmettons à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, qui envoie l'e-mail pour nous ; nous ne conservons pas l'adresse."
+      "p2": "S'abonner crée un compte : un nombre aléatoire, pas votre nom ni votre e-mail. Nous donnons à Stripe la clé publique de votre appareil pour que le paiement puisse lui être associé. En retour, notre service garde un court relevé : le compte que l'abonnement paie, les clés d'appareil qui sont dans le compte et quand chacune a été ajoutée, celle qui est utilisée en ce moment, et jusqu'à quelles dates court l'abonnement. Dans Stripe, nous voyons votre adresse e-mail, votre nom, votre pays, la marque de votre carte, ses quatre derniers chiffres et vos paiements.",
+      "p3": "Nous pourrions donc relier l'adresse e-mail d'un abonné à son compte, et ainsi aux noms et aux résultats publiés par ses appareils. Nous ne publions pas ce lien, et nous ne l'utilisons que pour gérer votre abonnement.",
+      "p4": "Si vous ajoutez un autre appareil à votre compte, notre service garde une trace du code à usage unique que vous avez créé, et des appareils qui l'ont créé et utilisé. Tout appareil du compte peut voir les clés des autres, celui qui est utilisé, et les retirer. Votre compte joue sur un appareil à la fois : ouvrir le jeu sur l'un en fait celui qui est utilisé, et le précédent cesse de jouer en direct jusqu'à ce que vous le repreniez.",
+      "p5": "Un compte a aussi cinq codes de secours, conservés par notre service avec le compte et affichés sur ses appareils, avec une note indiquant lesquels ont servi. Si vous vous êtes abonné sur le web, nous les envoyons à l'adresse e-mail avec laquelle vous avez payé au moment de l'abonnement, puis chaque fois qu'un appareil du compte nous le demande. Pour cela, nous lisons l'adresse dans Stripe à ce moment-là et la transmettons à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, qui envoie l'e-mail pour nous ; nous ne conservons pas l'adresse.",
+      "p6": "Si vous vous connectez avec Apple ou Google, nous gardons une forme brouillée du numéro qu'ils donnent à votre connexion — ni votre nom ni votre e-mail — reliée à votre compte, pour qu'une connexion faite de la même façon sur un autre appareil l'amène dans le compte. Votre appareil garde seulement lequel des deux vous avez utilisé. La connexion elle-même est faite par Apple ou Google, selon sa propre politique de confidentialité ; sur le web, son code de connexion n'est chargé que tant qu'un bouton de connexion est à l'écran."
     },
     "broken": {
       "title": "Signaler un problème",
@@ -200,7 +203,7 @@
       "p2": "Pas d'identifiant publicitaire, et rien qui vous suive d'une application à l'autre ou d'un site à l'autre.",
       "p3": "Pas de cookies sur nos pages. Stripe dépose les siens, sur son propre site, quand vous achetez.",
       "p4": "Pas de localisation, pas de contacts, pas de micro. L'appareil photo seulement pendant que vous scannez un code pour ajouter un appareil ; l'image reste sur l'appareil.",
-      "p5": "Pas de compte, et aucune adresse e-mail conservée par nous. Un e-mail n'est envoyé que pour les codes de secours, comme indiqué ci-dessus.",
+      "p5": "Aucune adresse e-mail conservée par nous, pas de mot de passe, et pas de compte sauf si vous vous abonnez. Un e-mail n'est envoyé que pour les codes de secours, comme indiqué ci-dessus.",
       "p6": "Pas de chat."
     },
     "kept": {
@@ -208,7 +211,7 @@
       "p1": "<b>Sur votre appareil :</b> jusqu'à ce que vous les supprimiez.",
       "p2": "<b>Sur notre relais :</b> coups, présence et attente d'une partie : non conservés. Salles, placements et images : un jour. Résultats des parties : aussi longtemps que les classements en sont calculés.",
       "p3": "<b>Parties en direct terminées :</b> définitivement, dans le stockage de Cloudflare, sauf si vous nous demandez d'en supprimer une à laquelle vous avez joué.",
-      "p4": "<b>Relevés d'abonnement de notre service :</b> tant que l'abonnement court, puis jusqu'à ce que vous nous demandiez de les supprimer.",
+      "p4": "<b>Relevés de compte et d'abonnement de notre service :</b> tant que l'abonnement court, puis jusqu'à ce que vous nous demandiez de les supprimer. La note indiquant l'appareil utilisé est remplacée chaque fois qu'un autre de vos appareils ouvre le jeu.",
       "p5": "<b>Stripe :</b> aussi longtemps que l'exigent la politique de Stripe et la loi sur les relevés de paiement.",
       "p6": "<b>Cloudflare et Google :</b> selon leurs propres politiques.",
       "p7": "<b>New Relic :</b> les erreurs et les temps de chargement, huit jours."
@@ -218,7 +221,7 @@
       "p1": "Jouez seul, et rien sur vous ne quitte votre appareil.",
       "p2": "Jouez en direct sous un nom qui n'est pas votre vrai nom, et sans image.",
       "p3": "Changez votre nom ou votre image quand vous voulez. Ce qui a déjà été publié reste où il est.",
-      "p4": "Demandez-nous une copie de ce que notre service conserve sur votre appareil, ou demandez-nous de le supprimer, y compris les résultats que votre appareil a publiés sur notre relais.",
+      "p4": "Demandez-nous une copie de ce que notre service conserve sur votre compte et ses appareils, ou demandez-nous de le supprimer, y compris les résultats que ses appareils ont publiés sur notre relais.",
       "p5": "Là où la loi sur la protection des données vous donne des droits — accéder à ce qui est détenu sur vous, le rectifier ou le supprimer, vous y opposer, ou porter plainte auprès de votre autorité de protection des données —, vous les avez ici aussi."
     },
     "children": {
@@ -231,7 +234,7 @@
     },
     "contact": {
       "title": "Contact",
-      "p1": "Pour une demande liée à la confidentialité — une copie de ce que notre service conserve sur votre appareil, ou sa suppression — ou pour toute autre question sur cette page, écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, ou par courrier à l'adresse indiquée dans les <a href=\"{{base}}/terms#contact\">conditions</a>. Pour que nous puissions retrouver ce qui vous concerne, indiquez-nous le nom sous lequel vous jouez et, si vous vous êtes abonné sur le web, l'adresse e-mail avec laquelle vous avez payé."
+      "p1": "Pour une demande liée à la confidentialité — une copie de ce que notre service conserve sur votre compte, ou sa suppression — ou pour toute autre question sur cette page, écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, ou par courrier à l'adresse indiquée dans les <a href=\"{{base}}/terms#contact\">conditions</a>. Pour que nous puissions retrouver ce qui vous concerne, indiquez-nous le nom sous lequel vous jouez et, si vous vous êtes abonné sur le web, l'adresse e-mail avec laquelle vous avez payé."
     }
   },
   "terms": {
@@ -242,7 +245,7 @@
     "header": {
       "title": "Conditions d'utilisation",
       "tagline": "L'accord entre vous et Open Hearts, en termes simples.",
-      "updated": "Dernière mise à jour : 5 octobre 2026"
+      "updated": "Dernière mise à jour : 6 octobre 2026"
     },
     "short": {
       "title": "En bref",
@@ -295,7 +298,7 @@
       "p22": "<b>Web :</b> contactez-nous. Là où la loi de votre pays vous donne un droit de rétractation ou un droit au remboursement, vous en bénéficiez, et nous examinerons équitablement toute autre demande.",
       "p23": "Un abonnement remboursé n'est plus renouvelé, et le jeu en direct sur ses appareils prend fin à l'expiration de leur licence en cours, dans un délai d'environ un mois.",
       "p24": "Vos appareils",
-      "p25": "Un abonnement appartient à l'appareil qui l'a acheté, jusqu'à ce que vous en ajoutiez d'autres. Il est conservé sur l'appareil, pas dans un compte : si vous effacez les données du jeu ou supprimez l'application sur votre seul appareil abonné, l'abonnement de cet appareil est perdu avec. Ajoutez un deuxième appareil pour garder un moyen de le récupérer, ou contactez-nous avec l'adresse e-mail avec laquelle vous avez payé sur le web, et nous vous aiderons dans la mesure du possible."
+      "p25": "S'abonner crée un compte, auquel appartiennent l'abonnement et ses appareils. Il n'y a pas de mot de passe, et le compte joue en direct sur un appareil à la fois : ouvrir le jeu sur un autre de ses appareils y amène le jeu en direct, et une partie laissée sur le premier compte comme abandonnée par vous. Si vous effacez les données du jeu ou supprimez l'application sur votre seul appareil du compte, ramenez le nouveau avec un code de secours, ou en vous connectant avec Apple ou Google comme avant. Ou contactez-nous avec l'adresse e-mail avec laquelle vous avez payé sur le web, et nous vous aiderons dans la mesure du possible."
     },
     "table": {
       "title": "À une table en direct",

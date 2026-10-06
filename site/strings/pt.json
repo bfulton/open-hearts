@@ -82,20 +82,22 @@
       "p1": "Como eu jogo?",
       "p2": "Acesse <a href=\"/play\">openhearts.game/play</a> ou (em breve) procure “Open Hearts” na {{appStore}} ou no {{googlePlay}}.",
       "p5": "Como eu assino?",
-      "p6": "Toque no botão <i>Assinar</i>, em <i>Jogar ao vivo</i>. Na <a href=\"/play/subscription\">web</a>, o pagamento é feito na página da Stripe. Nos apps para celular, é pela App Store ou pelo Google Play, que cobram e renovam a assinatura. Se você não entrou com uma conta, a assinatura pertence ao aparelho, e aos outros que você adicionar (até 5).",
+      "p6": "Toque no botão <i>Assinar</i>, em <i>Jogar ao vivo</i>. Na <a href=\"/play/subscription\">web</a>, o pagamento é feito na página da Stripe. Nos apps para celular, é pela App Store ou pelo Google Play, que cobram e renovam a assinatura. Assinar cria a sua conta: seu nome, seu rating e suas partidas vão com ela para qualquer aparelho que você adicionar (até 5).",
       "p7": "Como eu cancelo?",
       "p8": "Abra o menu, escolha <i>Assinatura</i> e depois <i>Gerenciar assinatura</i>. Outras formas, e os reembolsos, estão nos <a href=\"{{base}}/terms\">termos</a>.",
       "p9": "Como adiciono outro aparelho?",
-      "p10": "Num aparelho com assinatura, abra o menu, escolha <i>Assinatura</i> e toque em <i>Adicionar um aparelho</i>; depois, escaneie o código com o outro aparelho, ou toque em <i>Enviar o link</i>. Um código vale uma vez só, por dez minutos.",
+      "p10": "Num aparelho da sua conta, abra o menu, escolha <i>Assinatura</i> e toque em <i>Adicionar um aparelho</i>; depois, escaneie o código com o outro aparelho, ou toque em <i>Enviar o link</i>. Um código vale uma vez só, por dez minutos.",
       "p11": "E se eu perder o celular, ou limpar os dados do navegador?",
-      "p12": "Se outro aparelho seu está na assinatura, adicione o novo a partir dele e remova o perdido. Se não, use um código de backup: no aparelho novo, abra o menu, escolha <i>Ativar assinatura</i> e digite o código. Qualquer aparelho da assinatura pode <i>Mostrar códigos de backup</i>, e os de uma assinatura pela web foram enviados por e-mail quando você assinou: guarde-os em lugar seguro. Comprou na App Store ou no Google Play? No celular novo, toque em <i>Assinar</i> e depois em <i>Restaurar compras</i>.",
+      "p12": "Se outro aparelho seu está na sua conta, adicione o novo a partir dele e remova o perdido. Se não, use um código de backup: no aparelho novo, abra o menu, escolha <i>Ativar assinatura</i> e digite o código, e o aparelho entra na mesma conta, com seu rating e suas partidas. Entrou com Apple ou Google? Entre do mesmo jeito no aparelho novo. Qualquer aparelho da conta pode <i>Mostrar códigos de backup</i>, e os de uma assinatura pela web foram enviados por e-mail quando você assinou: guarde-os em lugar seguro. Comprou na App Store ou no Google Play? No celular novo, toque em <i>Assinar</i> e depois em <i>Restaurar compras</i>.",
+      "p21": "Por que aparece que o Open Hearts está aberto em outro aparelho?",
+      "p22": "A sua conta joga ao vivo em um aparelho por vez, e o que está em uso é o último que foi aberto. O outro sai de cena: deixa a mesa em que estava e para de jogar ao vivo, mas você ainda pode jogar sozinho nele. Toque em <i>Usar aqui</i> para retomar a conta. Se a sua conta está numa partida no outro aparelho, você é avisado antes, porque essa partida será perdida: um bot termina o seu lugar, e uma partida ranqueada conta como abandonada por você.",
       "p13": "Dá para jogar com leitor de tela, ou com letras maiores?",
       "p14": "Sim. Cada carta, lugar, vaza e pontuação tem um nome que um leitor de tela consegue ler. No navegador, aperte <i>Enable accessibility</i>, o primeiro botão que o leitor de tela encontra, e use o zoom do navegador para aumentar o texto. Nos apps para celular, ative o VoiceOver (iPhone) ou o TalkBack (Android); o app segue o tamanho de texto do celular.",
       "p15": "Posso escolher o idioma?",
       "p16": "O jogo segue o idioma do seu aparelho. Na web, escolha outro em <i>Idioma</i>, na página <i>Sobre</i> do jogo, ou no menu de idiomas no rodapé deste site. No celular, use o ajuste do próprio celular para cada app: no iPhone, Ajustes, depois Open Hearts, depois Idioma; no Android 13 ou mais recente, Configurações, depois Sistema, depois Idiomas, depois Idiomas dos apps.",
       "p17": "Como sei que a distribuição é justa?",
       "p19": "O que acontece com os meus dados?",
-      "p20": "Jogando sozinho, nada sai do seu aparelho. Ao vivo, seu nome, imagem e resultados são públicos. Nada é vendido nem usado para anúncios. Mais na <a href=\"{{base}}/privacy\">política de privacidade</a>."
+      "p20": "Jogando sozinho, nada sai do seu aparelho. Ao vivo, seu nome, imagem, número da conta e resultados são públicos. Nada é vendido nem usado para anúncios. Mais na <a href=\"{{base}}/privacy\">política de privacidade</a>."
     },
     "rules": {
       "title": "Quais são as regras de Copas?",
@@ -127,18 +129,18 @@
     "header": {
       "title": "Privacidade",
       "tagline": "O que o Open Hearts faz com o que você dá a ele, em palavras simples.",
-      "updated": "Última atualização: 5 de outubro de 2026"
+      "updated": "Última atualização: 6 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
       "p1": "Jogar sozinho fica no seu aparelho",
       "p2": "Seu nome, sua imagem e suas partidas contra os bots ficam guardados no aparelho em que você joga, e não são enviados a lugar nenhum.",
       "p3": "O jogo ao vivo é público, de propósito",
-      "p4": "Para jogar com pessoas, seu nome, sua imagem e seus resultados passam pelo nosso relay, onde qualquer um que pedir pode lê-los. Salas e imagens são guardadas por um dia; os resultados são guardados para os ratings.",
-      "p5": "Sem anúncios, sem contas",
-      "p6": "Nada é vendido, alugado ou usado para publicidade. Não há rastreadores no app nem neste site, e não há conta para criar.",
+      "p4": "Para jogar com pessoas, seu nome, sua imagem, o número da sua conta e seus resultados passam pelo nosso relay, onde qualquer um que pedir pode lê-los. Salas e imagens são guardadas por um dia; os resultados são guardados para os ratings.",
+      "p5": "Contas, mas sem e-mail nem senha",
+      "p6": "Nada é vendido, alugado ou usado para publicidade. Não há rastreadores no app nem neste site. Assinar cria uma conta: um número aleatório que o nosso serviço dá a você, com o qual os seus aparelhos jogam. Não há senha, e nós não guardamos nenhum endereço de e-mail.",
       "p7": "O pagamento fica com a Stripe",
-      "p8": "Na web, a assinatura é comprada pela Stripe, que fica com o seu endereço de e-mail e o seu cartão. Nós guardamos uma anotação de que o seu aparelho está pago. Nunca vemos o número do seu cartão."
+      "p8": "Na web, a assinatura é comprada pela Stripe, que fica com o seu endereço de e-mail e o seu cartão. Nós guardamos uma anotação de qual conta ela paga e de quais aparelhos estão nessa conta. Nunca vemos o número do seu cartão."
     },
     "who": {
       "title": "Quem somos",
@@ -147,12 +149,12 @@
     "device": {
       "title": "No seu aparelho",
       "p1": "O app guarda o seguinte no aparelho em que você joga — no armazenamento do navegador para este site, ou no armazenamento do próprio app num celular:",
-      "p2": "<b>Uma chave que o seu aparelho cria para si mesmo.</b> É um número aleatório longo, com uma metade pública e uma metade secreta. A metade pública é quem você é numa mesa ao vivo. A metade secreta nunca sai do aparelho.",
+      "p2": "<b>Uma chave que o seu aparelho cria para si mesmo.</b> É um número aleatório longo, com uma metade pública e uma metade secreta. A metade pública é este aparelho numa mesa ao vivo; se você assinar, a sua licença a liga à sua conta. A metade secreta nunca sai do aparelho.",
       "p3": "<b>Seu nome e sua aparência</b>: um ícone e uma cor, ou uma imagem sua. A imagem é reduzida para 64 por 64 pixels no seu aparelho, e só essa cópia pequena é guardada. A foto de onde você a tirou não é guardada nem enviada.",
       "p4": "<b>Suas últimas trinta partidas contra os bots</b>, que o seu perfil contabiliza. Elas só saem do aparelho se você tocar em <i>Copiar registro</i>.",
-      "p5": "<b>Com que rapidez você joga</b>, as opções da partida, o idioma que você escolheu, a sua licença se você assinar, e os jogadores cujas imagens você escolheu esconder.",
+      "p5": "<b>Com que rapidez você joga</b>, as opções da partida, o idioma que você escolheu, a sua licença e o número da sua conta se você assinar, e os jogadores cujas imagens você escolheu esconder.",
       "p6": "<b>A partida ao vivo em que você está</b>, enquanto estiver nela: a mesa, cada jogada e voto que o seu aparelho assinou ali, e os segredos com que ele distribuiu as suas cartas, para que uma página recarregada no meio da partida possa voltar ao seu lugar. Isso é descartado quando a partida termina ou você sai dela, ou dois minutos depois da última vez que você esteve lá.",
-      "p7": "Para remover tudo isso, apague os dados deste site no navegador, ou desinstale o app. Isso também remove a sua chave, então você volta como um jogador novo."
+      "p7": "Para remover tudo isso, apague os dados deste site no navegador, ou desinstale o app. Isso também remove a sua chave, então o aparelho volta como um jogador novo, até que um código de backup ou o seu login o traga de volta à sua conta."
     },
     "alone": {
       "title": "Jogar sozinho",
@@ -163,7 +165,7 @@
       "title": "Abrir o jogo na web",
       "p1": "<b>A Cloudflare</b> hospeda este site e o jogo, então vê cada requisição que o seu navegador faz: o seu endereço IP, o seu navegador e o endereço que você pediu. Nós não acrescentamos nenhum registro (log) próprio.",
       "p2": "<b>Os servidores de fontes do Google, às vezes.</b> O jogo traz a sua própria fonte, mas quando precisa desenhar um caractere que essa fonte não tem — um emoji, uma seta ou um nome escrito num sistema de escrita como o chinês ou o árabe — o kit de ferramentas com que ele foi feito busca a fonte extra em <code>fonts.gstatic.com</code>. Quando isso acontece, o Google recebe o seu endereço IP e a informação de que você está visitando este site.",
-      "p3": "<b>Uma verificação de licença.</b> Toda vez que o jogo começa, ele envia a chave pública do seu aparelho ao nosso serviço para perguntar se ele tem uma assinatura. Se não tiver, nada é guardado.",
+      "p3": "<b>Uma verificação de licença.</b> Toda vez que o jogo começa, ele envia a chave pública do seu aparelho ao nosso serviço para perguntar se ele tem uma assinatura. Se tiver, o serviço também anota que este é o aparelho que a sua conta está usando agora, quando, e em qual mesa ao vivo ele está, se estiver em alguma; essa anotação é substituída da próxima vez que qualquer aparelho seu abrir o jogo. Se não tiver, nada é guardado.",
       "p4": "<b>A sua página de perfil</b> pede ao nosso relay os resultados das partidas para poder mostrar o seu rating. Ela não publica nada sobre você.",
       "p5": "<b>A New Relic</b> nos avisa quando o jogo quebra ou fica lento para você na web, em openhearts.game. A página do jogo envia a ela os erros que encontra, quanto tempo levou para carregar, os endereços das chamadas que faz ao nosso serviço (sem nada depois de um \"?\"), e o seu navegador, o tipo de aparelho e a sua localização aproximada. O seu endereço IP é usado para essa localização e descartado em até um dia. Ela não cria cookies, não grava a tela nem a sessão, e não lê nada do que você digita. Sob os <a href=\"https://newrelic.com/termsandconditions/services-notices\">avisos de privacidade da New Relic</a>."
     },
@@ -171,10 +173,10 @@
       "title": "Jogo ao vivo",
       "p1": "O que todo mundo pode ver",
       "p2": "Uma partida ao vivo é jogada entre aparelhos, por meio do nosso relay, <code>relay.openhearts.game</code>, um servidor que passa mensagens entre apps. Ele é aberto: qualquer um que pedir a ele uma sala, uma mesa ou os resultados pode ler o que ele carrega ali, e parte disso é guardada. No jogo ao vivo:",
-      "p3": "<b>Guardado, e legível por qualquer um que pedir:</b> seu nome, ícone e cor, e sua chave pública, cada vez que você se senta a uma mesa; sua imagem, se você escolheu uma; e o resultado de cada partida ao vivo que você joga, ranqueada ou não — a mesa, a chave e a pontuação final de cada lugar, e quem saiu. Os ratings são calculados a partir desses resultados por quem quiser, e é essa a ideia: ninguém precisa acreditar na nossa palavra sobre um rating. Nomes, ícones, chaves e imagens são guardados por um dia; os resultados são guardados enquanto os ratings forem.",
-      "p4": "<b>Guardado, e legível por qualquer um com o endereço da partida:</b> cada partida ao vivo inteira, depois que termina — a chave de cada lugar e o nome com que jogou, cada carta distribuída, passada e jogada, e as assinaturas que comprovam isso. O aparelho de um jogador a envia ao nosso serviço quando a partida termina, e ela é guardada para sempre, para que a partida possa ser vista e conferida depois. O endereço dela é um código aleatório longo que ninguém consegue adivinhar; ele é compartilhado por quem o compartilhar.",
-      "p5": "<b>Repassado, mas não guardado:</b> enquanto você espera uma partida, seu nome, rating, ícone e cor e quantos segundos você costuma levar numa carta, a cada dois segundos, mais ou menos; e, enquanto o app está aberto, que o seu aparelho está online ou numa mesa. O relay repassa isso a quem estiver ouvindo naquele momento e não guarda nada — mas qualquer um que esteja ouvindo poderia gravar.",
-      "p6": "<b>Repassado, enquanto alguém assiste:</b> uma partida ao vivo pode ser assistida enquanto é jogada por qualquer um com o endereço dela. Enquanto alguém assiste, o aparelho de um dos jogadores envia, depois de cada jogada, o que todos na mesa já podem ver — os nomes, as pontuações, as cartas jogadas até agora nesta mão e de quem é a vez — e nunca uma mão que ainda está com alguém. O relay repassa isso e não guarda nada. Assistir não envia nada sobre quem assiste: o app assiste com uma chave que cria para isso e depois esquece.",
+      "p3": "<b>Guardado, e legível por qualquer um que pedir:</b> seu nome, ícone e cor, o número da sua conta, e a chave pública do seu aparelho com a licença que liga os dois, cada vez que você se senta a uma mesa; sua imagem, se você escolheu uma; e o resultado de cada partida ao vivo que você joga, ranqueada ou não — a mesa, a conta, a chave, a licença e a pontuação final de cada lugar, e quem saiu. Os ratings pertencem às contas e são calculados a partir desses resultados por quem quiser, e é essa a ideia: ninguém precisa acreditar na nossa palavra sobre um rating. Nomes, ícones, chaves, números de conta e imagens são guardados por um dia; os resultados são guardados enquanto os ratings forem.",
+      "p4": "<b>Guardado, e legível por qualquer assinante com o endereço da partida:</b> cada partida ao vivo inteira, depois que termina — a conta e a chave de cada lugar, a licença que as liga, o nome com que jogou, cada carta distribuída, passada e jogada, e as assinaturas que comprovam isso. O aparelho de um jogador a envia ao nosso serviço quando a partida termina, e ela é guardada para sempre, para que a partida possa ser vista e conferida depois, a partir do aparelho que a conta de um assinante está usando. O endereço dela é um código aleatório longo que ninguém consegue adivinhar; ele é compartilhado por quem o compartilhar.",
+      "p5": "<b>Repassado, mas não guardado:</b> enquanto você espera uma partida, seu nome, rating, ícone e cor e quantos segundos você costuma levar numa carta, a cada dois segundos, mais ou menos; e, enquanto o app está aberto, que o seu aparelho está online ou numa mesa, com o número da sua conta e uma anotação de curta duração do nosso serviço dizendo que este é o aparelho que a sua conta está usando. O relay repassa isso a quem estiver ouvindo naquele momento e não guarda nada — mas qualquer um que esteja ouvindo poderia gravar.",
+      "p6": "<b>Repassado, enquanto alguém assiste:</b> uma partida ao vivo pode ser assistida enquanto é jogada por qualquer assinante com o endereço dela. Enquanto alguém assiste, o aparelho de um dos jogadores envia, depois de cada jogada, o que todos na mesa já podem ver — os nomes, as pontuações, as cartas jogadas até agora nesta mão e de quem é a vez — e nunca uma mão que ainda está com alguém. O relay repassa isso e não guarda nada. Se você assiste, é com a chave e a licença do seu próprio aparelho, então o aparelho do jogador que responde vê o número da sua conta; ele não responde a ninguém cuja conta esteja jogando naquela mesa.",
       "p7": "Uma mesa com amigos é privada em um único sentido: estranhos não podem se sentar nela. O que ela publica é tão público quanto o de qualquer outra mesa.",
       "p8": "Para onde vai",
       "p9": "Só para o nosso relay, que roda na Cloudflare. Cada mensagem é assinada pelo aparelho que a enviou, então qualquer um que guarde uma cópia pode mostrar que ela é autêntica; não podemos apagar uma cópia feita por outra pessoa.",
@@ -185,10 +187,11 @@
     "subscribing": {
       "title": "Assinar",
       "p1": "O jogo ao vivo é uma assinatura. Na web, ela é comprada pela <a href=\"https://stripe.com/privacy\">Stripe</a>, na própria página da Stripe: a Stripe pede o seu endereço de e-mail, o seu cartão e os dados de cobrança de que precisa, sob a política de privacidade dela.",
-      "p2": "Nós damos à Stripe a chave pública do seu aparelho para que o pagamento possa ser associado ao seu aparelho. Em troca, o nosso serviço guarda um registro curto: qual chave está em qual assinatura, quando foi adicionada, e as datas até quando a assinatura vale. Na Stripe, podemos ver o seu endereço de e-mail, nome, país, bandeira do cartão, os quatro últimos dígitos do cartão e os seus pagamentos.",
-      "p3": "Isso significa que poderíamos ligar o endereço de e-mail de um assinante à chave dele e, assim, ao nome e aos resultados que ela publicou. Nós não publicamos essa ligação, e só a usamos para manter a sua assinatura funcionando.",
-      "p4": "Se você adicionar outro aparelho à sua assinatura, o nosso serviço guarda um registro do código de uso único que você criou e de quais aparelhos o criaram e o usaram. Qualquer aparelho de uma assinatura pode ver as chaves dos outros e removê-los.",
-      "p5": "Uma assinatura também tem cinco códigos de backup, guardados pelo nosso serviço junto com a assinatura e mostrados nos aparelhos dela, com uma anotação de quais já foram usados. Se você assinou na web, nós os enviamos por e-mail para o endereço com que você pagou quando você assina, e de novo sempre que um aparelho da assinatura nos pedir. Para isso, lemos o endereço na Stripe naquele momento e o passamos à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, que envia o e-mail por nós; nós não guardamos o endereço."
+      "p2": "Assinar cria uma conta: um número aleatório, não o seu nome nem o seu e-mail. Nós damos à Stripe a chave pública do seu aparelho para que o pagamento possa ser associado a ela. Em troca, o nosso serviço guarda um registro curto: qual conta a assinatura paga, quais chaves de aparelho estão na conta e quando cada uma foi adicionada, qual está em uso agora, e as datas até quando a assinatura vale. Na Stripe, podemos ver o seu endereço de e-mail, nome, país, bandeira do cartão, os quatro últimos dígitos do cartão e os seus pagamentos.",
+      "p3": "Isso significa que poderíamos ligar o endereço de e-mail de um assinante à conta dele e, assim, aos nomes e aos resultados que os aparelhos dela publicaram. Nós não publicamos essa ligação, e só a usamos para manter a sua assinatura funcionando.",
+      "p4": "Se você adicionar outro aparelho à sua conta, o nosso serviço guarda um registro do código de uso único que você criou e de quais aparelhos o criaram e o usaram. Qualquer aparelho da conta pode ver as chaves dos outros, qual está em uso, e removê-los. A sua conta joga em um aparelho por vez: abrir o jogo num aparelho faz dele o que está em uso, e o anterior para de jogar ao vivo até você retomá-lo.",
+      "p5": "Uma conta também tem cinco códigos de backup, guardados pelo nosso serviço junto com a conta e mostrados nos aparelhos dela, com uma anotação de quais já foram usados. Se você assinou na web, nós os enviamos por e-mail para o endereço com que você pagou quando você assina, e de novo sempre que um aparelho da conta nos pedir. Para isso, lemos o endereço na Stripe naquele momento e o passamos à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, que envia o e-mail por nós; nós não guardamos o endereço.",
+      "p6": "Se você entrar com Apple ou Google, guardamos uma forma embaralhada do número que eles dão ao seu login — não o seu nome nem o seu e-mail — ligada à sua conta, para que entrar do mesmo jeito em outro aparelho o traga para a conta. O seu aparelho guarda só qual dos dois você usou. O login é feito pela Apple ou pelo Google, sob a política de privacidade de cada um; na web, o código de login deles só é baixado enquanto há um botão de login na tela."
     },
     "broken": {
       "title": "Contar o que está quebrado",
@@ -200,7 +203,7 @@
       "p2": "Nada de identificadores de publicidade, e nada que siga você de app em app ou de site em site.",
       "p3": "Nada de cookies nas nossas páginas. A Stripe cria os dela, no site dela, quando você compra.",
       "p4": "Nada de localização, contatos ou microfone. A câmera, só enquanto você escaneia um código para adicionar um aparelho; a imagem fica no aparelho.",
-      "p5": "Nada de contas, e nenhum endereço de e-mail guardado por nós. E-mails são enviados só com os códigos de backup, como descrito acima.",
+      "p5": "Nenhum endereço de e-mail guardado por nós, nada de senha, e nenhuma conta a não ser que você assine. E-mails são enviados só com os códigos de backup, como descrito acima.",
       "p6": "Nada de chat."
     },
     "kept": {
@@ -208,7 +211,7 @@
       "p1": "<b>No seu aparelho:</b> até você removê-las.",
       "p2": "<b>No nosso relay:</b> jogadas, presença e espera por uma partida: não são guardadas. Salas, lugares ocupados e imagens: um dia. Resultados das partidas: enquanto os ratings forem calculados a partir deles.",
       "p3": "<b>Partidas ao vivo terminadas:</b> para sempre, no armazenamento da Cloudflare, a não ser que você nos peça para apagar uma em que jogou.",
-      "p4": "<b>Os registros de assinatura do nosso serviço:</b> enquanto a assinatura estiver valendo e, depois, até você nos pedir para apagá-los.",
+      "p4": "<b>Os registros de conta e de assinatura do nosso serviço:</b> enquanto a assinatura estiver valendo e, depois, até você nos pedir para apagá-los. A anotação de qual aparelho está em uso é substituída cada vez que outro aparelho seu abre o jogo.",
       "p5": "<b>Stripe:</b> pelo tempo que a política da Stripe e a lei sobre registros de pagamento exigirem.",
       "p6": "<b>Cloudflare e Google:</b> conforme as políticas deles.",
       "p7": "<b>New Relic:</b> os erros e os tempos, por oito dias."
@@ -218,7 +221,7 @@
       "p1": "Jogue sozinho, e nada sobre você sai do seu aparelho.",
       "p2": "Jogue ao vivo com um nome que não seja o seu nome verdadeiro, e sem imagem.",
       "p3": "Mude seu nome ou sua imagem quando quiser. O que já foi publicado continua onde está.",
-      "p4": "Peça uma cópia do que o nosso serviço guarda sobre o seu aparelho, ou peça que apaguemos isso, incluindo os resultados que o seu aparelho publicou no nosso relay.",
+      "p4": "Peça uma cópia do que o nosso serviço guarda sobre a sua conta e os aparelhos dela, ou peça que apaguemos isso, incluindo os resultados que os aparelhos dela publicaram no nosso relay.",
       "p5": "Onde a lei de proteção de dados lhe der direitos — de ver, corrigir ou apagar o que é guardado sobre você, de se opor, ou de reclamar à autoridade de proteção de dados — você também os tem aqui."
     },
     "children": {
@@ -231,7 +234,7 @@
     },
     "contact": {
       "title": "Contato",
-      "p1": "Para um pedido de privacidade — uma cópia do que o nosso serviço guarda sobre o seu aparelho, ou a exclusão disso — ou qualquer outra pergunta sobre esta página, escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, ou mande uma carta para o endereço que está nos <a href=\"{{base}}/terms#contact\">termos</a>. Para podermos achar o que é seu, diga o nome com que você joga e, se assinou na web, o endereço de e-mail com que pagou."
+      "p1": "Para um pedido de privacidade — uma cópia do que o nosso serviço guarda sobre a sua conta, ou a exclusão disso — ou qualquer outra pergunta sobre esta página, escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, ou mande uma carta para o endereço que está nos <a href=\"{{base}}/terms#contact\">termos</a>. Para podermos achar o que é seu, diga o nome com que você joga e, se assinou na web, o endereço de e-mail com que pagou."
     }
   },
   "terms": {
@@ -242,7 +245,7 @@
     "header": {
       "title": "Termos de uso",
       "tagline": "O acordo entre você e o Open Hearts, em palavras simples.",
-      "updated": "Última atualização: 5 de outubro de 2026"
+      "updated": "Última atualização: 6 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
@@ -295,7 +298,7 @@
       "p22": "<b>Web:</b> fale com a gente. Onde a lei do lugar em que você mora lhe der o direito de desistir da compra ou de receber um reembolso, você tem esse direito, e vamos analisar com justiça qualquer outro pedido.",
       "p23": "Uma assinatura reembolsada deixa de ser renovada, e o jogo ao vivo nos aparelhos dela acaba quando a licença atual deles vencer, em cerca de um mês.",
       "p24": "Seus aparelhos",
-      "p25": "Uma assinatura pertence ao aparelho que a comprou até você adicionar outros. Ela fica guardada no aparelho, não numa conta: se você apagar os dados do jogo ou desinstalar o app no seu único aparelho com assinatura, a assinatura desse aparelho se perde junto. Adicione um segundo aparelho para ter um jeito de recuperá-la, ou fale com a gente usando o endereço de e-mail com que pagou na web, e ajudaremos no que pudermos."
+      "p25": "Assinar cria uma conta, à qual pertencem a assinatura e os aparelhos dela. Não há senha, e a conta joga ao vivo em um aparelho por vez: abrir o jogo em outro aparelho dela leva o jogo ao vivo para lá, e uma partida deixada no primeiro conta como abandonada por você. Se você apagar os dados do jogo ou desinstalar o app no seu único aparelho da conta, traga o novo com um código de backup, ou entrando com Apple ou Google como antes. Ou fale com a gente usando o endereço de e-mail com que pagou na web, e ajudaremos no que pudermos."
     },
     "table": {
       "title": "Numa mesa ao vivo",
