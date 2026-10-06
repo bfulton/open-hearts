@@ -35,6 +35,12 @@ const googleClientId = String.fromEnvironment('OH_GOOGLE_CLIENT_ID');
 /// does not offer Apple.
 const appleServiceId = String.fromEnvironment('OH_APPLE_SERVICE_ID');
 
+/// The Return URL Apple's web sign-in names for an app whose document
+/// base is [base]: its origin and path, no query or fragment. It has to
+/// be one of the Return URLs on the Services ID, exactly.
+Uri appleReturnUrl(Uri base) =>
+    Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null, path: base.path.isEmpty ? '/' : base.path);
+
 /// The providers a build offers where it runs: Apple on an iPhone and
 /// on the web, Google on Android and on the web, and each only where
 /// its identifier was named.

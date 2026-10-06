@@ -283,4 +283,12 @@ void main() {
     expect(await signedInWith(), isNull);
     expect(tester.takeException(), isNull);
   });
+
+  test("Apple's return address is the app's base, whatever page is open", () {
+    // Registered on the Services ID: these exactly.
+    expect(appleReturnUrl(Uri.parse('https://openhearts.game/play/')).toString(), 'https://openhearts.game/play/');
+    expect(appleReturnUrl(Uri.parse('https://play.openhearts.game/')).toString(), 'https://play.openhearts.game/');
+    expect(appleReturnUrl(Uri.parse('https://openhearts.game/play/?lang=de#x')).toString(), 'https://openhearts.game/play/');
+    expect(appleReturnUrl(Uri.parse('http://localhost:8080/play/')).toString(), 'http://localhost:8080/play/');
+  });
 }
