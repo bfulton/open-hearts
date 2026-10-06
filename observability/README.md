@@ -11,7 +11,7 @@ rather than set up by hand.
   monitoring): errors, load times and the service's calls from people's
   own browsers, with no cookies, session replay or session traces.
   `apply.mjs` writes its loader to `app/web/observability.js`, which
-  runs only on openhearts.game. New Relic cannot rename a browser app,
+  runs only on play.openhearts.game, where the app is. New Relic cannot rename a browser app,
   so changing its name in the definition deletes it and makes it again.
 - `apply.mjs` — makes the account match. A dry run by default:
 

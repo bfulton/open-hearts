@@ -25,7 +25,9 @@ export const synthetics = {
     // The marketing site.
     { name: 'Site', uri: 'https://openhearts.game/', expect: 'Open Hearts' },
     // The app's page; the app itself is a canvas a ping cannot see into.
-    { name: 'App', uri: 'https://openhearts.game/play/', expect: 'Open Hearts' },
+    // At its own host (docs/06-service.md, "Where the app is"); the old
+    // address, openhearts.game/play/, only redirects there.
+    { name: 'App', uri: 'https://play.openhearts.game/', expect: 'Open Hearts' },
     // What a purchase needs: the store read, and Stripe answering the
     // service's key for the price (service/functions/worker.mjs, healthOf).
     { name: 'Service health', uri: 'https://openhearts.game/api/health', expect: '"ok":true' },
@@ -45,7 +47,7 @@ export const browser = {
   // The web build's; a phone build is an app of its own.
   name: 'web',
   loader: 'PRO',
-  onlyOn: 'openhearts.game',
+  onlyOn: 'play.openhearts.game',
   out: 'app/web/observability.js',
 };
 

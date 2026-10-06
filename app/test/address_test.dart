@@ -12,25 +12,30 @@ void main() {
     Duration waits(String url) => roomWait(Uri.parse(url), standard: ten);
 
     // A page somebody is playing on gets the rule, whatever it says.
-    expect(waits('https://openhearts.game/play/'), ten);
-    expect(waits('https://openhearts.game/play/?roomWait=45'), ten, reason: 'not without e2e');
+    expect(waits('https://play.openhearts.game/'), ten);
+    expect(waits('https://play.openhearts.game/?roomWait=45'), ten, reason: 'not without e2e');
 
     // A build being driven can ask for longer, which is what the
     // four-browser suite needs and nothing else does.
-    expect(waits('https://openhearts.game/play/?e2e=1&roomWait=45'), const Duration(seconds: 45));
-    expect(waits('https://openhearts.game/play/?e2e=1'), ten, reason: 'asking for nothing is the rule');
-    expect(waits('https://openhearts.game/play/?e2e=1&roomWait=soon'), ten, reason: 'and neither is nonsense');
+    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=45'), const Duration(seconds: 45));
+    expect(waits('https://play.openhearts.game/?e2e=1'), ten, reason: 'asking for nothing is the rule');
+    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=soon'), ten, reason: 'and neither is nonsense');
 
     // Longer, never shorter, and never much longer: it is one device's
     // read of a clock the whole room keeps.
-    expect(waits('https://openhearts.game/play/?e2e=1&roomWait=1'), ten);
-    expect(waits('https://openhearts.game/play/?e2e=1&roomWait=-5'), ten);
-    expect(waits('https://openhearts.game/play/?e2e=1&roomWait=99999'), const Duration(minutes: 1));
+    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=1'), ten);
+    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=-5'), ten);
+    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=99999'), const Duration(minutes: 1));
   });
 
   test('a room\'s link is the app\'s own address and the room under it, whatever page made it', () {
-    expect(roomLink('KP4T9MXR', Uri.parse('https://openhearts.game/play/')).toString(), 'https://openhearts.game/play/room/KP4T9MXR');
-    expect(roomLink('KP4T9MXR', Uri.parse('https://openhearts.game/play/?e2e=1')).toString(), 'https://openhearts.game/play/room/KP4T9MXR');
+    expect(roomLink('KP4T9MXR', Uri.parse('https://play.openhearts.game/')).toString(), 'https://play.openhearts.game/room/KP4T9MXR');
+    expect(roomLink('KP4T9MXR', Uri.parse('https://play.openhearts.game/?e2e=1')).toString(), 'https://play.openhearts.game/room/KP4T9MXR');
     expect(roomLink('KP4T9MXR', Uri.parse('http://127.0.0.1:8123/')).toString(), 'http://127.0.0.1:8123/room/KP4T9MXR');
+    // A preview, which serves the app at /play/.
+    expect(roomLink('KP4T9MXR', Uri.parse('https://dev.open-hearts.pages.dev/play/')).toString(),
+        'https://dev.open-hearts.pages.dev/play/room/KP4T9MXR');
+    expect(tableLink('0a1b2c3d4e5f60718293a4b5c6d7e8f9', Uri.parse('https://play.openhearts.game/')).toString(),
+        'https://play.openhearts.game/table/0a1b2c3d4e5f60718293a4b5c6d7e8f9');
   });
 }

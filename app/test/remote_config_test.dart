@@ -207,9 +207,9 @@ void main() {
 
   test('the relays the operator names, on a deployed build, ours only; a local one keeps its own', () {
     final named = RemoteConfig.parse({'relays': ['wss://moved.openhearts.game/{tag}']});
-    expect(appRelays(base: Uri.parse('https://openhearts.game/play/'), config: named, web: true),
+    expect(appRelays(base: Uri.parse('https://play.openhearts.game/'), config: named, web: true),
         [Uri.parse('wss://moved.openhearts.game/{tag}')]);
-    expect(appRelays(base: Uri.parse('https://openhearts.game/play/'), config: RemoteConfig.none, web: true),
+    expect(appRelays(base: Uri.parse('https://play.openhearts.game/'), config: RemoteConfig.none, web: true),
         [for (final r in deployedRelays) Uri.parse(r)]);
     expect(appRelays(base: Uri.parse('http://localhost:8080/'), config: named, web: true), [Uri.parse(localRelay)]);
     // Never anyone else's: a public relay named is no relay named.

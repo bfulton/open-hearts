@@ -210,6 +210,45 @@ export function pagesEnvPlan(want, have, ids) {
   return { patch, lines, owner };
 }
 
+/// The project's custom domains against the definition's, apex or
+/// subdomain alike: `have` is the API's list ([{name, status}]). Returns
+/// { add: [names], remove: [names], pending: [{name, status}] } — a
+/// domain the API has but not yet active (its certificate or its
+/// record still being checked) is the operator's to look at, not one to
+/// add again.
+export function pagesDomainsPlan(want, have) {
+  const add = want.filter((name) => !have.some((d) => d.name === name));
+  const remove = have.filter((d) => !want.includes(d.name)).map((d) => d.name);
+  const pending = have.filter((d) => want.includes(d.name) && d.status !== 'active').map((d) => ({ name: d.name, status: d.status }));
+  return { add, remove, pending };
+}
+
+/// The zone a hostname is in: the longest zone name it is, or ends in.
+export function zoneOf(hostname, zoneNames) {
+  return zoneNames.filter((z) => hostname === z || hostname.endsWith(`.${z}`)).sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
+/// What a custom domain of the project needs and the definition does
+/// not give it: a zone of ours to be in, and a proxied CNAME there to
+/// the project's own address. Pages answers a domain only once its
+/// record points at the project, so a domain without one is a domain
+/// that never comes up. Lines, empty when all is well.
+export function pagesDomainProblems(pages, zones) {
+  const target = `${pages.project}.pages.dev`;
+  const out = [];
+  for (const name of pages.domains) {
+    const zone = zoneOf(name, Object.keys(zones));
+    if (!zone) {
+      out.push(`${name} is in no zone defined here`);
+      continue;
+    }
+    const record = zones[zone].dns.find((r) => r.name === name && r.type === 'CNAME');
+    if (!record) out.push(`${name} has no CNAME in ${zone}`);
+    else if (record.content !== target || !record.proxied) out.push(`${name}'s CNAME is ${record.content}${record.proxied ? '' : ' (not proxied)'}, not ${target} (proxied)`);
+  }
+  return out;
+}
+
 // ---- the relay's wrangler.toml -------------------------------------------
 
 /// Enough TOML for a wrangler.toml: tables, arrays of tables, and values

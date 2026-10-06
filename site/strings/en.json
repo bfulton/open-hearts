@@ -80,9 +80,9 @@
     "faq": {
       "title": "Questions",
       "p1": "How do I play?",
-      "p2": "Go to <a href=\"/play\">openhearts.game/play</a>, or (coming soon) search for “Open Hearts” in the {{appStore}} or {{googlePlay}}.",
+      "p2": "Go to <a href=\"{{play}}\">play.openhearts.game</a>, or (coming soon) search for “Open Hearts” in the {{appStore}} or {{googlePlay}}.",
       "p5": "How do I subscribe?",
-      "p6": "Tap the <i>Subscribe</i> button under <i>Play live</i>. On the <a href=\"/play/subscription\">web</a>, payment is on Stripe's page. In the phone apps, it is through the App Store or Google Play, which bill and renew it. Subscribing makes your account: your name, rating and games go with it onto any device you add (up to 5).",
+      "p6": "Tap the <i>Subscribe</i> button under <i>Play live</i>. On the <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, payment is on Stripe's page. In the phone apps, it is through the App Store or Google Play, which bill and renew it. Subscribing makes your account: your name, rating and games go with it onto any device you add (up to 5).",
       "p7": "How do I cancel?",
       "p8": "Open the menu, choose <i>Subscription</i>, then <i>Manage subscription</i>. Other ways, and refunds, are in the <a href=\"{{base}}/terms\">terms</a>.",
       "p9": "How do I add another device?",
@@ -148,13 +148,13 @@
     },
     "device": {
       "title": "On your device",
-      "p1": "The app keeps these on the device you play on — in the browser's storage for this site, or in the app's own storage on a phone:",
+      "p1": "The app keeps these on the device you play on — in the browser's storage for play.openhearts.game, or in the app's own storage on a phone:",
       "p2": "<b>A key your device makes for itself.</b> It is a long random number with a public half and a secret half. The public half is this device at a live table; if you subscribe, your licence ties it to your account. The secret half never leaves the device.",
       "p3": "<b>Your name and how you look</b>: an icon and a colour, or a picture of your own. The picture is cut down to 64 by 64 pixels on your device, and only that small copy is kept. The photo you picked it from is not stored or sent.",
       "p4": "<b>Your last thirty games against the bots</b>, which your profile counts up. They leave the device only if you tap <i>Copy record</i>.",
       "p5": "<b>How quickly you play</b>, your game options, the language you chose, your licence and your account's number if you subscribe, and the players whose pictures you chose to hide.",
       "p6": "<b>The live game you are in</b>, while you are in it: the table, every move and vote your device signed there, and the secrets it dealt your cards with, so that a page reloaded mid-game can come back to its seat. Let go of when the game ends or you leave it, or two minutes after you were last there.",
-      "p7": "To remove all of it, clear this site's data in your browser, or delete the app. That also removes your key, so the device comes back as a new player, until a backup code or your sign-in brings it into your account again."
+      "p7": "To remove all of it, clear the data of play.openhearts.game in your browser (and of openhearts.game, where a browser that played before the game moved to play.openhearts.game keeps its earlier copy), or delete the app. That also removes your key, so the device comes back as a new player, until a backup code or your sign-in brings it into your account again."
     },
     "alone": {
       "title": "Playing alone",
@@ -260,7 +260,7 @@
     },
     "who": {
       "title": "Who these terms are with",
-      "p1": "These terms are an agreement between you and Open Hearts (\"we\", \"us\"), whose address is under <a href=\"#contact\">Contact</a>. They cover this site, the game at <a href=\"/play\">openhearts.game/play</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
+      "p1": "These terms are an agreement between you and Open Hearts (\"we\", \"us\"), whose address is under <a href=\"#contact\">Contact</a>. They cover this site, the game at <a href=\"{{play}}\">play.openhearts.game</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
       "p2": "How we handle information about you is in the <a href=\"{{base}}/privacy\">privacy policy</a>, which is part of these terms."
     },
     "appStore": {

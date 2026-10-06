@@ -1,5 +1,5 @@
 /// Finished games, kept to be looked at afterwards (router.dart,
-/// `/play/table/ID`; service/functions/records.mjs).
+/// `/table/ID`; service/functions/records.mjs).
 ///
 /// A player's device sends its record when the game is over; the first
 /// copy is the one kept, so a table's other players sending theirs costs

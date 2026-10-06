@@ -1,7 +1,7 @@
 // New Relic Browser (observability/monitoring.mjs, `browser`), written by
 // observability/apply.mjs: run it again rather than editing this. Only on
-// openhearts.game, so a fork or a local build reports nothing to us.
-if (location.hostname === "openhearts.game") {
+// play.openhearts.game, so a fork or a local build reports nothing to us.
+if (location.hostname === "play.openhearts.game") {
 ;window.NREUM||(NREUM={});NREUM.init={session_replay:{enabled:false},session_trace:{enabled:false},browser_consent_mode:{enabled:false},privacy:{cookies_enabled:false},performance:{capture_measures:true},ajax:{deny_list:["bam.nr-data.net"],capture_payloads:'none'}};
 
 ;NREUM.loader_config={accountID:"8577544",trustKey:"8577544",agentID:"653449983",licenseKey:"NRJS-fa56ccf6775b31c57d1",applicationID:"653449983"};

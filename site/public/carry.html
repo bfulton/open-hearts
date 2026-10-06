@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Open Hearts</title>
+</head>
+<body>
+<!--
+  The device, handed on to the app at its own host (app/web/carry.js;
+  docs/06-service.md, "Where the app is"). The app used to be served at
+  openhearts.game/play/, so a device that played there keeps its key,
+  licence, name, records and settings in this origin's storage, under
+  `flutter.*`. The app, at play.openhearts.game, frames this page on its
+  first load and asks for them.
+
+  Answered to that origin alone, and only when it asks: the asker must
+  be this page's parent and at exactly that origin, and the answer is
+  addressed to exactly that origin, so no other page — framing this one
+  or not — is ever handed a key. The worker lets that origin, and no
+  other, frame this page (service/functions/worker.mjs, framedBy).
+  Nothing here is deleted: a rollback to the old address would want it.
+-->
+<script>
+(() => {
+  'use strict';
+  // Production's, spelled out; and the browser rig's stand-in for it
+  // (e2e/drive.mjs). Anywhere else, nobody is answered.
+  const app =
+    location.protocol === 'https:' && location.hostname === 'openhearts.game'
+      ? 'https://play.openhearts.game'
+      : /^[a-z0-9-]+\.localhost$/.test(location.hostname)
+        ? `${location.protocol}//play.${location.host}`
+        : null;
+  if (!app || window.parent === window) return;
+  window.addEventListener('message', (event) => {
+    if (event.origin !== app || event.source !== window.parent) return;
+    if (!event.data || event.data.type !== 'oh-carry/ask') return;
+    const entries = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key !== null && key.startsWith('flutter.')) entries[key] = localStorage.getItem(key);
+      }
+    } catch (_) {
+      // No storage to read: nothing to hand on, which is an answer too.
+    }
+    window.parent.postMessage({ type: 'oh-carry/entries', entries }, app);
+  });
+})();
+</script>
+</body>
+</html>

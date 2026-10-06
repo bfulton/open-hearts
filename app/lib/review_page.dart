@@ -1,4 +1,4 @@
-/// A table by its address (router.dart, `/play/table/ID`): the game
+/// A table by its address (router.dart, `/table/ID`): the game
 /// being played, watched, or the finished game, hand by hand.
 ///
 /// The record is fetched by the table's id and checked here, on this

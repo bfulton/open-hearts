@@ -36,9 +36,10 @@ void main() {
   });
 
   test('credentials are asked of the app\'s own origin: the site, or the rig on this machine', () {
-    expect(turnEndpoint(Uri.parse('https://openhearts.game/play/')), Uri.parse('https://openhearts.game/api/turn'));
+    expect(turnEndpoint(Uri.parse('https://play.openhearts.game/room/KP4T9MXR')), Uri.parse('https://play.openhearts.game/api/turn'));
     expect(turnEndpoint(Uri.parse('http://127.0.0.1:4321/')), Uri.parse('http://127.0.0.1:4321/api/turn'));
     expect(turnEndpoint(Uri.parse('http://localhost:4321/')), Uri.parse('http://localhost:4321/api/turn'));
+    expect(turnEndpoint(Uri.parse('http://play.openhearts.localhost:4321/')), Uri.parse('http://play.openhearts.localhost:4321/api/turn'));
     expect(turnEndpoint(Uri.parse('http://example.com/')), isNull, reason: 'never in the clear over the network');
   });
 }

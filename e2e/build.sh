@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # The app as the browser suites drive it.
 #
-# Same build as the site's, with two differences. It is served at the
-# root rather than /play/, and it names the rig's own service: the
+# Same build as the site's, base / and all, served the way the site
+# serves it (drive.mjs: at the root of play.openhearts.localhost, and at
+# /play/ on 127.0.0.1, the rig's preview), with one difference: it
+# names the rig's own service. The
 # handlers the suites run in-process (drive.mjs, localService) sign
 # licences with BIP-340's published pair, and a build only takes a
 # licence from the service it was built to expect. The published pair

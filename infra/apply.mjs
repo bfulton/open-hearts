@@ -28,6 +28,8 @@ import {
   emailRoutingPlan,
   formBody,
   keyMode,
+  pagesDomainProblems,
+  pagesDomainsPlan,
   pagesEnvPlan,
   parseToml,
   portalPlan,
@@ -139,18 +141,19 @@ async function applyPages() {
     if (write) await cf('PATCH', `${acct}/pages/projects/${p}`, { build_config: { web_analytics_tag: null, web_analytics_token: null } });
   }
 
-  // Custom domains.
+  // Custom domains, the apex's and play's alike; each one's CNAME is
+  // the zone's (applyZone), and the definition is checked to give it one.
+  for (const line of pagesDomainProblems(pages, zones)) owner(`${p}: ${line} (infra/cloudflare.mjs)`);
   const domains = await get(`${acct}/pages/projects/${p}/domains`);
-  for (const name of pages.domains) {
-    const d = domains.find((x) => x.name === name);
-    if (!d) {
-      say(`add custom domain ${name} to ${p}`);
-      if (write) await cf('POST', `${acct}/pages/projects/${p}/domains`, { name });
-    } else if (d.status !== 'active') owner(`${p}'s domain ${name} is ${d.status}: see the project's Custom domains`);
+  const plan = pagesDomainsPlan(pages.domains, domains);
+  for (const name of plan.add) {
+    say(`add custom domain ${name} to ${p}`);
+    if (write) await cf('POST', `${acct}/pages/projects/${p}/domains`, { name });
   }
-  for (const d of domains.filter((x) => !pages.domains.includes(x.name))) {
-    say(`remove custom domain ${d.name} from ${p}, which is not defined`);
-    if (write) await cf('DELETE', `${acct}/pages/projects/${p}/domains/${d.name}`);
+  for (const d of plan.pending) owner(`${p}'s domain ${d.name} is ${d.status}: see the project's Custom domains`);
+  for (const name of plan.remove) {
+    say(`remove custom domain ${name} from ${p}, which is not defined`);
+    if (write) await cf('DELETE', `${acct}/pages/projects/${p}/domains/${name}`);
   }
 
   // Environments: variables, secrets by name, bindings.

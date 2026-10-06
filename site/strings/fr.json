@@ -80,9 +80,9 @@
     "faq": {
       "title": "Questions",
       "p1": "Comment jouer ?",
-      "p2": "Allez sur <a href=\"/play\">openhearts.game/play</a>, ou (bientôt) cherchez « Open Hearts » sur l'{{appStore}} ou {{googlePlay}}.",
+      "p2": "Allez sur <a href=\"{{play}}\">play.openhearts.game</a>, ou (bientôt) cherchez « Open Hearts » sur l'{{appStore}} ou {{googlePlay}}.",
       "p5": "Comment s'abonner ?",
-      "p6": "Touchez le bouton <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le <a href=\"/play/subscription\">web</a>, le paiement se fait sur la page de Stripe. Dans les applications mobiles, il passe par l'App Store ou Google Play, qui le facturent et le renouvellent. S'abonner crée votre compte : votre nom, votre classement et vos parties le suivent sur tout appareil que vous ajoutez (jusqu'à 5).",
+      "p6": "Touchez le bouton <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, le paiement se fait sur la page de Stripe. Dans les applications mobiles, il passe par l'App Store ou Google Play, qui le facturent et le renouvellent. S'abonner crée votre compte : votre nom, votre classement et vos parties le suivent sur tout appareil que vous ajoutez (jusqu'à 5).",
       "p7": "Comment résilier ?",
       "p8": "Ouvrez le menu, choisissez <i>Abonnement</i>, puis <i>Gérer l'abonnement</i>. Les autres moyens, et les remboursements, sont dans les <a href=\"{{base}}/terms\">conditions</a>.",
       "p9": "Comment ajouter un autre appareil ?",
@@ -148,13 +148,13 @@
     },
     "device": {
       "title": "Sur votre appareil",
-      "p1": "L'application conserve ce qui suit sur l'appareil sur lequel vous jouez — dans le stockage du navigateur pour ce site, ou dans le stockage propre de l'application sur un téléphone :",
+      "p1": "L'application conserve ce qui suit sur l'appareil sur lequel vous jouez — dans le stockage du navigateur pour play.openhearts.game, ou dans le stockage propre de l'application sur un téléphone :",
       "p2": "<b>Une clé que votre appareil crée lui-même.</b> C'est un long nombre aléatoire, avec une moitié publique et une moitié secrète. La moitié publique représente cet appareil à une table en direct ; si vous êtes abonné, votre licence la relie à votre compte. La moitié secrète ne quitte jamais l'appareil.",
       "p3": "<b>Votre nom et votre apparence</b> : une icône et une couleur, ou une image à vous. L'image est réduite à 64 sur 64 pixels sur votre appareil, et seule cette petite copie est conservée. La photo d'origine n'est ni stockée ni envoyée.",
       "p4": "<b>Vos trente dernières parties contre les bots</b>, que votre profil comptabilise. Elles ne quittent l'appareil que si vous touchez <i>Copier le relevé</i>.",
       "p5": "<b>Votre rythme de jeu</b>, vos options de partie, la langue que vous avez choisie, votre licence et le numéro de votre compte si vous êtes abonné, et les joueurs dont vous avez choisi de masquer l'image.",
       "p6": "<b>La partie en direct en cours</b>, tant que vous y êtes : la table, chaque coup et chaque vote que votre appareil y a signés, et les secrets avec lesquels il a distribué vos cartes, pour qu'une page rechargée en cours de partie puisse reprendre sa place. Tout cela est effacé quand la partie se termine ou que vous la quittez, ou deux minutes après votre dernier passage.",
-      "p7": "Pour tout supprimer, effacez les données de ce site dans votre navigateur, ou supprimez l'application. Cela supprime aussi votre clé : l'appareil revient alors comme un nouveau joueur, jusqu'à ce qu'un code de secours ou votre connexion le ramène dans votre compte."
+      "p7": "Pour tout supprimer, effacez les données de play.openhearts.game dans votre navigateur (et celles d'openhearts.game, où un navigateur qui jouait avant que le jeu ne passe à play.openhearts.game garde sa copie antérieure), ou supprimez l'application. Cela supprime aussi votre clé : l'appareil revient alors comme un nouveau joueur, jusqu'à ce qu'un code de secours ou votre connexion le ramène dans votre compte."
     },
     "alone": {
       "title": "Jouer seul",
@@ -260,7 +260,7 @@
     },
     "who": {
       "title": "Avec qui ces conditions sont conclues",
-      "p1": "Ces conditions sont un accord entre vous et Open Hearts (« nous »), dont l'adresse figure sous <a href=\"#contact\">Contact</a>. Elles couvrent ce site, le jeu à l'adresse <a href=\"/play\">openhearts.game/play</a>, les applications Open Hearts pour téléphone et le service de jeu en direct. En utilisant l'un d'eux, vous acceptez ces conditions. Si vous ne les acceptez pas, merci de ne pas les utiliser.",
+      "p1": "Ces conditions sont un accord entre vous et Open Hearts (« nous »), dont l'adresse figure sous <a href=\"#contact\">Contact</a>. Elles couvrent ce site, le jeu à l'adresse <a href=\"{{play}}\">play.openhearts.game</a>, les applications Open Hearts pour téléphone et le service de jeu en direct. En utilisant l'un d'eux, vous acceptez ces conditions. Si vous ne les acceptez pas, merci de ne pas les utiliser.",
       "p2": "La façon dont nous traitons les informations vous concernant est décrite dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>, qui fait partie de ces conditions."
     },
     "appStore": {

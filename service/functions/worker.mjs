@@ -38,7 +38,7 @@ const UPSTREAM = 'https://rtc.live.cloudflare.com/v1/turn/keys';
 export function isLocal(url) {
   try {
     const host = new URL(url).hostname;
-    return host === 'localhost' || host === '127.0.0.1';
+    return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost');
   } catch {
     return false;
   }
@@ -162,8 +162,9 @@ export function forgetSettings() {
 }
 
 /// The origin a browser may call the handlers from, echoed back, or
-/// null: the site's own hosts, and — on a dev machine only — the dev
-/// machine's own pages.
+/// null: the site's own hosts, the app's (which calls its own origin's
+/// /api/, so needs none of this, but an app's page is not the only
+/// caller), and — on a dev machine only — the dev machine's own pages.
 export function allowedOrigin(origin, requestUrl = null) {
   if (!origin) return null;
   let host;
@@ -172,8 +173,8 @@ export function allowedOrigin(origin, requestUrl = null) {
   } catch {
     return null;
   }
-  if (host === 'localhost' || host === '127.0.0.1') return requestUrl && isLocal(requestUrl) ? origin : null;
-  if (host === 'openhearts.game' || host === 'www.openhearts.game') return origin;
+  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) return requestUrl && isLocal(requestUrl) ? origin : null;
+  if (host === 'openhearts.game' || host === 'www.openhearts.game' || host === APP_HOST) return origin;
   if (host === 'open-hearts.pages.dev' || host.endsWith('.open-hearts.pages.dev')) return origin;
   return null;
 }
@@ -2947,24 +2948,123 @@ export function measure(env, handler, status, ms, { random = Math.random } = {})
   }
 }
 
-/// Whether [url] is a page of the app rather than one of its files: an
-/// address under /play/ with no extension, `/play/subscription` or
-/// `/play/room/ABCD` (app/lib/router.dart). Each is answered with the
-/// app, which reads the address and opens the page. Decided by the path,
-/// not by a file being missing: the site has no 404 page, so a missing
-/// file comes back as the site's front page rather than as missing.
-export function appPage(url) {
-  const path = url.pathname;
-  if (!path.startsWith('/play/') || path === '/play/') return false;
+// ---- where the app is ------------------------------------------------------
+// One Pages project, one deployment, routed by host (docs/06-service.md,
+// "Where the app is"). The build's /play/ directory is the app:
+//
+//   play.openhearts.game   the app at the root: /room/ABCD is the build's
+//                          /play/ index, /main.dart.js its /play/main.dart.js
+//   openhearts.game        the site; /play and /play/… are sent on to the
+//                          same path at play.openhearts.game, query kept,
+//                          and /carry is the one page the app may frame
+//   anything else          a preview (dev.open-hearts.pages.dev): the site
+//                          at the root and the app at /play/, as before,
+//                          with the app's base moved there and the site's
+//                          links to the app pointed at it
+//
+// /api/ is the handlers on every host. The app calls its own origin's.
+
+/// The app's own host.
+export const APP_HOST = 'play.openhearts.game';
+
+/// For a host the site is served at, the host its app is served at —
+/// production's, and the browser rig's stand-in for it (e2e/drive.mjs)
+/// — or null where the app is served beside the site, at /play/.
+export function appHostFor(host) {
+  if (host === 'openhearts.game') return APP_HOST;
+  if (host === 'openhearts.localhost') return 'play.openhearts.localhost';
+  return null;
+}
+
+/// Whether [host] serves the app at its root.
+export const isAppHost = (host) => host === APP_HOST || host === 'play.openhearts.localhost';
+
+/// Whether [path], as the app has it, is a page of the app rather than
+/// one of its files: an address with no extension, `/subscription` or
+/// `/room/ABCD` (app/lib/router.dart), or the front door. Each is
+/// answered with the app, which reads the address and opens the page.
+/// Decided by the path, not by a file being missing: the site has no
+/// 404 page, so a missing file comes back as the site's front page
+/// rather than as missing.
+export function appPage(path) {
   const last = path.slice(path.lastIndexOf('/') + 1);
   return !last.includes('.');
+}
+
+/// The build's base, as Flutter writes it into the page: `/`, for the
+/// app at the root of its host.
+const ROOT_BASE = '<base href="/">';
+
+/// [response] with [text] for its body: its status and headers, less
+/// those that described the old body.
+function withBody(response, text) {
+  const headers = new Headers(response.headers);
+  for (const h of ['content-length', 'content-encoding', 'etag']) headers.delete(h);
+  return new Response(text, { status: response.status, statusText: response.statusText, headers });
+}
+
+/// The app's page as a preview serves it, at /play/: the same build,
+/// its base moved there, so its files and its pages' addresses are
+/// found under /play/.
+async function underPlay(response) {
+  if (response.status !== 200 || !(response.headers.get('content-type') ?? '').includes('text/html')) return response;
+  const page = await response.text();
+  return withBody(response, page.replace(ROOT_BASE, '<base href="/play/">'));
+}
+
+/// The site's page as a preview or the rig serves it: its links to the
+/// app point at that host's app, not production's.
+async function linkedTo(response, app) {
+  if (response.status !== 200 || !(response.headers.get('content-type') ?? '').includes('text/html')) return response;
+  const page = await response.text();
+  return withBody(response, page.replaceAll(`https://${APP_HOST}/`, app));
+}
+
+/// /carry, the page that hands the device's storage on to the app at its
+/// own host (site/public/carry.html, app/web/carry.js): framed by that
+/// host and nothing else, where every other page is framed by nobody.
+function framedBy(response, origin) {
+  const headers = new Headers(response.headers);
+  headers.delete('x-frame-options');
+  headers.set('content-security-policy', `frame-ancestors ${origin}`);
+  headers.set('cache-control', 'no-store');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+/// Everything that is not /api/: the site, the app, and the redirects
+/// from where the app used to be.
+export async function serveStatic(request, env) {
+  const url = new URL(request.url);
+  const path = url.pathname;
+  const port = url.port ? `:${url.port}` : '';
+  if (isAppHost(url.hostname)) {
+    const asset = appPage(path) ? '/play/' : `/play${path}`;
+    return env.ASSETS.fetch(new Request(new URL(asset + url.search, url), request));
+  }
+  const appHost = appHostFor(url.hostname);
+  if (appHost) {
+    if (path === '/play' || path.startsWith('/play/')) {
+      const to = `${url.protocol}//${appHost}${port}${path.slice('/play'.length) || '/'}${url.search}`;
+      return new Response(null, { status: 301, headers: { location: to, 'cache-control': 'no-store' } });
+    }
+    const app = `${url.protocol}//${appHost}${port}`;
+    const response = await env.ASSETS.fetch(request);
+    if (path === '/carry' || path === '/carry.html') return framedBy(response, app);
+    return appHost === APP_HOST ? response : linkedTo(response, `${app}/`);
+  }
+  // A preview.
+  if (path.startsWith('/play/')) {
+    const inApp = path.slice('/play'.length);
+    return underPlay(await env.ASSETS.fetch(appPage(inApp) ? new Request(new URL(`/play/${url.search}`, url), request) : request));
+  }
+  return linkedTo(await env.ASSETS.fetch(request), `${url.origin}/play/`);
 }
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const name = url.pathname.startsWith('/api/') ? url.pathname.slice('/api/'.length) : null;
-    if (name === null) return env.ASSETS.fetch(appPage(url) ? new Request(new URL('/play/', url), request) : request);
+    if (name === null) return serveStatic(request, env);
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await settle(env);

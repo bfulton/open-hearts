@@ -11,7 +11,7 @@ import 'package:table/table.dart';
 
 void main() {
   test('a deployed build talks to our relay and nobody else', () {
-    final relays = appRelays(base: Uri.parse('https://openhearts.game/play/'), web: true);
+    final relays = appRelays(base: Uri.parse('https://play.openhearts.game/'), web: true);
     expect(relays, [Uri.parse(ourRelay)]);
     for (final r in relays) {
       expect(r.scheme, 'wss');
@@ -27,13 +27,15 @@ void main() {
   });
 
   test('ours are pinned first, a local relay is not', () {
-    expect(pinnedRelays(appRelays(base: Uri.parse('https://openhearts.game/play/'), web: true)), 1);
+    expect(pinnedRelays(appRelays(base: Uri.parse('https://play.openhearts.game/'), web: true)), 1);
     expect(pinnedRelays(appRelays(base: Uri.parse('http://localhost:8080/'), web: true)), 0);
+    // The browser rig's stand-in for play.openhearts.game is this machine.
+    expect(appRelays(base: Uri.parse('http://play.openhearts.localhost:8080/'), web: true), [Uri.parse(localRelay)]);
     expect(pinnedRelays(const []), 0);
   });
 
   test('a table, a pool, the results and presence each reach the object for their own tag', () {
-    final deployed = appRelays(base: Uri.parse('https://openhearts.game/play/'), web: true);
+    final deployed = appRelays(base: Uri.parse('https://play.openhearts.game/'), web: true);
     for (final tag in ['mf66d4537', 'queue:anyone', 'results', 'KP4T9MXR']) {
       final t = RelayTransport(relays: deployed, signer: FakeSigner('t'), table: tag, pinned: pinnedRelays(deployed));
       addTearDown(t.close);

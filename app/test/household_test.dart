@@ -85,6 +85,9 @@ void main() {
     expect(legalPage('privacy', base: Uri.parse('https://open-hearts.pages.dev/play/?e2e')).toString(), 'https://open-hearts.pages.dev/privacy');
     expect(legalPage('terms', base: Uri.parse('http://127.0.0.1:8123/')).toString(), 'http://127.0.0.1:8123/terms');
     expect(legalPage('terms', base: Uri()).toString(), 'https://openhearts.game/terms', reason: 'a phone build');
+    // The app at its own host: the site is the host without play.
+    expect(legalPage('privacy', base: Uri.parse('https://play.openhearts.game/subscription')).toString(), 'https://openhearts.game/privacy');
+    expect(legalPage('terms', base: Uri.parse('http://play.openhearts.localhost:8123/')).toString(), 'http://openhearts.localhost:8123/terms');
     RemoteSettings.current.adopt(RemoteConfig.parse({'terms': 'https://legal.example/t'}));
     addTearDown(() => RemoteSettings.current = RemoteSettings());
     expect(legalPage('terms', base: Uri.parse('https://open-hearts.pages.dev/play/')).toString(), 'https://legal.example/t');
@@ -346,7 +349,7 @@ void main() {
     // Off another device's screen: the link it travels in, or the code
     // itself, as shown in fours or run together, in either case.
     const ticket = '0a1b2c3d4e5f60718293a4b5c6d7e8f9';
-    expect(codeIn('https://openhearts.game/play/?claim=$ticket'), ticket);
+    expect(codeIn('https://play.openhearts.game/?claim=$ticket'), ticket);
     expect(codeIn(ticket), ticket);
     expect(codeIn(' 0A1B 2C3D 4E5F 6071 8293 A4B5 C6D7 E8F9 '), ticket);
     // A backup code, from the email.

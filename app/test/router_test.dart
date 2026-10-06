@@ -16,7 +16,7 @@ import 'package:open_hearts/theme.dart';
 
 /// The app's routes from [location], with a stand-in home screen that
 /// says which room it is in.
-Future<GoRouter> pumpAt(WidgetTester tester, String location, {String boot = 'https://openhearts.game/play/'}) async {
+Future<GoRouter> pumpAt(WidgetTester tester, String location, {String boot = 'https://play.openhearts.game/'}) async {
   final router = appRouter(
     boot: Uri.parse(boot),
     initialLocation: location,
@@ -58,7 +58,7 @@ void main() {
   });
 
   testWidgets('the session\'s parameters stay in the address wherever it goes', (tester) async {
-    final router = await pumpAt(tester, '/?lang=fr&e2e=1', boot: 'https://openhearts.game/play/?lang=fr&e2e=1');
+    final router = await pumpAt(tester, '/?lang=fr&e2e=1', boot: 'https://play.openhearts.game/?lang=fr&e2e=1');
     router.push(located('/about'));
     await tester.pumpAndSettle();
     final at = Uri.parse(where(router));
@@ -70,7 +70,7 @@ void main() {
   });
 
   testWidgets('a game opened with the session\'s parameters in the address is the game, not the front door', (tester) async {
-    final router = await pumpAt(tester, '/?e2e=1', boot: 'https://openhearts.game/play/?e2e=1');
+    final router = await pumpAt(tester, '/?e2e=1', boot: 'https://play.openhearts.game/?e2e=1');
     router.push(located(soloPath), extra: const SoloGame(seed: 4, paced: false));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget, reason: where(router));
@@ -79,9 +79,10 @@ void main() {
   });
 
   test('Stripe sends the browser back to the page that left for it', () {
-    final at = Uri.parse('https://openhearts.game/play/subscription?lang=fr');
+    final at = Uri.parse('https://play.openhearts.game/subscription?lang=fr');
     final back = Uri.parse(returnAddress(at, bought: false));
-    expect(back.path, '/play/subscription');
+    expect(back.host, 'play.openhearts.game');
+    expect(back.path, '/subscription');
     expect(back.queryParameters, {'lang': 'fr'});
     expect(Uri.parse(returnAddress(at, bought: true)).queryParameters, {'lang': 'fr', 'bought': '1'});
   });

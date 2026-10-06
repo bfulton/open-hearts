@@ -13,6 +13,8 @@
 //   {{locale}}      the same, for og:locale
 //   {{base}}        '' in English, '/es' in Spanish: the start of a link
 //   {{url}}         the page's own address
+//   {{app}}         where the app is: https://play.openhearts.game
+//   {{play}}        the app, in the page's language: {{app}}/?lang=es
 //   {{alternates}}  <link rel="alternate"> for each language's copy
 //   {{langs}}       a link to each language's copy, the page's own marked
 //   {{langName}}    the page's language, by its own name
@@ -26,6 +28,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const origin = 'https://openhearts.game';
+/// Where the app is (docs/06-service.md, "Where the app is"). A preview
+/// serves its own instead, at /play/: its worker points these links
+/// there (service/functions/worker.mjs).
+export const app = 'https://play.openhearts.game';
 
 /// The apps' store listings, once they are live. Until then the site's
 /// mentions of a store link to the store itself, and its badges do
@@ -65,6 +71,10 @@ export function render(page, language, words) {
     locale: language.locale,
     base: base(language.code),
     url: `${origin}${base(language.code)}${path}`,
+    app,
+    // The site's language is the app's: the app is at an origin of its
+    // own now, and reads it from the address (app/lib/l10n/l10n.dart).
+    play: `${app}/?lang=${language.code}`,
     alternates: [
       ...languages.map((l) => `<link rel="alternate" hreflang="${l.lang}" href="${origin}${base(l.code)}${path}">`),
       `<link rel="alternate" hreflang="x-default" href="${origin}${path}">`,

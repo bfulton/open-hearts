@@ -1,7 +1,7 @@
 /// The app's pages that have an address of their own (router.dart).
 ///
 /// Each is a place in the browser's history: opening one puts
-/// `/play/subscription` (say) in the address, and an address that names
+/// `/subscription` (say) in the address, and an address that names
 /// one opens it, on top of the home screen. The back button coming back
 /// from Stripe, Stripe's own link home, a refresh, and a link someone
 /// sent all land on the page they name, not the front door.

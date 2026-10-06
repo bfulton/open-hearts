@@ -6,7 +6,9 @@
 #   /            the marketing site, in each of its languages (site/build.mjs)
 #   /api/        the service's handlers (service/functions/worker.mjs,
 #                published as _worker.js)
-#   /play/       the Flutter web build, base-href /play/
+#   /play/       the Flutter web build, base-href / : served at the root
+#                of play.openhearts.game, and at /play/ on a preview
+#                (the worker routes by host, docs/06-service.md)
 #   /measure/    benchmarks meant to be run on a phone (only the ones
 #                that have been built; see measurements/README.md)
 #
@@ -24,7 +26,8 @@
 # The label names the Pages branch, and Cloudflare gives every branch a
 # stable alias URL. Default is "dev" on any working branch — a short,
 # bookmarkable host that does not change as branches come and go — and
-# "main" (which is production, so the custom domain) on main.
+# "main" (which is production, so the custom domains: the site at
+# openhearts.game, the app at play.openhearts.game) on main.
 #
 # Needs CLOUDFLARE_TOKEN and CLOUDFLARE_ACCOUNT_ID in the environment.
 set -euo pipefail
@@ -193,10 +196,15 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
 # (docs/06-service.md, app/lib/net/provider_tokens.dart).
 # Neither is a secret. A build without one offers no sign-in with that
 # provider.
+#
+# The base is / : production serves the app at the root of
+# play.openhearts.game. A preview, which has no such host, serves the
+# same files at /play/, its worker moving the page's base there
+# (service/functions/worker.mjs, serveStatic).
 ( cd app && "$FLUTTER" build web \
     --release \
     --no-web-resources-cdn \
-    --base-href /play/ \
+    --base-href / \
     --dart-define=OH_RELAYS="${OH_RELAYS:-}" \
     --dart-define=OH_SERVICE_KEY="${OH_SERVICE_KEY:-}" \
     --dart-define=OH_GOOGLE_CLIENT_ID="${OH_GOOGLE_CLIENT_ID:-}" \
@@ -231,7 +239,10 @@ CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
 
 echo
 echo "site  https://$LABEL.$PROJECT.pages.dev/"
-echo "app   https://$LABEL.$PROJECT.pages.dev/play"
+echo "app   https://$LABEL.$PROJECT.pages.dev/play/"
+if [ "$LABEL" = main ]; then
+  echo "      https://play.openhearts.game/ (production; openhearts.game/play/ redirects there)"
+fi
 if [ -f "$SHUFFLE_WASM" ]; then
   echo "bench https://$LABEL.$PROJECT.pages.dev/measure/shuffle/"
 fi

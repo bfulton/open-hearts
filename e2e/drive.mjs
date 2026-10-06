@@ -11,9 +11,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { createWriteStream, mkdirSync } from 'node:fs';
+import { createWriteStream, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { build as buildSite } from '../site/build.mjs';
 
 export const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // The e2e tools take arguments, not environment: --app-dir <path>
@@ -227,15 +229,34 @@ export const records = {
   },
 };
 
+/// The site and the app, served as the site's Pages project serves them:
+/// one directory — the site built in every language at the root, the app
+/// at /play/ — behind the site's own worker (service/functions/worker.mjs),
+/// which routes by host (docs/06-service.md, "Where the app is").
+/// Production's hosts have stand-ins here that a browser takes to be
+/// this machine, and that are one site to it, as production's are:
+///
+///   url       http://play.openhearts.localhost:PORT   the app at the root
+///   site      http://openhearts.localhost:PORT        the site; /play/…
+///                                                     redirects to `url`
+///   preview   http://127.0.0.1:PORT                   a preview: the app
+///                                                     at /play/
+///
+/// `legacy(true)` serves the site's host as it was before the app moved
+/// (as a preview is served, the app at /play/), for a suite that needs
+/// a device made where the app used to be.
 export async function serveApp() {
+  const site = mkdtempSync(join(tmpdir(), 'oh-site-'));
+  buildSite(site);
   // Static files as a fetch, which is what the worker's own ASSETS
-  // binding is: the handlers reach the app's wasm through it exactly
-  // as they do on the site.
+  // binding is, by Pages' rules: a directory is its index.html, an
+  // address with no extension its .html.
   const asset = async (request) => {
     const path = decodeURIComponent(new URL(request.url ?? request).pathname);
-    // The app is served at the root here and at /play/ on the site;
-    // the worker asks for its wasm by the site's path.
-    const file = join(appDir, (path.startsWith('/play/') ? path.slice(5) : path) === '/' ? 'index.html' : path.startsWith('/play/') ? path.slice(5) : path);
+    const inApp = path === '/play' || path.startsWith('/play/');
+    let file = inApp ? join(appDir, path.slice('/play'.length) || '/') : join(site, path);
+    if (file.endsWith('/') || path.endsWith('/')) file = join(file, 'index.html');
+    else if (!extname(file)) file += '.html';
     try {
       const body = await readFile(file);
       return new Response(body, { status: 200, headers: { 'content-type': types[extname(file)] ?? 'application/octet-stream' } });
@@ -245,40 +266,39 @@ export async function serveApp() {
   };
   const turn = await startTurn();
   const handlers = await handlersFor(asset, turn.url);
+  let legacy = false;
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
-    if (url.pathname.startsWith('/api/')) {
-      const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
-      const answer = await handlers(
-        new Request(url, {
-          method: req.method,
-          headers: req.headers,
-          ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
-        }),
-      );
-      res.writeHead(answer.status, Object.fromEntries(answer.headers));
-      res.end(Buffer.from(await answer.arrayBuffer()));
-      return;
-    }
-    // A page of the app — `/subscription`, `/room/ABCD` — is answered
-    // with the app, as the site's worker does under /play
-    // (service/functions/worker.mjs, appPage).
-    const last = url.pathname.slice(url.pathname.lastIndexOf('/') + 1);
-    const answer = await asset(url.pathname !== '/' && !last.includes('.') ? new URL('/', url) : url);
-    if (!answer.ok) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'content-type': answer.headers.get('content-type'), 'cache-control': 'no-store' });
+    // Before the move, the site's host served the app itself at /play/:
+    // as a preview does now.
+    if (legacy && url.hostname === 'openhearts.localhost') url.hostname = '127.0.0.1';
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const answer = await handlers(
+      new Request(url, {
+        method: req.method,
+        headers: req.headers,
+        redirect: 'manual',
+        ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
+      }),
+    );
+    const headers = Object.fromEntries(answer.headers);
+    // Nothing static is kept between runs: each build is the one served.
+    if (!url.pathname.startsWith('/api/') && !headers['cache-control']) headers['cache-control'] = 'no-store';
+    res.writeHead(answer.status, headers);
     res.end(Buffer.from(await answer.arrayBuffer()));
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
   return {
-    url: `http://127.0.0.1:${server.address().port}`,
+    url: `http://play.openhearts.localhost:${port}`,
+    site: `http://openhearts.localhost:${port}`,
+    preview: `http://127.0.0.1:${port}`,
+    legacy: (on) => void (legacy = on),
     stop: () => {
       server.close();
       turn.stop();
+      rmSync(site, { recursive: true, force: true });
     },
   };
 }

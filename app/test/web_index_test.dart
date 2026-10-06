@@ -43,7 +43,7 @@ void main() {
   test('nobody else\'s page frames the app', () {
     // Subscribe and Drop are a tap each; under another site's frame
     // the taps are that site's to steer. The rule is the site's, which
-    // serves this page at /play (site/public/_headers).
+    // serves this page at play.openhearts.game (site/public/_headers).
     final rules = File('../site/public/_headers').readAsStringSync();
     final everything = RegExp(r'^/\*\n((?:[ \t]+\S.*\n)+)', multiLine: true).firstMatch(rules);
     expect(everything, isNotNull, reason: 'a rule for every path');
@@ -69,6 +69,31 @@ void main() {
     final worker = File('web/offline_worker.js').readAsStringSync();
     expect(worker, contains('/build-info.json'));
     expect(worker, contains('/api/'));
+  });
+
+  test('the device is brought along from where the app used to be before the app reads its storage', () {
+    // carry.js asks openhearts.game/carry for the device a load at the
+    // old address left there (docs/06-service.md, "Where the app is"),
+    // and the bootstrap starts the app only once it has an answer or
+    // has given up; e2e/move.mjs drives it in a browser.
+    final page = File('web/index.html').readAsStringSync();
+    final carry = page.indexOf('<script src="carry.js"></script>');
+    expect(carry, greaterThan(0));
+    expect(carry, lessThan(page.indexOf('flutter_bootstrap.js')), reason: 'carried before the app starts');
+    final bootstrap = File('web/flutter_bootstrap.js').readAsStringSync();
+    expect(bootstrap, contains('(window.ohCarried ?? Promise.resolve()).finally(() => _flutter.loader.load())'));
+    final script = File('web/carry.js').readAsStringSync();
+    // Production's two origins exactly, both ways; never a wildcard.
+    expect(script, contains("location.hostname === 'play.openhearts.game'"));
+    expect(script, contains("'https://openhearts.game'"));
+    expect(script, contains('event.origin !== site || event.source !== frame.contentWindow'));
+    expect(script, isNot(contains("'*'")));
+    // Quickly, and never over a key that is here.
+    expect(script, contains('const WAIT_MS = 1500;'));
+    expect(script, contains("if (storage.getItem(KEY) !== null) return 'kept';"));
+    expect(script, contains("const KEY = 'flutter.identity_secret';"));
+    // The key the app keeps is the one carried (identity.dart).
+    expect(File('lib/identity.dart').readAsStringSync(), contains("_key = 'identity_secret'"));
   });
 
   test('installed, the app turns with the device, as it does in a tab', () {

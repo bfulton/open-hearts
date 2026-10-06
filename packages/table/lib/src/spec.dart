@@ -43,7 +43,7 @@ class BotSeat extends SeatHolder {
 
 /// A table's id: 128 bits from the system's own randomness, as 32 hex
 /// digits. It is the table's address — the tag its object on the relay
-/// is named by, and `/play/table/<id>` — so it is unguessable, and two
+/// is named by, and `/table/<id>` on play.openhearts.game — so it is unguessable, and two
 /// tables never share one.
 String newTableId([Random? random]) {
   final rng = random ?? Random.secure();

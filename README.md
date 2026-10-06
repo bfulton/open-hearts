@@ -6,7 +6,7 @@ people is a paid subscription. Each live table is dealt by a protocol
 that lets every player verify the deal was fair and keeps each hand
 private to the person holding it.
 
-**Play:** <https://openhearts.game/play>
+**Play:** <https://play.openhearts.game/>
 
 ## How it is built
 
@@ -64,7 +64,7 @@ cd service && OH_RELAY=js dart test  # the same suite against the relay the Dura
 cd app && flutter test               # widgets
 
 node --test service/do/*.test.mjs service/functions/*.test.mjs infra/*.test.mjs
-node --test e2e/deal_worker.test.mjs e2e/offline_worker.test.mjs
+node --test e2e/deal_worker.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
 
 cd app && flutter run -d chrome      # run the app locally
 ```
@@ -81,6 +81,7 @@ node e2e/flows.mjs     # every flow one device can drive
 node e2e/run.mjs       # four browsers at one table
 node e2e/escrow.mjs    # a bot seat's juror goes, and the escrow opens the seat
 node e2e/offline.mjs   # no network, relay or worker: solo still plays
+node e2e/move.mjs      # openhearts.game/play/ to play.openhearts.game: the redirect and the device carried over
 node e2e/shots.mjs     # screenshots at the shapes docs/05 names
 ```
 

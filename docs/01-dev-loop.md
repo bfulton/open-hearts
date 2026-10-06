@@ -17,13 +17,20 @@ Pages project `open-hearts`:
 |---|---|
 | `/` | `site/`, built in each language by `site/build.mjs` |
 | `/api/` | the service's handlers, `service/functions/` published as `_worker.js` ([doc 06](06-service.md)) |
-| `/play/` | the Flutter web build, `--base-href /play/` |
+| `/play/` | the Flutter web build, `--base-href /` |
 | `/measure/shuffle/` | the deal benchmark, when its wasm has been built ([measurements](../measurements/README.md)) |
+
+The worker routes by host ([doc 06](06-service.md#where-the-app-is)).
+In production the site is `openhearts.game` and the app is the root of
+`play.openhearts.game`, served from the build's `/play/` directory;
+`openhearts.game/play/…` redirects there, path and query kept. A preview
+has no play host, so it serves the same build at `/play/`, its worker
+moving the page's base there.
 
 The label names the Pages branch, and every branch gets a stable alias.
 It defaults to `dev` on any working branch, so the latest push is always
-at `https://dev.open-hearts.pages.dev/play`, and to `main` (production,
-`openhearts.game`) on `main`. A production deploy refuses to run without
+at `https://dev.open-hearts.pages.dev/play/`, and to `main` (production,
+`openhearts.game` and `play.openhearts.game`) on `main`. A production deploy refuses to run without
 the service's public key (`serviceKey` in `config/openhearts.json`),
 since a build without it has live play shut for everyone. Before uploading, the script loads the staged worker, so a
 missing module fails locally instead of at Cloudflare.
@@ -52,7 +59,22 @@ The worker fetches from the network first and keeps a copy of each file.
 It falls back to the copy only when the network fails, so online
 behaviour is unchanged and offline the last loaded build opens.
 `build-info.json` and the service's handlers are never cached.
-`node e2e/offline.mjs` checks this in a browser.
+`node e2e/offline.mjs` checks this in a browser. At
+`play.openhearts.game` the worker's scope is the whole host; at a
+preview it is `/play/`.
+
+## The move to play.openhearts.game
+
+The app used to be at `openhearts.game/play/`, and a browser that played
+there keeps its device — key, licence, name, records, settings — in that
+origin's storage. On its first load at `play.openhearts.game` with no key,
+`app/web/carry.js` asks a hidden frame of `openhearts.game/carry` for
+those entries and writes them before the app starts, waiting 1.5 s at
+most ([doc 06](06-service.md#the-device-carried-over)). The old origin
+keeps its copy, so rolling back to serving the app at `/play/` loses
+nobody. `node e2e/move.mjs` drives the redirect, the carry and a preview
+in a browser, on the rig's stand-ins for the two hosts
+(`openhearts.localhost` and `play.openhearts.localhost`).
 
 ## Credentials
 

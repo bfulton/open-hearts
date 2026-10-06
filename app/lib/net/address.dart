@@ -28,8 +28,16 @@ Duration roomWait(Uri at, {required Duration standard, Duration most = const Dur
   return Duration(seconds: asked.clamp(standard.inSeconds, most.inSeconds));
 }
 
+/// Whether [host] is this machine: `localhost`, `127.0.0.1`, or a name
+/// under `.localhost`, which a browser takes to be this machine too. The
+/// browser rig serves the site at openhearts.localhost and the app at
+/// play.openhearts.localhost (e2e/drive.mjs), as production serves them
+/// at openhearts.game and play.openhearts.game.
+bool isLocalHost(String host) => host == 'localhost' || host == '127.0.0.1' || host.endsWith('.localhost');
+
 /// Where the app itself is: the address its page was served at, under
-/// which every page's address sits (router.dart) — `/play/` on the site.
+/// which every page's address sits (router.dart) — the root of
+/// play.openhearts.game, or `/play/` on a preview of the site.
 /// What a link to the app is made from, rather than the address of
 /// whichever page happens to be showing.
 Uri appBase() => platform.appBase();

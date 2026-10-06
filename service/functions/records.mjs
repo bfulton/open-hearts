@@ -1,5 +1,5 @@
 // Games kept for looking at afterwards (app/lib/router.dart,
-// /play/table/<id>): a finished game's whole record, as one of its
+// /table/<id> on play.openhearts.game): a finished game's whole record, as one of its
 // players' devices sends it, kept in R2 (OH_RECORDS) under the table's
 // id, packed.
 //

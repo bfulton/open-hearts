@@ -10,7 +10,7 @@ import 'package:open_hearts/theme.dart';
 Widget routed(String location, {Object? extra, Widget home = const Scaffold(body: Text('home'))}) => MaterialApp.router(
       theme: buildTheme(),
       routerConfig: appRouter(
-        boot: Uri.parse('https://openhearts.game/play/'),
+        boot: Uri.parse('https://play.openhearts.game/'),
         initialLocation: location,
         initialExtra: extra,
         home: (_, _) => home,

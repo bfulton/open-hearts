@@ -16,6 +16,9 @@ import {
   formBody,
   keyMode,
   madeByCloudflare,
+  zoneOf,
+  pagesDomainProblems,
+  pagesDomainsPlan,
   pagesEnvPlan,
   parseToml,
   portalPlan,
@@ -60,10 +63,11 @@ test('describe says what is and what is wanted', () => {
 
 const game = zones['openhearts.game'];
 const liveRecords = () => [
-  { id: 'r1', type: 'CNAME', name: 'openhearts.game', content: 'open-hearts.pages.dev', proxied: true, ttl: 1, comment: 'Pages: site, app, /api', meta: {} },
+  { id: 'r1', type: 'CNAME', name: 'openhearts.game', content: 'open-hearts.pages.dev', proxied: true, ttl: 1, comment: 'Pages: site, /api', meta: {} },
   { id: 'r2', type: 'CNAME', name: 'www.openhearts.game', content: 'openhearts.game', proxied: true, ttl: 1, comment: 'redirects to the apex', meta: {} },
   { id: 'r3', type: 'TXT', name: 'openhearts.game', content: '"v=spf1 include:_spf.mx.cloudflare.net ~all"', proxied: false, ttl: 1, comment: null, meta: {} },
   { id: 'r4', type: 'TXT', name: '_dmarc.openhearts.game', content: '"v=DMARC1; p=reject;"', proxied: false, ttl: 1, comment: null, meta: {} },
+  { id: 'r5', type: 'CNAME', name: 'play.openhearts.game', content: 'open-hearts.pages.dev', proxied: true, ttl: 1, comment: 'Pages: the app, /api', meta: {} },
   ...[78, 67, 82].map((priority, i) => ({ id: `mx${i}`, type: 'MX', name: 'openhearts.game', content: `route${i + 1}.mx.cloudflare.net`, priority, meta: { email_routing: true, read_only: true } })),
   ...[78, 67, 82].map((priority, i) => ({ id: `bx${i}`, type: 'MX', name: 'cf-bounce.openhearts.game', content: `route${i + 1}.mx.cloudflare.net`, priority, meta: { email_routing: true, read_only: true } })),
   { id: 'k1', type: 'TXT', name: 'cf2024-1._domainkey.openhearts.game', content: '"v=DKIM1; …"', meta: { email_routing: true, read_only: true } },
@@ -102,6 +106,19 @@ test('DNS: a record whose content changed is updated in place, not made twice', 
   assert.deepEqual(plan.create, []);
   assert.deepEqual(plan.remove, []);
   assert.equal(plan.update[0].id, 'r4');
+});
+
+test("DNS: the app's host, play, is made where it is missing", () => {
+  // As it was before the app moved: the apex's record only, and its
+  // comment from when the apex served the app.
+  const have = liveRecords().filter((r) => r.id !== 'r5');
+  have[0].comment = 'Pages: site, app, /api';
+  const plan = dnsPlan(game, have);
+  assert.deepEqual(plan.create, [
+    { type: 'CNAME', name: 'play.openhearts.game', content: 'open-hearts.pages.dev', proxied: true, ttl: 1, comment: 'Pages: the app, /api' },
+  ]);
+  assert.deepEqual(plan.update.map((u) => [u.id, u.diffs.map(describe)]), [['r1', ['comment: "Pages: site, app, /api" -> "Pages: site, /api"']]]);
+  assert.deepEqual(plan.remove, []);
 });
 
 test("DNS: one of Cloudflare's records missing is put back by hand", () => {
@@ -259,6 +276,58 @@ test('Pages: compatibility date and flags', () => {
   have.compatibility_flags = ['nodejs_compat'];
   const plan = pagesEnvPlan(pages.environments.production, have, ids);
   assert.deepEqual(plan.patch, { compatibility_date: '2026-09-09', compatibility_flags: [] });
+});
+
+test('Pages: the site at the apex and the app at play, one project', () => {
+  assert.deepEqual(pages.domains, ['openhearts.game', 'play.openhearts.game']);
+  const live = [
+    { name: 'openhearts.game', status: 'active' },
+    { name: 'play.openhearts.game', status: 'active' },
+  ];
+  assert.deepEqual(pagesDomainsPlan(pages.domains, live), { add: [], remove: [], pending: [] });
+});
+
+test('Pages: a subdomain missing is added; one still being checked is the owner\'s; a stray one goes', () => {
+  // Before the move: the apex alone.
+  assert.deepEqual(pagesDomainsPlan(pages.domains, [{ name: 'openhearts.game', status: 'active' }]), {
+    add: ['play.openhearts.game'],
+    remove: [],
+    pending: [],
+  });
+  // Just added: Cloudflare checks the record and issues a certificate.
+  assert.deepEqual(
+    pagesDomainsPlan(pages.domains, [
+      { name: 'openhearts.game', status: 'active' },
+      { name: 'play.openhearts.game', status: 'pending' },
+      { name: 'old.openhearts.game', status: 'active' },
+    ]),
+    { add: [], remove: ['old.openhearts.game'], pending: [{ name: 'play.openhearts.game', status: 'pending' }] },
+  );
+});
+
+test('Pages: every custom domain has its proxied CNAME to the project in its zone', () => {
+  assert.deepEqual(pagesDomainProblems(pages, zones), []);
+  assert.equal(zoneOf('play.openhearts.game', Object.keys(zones)), 'openhearts.game');
+  assert.equal(zoneOf('openhearts.game', Object.keys(zones)), 'openhearts.game');
+  assert.equal(zoneOf('play.openhearts.gamer', Object.keys(zones)), null);
+  assert.equal(zoneOf('a.b.example', ['example', 'b.example']), 'b.example', 'the longest zone wins');
+  // Each way it can go wrong.
+  const without = (name) => ({ ...zones, 'openhearts.game': { ...zones['openhearts.game'], dns: zones['openhearts.game'].dns.filter((r) => r.name !== name) } });
+  assert.deepEqual(pagesDomainProblems(pages, without('play.openhearts.game')), ['play.openhearts.game has no CNAME in openhearts.game']);
+  const elsewhere = {
+    ...zones,
+    'openhearts.game': {
+      ...zones['openhearts.game'],
+      dns: zones['openhearts.game'].dns.map((r) => (r.name === 'play.openhearts.game' ? { ...r, content: 'other.pages.dev', proxied: false } : r)),
+    },
+  };
+  assert.deepEqual(pagesDomainProblems(pages, elsewhere), ["play.openhearts.game's CNAME is other.pages.dev (not proxied), not open-hearts.pages.dev (proxied)"]);
+  assert.deepEqual(pagesDomainProblems({ ...pages, domains: ['play.openhearts.example'] }, zones), ['play.openhearts.example is in no zone defined here']);
+});
+
+test("rules: the API's rate limit covers /api/ on the app's host as on the site's", () => {
+  const [limit] = game.rules.http_ratelimit;
+  assert.match(limit.expression, /http\.host in \{"openhearts\.game" "play\.openhearts\.game"\}/);
 });
 
 // ---- the relay's wrangler.toml ------------------------------------------------

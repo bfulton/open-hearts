@@ -16,6 +16,7 @@ library;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:table/table.dart';
 
+import 'address.dart' show isLocalHost;
 import 'remote_config.dart';
 
 /// Our relay: a Cloudflare object per tag, which is why the tag is in
@@ -30,7 +31,7 @@ const deployedRelays = [ourRelay];
 /// every table's rotation. All of a deployed list; none of a local one.
 int pinnedRelays(List<Uri> relays) => relays.takeWhile(RemoteConfig.ours).length;
 
-/// The local relay, where a build served from localhost looks.
+/// The local relay, where a build served from this machine looks.
 const localRelay = 'ws://127.0.0.1:7447';
 
 /// A dev loop's shortcut: a build made with `--dart-define=OH_RELAYS=…`
@@ -47,7 +48,7 @@ const devRelay = String.fromEnvironment('OH_RELAYS');
 List<Uri> appRelays({Uri? base, RemoteConfig? config, bool web = kIsWeb}) {
   if (devRelay.isNotEmpty) return Relays.parse(devRelay);
   final host = (base ?? Uri.base).host;
-  if (web && (host == 'localhost' || host == '127.0.0.1' || host.isEmpty)) return [Uri.parse(localRelay)];
+  if (web && (isLocalHost(host) || host.isEmpty)) return [Uri.parse(localRelay)];
   final named = (config ?? RemoteSettings.current.config).relays;
   if (named != null) return named;
   return [for (final r in deployedRelays) Uri.parse(r)];

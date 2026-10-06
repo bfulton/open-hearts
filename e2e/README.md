@@ -13,22 +13,42 @@ through TURN as in production (`apt-get install coturn`; its log is
 after building the app the way the suites expect it:
 
 ```bash
-./e2e/build.sh                          # app/build/e2e, served at / and keyed to the rig's service
+./e2e/build.sh                          # app/build/e2e, base / like the site's, keyed to the rig's service
 node e2e/flows.mjs                      # every flow one device can drive
 node e2e/flows.mjs --only "a hand alone"
 node e2e/run.mjs                        # four browsers at one table
 node e2e/escrow.mjs                     # one browser and three bot seats; a juror is taken off the air
 node e2e/offline.mjs                    # the network taken away a piece at a time
 node e2e/offline.mjs --only "airplane"
+node e2e/move.mjs                       # openhearts.game/play/ to play.openhearts.game: redirect, carry-over, previews
 node e2e/shots.mjs                      # screenshots at docs/05's shapes, in app/build/shots/
 node e2e/longpress_copy.mjs             # long-press Copy on an iPhone user agent
 node e2e/site.mjs                       # the marketing site in each language: redirect, choice kept, fits a phone
 node e2e/site_shots.mjs                 # the site's pictures of the game, into site/public/img/ (after a menu change)
-node --test e2e/deal_worker.test.mjs e2e/offline_worker.test.mjs
+node --test e2e/deal_worker.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
 ```
 
 Every suite takes `--app-dir <path>` to use a different build. The exit
 code is the verdict.
+
+The rig (`drive.mjs`, `serveApp`) serves the site and the app as the
+Pages project does: the site built in every language, the app at its
+`/play/`, and the site's own worker in front of both, routing by host
+([doc 06](../docs/06-service.md#where-the-app-is)). Production's hosts
+have stand-ins that Chromium takes to be this machine and to be one site,
+as production's two are: `play.openhearts.localhost` is the app at its
+root (`app.url`, where the suites open it), `openhearts.localhost` the
+site (`app.site`), and `127.0.0.1` a preview (`app.preview`), with the
+app at `/play/`.
+
+- **`move.mjs`**: the move from `openhearts.game/play/` to
+  `play.openhearts.game`. An old link lands on the same page at the new
+  host with its query, through the offline worker the old address
+  installed; a device made at the old address (key, licence, name) is
+  the same device at the new one, read through a same-site frame;
+  a key already at the new host is never replaced; nothing to carry
+  costs no wait, and a carry that never answers holds the app up for
+  1.5 s; a preview keeps the app at `/play/`.
 
 - **`run.mjs`**: four headless Chromium contexts, four devices and four
   keys. They host a room, join it by code, and play a hand over WebRTC.

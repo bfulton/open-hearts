@@ -286,10 +286,14 @@ void main() {
   });
 
   test("Apple's return address is the app's base, whatever page is open", () {
-    // Registered on the Services ID: these exactly.
-    expect(appleReturnUrl(Uri.parse('https://openhearts.game/play/')).toString(), 'https://openhearts.game/play/');
+    // Registered on the Services ID: these exactly. The app is at the
+    // root of play.openhearts.game; the old address, openhearts.game/play/,
+    // stays registered for a build still open there.
     expect(appleReturnUrl(Uri.parse('https://play.openhearts.game/')).toString(), 'https://play.openhearts.game/');
-    expect(appleReturnUrl(Uri.parse('https://openhearts.game/play/?lang=de#x')).toString(), 'https://openhearts.game/play/');
+    expect(appleReturnUrl(Uri.parse('https://play.openhearts.game/?lang=de#x')).toString(), 'https://play.openhearts.game/');
+    expect(appleReturnUrl(Uri.parse('https://openhearts.game/play/')).toString(), 'https://openhearts.game/play/');
+    // A preview's, which has the app at /play/.
+    expect(appleReturnUrl(Uri.parse('https://dev.open-hearts.pages.dev/play/')).toString(), 'https://dev.open-hearts.pages.dev/play/');
     expect(appleReturnUrl(Uri.parse('http://localhost:8080/play/')).toString(), 'http://localhost:8080/play/');
   });
 }

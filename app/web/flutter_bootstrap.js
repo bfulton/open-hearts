@@ -3,8 +3,10 @@
 
 // Flutter's own loader, without Flutter's service worker: that one is
 // a stub, which unregisters whatever is registered where it is —
-// ours included.
-_flutter.loader.load();
+// ours included. Once the device has been brought along from where the
+// app used to be, if it is to be (carry.js): the app reads its key as
+// it starts, and would make a new one.
+(window.ohCarried ?? Promise.resolve()).finally(() => _flutter.loader.load());
 
 // The app kept for a load with no network (offline_worker.js): once
 // the first frame is up, so that it never competes with the app for a

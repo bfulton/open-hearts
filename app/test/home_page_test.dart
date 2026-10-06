@@ -75,7 +75,7 @@ Future<void> pumpHome(WidgetTester tester, {String? openRoom, String? openClaim,
 Widget still(Widget home) => MaterialApp.router(
       theme: buildTheme(),
       routerConfig: appRouter(
-        boot: Uri.parse('https://openhearts.game/play/'),
+        boot: Uri.parse('https://play.openhearts.game/'),
         initialLocation: '/',
         home: (_, _) => MediaQuery(data: const MediaQueryData(disableAnimations: true), child: home),
       ),

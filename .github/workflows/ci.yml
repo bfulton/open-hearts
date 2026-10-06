@@ -56,7 +56,7 @@ jobs:
         run: |
           cd app
           flutter build web --release --no-web-resources-cdn \
-            --base-href /play/
+            --base-href /
 
   # In two halves, on two runners: each takes the first or second half
   # of every test file (dart test's shards), about 13 minutes a half, 22

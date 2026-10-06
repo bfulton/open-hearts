@@ -42,8 +42,93 @@ None of it is in a game's latency path.
 | `health` | GET | whether the store is readable and Stripe answers for the price, for the monitors |
 
 Bodies are capped at 16 KB (a record at 2 MiB, the Stripe webhook at
-512 KB). CORS answers the site's own origins. A local origin is answered
-only by a worker that is itself running locally.
+512 KB). CORS answers the site's own origins (openhearts.game, www,
+play.openhearts.game and the project's `*.open-hearts.pages.dev`). A
+local origin is answered only by a worker that is itself running locally.
+
+### Where the app is
+
+One Pages project and one deployment serve the site, the app and the
+handlers. The worker routes by host (`serveStatic` in `worker.mjs`):
+
+| Host | `/api/…` | Everything else |
+|---|---|---|
+| `play.openhearts.game` | the handlers | the app at the root: a file from the build's `/play/` directory (`/main.dart.js` is `/play/main.dart.js`), and any address with no extension (`/`, `/room/ABCD`, `/subscription`, `/table/<id>`) the app's page |
+| `openhearts.game` | the handlers | the site. `/play` and `/play/…` answer **301** to the same path at `play.openhearts.game`, query kept (`/play/room/ABCD?x` → `https://play.openhearts.game/room/ABCD?x`), with `no-store` so a browser does not keep it for good and a rollback stays possible. `/carry` is the one page excepted (below) |
+| a preview, `*.open-hearts.pages.dev` | the handlers | the site at the root and the app at `/play/`, as before the move: the worker moves the page's `<base href="/">` to `/play/` and points the site's links to `https://play.openhearts.game/` at the preview's own `/play/`. A preview never sends anyone to production |
+
+The app is built once, with base `/` (`deploy.sh`). Old links in the
+wild — shared rooms and their QR codes, table links, Stripe's return
+addresses for a checkout opened before the move, a claim link in an
+email, bookmarks and home-screen installs — all go through the redirect
+and land on the same page. The offline worker an old visit installed at
+`openhearts.game/play/` is network-first, so a navigation it handles
+gets the 301 from the network and the browser follows it
+(`e2e/move.mjs` checks this); offline, it opens the last build at the
+old address, with that address's own data.
+
+**The app calls the handlers on its own origin.** Every address the app
+makes for the service is its page's origin plus `/api/<name>`
+(`handlerFor` in `licence.dart`, `turn.dart`), so at
+`play.openhearts.game` it calls `play.openhearts.game/api/…`. That keeps
+the three things that care about origins as simple as they were:
+
+- No CORS. The calls are same-origin, as they were at `/play/`; there
+  is no preflight to get right and no second origin whose `Origin` header
+  a handler has to trust. (`play.openhearts.game` is in the allowed list
+  anyway, for anything else of ours that asks.)
+- Stripe's return addresses must be on the origin the checkout was
+  asked of (`sameSite`). Asked of the app's own origin, the app's own
+  page (`https://play.openhearts.game/subscription?bought=1`) is one,
+  with no list of other origins to accept. The billing portal's return
+  is the same.
+- Signed requests carry no cookie and no session, so nothing depends
+  on which host a device calls. A device whose page is still open at the
+  old address keeps calling `openhearts.game/api/…`, which answers it.
+
+The rate limit on `/api/` covers both hosts (`infra/cloudflare.mjs`).
+Sign in with Apple's return address is the document's base, so it is
+`https://play.openhearts.game/`; the old `https://openhearts.game/play/`
+stays registered on the Services ID for a page still open there. The
+relay checks no `Origin` header, so it needs nothing for the new host.
+
+### The device, carried over
+
+What makes a device itself — its secret key, licence, name and picture,
+records and settings — is in the browser's `localStorage` under
+`flutter.*`, and storage is per origin. A device that played at
+`openhearts.game/play/` would be a new player at `play.openhearts.game`,
+and a subscriber's device no device of any account. So it is carried
+over, once, in the browser:
+
+1. On a load at `play.openhearts.game` with no `flutter.identity_secret`
+   and no `oh.carried` mark, `app/web/carry.js` — a script before the
+   bootstrap, so before Dart reads storage — puts a hidden iframe of
+   `https://openhearts.game/carry` (`site/public/carry.html`) on the page
+   and, once it loads, asks it with `postMessage` addressed to exactly
+   `https://openhearts.game`.
+2. The carry page answers only a message from its parent at exactly
+   `https://play.openhearts.game`, and only when asked: it posts its
+   `flutter.*` entries back, addressed to exactly that origin. The worker
+   lets that origin, and no other, frame it (`frame-ancestors
+   https://play.openhearts.game`, no `X-Frame-Options`), where every
+   other page is framed by nobody.
+3. The app takes an answer only from that frame at that origin. It
+   writes the entries if there is still no key (another tab may have made
+   one), never over an entry already there, marks the carry done
+   (`oh.carried`), and starts the app. `flutter_bootstrap.js` waits on
+   this, and on nothing else.
+4. It waits 1.5 s at most. A carry that does not answer in time is not
+   marked done and the app boots: it makes a key of its own, and with a
+   key there the carry is never tried again.
+
+The two hosts are one site (same scheme, same registrable domain), so
+the frame reads `openhearts.game`'s own storage, not a copy partitioned
+under the top-level site, in Chromium, Firefox and Safari alike;
+`e2e/move.mjs` checks this in Chromium with the rig's stand-ins, which
+are one site in the same way. Nothing is deleted at the old origin: a
+rollback to `/play/` finds the device where it left it. What is carried
+never leaves the browser.
 
 ### Signed requests
 
@@ -94,8 +179,9 @@ yearly because a card fee's fixed 30¢ would be most of a monthly price.
 
 **Web: Stripe.** `checkout` writes the device's key into the session's
 metadata and the subscription's metadata, so renewals carry it too. The
-return address must be on this site, and the app only leaves for Stripe's
-own hosts. The webhook reads nothing until `Stripe-Signature` verifies
+return address must be on the origin the checkout was asked of — the
+app's own, `play.openhearts.game` ([where the app is](#where-the-app-is))
+— and the app only leaves for Stripe's own hosts. The webhook reads nothing until `Stripe-Signature` verifies
 (HMAC-SHA-256, constant-time, at most five minutes old).
 `checkout.session.completed` and `checkout.session.async_payment_succeeded`
 bind the device, but only for a session this service created (the key

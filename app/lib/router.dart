@@ -3,7 +3,7 @@
 /// The address is the app's state as far as the browser is concerned, and
 /// every way of arriving goes through here — a link, a refresh, the back
 /// and forward buttons, Stripe sending the browser home. So there is one
-/// place that says what `/play/subscription` is, rather than each page
+/// place that says what `/subscription` is, rather than each page
 /// arranging its own way back.
 ///
 ///   /                   the home screen

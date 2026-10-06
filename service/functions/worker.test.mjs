@@ -102,6 +102,8 @@ const post = (body, origin) =>
 test('origins: the site, its branches and a dev machine; nobody else', () => {
   assert.equal(allowedOrigin('https://openhearts.game'), 'https://openhearts.game');
   assert.equal(allowedOrigin('https://www.openhearts.game'), 'https://www.openhearts.game');
+  assert.equal(allowedOrigin('https://play.openhearts.game'), 'https://play.openhearts.game', 'the app, at its own host');
+  assert.equal(allowedOrigin('https://evil.openhearts.game'), null);
   assert.equal(allowedOrigin('https://openhearts.game.evil.example'), null);
   assert.equal(allowedOrigin('https://openhearts.lol'), null, 'the redirect serves nothing');
   assert.equal(allowedOrigin('https://dev.open-hearts.pages.dev'), 'https://dev.open-hearts.pages.dev');
@@ -112,6 +114,9 @@ test('origins: the site, its branches and a dev machine; nobody else', () => {
   assert.equal(allowedOrigin('http://127.0.0.1:8788', 'http://127.0.0.1:8788/api/turn'), 'http://127.0.0.1:8788');
   assert.equal(allowedOrigin('http://localhost:8788', 'https://dev.open-hearts.pages.dev/api/turn'), null);
   assert.equal(allowedOrigin('http://127.0.0.1:8788'), null);
+  // The browser rig's site and app (e2e/drive.mjs), on this machine only.
+  assert.equal(allowedOrigin('http://play.openhearts.localhost:8788', 'http://play.openhearts.localhost:8788/api/turn'), 'http://play.openhearts.localhost:8788');
+  assert.equal(allowedOrigin('http://play.openhearts.localhost:8788', 'https://play.openhearts.game/api/turn'), null);
   assert.equal(allowedOrigin('https://evil-open-hearts.pages.dev'), null);
   assert.equal(allowedOrigin('https://open-hearts.pages.dev.evil.com'), null);
   assert.equal(allowedOrigin('not a url'), null);

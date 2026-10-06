@@ -177,8 +177,9 @@ frame (`service/do/ws.test.mjs`).
   Nothing a caller sends can add a `|` or reach another prefix.
 - **Local mode is local.** `OH_OPEN_HOUSE` licenses every key and
   accepts `local:` sign-ins, but the worker honours it only for requests
-  to `localhost` or `127.0.0.1`. Local origins get CORS only from a local
-  worker.
+  to `localhost`, `127.0.0.1` or a name under `.localhost` (the browser
+  rig's stand-ins for the site and the app). Cloudflare routes no such
+  host to the project. Local origins get CORS only from a local worker.
 - **Errors** describe what went wrong in words and upstream status
   codes, never stack traces or upstream bodies.
 - **Game records** are accepted only from a key seated at the table, and
@@ -190,7 +191,13 @@ frame (`service/do/ws.test.mjs`).
 Every path is served with `Content-Security-Policy: frame-ancestors
 'none'`, `X-Frame-Options: DENY`, HSTS, `nosniff` and a strict referrer
 policy (`site/public/_headers`), so no other page can frame the app and steer
-its one-tap buttons. The app loads no third-party script. Cloudflare's
+its one-tap buttons. One page is excepted: `openhearts.game/carry`, which
+hands a device's storage from where the app used to be to
+`play.openhearts.game` ([doc 06](06-service.md#the-device-carried-over)).
+The worker lets exactly that origin frame it. The page has no buttons, and
+it answers only a message from its parent at exactly that origin,
+addressed back to exactly that origin. The app checks the answer's origin
+and source, and never writes over a key it already has. The app loads no third-party script. Cloudflare's
 Web Analytics and email obfuscation are off, since both inject scripts.
 Open: a fuller CSP (`script-src`) has not been set. The Flutter build
 needs `wasm-unsafe-eval`, and the policy has to be tested against it.

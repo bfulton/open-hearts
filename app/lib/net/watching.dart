@@ -1,5 +1,5 @@
 /// Watching a game being played, from its address (router.dart,
-/// `/play/table/ID`; packages/table, watch.dart).
+/// `/table/ID`; packages/table, watch.dart).
 ///
 /// The watcher reads the table's watch lane on our relay and says every
 /// [WatchBroadcast.again] that it is there; a seated player's device

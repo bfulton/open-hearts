@@ -13,6 +13,7 @@ import 'dart:convert';
 
 import 'package:table/table.dart';
 
+import 'address.dart' show isLocalHost;
 import 'licence.dart' show signedAsk;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 import 'remote_config.dart' show waits;
@@ -22,7 +23,7 @@ import 'remote_config.dart' show waits;
 /// (e2e/drive.mjs) — else nowhere.
 Uri? turnEndpoint([Uri? at]) {
   final base = at ?? Uri.base;
-  final local = base.scheme == 'http' && (base.host == 'localhost' || base.host == '127.0.0.1');
+  final local = base.scheme == 'http' && isLocalHost(base.host);
   if ((base.scheme != 'https' && !local) || base.host.isEmpty) return null;
   return Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null, path: '/api/turn');
 }

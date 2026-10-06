@@ -26,8 +26,11 @@ export const app = {
 export const pages = {
   project: 'open-hearts',
   productionBranch: 'main',
-  /// Besides open-hearts.pages.dev, which every project has.
-  domains: ['openhearts.game'],
+  /// Besides open-hearts.pages.dev, which every project has. The site
+  /// at the apex, the app at play (one deployment: the worker routes by
+  /// host, docs/06-service.md). Each needs its CNAME to the project in
+  /// its zone's dns, below; diff.test.mjs holds the two together.
+  domains: ['openhearts.game', 'play.openhearts.game'],
   /// Cloudflare Web Analytics, which injects a beacon script into every
   /// page, is off: the site promises no third-party scripts.
   webAnalytics: false,
@@ -132,7 +135,8 @@ export const zones = {
     settings: { ...tls, email_obfuscation: 'off' },
     botFightMode: false,
     dns: [
-      { type: 'CNAME', name: 'openhearts.game', content: 'open-hearts.pages.dev', proxied: true, comment: 'Pages: site, app, /api' },
+      { type: 'CNAME', name: 'openhearts.game', content: 'open-hearts.pages.dev', proxied: true, comment: 'Pages: site, /api' },
+      { type: 'CNAME', name: 'play.openhearts.game', content: 'open-hearts.pages.dev', proxied: true, comment: 'Pages: the app, /api' },
       { type: 'CNAME', name: 'www.openhearts.game', content: 'openhearts.game', proxied: true, comment: 'redirects to the apex' },
       // Mail from the zone is Cloudflare's (Email Routing in, Email
       // Sending out), and nothing else may send as it.
@@ -170,7 +174,7 @@ export const zones = {
         {
           description: 'API and relay: 30 requests per 10 s per address',
           expression:
-            '(http.host eq "openhearts.game" and starts_with(http.request.uri.path, "/api/") and not http.request.uri.path in {"/api/stripe" "/api/apple" "/api/play"}) or http.host eq "relay.openhearts.game"',
+            '(http.host in {"openhearts.game" "play.openhearts.game"} and starts_with(http.request.uri.path, "/api/") and not http.request.uri.path in {"/api/stripe" "/api/apple" "/api/play"}) or http.host eq "relay.openhearts.game"',
           action: 'block',
           ratelimit: { characteristics: ['cf.colo.id', 'ip.src'], period: 10, requests_per_period: 30, mitigation_timeout: 10 },
           enabled: true,

@@ -45,9 +45,10 @@ Future<void> _append(String src) {
 }
 
 /// Where Apple's popup says it came back to: the app's own address,
-/// which is the document's base (`<base href>`, `/play/` on the site),
-/// whatever page of the app is open. Not [Uri.base], which in a browser
-/// is the page's whole address, `/play/subscription` included.
+/// which is the document's base (`<base href>`: `https://play.openhearts.game/`
+/// in production, `/play/` on a preview), whatever page of the app is
+/// open. Not [Uri.base], which in a browser is the page's whole address,
+/// `/subscription` included.
 Uri _returnUrl() => appleReturnUrl(Uri.parse(((globalContext['document'] as JSObject)['baseURI'] as JSString).toDart));
 
 class _BrowserTokens implements ProviderTokens {

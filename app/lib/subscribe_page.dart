@@ -817,16 +817,18 @@ class _Point extends StatelessWidget {
 }
 
 /// The site's page [name] — `privacy` or `terms` — or where the remote
-/// config says it is. The site is the app's own origin on the web, the
-/// app being served beside it at /play; a phone's build has no origin
-/// and goes to the site's home.
+/// config says it is. On the web the site is the app's own host without
+/// its `play.` (play.openhearts.game's site is openhearts.game), or the
+/// app's own origin on a preview, which serves the app beside the site
+/// at /play/; a phone's build has no origin and goes to the site's home.
 Uri legalPage(String name, {Uri? base}) {
   final config = RemoteSettings.current.config;
   final set = name == 'privacy' ? config.privacy : config.terms;
   if (set != null) return set;
   final at = base ?? Uri.base;
   if ((at.scheme == 'https' || at.scheme == 'http') && at.host.isNotEmpty) {
-    return Uri(scheme: at.scheme, host: at.host, port: at.hasPort ? at.port : null, path: '/$name');
+    final host = at.host.startsWith('play.') ? at.host.substring('play.'.length) : at.host;
+    return Uri(scheme: at.scheme, host: host, port: at.hasPort ? at.port : null, path: '/$name');
   }
   return Uri.parse('https://openhearts.game/$name');
 }

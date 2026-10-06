@@ -4,7 +4,9 @@ What Open Hearts has in Cloudflare and Stripe, defined here and checked
 (and, when asked, applied) by script rather than kept in someone's head.
 
 - `cloudflare.mjs` — the Pages project `open-hearts` (production branch,
-  the openhearts.game domain, each environment's plain variables, the
+  its custom domains — openhearts.game for the site and
+  play.openhearts.game for the app, each with its CNAME to the project in
+  the zone's records — each environment's plain variables, the
   names of its secrets, and its bindings: KV `OH_STORE`, R2
   `OH_RECORDS`, the relay's `HOUSEHOLD` object on production only; no
   Web Analytics); the KV namespaces and the R2 buckets, production's and

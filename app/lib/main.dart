@@ -24,9 +24,10 @@ import 'ui/touch_probe.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Addresses are paths, `/play/subscription`, not `/play/#/subscription`:
-  // the site answers every address under /play with the app
-  // (service/functions/worker.mjs), and the router reads the rest.
+  // Addresses are paths, `/subscription`, not `/#/subscription`: the
+  // site's worker answers every address of play.openhearts.game (and of
+  // /play/ on a preview) with the app (service/functions/worker.mjs),
+  // and the router reads the rest.
   usePathUrlStrategy();
   // The end-to-end suite drives the app through its accessibility
   // tree, which the web build only grows on request.

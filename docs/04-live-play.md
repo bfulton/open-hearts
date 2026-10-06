@@ -586,7 +586,7 @@ it matters, with the collusion arranged in advance.
 
 ## Watching a live game
 
-A table can be watched from its address (`/play/table/ID`; `watch.dart`,
+A table can be watched from its address (`/table/ID`; `watch.dart`,
 `app/lib/net/watching.dart`). Watching is live play, so it is a
 subscription's: the watcher's device, its account's device in use, says
 on the table's watch lane that it is watching, with its licence, and
