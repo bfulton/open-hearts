@@ -80,9 +80,7 @@
     "faq": {
       "title": "Questions",
       "p1": "How do I play?",
-      "p2": "Open <a href=\"/play\">openhearts.game/play</a> and tap <i>Play solo</i>.",
-      "p3": "Is it in the App Store or Google Play?",
-      "p4": "Not yet. Add the page to your home screen to keep it handy; playing alone then works offline.",
+      "p2": "Open <a href=\"/play\">openhearts.game/play</a> and tap <i>Play solo</i>. The phone apps are coming soon to the {{appStore}} and {{googlePlay}}.",
       "p5": "How do I subscribe?",
       "p6": "Tap <i>Subscribe</i> under <i>Play live</i>. Payment is on Stripe's page. There is no account: the subscription belongs to the device, and to any you add.",
       "p7": "How do I cancel?",
@@ -101,7 +99,7 @@
       "p20": "See the <a href=\"{{base}}/privacy\">privacy policy</a>."
     },
     "rules": {
-      "title": "How do you play Hearts?",
+      "title": "What are the rules for Hearts?",
       "r1": "Four players, thirteen cards each.",
       "r2": "Pass three cards: left, right, across, then no pass.",
       "r3": "The two of clubs leads. Follow suit if you can.",

@@ -80,9 +80,7 @@
     "faq": {
       "title": "Preguntas",
       "p1": "¿Cómo se juega?",
-      "p2": "Abre <a href=\"/play\">openhearts.game/play</a> y toca <i>Jugar solo</i>.",
-      "p3": "¿Está en el App Store o en Google Play?",
-      "p4": "Todavía no. Añade la página a tu pantalla de inicio para tenerla a mano; así, jugar solo funciona sin conexión.",
+      "p2": "Abre <a href=\"/play\">openhearts.game/play</a> y toca <i>Jugar solo</i>. Las apps para móvil llegarán pronto a la {{appStore}} y a {{googlePlay}}.",
       "p5": "¿Cómo me suscribo?",
       "p6": "Toca <i>Suscribirse</i> en <i>Jugar en vivo</i>. El pago se hace en la página de Stripe. No hay cuenta: la suscripción pertenece al dispositivo, y a los que añadas.",
       "p7": "¿Cómo cancelo?",
@@ -101,7 +99,7 @@
       "p20": "Consulta la <a href=\"{{base}}/privacy\">política de privacidad</a>."
     },
     "rules": {
-      "title": "¿Cómo se juega a Corazones?",
+      "title": "¿Cuáles son las reglas de Corazones?",
       "r1": "Cuatro jugadores, trece cartas cada uno.",
       "r2": "Se pasan tres cartas: a la izquierda, a la derecha, al frente y luego sin pase.",
       "r3": "Sale el dos de tréboles. Sigue el palo si puedes.",

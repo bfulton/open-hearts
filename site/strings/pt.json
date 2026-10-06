@@ -80,9 +80,7 @@
     "faq": {
       "title": "Perguntas",
       "p1": "Como eu jogo?",
-      "p2": "Abra <a href=\"/play\">openhearts.game/play</a> e toque em <i>Jogar sozinho</i>.",
-      "p3": "Está na App Store ou no Google Play?",
-      "p4": "Ainda não. Adicione a página à tela inicial para tê-la sempre à mão; assim, jogar sozinho funciona offline.",
+      "p2": "Abra <a href=\"/play\">openhearts.game/play</a> e toque em <i>Jogar sozinho</i>. Os apps para celular chegam em breve à {{appStore}} e ao {{googlePlay}}.",
       "p5": "Como eu assino?",
       "p6": "Toque em <i>Assinar</i>, em <i>Jogar ao vivo</i>. O pagamento é feito na página da Stripe. Não existe conta: a assinatura pertence ao aparelho, e a qualquer outro que você adicionar.",
       "p7": "Como eu cancelo?",
@@ -101,7 +99,7 @@
       "p20": "Veja a <a href=\"{{base}}/privacy\">política de privacidade</a>."
     },
     "rules": {
-      "title": "Como se joga Copas?",
+      "title": "Quais são as regras de Copas?",
       "r1": "Quatro jogadores, treze cartas cada um.",
       "r2": "Passe três cartas: para a esquerda, para a direita, para a frente e, depois, sem passe.",
       "r3": "O 2 de paus abre. Siga o naipe, se puder.",

@@ -16,6 +16,8 @@
 //   {{alternates}}  <link rel="alternate"> for each language's copy
 //   {{langs}}       a link to each language's copy, the page's own marked
 //   {{langName}}    the page's language, by its own name
+//   {{appStore}}, {{googlePlay}}  the store, linked once its listing is live
+//   {{appStoreBadge}}, {{googlePlayBadge}}  a badge's link, or inactive
 //   {{> name}}      pages/_name.html, filled in the same way
 import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -24,6 +26,12 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const origin = 'https://openhearts.game';
+
+/// The apps' store listings, once they are live. Until then the site
+/// names the stores without linking them, and its badges do nothing.
+export const stores = { appStore: null, googlePlay: null };
+const storeLink = (url, name) => (url ? `<a href="${url}">${name}</a>` : name);
+const storeBadge = (url) => (url ? `href="${url}"` : 'aria-disabled="true"');
 
 export const languages = [
   { code: 'en', lang: 'en', locale: 'en_US', name: 'English' },
@@ -64,6 +72,10 @@ export function render(page, language, words) {
         `${l.code === language.code ? ' aria-current="true"' : ''}>${l.name}</a></li>`)
       .join('\n'),
     langName: language.name,
+    appStore: storeLink(stores.appStore, 'App Store'),
+    googlePlay: storeLink(stores.googlePlay, 'Google Play'),
+    appStoreBadge: storeBadge(stores.appStore),
+    googlePlayBadge: storeBadge(stores.googlePlay),
   };
   const fill = (text, depth = 0) => {
     if (depth > 4) throw new Error(`${page}: placeholders nested too deep`);

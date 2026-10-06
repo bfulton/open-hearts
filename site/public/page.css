@@ -30,6 +30,14 @@ header {
 }
 .home { display: inline-block; font-size: 14px; text-decoration: none; margin-bottom: 18px; }
 .suits { font-size: 22px; letter-spacing: 7px; margin-bottom: 12px; }
+/* A page's title on the left and the logo on the right, both the way home. */
+header.bar { text-align: left; padding: 28px 0 28px; }
+header.bar .title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+header.bar h1 { margin: 0; font-size: clamp(26px, 7vw, 40px); }
+header.bar h1 a { color: inherit; text-decoration: none; }
+header.bar .logo { flex: none; color: var(--chrome); line-height: 0; }
+header.bar .logo svg { width: 44px; height: 44px; }
+header.bar .tagline { margin: 0; max-width: none; }
 .suits .r { color: var(--red); }
 .suits .b { color: var(--chrome); opacity: .55; }
 h1 {
@@ -90,6 +98,10 @@ ul.points span { color: var(--chrome-dim); font-size: 14.5px; }
 h3[id] { scroll-margin-top: 16px; }
 h3 a.anchor { color: inherit; text-decoration: none; }
 h3 a.anchor:hover { text-decoration: underline; text-decoration-color: var(--gold); }
+.points svg { width: 22px; height: 22px; margin-top: 2px; color: var(--gold); }
+.shot { display: block; max-width: 100%; height: auto; margin-top: 12px; border-radius: 12px; }
+ul.toc { margin: 0 0 8px; padding-left: 20px; color: #CFDCD5; }
+ul.toc li { margin-bottom: 4px; }
 ol.rules { margin: 0 0 14px; padding-left: 20px; color: #CFDCD5; }
 ol.rules li { margin-bottom: 8px; }
 ul.plain { margin: 0 0 14px; padding-left: 20px; color: #CFDCD5; }

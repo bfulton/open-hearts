@@ -80,9 +80,7 @@
     "faq": {
       "title": "Fragen",
       "p1": "Wie spiele ich?",
-      "p2": "Öffne <a href=\"/play\">openhearts.game/play</a> und tippe auf <i>Allein spielen</i>.",
-      "p3": "Gibt es das im App Store oder bei Google Play?",
-      "p4": "Noch nicht. Leg die Seite auf deinen Startbildschirm, dann hast du sie immer zur Hand; allein spielen funktioniert dann auch offline.",
+      "p2": "Öffne <a href=\"/play\">openhearts.game/play</a> und tippe auf <i>Allein spielen</i>. Die Apps fürs Handy kommen bald in den {{appStore}} und zu {{googlePlay}}.",
       "p5": "Wie abonniere ich?",
       "p6": "Tippe unter <i>Live spielen</i> auf <i>Abonnieren</i>. Bezahlt wird auf der Seite von Stripe. Es gibt kein Konto: Das Abo gehört dem Gerät und allen Geräten, die du hinzufügst.",
       "p7": "Wie kündige ich?",
@@ -101,7 +99,7 @@
       "p20": "Siehe die <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>."
     },
     "rules": {
-      "title": "Wie spielt man Hearts?",
+      "title": "Was sind die Regeln von Hearts?",
       "r1": "Vier Spieler, je dreizehn Karten.",
       "r2": "Drei Karten weitergeben: nach links, nach rechts, gegenüber, dann kein Tausch.",
       "r3": "Die Kreuz 2 spielt aus. Bediene, wenn du kannst.",

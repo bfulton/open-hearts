@@ -80,9 +80,7 @@
     "faq": {
       "title": "Questions",
       "p1": "Comment jouer ?",
-      "p2": "Ouvrez <a href=\"/play\">openhearts.game/play</a> et touchez <i>Jouer seul</i>.",
-      "p3": "Le jeu est-il sur l'App Store ou Google Play ?",
-      "p4": "Pas encore. Ajoutez la page à votre écran d'accueil pour l'avoir sous la main ; le jeu en solo fonctionne alors hors ligne.",
+      "p2": "Ouvrez <a href=\"/play\">openhearts.game/play</a> et touchez <i>Jouer seul</i>. Les applications mobiles arrivent bientôt sur l'{{appStore}} et {{googlePlay}}.",
       "p5": "Comment s'abonner ?",
       "p6": "Touchez <i>S'abonner</i> sous <i>Jouer en direct</i>. Le paiement se fait sur la page de Stripe. Il n'y a pas de compte : l'abonnement appartient à l'appareil, et à ceux que vous y ajoutez.",
       "p7": "Comment résilier ?",
@@ -101,7 +99,7 @@
       "p20": "Consultez la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
     },
     "rules": {
-      "title": "Comment jouer à la Dame de pique ?",
+      "title": "Quelles sont les règles de la Dame de pique ?",
       "r1": "Quatre joueurs, treize cartes chacun.",
       "r2": "Passez trois cartes : à gauche, à droite, en face, puis pas de passe.",
       "r3": "Le 2 de trèfle entame. Fournissez la couleur demandée si vous le pouvez.",
