@@ -72,7 +72,7 @@ export const stripe = {
   /// are received, answered and ignored.
   webhooks: [
     {
-      url: 'https://openhearts.game/api/stripe',
+      url: 'https://play.openhearts.game/api/stripe',
       // The shape the worker parses; Stripe sets it only when an
       // endpoint is made.
       apiVersion: '2025-11-17.clover',

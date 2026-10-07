@@ -12,10 +12,9 @@
 // play.openhearts.localhost for play.openhearts.game. 127.0.0.1 is a
 // preview.
 //
-// What is held: an old link lands on the same page at the new host,
-// query and all, even through the offline worker the old address
-// installed; a device made at the old address is the same device at the
-// new one — its key, its licence, its name — because the frame of the
+// What is held: the old address serves nothing of the app any more,
+// and the site's host no service; a device made at the old address is
+// the same device at the new one — its key, its licence, its name — because the frame of the
 // old origin it is asked through reads that origin's own storage, not a
 // partitioned copy; a key already at the new address is never replaced;
 // a device with nothing to bring is not held up; a carry that never
@@ -63,22 +62,19 @@ function expect(ok, what) {
 
 const flows = [
   {
-    name: 'an old link is sent on to the same page at the new host, query kept',
+    name: 'the old address serves nothing of the app, and the site no service',
     async run({ app }) {
-      for (const [from, to] of [
-        ['/play', '/'],
-        ['/play/', '/'],
-        ['/play/room/ABCD2345?x=1&lang=de', '/room/ABCD2345?x=1&lang=de'],
-        ['/play/subscription?bought=1', '/subscription?bought=1'],
-      ]) {
+      for (const from of ['/play', '/play/', '/play/room/ABCD2345?x=1&lang=de', '/play/main.dart.js', '/api/health']) {
         const res = await head(app.site, from);
-        expect(res.status === 301, `${from}: ${res.status}, not 301`);
-        expect(res.location === `${app.url}${to}`, `${from} went to ${res.location}, not ${app.url}${to}`);
+        expect(res.status === 404, `${from}: ${res.status}, not 404`);
+        expect(res.location === undefined, `${from} was sent to ${res.location}`);
       }
+      const health = await head(app.url, '/api/health');
+      expect(health.status === 200, `the app's host's health: ${health.status}`);
     },
   },
   {
-    name: 'a device made at the old address is carried to the new one, through the old offline worker',
+    name: 'a device made at the old address, its offline worker installed, is carried to the new one',
     async run({ app, newContext }) {
       const context = await newContext();
       const page = await context.newPage();
@@ -98,9 +94,8 @@ const flows = [
         // hands over afresh: the service is not asked here.
         await context.route(`${app.url}/api/licence`, (route) => route.abort());
 
-        // A shared room's link, from before the move.
-        await page.goto(`${app.site}/play/room/ABCD2345?e2e=1&x=1`);
-        await until('the new host', async () => new URL(page.url()).host === new URL(app.url).host);
+        // A room at the new host.
+        await page.goto(`${app.url}/room/ABCD2345?e2e=1&x=1`);
         const at = new URL(page.url());
         expect(at.pathname === '/room/ABCD2345' && at.search === '?e2e=1&x=1', `the link landed at ${page.url()}`);
         await waitFor(page, ready, { what: 'the app at the new address', timeout: 60000 });

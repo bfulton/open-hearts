@@ -72,23 +72,20 @@ test("play.openhearts.game: the app at the root, its files from the build's /pla
   assert.match(await front.text(), /https:\/\/play\.openhearts\.game\//, "nothing rewritten on the app's host");
 });
 
-test('openhearts.game/play/… is sent on to play.openhearts.game, path and query kept', async () => {
+test('openhearts.game serves nothing of the app: /play/… is not found there', async () => {
   const { asked, env } = assets();
-  for (const [from, to] of [
-    ['https://openhearts.game/play', 'https://play.openhearts.game/'],
-    ['https://openhearts.game/play/', 'https://play.openhearts.game/'],
-    ['https://openhearts.game/play/?lang=de', 'https://play.openhearts.game/?lang=de'],
-    ['https://openhearts.game/play/room/ABCD2345?x=1&lang=fr', 'https://play.openhearts.game/room/ABCD2345?x=1&lang=fr'],
-    ['https://openhearts.game/play/subscription?bought=1', 'https://play.openhearts.game/subscription?bought=1'],
-    ['https://openhearts.game/play/table/0a1b2c3d4e5f60718293a4b5c6d7e8f9', 'https://play.openhearts.game/table/0a1b2c3d4e5f60718293a4b5c6d7e8f9'],
-    ['https://openhearts.game/play/?claim=0a1b2c3d', 'https://play.openhearts.game/?claim=0a1b2c3d'],
-    ['https://openhearts.game/play/main.dart.js', 'https://play.openhearts.game/main.dart.js'],
+  for (const from of [
+    'https://openhearts.game/play',
+    'https://openhearts.game/play/',
+    'https://openhearts.game/play/?lang=de',
+    'https://openhearts.game/play/room/ABCD2345?x=1&lang=fr',
+    'https://openhearts.game/play/main.dart.js',
   ]) {
     const res = await get(from, env);
-    assert.equal(res.status, 301, from);
-    assert.equal(res.headers.get('location'), to, from);
+    assert.equal(res.status, 404, from);
+    assert.equal(res.headers.get('location'), null, from);
   }
-  assert.deepEqual(asked, [], 'a redirect reads nothing');
+  assert.deepEqual(asked, [], 'the build under /play/ is never read from the site');
   // Not under /play: the site, as it was.
   const playground = await get('https://openhearts.game/playground', env);
   assert.equal(playground.status, 200);
@@ -133,23 +130,27 @@ test('a preview keeps the app at /play/, its base moved there, and never sends a
   assert.doesNotMatch(site, /play\.openhearts\.game/);
 });
 
-test("the rig's stand-ins: openhearts.localhost sends /play/ on to play.openhearts.localhost, port kept", async () => {
+test("the rig's stand-ins: openhearts.localhost is the site, play.openhearts.localhost the app, port kept", async () => {
   const { env } = assets();
   const res = await get('http://openhearts.localhost:8788/play/room/ABCD2345?x=1', env);
-  assert.equal(res.status, 301);
-  assert.equal(res.headers.get('location'), 'http://play.openhearts.localhost:8788/room/ABCD2345?x=1');
+  assert.equal(res.status, 404);
   const site = await (await get('http://openhearts.localhost:8788/', env)).text();
   assert.match(site, /href="http:\/\/play\.openhearts\.localhost:8788\/\?lang=de"/);
   const carry = await get('http://openhearts.localhost:8788/carry', env);
   assert.equal(carry.headers.get('content-security-policy'), 'frame-ancestors http://play.openhearts.localhost:8788');
 });
 
-test('/api/ is the handlers on every host', async () => {
+test("/api/ is the handlers on the app's host and a preview's, and not the site's", async () => {
   const { asked, env } = assets();
-  for (const host of ['openhearts.game', 'play.openhearts.game', 'dev.open-hearts.pages.dev']) {
+  for (const host of ['play.openhearts.game', 'dev.open-hearts.pages.dev']) {
     const res = await get(`https://${host}/api/nothing`, env);
     assert.equal(res.status, 404, host);
     assert.deepEqual(await res.json(), { error: 'no such handler' });
+  }
+  for (const path of ['/api/health', '/api/licence', '/api/stripe']) {
+    const res = await get(`https://openhearts.game${path}`, env);
+    assert.equal(res.status, 404, path);
+    assert.equal(await res.text(), 'not found\n', path);
   }
   assert.deepEqual(asked, []);
 });

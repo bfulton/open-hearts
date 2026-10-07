@@ -22,8 +22,8 @@ Pages project `open-hearts`:
 
 The worker routes by host ([doc 06](06-service.md#where-the-app-is)).
 In production the site is `openhearts.game` and the app is the root of
-`play.openhearts.game`, served from the build's `/play/` directory;
-`openhearts.game/play/…` redirects there, path and query kept. A preview
+`play.openhearts.game`, served from the build's `/play/` directory, with
+the handlers at its `/api/`; `openhearts.game` is the site alone. A preview
 has no play host, so it serves the same build at `/play/`, its worker
 moving the page's base there.
 
@@ -72,7 +72,7 @@ origin's storage. On its first load at `play.openhearts.game` with no key,
 those entries and writes them before the app starts, waiting 10 s at
 most for that page and 2 s for its answer ([doc 06](06-service.md#the-device-carried-over)). The old origin
 keeps its copy, so rolling back to serving the app at `/play/` loses
-nobody. `node e2e/move.mjs` drives the redirect, the carry and a preview
+nobody. `node e2e/move.mjs` drives the old address's 404s, the carry and a preview
 in a browser, on the rig's stand-ins for the two hosts
 (`openhearts.localhost` and `play.openhearts.localhost`).
 

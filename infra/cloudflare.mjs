@@ -174,7 +174,7 @@ export const zones = {
         {
           description: 'API and relay: 30 requests per 10 s per address',
           expression:
-            '(http.host in {"openhearts.game" "play.openhearts.game"} and starts_with(http.request.uri.path, "/api/") and not http.request.uri.path in {"/api/stripe" "/api/apple" "/api/play"}) or http.host eq "relay.openhearts.game"',
+            '(http.host eq "play.openhearts.game" and starts_with(http.request.uri.path, "/api/") and not http.request.uri.path in {"/api/stripe" "/api/apple" "/api/play"}) or http.host eq "relay.openhearts.game"',
           action: 'block',
           ratelimit: { characteristics: ['cf.colo.id', 'ip.src'], period: 10, requests_per_period: 30, mitigation_timeout: 10 },
           enabled: true,

@@ -145,7 +145,7 @@ test('the licence route tells of a subscriber; the answer is the same', async ()
   const ask = async () => {
     const at = Math.floor(Date.now() / 1000);
     const body = { key: ada.public, at, sig: signer.sign(ada.secret, await sha(`oh-request/1\nlicence\n${ada.public}\n${at}\n`)) };
-    return worker.fetch(new Request('https://openhearts.game/api/licence', { method: 'POST', headers: { origin: 'https://openhearts.game' }, body: JSON.stringify(body) }), env);
+    return worker.fetch(new Request('https://play.openhearts.game/api/licence', { method: 'POST', headers: { origin: 'https://play.openhearts.game' }, body: JSON.stringify(body) }), env);
   };
   assert.equal((await ask()).status, 200);
   assert.equal((await ask()).status, 200);

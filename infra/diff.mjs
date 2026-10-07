@@ -555,8 +555,19 @@ export function webhookPlan(want, have, hosts) {
   const update = [];
   const owner = [];
   const used = new Set();
+  const pathOf = (u) => {
+    try {
+      return new URL(u).pathname;
+    } catch {
+      return null;
+    }
+  };
   for (const w of want) {
-    const e = ours.find((x) => x.url === w.url);
+    // The endpoint at this address, or else one of ours at the same path
+    // on another of our hosts: moved, not made again, so its signing
+    // secret — which only the dashboard shows, once — stays the one the
+    // Pages project holds.
+    const e = ours.find((x) => x.url === w.url) ?? ours.find((x) => !used.has(x.id) && pathOf(x.url) === pathOf(w.url));
     if (!e) {
       // Its signing secret is shown once, at creation, and has to go to
       // the Pages project: that is done by hand, not by a script that
@@ -566,9 +577,10 @@ export function webhookPlan(want, have, hosts) {
     }
     used.add(e.id);
     const changes = {};
+    if (e.url !== w.url) changes.url = w.url;
     if (!sameList(w.events, e.enabled_events ?? [])) changes.enabled_events = w.events;
     if (e.status !== 'enabled') changes.disabled = false;
-    if (Object.keys(changes).length) update.push({ id: e.id, url: w.url, changes, had: { events: e.enabled_events, status: e.status } });
+    if (Object.keys(changes).length) update.push({ id: e.id, url: w.url, changes, had: { url: e.url, events: e.enabled_events, status: e.status } });
     if (w.apiVersion && e.api_version !== w.apiVersion) owner.push(`webhook to ${w.url} is on API version ${e.api_version}, defined as ${w.apiVersion}: Stripe sets it only at creation, so make a new endpoint (and its secret) to change it`);
   }
   const remove = ours.filter((e) => !used.has(e.id)).map((e) => ({ id: e.id, url: e.url }));

@@ -20,7 +20,7 @@ node e2e/run.mjs                        # four browsers at one table
 node e2e/escrow.mjs                     # one browser and three bot seats; a juror is taken off the air
 node e2e/offline.mjs                    # the network taken away a piece at a time
 node e2e/offline.mjs --only "airplane"
-node e2e/move.mjs                       # openhearts.game/play/ to play.openhearts.game: redirect, carry-over, previews
+node e2e/move.mjs                       # openhearts.game/play/ to play.openhearts.game: old address 404, carry-over, previews
 node e2e/shots.mjs                      # screenshots at docs/05's shapes, in app/build/shots/
 node e2e/longpress_copy.mjs             # long-press Copy on an iPhone user agent
 node e2e/site.mjs                       # the marketing site in each language: redirect, choice kept, fits a phone

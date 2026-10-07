@@ -566,6 +566,7 @@ async function applyStripe() {
     for (const line of plan.owner) owner(line);
     for (const u of plan.update) {
       const parts = [];
+      if (u.changes.url) parts.push(`address ${u.had.url} -> ${u.changes.url}`);
       if (u.changes.enabled_events) parts.push(`events ${u.had.events?.length ?? 0} -> ${u.changes.enabled_events.length}`);
       if ('disabled' in u.changes) parts.push(`${u.had.status} -> enabled`);
       say(`update webhook ${u.id} to ${u.url}: ${parts.join(', ')}`);

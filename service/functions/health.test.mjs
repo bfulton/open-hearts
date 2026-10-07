@@ -62,14 +62,14 @@ test('the route: 200 when up, 503 when not, never cached, GET only', async () =>
   const realFetch = globalThis.fetch;
   globalThis.fetch = stripe(401);
   try {
-    const res = await worker.fetch(new Request('https://openhearts.game/api/health'), env());
+    const res = await worker.fetch(new Request('https://play.openhearts.game/api/health'), env());
     assert.equal(res.status, 503);
     assert.equal(res.headers.get('cache-control'), 'no-store');
     assert.deepEqual(await res.json(), { ok: false, store: 'ok', stripe: 'stripe said 401' });
-    assert.equal((await worker.fetch(new Request('https://openhearts.game/api/health', { method: 'POST' }), env())).status, 405);
+    assert.equal((await worker.fetch(new Request('https://play.openhearts.game/api/health', { method: 'POST' }), env())).status, 405);
     forgetHealth();
     globalThis.fetch = stripe(200);
-    assert.equal((await worker.fetch(new Request('https://openhearts.game/api/health'), env())).status, 200);
+    assert.equal((await worker.fetch(new Request('https://play.openhearts.game/api/health'), env())).status, 200);
   } finally {
     globalThis.fetch = realFetch;
   }

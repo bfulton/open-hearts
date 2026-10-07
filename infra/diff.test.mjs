@@ -325,9 +325,9 @@ test('Pages: every custom domain has its proxied CNAME to the project in its zon
   assert.deepEqual(pagesDomainProblems({ ...pages, domains: ['play.openhearts.example'] }, zones), ['play.openhearts.example is in no zone defined here']);
 });
 
-test("rules: the API's rate limit covers /api/ on the app's host as on the site's", () => {
+test("rules: the API's rate limit covers /api/ on the app's host, the one that serves it", () => {
   const [limit] = game.rules.http_ratelimit;
-  assert.match(limit.expression, /http\.host in \{"openhearts\.game" "play\.openhearts\.game"\}/);
+  assert.match(limit.expression, /http\.host eq "play\.openhearts\.game" and starts_with\(http\.request\.uri\.path, "\/api\/"\)/);
 });
 
 // ---- the relay's wrangler.toml ------------------------------------------------
@@ -543,7 +543,7 @@ test('price: as it is; another amount is a new price', () => {
 });
 
 const liveWebhooks = () => [
-  { id: 'we_1', url: 'https://openhearts.game/api/stripe', api_version: '2025-11-17.clover', status: 'enabled', enabled_events: [...stripe.webhooks[0].events].reverse() },
+  { id: 'we_1', url: 'https://play.openhearts.game/api/stripe', api_version: '2025-11-17.clover', status: 'enabled', enabled_events: [...stripe.webhooks[0].events].reverse() },
   { id: 'we_2', url: 'https://other.example/hook', api_version: '2020-01-01', status: 'enabled', enabled_events: ['*'] },
 ];
 
@@ -559,7 +559,18 @@ test('webhooks: events and status are fixed, a stray one of ours deleted, a miss
   const plan = webhookPlan(stripe.webhooks, have, stripe.hosts);
   assert.deepEqual(plan.update.map((u) => [u.id, Object.keys(u.changes)]), [['we_1', ['enabled_events', 'disabled']]]);
   assert.deepEqual(plan.remove, [{ id: 'we_3', url: 'https://dev.open-hearts.pages.dev/api/stripe' }]);
-  assert.match(webhookPlan(stripe.webhooks, [], stripe.hosts).owner.join(), /no webhook to https:\/\/openhearts.game\/api\/stripe.*OH_STRIPE_WEBHOOK_SECRET/);
+  assert.match(webhookPlan(stripe.webhooks, [], stripe.hosts).owner.join(), /no webhook to https:\/\/play.openhearts.game\/api\/stripe.*OH_STRIPE_WEBHOOK_SECRET/);
+});
+
+test('webhooks: one of ours at the same path on another of our hosts is moved, keeping its secret', () => {
+  const have = liveWebhooks();
+  have[0].url = 'https://openhearts.game/api/stripe';
+  const plan = webhookPlan(stripe.webhooks, have, stripe.hosts);
+  assert.deepEqual(plan.update, [
+    { id: 'we_1', url: 'https://play.openhearts.game/api/stripe', changes: { url: 'https://play.openhearts.game/api/stripe' }, had: { url: 'https://openhearts.game/api/stripe', events: have[0].enabled_events, status: 'enabled' } },
+  ]);
+  assert.deepEqual(plan.remove, []);
+  assert.deepEqual(plan.owner, [], 'no new endpoint, so no new secret to set');
 });
 
 test('webhooks: another API version can only be made anew', () => {

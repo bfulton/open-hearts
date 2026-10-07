@@ -2954,15 +2954,17 @@ export function measure(env, handler, status, ms, { random = Math.random } = {})
 //
 //   play.openhearts.game   the app at the root: /room/ABCD is the build's
 //                          /play/ index, /main.dart.js its /play/main.dart.js
-//   openhearts.game        the site; /play and /play/… are sent on to the
-//                          same path at play.openhearts.game, query kept,
-//                          and /carry is the one page the app may frame
+//   openhearts.game        the site, and nothing of the app: /play/… is not
+//                          found, and /carry is the one page the app may
+//                          frame
 //   anything else          a preview (dev.open-hearts.pages.dev): the site
 //                          at the root and the app at /play/, as before,
 //                          with the app's base moved there and the site's
 //                          links to the app pointed at it
 //
-// /api/ is the handlers on every host. The app calls its own origin's.
+// /api/ is the handlers on the app's host and on a preview, and not on
+// the site's: the app calls its own origin's, and so does everything
+// else that calls the service — Stripe, the stores, the monitors.
 
 /// The app's own host.
 export const APP_HOST = 'play.openhearts.game';
@@ -3020,6 +3022,8 @@ async function linkedTo(response, app) {
   return withBody(response, page.replaceAll(`https://${APP_HOST}/`, app));
 }
 
+const notFound = () => new Response('not found\n', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
+
 /// /carry, the page that hands the device's storage on to the app at its
 /// own host (site/public/carry.html, app/web/carry.js): framed by that
 /// host and nothing else, where every other page is framed by nobody.
@@ -3031,8 +3035,7 @@ function framedBy(response, origin) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
-/// Everything that is not /api/: the site, the app, and the redirects
-/// from where the app used to be.
+/// Everything that is not /api/: the site, and the app.
 export async function serveStatic(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -3043,10 +3046,9 @@ export async function serveStatic(request, env) {
   }
   const appHost = appHostFor(url.hostname);
   if (appHost) {
-    if (path === '/play' || path.startsWith('/play/')) {
-      const to = `${url.protocol}//${appHost}${port}${path.slice('/play'.length) || '/'}${url.search}`;
-      return new Response(null, { status: 301, headers: { location: to, 'cache-control': 'no-store' } });
-    }
+    // The build's /play/ is the app's host's to serve: from here it would
+    // be the app at another origin, with no device in it.
+    if (path === '/play' || path.startsWith('/play/')) return notFound();
     const app = `${url.protocol}//${appHost}${port}`;
     const response = await env.ASSETS.fetch(request);
     if (path === '/carry' || path === '/carry.html') return framedBy(response, app);
@@ -3065,6 +3067,7 @@ export default {
     const url = new URL(request.url);
     const name = url.pathname.startsWith('/api/') ? url.pathname.slice('/api/'.length) : null;
     if (name === null) return serveStatic(request, env);
+    if (appHostFor(url.hostname)) return notFound();
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await settle(env);

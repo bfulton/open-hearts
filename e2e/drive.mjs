@@ -237,8 +237,8 @@ export const records = {
 /// this machine, and that are one site to it, as production's are:
 ///
 ///   url       http://play.openhearts.localhost:PORT   the app at the root
-///   site      http://openhearts.localhost:PORT        the site; /play/…
-///                                                     redirects to `url`
+///   site      http://openhearts.localhost:PORT        the site; nothing
+///                                                     of the app, no /api/
 ///   preview   http://127.0.0.1:PORT                   a preview: the app
 ///                                                     at /play/
 ///

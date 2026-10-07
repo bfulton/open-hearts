@@ -54,18 +54,15 @@ handlers. The worker routes by host (`serveStatic` in `worker.mjs`):
 | Host | `/api/…` | Everything else |
 |---|---|---|
 | `play.openhearts.game` | the handlers | the app at the root: a file from the build's `/play/` directory (`/main.dart.js` is `/play/main.dart.js`), and any address with no extension (`/`, `/room/ABCD`, `/subscription`, `/table/<id>`) the app's page |
-| `openhearts.game` | the handlers | the site. `/play` and `/play/…` answer **301** to the same path at `play.openhearts.game`, query kept (`/play/room/ABCD?x` → `https://play.openhearts.game/room/ABCD?x`), with `no-store` so a browser does not keep it for good and a rollback stays possible. `/carry` is the one page excepted (below) |
+| `openhearts.game` | **404** | the site, and nothing of the app: `/play` and `/play/…` are **404**, since serving the build from there would be the app at another origin, with no device in it. `/carry` is the one page the app may frame (below) |
 | a preview, `*.open-hearts.pages.dev` | the handlers | the site at the root and the app at `/play/`, as before the move: the worker moves the page's `<base href="/">` to `/play/` and points the site's links to `https://play.openhearts.game/` at the preview's own `/play/`. A preview never sends anyone to production |
 
-The app is built once, with base `/` (`deploy.sh`). Old links in the
-wild — shared rooms and their QR codes, table links, Stripe's return
-addresses for a checkout opened before the move, a claim link in an
-email, bookmarks and home-screen installs — all go through the redirect
-and land on the same page. The offline worker an old visit installed at
-`openhearts.game/play/` is network-first, so a navigation it handles
-gets the 301 from the network and the browser follows it
-(`e2e/move.mjs` checks this); offline, it opens the last build at the
-old address, with that address's own data.
+The app is built once, with base `/` (`deploy.sh`). Links from before
+the move (`openhearts.game/play/…`) are not sent on: there were none in
+anyone else's hands. The offline worker an old visit installed at
+`openhearts.game/play/` is network-first, so online it passes the 404
+through; offline, it opens the last build at the old address, with that
+address's own data.
 
 **The app calls the handlers on its own origin.** Every address the app
 makes for the service is its page's origin plus `/api/<name>`
@@ -83,13 +80,16 @@ the three things that care about origins as simple as they were:
   with no list of other origins to accept. The billing portal's return
   is the same.
 - Signed requests carry no cookie and no session, so nothing depends
-  on which host a device calls. A device whose page is still open at the
-  old address keeps calling `openhearts.game/api/…`, which answers it.
+  on which host a device calls.
 
-The rate limit on `/api/` covers both hosts (`infra/cloudflare.mjs`).
+Everything else that calls the service calls it there too: Stripe's
+webhook (`infra/stripe.mjs`), the App Store's and Google Play's
+notifications, and the health monitor (`observability/`). The site's
+host answers no handler, so there is one address for the service, and
+the rate limit on `/api/` is on that host (`infra/cloudflare.mjs`).
 Sign in with Apple's return address is the document's base, so it is
-`https://play.openhearts.game/`; the old `https://openhearts.game/play/`
-stays registered on the Services ID for a page still open there. The
+`https://play.openhearts.game/`, and the Services ID names only that
+host and that address. The
 relay checks no `Origin` header, so it needs nothing for the new host.
 
 ### The device, carried over

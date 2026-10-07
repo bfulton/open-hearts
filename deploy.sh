@@ -241,7 +241,7 @@ echo
 echo "site  https://$LABEL.$PROJECT.pages.dev/"
 echo "app   https://$LABEL.$PROJECT.pages.dev/play/"
 if [ "$LABEL" = main ]; then
-  echo "      https://play.openhearts.game/ (production; openhearts.game/play/ redirects there)"
+  echo "      https://play.openhearts.game/ (production, and its /api/)"
 fi
 if [ -f "$SHUFFLE_WASM" ]; then
   echo "bench https://$LABEL.$PROJECT.pages.dev/measure/shuffle/"
