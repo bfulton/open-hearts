@@ -330,6 +330,15 @@ test("rules: the API's rate limit covers /api/ on the app's host, the one that s
   assert.match(limit.expression, /http\.host eq "play\.openhearts\.game" and starts_with\(http\.request\.uri\.path, "\/api\/"\)/);
 });
 
+test("rules: the webhooks are left out of the API's rate limit, and nothing else is", () => {
+  const [limit] = game.rules.http_ratelimit;
+  const left = /not http\.request\.uri\.path in \{([^}]*)\}/.exec(limit.expression)?.[1];
+  // Stripe's, the App Store's, Sign in with Apple's and Play's
+  // (service/functions/worker.mjs): each sent again in bursts from few
+  // addresses, and each checked by its sender's signature.
+  assert.deepEqual(left?.match(/"[^"]*"/g), ['"/api/stripe"', '"/api/apple"', '"/api/apple-id"', '"/api/play"']);
+});
+
 // ---- the relay's wrangler.toml ------------------------------------------------
 
 test('toml: tables, arrays of tables, inline tables, comments', () => {

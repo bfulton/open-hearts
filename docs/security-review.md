@@ -55,6 +55,15 @@ allow-listed algorithms (RS256, ES256), checking issuer, audience
 (one of a configured list), expiry, subject and nonce. A malformed token is a 401, never a 500. Only
 an HMAC of the subject (`OH_ID_HMAC`) is stored.
 
+Sign in with Apple's notifications (`apple-id`) are checked against the
+same key set, issuer and audiences, and an expiry (a day from `iat` when
+the token gives none). They must carry an `events` claim with a type and
+a subject, so an ID token posted there does nothing. All one can do is
+unlink the Apple sign-in it names from its account. A replay unlinks it
+again, which is nothing, so no `jti` is kept. The account's devices,
+backup codes and subscription are not touched, so the person is never
+locked out by it.
+
 ## Licences
 
 A licence is domain-separated (`oh-licence/1`), never runs past what
@@ -166,8 +175,9 @@ frame (`service/do/ws.test.mjs`).
 - **Body limits.** 16 KB for every handler, 2 MiB for a game record,
   512 KB for Stripe's webhook.
 - **Rate limits.** A Cloudflare rule limits `/api/*` (except the
-  payment webhooks) and the relay host to 30 requests per 10 seconds per
-  address (`infra/cloudflare.mjs`). An unsigned or wrongly signed request
+  webhooks: Stripe's, the stores' and Sign in with Apple's) and the
+  relay host to 30 requests per 10 seconds per address
+  (`infra/cloudflare.mjs`). An unsigned or wrongly signed request
   costs a parse and one signature check and touches no storage.
 - **No SSRF.** Every outbound fetch goes to a fixed host: Cloudflare's
   TURN API, Stripe, Apple's and Google's key sets and Play's API, and the

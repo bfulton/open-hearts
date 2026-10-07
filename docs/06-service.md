@@ -36,6 +36,7 @@ None of it is in a game's latency path.
 | `backups` | POST, signed | shows, replaces or emails the account's backup codes |
 | `profile` | POST, signed | reads the account's profile, or writes it from the account's device in use ([below](#the-accounts-profile)) |
 | `attest`, `supersede` | POST, signed | links an Apple/Google sign-in to the device's account, or brings the device into the account a sign-in is linked to |
+| `apple-id` | POST, Apple-signed | Sign in with Apple's server-to-server notifications: unlinks a sign-in its person stopped using with the app, or whose Apple Account is deleted ([below](#when-apple-says-a-sign-in-is-gone)) |
 | `turn` | POST, signed | Cloudflare Realtime TURN credentials for a subscribed device |
 | `record` | POST, signed | keeps a finished game's record |
 | `review` | POST, signed | a finished game's record, for an account's device in use that is not at that table |
@@ -85,7 +86,8 @@ the three things that care about origins as simple as they were:
 
 Everything else that calls the service calls it there too: Stripe's
 webhook (`infra/stripe.mjs`), the App Store's and Google Play's
-notifications, and the health monitor (`observability/`). The site's
+notifications, Sign in with Apple's, and the health monitor
+(`observability/`). The site's
 host answers no handler, so there is one address for the service, and
 the rate limit on `/api/` is on that host (`infra/cloudflare.mjs`).
 Sign in with Apple's return address is the document's base, so it is
@@ -270,7 +272,9 @@ can drop another or open the billing portal.
   subject (`OH_ID_HMAC`) is stored. Google's audience is
   `google.webClientId`; Apple's are `apple.bundleId` and
   `apple.servicesId`, since Apple's token names the bundle id on an
-  iPhone and the Services ID on the web.
+  iPhone and the Services ID on the web. When Apple says a person has
+  stopped using it with the app, the sign-in is unlinked
+  ([below](#when-apple-says-a-sign-in-is-gone)).
 
   The app (`app/lib/net/sign_in.dart`, `provider_tokens.dart`) offers
   Apple on iOS and the web and Google on Android and the web, each only
@@ -307,7 +311,7 @@ the Pages project as `HOUSEHOLD` (production only) and to the relay
 worker under the same name. Without the binding, as in the tests and
 previews, an in-memory queue in the isolate does the same. An account
 is limited to 20 changes, 60 reads, 600 activations and 30 profile
-writes an hour.
+writes an hour, and Apple's unlinks to 20 of their own.
 
 **Before accounts.** A subscription from before accounts is made an
 account the first time any of its devices, its store or Stripe is heard
@@ -320,6 +324,48 @@ the worker moves anything the old one added in between. Nobody's
 subscription is lost. A sign-in linked before accounts named a device;
 it is read as that device's account. Codes made before are for ten
 minutes, and are gone.
+
+### When Apple says a sign-in is gone
+
+Sign in with Apple tells `apple-id` when a person stops using it with the
+app (in their Apple Account's settings, Sign in with Apple, Stop Using)
+or deletes their Apple Account, and when they turn forwarding to a
+hidden address on or off. Apple posts `{"payload": <JWT>}`. The token is
+checked as an ID token is, against the same key set
+(`appleid.apple.com/auth/keys`): issuer `https://appleid.apple.com`, one
+of our Apple audiences (Apple names the primary App ID,
+`game.openhearts`), and its date — past its `exp`, or, with none, more
+than a day after its `iat`, it is refused. Its `events` claim, a JSON
+string as it arrives or the object Apple's page shows, must give a
+`type` and the person's `sub`, so a sign-in's ID token, which is signed
+the same way for the same audience, does nothing here. Anything that
+does not check out is a 400.
+
+- **`consent-revoked`, `account-deleted`** (Apple's page once said
+  `account-delete`; both are taken): the sign-in found by the HMAC of
+  `sub` is unlinked, in its account's turn, where it was linked: its
+  `LOGIN#apple#…` row and the account's `LOGIN` row are deleted. It
+  brings no device in after that (`supersede` answers 404), and the
+  account can be linked again, to it or to another sign-in. Nothing
+  else changes: the account stays, with its devices and backup codes,
+  which still bring devices in, and its subscription, which is the
+  store's or Stripe's to end.
+- **`email-disabled`, `email-enabled`**: we hold no email from Apple, so
+  nothing changes.
+
+Anything authentic is answered 200, whatever its type, so Apple does not
+send it again; an unlink that could not be done is a 503, to be done when
+it comes again. Nothing is kept to spot a notice seen before (`jti`): one
+sent again only unlinks what is already unlinked. It is quiet: the
+operator is not mailed, and `measure` counts it as `apple-id`. Without
+the Apple identifiers or `OH_ID_HMAC` it answers 503.
+
+The address is registered by hand on Apple's developer site:
+Certificates, Identifiers & Profiles → Identifiers → the App ID
+`game.openhearts` → Sign In with Apple → Edit → Server-to-Server
+Notification Endpoint, `https://play.openhearts.game/api/apple-id`. Like
+the other webhooks it is left out of the rate limit on `/api/`
+(`infra/cloudflare.mjs`).
 
 ### One device at a time
 
@@ -666,9 +712,10 @@ container. The image is built from the repository on every relay deploy
 
 The `Household` object is the relay worker's, built from
 `service/functions/worker.mjs`. A change to what an account's turn can be
-asked (such as `profile`) deploys the relay first, then the site: the
-other way round, the new handler asks an object that does not know the
-question yet, which answers 400 and the app asks again later.
+asked (such as `profile`, or `unlink` for `apple-id`) deploys the relay
+first, then the site: the other way round, the new handler asks an
+object that does not know the question yet, which answers 400 and the
+app asks again later (Apple is answered 503).
 
 Pages secrets: `OH_SERVICE_SECRET`, `OH_ID_HMAC`, `OH_STRIPE_SECRET` (a
 restricted key), `OH_STRIPE_WEBHOOK_SECRET`, `OH_TURN_API_TOKEN`, and

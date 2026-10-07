@@ -168,13 +168,13 @@ export const zones = {
         },
       ],
       // The one rate-limit rule the Free plan allows.
-      // Stores' and Stripe's webhooks are left out: their retries come in
-      // bursts from few addresses.
+      // The webhooks are left out — Stripe's, the stores' and Sign in
+      // with Apple's: their retries come in bursts from few addresses.
       http_ratelimit: [
         {
           description: 'API and relay: 30 requests per 10 s per address',
           expression:
-            '(http.host eq "play.openhearts.game" and starts_with(http.request.uri.path, "/api/") and not http.request.uri.path in {"/api/stripe" "/api/apple" "/api/play"}) or http.host eq "relay.openhearts.game"',
+            '(http.host eq "play.openhearts.game" and starts_with(http.request.uri.path, "/api/") and not http.request.uri.path in {"/api/stripe" "/api/apple" "/api/apple-id" "/api/play"}) or http.host eq "relay.openhearts.game"',
           action: 'block',
           ratelimit: { characteristics: ['cf.colo.id', 'ip.src'], period: 10, requests_per_period: 30, mitigation_timeout: 10 },
           enabled: true,

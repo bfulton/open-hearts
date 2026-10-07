@@ -1585,6 +1585,8 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
     }
     case 'attest':
       return attest(op.who, op.key, store, op.login, { now });
+    case 'unlink':
+      return unlinkSignIn(op.account, op.login, store);
     case 'activate':
       return activate(op, store, active, { now, revoke });
     case 'seen':
@@ -1598,14 +1600,20 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
   }
 }
 
+/// Which of the hour's allowances [op] is counted against. An unlink is
+/// Apple's word, not the person's, and has an allowance of its own (the
+/// size of the changes'), so the person's own changes never stand in
+/// its way.
 const kindOf = (op) =>
   op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
     ? 'active'
     : op.op === 'profile' && op.profile
       ? 'profile'
-      : op.op === 'list' || op.op === 'profile' || (op.op === 'backups' && op.rotate !== true)
-        ? 'read'
-        : 'change';
+      : op.op === 'unlink'
+        ? 'unlink'
+        : op.op === 'list' || op.op === 'profile' || (op.op === 'backups' && op.rotate !== true)
+          ? 'read'
+          : 'change';
 
 /// Tells the relay's object for each of [tags] that [account]'s device
 /// in use is now the one of [epoch], so it closes the sockets of any
@@ -2184,6 +2192,132 @@ async function signInRoute(request, env, move) {
   // has just proved who it is should not have to ask twice.
   const licensed = await licence(key, env, { signer, open: openHouse(env, request) });
   return json(request, 200, { ...out, ...(licensed.status === 200 ? licensed.body : {}) });
+}
+
+// ---- when Apple says a sign-in is gone -----------------------------------
+// Sign in with Apple tells the app's server when a person stops using it
+// with the app (their Apple Account's settings, Sign in with Apple, Stop
+// Using) or deletes their Apple Account, and when they turn forwarding
+// to a hidden address on or off. Apple POSTs {"payload": <JWT>} to the
+// address registered on the primary App ID, signed with the keys it
+// signs ID tokens with, for that App ID as its audience, and with an
+// `events` claim — a JSON string, as it arrives, or the object Apple's
+// own page shows — holding the type, the person's subject and when.
+//
+// A sign-in that is gone is unlinked from its account: it no longer
+// brings a device in, and the account can be linked again. That is all.
+// The account stays, with its devices and its backup codes, which still
+// bring devices in, and with its subscription, which is the store's or
+// Stripe's to end. We hold no email from Apple, so the notices about
+// forwarding change nothing here.
+//
+// Nothing is kept to spot a notice seen before (its jti): one sent again,
+// by Apple or by anybody holding a copy, only unlinks what is already
+// unlinked.
+
+/// The types after which the person's Apple identity no longer signs in
+/// to this app. Apple's page names the deletion `account-deleted`; it
+/// once said `account-delete`, and both are taken.
+const APPLE_ID_GONE = new Set(['consent-revoked', 'account-deleted', 'account-delete']);
+
+/// How long a notice is good for when its token gives no expiry: the
+/// day Apple's own carry.
+const APPLE_ID_NOTICE_S = 24 * 60 * 60;
+
+/// What a Sign in with Apple notification says, once its token has
+/// checked out against Apple's published keys, its issuer, one of our
+/// audiences and its date: {type, sub}. Null when it is not that — a
+/// forgery, somebody else's app's, run out, or a token that is not a
+/// notification at all, such as an ID token from a sign-in, which is
+/// signed by the same keys for the same audience but carries no events.
+export async function appleIdNotice(payload, env, fetchImpl = fetch, { now = Date.now() } = {}) {
+  const audiences = String(env[PROVIDERS.apple.audience] ?? '').split(',').map((a) => a.trim()).filter(Boolean);
+  if (!audiences.length) return null;
+  const claims = await jwtOf('apple', payload, fetchImpl, { now });
+  if (!claims) return null;
+  if (claims.iss !== PROVIDERS.apple.iss) return null;
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!aud.some((a) => audiences.includes(a))) return null;
+  const until = typeof claims.exp === 'number' ? claims.exp : typeof claims.iat === 'number' ? claims.iat + APPLE_ID_NOTICE_S : null;
+  if (until === null || until * 1000 <= now) return null;
+  let events = claims.events;
+  if (typeof events === 'string') {
+    try {
+      events = JSON.parse(events);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof events?.type !== 'string' || typeof events.sub !== 'string' || !events.sub) return null;
+  return { type: events.type, sub: events.sub };
+}
+
+/// [login] taken off [account], in the account's turn: the row it is
+/// found by, and the account's note of it, so the account is free to be
+/// linked again — to the same sign-in, if the person signs in with it
+/// again. {status: 200, body: {unlinked}}, whether anything was there to
+/// take; unlinking twice is nothing the second time.
+export async function unlinkSignIn(account, login, store) {
+  if (!isAccount(account) || typeof login !== 'string' || !/^LOGIN#[a-z]+#[0-9a-f]{64}$/.test(login)) {
+    return { status: 400, body: { error: 'not a sign-in' } };
+  }
+  let unlinked = false;
+  // Apple's word is about the identity, wherever it is linked, so its
+  // row goes whatever it names.
+  if (await store.get(login, 'IDENTITY')) {
+    await store.del(login, 'IDENTITY');
+    unlinked = true;
+  }
+  if ((await store.get(`ACCOUNT#${account}`, 'LOGIN'))?.login === login) {
+    await store.del(`ACCOUNT#${account}`, 'LOGIN');
+    unlinked = true;
+  }
+  return { status: 200, body: { unlinked } };
+}
+
+/// [login] unlinked from the account it is linked to: in that account's
+/// turn, since linking it is done in that turn too.
+async function unlinkFromAccount(env, store, login) {
+  if (!(await store.get(login, 'IDENTITY'))) return { status: 200, body: { unlinked: false } };
+  const account = await linkedAccount(store, login);
+  // A link from before accounts, to a device that is now in none, has
+  // no turn to run in and nothing on an account's side to take away.
+  if (!account) {
+    await store.del(login, 'IDENTITY');
+    return { status: 200, body: { unlinked: true } };
+  }
+  return inHousehold(env, account, { op: 'unlink', account, login });
+}
+
+/// Sign in with Apple's server-to-server notifications. Answered 200
+/// once it has been read, whatever its type, so Apple does not send it
+/// again; 400 when it is not Apple's; 503 when what it asks could not be
+/// done, so that if Apple sends it again it is done then. Quiet: the
+/// operator is not mailed, and the line `measure` writes, under this
+/// handler's name, is the count.
+async function appleIdRoute(request, env) {
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
+  // One token of a kilobyte or so: an ordinary request's bound is room
+  // and to spare.
+  const raw = await textOf(request, MOST_BODY);
+  if (raw === null) return json(request, 413, { error: 'too big' });
+  if (!env[PROVIDERS.apple.audience]) return json(request, 503, { error: 'sign-in is not set up yet' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  let payload;
+  try {
+    ({ payload } = JSON.parse(raw));
+  } catch {
+    return json(request, 400, { error: 'not signed' });
+  }
+  const notice = await appleIdNotice(payload, env);
+  if (!notice) return json(request, 400, { error: 'not signed' });
+  if (!APPLE_ID_GONE.has(notice.type)) return json(request, 200, { unlinked: null });
+  const login = await loginRow({ provider: 'apple', sub: notice.sub }, env);
+  if (!login) return json(request, 503, { error: 'sign-in is not configured' });
+  const done = await unlinkFromAccount(env, store, login);
+  if (done.status !== 200) return json(request, 503, { error: 'not unlinked yet' });
+  return json(request, 200, done.body);
 }
 
 async function checkoutRoute(request, env) {
@@ -3126,6 +3260,7 @@ const ROUTES = {
   profile: (request, env) => profileRoute(request, env),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),
+  'apple-id': (request, env) => appleIdRoute(request, env),
   activate: (request, env) => activateRoute(request, env),
   record: (request, env) => recordRoute(request, env),
   review: (request, env) => reviewRoute(request, env),
