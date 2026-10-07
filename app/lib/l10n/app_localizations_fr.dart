@@ -1071,6 +1071,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get paste => 'Coller';
 
   @override
+  String get pasteByHand =>
+      'Impossible de lire le presse-papiers ici. Touchez longuement le champ du code, puis choisissez Coller.';
+
+  @override
   String get scanCode => 'Scanner un code';
 
   @override

@@ -3067,7 +3067,11 @@ export default {
     const url = new URL(request.url);
     const name = url.pathname.startsWith('/api/') ? url.pathname.slice('/api/'.length) : null;
     if (name === null) return serveStatic(request, env);
-    if (appHostFor(url.hostname)) return notFound();
+    // Said in the handlers' own way, so an app still open at the old
+    // address shows it rather than "could not reach the service".
+    if (appHostFor(url.hostname)) {
+      return Response.json({ error: `the service has moved to ${appHostFor(url.hostname)}` }, { status: 404, headers: { 'cache-control': 'no-store' } });
+    }
     const route = Object.hasOwn(ROUTES, name) ? ROUTES[name] : null;
     const started = Date.now();
     if (route) await settle(env);

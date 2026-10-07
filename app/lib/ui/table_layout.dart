@@ -137,6 +137,13 @@ class TableLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The table is played by touch, not read: a card held a moment, or a
+    // seat's badge, is not text to select (ui/selection.dart), and the
+    // browser's Select All bubble over the hand is only in the way.
+    return SelectionContainer.disabled(child: _laidOut(context));
+  }
+
+  Widget _laidOut(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final roomy = isRoomy(constraints);

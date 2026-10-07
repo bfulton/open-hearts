@@ -12,6 +12,14 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('a text field taking focus is never small enough for Safari to zoom into', () {
+    final page = File('web/index.html').readAsStringSync();
+    for (final where in ['flt-semantics input', 'flt-text-editing-host input', 'input.flt-text-editing']) {
+      expect(page, contains(where));
+    }
+    expect(page, contains('font-size: 16px !important;'));
+  });
+
   test('the page asks for the device\'s width, and lets the reader zoom it', () {
     final head = File('web/index.html').readAsStringSync();
     final meta = RegExp(r'<meta name="viewport" content="([^"]*)">').firstMatch(head);
@@ -89,7 +97,8 @@ void main() {
     expect(script, contains('event.origin !== site || event.source !== frame.contentWindow'));
     expect(script, isNot(contains("'*'")));
     // Quickly, and never over a key that is here.
-    expect(script, contains('const WAIT_MS = 1500;'));
+    expect(script, contains('const LOAD_MS = 10000;'));
+    expect(script, contains('const ANSWER_MS = 2000;'));
     expect(script, contains("if (storage.getItem(KEY) !== null) return 'kept';"));
     expect(script, contains("const KEY = 'flutter.identity_secret';"));
     // The key the app keeps is the one carried (identity.dart).

@@ -16,6 +16,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:table/table.dart';
 
 import '../l10n/l10n.dart';
@@ -127,6 +128,54 @@ String? backupCodeOf(String text) {
   final plain = text.toUpperCase().replaceAll(RegExp(r'[\s-]'), '').replaceAll('O', '0').replaceAll(RegExp('[IL]'), '1');
   if (!RegExp(r'^[0-9A-HJKMNP-TV-Z]{16}$').hasMatch(plain)) return null;
   return [for (var i = 0; i < 16; i += 4) plain.substring(i, i + 4)].join('-');
+}
+
+/// [text] as the code field shows it: a backup code in its groups of
+/// four, XXXX-XXXX-XXXX-XXXX, as far as it has been typed; anything else
+/// — a device's thirty-two-character code, a link — as it is.
+String codeAsTyped(String text) {
+  if (!_codeSoFar(text)) return text;
+  final plain = text.toUpperCase().replaceAll(RegExp(r'[\s-]'), '');
+  return [for (var i = 0; i < plain.length; i += 4) plain.substring(i, i + 4 > plain.length ? plain.length : i + 4)].join('-');
+}
+
+/// Whether [text] could be a backup code typed so far: up to sixteen
+/// letters and digits, with spaces and dashes anywhere.
+bool _codeSoFar(String text) {
+  final plain = text.toUpperCase().replaceAll(RegExp(r'[\s-]'), '');
+  return plain.isNotEmpty && plain.length <= 16 && RegExp(r'^[0-9A-Z]+$').hasMatch(plain);
+}
+
+/// The code field's dashes, put in as a backup code is typed or pasted,
+/// with the cursor kept after the same characters it was after. Deleting
+/// a dash deletes the character before it, so backspace never sticks.
+class CodeFormatter extends TextInputFormatter {
+  const CodeFormatter();
+
+  static String _plain(String s) => s.replaceAll(RegExp(r'[\s-]'), '');
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue old, TextEditingValue next) {
+    var text = next.text;
+    var cursor = next.selection.isValid ? next.selection.extentOffset : text.length;
+    // A dash and nothing else taken out: take the character before it too.
+    if (_codeSoFar(old.text) && text.length < old.text.length && _plain(text) == _plain(old.text) && cursor > 0) {
+      final before = _plain(text.substring(0, cursor));
+      final kept = before.isEmpty ? '' : before.substring(0, before.length - 1);
+      text = kept + _plain(text.substring(cursor));
+      cursor = kept.length;
+    } else {
+      cursor = _plain(text.substring(0, cursor.clamp(0, text.length))).length;
+    }
+    final shown = codeAsTyped(text);
+    if (shown == text && text == next.text) return next;
+    // The cursor after as many of the code's own characters as before.
+    var at = 0;
+    for (var seen = 0; at < shown.length && seen < cursor; at++) {
+      if (shown[at] != '-' && shown[at].trim().isNotEmpty) seen++;
+    }
+    return TextEditingValue(text: shown, selection: TextSelection.collapsed(offset: at));
+  }
 }
 
 /// A subscription's backup codes, as a device on it is shown them.

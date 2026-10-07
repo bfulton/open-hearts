@@ -46,6 +46,17 @@
       touch-action: manipulation;
       overscroll-behavior: none;
     }
+    /* Safari on a phone zooms the page into any text field whose type is
+       smaller than 16px as it takes focus, and in an app added to the
+       home screen there is nothing to zoom it back out with: the table
+       is left cut off at the edges. The fields the browser focuses are
+       Flutter's own, invisible — the app draws what is seen — so their
+       size changes nothing on the screen. The reader can still zoom. */
+    flt-semantics input, flt-semantics textarea,
+    flt-text-editing-host input, flt-text-editing-host textarea,
+    input.flt-text-editing, textarea.flt-text-editing {
+      font-size: 16px !important;
+    }
   </style>
   <title>Open Hearts</title>
   <link rel="manifest" href="manifest.json">

@@ -150,7 +150,7 @@ test("/api/ is the handlers on the app's host and a preview's, and not the site'
   for (const path of ['/api/health', '/api/licence', '/api/stripe']) {
     const res = await get(`https://openhearts.game${path}`, env);
     assert.equal(res.status, 404, path);
-    assert.equal(await res.text(), 'not found\n', path);
+    assert.deepEqual(await res.json(), { error: 'the service has moved to play.openhearts.game' }, path);
   }
   assert.deepEqual(asked, []);
 });

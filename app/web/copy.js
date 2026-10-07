@@ -51,4 +51,35 @@
     pending = text;
     return write(text);
   };
+
+  // Pasting is the other way round, and Safari holds it to the same
+  // rule — above all in an app added to the home screen. So the app asks
+  // here, and the clipboard is read in the tap's own touchend or click;
+  // with no such event soon (a key pressed, a browser that allows it
+  // anyway) it is read at once. Null when it cannot be read: the app then
+  // leaves the person to paste by hand.
+  var asked = null;
+  function read() {
+    var a = asked;
+    asked = null;
+    if (!a) return;
+    clearTimeout(a.timer);
+    if (!navigator.clipboard || !navigator.clipboard.readText) return a.resolve(null);
+    navigator.clipboard.readText().then(
+      function (text) { a.resolve(typeof text === 'string' ? text : null); },
+      function () { a.resolve(null); }
+    );
+  }
+  document.addEventListener('touchend', read, true);
+  document.addEventListener('click', read, true);
+
+  window.ohPaste = function () {
+    return new Promise(function (resolve) {
+      if (asked) {
+        clearTimeout(asked.timer);
+        asked.resolve(null);
+      }
+      asked = { resolve: resolve, timer: setTimeout(read, 400) };
+    });
+  };
 })();

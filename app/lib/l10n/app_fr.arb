@@ -224,6 +224,7 @@
   "activateBody": "Ajoutez cet appareil à un abonnement que vous avez déjà. Scannez le code qu'un autre de vos appareils affiche sous Abonnement, ou tapez ou collez un code : celui-là, ou un code de secours reçu par e-mail.",
   "code": "Code",
   "paste": "Coller",
+  "pasteByHand": "Impossible de lire le presse-papiers ici. Touchez longuement le champ du code, puis choisissez Coller.",
   "scanCode": "Scanner un code",
   "activate": "Activer",
   "activated": "Le jeu en direct est ouvert sur cet appareil.",

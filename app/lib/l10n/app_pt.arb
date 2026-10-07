@@ -224,6 +224,7 @@
   "activateBody": "Traga este dispositivo para uma assinatura que você já tem. Escaneie o código que outro dispositivo seu mostra em Assinatura, ou digite ou cole um código: esse, ou um código de backup do e-mail.",
   "code": "Código",
   "paste": "Colar",
+  "pasteByHand": "Não foi possível ler a área de transferência aqui. Toque e segure o campo do código e escolha Colar.",
   "scanCode": "Escanear um código",
   "activate": "Ativar",
   "activated": "O jogo ao vivo está aberto neste dispositivo.",

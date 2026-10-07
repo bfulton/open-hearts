@@ -1070,6 +1070,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get paste => 'Colar';
 
   @override
+  String get pasteByHand =>
+      'Não foi possível ler a área de transferência aqui. Toque e segure o campo do código e escolha Colar.';
+
+  @override
   String get scanCode => 'Escanear um código';
 
   @override

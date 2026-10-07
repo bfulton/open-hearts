@@ -1073,6 +1073,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get paste => 'Pegar';
 
   @override
+  String get pasteByHand =>
+      'Aquí no se pudo leer el portapapeles. Mantén pulsado el campo del código y elige Pegar.';
+
+  @override
   String get scanCode => 'Escanear un código';
 
   @override

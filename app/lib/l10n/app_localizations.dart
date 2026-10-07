@@ -1448,6 +1448,12 @@ abstract class AppLocalizations {
   /// **'Paste'**
   String get paste;
 
+  /// Shown when the Paste button could not read the clipboard (Safari in an app added to the home screen): how to paste by hand, with the system's own Paste.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t read the clipboard here. Touch and hold the code field, then choose Paste.'**
+  String get pasteByHand;
+
   /// Button: open the camera to scan another device's code.
   ///
   /// In en, this message translates to:

@@ -224,6 +224,7 @@
   "activateBody": "Añade este dispositivo a una suscripción que ya tienes. Escanea el código que otro de tus dispositivos muestra en Suscripción, o escribe o pega un código: ese, o un código de respaldo del correo.",
   "code": "Código",
   "paste": "Pegar",
+  "pasteByHand": "Aquí no se pudo leer el portapapeles. Mantén pulsado el campo del código y elige Pegar.",
   "scanCode": "Escanear un código",
   "activate": "Activar",
   "activated": "El juego en vivo está abierto en este dispositivo.",

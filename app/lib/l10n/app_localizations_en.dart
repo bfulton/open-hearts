@@ -1065,6 +1065,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get paste => 'Paste';
 
   @override
+  String get pasteByHand =>
+      'Couldn\'t read the clipboard here. Touch and hold the code field, then choose Paste.';
+
+  @override
   String get scanCode => 'Scan a code';
 
   @override

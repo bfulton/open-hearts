@@ -9,12 +9,12 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'net/copy.dart';
 import 'net/household.dart';
 import 'pages.dart';
 import 'theme.dart';
@@ -32,21 +32,30 @@ class ActivatePage extends StatefulWidget {
 
 class _ActivatePageState extends State<ActivatePage> {
   final _field = TextEditingController();
+  final _focus = FocusNode();
   bool _working = false;
   String? _refusal;
 
   @override
   void dispose() {
     _field.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
   Future<void> _paste() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = data?.text?.trim();
-    if (text == null || text.isEmpty || !mounted) return;
+    final text = (await pasteText())?.trim();
+    if (!mounted) return;
+    if (text == null || text.isEmpty) {
+      // The browser would not hand it over (Safari, in an app added to the
+      // home screen): the field takes a paste of the system's own.
+      _focus.requestFocus();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.pasteByHand, textAlign: TextAlign.center)));
+      return;
+    }
+    final shown = codeAsTyped(text);
     setState(() {
-      _field.text = text;
+      _field.value = TextEditingValue(text: shown, selection: TextSelection.collapsed(offset: shown.length));
       _refusal = null;
     });
   }
@@ -55,7 +64,7 @@ class _ActivatePageState extends State<ActivatePage> {
     setState(() => _refusal = null);
     final read = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const _ScanPage()));
     if (read == null || !mounted) return;
-    _field.text = read;
+    _field.text = codeAsTyped(read);
     await _activate();
   }
 
@@ -115,7 +124,9 @@ class _ActivatePageState extends State<ActivatePage> {
                   const SizedBox(height: 18),
                   TextField(
                     controller: _field,
+                    focusNode: _focus,
                     enabled: !_working,
+                    inputFormatters: const [CodeFormatter()],
                     autocorrect: false,
                     enableSuggestions: false,
                     textCapitalization: TextCapitalization.characters,

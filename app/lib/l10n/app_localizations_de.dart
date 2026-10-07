@@ -1081,6 +1081,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get paste => 'Einfügen';
 
   @override
+  String get pasteByHand =>
+      'Die Zwischenablage ließ sich hier nicht lesen. Halte das Codefeld gedrückt und wähle Einfügen.';
+
+  @override
   String get scanCode => 'Code scannen';
 
   @override

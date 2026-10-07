@@ -1277,6 +1277,10 @@
   "@paste": {
     "description": "Button: paste from the clipboard into the code field."
   },
+  "pasteByHand": "Couldn't read the clipboard here. Touch and hold the code field, then choose Paste.",
+  "@pasteByHand": {
+    "description": "Shown when the Paste button could not read the clipboard (Safari in an app added to the home screen): how to paste by hand, with the system's own Paste."
+  },
   "scanCode": "Scan a code",
   "@scanCode": {
     "description": "Button: open the camera to scan another device's code."

@@ -224,6 +224,7 @@
   "activateBody": "Hol dieses Gerät in ein Abo, das du schon hast. Scanne den Code, den ein anderes deiner Geräte unter Abo zeigt, oder tippe oder füge einen Code ein: diesen oder einen Backup-Code aus der E-Mail.",
   "code": "Code",
   "paste": "Einfügen",
+  "pasteByHand": "Die Zwischenablage ließ sich hier nicht lesen. Halte das Codefeld gedrückt und wähle Einfügen.",
   "scanCode": "Code scannen",
   "activate": "Aktivieren",
   "activated": "Live-Spiel ist auf diesem Gerät offen.",
