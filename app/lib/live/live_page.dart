@@ -4,6 +4,8 @@
 /// why — and what leaving means: a bot takes the seat.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:engine/engine.dart' as engine;
@@ -15,6 +17,7 @@ import '../feedback_page.dart';
 import '../l10n/l10n.dart';
 import '../live_controller.dart';
 import '../pages.dart';
+import '../reaction_mute.dart';
 import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
@@ -22,6 +25,7 @@ import '../ui/hand_fan.dart';
 import '../ui/gone.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
+import '../ui/reactions.dart';
 import '../net/copy.dart';
 import '../net/in_use.dart';
 import '../net/share.dart';
@@ -46,6 +50,8 @@ class _LivePageState extends State<LivePage> {
     super.initState();
     _c.addListener(_changed);
     InUse.current.addListener(_steppedBack);
+    // Whether this device hides the others' reactions, as it was left.
+    unawaited(ReactionMute.current.load());
   }
 
   /// Another device of the account took it up, at this table's expense
@@ -95,6 +101,14 @@ class _LivePageState extends State<LivePage> {
     if (await shareLink(link)) return;
     await copyText(link.toString());
     if (mounted) _say(context.l10n.linkCopied);
+  }
+
+  /// The reactions to send (ui/reactions.dart), and the one picked said
+  /// for this player — by this device, the account's device in use: one
+  /// the account has been taken up from has already left its seat.
+  Future<void> _pickReaction() async {
+    final picked = await pickReaction(context);
+    if (picked != null && mounted && !InUse.current.elsewhere) _c.react(picked);
   }
 
   void _say(String message) {
@@ -341,7 +355,13 @@ class _LivePageState extends State<LivePage> {
                 ),
                 // Who is here, in the felt's corner: the felt keeps it
                 // clear of the seat across the table.
-                felt: TableView(controller: _c, onHold: _aboutPicture, corner: _presence(context)),
+                felt: TableView(
+                  controller: _c,
+                  onHold: _aboutPicture,
+                  corner: _presence(context),
+                  // Beside the player's own badge, while they sit here.
+                  react: _c.canReact && !InUse.current.elsewhere ? ReactionButton(onPressed: _pickReaction) : null,
+                ),
                 below: _debugState(),
                 action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
                 hand: (landscape) => HandFan(

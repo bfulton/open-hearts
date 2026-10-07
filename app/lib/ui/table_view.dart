@@ -14,6 +14,7 @@ import '../theme.dart';
 import 'card_view.dart';
 import 'pip.dart';
 import 'player_icon.dart';
+import 'reactions.dart';
 import 'scaled.dart';
 import '../l10n/l10n.dart';
 
@@ -93,7 +94,7 @@ const _wideTrickOffset = <int, Offset>{
 bool turnPillBreathes = true;
 
 class TableView extends StatelessWidget {
-  const TableView({super.key, required this.controller, this.onHold, this.corner});
+  const TableView({super.key, required this.controller, this.onHold, this.corner, this.react});
 
   final TableModel controller;
 
@@ -105,6 +106,12 @@ class TableView extends StatelessWidget {
   /// A line in the felt's top corner, where the page has one — at a
   /// live table, who is here — and the colour it is said in.
   final ({String text, Color tone})? corner;
+
+  /// The player's way to react, beside their own badge, where the page
+  /// has one: at a live table they sit at, the button that opens the
+  /// reactions (ui/reactions.dart). Their own reaction takes its place
+  /// while it shows, and the button is back when it goes.
+  final Widget? react;
 
   @override
   Widget build(BuildContext context) {
@@ -306,12 +313,74 @@ class TableView extends StatelessWidget {
         final slack = (box.height - cluster).clamp(0.0, double.infinity);
         final above = noteRow + (slack > _roomToSpare ? slack * 0.7 : slack / 2);
 
+        // A seat's reaction while it shows (ui/reactions.dart), beside
+        // its badge in room nothing else is drawn in, and never over a
+        // card: across the felt, to the left of the far badge; at the
+        // sides, over the right-hand badge and under the left-hand one,
+        // each in the strip its badge stands in, so the two run off into
+        // opposite corners and neither meets the seats across; and at
+        // the near edge the player's own, in the place of the button
+        // that sent it, on the far side of the badge from the left-hand
+        // seat's. Drawn at the table's scale, as big as the room lets it
+        // be. The tail points at the badge.
+        final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+        Widget shows(Widget? child) => AnimatedSwitcher(
+              duration: still ? Duration.zero : const Duration(milliseconds: 180),
+              child: child ?? const SizedBox.shrink(),
+            );
+        Widget? bubble(int position, AxisDirection tail) {
+          final seat = controller.seatAt(position);
+          final shown = controller.reactionAt(seat);
+          if (shown == null) return null;
+          return Scaled(
+            key: ValueKey(shown.n),
+            scale: scale,
+            child: ReactionBubble(reaction: shown.reaction, name: controller.nameAlone(seat), tail: tail),
+          );
+        }
+
+        // The line in the corner, where it shares a row with the far
+        // seat — beside it, on a wide felt — is room the far seat's
+        // reaction keeps clear of; and where it runs across the top of
+        // the felt, the right-hand seat's keeps under it.
+        final noteBottom = edge + noteSize.height;
+        final northReserve = note != null && beside && noteBottom > above && edge < above + line ? noteSize.width + badgeGap : 0.0;
+        final eastTop = note != null && noteSize.width > sideOut ? noteBottom + badgeGap : edge;
+        // How far the side seats' reactions may run: over the right-hand
+        // badge up to the top of the felt, and under the left-hand one
+        // down past the near seat's row — the player's own reaction and
+        // the button are on the other side of it. On a wide felt the far
+        // and near badges may run as wide as the side strips, and the two
+        // keep to the trick's own rows.
+        final trickTop = above + line + gap;
+        final eastUp = wide ? gap : math.max(0.0, trickTop - eastTop);
+        final westDown = wide ? gap : gap + line;
+
+        // The player's own corner: the button, or their reaction.
+        final mine = bubble(0, wide ? AxisDirection.right : AxisDirection.left) ?? (react == null ? null : Scaled(scale: scale, child: react!));
+
         final table = Padding(
           padding: EdgeInsets.symmetric(horizontal: edge),
           child: Column(
             children: [
               SizedBox(height: above),
-              seat(2),
+              // The far badge holds the middle, as it always has, and its
+              // reaction comes in on the left of it.
+              SizedBox(
+                height: line,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(left: northReserve, right: badgeGap),
+                        child: Align(alignment: Alignment.centerRight, child: shows(bubble(2, AxisDirection.right))),
+                      ),
+                    ),
+                    seat(2),
+                    const Expanded(child: SizedBox.shrink()),
+                  ],
+                ),
+              ),
               SizedBox(height: gap),
               SizedBox(
                 height: trickBox.height,
@@ -319,8 +388,34 @@ class TableView extends StatelessWidget {
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    Positioned(right: sideOut, top: 0, bottom: 0, child: Center(child: seat(1))),
-                    Positioned(left: sideOut, top: 0, bottom: 0, child: Center(child: seat(3))),
+                    Positioned(
+                      right: sideOut,
+                      width: sideRoom,
+                      top: 0,
+                      bottom: -westDown,
+                      child: _SideSeat(
+                        badge: seat(1),
+                        bubble: shows(bubble(1, AxisDirection.up)),
+                        home: Rect.fromLTWH(0, 0, sideRoom, trickBox.height),
+                        anchoredRight: true,
+                        up: false,
+                        gap: badgeGap,
+                      ),
+                    ),
+                    Positioned(
+                      left: sideOut,
+                      width: sideRoom,
+                      top: -eastUp,
+                      bottom: 0,
+                      child: _SideSeat(
+                        badge: seat(3),
+                        bubble: shows(bubble(3, AxisDirection.down)),
+                        home: Rect.fromLTWH(0, eastUp, sideRoom, trickBox.height),
+                        anchoredRight: false,
+                        up: true,
+                        gap: badgeGap,
+                      ),
+                    ),
                     Align(alignment: Alignment.center, child: trick),
                   ],
                 ),
@@ -331,13 +426,19 @@ class TableView extends StatelessWidget {
                 // the other side of it, so the badge holds the middle
                 // whether or not there is anything to say. In the
                 // badge's row: a wide felt has no height to give it a
-                // row of its own.
+                // row of its own. The room on the other side is the
+                // player's own corner.
                 SizedBox(
                   height: line,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Expanded(child: SizedBox.shrink()),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(right: badgeGap),
+                          child: Align(alignment: Alignment.centerRight, child: shows(mine)),
+                        ),
+                      ),
                       seat(0),
                       Expanded(
                         child: Align(
@@ -352,7 +453,23 @@ class TableView extends StatelessWidget {
                   ),
                 )
               else ...[
-                seat(0),
+                // The near badge holds the middle too, and the player's
+                // own corner is beside it.
+                SizedBox(
+                  height: line,
+                  child: Row(
+                    children: [
+                      const Expanded(child: SizedBox.shrink()),
+                      seat(0),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(left: badgeGap),
+                          child: Align(alignment: Alignment.centerLeft, child: shows(mine)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 // The room under the near seat, with the line the table
                 // says in the middle of it: the action line has the row
                 // against the hand (table_layout.dart).
@@ -411,6 +528,73 @@ class TableView extends StatelessWidget {
     }
     return null;
   }
+}
+
+/// A side badge where it has always been — held against its card by
+/// its inner edge, in the middle of the trick's height ([home]) — and
+/// its reaction beside it, over or under it in the strip the badge
+/// stands in, as far as this box runs: the felt gives the box the room
+/// past the trick that the reaction may have (TableView).
+class _SideSeat extends StatelessWidget {
+  const _SideSeat({
+    required this.badge,
+    required this.bubble,
+    required this.home,
+    required this.anchoredRight,
+    required this.up,
+    required this.gap,
+  });
+
+  final Widget badge;
+  final Widget bubble;
+  final Rect home;
+
+  /// Which side of the strip the badge holds to: the one against the
+  /// trick.
+  final bool anchoredRight;
+
+  /// Whether the reaction goes over the badge, rather than under it.
+  final bool up;
+  final double gap;
+
+  @override
+  Widget build(BuildContext context) => CustomMultiChildLayout(
+        delegate: _SideSeatLayout(home: home, anchoredRight: anchoredRight, up: up, gap: gap),
+        children: [
+          LayoutId(id: _SideSeatLayout.badge, child: badge),
+          LayoutId(id: _SideSeatLayout.bubble, child: bubble),
+        ],
+      );
+}
+
+class _SideSeatLayout extends MultiChildLayoutDelegate {
+  _SideSeatLayout({required this.home, required this.anchoredRight, required this.up, required this.gap});
+
+  static const badge = 'badge';
+  static const bubble = 'bubble';
+
+  final Rect home;
+  final bool anchoredRight;
+  final bool up;
+  final double gap;
+
+  @override
+  void performLayout(Size size) {
+    final b = layoutChild(badge, BoxConstraints.loose(home.size));
+    final at = Offset(anchoredRight ? home.right - b.width : home.left, home.top + (home.height - b.height) / 2);
+    positionChild(badge, at);
+    // From a gap off the badge to the end of the box, the strip's width.
+    final top = up ? 0.0 : at.dy + b.height + gap;
+    final bottom = up ? at.dy - gap : size.height;
+    final r = layoutChild(bubble, BoxConstraints.loose(Size(size.width, math.max(0.0, bottom - top))));
+    // Over or under the middle of the badge, inside the strip.
+    final x = (at.dx + b.width / 2 - r.width / 2).clamp(0.0, math.max(0.0, size.width - r.width)).toDouble();
+    positionChild(bubble, Offset(x, up ? bottom - r.height : top));
+  }
+
+  @override
+  bool shouldRelayout(_SideSeatLayout old) =>
+      old.home != home || old.anchoredRight != anchoredRight || old.up != up || old.gap != gap;
 }
 
 /// The middle of the felt: four slots that hold their place, whatever

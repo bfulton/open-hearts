@@ -10,6 +10,7 @@ import 'package:flutter/material.dart' hide Card;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
 import 'package:open_hearts/net/record_check.dart';
+import 'package:open_hearts/net/watching.dart';
 import 'package:engine/engine.dart' show Card, Phase, twoOfClubs;
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/theme.dart';
@@ -135,7 +136,7 @@ void main() {
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     GameRecord? kept;
-    final views = StreamController<WatchedTable>();
+    final views = StreamController<Watched>();
     final hands = checked.whereType<HandChecked>().toList();
     final verdict = checked.last as RecordChecked;
     final checking = StreamController<RecordCheck>();
@@ -161,7 +162,7 @@ void main() {
           plays: plays,
           toPlay: toPlay,
         );
-    views.add(view(10, Phase.playing, [(seat: 2, card: twoOfClubs)], toPlay: 3));
+    views.add(Viewed(view(10, Phase.playing, [(seat: 2, card: twoOfClubs)], toPlay: 3)));
     await tester.pump();
     expect(find.text('Live'), findsOneWidget);
     expect(find.text('Hand 1  ·  Pass left'), findsOneWidget);
@@ -170,13 +171,13 @@ void main() {
     expect(find.bySemanticsLabel('2 of clubs, Cy'), findsOneWidget);
 
     // A card later: the same trick, one more card.
-    views.add(view(11, Phase.playing, [(seat: 2, card: twoOfClubs), (seat: 3, card: Card.parse('KC'))], toPlay: 0));
+    views.add(Viewed(view(11, Phase.playing, [(seat: 2, card: twoOfClubs), (seat: 3, card: Card.parse('KC'))], toPlay: 0)));
     await tester.pump();
     expect(find.text('Ada to play'), findsOneWidget);
     expect(find.bySemanticsLabel('king of clubs, Dee'), findsOneWidget);
 
     // Over: the record is asked for until it is kept, then checked and shown.
-    views.add(view(400, Phase.gameOver, const [], totals: const [12, 55, 30, 8]));
+    views.add(Viewed(view(400, Phase.gameOver, const [], totals: const [12, 55, 30, 8])));
     await tester.pump();
     await tester.pump(ReviewPage.recordAgain);
     kept = played;

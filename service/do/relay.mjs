@@ -766,13 +766,62 @@ export const resultsTag = 'results';
 /// folded by the service rather than by every device.
 export const storedKeep = (tag) => (tag === resultsTag ? 20000 : 2000);
 
+/// A player's quick reaction at a live table (packages/table,
+/// reactions.dart): 👍, 😬 and the rest, as a short code and the moment
+/// it was said at, `{"react":"nice","hand":2,"turn":17}`. Ephemeral, so
+/// forwarded and forgotten like the table's own events; never free
+/// text, so there is nothing in one to read but its shape.
+export const reactionKind = 24248;
+
+/// The longest a reaction's content is, in characters: some thirty
+/// is what one says.
+export const reactionMost = 128;
+
+/// What a table's tag is (packages/table, spec.dart, newTableId): the
+/// only tag a reaction rides.
+const tableTag = /^[0-9a-f]{32}$/;
+
+/// Why this [tag]'s object does not carry [event], a reaction, or null
+/// when it does: on a table's own tag, tagged with that table and
+/// nothing else, small, and the shape a reaction is. The codes are
+/// not listed here — a screen shows only those it knows — so a new one
+/// needs no relay to learn it; the shape is what keeps words out.
+export function reactionRefusal(tag, event) {
+  if (!tableTag.test(tag)) return 'blocked: a reaction rides a table\'s own tag';
+  const [t, ...rest] = event.tags ?? [];
+  if (rest.length || !t || t.length !== 2 || t[0] !== 't' || t[1] !== tag) return `blocked: a reaction is tagged with its table, ${tag}, and nothing else`;
+  if (event.content.length > reactionMost) return 'invalid: too big for a reaction';
+  let said = null;
+  try {
+    said = JSON.parse(event.content);
+  } catch {
+    // Not JSON: not a reaction.
+  }
+  const shaped =
+    !!said &&
+    typeof said === 'object' &&
+    !Array.isArray(said) &&
+    Object.keys(said).length === 3 &&
+    typeof said.react === 'string' &&
+    /^[a-z]{1,16}$/.test(said.react) &&
+    Number.isInteger(said.hand) &&
+    said.hand >= 0 &&
+    said.hand <= 9999 &&
+    Number.isInteger(said.turn) &&
+    said.turn >= 0 &&
+    said.turn <= 52;
+  return shaped ? null : 'invalid: a reaction is a code and the moment it was said at';
+}
+
 /// What a tag's object refuses. Presence: anything but the ephemeral
 /// kinds. A table's or a lobby's tag: anything but the ephemeral kinds
 /// and the lobby kind tagged for this very tag — an object stores what
 /// belongs to it, and nobody writes into one tag's store through
-/// another's.
+/// another's. And a reaction anywhere but a table's own tag, or in any
+/// shape but a reaction's ([reactionRefusal]).
 export function refusalFor(tag) {
   return (event) => {
+    if (event.kind === reactionKind) return reactionRefusal(tag, event);
     if (ephemeral(event.kind)) return null;
     if (tag !== presenceTag && event.kind === lobbyKind && event.tags?.some((t) => t[0] === 't' && t[1] === tag)) return null;
     return tag === presenceTag

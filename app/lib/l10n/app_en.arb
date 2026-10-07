@@ -1588,5 +1588,34 @@
   "autoOffered": "Nothing you hold can change this hand now. Auto plays it out for you.",
   "@autoOffered": {
     "description": "Said aloud when the Auto switch appears beside the hand."
+  },
+  "reaction": "{code, select, nice{Nice} ha{Ha} wow{Wow} ouch{Ouch} sorry{Sorry} gg{Good game} other{…}}",
+  "@reaction": {
+    "description": "A quick reaction a player at a live table sends, shown beside their emoji in a bubble by their seat and in the picker. One or two short words. code is nice (👍), ha (😂), wow (😮), ouch (😬), sorry (🙏) or gg (👋, good game).",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "reactionSaid": "{name}: {reaction}",
+  "@reactionSaid": {
+    "description": "What a screen reader says when another player's reaction appears beside their seat: the player's name and the reaction's word, as in 'Bonnie: Nice'.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "reaction": {
+        "type": "String"
+      }
+    }
+  },
+  "react": "React",
+  "@react": {
+    "description": "The speech-bubble button beside the player's own seat at a live table, which opens the reactions to send; what a screen reader calls it."
+  },
+  "hideReactions": "Hide others' reactions",
+  "@hideReactions": {
+    "description": "A switch, under the reactions to send and under a game being watched: stops other players' reactions showing on this device."
   }
 }

@@ -7,9 +7,14 @@ library;
 import 'package:flutter/foundation.dart';
 
 import 'package:engine/engine.dart';
+import 'package:table/table.dart' show Reaction;
 
 import 'avatar.dart';
 import 'l10n/l10n.dart';
+
+/// A reaction showing at a seat, and which of this screen's it is: a
+/// second 👍 from the same seat is a new bubble, said aloud again.
+typedef SeatReaction = ({Reaction reaction, int n});
 
 abstract class TableModel implements Listenable {
   HeartsGame get game;
@@ -80,6 +85,16 @@ abstract class TableModel implements Listenable {
 
   /// The player's own switch. On, and their turn is played at once.
   void setAutoPlay(bool on) {}
+
+  /// The reaction showing beside [seat]'s badge (packages/table,
+  /// reactions.dart), for a moment after its player sent it; null at
+  /// every other moment, and always at a solo table, where bots do not
+  /// react.
+  SeatReaction? reactionAt(int seat) => null;
+
+  /// [seat]'s name as a sentence says it, without a rating beside it:
+  /// "Bonnie: Nice".
+  String nameAlone(int seat) => names[seat];
 
   /// Where a seat sits on screen: 0 is the player at the bottom, then
   /// clockwise — 1 left, 2 across, 3 right.

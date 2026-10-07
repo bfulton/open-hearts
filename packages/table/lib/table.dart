@@ -23,6 +23,7 @@ export 'src/nostr.dart';
 export 'src/presence_relay.dart';
 export 'src/pace.dart';
 export 'src/rating.dart';
+export 'src/reactions.dart';
 export 'src/record.dart';
 export 'src/results.dart';
 export 'src/schnorr_native.dart';

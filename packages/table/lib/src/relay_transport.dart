@@ -23,11 +23,12 @@ import 'dart:typed_data';
 import 'nip44.dart';
 import 'nostr.dart';
 import 'presence_relay.dart' show relaysForTag;
+import 'reactions.dart';
 import 'relays.dart';
 import 'signing.dart';
 import 'transport.dart';
 
-class RelayTransport implements Transport {
+class RelayTransport implements Transport, ReactionLane {
   RelayTransport(
       {required List<Uri> relays,
       required this.signer,
@@ -37,13 +38,16 @@ class RelayTransport implements Transport {
       int refusalMs = RelayGroup.defaultRefusalMs,
       bool watchOnly = false})
       : relays = Relays.turnedBy(relaysForTag(relays, table), table, pinned: pinned) {
-    final watch = const Filter(kinds: [TableKinds.watch]).toJson()..['#t'] = [table];
+    // The watch lane, and the players' reactions beside it: both are for
+    // anyone looking at the table, watching it or seated at it.
+    final watch = const Filter(kinds: [TableKinds.watch, TableKinds.react]).toJson()..['#t'] = [table];
     _group = RelayGroup(
       urls: this.relays,
       refusalMs: refusalMs,
       auth: relayAuthFor(signer),
-      // Someone watching (watch.dart) reads the watch lane and nothing
-      // else: not the table's own traffic, which is not theirs to carry.
+      // Someone watching (watch.dart) reads the watch lane, with the
+      // players' reactions on it, and nothing else: not the table's own
+      // traffic, which is not theirs to carry.
       subscriptions: watchOnly ? {'watch': [watch]} : {
         'table': [
           watch,
@@ -92,6 +96,7 @@ class RelayTransport implements Transport {
   final _signals = StreamController<Signal>.broadcast();
   final _lobby = StreamController<NostrEvent>.broadcast();
   final _watch = StreamController<({PublicKey from, Map<String, Object?> content})>.broadcast();
+  final _reactions = StreamController<HeardReaction>.broadcast();
 
   /// Resolves once some relay has acknowledged the subscription.
   Future<void> get ready => _group.ready;
@@ -134,6 +139,23 @@ class RelayTransport implements Transport {
       ['t', table],
     ]), everywhere: true);
   }
+
+  /// Says a reaction (reactions.dart) on every relay, as the watch lane
+  /// is said: a watcher reads whichever it reaches. A relay that turns
+  /// it away is not taken to be refusing the table's own events
+  /// ([RelayGroup.publish], `aside`) — a reaction is nothing the table
+  /// waits on.
+  @override
+  void sayReaction(String content) {
+    _group.publish(NostrEvent.sign(signer, kind: TableKinds.react, content: content, tags: [
+      ['t', table],
+    ]), everywhere: true, aside: true);
+  }
+
+  /// Everyone else's reactions, as they arrive, not yet believed: the
+  /// screen holds each to [ReactionRules].
+  @override
+  Stream<HeardReaction> get reactions => _reactions.stream;
 
   /// Every lobby event received so far, in order.
   final List<NostrEvent> lobbySoFar = [];
@@ -227,6 +249,9 @@ class RelayTransport implements Transport {
   /// not remembered and
   /// the real event under it still gets in.
   bool _onEvent(Map<String, Object?> raw) {
+    // A reaction nobody here shows — a juror's client, say — is not
+    // worth its signature.
+    if (raw['kind'] == TableKinds.react && !_reactions.hasListener) return true;
     final e = NostrEvent.parse(raw, verifySignature: raw['kind'] != TableKinds.table);
     if (e == null || e.tag('t') != table) return false;
     if (e.kind == TableKinds.lobby || e.kind == TableKinds.waiting) {
@@ -239,6 +264,8 @@ class RelayTransport implements Transport {
       try {
         _watch.add((from: e.pubkey, content: Map<String, Object?>.from(jsonDecode(e.content) as Map)));
       } catch (_) {}
+    } else if (e.kind == TableKinds.react) {
+      _reactions.add((from: e.pubkey, id: e.id, createdAt: e.createdAt, content: e.content));
     } else if (e.kind == TableKinds.table) {
       try {
         final message = Map<String, Object?>.from(jsonDecode(e.content) as Map);
@@ -271,6 +298,7 @@ class RelayTransport implements Transport {
     _signals.close();
     _lobby.close();
     _watch.close();
+    _reactions.close();
   }
 }
 

@@ -297,6 +297,10 @@ class RelayGroup {
 
   /// Waiting to hear whether an event was taken: see [taken].
   final Map<String, Completer<bool>> _taking = {};
+
+  /// Events published [publish] `aside`, whose refusal is nobody's
+  /// business but theirs: the newest few hundred, oldest first.
+  final _aside = <String>{};
   final _refusals = StreamController<String?>.broadcast();
   String? _refusal;
   Timer? _sweeper;
@@ -338,8 +342,22 @@ class RelayGroup {
   /// written to is the first in order among those, and when none of
   /// them is up and taking events the event goes to every relay that
   /// is, since a relay nobody can read is no place for it.
-  void publish(NostrEvent e, {bool everywhere = false, Set<Uri>? readBy}) {
+  ///
+  /// [aside]: what becomes of [e] is its own business. A relay that
+  /// turns it away is not taken to be refusing this client — not kept
+  /// out of the running for [refusalMs], not said under the felt — since
+  /// the table waits on nothing like it: a player's reaction
+  /// (reactions.dart). Gone is gone; it is not tried anywhere else.
+  void publish(NostrEvent e, {bool everywhere = false, Set<Uri>? readBy, bool aside = false}) {
     if (_closed) return;
+    if (aside) {
+      _aside.add(e.id);
+      if (_aside.length > 200) _aside.remove(_aside.first);
+      for (final c in connections) {
+        if (c.connected && (_refusedUntil[c.url] ?? 0) <= _nowMs) c.publish(e);
+      }
+      return;
+    }
     final now = _nowMs;
     final upUrls = [for (final c in connections) if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c.url];
     if (floodWrite(upUrls, readBy, everywhere: everywhere)) {
@@ -403,6 +421,12 @@ class RelayGroup {
         final id = m[1] as String;
         final reason = m.length > 3 ? '${m[3]}' : '';
         final taken = m[2] == true || reason.startsWith('duplicate:');
+        // Every relay it went to answers for itself, so it stays marked
+        // until the newest few hundred have pushed it out.
+        if (_aside.contains(id)) {
+          if (!taken) log?.call('${from.url} refused ${id.substring(0, 8)}, said aside: $reason');
+          return;
+        }
         final p = _pending.remove(id);
         final flood = _flooded[id];
         if (taken) {

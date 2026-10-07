@@ -30,6 +30,7 @@ import 'package:table/table.dart';
 import 'avatar.dart';
 import 'l10n/l10n.dart';
 import 'pictures.dart';
+import 'reaction_mute.dart';
 import 'table_model.dart';
 
 class LiveController extends ChangeNotifier implements TableModel {
@@ -50,7 +51,13 @@ class LiveController extends ChangeNotifier implements TableModel {
     this.paced = true,
     this.canPlayAgain = false,
     TableJournal? journal,
+    ReactionLane? reactions,
+    ValueListenable<bool>? reactionMute,
+    int Function()? reactionClock,
   })  : _crypto = crypto,
+        _lane = reactions,
+        _mute = reactionMute ?? ReactionMute.current,
+        _reactionRules = ReactionRules(now: reactionClock),
         client = TableClient(
             spec: spec,
             signer: signer,
@@ -71,6 +78,8 @@ class LiveController extends ChangeNotifier implements TableModel {
       client.writesRefused = reason != null;
       if (!_disposed) notifyListeners();
     });
+    _heardReactions = reactions?.reactions.listen(_heardReaction);
+    _mute.addListener(_muteChanged);
     client.start();
   }
 
@@ -818,6 +827,88 @@ class LiveController extends ChangeNotifier implements TableModel {
   Verification verification() => verifyRecord(client.spec, client.record,
       allowPartial: !client.done, juries: client.juries, crypto: _crypto, releases: client.releases);
 
+  // ---- reactions ---------------------------------------------------------
+  // A seated player's 👍, shown for a moment beside their badge here and
+  // on every other screen at the table and watching it (packages/table,
+  // reactions.dart). Nothing of it reaches the client: it is said on a
+  // lane of its own, beside the table's events and never among them, so
+  // no turn, clock or jury can be moved by one.
+
+  /// Where this table's reactions are said and heard; null where there
+  /// are none.
+  final ReactionLane? _lane;
+  final ReactionRules _reactionRules;
+  StreamSubscription<HeardReaction>? _heardReactions;
+
+  /// Whether this device hides the others' reactions (reaction_mute.dart).
+  final ValueListenable<bool> _mute;
+
+  /// What is showing at each seat, and when it goes.
+  final Map<int, ({SeatReaction shown, Timer gone})> _reacting = {};
+  int _reactions = 0;
+
+  /// Whether this player may react: seated in person at a table that
+  /// carries reactions, and the seat not given up — which a device the
+  /// account was taken up from has done (live/live_page.dart), so only
+  /// the device in use says one. Through to the last trick: a good game
+  /// is said as it ends.
+  bool get canReact => _lane != null && client.amSeated && !_left;
+
+  /// Says [reaction] for this player, and shows it beside their badge:
+  /// at most one every [ReactionRules.gap], and nothing in between.
+  void react(Reaction reaction) {
+    final seat = client.mySeat;
+    if (!canReact || seat == null) return;
+    // The moment it is about, as this screen shows it: the hand, and how
+    // many of its cards have been seen played.
+    final content = _reactionRules.say(reaction, hand: _shown.handNumber, turn: _shownPlayed.length);
+    if (content == null) return;
+    _lane!.sayReaction(content);
+    _showReaction(seat, reaction);
+  }
+
+  /// Somebody else's, as it arrives: shown if it is a reaction from a
+  /// seat held in person here now, by the device holding it, about this
+  /// hand or the one either side, lately, and not too soon after their
+  /// last. A bot's seat has no key to say one with.
+  void _heardReaction(HeardReaction heard) {
+    if (_disposed) return;
+    final seated = {
+      for (final (seat, holder) in client.holders.indexed)
+        if (holder is HumanSeat && seat != client.mySeat) holder.key: seat,
+    };
+    final shown = _reactionRules.hear(heard, seated: seated, hand: client.game.handNumber);
+    if (shown != null) _showReaction(shown.seat, shown.reaction);
+  }
+
+  void _showReaction(int seat, Reaction reaction) {
+    _reacting.remove(seat)?.gone.cancel();
+    _reacting[seat] = (
+      shown: (reaction: reaction, n: ++_reactions),
+      gone: Timer(ReactionRules.shownFor, () {
+        _reacting.remove(seat);
+        if (!_disposed) notifyListeners();
+      }),
+    );
+    notifyListeners();
+  }
+
+  void _muteChanged() {
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Muted, nobody else's: this player's own still shows, since it is
+  /// what they did.
+  @override
+  SeatReaction? reactionAt(int seat) {
+    final shown = _reacting[seat]?.shown;
+    if (shown == null || (seat != client.mySeat && _mute.value)) return null;
+    return shown;
+  }
+
+  @override
+  String nameAlone(int seat) => _plainName(seat);
+
   @override
   void dispose() {
     _disposed = true;
@@ -825,6 +916,11 @@ class LiveController extends ChangeNotifier implements TableModel {
     _sheetTimer?.cancel();
     _sub?.cancel();
     _refusals?.cancel();
+    _heardReactions?.cancel();
+    _mute.removeListener(_muteChanged);
+    for (final r in _reacting.values) {
+      r.gone.cancel();
+    }
     pictures?.removeListener(_pictured);
     // Nothing here reacts to the table any more, whichever way this
     // goes; only the socket waits, and only for a leave that is still

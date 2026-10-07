@@ -176,9 +176,10 @@ class Filter {
   }
 }
 
-/// The kinds the table uses. Ephemeral, all of them: a relay forwards
-/// them to whoever is listening and keeps nothing, and the table's own
-/// repeat-and-catch-up is what recovers a dropped message.
+/// The kinds the table uses. Ephemeral, all of them but the lobby: a
+/// relay forwards them to whoever is listening and keeps nothing, and
+/// the table's own repeat-and-catch-up is what recovers a dropped
+/// message.
 abstract final class TableKinds {
   /// A table event (events.dart) as the content, tagged `t` with the
   /// table id. Signed by the sender, who may be relaying.
@@ -208,6 +209,12 @@ abstract final class TableKinds {
   /// table id: a watcher saying it is there, or a seated player's view
   /// of the table for whoever is.
   static const watch = 24247;
+
+  /// A seated player's quick reaction (reactions.dart), tagged `t` with
+  /// the table id and signed by the seat's own device: one of a fixed
+  /// few codes, shown for a moment beside their badge on every screen at
+  /// the table and every screen watching it, and outside the record.
+  static const react = 24248;
 
   /// A device answering a relay that asks who it is (NIP-42's kind):
   /// the relay's challenge, and what the service gave the device to

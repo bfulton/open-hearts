@@ -33,10 +33,13 @@ import 'net/game_records.dart';
 import 'net/in_use.dart';
 import 'net/record_check.dart';
 import 'net/watching.dart';
+import 'reaction_mute.dart';
 import 'subscribe_page.dart';
+import 'table_model.dart' show SeatReaction;
 import 'theme.dart';
 import 'ui/pip.dart';
 import 'ui/player_icon.dart';
+import 'ui/reactions.dart';
 
 class ReviewPage extends StatefulWidget {
   const ReviewPage({super.key, required this.table, this.load = gameShownHere, this.check, this.watch});
@@ -54,7 +57,7 @@ class ReviewPage extends StatefulWidget {
 
   /// How a game still being played is watched: [watchTable] unless a
   /// test says otherwise.
-  final Stream<WatchedTable> Function(String table)? watch;
+  final Stream<Watched> Function(String table)? watch;
 
   /// How often a game just over is asked for again, and how many times,
   /// while its players' devices send it to be kept.
@@ -112,13 +115,24 @@ class _ReviewPageState extends State<ReviewPage> {
   _Shown _shown = const _Checking();
   int _hand = 0;
   StreamSubscription<RecordCheck>? _checking;
-  StreamSubscription<WatchedTable>? _watching;
+  StreamSubscription<Watched>? _watching;
+
+  /// The players' reactions, held to the rules against the seats of the
+  /// view on the screen (packages/table, reactions.dart), and what is
+  /// showing at each seat until it goes.
+  final _reactionRules = ReactionRules();
+  final Map<int, ({SeatReaction shown, Timer gone})> _reacting = {};
+  int _reactions = 0;
 
   @override
   void dispose() {
     _checking?.cancel();
     _watching?.cancel();
+    for (final r in _reacting.values) {
+      r.gone.cancel();
+    }
     InUse.current.removeListener(_inUse);
+    ReactionMute.current.removeListener(_muted);
     super.dispose();
   }
 
@@ -126,7 +140,33 @@ class _ReviewPageState extends State<ReviewPage> {
   void initState() {
     super.initState();
     InUse.current.addListener(_inUse);
+    ReactionMute.current.addListener(_muted);
+    unawaited(ReactionMute.current.load());
     _check();
+  }
+
+  void _muted() {
+    if (mounted) setState(() {});
+  }
+
+  /// A reaction said at the table being watched: shown beside its seat
+  /// for a moment if it is one, said by the device the view says holds
+  /// that seat.
+  void _heardReaction(HeardReaction heard) {
+    final shown = _shown;
+    if (shown is! _Live) return;
+    final r = _reactionRules.hear(heard, seated: shown.view.seated, hand: shown.view.hand);
+    if (r == null) return;
+    _reacting.remove(r.seat)?.gone.cancel();
+    final seat = r.seat;
+    setState(() {
+      _reacting[seat] = (
+        shown: (reaction: r.reaction, n: ++_reactions),
+        gone: Timer(ReactionRules.shownFor, () {
+          if (mounted) setState(() => _reacting.remove(seat));
+        }),
+      );
+    });
   }
 
   /// Another device of the account took it up: watching stops, as all
@@ -180,12 +220,17 @@ class _ReviewPageState extends State<ReviewPage> {
   }
 
   void _watch() {
-    _watching = (widget.watch ?? watchTable)(widget.table).listen((v) {
+    _watching = (widget.watch ?? watchTable)(widget.table).listen((w) {
       if (!mounted || _checking != null) return;
-      setState(() => _shown = _Live(v));
-      if (v.over) {
-        _watching?.cancel();
-        _awaitRecord();
+      switch (w) {
+        case Reacted(:final heard):
+          _heardReaction(heard);
+        case Viewed(view: final v):
+          setState(() => _shown = _Live(v));
+          if (v.over) {
+            _watching?.cancel();
+            _awaitRecord();
+          }
       }
     });
   }
@@ -465,6 +510,16 @@ class _ReviewPageState extends State<ReviewPage> {
                       ),
                     ),
                   ),
+                  // A player's reaction, for a moment, beside their name;
+                  // none where this device hides them.
+                  if (_reacting[s]?.shown case final r? when !ReactionMute.current.value)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 150, maxHeight: 30),
+                        child: ReactionBubble(key: ValueKey(r.n), reaction: r.reaction, name: v.names[s], tail: AxisDirection.left),
+                      ),
+                    ),
                   if (v.taken[s] > 0)
                     Padding(
                       padding: const EdgeInsets.only(right: 12),
@@ -506,6 +561,10 @@ class _ReviewPageState extends State<ReviewPage> {
             ),
           const SizedBox(height: 16),
           Text(l10n.watchingNote, style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
+          // The players' reactions show here as at the table; a watcher
+          // has none to send, and can hide theirs.
+          const SizedBox(height: 8),
+          ReactionMuteSwitch(),
         ],
       ),
     );
