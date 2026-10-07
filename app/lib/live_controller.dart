@@ -525,8 +525,47 @@ class LiveController extends ChangeNotifier implements TableModel {
       }
     } finally {
       _pumping = false;
-      if (!_disposed) notifyListeners();
+      if (!_disposed) {
+        notifyListeners();
+        _autoPlay();
+      }
     }
+  }
+
+  // ---- the Auto switch ---------------------------------------------------
+
+  final AutoPilot _auto = AutoPilot();
+
+  @override
+  bool get autoOffered => _auto.offered(this);
+
+  @override
+  bool get autoPlay => _auto.on;
+
+  @override
+  void setAutoPlay(bool on) {
+    _auto.set(this, on);
+    notifyListeners();
+    _autoPlay();
+  }
+
+  /// The player's turn, played for them when the switch is on: their
+  /// own play, sent as any tap sends it. Only once the screen has
+  /// caught up with the table and nothing of theirs is in flight
+  /// ([awaitingPlay]), which is also what keeps it from playing twice —
+  /// the card is pending from the moment it is sent.
+  void _autoPlay() {
+    if (_disposed) return;
+    _auto.watch(this);
+    final card = _auto.cardFor(this);
+    if (card != null) playCard(card);
+  }
+
+  /// Every change the table shows is one the switch may be offered on.
+  @override
+  void notifyListeners() {
+    _auto.watch(this);
+    super.notifyListeners();
   }
 
   Timer? _waitTimer;

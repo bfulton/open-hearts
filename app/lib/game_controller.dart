@@ -60,6 +60,7 @@ class GameController extends ChangeNotifier implements TableModel {
     );
     _saved = false;
     _sheetDue = false;
+    _auto.reset();
     _played.clear();
     _selected.clear();
     _pump();
@@ -234,12 +235,43 @@ class GameController extends ChangeNotifier implements TableModel {
     if (!awaitingPlay) return null;
     final legal = _game.legalPlaysFor(humanSeat);
     if (!legal.contains(card)) return refusalFor(_game, humanSeat, card, words);
+    _playMine(card);
+    _pump();
+    return null;
+  }
+
+  /// The player's card, played: by their hand, or by the Auto switch.
+  void _playMine(Card card) {
     _record.plays.add(card);
     _game.play(humanSeat, card);
     _played.add(card);
     notifyListeners();
-    _pump();
-    return null;
+  }
+
+  // ---- the Auto switch -------------------------------------------------
+
+  final AutoPilot _auto = AutoPilot();
+
+  @override
+  bool get autoOffered => _auto.offered(this);
+
+  @override
+  bool get autoPlay => _auto.on;
+
+  /// On, and the player's turn — if it is theirs now — is played at
+  /// once; the pump plays every one after it as it comes round.
+  @override
+  void setAutoPlay(bool on) {
+    _auto.set(this, on);
+    notifyListeners();
+    if (on) _pump();
+  }
+
+  /// Every change the table shows is one the switch may be offered on.
+  @override
+  void notifyListeners() {
+    _auto.watch(this);
+    super.notifyListeners();
   }
 
   void nextHand() {
@@ -307,7 +339,16 @@ class GameController extends ChangeNotifier implements TableModel {
         }
 
         final seat = _game.currentSeat!;
-        if (seat == humanSeat) break; // the player's turn
+        if (seat == humanSeat) {
+          // The player's turn: theirs to take, unless the Auto switch is
+          // on, in which case it is played at once — no thinking beat,
+          // since nobody is thinking.
+          _auto.watch(this);
+          final card = _auto.cardFor(this);
+          if (card == null) break;
+          _playMine(card);
+          continue;
+        }
 
         if (!await _wait(_botThink(seat))) return;
         final legal = _game.legalPlaysFor(seat);

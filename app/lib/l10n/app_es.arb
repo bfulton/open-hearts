@@ -284,5 +284,8 @@
   "liveOpenElsewhere": "Tu cuenta está en uso en otro dispositivo.",
   "deviceInUse": "en uso",
   "reviewIsLivePlay": "Ver una partida, y repasar una ya jugada, es parte del juego en vivo.",
-  "reviewOwnGame": "Esta es tu propia partida y aún se está jugando. Estará aquí cuando termine."
+  "reviewOwnGame": "Esta es tu propia partida y aún se está jugando. Estará aquí cuando termine.",
+  "autoSwitch": "Auto",
+  "autoPlayLabel": "Jugar solo el resto de esta mano",
+  "autoOffered": "Ya nada de lo que tienes puede cambiar esta mano. Auto la juega por ti."
 }

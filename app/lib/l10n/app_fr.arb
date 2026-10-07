@@ -284,5 +284,8 @@
   "liveOpenElsewhere": "Votre compte est utilisé sur un autre appareil.",
   "deviceInUse": "en cours d’utilisation",
   "reviewIsLivePlay": "Regarder une partie, et en revoir une déjà jouée, fait partie du jeu en direct.",
-  "reviewOwnGame": "C'est votre propre partie, toujours en cours. Elle sera ici une fois terminée."
+  "reviewOwnGame": "C'est votre propre partie, toujours en cours. Elle sera ici une fois terminée.",
+  "autoSwitch": "Auto",
+  "autoPlayLabel": "Jouer automatiquement la fin de cette donne",
+  "autoOffered": "Plus rien dans votre main ne peut changer cette donne. Auto la joue pour vous."
 }

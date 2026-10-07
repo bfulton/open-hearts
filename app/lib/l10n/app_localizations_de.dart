@@ -1311,4 +1311,14 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get reviewOwnGame =>
       'Das ist deine eigene Partie, sie läuft noch. Sie ist hier, sobald sie vorbei ist.';
+
+  @override
+  String get autoSwitch => 'Auto';
+
+  @override
+  String get autoPlayLabel => 'Den Rest dieser Runde automatisch spielen';
+
+  @override
+  String get autoOffered =>
+      'An dieser Runde kann keine deiner Karten mehr etwas ändern. Auto spielt sie für dich zu Ende.';
 }

@@ -6,6 +6,7 @@
 library;
 
 export 'src/arena.dart';
+export 'src/autopilot.dart';
 export 'src/bot.dart';
 export 'src/card.dart';
 export 'src/deal_seed.dart';

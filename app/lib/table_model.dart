@@ -69,6 +69,18 @@ abstract class TableModel implements Listenable {
   /// pass resolves. Empty at every other moment.
   Set<Card> get passed => const {};
 
+  /// Whether the Auto switch is up: nothing the player still holds can
+  /// change how the hand comes out (engine, autopilot.dart). Once up,
+  /// up until the hand ends or a single card is left.
+  bool get autoOffered => false;
+
+  /// Whether the table plays the player's turns for them, the rest of
+  /// this hand. Off at the start of every hand.
+  bool get autoPlay => false;
+
+  /// The player's own switch. On, and their turn is played at once.
+  void setAutoPlay(bool on) {}
+
   /// Where a seat sits on screen: 0 is the player at the bottom, then
   /// clockwise — 1 left, 2 across, 3 right.
   int positionOf(int seat) => (seat - mySeat + seatCount) % seatCount;
@@ -106,4 +118,73 @@ String refusalFor(HeartsGame game, int seat, Card card, [AppLocalizations? words
     return say.refuseHeartsUnbroken;
   }
   return say.refuseOther;
+}
+
+/// The Auto switch's state, kept by whichever controller drives a
+/// table (game_controller.dart, live_controller.dart): whether it has
+/// been offered this hand, and whether it is on.
+///
+/// The judgement is the engine's, over what the screen shows; this
+/// keeps it once given. Every reason it can give holds for the rest of
+/// the hand in principle, but the screen that showed it does not stay:
+/// the trick a player showed out of is swept, a run with a card gone
+/// from its middle no longer looks like one. A switch that came and
+/// went with them would be a switch nobody could rely on.
+class AutoPilot {
+  int _hand = -1;
+  bool _settled = false;
+  bool _on = false;
+
+  /// Called on every change the table shows: takes the judgement while
+  /// the hand is in play, and starts over when a new one is dealt.
+  void watch(TableModel table) {
+    final game = table.game;
+    if (game.handNumber != _hand) reset(game.handNumber);
+    if (_settled || game.phase != Phase.playing || !game.knowsHand(table.mySeat)) return;
+    final pending = game.pendingTrick;
+    // Leading or following is only known on the player's own turn, with
+    // the card they are about to play still in their hand.
+    final toPlay = pending == null && game.currentSeat == table.mySeat && table.pendingPlay == null;
+    _settled = whyHandPlaysItself(
+          hand: table.handShown,
+          trick: game.trick,
+          toPlay: toPlay,
+          seat: table.mySeat,
+          lastTrick: pending?.plays ?? game.lastTrick,
+          // What the badges say each seat has taken, and the trick on its
+          // way to its taker: the felt says who, and how many.
+          pointsTaken: game.taken.fold(0, (a, b) => a + b) + (pending == null ? 0 : pointsIn(pending.plays.map((p) => p.card))),
+        ) !=
+        null;
+  }
+
+  /// A new hand, or a new game: the switch is down and off.
+  void reset([int hand = -1]) {
+    _hand = hand;
+    _settled = false;
+    _on = false;
+  }
+
+  /// Whether the switch is up: offered this hand, in play, and more
+  /// than one card left — with one, there is nothing to save.
+  bool offered(TableModel table) => _settled && table.game.phase == Phase.playing && table.handShown.length >= 2;
+
+  /// Whether it is on. On stays on through the last card, which the
+  /// switch is no longer shown for: it was turned on for the hand.
+  bool get on => _on;
+
+  /// The player's switch. Only turned on where it is offered.
+  void set(TableModel table, bool on) {
+    if (on && !offered(table)) return;
+    _on = on;
+  }
+
+  /// The card to play for the player now, if the table is to play it:
+  /// on, and their turn. The rightmost legal card as the hand is drawn.
+  Card? cardFor(TableModel table) {
+    if (!_on || !_settled || !table.awaitingPlay) return null;
+    final legal = table.legalNow;
+    if (legal.isEmpty) return null;
+    return autoPlayCard(table.handShown, legal);
+  }
 }

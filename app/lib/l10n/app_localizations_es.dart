@@ -1300,4 +1300,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get reviewOwnGame =>
       'Esta es tu propia partida y aún se está jugando. Estará aquí cuando termine.';
+
+  @override
+  String get autoSwitch => 'Auto';
+
+  @override
+  String get autoPlayLabel => 'Jugar solo el resto de esta mano';
+
+  @override
+  String get autoOffered =>
+      'Ya nada de lo que tienes puede cambiar esta mano. Auto la juega por ti.';
 }

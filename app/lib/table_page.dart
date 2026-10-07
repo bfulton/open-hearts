@@ -268,7 +268,34 @@ class ActionBar extends StatelessWidget {
       );
     }
 
-    if (this.note != null) return SizedBox(height: 30, child: Center(child: this.note));
+    final line = _playLine(context);
+    if (!controller.autoOffered) return line;
+    // The Auto switch, at the end of the line nearest the hand's last
+    // card — the one it plays. The line gives up the width it takes, so
+    // the two never overlap: what was centred in the whole row is
+    // centred in what is left of it.
+    return Row(
+      children: [
+        Expanded(child: line),
+        AutoSwitch(on: controller.autoPlay, onChanged: controller.setAutoPlay),
+      ],
+    );
+  }
+
+  /// The line through the play: the table's note, what was passed, or
+  /// nothing.
+  Widget _playLine(BuildContext context) {
+    final l10n = context.l10n;
+    final game = controller.game;
+
+    // A note narrowed by the switch shrinks to its room rather than
+    // wrapping out of its row.
+    if (this.note != null) {
+      return SizedBox(
+        height: 30,
+        child: Center(child: controller.autoOffered ? FittedBox(fit: BoxFit.scaleDown, child: this.note) : this.note),
+      );
+    }
 
     final received = game.receivedBy(controller.mySeat);
 
@@ -358,3 +385,67 @@ IconData _towards(int position) => switch (position) {
       2 => Icons.arrow_upward,
       _ => Icons.arrow_forward,
     };
+
+/// The switch that has the table play the rest of the hand: shown
+/// once nothing the player holds can change how it comes out (engine,
+/// autopilot.dart), and said aloud as it appears, since it turns up
+/// unasked in the middle of a hand.
+///
+/// "Auto" on the felt, and the whole of what it does to a screen
+/// reader: one short word is what fits beside a hand in every
+/// language, and a switch is read out with its label, not looked at.
+class AutoSwitch extends StatelessWidget {
+  const AutoSwitch({super.key, required this.on, required this.onChanged});
+
+  final bool on;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Announced(
+      message: l10n.autoOffered,
+      child: MergeSemantics(
+        child: Semantics(
+          label: l10n.autoPlayLabel,
+          child: GestureDetector(
+            // The word is part of the switch: a tap on either turns it.
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onChanged(!on),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8, right: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ExcludeSemantics(
+                    child: Text(
+                      l10n.autoSwitch,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                        // Gold while it is doing something for you.
+                        color: on ? Palette.gold : Palette.chromeDim,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Switch(
+                    value: on,
+                    onChanged: onChanged,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    activeThumbColor: Felt.dark,
+                    activeTrackColor: Palette.gold,
+                    inactiveThumbColor: Palette.chromeDim,
+                    inactiveTrackColor: Colors.white.withValues(alpha: 0.08),
+                    trackOutlineColor: WidgetStatePropertyAll(Palette.chromeDim.withValues(alpha: 0.5)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

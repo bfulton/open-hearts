@@ -1300,4 +1300,14 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get reviewOwnGame =>
       'C\'est votre propre partie, toujours en cours. Elle sera ici une fois terminée.';
+
+  @override
+  String get autoSwitch => 'Auto';
+
+  @override
+  String get autoPlayLabel => 'Jouer automatiquement la fin de cette donne';
+
+  @override
+  String get autoOffered =>
+      'Plus rien dans votre main ne peut changer cette donne. Auto la joue pour vous.';
 }

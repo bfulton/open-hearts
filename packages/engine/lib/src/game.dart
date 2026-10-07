@@ -134,6 +134,12 @@ class HeartsGame {
   ({List<Play> plays, int winner})? get pendingTrick => _pendingTrick;
   ({List<Play> plays, int winner})? _pendingTrick;
 
+  /// The trick swept last this hand, as it was played; empty before
+  /// the first. What the felt has just shown going to its taker — the
+  /// table reads it to see who showed out (autopilot.dart).
+  List<Play> get lastTrick => List.unmodifiable(_lastTrick);
+  List<Play> _lastTrick = const [];
+
   /// Tricks completed and swept this hand, 0..13.
   int get tricksPlayed => _tricksPlayed;
   int _tricksPlayed = 0;
@@ -183,6 +189,7 @@ class HeartsGame {
     _received = [for (var s = 0; s < seatCount; s++) <Card>[]];
     _trick.clear();
     _pendingTrick = null;
+    _lastTrick = const [];
     _tricksPlayed = 0;
     _heartsBroken = false;
     _handScores = const [];
@@ -456,6 +463,7 @@ class HeartsGame {
     if (done == null) throw StateError('no finished trick to collect');
     _taken[done.winner] += pointsIn(done.plays.map((p) => p.card));
     _leader = done.winner;
+    _lastTrick = done.plays;
     _trick.clear();
     _pendingTrick = null;
     _tricksPlayed++;

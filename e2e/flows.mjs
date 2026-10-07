@@ -119,6 +119,30 @@ flow('a hand alone', async ({ open }) => {
   await waitFor(page, /^Play solo$/, { what: 'the home screen again' });
 });
 
+flow('the rest of a hand left to Auto', async ({ open }) => {
+  // Played by the first legal card until the table offers to play the
+  // rest itself — not every hand comes to it, so as many hands as it
+  // takes — and then left alone: the hand has to end with nobody
+  // touching it.
+  const page = await open();
+  await click(page, /^Play solo$/);
+  await waitFor(page, /^Choose 3 more to pass$/, { what: 'the pass' });
+  const until = Date.now() + 240000;
+  while (!(await has(page, /^Auto-play the rest of this hand$/))) {
+    if (Date.now() > until) throw new Error(`no Auto offered\nsaw: ${(await texts(page)).join(' | ')}`);
+    await dismiss(page, /^Next hand$/);
+    await act(page);
+    await sleep(250);
+  }
+  await click(page, /^Auto-play the rest of this hand$/);
+  await waitFor(page, /^Next hand$|^New game$/, { what: 'the hand played out by Auto', timeout: 60000 });
+  if (await has(page, /^Next hand$/)) {
+    await click(page, /^Next hand$/);
+    await waitFor(page, /^Choose 3 more to pass$|^Your turn$/, { what: 'the next hand' });
+    if (await has(page, /^Auto-play the rest of this hand$/)) throw new Error('Auto is still up in a new hand');
+  }
+});
+
 flow('a thumb, not the tree', async ({ open }) => {
   // The only flow that presses with a pointer. Every other suite here
   // clicks the semantics nodes, which never touches the app's hit

@@ -1813,6 +1813,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This is your own game, still being played. It is here once it is over.'**
   String get reviewOwnGame;
+
+  /// The switch beside the hand that has the app play the player's turns for the rest of the hand. Shown only once nothing they hold can change how the hand comes out. One short word.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get autoSwitch;
+
+  /// What a screen reader says the Auto switch does.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-play the rest of this hand'**
+  String get autoPlayLabel;
+
+  /// Said aloud when the Auto switch appears beside the hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing you hold can change this hand now. Auto plays it out for you.'**
+  String get autoOffered;
 }
 
 class _AppLocalizationsDelegate

@@ -284,5 +284,8 @@
   "liveOpenElsewhere": "Dein Konto wird auf einem anderen Gerät genutzt.",
   "deviceInUse": "in Gebrauch",
   "reviewIsLivePlay": "Einer Partie zuschauen und eine gespielte ansehen gehört zum Live-Spiel.",
-  "reviewOwnGame": "Das ist deine eigene Partie, sie läuft noch. Sie ist hier, sobald sie vorbei ist."
+  "reviewOwnGame": "Das ist deine eigene Partie, sie läuft noch. Sie ist hier, sobald sie vorbei ist.",
+  "autoSwitch": "Auto",
+  "autoPlayLabel": "Den Rest dieser Runde automatisch spielen",
+  "autoOffered": "An dieser Runde kann keine deiner Karten mehr etwas ändern. Auto spielt sie für dich zu Ende."
 }

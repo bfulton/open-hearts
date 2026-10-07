@@ -1555,5 +1555,17 @@
   "reviewOwnGame": "This is your own game, still being played. It is here once it is over.",
   "@reviewOwnGame": {
     "description": "A game's address opened while the account is playing it."
+  },
+  "autoSwitch": "Auto",
+  "@autoSwitch": {
+    "description": "The switch beside the hand that has the app play the player's turns for the rest of the hand. Shown only once nothing they hold can change how the hand comes out. One short word."
+  },
+  "autoPlayLabel": "Auto-play the rest of this hand",
+  "@autoPlayLabel": {
+    "description": "What a screen reader says the Auto switch does."
+  },
+  "autoOffered": "Nothing you hold can change this hand now. Auto plays it out for you.",
+  "@autoOffered": {
+    "description": "Said aloud when the Auto switch appears beside the hand."
   }
 }
