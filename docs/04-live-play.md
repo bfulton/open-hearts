@@ -402,7 +402,12 @@ any peer behind, and the seats dial it.
 ### Appeals and verdicts
 
 - **The appeal.** A stuck turn — a race that split, or any open turn
-  while the table is paused — is appealed every ten seconds.
+  while the table is paused — is appealed every ten seconds. It stands
+  while a juror hears it: one unheard for half a minute
+  (`appealStandsMs`) is a table the juror has lost, or one that no
+  longer asks, and the juror neither carries nor rules on it until it
+  hears it again. A juror cut off hears every seat fall silent and
+  cannot tell that from its own silence (`juror_cut_off_test.dart`).
 - **Carrying.** While an appeal stands, a juror says again, every five
   seconds, everything it holds for the turn: a table cut in two has
   votes on both sides, the juror hears both, and the turn often settles
@@ -420,8 +425,11 @@ any peer behind, and the seats dial it.
   the first — hears it before the jury that gave it; it keeps the
   verdict for its turn, and asks whose it is there, not on arrival
   (`late_juror_verdict_test.dart`). The verifier checks each verdict
-  against the jury in force for the hand, the turn, the seat and the
-  event.
+  against the turn, the seat, the event and a jury in force at the
+  turn: the hand's own, or the one before up to the turn the hand's
+  own carried at — a table of two whose one person left carries the
+  hand's draw only once the jury before it has ruled the other out
+  (`verdict_before_the_draw_test.dart`).
 
 A rage quit is offline to every juror, so they agree; only a partition
 that also splits the jury can give two answers.
