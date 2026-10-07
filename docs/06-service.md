@@ -34,6 +34,7 @@ None of it is in a game's latency path.
 | `claim` | POST, signed | spends a code (a household code or a backup code), brings the device into the account, returns its licence |
 | `devices` | POST, signed | lists the account's devices, which one is in use, and can drop one |
 | `backups` | POST, signed | shows, replaces or emails the account's backup codes |
+| `profile` | POST, signed | reads the account's profile, or writes it from the account's device in use ([below](#the-accounts-profile)) |
 | `attest`, `supersede` | POST, signed | links an Apple/Google sign-in to the device's account, or brings the device into the account a sign-in is linked to |
 | `turn` | POST, signed | Cloudflare Realtime TURN credentials for a subscribed device |
 | `record` | POST, signed | keeps a finished game's record |
@@ -41,8 +42,8 @@ None of it is in a game's latency path.
 | `config` | GET | the remote config ([below](#remote-config)) |
 | `health` | GET | whether the store is readable and Stripe answers for the price, for the monitors |
 
-Bodies are capped at 16 KB (a record at 2 MiB, the Stripe webhook at
-512 KB). CORS answers the site's own origins (openhearts.game, www,
+Bodies are capped at 16 KB (a profile at 36 KB, a record at 2 MiB,
+the Stripe webhook at 512 KB). CORS answers the site's own origins (openhearts.game, www,
 play.openhearts.game and the project's `*.open-hearts.pages.dev`). A
 local origin is answered only by a worker that is itself running locally.
 
@@ -94,8 +95,8 @@ relay checks no `Origin` header, so it needs nothing for the new host.
 
 ### The device, carried over
 
-What makes a device itself — its secret key, licence, name and picture,
-records and settings — is in the browser's `localStorage` under
+What makes a device itself — its secret key, licence, name and picture
+(its copy of its account's, for a subscriber), records and settings — is in the browser's `localStorage` under
 `flutter.*`, and storage is per origin. A device that played at
 `openhearts.game/play/` would be a new player at `play.openhearts.game`,
 and a subscriber's device no device of any account. So it is carried
@@ -305,7 +306,8 @@ exactly once. The class is exported from the relay worker and bound to
 the Pages project as `HOUSEHOLD` (production only) and to the relay
 worker under the same name. Without the binding, as in the tests and
 previews, an in-memory queue in the isolate does the same. An account
-is limited to 20 changes, 60 reads and 600 activations an hour.
+is limited to 20 changes, 60 reads, 600 activations and 30 profile
+writes an hour.
 
 **Before accounts.** A subscription from before accounts is made an
 account the first time any of its devices, its store or Stripe is heard
@@ -374,6 +376,84 @@ jurors of last resort answers the challenge with an HMAC of its key
 under `OH_JUROR_SECRET`, which the relay holds too; it belongs to no
 account.
 
+### The account's profile
+
+The name the others see, and the icon and colour or the picture they see
+it on, are the account's, as its seat and rating are: every device of the
+account shows the same, and a change on one reaches the others. The
+service keeps it as `ACCOUNT#<account>|PROFILE`: `name`, `icon`, `color`
+and `picture` (null for what is not chosen), a `version` that goes up by
+one at each write, and `updated_at`.
+
+`profile` is one signed handler. Asked with nothing, it is a read, for
+any device of the account while the subscription stands, in the account's
+turn among its reads: `{profile, version, updated_at}`, or `{profile:
+null, version: 0}` for an account with none yet. Asked with `profile` —
+the profile as the device's own JSON text, which is also the request's
+signed *what*, so nobody else's request writes it — it is a write, only
+from the account's device in use (409 from another device of it, 402 from
+a device of none), with an allowance of its own (`profileWritesPerHour`)
+so that a person changing their mind never spends what a code or a claim
+needs. The text is taken only in the shape the app makes (`profileOf`):
+a name of at most 60 characters, trimmed, with no control characters (a
+watched table carries no longer, and `Identity.longestName` in the app
+cuts to the same); an icon from the app's set and a colour from its
+palette of ten; a picture that is base64 of a JPEG of at most 12,000
+bytes (`Avatar.maxPictureBytes`, which the app's picture is made to fit);
+and nothing else. A test reads `app/lib/avatar.dart` and `identity.dart`
+and holds the two sides equal.
+
+**The last write wins.** Each write is the next version, whatever version
+the writing device had last seen. There is nothing to merge in a name,
+writes come only from the device in use, which is the one in the
+person's hand, and a compare-and-set would only turn a change made
+offline into a refusal the person has to make again.
+
+**The app** (`app/lib/net/account_profile.dart`) keeps the profile on the
+device as before, so the front door draws it with no network, and keeps
+beside it which account and version it last matched:
+
+- A change on the profile page is kept on the device at once, marked
+  unsent for the account, and sent. Unanswered, refused as not the device
+  in use, or over the allowance, it stays marked and is sent at the next
+  chance: the next start, this device becoming the one in use again, the
+  app coming back to the foreground, or the quarter-hourly config ask. A
+  profile the service refuses as malformed is not sent again.
+- At start, behind the licence, and whenever the device becomes the one
+  in use, a licensed device sends its unsent change if it has one, and
+  otherwise reads the account's and takes it if its version is newer than
+  the one it last matched — or if it last matched another account, or
+  none. A change made while a read was on its way wins: it is sent next.
+- **Joining** — a household code, a backup code, a sign-in, a store
+  restore — ends in a licence for another account, which the app watches
+  for: the account's profile replaces the device's, and an unsent change
+  for the account it left is let go.
+- **Before profiles were kept** an account has none. The first of its
+  devices to read finds none and sends its own, if it has a name or a
+  look; the others take it from there. Two at once both write, and the
+  later is the profile.
+- A device with no subscription keeps its profile to itself. One that
+  leaves an account, or is dropped, keeps the last profile it had.
+
+What is published at tables is unchanged: it is read from the device's
+copy, as before ([doc 04](04-live-play.md)).
+
+### Deleting an account's data
+
+On request (the privacy policy's choices), `node service/tool/forget.mjs
+<account>` (a dry run unless given `--apply`; Cloudflare API token and
+account id in the environment) deletes every row kept for the account
+(`forgetAccount`): those under `ACCOUNT#` — its devices, code, backup
+codes, sign-in, device in use and profile — each device's `ENTITLEMENT`,
+the rows its codes and sign-in are found by, and its subscription's
+`SUB#` rows. It refuses a subscription still paid up, which is cancelled
+first. Where the `Household` object runs, its note of the device in use
+(a key, a count and times) is in the object's own storage and is not
+reached from outside: it is written over the next time the account is
+taken up, which after deletion is never, and holds no name or picture.
+The account's finished games are deleted from R2, and its results from
+the relay, by hand ([doc 08](08-own-relays.md)).
+
 ### TURN
 
 `turn` mints Cloudflare Realtime TURN credentials (`OH_TURN_KEY_ID`,
@@ -410,6 +490,7 @@ ACCOUNT#<account>          TICKET          the outstanding code (expires)
 ACCOUNT#<account>          BACKUP          the five backup codes, used or not
 ACCOUNT#<account>          LOGIN           provider, the linked sign-in's row, at
 ACCOUNT#<account>          ACTIVE          device in use, epoch, at, seated, relay tags (without HOUSEHOLD)
+ACCOUNT#<account>          PROFILE         name, icon, color, picture, version, updated_at
 SUB#<subscription>         META            source, txn_ref, renews_at, cancelled_at, event time
 SUB#<subscription>         ACCOUNT         account
 SUB#<subscription>         CUSTOMER        Stripe customer, for the portal
@@ -487,6 +568,7 @@ most once a minute per isolate:
 | `webhookToleranceS` | 60–900 | 300 |
 | `householdChangesPerHour`, `householdReadsPerHour` | 5–500, 10–2,000 | 20, 60 |
 | `activationsPerHour`: an account's activations and the relay's asking | 60–6,000 | 600 |
+| `profileWritesPerHour`: writes of an account's profile | 5–300 | 30 |
 
 `config|relay` is read by each presence object when it wakes (through
 the relay worker's own `OH_STORE` binding):
@@ -578,8 +660,15 @@ container. The image is built from the repository on every relay deploy
 | Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)) |
 | Relay, Household, Bench | `cd service/do && npx wrangler@4 deploy` (`wrangler.toml`: the `TABLE`, `HOUSEHOLD` and `BENCH` objects, the container, `OH_STORE`, `EMAIL`, `OH_SERVICE_KEY`, the domain `relay.openhearts.game`) |
 | Accounts from before | `node service/tool/accounts.mjs`, a dry run unless given `--apply`; once, before the deploy that brings accounts in |
+| An account's data, deleted on request | `node service/tool/forget.mjs <account>`, a dry run unless given `--apply` ([above](#deleting-an-accounts-data)) |
 | Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../infra/README.md)) |
 | Monitoring | `node observability/apply.mjs` |
+
+The `Household` object is the relay worker's, built from
+`service/functions/worker.mjs`. A change to what an account's turn can be
+asked (such as `profile`) deploys the relay first, then the site: the
+other way round, the new handler asks an object that does not know the
+question yet, which answers 400 and the app asks again later.
 
 Pages secrets: `OH_SERVICE_SECRET`, `OH_ID_HMAC`, `OH_STRIPE_SECRET` (a
 restricted key), `OH_STRIPE_WEBHOOK_SECRET`, `OH_TURN_API_TOKEN`, and

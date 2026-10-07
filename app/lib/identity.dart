@@ -30,6 +30,18 @@ class Identity {
 
   static Future<String?> name() async => (await SharedPreferences.getInstance()).getString(_nameKey);
 
+  /// The longest name, in characters: what a watched table carries
+  /// (packages/table, watch.dart), and what the service keeps with the
+  /// account (service/functions/worker.mjs, a test holding them equal).
+  static const longestName = 60;
+
+  /// [name] as it is kept: trimmed, nothing in it that is not text,
+  /// and no longer than [longestName].
+  static String nameOf(String name) {
+    final chars = name.replaceAll(RegExp('[\u0000-\u001f\u007f-\u009f]'), '').trim().runes.toList();
+    return String.fromCharCodes(chars.length > longestName ? chars.sublist(0, longestName) : chars).trim();
+  }
+
   static const _avatarKey = 'identity_avatar';
 
   /// The avatar chosen on this device, as it was saved; none until one
@@ -48,5 +60,5 @@ class Identity {
       (await SharedPreferences.getInstance()).setString(_avatarKey, jsonEncode(avatar.toJson()));
 
   static Future<void> setName(String name) async =>
-      (await SharedPreferences.getInstance()).setString(_nameKey, name.trim());
+      (await SharedPreferences.getInstance()).setString(_nameKey, nameOf(name));
 }

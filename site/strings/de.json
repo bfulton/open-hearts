@@ -82,13 +82,13 @@
       "p1": "Wie spiele ich?",
       "p2": "Geh auf <a href=\"{{play}}\">play.openhearts.game</a>, oder such (demnächst) im {{appStore}} oder bei {{googlePlay}} nach „Open Hearts“.",
       "p5": "Wie abonniere ich?",
-      "p6": "Tippe unter <i>Live spielen</i> auf <i>Abonnieren</i>. Im <a href=\"{{app}}/subscription?lang={{code}}\">Web</a> bezahlst du auf der Seite von Stripe. In den Apps fürs Handy läuft es über den App Store oder Google Play, die das Abo abrechnen und verlängern. Mit dem Abo bekommst du dein Konto: Dein Name, deine Wertung und deine Spiele kommen damit auf jedes Gerät, das du hinzufügst (bis zu 5).",
+      "p6": "Tippe unter <i>Live spielen</i> auf <i>Abonnieren</i>. Im <a href=\"{{app}}/subscription?lang={{code}}\">Web</a> bezahlst du auf der Seite von Stripe. In den Apps fürs Handy läuft es über den App Store oder Google Play, die das Abo abrechnen und verlängern. Mit dem Abo bekommst du dein Konto: Dein Name, dein Bild, deine Wertung und deine Spiele kommen damit auf jedes Gerät, das du hinzufügst (bis zu 5), und eine Änderung an deinem Profil auf einem davon erscheint auf allen.",
       "p7": "Wie kündige ich?",
       "p8": "Öffne das Menü, wähle <i>Abo</i> und dann <i>Abo verwalten</i>. Andere Wege und Erstattungen stehen in den <a href=\"{{base}}/terms\">Nutzungsbedingungen</a>.",
       "p9": "Wie füge ich ein weiteres Gerät hinzu?",
       "p10": "Öffne auf einem Gerät in deinem Konto das Menü, wähle <i>Abo</i> und tippe auf <i>Gerät hinzufügen</i>. Scanne dann den Code mit dem anderen Gerät oder tippe auf <i>Stattdessen den Link schicken</i>. Ein Code funktioniert einmal, zehn Minuten lang.",
       "p11": "Was, wenn ich mein Handy verliere oder meinen Browser leere?",
-      "p12": "Ist ein anderes deiner Geräte in deinem Konto, füge das neue von dort hinzu und entferne das verlorene. Wenn nicht, nimm einen Backup-Code: Öffne auf dem neuen Gerät das Menü, wähle <i>Abo aktivieren</i> und gib ihn ein, dann kommt das Gerät in dasselbe Konto, mit deiner Wertung und deinen Spielen. Mit Apple oder Google angemeldet? Melde dich auf dem neuen Gerät genauso an. Jedes Gerät im Konto kann <i>Backup-Codes zeigen</i>, und die eines Web-Abos kamen beim Abschluss per E-Mail: Bewahre sie sicher auf. Im App Store oder bei Google Play gekauft? Tippe auf dem neuen Handy auf <i>Abonnieren</i> und dann auf <i>Käufe wiederherstellen</i>.",
+      "p12": "Ist ein anderes deiner Geräte in deinem Konto, füge das neue von dort hinzu und entferne das verlorene. Wenn nicht, nimm einen Backup-Code: Öffne auf dem neuen Gerät das Menü, wähle <i>Abo aktivieren</i> und gib ihn ein, dann kommt das Gerät in dasselbe Konto, mit deinem Namen, deinem Bild, deiner Wertung und deinen Spielen. Mit Apple oder Google angemeldet? Melde dich auf dem neuen Gerät genauso an. Jedes Gerät im Konto kann <i>Backup-Codes zeigen</i>, und die eines Web-Abos kamen beim Abschluss per E-Mail: Bewahre sie sicher auf. Im App Store oder bei Google Play gekauft? Tippe auf dem neuen Handy auf <i>Abonnieren</i> und dann auf <i>Käufe wiederherstellen</i>.",
       "p21": "Warum steht da, Open Hearts sei auf einem anderen Gerät offen?",
       "p22": "Dein Konto spielt live auf einem Gerät zur Zeit, und genutzt wird das, das zuletzt geöffnet wurde. Das andere tritt zurück: Es verlässt den Tisch, an dem es war, und spielt nicht mehr live; allein spielen kannst du darauf weiter. Tippe auf <i>Hier nutzen</i>, um das Konto zurückzuholen. Ist dein Konto auf dem anderen Gerät in einer Partie, wirst du vorher gefragt, denn diese Partie geht verloren: Ein Bot spielt deinen Platz zu Ende, und eine gewertete Partie zählt als verlassen.",
       "p13": "Kann ich mit einem Screenreader oder mit größerer Schrift spielen?",
@@ -129,14 +129,14 @@
     "header": {
       "title": "Datenschutz",
       "tagline": "Was Open Hearts mit dem macht, was du ihm gibst, in einfachen Worten.",
-      "updated": "Zuletzt aktualisiert am 6. Oktober 2026"
+      "updated": "Zuletzt aktualisiert am 7. Oktober 2026"
     },
     "short": {
       "title": "Kurz gesagt",
       "p1": "Allein spielen bleibt auf deinem Gerät",
-      "p2": "Dein Name, dein Bild und deine Spiele gegen die Bots werden auf dem Gerät gespeichert, auf dem du spielst, und nirgendwohin gesendet.",
+      "p2": "Deine Spiele gegen die Bots werden auf dem Gerät gespeichert, auf dem du spielst, und nirgendwohin gesendet. Dein Name und dein Bild auch, bis du ein Abo abschließt: Dann speichert unser Dienst sie zusätzlich mit deinem Konto, damit alle seine Geräte dieselben zeigen.",
       "p3": "Live-Spiel ist öffentlich, mit Absicht",
-      "p4": "Um mit Menschen zu spielen, gehen dein Name, dein Bild, die Nummer deines Kontos und deine Ergebnisse über unser Relay, wo jeder sie lesen kann, der danach fragt. Räume und Bilder werden einen Tag gespeichert, Ergebnisse für die Wertungen.",
+      "p4": "Um mit Menschen zu spielen, gehen dein Name, dein Bild, die Nummer deines Kontos und deine Ergebnisse über unser Relay, wo jeder sie lesen kann, der danach fragt. Räume und Bilder werden dort einen Tag gespeichert, Ergebnisse für die Wertungen.",
       "p5": "Konten, aber ohne E-Mail und Passwort",
       "p6": "Nichts wird verkauft, vermietet oder für Werbung genutzt. Es gibt keine Tracker in der App oder auf dieser Website. Ein Abo legt ein Konto an: eine Zufallszahl, die dir unser Dienst gibt und unter der deine Geräte spielen. Es gibt kein Passwort, und wir speichern keine E-Mail-Adresse.",
       "p7": "Bezahlen übernimmt Stripe",
@@ -150,7 +150,7 @@
       "title": "Auf deinem Gerät",
       "p1": "Die App speichert Folgendes auf dem Gerät, auf dem du spielst — im Speicher des Browsers für play.openhearts.game oder auf einem Handy im eigenen Speicher der App:",
       "p2": "<b>Einen Schlüssel, den dein Gerät selbst erzeugt.</b> Er ist eine lange Zufallszahl mit einer öffentlichen und einer geheimen Hälfte. Die öffentliche Hälfte ist dieses Gerät an einem Live-Tisch; wenn du ein Abo hast, verbindet deine Lizenz sie mit deinem Konto. Die geheime Hälfte verlässt das Gerät nie.",
-      "p3": "<b>Deinen Namen und dein Aussehen</b>: ein Symbol und eine Farbe oder ein eigenes Bild. Das Bild wird auf deinem Gerät auf 64 mal 64 Pixel verkleinert, und nur diese kleine Kopie wird gespeichert. Das Foto, aus dem du es gewählt hast, wird weder gespeichert noch gesendet.",
+      "p3": "<b>Deinen Namen und dein Aussehen</b>: ein Symbol und eine Farbe oder ein eigenes Bild. Das Bild wird auf deinem Gerät auf 64 mal 64 Pixel verkleinert, und nur diese kleine Kopie wird gespeichert. Das Foto, aus dem du es gewählt hast, wird weder gespeichert noch gesendet. Mit einem Abo speichert unser Dienst eine Kopie bei deinem Konto, wie unten beschrieben.",
       "p4": "<b>Deine letzten dreißig Spiele gegen die Bots</b>, die dein Profil zusammenzählt. Sie verlassen das Gerät nur, wenn du auf <i>Protokoll kopieren</i> tippst.",
       "p5": "<b>Wie schnell du spielst</b>, deine Spieloptionen, die Sprache, die du gewählt hast, deine Lizenz und die Nummer deines Kontos, wenn du ein Abo hast, und die Spieler, deren Bilder du ausgeblendet hast.",
       "p6": "<b>Das Live-Spiel, in dem du gerade bist</b>, solange du darin bist: den Tisch, jeden Zug und jede Abstimmung, die dein Gerät dort signiert hat, und die Geheimnisse, mit denen es deine Karten ausgeteilt hat, damit eine mitten im Spiel neu geladene Seite an ihren Platz zurückkehren kann. Das wird verworfen, wenn das Spiel endet oder du es verlässt, oder zwei Minuten, nachdem du zuletzt dort warst.",
@@ -187,7 +187,7 @@
     "subscribing": {
       "title": "Abonnieren",
       "p1": "Live-Spiel ist ein Abo. Im Web wird es über <a href=\"https://stripe.com/privacy\">Stripe</a> auf Stripes eigener Seite gekauft: Stripe fragt nach deiner E-Mail-Adresse, deiner Karte und den nötigen Rechnungsdaten, nach seiner eigenen Datenschutzerklärung.",
-      "p2": "Ein Abo legt ein Konto an: eine Zufallszahl, nicht dein Name oder deine E-Mail. Wir geben Stripe den öffentlichen Schlüssel deines Geräts, damit die Zahlung ihm zugeordnet werden kann. Im Gegenzug speichert unser Dienst einen kurzen Eintrag: für welches Konto das Abo bezahlt, welche Geräteschlüssel im Konto sind und wann jeder hinzugefügt wurde, welcher gerade genutzt wird und bis wann das Abo läuft. In Stripe sehen wir deine E-Mail-Adresse, deinen Namen, dein Land, die Kartenmarke, die letzten vier Ziffern deiner Karte und deine Zahlungen.",
+      "p2": "Ein Abo legt ein Konto an: eine Zufallszahl, nicht dein Name oder deine E-Mail. Wir geben Stripe den öffentlichen Schlüssel deines Geräts, damit die Zahlung ihm zugeordnet werden kann. Im Gegenzug speichert unser Dienst einen kurzen Eintrag: für welches Konto das Abo bezahlt, welche Geräteschlüssel im Konto sind und wann jeder hinzugefügt wurde, welcher gerade genutzt wird und bis wann das Abo läuft. Außerdem speichert er das Profil deines Kontos – den Namen, das Symbol, die Farbe und das Bild, die du gewählt hast –, damit alle Geräte im Konto dieselben zeigen und eine Änderung auf einem die anderen erreicht. In Stripe sehen wir deine E-Mail-Adresse, deinen Namen, dein Land, die Kartenmarke, die letzten vier Ziffern deiner Karte und deine Zahlungen.",
       "p3": "Wir könnten also die E-Mail-Adresse eines Abonnenten mit seinem Konto verbinden und damit mit den Namen und Ergebnissen, die dessen Geräte veröffentlicht haben. Diese Verbindung veröffentlichen wir nicht, und wir nutzen sie nur, um dein Abo zu betreiben.",
       "p4": "Wenn du deinem Konto ein weiteres Gerät hinzufügst, speichert unser Dienst einen Eintrag über den Einmal-Code, den du erstellt hast, und welche Geräte ihn erstellt und benutzt haben. Jedes Gerät im Konto kann die Schlüssel der anderen sehen, welches gerade genutzt wird, und sie entfernen. Dein Konto spielt auf einem Gerät zur Zeit: Wer das Spiel auf einem Gerät öffnet, nutzt ab dann dieses, und das vorige spielt nicht mehr live, bis du es zurückholst.",
       "p5": "Ein Konto hat außerdem fünf Backup-Codes, die unser Dienst mit dem Konto speichert und auf dessen Geräten anzeigt, mit einem Vermerk, welche schon benutzt wurden. Wenn du im Web abonniert hast, schicken wir sie beim Abschluss per E-Mail an die Adresse, mit der du bezahlt hast, und erneut, wann immer ein Gerät des Kontos uns darum bittet. Dafür lesen wir die Adresse in dem Moment bei Stripe aus und geben sie an <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, das die E-Mail für uns verschickt; die Adresse speichern wir nicht.",
@@ -211,7 +211,7 @@
       "p1": "<b>Auf deinem Gerät:</b> bis du es entfernst.",
       "p2": "<b>Auf unserem Relay:</b> Züge, Anwesenheit und das Warten auf ein Spiel: nicht gespeichert. Räume, Platzierungen und Bilder: einen Tag. Spielergebnisse: so lange, wie die Wertungen daraus berechnet werden.",
       "p3": "<b>Beendete Live-Spiele:</b> dauerhaft, im Speicher von Cloudflare, außer du bittest uns, eines zu löschen, in dem du gespielt hast.",
-      "p4": "<b>Die Konto- und Abo-Einträge unseres Dienstes:</b> solange das Abo läuft, und danach, bis du uns bittest, sie zu löschen. Der Vermerk, welches Gerät gerade genutzt wird, wird jedes Mal ersetzt, wenn ein anderes deiner Geräte das Spiel öffnet.",
+      "p4": "<b>Die Konto- und Abo-Einträge unseres Dienstes, einschließlich des Profils deines Kontos:</b> solange das Abo läuft, und danach, bis du uns bittest, sie zu löschen. Ein geändertes Profil ersetzt das vorige. Der Vermerk, welches Gerät gerade genutzt wird, wird jedes Mal ersetzt, wenn ein anderes deiner Geräte das Spiel öffnet.",
       "p5": "<b>Stripe:</b> so lange, wie die Richtlinien von Stripe und das Gesetz für Zahlungsbelege es verlangen.",
       "p6": "<b>Cloudflare und Google:</b> nach ihren eigenen Richtlinien.",
       "p7": "<b>New Relic:</b> die Fehler und Ladezeiten acht Tage."
@@ -220,8 +220,8 @@
       "title": "Deine Möglichkeiten",
       "p1": "Spiel allein, dann verlässt nichts über dich dein Gerät.",
       "p2": "Spiel live mit einem Namen, der nicht dein echter ist, und ohne Bild.",
-      "p3": "Ändere deinen Namen oder dein Bild jederzeit. Was schon veröffentlicht wurde, bleibt, wo es ist.",
-      "p4": "Bitte uns um eine Kopie dessen, was unser Dienst über dein Konto und seine Geräte speichert, oder bitte uns, es zu löschen, einschließlich der Ergebnisse, die seine Geräte auf unserem Relay veröffentlicht haben.",
+      "p3": "Ändere deinen Namen oder dein Bild jederzeit; mit einem Abo erreicht die Änderung alle Geräte deines Kontos. Was schon veröffentlicht wurde, bleibt, wo es ist.",
+      "p4": "Bitte uns um eine Kopie dessen, was unser Dienst über dein Konto, sein Profil und seine Geräte speichert, oder bitte uns, es zu löschen, einschließlich der Ergebnisse, die seine Geräte auf unserem Relay veröffentlicht haben.",
       "p5": "Wo dir das Datenschutzrecht Rechte gibt — einzusehen, zu berichtigen oder zu löschen, was über dich gespeichert ist, zu widersprechen oder dich bei deiner Datenschutzbehörde zu beschweren —, hast du sie auch hier."
     },
     "children": {

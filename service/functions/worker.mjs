@@ -86,6 +86,12 @@ export const SERVICE_DEFAULTS = Object.freeze({
   // renewal every twenty minutes, a word at each table sat at, and the
   // relay asking at every socket a device opens.
   activationsPerHour: 600,
+  // How often one account's profile may be written in an hour: the app
+  // writes it once each time the profile page is left changed, so this
+  // is a person changing their mind a good many times — and it has an
+  // allowance of its own, so that it never spends the one a code or a
+  // claim needs.
+  profileWritesPerHour: 30,
   stripePrice: null,
 });
 
@@ -105,6 +111,7 @@ export const SERVICE_BOUNDS = Object.freeze({
   householdChangesPerHour: [5, 500],
   householdReadsPerHour: [10, 2000],
   activationsPerHour: [60, 6000],
+  profileWritesPerHour: [5, 300],
 });
 
 /// The row, checked: every field that checks out, the default for the
@@ -668,6 +675,172 @@ async function dropActive(account, device, active, revoke) {
   const epoch = (was.epoch ?? 0) + 1;
   await active.put(account, { key: null, epoch, at: null, seated: null, tags: [] });
   if (was.tags?.length) await revoke?.(was.tags, account, epoch);
+}
+
+// ---- the account's profile ------------------------------------------------
+// The name the others see and how they see it — an icon, a colour, a
+// picture — are the account's, as the seat and the rating are: every
+// device of the account shows the same, and a change on one reaches the
+// others (docs/06-service.md). So the service keeps one profile per
+// account, beside its devices, with a version that goes up by one at
+// each write. The last write is the profile: there is nothing to merge
+// in a name, and a person changes their own name from one device at a
+// time.
+//
+// Read by any device of the account while its subscription stands;
+// written only by the account's device in use, which is the one the
+// person has in their hand. Strictly what the app makes and nothing
+// else: a name of at most sixty characters (what a watched table
+// carries, packages/table/lib/src/watch.dart), an icon and a colour from
+// the app's own sets, and a picture as the app makes one — a JPEG of at
+// most 12,000 bytes, base64 (app/lib/avatar.dart; a test holds the two
+// sides equal). The picture is published at tables anyway; here it is
+// kept with the account, for its devices, until the account's data is
+// deleted.
+
+/// The icons the app offers, by their keys (AvatarIcons.all).
+export const PROFILE_ICONS = Object.freeze([
+  'pets', 'rabbit', 'bug', 'sailing', 'rocket', 'anchor', 'castle', 'diamond', 'spa', 'park', 'star', 'bolt',
+  'sun', 'moon', 'flower', 'cake', 'coffee', 'music', 'game', 'umbrella', 'bike', 'piano', 'palette', 'snow',
+]);
+
+/// How many colours the palette has (AvatarIcons.paletteSize).
+export const PROFILE_COLOURS = 10;
+
+/// The longest name, in characters.
+export const PROFILE_NAME_MOST = 60;
+
+/// The most a picture may be, in bytes (Avatar.maxPictureBytes).
+export const PROFILE_PICTURE_MOST = 12000;
+
+/// The most a profile's own text may be: the picture, base64, and room
+/// for the rest.
+const PROFILE_TEXT_MOST = Math.ceil(PROFILE_PICTURE_MOST / 3) * 4 + 1024;
+
+/// The most a profile's request may be: the text, sent once as itself
+/// inside the JSON around it (quotes escaped), and the signature.
+const MOST_PROFILE_BODY = 2 * PROFILE_TEXT_MOST + 2048;
+
+/// [text], the profile as a device sent it, checked:
+/// {profile: {name, icon, color, picture}} with null for what is not
+/// chosen, or {error}.
+export function profileOf(text) {
+  if (typeof text !== 'string' || text.length > PROFILE_TEXT_MOST) return { error: 'not a profile' };
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { error: 'not a profile' };
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: 'not a profile' };
+  if (Object.keys(raw).some((k) => !['name', 'icon', 'color', 'picture'].includes(k))) return { error: 'not a profile' };
+  const { name, icon = null, color = null, picture = null } = raw;
+  // A name as the profile page keeps it: trimmed, no longer than a
+  // table carries, and nothing in it that is not text.
+  if (typeof name !== 'string' || name !== name.trim() || [...name].length > PROFILE_NAME_MOST || /\p{Cc}/u.test(name)) {
+    return { error: 'not a name' };
+  }
+  if (icon !== null && !PROFILE_ICONS.includes(icon)) return { error: 'not one of the icons' };
+  if (color !== null && !(Number.isInteger(color) && color >= 0 && color < PROFILE_COLOURS)) return { error: 'not one of the colours' };
+  if (picture !== null && !isPicture(picture)) return { error: 'not a picture' };
+  return { profile: { name, icon, color, picture } };
+}
+
+/// Whether [picture] is one as the app makes one: base64 of a JPEG of
+/// at most [PROFILE_PICTURE_MOST] bytes.
+function isPicture(picture) {
+  if (typeof picture !== 'string' || picture.length < 4 || picture.length % 4 !== 0) return false;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(picture)) return false;
+  const bytes = (picture.length / 4) * 3 - (picture.endsWith('==') ? 2 : picture.endsWith('=') ? 1 : 0);
+  if (bytes > PROFILE_PICTURE_MOST) return false;
+  // A JPEG begins with its start-of-image marker and another marker.
+  const head = atob(picture.slice(0, 4));
+  return head.charCodeAt(0) === 0xff && head.charCodeAt(1) === 0xd8 && head.charCodeAt(2) === 0xff;
+}
+
+/// A profile as it is served: what is chosen, without the nulls, as the
+/// app keeps one (Avatar.toJson), and its version.
+const profileShown = (row) => ({
+  profile: {
+    name: row.name,
+    ...(row.icon !== null ? { icon: row.icon } : {}),
+    ...(row.color !== null ? { color: row.color } : {}),
+    ...(row.picture !== null ? { picture: row.picture } : {}),
+  },
+  version: row.version,
+  updated_at: row.updated_at,
+});
+
+/// The account [key] is a device of, while it is one and its
+/// subscription stands; null otherwise.
+async function profileAccount(store, key, now) {
+  const held = await entitlementOf(store, key, { now });
+  if (!held || !isAccount(held.account) || !(await store.get(`ACCOUNT#${held.account}`, `DEVICE#${key}`))) return null;
+  return held.account;
+}
+
+/// The account's profile, for a device of it: {profile, version,
+/// updated_at}, or {profile: null, version: 0} for an account with none
+/// yet — one from before profiles were kept, whose first device to ask
+/// sends its own.
+export async function profileRead(op, store, { now = Date.now() } = {}) {
+  const account = await profileAccount(store, op.key, now);
+  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  const row = await store.get(`ACCOUNT#${account}`, 'PROFILE');
+  return { status: 200, body: row ? profileShown(row) : { profile: null, version: 0 } };
+}
+
+/// The account's profile written by its device in use, in the account's
+/// turn: the next version, whatever was there.
+export async function profileWritten(op, store, active, { now = Date.now() } = {}) {
+  const account = await profileAccount(store, op.key, now);
+  if (!account) return { status: 402, body: { error: 'no subscription' } };
+  const checked = profileOf(op.profile);
+  if (checked.error) return { status: 400, body: { error: checked.error } };
+  // From the device in hand, and no other: a device that has stepped
+  // back writes once it takes the account back.
+  if ((await active.get(account))?.key !== op.key) {
+    return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
+  }
+  const was = await store.get(`ACCOUNT#${account}`, 'PROFILE');
+  const row = { ...checked.profile, version: (was?.version ?? 0) + 1, updated_at: new Date(now).toISOString() };
+  await store.put(`ACCOUNT#${account}`, 'PROFILE', row);
+  return { status: 200, body: profileShown(row) };
+}
+
+// ---- an account's data, deleted -------------------------------------------
+// On request (the privacy policy's choices): everything the service
+// keeps for an account, its profile included, by
+// `node service/tool/forget.mjs <account>`.
+
+/// Deletes [account]'s rows: the account's own (its devices, its code,
+/// backup codes, sign-in, device in use and profile), each of its
+/// devices' entitlements, the rows its codes and its sign-in are found
+/// by, and its subscription's. Returns the rows, as `PK|SK`. With
+/// [dry], deletes nothing and says what it would.
+export async function forgetAccount(store, account, { dry = false } = {}) {
+  if (!isAccount(account)) return [];
+  const gone = [];
+  const del = async (pk, sk) => {
+    gone.push(`${pk}|${sk}`);
+    if (!dry) await store.del(pk, sk);
+  };
+  const pk = `ACCOUNT#${account}`;
+  for (const sk of await store.under(pk, 'DEVICE#')) {
+    const key = sk.slice('DEVICE#'.length);
+    if ((await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.account === account) await del(`KEY#${key}`, 'ENTITLEMENT');
+  }
+  for (const c of (await store.get(pk, 'BACKUP'))?.codes ?? []) await del(await backupRow(c.code), 'META');
+  const login = (await store.get(pk, 'LOGIN'))?.login;
+  if (typeof login === 'string' && login.startsWith('LOGIN#')) await del(login, 'IDENTITY');
+  const ticket = (await store.get(pk, 'TICKET'))?.code;
+  if (typeof ticket === 'string') await del(`TICKET#${ticket}`, 'META');
+  const subscription = (await store.get(pk, 'META'))?.subscription;
+  if (typeof subscription === 'string' && (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account === account) {
+    for (const sk of await store.under(`SUB#${subscription}`, '')) await del(`SUB#${subscription}`, sk);
+  }
+  for (const sk of await store.under(pk, '')) await del(pk, sk);
+  return gone;
 }
 
 // ---- who is asking -----------------------------------------------------
@@ -1360,7 +1533,14 @@ export function sequencer({ now = Date.now } = {}) {
     const run = queue.then(async () => {
       const t = now();
       const recent = (done[kind] = (done[kind] ?? []).filter((at) => t - at < 3600000));
-      const most = kind === 'read' ? S().householdReadsPerHour : kind === 'active' ? S().activationsPerHour : S().householdChangesPerHour;
+      const most =
+        kind === 'read'
+          ? S().householdReadsPerHour
+          : kind === 'active'
+            ? S().activationsPerHour
+            : kind === 'profile'
+              ? S().profileWritesPerHour
+              : S().householdChangesPerHour;
       if (recent.length >= most) return { status: 429, body: { error: 'too many at once: try again in a while' } };
       recent.push(t);
       return work();
@@ -1411,6 +1591,8 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       return seenAt(op, active);
     case 'inUse':
       return inUse(op, active, { now });
+    case 'profile':
+      return op.profile ? profileWritten(op, store, active, { now }) : profileRead(op, store, { now });
     default:
       return { status: 400, body: { error: 'not a household operation' } };
   }
@@ -1419,9 +1601,11 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
 const kindOf = (op) =>
   op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
     ? 'active'
-    : op.op === 'list' || (op.op === 'backups' && op.rotate !== true)
-      ? 'read'
-      : 'change';
+    : op.op === 'profile' && op.profile
+      ? 'profile'
+      : op.op === 'list' || op.op === 'profile' || (op.op === 'backups' && op.rotate !== true)
+        ? 'read'
+        : 'change';
 
 /// Tells the relay's object for each of [tags] that [account]'s device
 /// in use is now the one of [epoch], so it closes the sockets of any
@@ -1759,6 +1943,29 @@ async function devicesRoute(request, env) {
     if (status !== 200) return json(request, status, out);
   }
   const { status, body: out } = await inHousehold(env, account, { op: 'list', key });
+  return json(request, status, out);
+}
+
+/// The account's profile: read with nothing asked, or written with
+/// `profile`, the profile as the device's own text — which is what it
+/// signs, so nobody else's request writes this one's name. Both in the
+/// account's turn: a read among its reads, a write with an allowance of
+/// its own.
+async function profileRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'profile', (body) => (typeof body.profile === 'string' ? body.profile : ''), {
+    most: MOST_PROFILE_BODY,
+  });
+  if (asked instanceof Response) return asked;
+  const { key, body } = asked;
+  if (body.profile !== undefined && typeof body.profile !== 'string') return json(request, 400, { error: 'not a profile' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  const account = await deviceAccount(env, store, key);
+  if (!account) return json(request, 402, { error: 'no subscription' });
+  const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, ...(body.profile !== undefined ? { profile: body.profile } : {}) });
   return json(request, status, out);
 }
 
@@ -2916,6 +3123,7 @@ const ROUTES = {
   claim: (request, env) => claimRoute(request, env),
   backups: (request, env) => backupsRoute(request, env),
   devices: (request, env) => devicesRoute(request, env),
+  profile: (request, env) => profileRoute(request, env),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),
   activate: (request, env) => activateRoute(request, env),

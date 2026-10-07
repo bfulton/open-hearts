@@ -20,6 +20,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
@@ -27,6 +28,7 @@ import 'avatar.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'net/account_profile.dart';
 import 'net/network.dart';
 import 'net/relays.dart';
 import 'net/standing.dart';
@@ -133,6 +135,11 @@ class _ProfilePageState extends State<ProfilePage> {
   late Avatar _avatar = widget.current?.avatar ?? Avatar.none;
   late final _name = TextEditingController(text: widget.current?.name ?? '');
   late String _seed = widget.seed ?? '';
+
+  /// What the page opened with: left unchanged, nothing is kept, so a
+  /// page that sat open while another device of the account changed the
+  /// profile does not put the old one back.
+  late Profile _opened;
   String? _note;
   bool _busy = false;
 
@@ -144,8 +151,16 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    _opened = (name: Identity.nameOf(_name.text), avatar: _avatar);
     _watch();
     if (widget.current == null) unawaited(_readDevice());
+    AccountProfile.current.addListener(_reprofiled);
+  }
+
+  /// Another device of the account changed the profile while this page
+  /// was open: shown here too, unless something has been changed here.
+  void _reprofiled() {
+    if ((name: Identity.nameOf(_name.text), avatar: _avatar) == _opened) unawaited(_readDevice());
   }
 
   /// Who this device is, when nobody said: opened by its address.
@@ -157,6 +172,7 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       _name.text = name ?? '';
       _avatar = avatar;
+      _opened = (name: Identity.nameOf(_name.text), avatar: avatar);
       // The account's colour, the one every table shows it in.
       _seed = widget.seed ?? Entitlement.current.licence?.account ?? signer.publicKey;
     });
@@ -186,6 +202,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void dispose() {
     _watching?.cancel();
+    AccountProfile.current.removeListener(_reprofiled);
     _name.dispose();
     super.dispose();
   }
@@ -284,6 +301,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   // being typed, so a name with no avatar behind it
                   // is still a picture of something.
                   onChanged: (_) => setState(() {}),
+                  // No longer than a table carries, or the account keeps.
+                  inputFormatters: [LengthLimitingTextInputFormatter(Identity.longestName)],
                   style: const TextStyle(color: Palette.chrome, fontSize: 16),
                 ),
                 const SizedBox(height: 20),
@@ -369,12 +388,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   /// Kept on the device, then closed with it: whoever opened the page
   /// reads it back from there (home_page.dart), so it is the same
-  /// whether the menu opened it or an address did.
+  /// whether the menu opened it or an address did. A change goes on to
+  /// the account's other devices too, behind the page
+  /// (net/account_profile.dart).
   Future<void> _done() async {
-    final chosen = (name: _name.text.trim(), avatar: _avatar);
-    if (widget.current == null || widget.current != chosen) {
-      await Identity.setName(chosen.name);
-      await Identity.setAvatar(chosen.avatar);
+    final chosen = (name: Identity.nameOf(_name.text), avatar: _avatar);
+    if (chosen != _opened) {
+      await AccountProfile.current.keep(chosen.name, chosen.avatar);
+      unawaited(AccountProfile.current.sync());
     }
     if (mounted) Navigator.of(context).pop(chosen);
   }

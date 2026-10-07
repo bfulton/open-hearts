@@ -49,6 +49,7 @@ test('no row is the defaults', () => {
     householdChangesPerHour: 20,
     householdReadsPerHour: 60,
     activationsPerHour: 600,
+    profileWritesPerHour: 30,
     stripePrice: null,
   });
   for (const raw of [[], 'x', 7]) assert.deepEqual(serviceSettingsOf(raw), { ...SERVICE_DEFAULTS });

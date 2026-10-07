@@ -39,6 +39,7 @@ import 'pages.dart';
 import 'profile_page.dart';
 import 'live/options_sheet.dart';
 import 'live_controller.dart';
+import 'net/account_profile.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
 import 'net/duty.dart';
@@ -202,6 +203,9 @@ class _HomePageState extends State<HomePage> {
     Entitlement.current.addListener(_licensed);
     RemoteSettings.current.addListener(_configured);
     InUse.current.addListener(_inUse);
+    // Who this device is can change under this screen: another device
+    // of the account changed the profile (net/account_profile.dart).
+    AccountProfile.current.addListener(_reprofiled);
     // A device that cannot play live has no business in the count of
     // who is here, or in a jury — nor one whose live play the operator
     // has paused.
@@ -250,6 +254,18 @@ class _HomePageState extends State<HomePage> {
       _avatar = avatar;
     });
     _showAddress();
+  }
+
+  /// The account's profile taken over this device's: shown at once, and
+  /// what the next room or table is told.
+  Future<void> _reprofiled() async {
+    final name = await Identity.name();
+    final avatar = await Identity.avatar();
+    if (!mounted) return;
+    setState(() {
+      _name = name ?? '';
+      _avatar = avatar;
+    });
   }
 
   /// The address, as this screen says it: its room, or none, and [drop]
@@ -473,6 +489,7 @@ class _HomePageState extends State<HomePage> {
     Entitlement.current.removeListener(_licensed);
     RemoteSettings.current.removeListener(_configured);
     InUse.current.removeListener(_inUse);
+    AccountProfile.current.removeListener(_reprofiled);
     _closeLobby(address: false);
     _onlineClock?.cancel();
     _refusalSub?.cancel();

@@ -82,13 +82,13 @@
       "p1": "¿Cómo se juega?",
       "p2": "Ve a <a href=\"{{play}}\">play.openhearts.game</a> o (próximamente) busca «Open Hearts» en la {{appStore}} o en {{googlePlay}}.",
       "p5": "¿Cómo me suscribo?",
-      "p6": "Toca el botón <i>Suscribirse</i> en <i>Jugar en vivo</i>. En la <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, el pago se hace en la página de Stripe. En las apps para móvil, a través de la App Store o Google Play, que la cobran y la renuevan. Suscribirte crea tu cuenta: tu nombre, tu clasificación y tus partidas van con ella a cualquier dispositivo que añadas (hasta 5).",
+      "p6": "Toca el botón <i>Suscribirse</i> en <i>Jugar en vivo</i>. En la <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, el pago se hace en la página de Stripe. En las apps para móvil, a través de la App Store o Google Play, que la cobran y la renuevan. Suscribirte crea tu cuenta: tu nombre, tu imagen, tu clasificación y tus partidas van con ella a cualquier dispositivo que añadas (hasta 5), y un cambio en tu perfil en uno de ellos se ve en todos.",
       "p7": "¿Cómo cancelo?",
       "p8": "Abre el menú, elige <i>Suscripción</i> y luego <i>Gestionar suscripción</i>. Las otras formas, y los reembolsos, están en los <a href=\"{{base}}/terms\">términos</a>.",
       "p9": "¿Cómo añado otro dispositivo?",
       "p10": "En un dispositivo de tu cuenta, abre el menú, elige <i>Suscripción</i> y toca <i>Añadir un dispositivo</i>; luego escanea el código con el otro dispositivo, o toca <i>Enviar el enlace</i>. Cada código sirve una vez, durante diez minutos.",
       "p11": "¿Y si pierdo el teléfono, o borro los datos del navegador?",
-      "p12": "Si otro de tus dispositivos está en tu cuenta, añade el nuevo desde allí y quita el perdido. Si no, usa un código de respaldo: en el dispositivo nuevo, abre el menú, elige <i>Activar suscripción</i> e introdúcelo, y el dispositivo entra en la misma cuenta, con tu clasificación y tus partidas. ¿Iniciaste sesión con Apple o Google? Inicia sesión de la misma manera en el dispositivo nuevo. Cualquier dispositivo de la cuenta puede <i>Mostrar códigos de respaldo</i>, y los de una suscripción web te llegaron por correo al suscribirte: guárdalos en un lugar seguro. ¿La compraste en la App Store o en Google Play? En el teléfono nuevo, toca <i>Suscribirse</i> y luego <i>Restaurar compras</i>.",
+      "p12": "Si otro de tus dispositivos está en tu cuenta, añade el nuevo desde allí y quita el perdido. Si no, usa un código de respaldo: en el dispositivo nuevo, abre el menú, elige <i>Activar suscripción</i> e introdúcelo, y el dispositivo entra en la misma cuenta, con tu nombre, tu imagen, tu clasificación y tus partidas. ¿Iniciaste sesión con Apple o Google? Inicia sesión de la misma manera en el dispositivo nuevo. Cualquier dispositivo de la cuenta puede <i>Mostrar códigos de respaldo</i>, y los de una suscripción web te llegaron por correo al suscribirte: guárdalos en un lugar seguro. ¿La compraste en la App Store o en Google Play? En el teléfono nuevo, toca <i>Suscribirse</i> y luego <i>Restaurar compras</i>.",
       "p21": "¿Por qué dice que Open Hearts está abierto en otro dispositivo?",
       "p22": "Tu cuenta juega en vivo en un dispositivo a la vez, y el que está en uso es el último que se abrió. El otro se hace a un lado: deja la mesa en la que estuviera y deja de jugar en vivo, aunque puedes seguir jugando solo en él. Toca <i>Usarlo aquí</i> para recuperar la cuenta. Si tu cuenta está en una partida en el otro dispositivo, se te pregunta antes, porque esa partida se perderá: un bot termina tu asiento, y una partida con clasificación cuenta como abandonada.",
       "p13": "¿Puedo jugar con un lector de pantalla, o con el texto más grande?",
@@ -129,14 +129,14 @@
     "header": {
       "title": "Privacidad",
       "tagline": "Qué hace Open Hearts con lo que le das, en palabras sencillas.",
-      "updated": "Última actualización: 6 de octubre de 2026"
+      "updated": "Última actualización: 7 de octubre de 2026"
     },
     "short": {
       "title": "En resumen",
       "p1": "Jugar solo se queda en tu dispositivo",
-      "p2": "Tu nombre, tu imagen y tus partidas contra los bots se guardan en el dispositivo en el que juegas, y no se envían a ninguna parte.",
+      "p2": "Tus partidas contra los bots se guardan en el dispositivo en el que juegas, y no se envían a ninguna parte. También tu nombre y tu imagen, hasta que te suscribes: entonces nuestro servicio los guarda además con tu cuenta, para que todos sus dispositivos muestren los mismos.",
       "p3": "El juego en vivo es público, a propósito",
-      "p4": "Para jugar con otras personas, tu nombre, tu imagen, el número de tu cuenta y tus resultados pasan por nuestro relé, donde cualquiera que los pida puede leerlos. Las salas y las imágenes se guardan un día; los resultados se guardan para las clasificaciones.",
+      "p4": "Para jugar con otras personas, tu nombre, tu imagen, el número de tu cuenta y tus resultados pasan por nuestro relé, donde cualquiera que los pida puede leerlos. Allí, las salas y las imágenes se guardan un día; los resultados se guardan para las clasificaciones.",
       "p5": "Cuentas, pero sin correo ni contraseña",
       "p6": "No se vende, alquila ni usa nada para publicidad. No hay rastreadores en la app ni en este sitio. Suscribirte crea una cuenta: un número aleatorio que te da nuestro servicio, con el que juegan tus dispositivos. No hay contraseña, y no guardamos ningún correo electrónico.",
       "p7": "El pago es cosa de Stripe",
@@ -150,7 +150,7 @@
       "title": "En tu dispositivo",
       "p1": "La app guarda esto en el dispositivo en el que juegas — en el almacenamiento del navegador para play.openhearts.game, o en el almacenamiento propio de la app en un teléfono:",
       "p2": "<b>Una clave que tu dispositivo crea por sí mismo.</b> Es un número aleatorio largo con una mitad pública y una mitad secreta. La mitad pública es este dispositivo en una mesa en vivo; si te suscribes, tu licencia la vincula a tu cuenta. La mitad secreta nunca sale del dispositivo.",
-      "p3": "<b>Tu nombre y tu aspecto</b>: un icono y un color, o una imagen tuya. La imagen se reduce a 64 por 64 píxeles en tu dispositivo, y solo se guarda esa copia pequeña. La foto de la que la sacaste no se guarda ni se envía.",
+      "p3": "<b>Tu nombre y tu aspecto</b>: un icono y un color, o una imagen tuya. La imagen se reduce a 64 por 64 píxeles en tu dispositivo, y solo se guarda esa copia pequeña. La foto de la que la sacaste no se guarda ni se envía. Si te suscribes, nuestro servicio guarda una copia con tu cuenta, como se explica más abajo.",
       "p4": "<b>Tus últimas treinta partidas contra los bots</b>, que tu perfil va contando. Solo salen del dispositivo si tocas <i>Copiar registro</i>.",
       "p5": "<b>Lo rápido que juegas</b>, tus opciones de partida, el idioma que elegiste, tu licencia y el número de tu cuenta si te suscribes, y los jugadores cuyas imágenes elegiste ocultar.",
       "p6": "<b>La partida en vivo en la que estás</b>, mientras estás en ella: la mesa, cada jugada y cada voto que tu dispositivo firmó allí, y los secretos con los que repartió tus cartas, para que una página recargada a mitad de partida pueda volver a su asiento. Se descarta cuando la partida termina o la dejas, o dos minutos después de la última vez que estuviste en ella.",
@@ -187,7 +187,7 @@
     "subscribing": {
       "title": "Suscribirse",
       "p1": "El juego en vivo es una suscripción. En la web se compra a través de <a href=\"https://stripe.com/privacy\">Stripe</a>, en la propia página de Stripe: Stripe te pide tu correo electrónico, tu tarjeta y los datos de facturación que necesita, conforme a su propia política de privacidad.",
-      "p2": "Suscribirte crea una cuenta: un número aleatorio, no tu nombre ni tu correo. Damos a Stripe la clave pública de tu dispositivo para que el pago se pueda asociar a ella. A cambio, nuestro servicio guarda un registro breve: qué cuenta paga la suscripción, qué claves de dispositivo están en la cuenta y cuándo se añadió cada una, cuál está en uso ahora y las fechas hasta las que dura la suscripción. En Stripe podemos ver tu correo electrónico, nombre, país, marca de la tarjeta, los cuatro últimos dígitos de tu tarjeta y tus pagos.",
+      "p2": "Suscribirte crea una cuenta: un número aleatorio, no tu nombre ni tu correo. Damos a Stripe la clave pública de tu dispositivo para que el pago se pueda asociar a ella. A cambio, nuestro servicio guarda un registro breve: qué cuenta paga la suscripción, qué claves de dispositivo están en la cuenta y cuándo se añadió cada una, cuál está en uso ahora y las fechas hasta las que dura la suscripción. También guarda el perfil de tu cuenta —el nombre, el icono, el color y la imagen que elegiste— para que todos los dispositivos de la cuenta muestren los mismos, y un cambio en uno llegue a los demás. En Stripe podemos ver tu correo electrónico, nombre, país, marca de la tarjeta, los cuatro últimos dígitos de tu tarjeta y tus pagos.",
       "p3": "Eso significa que podríamos relacionar el correo electrónico de un suscriptor con su cuenta, y por tanto con los nombres y los resultados que han publicado sus dispositivos. No publicamos esa relación, y solo la usamos para gestionar tu suscripción.",
       "p4": "Si añades otro dispositivo a tu cuenta, nuestro servicio guarda un registro del código de un solo uso que creaste y de qué dispositivos lo crearon y lo usaron. Cualquier dispositivo de la cuenta puede ver las claves de los demás, cuál está en uso, y quitarlos. Tu cuenta juega en un dispositivo a la vez: abrir el juego en uno lo convierte en el que está en uso, y el anterior deja de jugar en vivo hasta que lo recuperes.",
       "p5": "Una cuenta tiene además cinco códigos de respaldo, que nuestro servicio guarda con la cuenta y que se muestran en sus dispositivos, con una nota de cuáles se han usado. Si te suscribiste en la web, te los enviamos al correo con el que pagaste cuando te suscribes, y de nuevo siempre que un dispositivo de la cuenta nos lo pida. Para ello leemos la dirección en Stripe en ese momento y se la pasamos a <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, que envía el correo por nosotros; no guardamos la dirección.",
@@ -211,7 +211,7 @@
       "p1": "<b>En tu dispositivo:</b> hasta que las borres.",
       "p2": "<b>En nuestro relé:</b> las jugadas, la presencia y la espera de partida: no se guardan. Las salas, los asientos y las imágenes: un día. Los resultados de las partidas: mientras se calculen las clasificaciones a partir de ellos.",
       "p3": "<b>Las partidas en vivo terminadas:</b> para siempre, en el almacenamiento de Cloudflare, salvo que nos pidas borrar una en la que jugaste.",
-      "p4": "<b>Los registros de cuenta y suscripción de nuestro servicio:</b> mientras dure la suscripción, y después hasta que nos pidas borrarlos. La nota de qué dispositivo está en uso se sustituye cada vez que otro de tus dispositivos abre el juego.",
+      "p4": "<b>Los registros de cuenta y suscripción de nuestro servicio, incluido el perfil de tu cuenta:</b> mientras dure la suscripción, y después hasta que nos pidas borrarlos. Un perfil cambiado sustituye al anterior. La nota de qué dispositivo está en uso se sustituye cada vez que otro de tus dispositivos abre el juego.",
       "p5": "<b>Stripe:</b> el tiempo que exijan la política de Stripe y la ley sobre registros de pagos.",
       "p6": "<b>Cloudflare y Google:</b> según sus propias políticas.",
       "p7": "<b>New Relic:</b> los errores y los tiempos, ocho días."
@@ -220,8 +220,8 @@
       "title": "Tus opciones",
       "p1": "Juega solo, y nada sobre ti sale de tu dispositivo.",
       "p2": "Juega en vivo con un nombre que no sea el tuyo real, y sin imagen.",
-      "p3": "Cambia tu nombre o tu imagen cuando quieras. Lo que ya se publicó se queda donde está.",
-      "p4": "Pídenos una copia de lo que nuestro servicio guarda sobre tu cuenta y sus dispositivos, o pídenos que lo borremos, incluidos los resultados que sus dispositivos publicaron en nuestro relé.",
+      "p3": "Cambia tu nombre o tu imagen cuando quieras; si estás suscrito, el cambio llega a todos los dispositivos de tu cuenta. Lo que ya se publicó se queda donde está.",
+      "p4": "Pídenos una copia de lo que nuestro servicio guarda sobre tu cuenta, su perfil y sus dispositivos, o pídenos que lo borremos, incluidos los resultados que sus dispositivos publicaron en nuestro relé.",
       "p5": "Donde la ley de protección de datos te dé derechos — a ver, corregir o borrar lo que se guarda sobre ti, a oponerte o a reclamar ante tu autoridad de protección de datos —, también los tienes aquí."
     },
     "children": {
