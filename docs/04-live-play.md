@@ -18,8 +18,10 @@ driven by `app/lib/live_controller.dart` and `app/lib/net/`.
 
 There is one screen before a game. The profile behind its top-right
 icon holds a name and an avatar (an icon on a colour, or a 64-pixel
-picture), kept on the device; a picture travels once, as a stored
-event. The live area says which game is asked for — fifty points or a
+picture), kept on the device and, for a subscriber, with the account,
+so every device of the account shows the same
+([doc 06](06-service.md#the-accounts-profile)); a picture travels once,
+as a stored event. The live area says which game is asked for — fifty points or a
 hundred, rated or unrated — and *Play live* shows how many devices are
 online.
 

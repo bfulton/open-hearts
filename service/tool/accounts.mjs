@@ -53,7 +53,7 @@ async function subscriptionsIn(store) {
 
 /// OH_STORE through Cloudflare's API, behind the calls the worker's
 /// store makes (service/functions/worker.mjs, storeOf).
-function restStore({ token, account, namespace }) {
+export function restStore({ token, account, namespace }) {
   const base = `https://api.cloudflare.com/client/v4/accounts/${account}/storage/kv/namespaces/${namespace}`;
   const auth = { authorization: `Bearer ${token}` };
   const at = (pk, sk) => encodeURIComponent(`${pk}|${sk}`);

@@ -82,13 +82,13 @@
       "p1": "How do I play?",
       "p2": "Go to <a href=\"{{play}}\">play.openhearts.game</a>, or (coming soon) search for “Open Hearts” in the {{appStore}} or {{googlePlay}}.",
       "p5": "How do I subscribe?",
-      "p6": "Tap the <i>Subscribe</i> button under <i>Play live</i>. On the <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, payment is on Stripe's page. In the phone apps, it is through the App Store or Google Play, which bill and renew it. Subscribing makes your account: your name, rating and games go with it onto any device you add (up to 5).",
+      "p6": "Tap the <i>Subscribe</i> button under <i>Play live</i>. On the <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, payment is on Stripe's page. In the phone apps, it is through the App Store or Google Play, which bill and renew it. Subscribing makes your account: your name, picture, rating and games go with it onto any device you add (up to 5), and a change to your profile on one of them shows on all of them.",
       "p7": "How do I cancel?",
       "p8": "Open the menu, choose <i>Subscription</i>, then <i>Manage subscription</i>. Other ways, and refunds, are in the <a href=\"{{base}}/terms\">terms</a>.",
       "p9": "How do I add another device?",
       "p10": "On a device in your account, open the menu, choose <i>Subscription</i> and tap <i>Add a device</i>, then scan the code with the other device, or tap <i>Send the link instead</i>. A code works once, for ten minutes.",
       "p11": "What if I lose my phone, or clear my browser?",
-      "p12": "If another of your devices is in your account, add the new one from there and drop the lost one. If not, use a backup code: on the new device, open the menu, choose <i>Activate subscription</i> and enter it, and the device joins the same account, with your rating and games. Signed in with Apple or Google? Sign in the same way on the new device instead. Any device in the account can <i>Show backup codes</i>, and a web subscription's were emailed when you subscribed: keep them somewhere safe. Bought in the App Store or Google Play? On the new phone, tap <i>Subscribe</i>, then <i>Restore purchases</i>.",
+      "p12": "If another of your devices is in your account, add the new one from there and drop the lost one. If not, use a backup code: on the new device, open the menu, choose <i>Activate subscription</i> and enter it, and the device joins the same account, with your name, picture, rating and games. Signed in with Apple or Google? Sign in the same way on the new device instead. Any device in the account can <i>Show backup codes</i>, and a web subscription's were emailed when you subscribed: keep them somewhere safe. Bought in the App Store or Google Play? On the new phone, tap <i>Subscribe</i>, then <i>Restore purchases</i>.",
       "p21": "Why does it say Open Hearts is open on another device?",
       "p22": "Your account plays live on one device at a time, and the one opened most recently is the one in use. The other steps back: it leaves any table it was at and stops playing live, and you can still play alone on it. Tap <i>Use it here</i> to take the account back. If your account is in a game on the other device, you are asked first, because that game will be lost: a bot finishes your seat, and a rated game counts as one you left.",
       "p13": "Can I play with a screen reader, or bigger text?",
@@ -129,14 +129,14 @@
     "header": {
       "title": "Privacy",
       "tagline": "What Open Hearts does with what you give it, in plain words.",
-      "updated": "Last updated 6 October 2026"
+      "updated": "Last updated 7 October 2026"
     },
     "short": {
       "title": "The short version",
       "p1": "Playing alone stays on your device",
-      "p2": "Your name, your picture and your games against the bots are kept on the device you play on, and not sent anywhere.",
+      "p2": "Your games against the bots are kept on the device you play on, and not sent anywhere. So are your name and picture, until you subscribe: then our service keeps them with your account too, so that all its devices show the same ones.",
       "p3": "Live play is public, on purpose",
-      "p4": "To play people, your name, your picture, your account's number and your results go through our relay, where anyone who asks can read them. Rooms and pictures are kept a day; results are kept for the ratings.",
+      "p4": "To play people, your name, your picture, your account's number and your results go through our relay, where anyone who asks can read them. Rooms and pictures are kept there a day; results are kept for the ratings.",
       "p5": "Accounts, but no email or password",
       "p6": "Nothing is sold, rented or used for advertising. There are no trackers in the app or on this site. Subscribing makes an account: a random number our service gives you, which your devices play under. There is no password, and we hold no email address.",
       "p7": "Paying is Stripe's job",
@@ -150,7 +150,7 @@
       "title": "On your device",
       "p1": "The app keeps these on the device you play on — in the browser's storage for play.openhearts.game, or in the app's own storage on a phone:",
       "p2": "<b>A key your device makes for itself.</b> It is a long random number with a public half and a secret half. The public half is this device at a live table; if you subscribe, your licence ties it to your account. The secret half never leaves the device.",
-      "p3": "<b>Your name and how you look</b>: an icon and a colour, or a picture of your own. The picture is cut down to 64 by 64 pixels on your device, and only that small copy is kept. The photo you picked it from is not stored or sent.",
+      "p3": "<b>Your name and how you look</b>: an icon and a colour, or a picture of your own. The picture is cut down to 64 by 64 pixels on your device, and only that small copy is kept. The photo you picked it from is not stored or sent. If you subscribe, our service keeps a copy with your account, as below.",
       "p4": "<b>Your last thirty games against the bots</b>, which your profile counts up. They leave the device only if you tap <i>Copy record</i>.",
       "p5": "<b>How quickly you play</b>, your game options, the language you chose, your licence and your account's number if you subscribe, and the players whose pictures you chose to hide.",
       "p6": "<b>The live game you are in</b>, while you are in it: the table, every move and vote your device signed there, and the secrets it dealt your cards with, so that a page reloaded mid-game can come back to its seat. Let go of when the game ends or you leave it, or two minutes after you were last there.",
@@ -187,7 +187,7 @@
     "subscribing": {
       "title": "Subscribing",
       "p1": "Live play is a subscription. On the web it is bought through <a href=\"https://stripe.com/privacy\">Stripe</a>, on Stripe's own page: Stripe asks for your email address, your card and the billing details it needs, under its own privacy policy.",
-      "p2": "Subscribing makes an account: a random number, not your name or email. We give Stripe your device's public key so the payment can be matched to it. In return our service keeps a short record: which account the subscription pays for, which device keys are in the account and when each was added, which one is in use now, and the dates the subscription runs to. In Stripe we can see your email address, name, country, card brand, the last four digits of your card and your payments.",
+      "p2": "Subscribing makes an account: a random number, not your name or email. We give Stripe your device's public key so the payment can be matched to it. In return our service keeps a short record: which account the subscription pays for, which device keys are in the account and when each was added, which one is in use now, and the dates the subscription runs to. It also keeps your account's profile — the name, icon, colour and picture you chose — so that every device in the account shows the same ones, and a change on one reaches the others. In Stripe we can see your email address, name, country, card brand, the last four digits of your card and your payments.",
       "p3": "That means we could connect a subscriber's email address with their account, and so with the names and results its devices have published. We do not publish that connection, and we use it only to run your subscription.",
       "p4": "If you add another device to your account, our service keeps a record of the one-use code you made and which devices made and used it. Any device in the account can see the others' keys, which one is in use, and remove them. Your account plays on one device at a time: opening the game on one makes it the one in use, and the device before it stops playing live until you take it back.",
       "p5": "An account also has five backup codes, kept by our service with the account and shown on its devices, with a note of which have been used. If you subscribed on the web, we email them to the address you paid with when you subscribe, and again whenever a device in the account asks us to. To do that we read the address from Stripe at that moment and hand it to <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, which sends the email for us; we do not keep the address.",
@@ -211,7 +211,7 @@
       "p1": "<b>On your device:</b> until you remove them.",
       "p2": "<b>On our relay:</b> moves, presence and waiting for a game: not kept. Rooms, seatings and pictures: a day. Game results: for as long as the ratings are worked out from them.",
       "p3": "<b>Finished live games:</b> for good, in Cloudflare's storage, unless you ask us to delete one you played in.",
-      "p4": "<b>Our service's account and subscription records:</b> while the subscription runs, and afterwards until you ask us to delete them. The note of which device is in use is replaced each time another of your devices opens the game.",
+      "p4": "<b>Our service's account and subscription records, your account's profile among them:</b> while the subscription runs, and afterwards until you ask us to delete them. A changed profile replaces the one before. The note of which device is in use is replaced each time another of your devices opens the game.",
       "p5": "<b>Stripe:</b> as long as Stripe's policy and the law on payment records require.",
       "p6": "<b>Cloudflare and Google:</b> under their own policies.",
       "p7": "<b>New Relic:</b> the errors and timings, eight days."
@@ -220,8 +220,8 @@
       "title": "Your choices",
       "p1": "Play alone, and nothing about you leaves your device.",
       "p2": "Play live with a name that is not your real one, and with no picture.",
-      "p3": "Change your name or picture at any time. What was already published stays where it is.",
-      "p4": "Ask us for a copy of what our service keeps about your account and its devices, or ask us to delete it, including the results its devices published on our relay.",
+      "p3": "Change your name or picture at any time; if you subscribe, the change reaches all your account's devices. What was already published stays where it is.",
+      "p4": "Ask us for a copy of what our service keeps about your account, its profile and its devices, or ask us to delete it, including the results its devices published on our relay.",
       "p5": "Where data protection law gives you rights — to see, correct or delete what is held about you, to object, or to complain to your data protection authority — you have them here too."
     },
     "children": {

@@ -11,6 +11,7 @@ import 'crypto/schnorr.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'net/account_profile.dart';
 import 'net/duty.dart';
 import 'net/in_use.dart';
 import 'net/licence.dart' show serviceKey;
@@ -50,7 +51,11 @@ Future<void> main() async {
   // asked of the service behind the first frame (docs/06-service.md).
   final signer = await Identity.signer();
   await Entitlement.current.load(signer.publicKey);
-  unawaited(Entitlement.current.refresh(signer));
+  // And who this device is, which is its account's (net/account_profile.dart):
+  // read behind the licence, and again whenever this device becomes
+  // the one in use or comes into another account.
+  AccountProfile.current.watch();
+  unawaited(Entitlement.current.refresh(signer).whenComplete(AccountProfile.current.sync));
   // In a store build, the store: what the product costs, and anything
   // it is holding for this app — a renewal, or a purchase the service
   // did not take last time — handed over as soon as it is listened for
@@ -70,6 +75,8 @@ Future<void> main() async {
 
 /// Asks for the config again after as long as it last said to wait.
 void _askAgain() => Timer(waits.configEvery, () {
+  // A change to the profile that could not be sent goes now, if it can.
+  unawaited(AccountProfile.current.retry());
   unawaited(RemoteSettings.current.refresh().whenComplete(_askAgain));
 });
 
@@ -100,6 +107,7 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
           // Back from the background, perhaps after a long sleep: still
           // the device in use, or not.
           unawaited(InUse.current.renew());
+          unawaited(AccountProfile.current.retry());
         // Hidden is a tab switched away from or a phone's home button:
         // timers throttle, sockets may go, and this device is not
         // answering a summons until it is back. Detached is the page

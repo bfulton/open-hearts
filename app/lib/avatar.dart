@@ -1,8 +1,10 @@
 /// What a player looks like: one of a set of icons on a colour of
 /// their choosing, a small picture of their own, or — with nothing
 /// chosen — their initials on a colour that is theirs. Chosen once in
-/// the lobby, kept on the device with the name, and carried to the
-/// others over the relay with the name (docs/04-live-play.md).
+/// the lobby, kept on the device with the name — and with the account,
+/// for a subscriber's devices to share (net/account_profile.dart) — and
+/// carried to the others over the relay with the name
+/// (docs/04-live-play.md).
 library;
 
 import 'dart:convert';

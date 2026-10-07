@@ -581,6 +581,86 @@ flow('one device at a time: the newest opened wins, and the other takes it back 
   if (await has(first, /^1 of 1 here/)) throw new Error('the first device is still at its table');
 });
 
+/// What the profile page shows: the name in its field — which the
+/// field's input holds once it has the focus — and whether the rocket
+/// is the icon chosen.
+async function profileShown(page) {
+  const input = page.locator('flt-semantics[aria-label="Your name"] input, input[aria-label="Your name"]').first();
+  await input.click();
+  await sleep(300);
+  const name = await input.inputValue();
+  const rocket = await page.evaluate(`(() => {
+    const labelOf = ${labelOf};
+    const node = [...document.querySelectorAll('flt-semantics')].find((e) => labelOf(e) === 'Rocket');
+    return node ? node.getAttribute('aria-current') ?? node.getAttribute('aria-selected') : null;
+  })()`);
+  return { name, rocket };
+}
+
+flow('the profile is the account\'s: changed on one device, the other shows it at its next start', async ({ open, relay }) => {
+  // The name and how you look are the account's (docs/06-service.md):
+  // kept by the service with the account, written from the device in
+  // use, and read by the others when they start. Two devices of one
+  // account, brought together as the device-at-a-time flow brings them.
+  await relay();
+  const first = await open();
+  await waitFor(first, /^Play live/, { what: 'live play open on the first device', timeout: 40000 });
+  await click(first, /^Menu$/);
+  await waitFor(first, /^Subscription$/, { what: 'the menu' });
+  await click(first, /^Subscription$/);
+  await waitFor(first, /^Add a device$/, { what: 'the subscription page' });
+  await click(first, /^Add a device$/);
+  await waitFor(first, /^A code to scan$/, { what: 'the code' });
+  await click(first, /^Send the link instead$/);
+  await sleep(500);
+  const link = await first.evaluate('navigator.clipboard.readText()');
+  await click(first, /^Back$/);
+  await waitFor(first, /^Play solo$/, { what: 'the front door' });
+
+  const second = await open({ url: link, ready: /^Join this subscription\?$/ });
+  await click(second, /^Join$/);
+  await waitFor(first, /^Open Hearts is now open on another device$/, { what: 'the second device in use', timeout: 40000 });
+  await waitFor(second, /^Play live/, { what: 'live play open on the second device', timeout: 40000 });
+
+  // Changed on the second, the device in use.
+  await click(second, /^Your profile$/);
+  await waitFor(second, /^Rocket$/, { what: 'the profile on the second device' });
+  await type(second, 'Your name', 'Bao');
+  await click(second, /^Rocket$/);
+  await click(second, /^Done$/);
+  await waitFor(second, /^Play solo$/, { what: 'the second device\'s front door' });
+
+  // The first starts again: it takes the account up, reads its profile,
+  // and shows it. The read may land after the page is opened, so it is
+  // opened until it shows the account's — closed unchanged in between,
+  // which writes nothing.
+  await first.reload();
+  await waitFor(first, /^Play live/, { what: 'live play open on the first device again', timeout: 40000 });
+  let name = null;
+  let rocket = null;
+  for (let tries = 0; tries < 20; tries++) {
+    await click(first, /^Your profile$/);
+    await waitFor(first, /^Rocket$/, { what: 'the profile on the first device' });
+    await sleep(500);
+    ({ name, rocket } = await profileShown(first));
+    await click(first, /^Done$/);
+    await waitFor(first, /^Play solo$/, { what: 'the first device\'s front door' });
+    if (name === 'Bao' && rocket === 'true') break;
+    await sleep(1000);
+  }
+  if (name !== 'Bao') throw new Error(`the first device's name is ${JSON.stringify(name)}, not the account's (rocket ${rocket})`);
+  if (rocket !== 'true') throw new Error(`the first device's icon is not the account's rocket (selected: ${rocket})`);
+  // Nothing the first device did since put the old profile back: the
+  // second, at its own next start, still has its own change.
+  await second.reload();
+  await waitFor(second, /^Play live/, { what: 'live play open on the second device again', timeout: 40000 });
+  await click(second, /^Your profile$/);
+  await waitFor(second, /^Rocket$/, { what: 'the profile on the second device again' });
+  await sleep(500);
+  const still = (await profileShown(second)).name;
+  if (still !== 'Bao') throw new Error(`the second device's name became ${JSON.stringify(still)}`);
+});
+
 // ---- the runner ----------------------------------------------------------
 
 /// Plays for the thumb until [done], through the semantics tree —

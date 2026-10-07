@@ -22,7 +22,7 @@ fairness and privacy of the deal itself are covered in
 
 A public key alone is nobody. Every handler that acts for a device
 (`licence`, `checkout`, `manage`, `store`, `ticket`, `claim`, `devices`,
-`backups`, `attest`, `supersede`, `turn`, `record`) requires
+`backups`, `profile`, `attest`, `supersede`, `turn`, `record`) requires
 `{key, at, sig}`: a BIP-340 signature by the key over `oh-request/1`, the
 handler, the key, the second, and whatever else the request asks for
 (`askedBy` and `signedFor` in the worker; `signedAsk` in
