@@ -182,6 +182,12 @@ abstract class AppLocalizations {
   /// **'Hand {hand}  ·  {pass}  ·  to {target}'**
   String handHeader(int hand, String pass, int target);
 
+  /// handHeader without the score the game is played to, where the reader's text size leaves no room for all of it: the hand number and which way the cards pass, which change from hand to hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Hand {hand}  ·  {pass}'**
+  String handHeaderShort(int hand, String pass);
+
   /// Said by a screen reader about the heart at the top of the table.
   ///
   /// In en, this message translates to:
@@ -235,6 +241,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{Choose 1 more to pass} other{Choose {count} more to pass}}'**
   String choosePass(int count);
+
+  /// choosePass, where the reader's text size leaves no room for the whole of it beside the Pass button: how many more to choose, leaving "to pass" to the button that says it. As short as the language allows.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Choose 1 more} other{Choose {count} more}}'**
+  String choosePassShort(int count);
 
   /// The button that passes the three chosen cards.
   ///

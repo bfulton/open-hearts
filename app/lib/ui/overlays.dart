@@ -2,6 +2,8 @@
 /// the game.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart';
@@ -286,7 +288,7 @@ class _Sheet extends StatelessWidget {
                       style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
                 ],
                 const SizedBox(height: 16),
-                for (final row in ranked) _ScoreRow(row: row),
+                _Scores(rows: ranked),
                 if (note != null) ...[
                   const SizedBox(height: 12),
                   note!,
@@ -376,13 +378,109 @@ class _RatingLine extends StatelessWidget {
   }
 }
 
-class _ScoreRow extends StatelessWidget {
-  const _ScoreRow({required this.row});
+/// The four rows of the sheet, lowest total first, and the two columns
+/// of figures that line up down them.
+///
+/// The figures are read, so they keep the reader's text size and are
+/// never broken over two lines: each column is as wide as its widest
+/// figure, and never narrower than the sheet draws it at ordinary
+/// type. A name has the room left beside them, wrapped at its spaces.
+/// Where even that will not hold one of the names — the largest type
+/// on a narrow phone — every row puts its figures on a line of their
+/// own under its name, so the columns still line up and every name has
+/// the sheet's width; and a single word too long even for that gives
+/// way with an ellipsis, as a name on a badge does (ui/table_view.dart).
+class _Scores extends StatelessWidget {
+  const _Scores({required this.rows});
 
-  final _Row row;
+  final List<_Row> rows;
+
+  static const _icon = 28.0;
+  static const _iconGap = 10.0;
+
+  static String _delta(_Row row) => row.delta == 0 ? '—' : '+${row.delta}';
+
+  static TextStyle _nameStyle(_Row row) => TextStyle(
+        fontSize: 14.5,
+        // Your own row is the weight, not the colour: which row is
+        // yours is a fact about the sheet.
+        fontWeight: row.you ? FontWeight.w700 : FontWeight.w500,
+        color: row.mark ?? Palette.chrome,
+      );
+
+  static TextStyle _deltaStyle(_Row row) => TextStyle(
+        fontSize: 13,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        color: row.delta == 0 ? Palette.chromeDim : Palette.danger,
+      );
+
+  static TextStyle _totalStyle(_Row row) => TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        color: row.mark ?? Palette.chrome,
+      );
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ambient = DefaultTextStyle.of(context).style;
+        double widthOf(String text, TextStyle style) => (TextPainter(
+              text: TextSpan(text: text, style: ambient.merge(style)),
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+              maxLines: 1,
+            )..layout())
+            .width;
+        // The air before each figure that the columns have at ordinary
+        // type, kept at any other.
+        final delta = math.max(48.0, rows.map((r) => widthOf(_delta(r), _deltaStyle(r))).reduce(math.max) + 12);
+        final total = math.max(52.0, rows.map((r) => widthOf('${r.total}', _totalStyle(r))).reduce(math.max) + 12);
+        final room = constraints.maxWidth - _icon - _iconGap;
+        bool fits(_Row row, double width) => row.name.split(' ').every((word) => widthOf(word, _nameStyle(row)) <= width);
+        final beside = rows.every((row) => fits(row, room - delta - total));
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final row in rows)
+              _ScoreRow(row: row, delta: delta, total: total, beside: beside, whole: fits(row, beside ? room - delta - total : room)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ScoreRow extends StatelessWidget {
+  const _ScoreRow({required this.row, required this.delta, required this.total, required this.beside, required this.whole});
+
+  final _Row row;
+
+  /// The two columns' widths.
+  final double delta;
+  final double total;
+
+  /// The figures beside the name, rather than under it.
+  final bool beside;
+
+  /// The name fits its room whole, wrapped at its spaces if it must;
+  /// otherwise it is one line, cut with an ellipsis.
+  final bool whole;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = Text(
+      row.name,
+      style: _Scores._nameStyle(row),
+      maxLines: whole ? null : 1,
+      softWrap: whole,
+      overflow: whole ? null : TextOverflow.ellipsis,
+    );
+    final figures = [
+      SizedBox(width: delta, child: Text(_Scores._delta(row), textAlign: TextAlign.right, style: _Scores._deltaStyle(row))),
+      SizedBox(width: total, child: Text('${row.total}', textAlign: TextAlign.right, style: _Scores._totalStyle(row))),
+    ];
     // One line for a screen reader, the numbers said as what they are:
     // drawn, they are two columns a sighted reader takes in at a glance.
     return Semantics(
@@ -391,46 +489,19 @@ class _ScoreRow extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 5),
           child: Row(
+            crossAxisAlignment: beside ? CrossAxisAlignment.center : CrossAxisAlignment.start,
             children: [
-              PlayerIcon(name: row.iconName, seed: row.seed, avatar: row.avatar, size: 28),
-              const SizedBox(width: 10),
+              PlayerIcon(name: row.iconName, seed: row.seed, avatar: row.avatar, size: _Scores._icon),
+              const SizedBox(width: _Scores._iconGap),
               Expanded(
-                child: Text(
-                  row.name,
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    // Your own row is the weight, not the colour: which
-                    // row is yours is a fact about the sheet.
-                    fontWeight: row.you ? FontWeight.w700 : FontWeight.w500,
-                    color: row.mark ?? Palette.chrome,
-                  ),
-                ),
+                child: beside
+                    ? name
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [name, Row(mainAxisAlignment: MainAxisAlignment.end, children: figures)],
+                      ),
               ),
-              SizedBox(
-                width: 48,
-                child: Text(
-                  row.delta == 0 ? '—' : '+${row.delta}',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                    color: row.delta == 0 ? Palette.chromeDim : Palette.danger,
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 52,
-                child: Text(
-                  '${row.total}',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                    color: row.mark ?? Palette.chrome,
-                  ),
-                ),
-              ),
+              if (beside) ...figures,
             ],
           ),
         ),

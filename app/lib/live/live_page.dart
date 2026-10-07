@@ -190,6 +190,17 @@ class _LivePageState extends State<LivePage> {
         'my turn ${_c.client.awaitingMyPlay}; offered ${_c.awaitingPlay}; pass ${_c.awaitingPass}; ${_c.behind}\n';
   }
 
+  /// Who is still here: people at the table, out of those who sat down,
+  /// red while anybody is missing.
+  ({String text, Color tone}) _presence(BuildContext context) {
+    final humans = [for (var s = 0; s < seatCount; s++) if (_c.client.spec.seats[s] is HumanSeat) s];
+    final here = _c.here;
+    return (
+      text: context.l10n.hereCount(here, humans.length, _c.client.spec.rated ? 'rated' : 'unrated'),
+      tone: here == humans.length ? Palette.chromeDim : Palette.danger,
+    );
+  }
+
   /// The line under the felt: a pause and why, or a boot clock on the
   /// seat holding everyone up, or nothing special.
   Widget? _liveNote() {
@@ -328,16 +339,9 @@ class _LivePageState extends State<LivePage> {
                     }),
                   ],
                 ),
-                felt: Stack(
-                  children: [
-                    TableView(controller: _c, onHold: _aboutPicture),
-                    Positioned(
-                      left: 6,
-                      top: 4,
-                      child: _Presence(controller: _c),
-                    ),
-                  ],
-                ),
+                // Who is here, in the felt's corner: the felt keeps it
+                // clear of the seat across the table.
+                felt: TableView(controller: _c, onHold: _aboutPicture, corner: _presence(context)),
                 below: _debugState(),
                 action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
                 hand: (landscape) => HandFan(
@@ -394,30 +398,6 @@ class _LivePageState extends State<LivePage> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Who is still here: people at the table, out of those who sat down.
-class _Presence extends StatelessWidget {
-  const _Presence({required this.controller});
-
-  final LiveController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final humans = [for (var s = 0; s < seatCount; s++) if (controller.client.spec.seats[s] is HumanSeat) s];
-    final here = controller.here;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        context.l10n.hereCount(here, humans.length, controller.client.spec.rated ? 'rated' : 'unrated'),
-        style: TextStyle(fontSize: 10.5, color: here == humans.length ? Palette.chromeDim : Palette.danger),
       ),
     );
   }

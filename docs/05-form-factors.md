@@ -121,6 +121,35 @@ the ring around your chosen icon. **Red belongs to the game**: hearts,
 points against you, a loss. Each screen has at most one filled gold
 action. `app/test/palette_test.dart` checks this.
 
+## Text size
+
+The table follows the reader's text size up to twice the ordinary
+(WCAG 1.4.4), at every shape above and in every language.
+`app/test/table_fits_test.dart` plays a game alone and a live one
+through every phase at text ×1, ×1.3, ×1.5 and ×2. It fails on any
+overflow, any line cut short, and anything drawn over anything else.
+
+- **Words keep the size the reader asked for.** The header, the action
+  line, the line under your badge and the score sheets wrap rather
+  than shrink. The header takes a second line, and where two cannot
+  hold it, it drops the score the game is played to, which never
+  changes. The action line is as tall as two lines of its prompt beside
+  the Pass button. Where two lines cannot hold the prompt, it says only
+  how many cards are left to choose, since the button says "Pass". The
+  sheets' numbers are never broken. Where a name will not fit beside
+  them, every row puts its numbers under its name.
+- **A name gives way first.** A long name is cut short with an ellipsis
+  before the sentence around it, or the cards beside it, are.
+- **Pictures stay pictures.** A card's rank and suit are drawn at the
+  card's size, and so are the initials in a player's icon. A fan shows
+  only a sliver of each card, so a bigger rank would hide under the
+  next card. The cards grow with the felt instead, and a screen reader
+  says each card's name.
+- **The felt gives way last.** Badges, and the line beside your badge on
+  a wide felt, scale into the room the felt has. Where even the smallest
+  trick will not fit, which happens at ×2 on a phone on its side, the
+  whole felt is drawn slightly smaller rather than run off the screen.
+
 ## Screen readers
 
 The table can be played entirely through the accessibility tree. Each

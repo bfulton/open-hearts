@@ -160,7 +160,9 @@ class CardChip extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 1.5),
-        Pip(suit: card.suit, size: size * 0.82, color: tint),
+        // A chip is a word in a line of text, and its suit is half of
+        // it: the pip goes up with the reader's type as the rank does.
+        Pip(suit: card.suit, size: MediaQuery.textScalerOf(context).scale(size * 0.82), color: tint),
       ],
     );
   }

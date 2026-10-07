@@ -39,6 +39,7 @@ class LiveHarness {
     int jurors = 0,
     bool workers = false,
     bool canPlayAgain = false,
+    int seed = 21,
   }) {
     // Each device's deal work in a worker of its own, taking a
     // browser's time over each job, as the app's does.
@@ -46,7 +47,7 @@ class LiveHarness {
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
     spec = TableSpec(
         id: 'widget',
-        seed: 21,
+        seed: seed,
         seats: [
           for (var s = 0; s < engine.seatCount; s++)
             if (botSeats.contains(s)) BotSeat(engine.Persona.roster[s % engine.Persona.roster.length]) else HumanSeat(signers[s].publicKey),

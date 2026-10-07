@@ -100,6 +100,11 @@ class PlayerIcon extends StatelessWidget {
           ? Icon(glyph, size: size * 0.62, color: Felt.dark)
           : Text(
               initials,
+              // The initials are the icon's picture, drawn to fill its
+              // disc as a glyph would: the disc is what a badge or a
+              // sheet sizes, and the reader's type is in the name
+              // beside it.
+              textScaler: TextScaler.noScaling,
               style: TextStyle(
                 fontSize: size * (initials.length > 1 ? 0.42 : 0.52),
                 height: 1,

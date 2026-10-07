@@ -103,6 +103,11 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String handHeaderShort(int hand, String pass) {
+    return 'Mão $hand  ·  $pass';
+  }
+
+  @override
   String get heartsBroken => 'As copas foram quebradas';
 
   @override
@@ -133,6 +138,17 @@ class AppLocalizationsPt extends AppLocalizations {
       locale: localeName,
       other: 'Escolha mais $count cartas para passar',
       one: 'Escolha mais 1 carta para passar',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choosePassShort(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Escolha mais $count',
+      one: 'Escolha mais 1',
     );
     return '$_temp0';
   }

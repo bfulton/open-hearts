@@ -11,6 +11,8 @@
 /// in front of everybody. It is a memory aid, not a peek.
 library;
 
+import 'dart:math' as math;
+
 import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 
@@ -62,24 +64,34 @@ class _SuitRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // The suit's own symbol, then its thirteen ranks in a row that fits
-    // whatever width the rail has.
-    final each = ((width - 18) / engine.Rank.values.length).clamp(11.0, 22.0);
+    // whatever width the rail has. The ranks are read, so they keep the
+    // reader's text size: where that makes a 10 wider than its share of
+    // the row, every mark takes the room a 10 needs and the suit runs
+    // on to a second row rather than break a 10 in two.
+    final share = ((width - 18) / engine.Rank.values.length).clamp(11.0, 22.0);
+    final each = math.max(share, _RankMark.widest(context));
     return Row(
       children: [
         // Drawn, not typed: Roboto has no suit glyphs and a text pip
         // falls through to a network font (ui/pip.dart).
         SizedBox(width: 18, child: Pip(suit: suit, size: 11, color: colorOnFelt(suit))),
-        for (final rank in engine.Rank.values)
-          SizedBox(
-            width: each,
-            child: _RankMark(
-              rank: rank,
-              red: suit.isRed,
-              gone: played.contains(engine.Card.of(suit, rank)),
-              // The queen of spades is the card the hand is about.
-              heavy: suit == engine.Suit.spades && rank == engine.Rank.queen,
-            ),
+        Expanded(
+          child: Wrap(
+            children: [
+              for (final rank in engine.Rank.values)
+                SizedBox(
+                  width: each,
+                  child: _RankMark(
+                    rank: rank,
+                    red: suit.isRed,
+                    gone: played.contains(engine.Card.of(suit, rank)),
+                    // The queen of spades is the card the hand is about.
+                    heavy: suit == engine.Suit.spades && rank == engine.Rank.queen,
+                  ),
+                ),
+            ],
           ),
+        ),
       ],
     );
   }
@@ -92,6 +104,17 @@ class _RankMark extends StatelessWidget {
   final bool red;
   final bool gone;
   final bool heavy;
+
+  /// The widest a mark is, at the reader's text size: a 10, and the
+  /// heavy type, with a hair either side.
+  static double widest(BuildContext context) =>
+      (TextPainter(
+            text: TextSpan(text: '10', style: DefaultTextStyle.of(context).style.merge(const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800))),
+            textDirection: TextDirection.ltr,
+            textScaler: MediaQuery.textScalerOf(context),
+          )..layout())
+          .width +
+      2;
 
   @override
   Widget build(BuildContext context) {

@@ -236,17 +236,19 @@ void main() {
     (const Size(1920, 1080), 'es', 2.0),
   ]) {
     testWidgets('clear of everything at ${size.width.toInt()}x${size.height.toInt()}, $locale, text ×$scale', (tester) async {
-      // At large type the table has overflows of its own — a card's
-      // rank, the felt on a small phone — which are not this switch's
-      // to answer for; anything of the switch's, or its line's, is.
+      // Nothing on the table overflows on the way, at any text size:
+      // the switch's line, the cards, the felt (table_fits_test.dart
+      // walks every phase of a game at every size and scale). In the
+      // test font, a square a letter, which is wider than any the app
+      // is drawn in.
       final overflows = <String>[];
       final reported = FlutterError.onError;
       FlutterError.onError = (d) => overflows.add(d.toString());
       addTearDown(() => FlutterError.onError = reported);
       final c = await _pumpTable(tester, size: size, locale: Locale(locale), textScale: scale);
       final before = await _playToOffer(tester, c);
-      if (scale == 1) expect(overflows, isEmpty, reason: 'nothing overflows');
-      expect(overflows.where((o) => o.contains('AutoSwitch') || o.contains('ActionBar')), isEmpty);
+      FlutterError.onError = reported;
+      expect(overflows, isEmpty, reason: overflows.join('\n'));
       // The switch takes a place on the line the hand already had,
       // so nothing above it moves when it comes.
       expect(tester.getSize(find.byType(ActionBar)).height, before);
@@ -258,7 +260,9 @@ void main() {
         for (final e in what) {
           final box = e.renderObject;
           if (box is! RenderBox || !box.hasSize || box.size.isEmpty) continue;
-          final r = box.localToGlobal(Offset.zero) & box.size;
+          // Where it is drawn, scaled as it is drawn: the felt draws a
+          // badge's name, or its line, into the room it has.
+          final r = Rect.fromPoints(box.localToGlobal(Offset.zero), box.localToGlobal(box.size.bottomRight(Offset.zero)));
           expect(r.overlaps(toggle), isFalse, reason: '$name at $r under the switch at $toggle');
         }
       }
