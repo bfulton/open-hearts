@@ -420,8 +420,11 @@ any peer behind, and the seats dial it.
   the first — hears it before the jury that gave it; it keeps the
   verdict for its turn, and asks whose it is there, not on arrival
   (`late_juror_verdict_test.dart`). The verifier checks each verdict
-  against the jury in force for the hand, the turn, the seat and the
-  event.
+  against the turn, the seat, the event and a jury in force at the
+  hand: its own, or the one before, which ruled until the hand's own
+  carried — a table of two whose one person left carries the hand's
+  draw only once the jury before it has ruled the other out
+  (`verdict_before_the_draw_test.dart`).
 
 A rage quit is offline to every juror, so they agree; only a partition
 that also splits the jury can give two answers.

@@ -71,8 +71,9 @@ class Verification {
 /// verdict instead ([juries]: the jury proposals that carried at this
 /// peer). Each jury must itself be carried by a majority of the
 /// participants of its moment and be the draw its snapshot gives; a
-/// verdict must be by a juror of the hand, about this turn and this
-/// seat, ruling for the very event recorded.
+/// verdict must be by a juror of a jury in force at the hand — its own,
+/// or the one before, which served until the hand's own carried — about
+/// this turn and this seat, ruling for the very event recorded.
 ///
 /// A sealed record (docs/03-fair-deal.md) is replayed through the deal
 /// as well, with [crypto]: every key's proof, every shuffle's
@@ -192,6 +193,22 @@ Verification verifyRecord(
       if (h <= hand && h > latest) latest = h;
     }
     return latest < 0 ? const {} : jurors[latest]!;
+  }
+
+  /// The jurors whose verdicts carry at [hand]: those of every jury in
+  /// force there at some moment — the hand's own, and the latest
+  /// earlier hand's, in force until the hand's own carried. A table of
+  /// two with one gone quiet carries no draw, so the old jury rules the
+  /// seat out; then the one person left is the table's majority and
+  /// carries the hand's own draw, which the juror who ruled need not
+  /// be in (docs/04-live-play.md, "The draw";
+  /// `test/verdict_before_the_draw_test.dart`).
+  Set<PublicKey> rulersAt(int hand) {
+    var before = -1;
+    for (final h in jurors.keys) {
+      if (h < hand && h > before) before = h;
+    }
+    return {...?jurors[hand], if (before >= 0) ...jurors[before]!};
   }
 
   /// The bot seats a jury holds at [hand], if it holds any: the ones
@@ -456,12 +473,13 @@ Verification verifyRecord(
     jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
   }
 
-  /// Whether [d] is carried by a verdict: a juror of the hand ruled
-  /// for exactly this event at exactly this turn.
+  /// Whether [d] is carried by a verdict: a juror of a jury in force at
+  /// the hand ([rulersAt]) ruled for exactly this event at exactly this
+  /// turn.
   bool byVerdict(Decision d) {
     final v = d.verdict;
     if (v == null || v.kind != EventKind.verdict) return false;
-    if (!jurorsAt(d.turn.hand).contains(v.author)) return false;
+    if (!rulersAt(d.turn.hand).contains(v.author)) return false;
     try {
       if (v.turn != d.turn || v.seat != d.event.seat) return false;
       if ((v.side == 'removal') != d.removal) return false;
