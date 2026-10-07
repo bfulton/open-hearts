@@ -29,7 +29,10 @@ void main() {
     expect(v.plays.first.card, twoOfClubs, reason: 'the hand opens on the two of clubs');
     expect(v.taken, c.game.taken);
     // Nothing hidden in it: no hand held, no pass, nothing of the deal.
-    expect(v.toJson().keys.toSet(), {'table', 'target', 'seq', 'hand', 'phase', 'names', 'totals', 'taken', 'plays', 'toPlay'});
+    expect(v.toJson().keys.toSet(), {'table', 'target', 'seq', 'hand', 'phase', 'names', 'totals', 'taken', 'plays', 'toPlay', 'keys'});
+    // The seats' keys, whose reactions a watcher shows (reactions.dart):
+    // public already, named by the start event and the record.
+    expect(v.keys, [for (final h in c.holders) h is HumanSeat ? h.key : null]);
     final json = jsonEncode(v.toJson());
     final back = WatchedTable.parse(jsonDecode(json), table: c.spec.id)!;
     expect(back.toJson(), v.toJson());
