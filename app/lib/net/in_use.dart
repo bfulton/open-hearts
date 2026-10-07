@@ -104,8 +104,16 @@ class InUse extends ChangeNotifier {
   /// the account from a game.
   void seatedAt(String? table) {
     _seated = table;
-    unawaited(renew(place: true));
+    _placing = renew(place: true);
   }
+
+  /// The table this device has said it sits at, or null.
+  String? get seatedTable => _seated;
+
+  /// Until the service has heard the latest [seatedAt]: a game looked at
+  /// just after it ended is not still this account's own game to it.
+  Future<void> get placed => _placing ?? Future<void>.value();
+  Future<void>? _placing;
 
   /// [place]: whether to say where this device sits, which a renewal on
   /// the clock leaves alone and taking the account up always says.

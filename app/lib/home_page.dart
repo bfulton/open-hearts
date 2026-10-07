@@ -741,7 +741,15 @@ class _HomePageState extends State<HomePage> {
     controller.addListener(() {
       final seats = _seats;
       if (seats == null) return;
-      if (controller.client.done || (controller.client.mySeat != null && !controller.client.amSeated)) return seats.clear();
+      if (controller.client.done || (controller.client.mySeat != null && !controller.client.amSeated)) {
+        seats.clear();
+        // Over, or out of it: the account no longer sits at this table,
+        // and the service is told now rather than once the page is left,
+        // so the game — kept now — can be looked at from its end
+        // (net/game_records.dart) while the page still shows it.
+        if (InUse.current.seatedTable == spec.id && !InUse.current.elsewhere) InUse.current.seatedAt(null);
+        return;
+      }
       final now = DateTime.now().millisecondsSinceEpoch;
       if (now - hereAt < 10000) return;
       hereAt = now;

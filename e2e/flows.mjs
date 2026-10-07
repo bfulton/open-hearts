@@ -439,6 +439,31 @@ flow('a game watched as it is played, from the link a player shares', async ({ o
   if (bare.length) throw new Error(`cards with nobody's play to them, seen from outside: ${bare.join(', ')}`);
 });
 
+flow('a live game played to its end, then looked at from its end', async ({ open, relay }) => {
+  // Ada alone in the pool, with three bots, plays a game to fifty by the
+  // first legal card. At its end the sheet offers the whole game: the
+  // account has got up from the table, and the service has heard so
+  // before it is asked, so it is shown — not turned away as a game the
+  // account is still playing (net/game_records.dart, net/in_use.dart).
+  await relay();
+  const ada = await open();
+  await waitFor(ada, /^Play live/, { what: 'live play open', timeout: 40000 });
+  await click(ada, /^Play live/);
+  await waitFor(ada, /^1 of 1 here  ·  rated$/, { what: 'Ada alone with three bots', timeout: 60000 });
+  const until = Date.now() + 1200000;
+  while (!(await has(ada, /^See the whole game$/))) {
+    if (Date.now() > until) throw new Error(`no end to the game\nsaw: ${(await texts(ada)).join(' | ')}`);
+    if (await has(ada, /^Auto-play the rest of this hand$/)) await dismiss(ada, /^Auto-play the rest of this hand$/);
+    await dismiss(ada, /^On with it$/);
+    await act(ada);
+    await sleep(300);
+  }
+  await click(ada, /^See the whole game$/);
+  await waitFor(ada, /^The game$/, { what: 'the game\'s page' });
+  await waitFor(ada, /^Hand 1  ·  Pass left$/, { what: 'the game, shown from its end', timeout: 180000 });
+  if (await has(ada, /This is your own game/)) throw new Error('the game was turned away as one still being played');
+});
+
 flow('a reaction at a live table: one player sends 👍, and the other sees it by her seat', async ({ open, app, relay }) => {
   // Two people at a friends' table, two bots with them. Ada presses the
   // speech bubble beside her badge and picks Nice; it goes on the

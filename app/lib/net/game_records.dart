@@ -90,6 +90,8 @@ Future<GameRecord?> gameShownHere(String table) async {
   if (!Entitlement.current.live) throw const GameNotShown(NotShown.noSubscription);
   if (InUse.current.standing != Use.here) await InUse.current.open(signer);
   if (InUse.current.standing != Use.here) throw const GameNotShown(NotShown.elsewhere);
+  // A game just ended: up from its table, as far as the service knows.
+  await InUse.current.placed;
   final kept = (await SeatStore.open()).load();
   if (kept != null && kept.spec.id == table && kept.spec.seatOf(signer.publicKey) != null) {
     throw const GameNotShown(NotShown.ownGame);
