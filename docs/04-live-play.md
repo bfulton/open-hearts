@@ -402,7 +402,12 @@ any peer behind, and the seats dial it.
 ### Appeals and verdicts
 
 - **The appeal.** A stuck turn — a race that split, or any open turn
-  while the table is paused — is appealed every ten seconds.
+  while the table is paused — is appealed every ten seconds. It stands
+  while a juror hears it: one unheard for half a minute
+  (`appealStandsMs`) is a table the juror has lost, or one that no
+  longer asks, and the juror neither carries nor rules on it until it
+  hears it again. A juror cut off hears every seat fall silent and
+  cannot tell that from its own silence (`juror_cut_off_test.dart`).
 - **Carrying.** While an appeal stands, a juror says again, every five
   seconds, everything it holds for the turn: a table cut in two has
   votes on both sides, the juror hears both, and the turn often settles

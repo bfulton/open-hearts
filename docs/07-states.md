@@ -324,9 +324,12 @@ The clocks that stay are of three kinds:
   and release repeats, how often a jury is proposed. None decides a
   state.
 - **Noticing absence:** two minutes of silence from a person, half a
-  minute from a juror, "heard lately" for who is here, and how long a
+  minute from a juror, "heard lately" for who is here, how long a
   juror's position may stand still before it counts as stopped rather
-  than catching up. Nothing but time tells gone from slow.
+  than catching up, and half a minute without hearing an appeal before
+  a juror takes it as no longer standing — the juror's own way of
+  noticing it has lost the table. Nothing but time tells gone from
+  slow.
 - **Deadlines on someone present:** a person's grace and bank, and a
   held seat's 15 s and 40 s. These are rules of the game, like a chess
   clock.

@@ -798,6 +798,11 @@ class TableClient {
   /// closed where it starts, which the chaos walk holds it to.
   int saidBeforeSummons = 0;
   final Map<TurnId, int> _appealSeenAt = {};
+
+  /// When each appeal was last heard here. An appeal stands while the
+  /// people say it ([appealStandsMs]); one gone unheard that long is a
+  /// table this juror has lost, or one that no longer asks.
+  final Map<TurnId, int> _appealHeardAt = {};
   final Map<TurnId, int> _verdictAt = {};
   final Map<TurnId, int> _waitSaidAt = {};
 
@@ -1505,6 +1510,11 @@ class TableClient {
       // could not back it before, its presence not yet having seen
       // the jurors, looks again.
       if (event.kind == EventKind.jury) return _reconsiderJury(event);
+      // An appeal said again is the same appeal, and it still stands
+      // ([appealStandsMs]).
+      if (event.kind == EventKind.appeal && _appealSeenAt.containsKey(event.turn) && _isParticipant(event.author)) {
+        _appealHeardAt[event.turn] = clock.nowMs;
+      }
       if (event.kind != EventKind.leave && event.kind != EventKind.release && event.kind != EventKind.topup) _catchUp(event.turn);
       return;
     }
@@ -5529,6 +5539,7 @@ class TableClient {
   void stopServing() {
     _serving.clear();
     _appealSeenAt.clear();
+    _appealHeardAt.clear();
   }
 
   void _onAppeal(TableEvent event) {
@@ -5536,9 +5547,21 @@ class TableClient {
     if (mySeat != null || !_isParticipant(event.author)) return;
     if (!_orderFor(event.hand).contains(signer.publicKey)) return;
     _appealSeenAt.putIfAbsent(event.turn, () => clock.nowMs);
+    _appealHeardAt[event.turn] = clock.nowMs;
     _carryingHand = event.hand;
     _judgeAppeals();
   }
+
+  /// How long an appeal stands once last heard: three of the people's,
+  /// said every ten seconds while a turn is stuck ([_juryTick]). A
+  /// juror rules by the seat's presence to it, and a juror that has
+  /// lost the table hears every seat fall silent and cannot tell that
+  /// from its own silence. Ruling on an appeal heard minutes before, it
+  /// put the seat out on its own record alone, at a turn the table had
+  /// settled by the seat's own card (`test/juror_cut_off_test.dart`).
+  /// So it carries and rules only while it still hears the appeal; it
+  /// takes it up again as soon as it does.
+  static const appealStandsMs = 30000;
 
   final Map<TurnId, int> _relayedAt = {};
 
@@ -5548,9 +5571,11 @@ class TableClient {
       if (race == null) continue; // still catching up to it
       if (race.settled) {
         _appealSeenAt.remove(turn);
+        _appealHeardAt.remove(turn);
         _relayedAt.remove(turn);
         continue;
       }
+      if (clock.nowMs - (_appealHeardAt[turn] ?? _never) >= appealStandsMs) continue;
       // What this juror holds for the turn, said again every five
       // seconds while the appeal stands: a table cut in two has its
       // votes on both sides, and the juror is the one who hears both.
