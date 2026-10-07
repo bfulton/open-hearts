@@ -31,13 +31,18 @@ class TableHeader extends StatelessWidget {
   final HeartsGame game;
   final List<MenuAction> menu;
 
+  /// The line's height, and the least of it: where the reader's type
+  /// is large enough to take the line onto two, the header grows to
+  /// hold them and the felt below gives up the room.
   static const height = 40.0;
+
+  static const _style = TextStyle(fontSize: 11.5, color: Palette.chromeDim, letterSpacing: 0.3);
 
   @override
   Widget build(BuildContext context) {
     final broken = game.heartsBroken;
     return Container(
-      height: height,
+      constraints: const BoxConstraints(minHeight: height),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.28),
         border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.07))),
@@ -47,11 +52,35 @@ class TableHeader extends StatelessWidget {
           MenuButton(menu: menu),
           Expanded(
             child: Center(
-              child: Text(
-                context.l10n.handHeader(game.handNumber + 1, context.l10n.pass(game.passDirection), game.target),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim, letterSpacing: 0.3),
+              // Where the game stands is read, so it keeps the reader's
+              // size: on two lines where one will not hold it, and where
+              // even two will not — the largest type on a narrow phone —
+              // without the score the game is played to, which is the
+              // same all game, so that what changes from hand to hand is
+              // all there.
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: LayoutBuilder(
+                  builder: (context, room) {
+                    final l10n = context.l10n;
+                    final pass = l10n.pass(game.passDirection);
+                    final full = l10n.handHeader(game.handNumber + 1, pass, game.target);
+                    final fits = !(TextPainter(
+                      text: TextSpan(text: full, style: DefaultTextStyle.of(context).style.merge(_style)),
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context),
+                      maxLines: 2,
+                    )..layout(maxWidth: room.maxWidth))
+                        .didExceedMaxLines;
+                    return Text(
+                      fits ? full : l10n.handHeaderShort(game.handNumber + 1, pass),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: _style,
+                    );
+                  },
+                ),
               ),
             ),
           ),

@@ -7,6 +7,8 @@
 /// than it gives. The menu is the one way off it.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'avatar.dart';
@@ -217,6 +219,14 @@ class _TablePageState extends State<TablePage> {
 
 /// The line between the felt and your hand: what the game wants from you,
 /// and the Pass button when it wants three cards.
+///
+/// One height whatever it holds, so the table above never shifts under
+/// it: the height of the pass, its tallest state, at the width the line
+/// has and the reader's own text size. Everything on it is reading text
+/// and is drawn at the size the reader asked for (WCAG 1.4.4): the
+/// prompt wraps to a second line beside the button where it needs one,
+/// and where even two will not hold it, says it shorter (see
+/// [_PassFit]); a note takes two lines and, past that, an ellipsis.
 class ActionBar extends StatelessWidget {
   const ActionBar({super.key, required this.controller, required this.onPass, this.note});
 
@@ -228,8 +238,23 @@ class ActionBar extends StatelessWidget {
   /// clock.
   final Widget? note;
 
+  static const _padding = EdgeInsets.fromLTRB(14, 4, 14, 2);
+  static const _prompt = TextStyle(fontSize: 13, fontWeight: FontWeight.w600);
+  static const _note = TextStyle(fontSize: 12, color: Palette.chromeDim);
+  static const _buttonPadding = EdgeInsets.symmetric(horizontal: 22, vertical: 9);
+  static const _buttonLabel = TextStyle(fontWeight: FontWeight.w700);
+
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fit = _PassFit.of(context, width: constraints.maxWidth, direction: controller.game.passDirection);
+        return SizedBox(height: fit.height, child: _state(context, fit));
+      },
+    );
+  }
+
+  Widget _state(BuildContext context, _PassFit fit) {
     final l10n = context.l10n;
     final game = controller.game;
 
@@ -237,17 +262,15 @@ class ActionBar extends StatelessWidget {
       final chosen = controller.selected.length;
       final ready = chosen == passSize;
       return Padding(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
+        padding: _padding,
         child: Row(
           children: [
             Expanded(
               child: Text(
-                ready ? l10n.pass(game.passDirection) : l10n.choosePass(passSize - chosen),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: ready ? Palette.gold : Palette.chromeDim,
-                ),
+                ready ? l10n.pass(game.passDirection) : fit.prompt(l10n, passSize - chosen),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: _prompt.copyWith(color: ready ? Palette.gold : Palette.chromeDim),
               ),
             ),
             FilledButton(
@@ -257,11 +280,11 @@ class ActionBar extends StatelessWidget {
                 foregroundColor: Felt.dark,
                 disabledBackgroundColor: Colors.white.withValues(alpha: 0.08),
                 disabledForegroundColor: Palette.chromeDim,
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 9),
+                padding: _buttonPadding,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(11)),
               ),
-              child: Text(l10n.passButton, style: const TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(l10n.passButton, style: _buttonLabel),
             ),
           ],
         ),
@@ -288,12 +311,16 @@ class ActionBar extends StatelessWidget {
     final l10n = context.l10n;
     final game = controller.game;
 
-    // A note narrowed by the switch shrinks to its room rather than
-    // wrapping out of its row.
+    // Two lines at most, in whatever room the switch leaves it: the
+    // line keeps the height for two of them (_PassFit).
     if (this.note != null) {
-      return SizedBox(
-        height: 30,
-        child: Center(child: controller.autoOffered ? FittedBox(fit: BoxFit.scaleDown, child: this.note) : this.note),
+      return Center(
+        child: DefaultTextStyle.merge(
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          child: this.note!,
+        ),
       );
     }
 
@@ -309,7 +336,8 @@ class ActionBar extends StatelessWidget {
       final from = game.passerTo(controller.mySeat);
       return _cardsLine(
         position: controller.positionOf(from),
-        text: l10n.passedYou(controller.names[from]),
+        said: l10n.passedYou,
+        name: controller.names[from],
         l10n: l10n,
         cards: received,
       );
@@ -322,7 +350,8 @@ class ActionBar extends StatelessWidget {
       final to = (controller.mySeat + game.passDirection.seatOffset) % seatCount;
       return _cardsLine(
         position: controller.positionOf(to),
-        text: l10n.passedTo(controller.names[to]),
+        said: l10n.passedTo,
+        name: controller.names[to],
         l10n: l10n,
         cards: passed.toList()..sort(),
       );
@@ -335,46 +364,113 @@ class ActionBar extends StatelessWidget {
       _ => '',
     };
 
-    return SizedBox(
-      height: 30,
-      child: Center(
-        child: Text(
-          note,
-          style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
-        ),
+    return Center(
+      child: Text(
+        note,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: _note,
       ),
     );
   }
 }
 
+/// The pass as the line will say it, worked out before it is laid out:
+/// which form of the prompt fits beside the Pass button at this width
+/// and this reader's text size, and so how tall the line is.
+///
+/// The prompt is said in full where two lines of it fit. Where they do
+/// not — large type on a narrow phone — it says only how many more to
+/// choose, and leaves "to pass" to the button beside it that says so;
+/// the reader keeps the size they asked for, and loses no more than
+/// the button already tells them. Measured rather than guessed, in the
+/// type the line is drawn in, so the line holds its height through the
+/// pass and the play alike.
+class _PassFit {
+  const _PassFit({required this.full, required this.height});
+
+  factory _PassFit.of(BuildContext context, {required double width, required PassDirection direction}) {
+    final l10n = context.l10n;
+    final scaler = MediaQuery.textScalerOf(context);
+    final ambient = DefaultTextStyle.of(context).style;
+    TextPainter laid(String text, TextStyle style, double room) => TextPainter(
+          text: TextSpan(text: text, style: style),
+          textDirection: Directionality.of(context),
+          textScaler: scaler,
+          maxLines: 2,
+        )..layout(maxWidth: room);
+
+    // The button, as FilledButton draws it: its label in the theme's
+    // button type, inside its padding, and never under its least
+    // size or a finger's.
+    final label = laid(l10n.passButton, Theme.of(context).textTheme.labelLarge!.merge(ActionBar._buttonLabel), double.infinity);
+    final button = Size(
+      (label.width + ActionBar._buttonPadding.horizontal).clamp(64.0, double.infinity),
+      (label.height + ActionBar._buttonPadding.vertical).clamp(kMinInteractiveDimension, double.infinity),
+    );
+    final room = (width - ActionBar._padding.horizontal - button.width).clamp(0.0, double.infinity);
+    final style = ambient.merge(ActionBar._prompt);
+    bool fits(String text) => !laid(text, style, room).didExceedMaxLines;
+    final full = [for (var n = passSize; n > 0; n--) l10n.choosePass(n)].every(fits);
+    final said = [
+      for (var n = passSize; n > 0; n--) full ? l10n.choosePass(n) : l10n.choosePassShort(n),
+      l10n.pass(direction),
+    ];
+    final words = said.map((s) => laid(s, style, room).height).fold(0.0, math.max);
+    // And through the play, two lines of a note: what was passed, or at
+    // a live table what it is waiting for, which wraps rather than cut.
+    final notes = laid('M\nM', ambient.merge(ActionBar._note), double.infinity).height;
+    return _PassFit(full: full, height: math.max(ActionBar._padding.vertical + math.max(words, button.height), notes));
+  }
+
+  /// Whether the prompt is said in full.
+  final bool full;
+
+  /// The line's height: the tallest of the prompt beside the button and
+  /// two lines of a note. The table keeps a row at least this tall
+  /// whatever the line holds (ui/table_layout.dart).
+  final double height;
+
+  String prompt(AppLocalizations l10n, int count) => full ? l10n.choosePass(count) : l10n.choosePassShort(count);
+}
+
 /// Three cards and a line about them, with an arrow at the seat they
 /// came from or went to, so the direction is read off the table rather
 /// than out of the sentence.
-Widget _cardsLine({required int position, required String text, required List<engine.Card> cards, required AppLocalizations l10n}) {
-  return SizedBox(
-    height: 30,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(_towards(position), size: 14, color: Palette.chromeDim),
-        const SizedBox(width: 3),
-        // A long name gives way before the cards do.
-        Flexible(
-          child: Text(text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
+Widget _cardsLine(
+    {required int position,
+    required String Function(String name) said,
+    required String name,
+    required List<engine.Card> cards,
+    required AppLocalizations l10n}) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Icon(_towards(position), size: 14, color: Palette.chromeDim),
+      const SizedBox(width: 3),
+      // The words wrap to a second line before a long name gives way,
+      // and a long name gives way before the cards do; a screen reader
+      // hears the whole of it.
+      Flexible(
+        child: LayoutBuilder(
+          builder: (context, room) {
+            final whole = said(name);
+            final shown = nameGivesWay(context, said: said, name: name, style: ActionBar._note, width: room.maxWidth, lines: 2);
+            final text = Text(shown, maxLines: 2, overflow: TextOverflow.ellipsis, style: ActionBar._note);
+            return shown == whole ? text : Semantics(label: whole, child: ExcludeSemantics(child: text));
+          },
         ),
-        for (final card in cards)
-          Padding(
-            padding: const EdgeInsets.only(left: 9),
-            child: Semantics(
-              label: l10n.card(card),
-              child: ExcludeSemantics(child: CardChip(card: card, size: 14, onFelt: true)),
-            ),
+      ),
+      for (final card in cards)
+        Padding(
+          padding: const EdgeInsets.only(left: 9),
+          child: Semantics(
+            label: l10n.card(card),
+            child: ExcludeSemantics(child: CardChip(card: card, size: 14, onFelt: true)),
           ),
-      ],
-    ),
+        ),
+    ],
   );
 }
 

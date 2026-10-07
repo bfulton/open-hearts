@@ -299,12 +299,11 @@ void main() {
         testWidgets('$lang, $name: what a live table says under the felt fits the line it has', (tester) async {
           _size(tester, size);
           // The live page's notes (live/live_page.dart), in the strip
-          // between the felt and the hand: thirty pixels, whatever the
-          // language, and a sentence that needs more is cut off there
-          // without an ellipsis to say so. A relay's refusal carries
-          // forty characters of the relay's own and is two lines in
-          // English already; in another language it may need no more
-          // than it does in English.
+          // between the felt and the hand: two lines at most, whatever
+          // the language, and a sentence that needs more is cut short
+          // there. A relay's refusal carries forty characters of the
+          // relay's own and is two lines in English already; in another
+          // language it may need no more than it does in English.
           List<String> notes(AppLocalizations words) => [
             words.noRelayTakesEvents('blocked: rate-limited, slow down a…'),
             words.waitingToReconnect,
@@ -320,16 +319,15 @@ void main() {
             words.openingTheCards,
           ];
           Future<double> needs(String note) async {
-            // As ActionBar holds a note: thirty pixels, the width of the
-            // screen, centred (table_page.dart).
+            // As ActionBar holds a note: the width of the screen, centred,
+            // two lines at most (table_page.dart).
             await tester.pumpWidget(_inLanguage(
                 locale,
                 Scaffold(
                     body: Align(
                         alignment: Alignment.bottomCenter,
-                        child: SizedBox(
-                            height: 30,
-                            child: Center(child: Text(note, style: const TextStyle(fontSize: 12, color: Palette.chromeDim))))))));
+                        child: Center(
+                            child: Text(note, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Palette.chromeDim)))))));
             final paragraph = tester.renderObject<RenderParagraph>(find.text(note));
             return paragraph.getMinIntrinsicHeight(paragraph.size.width);
           }
@@ -337,8 +335,9 @@ void main() {
           final tall = <String>[];
           final theirs = notes(lookupAppLocalizations(locale));
           final ours = notes(english);
+          final twoLines = await needs('M\nM');
           for (var i = 0; i < theirs.length; i++) {
-            final room = max(30.0, await needs(ours[i]));
+            final room = max(twoLines, await needs(ours[i]));
             final needed = await needs(theirs[i]);
             if (needed > room) tall.add('"${theirs[i]}" needs ${needed.toStringAsFixed(1)} px of $room');
           }

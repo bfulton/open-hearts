@@ -116,6 +116,18 @@
       }
     }
   },
+  "handHeaderShort": "Hand {hand}  ·  {pass}",
+  "@handHeaderShort": {
+    "description": "handHeader without the score the game is played to, where the reader's text size leaves no room for all of it: the hand number and which way the cards pass, which change from hand to hand.",
+    "placeholders": {
+      "hand": {
+        "type": "int"
+      },
+      "pass": {
+        "type": "String"
+      }
+    }
+  },
   "heartsBroken": "Hearts are broken",
   "@heartsBroken": {
     "description": "Said by a screen reader about the heart at the top of the table."
@@ -151,6 +163,15 @@
   "choosePass": "{count, plural, =1{Choose 1 more to pass} other{Choose {count} more to pass}}",
   "@choosePass": {
     "description": "While picking the three cards to pass: how many are still to choose.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "choosePassShort": "{count, plural, =1{Choose 1 more} other{Choose {count} more}}",
+  "@choosePassShort": {
+    "description": "choosePass, where the reader's text size leaves no room for the whole of it beside the Pass button: how many more to choose, leaving \"to pass\" to the button that says it. As short as the language allows.",
     "placeholders": {
       "count": {
         "type": "int"
