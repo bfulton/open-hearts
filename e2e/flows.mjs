@@ -448,6 +448,11 @@ flow('a live game played to its end, then looked at from its end', async ({ open
   await relay();
   const ada = await open();
   await waitFor(ada, /^Play live/, { what: 'live play open', timeout: 40000 });
+  await click(ada, /^Your profile$/);
+  await waitFor(ada, /^Rocket$/, { what: 'the profile' });
+  await type(ada, 'Your name', 'Ada');
+  await click(ada, /^Done$/);
+  await waitFor(ada, /^Play live/, { what: 'the home screen again' });
   await click(ada, /^Play live/);
   await waitFor(ada, /^1 of 1 here  ·  rated$/, { what: 'Ada alone with three bots', timeout: 60000 });
   const until = Date.now() + 1200000;
