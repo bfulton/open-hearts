@@ -289,5 +289,9 @@
   "reviewOwnGame": "C'est votre propre partie, toujours en cours. Elle sera ici une fois terminée.",
   "autoSwitch": "Auto",
   "autoPlayLabel": "Jouer automatiquement la fin de cette donne",
-  "autoOffered": "Plus rien dans votre main ne peut changer cette donne. Auto la joue pour vous."
+  "autoOffered": "Plus rien dans votre main ne peut changer cette donne. Auto la joue pour vous.",
+  "reaction": "{code, select, nice{Joli} ha{Haha} wow{Waouh} ouch{Aïe} sorry{Pardon} gg{Bien joué} other{…}}",
+  "reactionSaid": "{name} : {reaction}",
+  "react": "Réagir",
+  "hideReactions": "Masquer les réactions des autres"
 }

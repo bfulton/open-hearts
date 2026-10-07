@@ -7,6 +7,7 @@ export 'scripted_human.dart';
 export 'sim_deal_worker.dart';
 export 'sim_juror.dart';
 export 'sim_presence.dart';
+export 'sim_reactions.dart';
 export 'sim_network.dart';
 export 'sim_table.dart';
 export 'structure.dart';

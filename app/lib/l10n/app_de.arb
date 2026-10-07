@@ -289,5 +289,9 @@
   "reviewOwnGame": "Das ist deine eigene Partie, sie läuft noch. Sie ist hier, sobald sie vorbei ist.",
   "autoSwitch": "Auto",
   "autoPlayLabel": "Den Rest dieser Runde automatisch spielen",
-  "autoOffered": "An dieser Runde kann keine deiner Karten mehr etwas ändern. Auto spielt sie für dich zu Ende."
+  "autoOffered": "An dieser Runde kann keine deiner Karten mehr etwas ändern. Auto spielt sie für dich zu Ende.",
+  "reaction": "{code, select, nice{Stark} ha{Haha} wow{Wow} ouch{Autsch} sorry{Sorry} gg{Gutes Spiel} other{…}}",
+  "reactionSaid": "{name}: {reaction}",
+  "react": "Reagieren",
+  "hideReactions": "Reaktionen der anderen ausblenden"
 }

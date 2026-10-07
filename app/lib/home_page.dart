@@ -712,6 +712,9 @@ class _HomePageState extends State<HomePage> {
         log: _debugging ? (l) => debugPrint('mesh: $l') : null,
       ),
       relay: relay,
+      // The players' reactions ride the table's own tag, beside its
+      // events and outside them (packages/table, reactions.dart).
+      reactions: relay,
       presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence,
       crypto: dealCrypto,
       dealWorker: dealWorker,

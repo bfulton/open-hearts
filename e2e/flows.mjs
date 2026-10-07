@@ -439,6 +439,49 @@ flow('a game watched as it is played, from the link a player shares', async ({ o
   if (bare.length) throw new Error(`cards with nobody's play to them, seen from outside: ${bare.join(', ')}`);
 });
 
+flow('a reaction at a live table: one player sends 👍, and the other sees it by her seat', async ({ open, app, relay }) => {
+  // Two people at a friends' table, two bots with them. Ada presses the
+  // speech bubble beside her badge and picks Nice; it goes on the
+  // table's tag, signed by her device, and Bao's screen shows it beside
+  // Ada's badge for a moment (packages/table, reactions.dart).
+  await relay();
+  const ada = await open();
+  const bao = await open();
+  for (const [page, name] of [[ada, 'Ada'], [bao, 'Bao']]) {
+    await waitFor(page, /^Play friends$/, { what: 'the home screen' });
+    await click(page, /^Your profile$/);
+    await waitFor(page, /^Rocket$/, { what: 'the profile' });
+    await type(page, 'Your name', name);
+    await click(page, /^Done$/);
+    await waitFor(page, /^Play live/, { what: 'live play open', timeout: 40000 });
+  }
+  await click(ada, /^Play friends$/);
+  await waitFor(ada, /^Share the link$/, { what: 'the room', timeout: 60000 });
+  const code = roomIn(ada.url());
+  await bao.goto(`${app.url}/room/${code}?e2e=1`);
+  // The room starts ten seconds after the last arrival.
+  for (const page of [ada, bao]) await waitFor(page, /^2 of 2 here/, { what: 'the live table', timeout: 90000 });
+
+  // Nobody at the table but its players has the button; Ada's opens the
+  // six, and her pick goes.
+  await waitFor(ada, /^React$/, { what: 'the speech bubble beside Ada\'s badge' });
+  await click(ada, /^React$/);
+  await waitFor(ada, /^Good game$/, { what: 'the reactions to pick from' });
+  await click(ada, /^Nice$/);
+  await waitFor(ada, /^You: Nice$/, { what: 'Ada\'s own reaction, in the button\'s place', timeout: 5000 });
+  await waitFor(bao, /^Ada: Nice$/, { what: 'Ada\'s reaction on Bao\'s screen', timeout: 5000 });
+  // Beside Ada's badge on Bao's screen: nearer it than any other seat's.
+  const bubble = await rectOf(bao, /^Ada: Nice$/);
+  const centre = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+  const away = (r) => Math.hypot(centre(r).x - centre(bubble).x, centre(r).y - centre(bubble).y);
+  const badges = (await texts(bao)).filter((t) => /^[^:]+: \d+ in the game/.test(t));
+  const nearest = (await Promise.all(badges.map(async (b) => ({ b, d: away(await rectOf(bao, new RegExp(`^${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`))) })))).sort((p, q) => p.d - q.d)[0];
+  if (!nearest || !nearest.b.startsWith('Ada:')) throw new Error(`the reaction is nearest ${nearest?.b ?? 'nothing'}, not Ada's badge\nBao saw: ${(await texts(bao)).join(' | ')}`);
+  // Gone again in a few seconds, on both screens.
+  await waitGone(bao, /^Ada: Nice$/, { what: 'the reaction gone', timeout: 8000 });
+  await waitFor(ada, /^React$/, { what: 'the button back', timeout: 8000 });
+});
+
 flow('a reload mid-hand comes back to the seat, and the hand plays on', async ({ open, relay }) => {
   // The page keeps what it signed and its deal secret as it plays
   // (app/lib/net/seat_store.dart); reloaded, it goes straight back to

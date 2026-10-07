@@ -36,8 +36,10 @@ import 'package:open_hearts/ui/header.dart';
 import 'package:open_hearts/ui/overlays.dart';
 import 'package:open_hearts/ui/pip.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+import 'package:open_hearts/ui/reactions.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table/table.dart' show Reaction;
 
 import 'live_page_test.dart' show LiveHarness;
 
@@ -330,14 +332,23 @@ List<String> _faults(WidgetTester tester, String where, {Iterable<String> names 
       return (what: '"${_textOf(_under(t.element, (w) => w is RichText).first)}"', rect: _rect(pill)!, element: pill);
     }).toList();
     final presence = _things(find.byType(FeltCorner), (e) => 'who is here').toList();
-    for (final t in [...badges, ...trick, ...said, ...presence]) {
+    // The players' reactions beside their badges, and the button beside
+    // the player's own (ui/reactions.dart): on the felt, clear of every
+    // badge, card and line on it and of each other.
+    final reactions = [
+      ..._things(find.descendant(of: find.byType(TableView), matching: find.byType(ReactionBubble)),
+          (e) => '${(e.widget as ReactionBubble).name}\'s reaction'),
+      ..._things(find.descendant(of: find.byType(TableView), matching: find.byType(ReactionButton)), (e) => 'the react button'),
+    ];
+    for (final t in [...badges, ...trick, ...said, ...presence, ...reactions]) {
       if (!_inside(t.rect, felt.rect)) faults.add('$where: ${t.what} ${_r(t.rect)} off the felt ${_r(felt.rect)}');
     }
-    _apart([...badges, ...said, ...presence], faults, where);
+    _apart([...badges, ...said, ...presence, ...reactions], faults, where);
     for (final card in trick) {
       _apart([card, ...badges], faults, where);
       _apart([card, ...said], faults, where);
       _apart([card, ...presence], faults, where);
+      _apart([card, ...reactions], faults, where);
     }
     // What is on a badge stays on it: the icon, the name, the numbers,
     // the hearts and the clock.
@@ -450,6 +461,8 @@ Future<List<String>> _walkSolo(WidgetTester tester, {required Size size, require
     await tester.pump(const Duration(seconds: 1));
     final c = tester.widget<TableView>(find.byType(TableView)).controller;
     walk = _Walk(tester, () => c.names);
+    // Alone, nobody reacts: no button, and bots say nothing.
+    expect(find.byType(ReactionButton), findsNothing);
     for (var step = 0; step < 3000 && !_sheetUp(); step++) {
       walk.look(_situation(c));
       if (!_act(c)) {
@@ -502,7 +515,15 @@ Future<List<String>> _walkLive(WidgetTester tester, {required Size size, require
     walk = _Walk(tester, () => c.names);
     live.people[0]!.thinkMs = 17000;
     for (var step = 0; step < 4000 && !_sheetUp(); step++) {
-      walk.look(_situation(c));
+      if (_reactAround(live)) {
+        await tester.pump();
+        await tester.pump();
+      }
+      final situation = _situation(c);
+      walk.look(situation);
+      // And each moment again as it is with the player's own reaction
+      // up, or the button in its place.
+      walk.look('$situation · ${c.reactionAt(c.mySeat) == null ? 'the button' : 'your reaction'}');
       if (c.clockMs(0) != null) walk.look('a clock on a badge');
       if (c.canBoot(0)) {
         walk.look('Boot offered');
@@ -521,7 +542,29 @@ Future<List<String>> _walkLive(WidgetTester tester, {required Size size, require
   });
   expect(walk.seen, containsAll({..._phases, 'a clock on a badge', 'Boot offered', toTheEnd ? 'game over' : 'hand over'}),
       reason: 'the walk went through every phase');
+  expect(walk.seen.where((s) => s.endsWith(' · your reaction')), isNotEmpty, reason: 'seen with a reaction at every seat');
+  expect(walk.seen.where((s) => s.endsWith(' · the button')), isNotEmpty, reason: 'seen with the button beside the player');
   return [...errors, ...walk.report];
+}
+
+/// A reaction up at every seat (ui/reactions.dart), the longest word
+/// there is in each: the others' said again as each goes, and the
+/// player's own every other three seconds, so that the table is seen
+/// with all four up and with three and the button. Whether anything
+/// was said.
+bool _reactAround(LiveHarness live) {
+  final c = live.controller;
+  var said = false;
+  for (var seat = 0; seat < engine.seatCount; seat++) {
+    if (seat == c.mySeat || c.reactionAt(seat) != null) continue;
+    live.reactFrom(seat, Reaction.gg);
+    said = true;
+  }
+  if (c.reactionAt(c.mySeat) == null && (live.clock.nowMs ~/ 3000).isEven && c.canReact) {
+    c.react(Reaction.gg);
+    said = true;
+  }
+  return said;
 }
 
 // ---- the suites --------------------------------------------------------------

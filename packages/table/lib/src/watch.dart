@@ -4,9 +4,11 @@
 /// watcher says on the table's tag that it is watching ([TableKinds
 /// .watch], `{"watching": true, "licence": …}`), and one seated player's device
 /// answers with what anyone at the table can see — the names, the
-/// scores, the cards played this hand, whose turn it is — as a
-/// [WatchedTable], again after every move while anyone has said so in the
-/// last minute. Nothing hidden is in it: no hand, no pass, no deal.
+/// scores, the cards played this hand, whose turn it is, and the keys
+/// the seats are held by, which is whose reactions to show
+/// (reactions.dart) — as a [WatchedTable], again after every move while
+/// anyone has said so in the last minute. Nothing hidden is in it: no
+/// hand, no pass, no deal.
 ///
 /// A view is a player's account, signed by their key, not a proof:
 /// the proof is the record, checked when the game is over (record.dart,
@@ -44,6 +46,7 @@ class WatchedTable {
     required this.plays,
     this.toPlay,
     this.winners = const [],
+    this.keys,
   });
 
   final String table;
@@ -74,6 +77,11 @@ class WatchedTable {
   /// Once the game is over, who won it.
   final List<int> winners;
 
+  /// The key of the device in each seat held in person, null for a
+  /// bot's: whose reactions (reactions.dart) a watcher shows, and at
+  /// which seat. Null from a player's device that does not say.
+  final List<PublicKey?>? keys;
+
   bool get over => phase == Phase.gameOver;
 
   /// What [client] shows anyone at its table now, with [names] by seat.
@@ -99,8 +107,18 @@ class WatchedTable {
       plays: plays,
       toPlay: game.currentSeat,
       winners: game.phase == Phase.gameOver ? game.winners : const [],
+      keys: [
+        for (final h in client.holders)
+          if (h is HumanSeat) h.key else null,
+      ],
     );
   }
+
+  /// The seats held in person, by their devices' keys: who may react.
+  Map<PublicKey, int> get seated => {
+        for (final (seat, key) in (keys ?? const <PublicKey?>[]).indexed)
+          if (key != null) key: seat,
+      };
 
   Map<String, Object?> toJson() => {
     'table': table,
@@ -116,6 +134,7 @@ class WatchedTable {
     ],
     if (toPlay != null) 'toPlay': toPlay,
     if (winners.isNotEmpty) 'winners': winners,
+    if (keys != null) 'keys': keys,
   };
 
   /// [json] as a view of [table], or null for anything else.
@@ -144,6 +163,8 @@ class WatchedTable {
       if (toPlay != null && (toPlay < 0 || toPlay >= seatCount)) return null;
       final winners = [for (final w in m['winners'] as List? ?? const []) w as int];
       if (winners.any((w) => w < 0 || w >= seatCount)) return null;
+      final keys = m['keys'] == null ? null : [for (final k in m['keys'] as List) k as String?];
+      if (keys != null && (keys.length != seatCount || keys.any((k) => k != null && !_key.hasMatch(k)))) return null;
       return WatchedTable(
         table: table,
         target: m['target'] as int,
@@ -156,11 +177,14 @@ class WatchedTable {
         plays: plays,
         toPlay: toPlay,
         winners: winners,
+        keys: keys,
       );
     } catch (_) {
       return null;
     }
   }
+
+  static final _key = RegExp(r'^[0-9a-f]{64}$');
 }
 
 /// A seated player's side of watching: answers whoever says they are

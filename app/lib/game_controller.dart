@@ -226,6 +226,14 @@ class GameController extends ChangeNotifier implements TableModel {
   @override
   int? clockMs(int seat) => null;
 
+  /// No reactions at a solo table: bots do not react, and there is
+  /// nobody else to react to.
+  @override
+  SeatReaction? reactionAt(int seat) => null;
+
+  @override
+  String nameAlone(int seat) => names[seat];
+
   @override
   Set<Card> get passed =>
       _game.phase == Phase.passing ? (_game.passOf(humanSeat) ?? const []).toSet() : const {};

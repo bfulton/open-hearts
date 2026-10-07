@@ -1324,4 +1324,29 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get autoOffered =>
       'Nada do que você tem pode mudar esta mão agora. Auto joga por você até o fim.';
+
+  @override
+  String reaction(String code) {
+    String _temp0 = intl.Intl.selectLogic(code, {
+      'nice': 'Boa',
+      'ha': 'Haha',
+      'wow': 'Uau',
+      'ouch': 'Ai',
+      'sorry': 'Desculpa',
+      'gg': 'Bom jogo',
+      'other': '…',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String reactionSaid(String name, String reaction) {
+    return '$name: $reaction';
+  }
+
+  @override
+  String get react => 'Reagir';
+
+  @override
+  String get hideReactions => 'Esconder as reações dos outros';
 }

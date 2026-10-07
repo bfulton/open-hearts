@@ -15,7 +15,7 @@ same one, wherever they are:
 
 | Tag | Carries |
 |---|---|
-| a table's id | its events (kind 24242), WebRTC signalling (24243), the watch lane (24247) |
+| a table's id | its events (kind 24242), WebRTC signalling (24243), the watch lane (24247), the players' reactions (24248) |
 | `queue:…` | a pool's waiting room (24245) |
 | a room code | the room's lobby events |
 | `results` | game results, which ratings are folded from |
@@ -31,8 +31,16 @@ message size, REQ size and publish rate are `objectLimits` for presence
 ## What is kept, and for how long
 
 Ephemeral kinds (20000–29999), which are table events, signalling,
-pools and presence, are forwarded and forgotten. The table protocol's
-own repeats recover a dropped message.
+pools, presence and the players' reactions, are forwarded and
+forgotten. The table protocol's own repeats recover a dropped message.
+
+A reaction ([doc 04](04-live-play.md#reactions)) is a code and the
+moment it was said at, never words, and the object holds it to that: it
+rides only a table's own tag, tagged with that table and nothing else,
+and an object refuses one anywhere else, longer than 128 characters, or
+in any other shape (`reactionRefusal`). The codes themselves are not
+listed there — a screen shows only those it knows — so a new one needs
+no new relay.
 
 One kind is stored: **4244, the lobby**. That covers a room announced, a
 pool's seating, a table started, a player's picture, and a game's
@@ -54,7 +62,9 @@ Anyone with a table's address can watch it without sitting at it
 (`packages/table/lib/src/watch.dart`). A watcher announces itself on the
 table's tag every twenty seconds under a throwaway key. The seated player
 with the lowest key answers after every move with a view anyone at the
-table could see: names, scores, this hand's cards played, and whose turn
-it is, until a minute after the last watcher spoke. A view never
+table could see: names, scores, this hand's cards played, whose turn
+it is and the keys the seats are held by, until a minute after the last
+watcher spoke. The watcher reads the players' reactions beside it, and
+shows those of the seats' keys. A view never
 includes a hand, a pass or the deal, is never stored, and proves
 nothing: once the game is over, the review page verifies the full record.

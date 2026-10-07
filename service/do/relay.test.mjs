@@ -12,7 +12,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { createRelay, limitsFrom, maxSubscriptions, memoryStore, objectLimitBounds, objectLimits, objectLimitsOf, objectRelay, schnorrVerifier, tagOf } from './relay.mjs';
+import {
+  createRelay,
+  limitsFrom,
+  maxSubscriptions,
+  memoryStore,
+  objectLimitBounds,
+  objectLimits,
+  objectLimitsOf,
+  objectRelay,
+  reactionKind,
+  reactionMost,
+  reactionRefusal,
+  schnorrVerifier,
+  tableLimits,
+  tagOf,
+} from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
 
@@ -458,4 +473,105 @@ test('an object built with the row\'s burst holds a socket to it', async () => {
   relay.open(a);
   for (let i = 0; i < 8; i++) await relay.message(a, JSON.stringify(['EVENT', await beat(keys[0], 2000 + i)]));
   assert.equal(a.of('OK').filter((m) => m[2]).length, 5);
+});
+
+// ---- a player's reaction ------------------------------------------------
+// A seated player's 👍 (packages/table, reactions.dart) rides the table's
+// own tag as an ephemeral kind: carried to the others and to whoever is
+// watching, and never written down. Never free text, so the object holds
+// it to the shape of one, and to the tag it belongs on.
+
+const table = '0123456789abcdef0123456789abcdef';
+const reaction = (key, { tag = table, content = '{"react":"nice","hand":2,"turn":17}', tags = [['t', tag]], at = 1000 } = {}) =>
+  sign.event(key, { kind: reactionKind, content, tags, created_at: at });
+
+test("a reaction rides a table's tag: carried to whoever reads it there, and kept by nobody", async () => {
+  const kept = [];
+  const relay = objectRelay(verify, { tag: table, kept: (e) => kept.push(e) });
+  const watcher = socket();
+  relay.open(watcher);
+  await relay.message(watcher, JSON.stringify(['REQ', 'watch', { kinds: [24247, reactionKind], '#t': [table] }]));
+  const a = socket();
+  relay.open(a);
+  const nice = await reaction(keys[0]);
+  await relay.message(a, JSON.stringify(['EVENT', nice]));
+  assert.deepEqual(a.of('OK')[0], ['OK', nice.id, true, '']);
+  assert.deepEqual(watcher.of('EVENT'), [['EVENT', 'watch', nice]]);
+  // Forwarded and forgotten: nothing stored, nothing written out, and a
+  // screen that arrives later hears nothing of it.
+  assert.equal(relay.stored, 0);
+  assert.deepEqual(kept, []);
+  const late = socket();
+  relay.open(late);
+  await relay.message(late, JSON.stringify(['REQ', 'watch', { kinds: [reactionKind], '#t': [table] }]));
+  assert.deepEqual(late.said, [['EOSE', 'watch']]);
+  // Every code a screen knows has the shape.
+  for (const code of ['nice', 'ha', 'wow', 'ouch', 'sorry', 'gg']) {
+    assert.equal(reactionRefusal(table, { tags: [['t', table]], content: JSON.stringify({ react: code, hand: 0, turn: 52 }) }), null, code);
+  }
+});
+
+test("a reaction anywhere but its table's tag, tagged otherwise, too big or not the shape of one, is refused and goes nowhere", async () => {
+  // Presence, the standings, a pool, a room's code: no table there.
+  for (const tag of ['online', 'results', 'queue:rated:50', 'AB12CD34']) {
+    const relay = objectRelay(verify, { tag });
+    const a = socket();
+    relay.open(a);
+    await relay.message(a, JSON.stringify(['EVENT', await reaction(keys[0], { tag })]));
+    assert.equal(a.of('OK')[0][2], false, tag);
+    assert.match(a.of('OK')[0][3], /^blocked: a reaction rides a table's own tag/, tag);
+  }
+  const relay = objectRelay(verify, { tag: table });
+  const watcher = socket();
+  relay.open(watcher);
+  await relay.message(watcher, JSON.stringify(['REQ', 'watch', { kinds: [reactionKind], '#t': [table] }]));
+  const a = socket();
+  relay.open(a);
+  const refused = async (options, why) => {
+    const e = await reaction(keys[1], options);
+    await relay.message(a, JSON.stringify(['EVENT', e]));
+    const ok = a.of('OK').at(-1);
+    assert.equal(ok[1], e.id);
+    assert.equal(ok[2], false, JSON.stringify(options));
+    assert.match(ok[3], why, JSON.stringify(options));
+  };
+  // Tagged for another table, for none, or with something more.
+  await refused({ tags: [['t', 'fedcba9876543210fedcba9876543210']] }, /^blocked: /);
+  await refused({ tags: [] }, /^blocked: /);
+  await refused({ tags: [['t', table], ['p', keys[0].public]] }, /^blocked: /);
+  // Too big: a reaction is some thirty characters.
+  await refused({ content: JSON.stringify({ react: 'nice', hand: 2, turn: 17, pad: 'x'.repeat(reactionMost) }) }, /^invalid: too big/);
+  // Words, or anything else that is not a code and a moment.
+  for (const content of [
+    'nice',
+    'hello, everyone at this table',
+    '["nice",2,17]',
+    '{"react":"nice","hand":2}',
+    '{"react":"nice","hand":2,"turn":17,"text":"hello"}',
+    '{"react":"Nice!","hand":2,"turn":17}',
+    '{"react":"nice","hand":-1,"turn":17}',
+    '{"react":"nice","hand":2,"turn":53}',
+    '{"react":"nice","hand":"2","turn":17}',
+  ]) {
+    await refused({ content }, /^invalid: a reaction is a code/);
+  }
+  assert.equal(watcher.of('EVENT').length, 0, 'and none of it reached anybody');
+  // A forged one is refused before the policy is asked.
+  const forged = { ...(await reaction(keys[1])), content: '{"react":"gg","hand":2,"turn":17}' };
+  await relay.message(a, JSON.stringify(['EVENT', forged]));
+  assert.match(a.of('OK').at(-1)[3], /^invalid: bad id or signature/);
+  // And the table's own traffic is untouched by any of it.
+  await relay.message(a, JSON.stringify(['EVENT', await sign.event(keys[1], { kind: 24242, content: '{"x":1}', tags: [['t', table]] })]));
+  assert.equal(a.of('OK').at(-1)[2], true);
+});
+
+test("a flood of reactions is held to the table's rate like anything else a socket says", async () => {
+  const relay = objectRelay(verify, { tag: table, now: () => 1_000_000 });
+  const a = socket();
+  relay.open(a);
+  const events = [];
+  for (let i = 0; i < tableLimits.burst + 3; i++) events.push(await reaction(keys[0], { at: 1000 + i }));
+  await Promise.all(events.map((e) => relay.message(a, JSON.stringify(['EVENT', e]))));
+  assert.equal(a.of('OK').filter((m) => m[2]).length, tableLimits.burst);
+  assert.match(a.of('OK').at(-1)[3], /^rate-limited: /);
 });

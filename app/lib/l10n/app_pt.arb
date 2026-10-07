@@ -289,5 +289,9 @@
   "reviewOwnGame": "Esta é a sua própria partida, ainda em andamento. Ela fica aqui quando terminar.",
   "autoSwitch": "Auto",
   "autoPlayLabel": "Jogar sozinho o resto desta mão",
-  "autoOffered": "Nada do que você tem pode mudar esta mão agora. Auto joga por você até o fim."
+  "autoOffered": "Nada do que você tem pode mudar esta mão agora. Auto joga por você até o fim.",
+  "reaction": "{code, select, nice{Boa} ha{Haha} wow{Uau} ouch{Ai} sorry{Desculpa} gg{Bom jogo} other{…}}",
+  "reactionSaid": "{name}: {reaction}",
+  "react": "Reagir",
+  "hideReactions": "Esconder as reações dos outros"
 }

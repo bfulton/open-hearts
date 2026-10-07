@@ -1337,4 +1337,29 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get autoOffered =>
       'An dieser Runde kann keine deiner Karten mehr etwas ändern. Auto spielt sie für dich zu Ende.';
+
+  @override
+  String reaction(String code) {
+    String _temp0 = intl.Intl.selectLogic(code, {
+      'nice': 'Stark',
+      'ha': 'Haha',
+      'wow': 'Wow',
+      'ouch': 'Autsch',
+      'sorry': 'Sorry',
+      'gg': 'Gutes Spiel',
+      'other': '…',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String reactionSaid(String name, String reaction) {
+    return '$name: $reaction';
+  }
+
+  @override
+  String get react => 'Reagieren';
+
+  @override
+  String get hideReactions => 'Reaktionen der anderen ausblenden';
 }

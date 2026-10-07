@@ -1843,6 +1843,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing you hold can change this hand now. Auto plays it out for you.'**
   String get autoOffered;
+
+  /// A quick reaction a player at a live table sends, shown beside their emoji in a bubble by their seat and in the picker. One or two short words. code is nice (👍), ha (😂), wow (😮), ouch (😬), sorry (🙏) or gg (👋, good game).
+  ///
+  /// In en, this message translates to:
+  /// **'{code, select, nice{Nice} ha{Ha} wow{Wow} ouch{Ouch} sorry{Sorry} gg{Good game} other{…}}'**
+  String reaction(String code);
+
+  /// What a screen reader says when another player's reaction appears beside their seat: the player's name and the reaction's word, as in 'Bonnie: Nice'.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: {reaction}'**
+  String reactionSaid(String name, String reaction);
+
+  /// The speech-bubble button beside the player's own seat at a live table, which opens the reactions to send; what a screen reader calls it.
+  ///
+  /// In en, this message translates to:
+  /// **'React'**
+  String get react;
+
+  /// A switch, under the reactions to send and under a game being watched: stops other players' reactions showing on this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide others\' reactions'**
+  String get hideReactions;
 }
 
 class _AppLocalizationsDelegate

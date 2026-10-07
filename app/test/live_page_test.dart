@@ -45,6 +45,7 @@ class LiveHarness {
     // browser's time over each job, as the app's does.
     SimDealWorker? worker() => workers && crypto != null ? SimDealWorker(crypto, clock) : null;
     final signers = [for (var s = 0; s < engine.seatCount; s++) FakeSigner('seat$s')];
+    keys = [for (final s in signers) s.publicKey];
     spec = TableSpec(
         id: 'widget',
         seed: seed,
@@ -87,6 +88,8 @@ class LiveHarness {
           ratingOf: rated ? ledger.of : null,
           onResult: rated ? ledger.apply : null,
           canPlayAgain: canPlayAgain,
+          reactions: reactions.lane(signers[s].publicKey),
+          reactionClock: reactions.nowMs,
         );
       } else {
         final client = TableClient(
@@ -117,6 +120,19 @@ class LiveHarness {
 
   final clock = VirtualClock();
   late final SimNetwork net = SimNetwork(clock, seed: 3);
+
+  /// Each seat's device's key, by seat.
+  late final List<PublicKey> keys;
+
+  /// The players' reactions (packages/table, reactions.dart): what
+  /// anyone at the table says, this device hears. On the screen's own
+  /// clock, the test's, which is the one a bubble goes by.
+  final reactions = ReactionHub(nowMs: () => TestWidgetsFlutterBinding.instance.clock.now().millisecondsSinceEpoch);
+
+  /// [seat]'s player says [reaction], at this hand, as their device
+  /// would.
+  void reactFrom(int seat, Reaction reaction) =>
+      reactions.sayAs(keys[seat], ReactionSaid(reaction, hand: controller.client.game.handNumber, turn: 0).encode());
 
   /// Who is online to be drawn as a juror, and the jurors themselves.
   SimPresence? presence;

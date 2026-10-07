@@ -593,11 +593,53 @@ A table can be watched from its address (`/table/ID`; `watch.dart`,
 subscription's: the watcher's device, its account's device in use, says
 on the table's watch lane that it is watching, with its licence, and
 one seated player's device answers with what anyone at the table can
-see — names, scores, this hand's cards, whose turn — after every move
-while anyone has asked in the last minute. A watcher of an account
+see — names, scores, this hand's cards, whose turn, and the keys the
+seats are held by, whose [reactions](#reactions) the watcher shows —
+after every move while anyone has asked in the last minute. A watcher of an account
 seated at the table is not answered: nobody watches their own game from
 another device. Nothing hidden is in it. A view is a player's signed
 account, believed only as far as a scoreboard is.
+
+## Reactions
+
+A seated player can say one of six things to the table — 👍 Nice,
+😂 Ha, 😮 Wow, 😬 Ouch, 🙏 Sorry, 👋 Good game — from the speech bubble
+beside their own badge (`packages/table/lib/src/reactions.dart`,
+`app/lib/ui/reactions.dart`). There is no free text, so there is
+nothing to moderate: on the wire a reaction is a short code and the
+moment it was said at, `{"react":"nice","hand":2,"turn":17}`, and each
+screen says the word in its own language. It shows beside the sender's
+badge for three seconds on every screen at the table and every screen
+watching it, and a screen reader says it politely ("Bonnie: Nice").
+
+A reaction is not a table event. It rides the table's tag as an
+ephemeral kind of its own (24248), signed by the seat's device, and a
+relay forwards it and keeps nothing. It is not in the record, the
+results or the game record; nothing the protocol decides — a turn, a
+clock, a jury — looks at one; one that is lost is not said again; and a
+relay that refuses one is not counted as refusing the table's own
+events.
+
+A screen shows one only from a key that holds a seat in person now —
+by the table's own state, or for a watcher by the view a player's
+device sends it, which names the seats' keys — a code it knows, about
+the hand it is at or one either side, made in the last ten seconds,
+heard once, and not within two and a half seconds of the last it showed
+from that key. A player sends one at most every three seconds. A bot
+has no key to say one with, and a table alone has none. Only the
+account's device in use is carried by the relay at all, and a device
+the account was taken up from has already left its seat.
+
+Anyone can hide everyone else's reactions on their own device, from
+under the six or under a game being watched
+(`app/lib/reaction_mute.dart`); hidden, none is drawn or said aloud, and
+the player's own still shows. On the felt the far seat's goes to the
+left of its badge, the right-hand seat's over its badge and the
+left-hand seat's under it, each in the strip its badge stands in, so
+they run into opposite corners; the player's own takes the button's
+place. None is ever over a card, which the large-text suite checks at
+every size, language and text size with one at every seat
+(`app/test/fits.dart`).
 
 ## Game records
 
@@ -669,7 +711,8 @@ table under way needs nothing from it.
 ## Not addressed
 
 - **Chat.** None. Text between strangers is a moderation surface Hearts
-  does not need.
+  does not need; the six [reactions](#reactions) are the whole of what
+  the players say to each other.
 - **Collusion.** Two players sharing hands out of band beat everything
   here. With nothing at stake it is small, which is a reason not to give
   the game stakes.
