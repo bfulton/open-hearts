@@ -71,9 +71,10 @@ class Verification {
 /// verdict instead ([juries]: the jury proposals that carried at this
 /// peer). Each jury must itself be carried by a majority of the
 /// participants of its moment and be the draw its snapshot gives; a
-/// verdict must be by a juror of a jury in force at the hand — its own,
-/// or the one before, which served until the hand's own carried — about
-/// this turn and this seat, ruling for the very event recorded.
+/// verdict must be by a juror of a jury in force at its turn — the
+/// hand's own, or the one before up to the turn the hand's own carried
+/// at — about this turn and this seat, ruling for the very event
+/// recorded.
 ///
 /// A sealed record (docs/03-fair-deal.md) is replayed through the deal
 /// as well, with [crypto]: every key's proof, every shuffle's
@@ -195,20 +196,37 @@ Verification verifyRecord(
     return latest < 0 ? const {} : jurors[latest]!;
   }
 
-  /// The jurors whose verdicts carry at [hand]: those of every jury in
-  /// force there at some moment — the hand's own, and the latest
-  /// earlier hand's, in force until the hand's own carried. A table of
-  /// two with one gone quiet carries no draw, so the old jury rules the
-  /// seat out; then the one person left is the table's majority and
-  /// carries the hand's own draw, which the juror who ruled need not
-  /// be in (docs/04-live-play.md, "The draw";
-  /// `test/verdict_before_the_draw_test.dart`).
-  Set<PublicKey> rulersAt(int hand) {
+  /// Where each hand's own jury carried: the earliest turn of its
+  /// draws. A draw names the turn its proposer stood at, and is carried
+  /// by a majority of the participants of that turn.
+  final ownJuryAt = <int, TurnId>{};
+
+  /// Whether [who] may rule at [turn]: a juror of a jury in force there.
+  /// The hand's own, across redraws; and, at turns up to the one the
+  /// hand's own carried at — or the whole hand, if it never carried —
+  /// the latest earlier hand's, since a jury serves until a later one
+  /// carries. A table of two with one gone quiet carries no draw, so
+  /// the old jury rules the seat out; then the one person left is the
+  /// table's majority and carries the hand's own draw, which the juror
+  /// who ruled need not be in (docs/04-live-play.md, "Appeals and
+  /// verdicts"; `test/verdict_before_the_draw_test.dart`).
+  ///
+  /// At the turn the hand's own carried, the old jury still rules: the
+  /// removal it rules there is what lets the one person left carry the
+  /// draw at all, so at that position the verdict comes first at the
+  /// table. Past it, a client that has carried the hand's own takes no
+  /// verdict from a juror outside it ([TableClient]'s _onVerdict), and
+  /// a record holding one is not a table's.
+  bool mayRule(PublicKey who, TurnId turn) {
+    final hand = turn.hand;
+    if (jurors[hand]?.contains(who) ?? false) return true;
+    final own = ownJuryAt[hand];
+    if (own != null && !atOrBefore(turn, own)) return false;
     var before = -1;
     for (final h in jurors.keys) {
       if (h < hand && h > before) before = h;
     }
-    return {...?jurors[hand], if (before >= 0) ...jurors[before]!};
+    return before >= 0 && jurors[before]!.contains(who);
   }
 
   /// The bot seats a jury holds at [hand], if it holds any: the ones
@@ -471,15 +489,17 @@ Verification verifyRecord(
       return fail('a jury for hand ${e.hand} without a majority behind it (${d.witnesses.length} of ${d.among.length})');
     }
     jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
+    final at = ownJuryAt[e.hand];
+    if (at == null || e.turn.position < at.position) ownJuryAt[e.hand] = e.turn;
   }
 
   /// Whether [d] is carried by a verdict: a juror of a jury in force at
-  /// the hand ([rulersAt]) ruled for exactly this event at exactly this
+  /// its turn ([mayRule]) ruled for exactly this event at exactly this
   /// turn.
   bool byVerdict(Decision d) {
     final v = d.verdict;
     if (v == null || v.kind != EventKind.verdict) return false;
-    if (!rulersAt(d.turn.hand).contains(v.author)) return false;
+    if (!mayRule(v.author, d.turn)) return false;
     try {
       if (v.turn != d.turn || v.seat != d.event.seat) return false;
       if ((v.side == 'removal') != d.removal) return false;
