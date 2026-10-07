@@ -119,12 +119,13 @@ flow('a hand alone', async ({ open }) => {
   await waitFor(page, /^Play solo$/, { what: 'the home screen again' });
 });
 
-flow('the rest of a hand left to Auto', async ({ open }) => {
+flow('the rest of a hand left to Auto', async ({ open, app }) => {
   // Played by the first legal card until the table offers to play the
-  // rest itself — not every hand comes to it, so as many hands as it
-  // takes — and then left alone: the hand has to end with nobody
-  // touching it.
-  const page = await open();
+  // rest itself, and then left alone: the hand has to end with nobody
+  // touching it. Dealt from the deal the app's own test uses
+  // (app/test/autopilot_test.dart), whose first hand comes to it, so it
+  // is not left to luck; as many hands as it takes, should it not.
+  const page = await open({ url: `${app.url}/?e2e=1&seed=156` });
   await click(page, /^Play solo$/);
   await waitFor(page, /^Choose 3 more to pass$/, { what: 'the pass' });
   const until = Date.now() + 240000;

@@ -86,6 +86,10 @@ void _relayLog(String line) => debugPrint('relay: $line');
 /// mesh's every channel change go to the console too.
 final _debugging = Uri.base.queryParameters.containsKey('e2e');
 
+/// The deal a solo game starts from, for a browser test that needs a
+/// particular one (`?e2e&seed=156`); with no `e2e`, never.
+final _dealtFrom = _debugging ? int.tryParse(Uri.base.queryParameters['seed'] ?? '') : null;
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true});
 
@@ -1027,7 +1031,7 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton(
-          onPressed: () => context.push<void>(located(soloPath), extra: SoloGame(target: _options.target)),
+          onPressed: () => context.push<void>(located(soloPath), extra: SoloGame(target: _options.target, seed: _dealtFrom)),
           style: _primary(),
           child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),

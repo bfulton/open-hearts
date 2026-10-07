@@ -43,7 +43,7 @@ import 'subscribe_page.dart';
 import 'table_page.dart';
 
 /// The query parameters that belong to the session, not to a page.
-const sessionParams = {'lang', 'e2e', 'roomWait', 'updatecheck'};
+const sessionParams = {'lang', 'e2e', 'seed', 'roomWait', 'updatecheck'};
 
 /// The home screen is one page whatever room it is in: the same key, so
 /// `/` and `/room/ABCD` are the same screen with the same state, and
