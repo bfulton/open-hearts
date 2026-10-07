@@ -693,6 +693,11 @@ class LiveController extends ChangeNotifier implements TableModel {
         BotSeat(:final persona) => persona.name,
       };
 
+  /// The player's own seat is labelled You, and wears the initials of
+  /// the name it is seated under.
+  @override
+  String iconNameOf(int seat) => seat == client.mySeat ? (seatNames[seat] ?? names[seat]) : names[seat];
+
   @override
   Avatar avatarOf(int seat) => switch (_shownHolders[seat]) {
         HumanSeat(:final account) => _asShown(account, seatAvatars[seat] ?? Avatar.none),

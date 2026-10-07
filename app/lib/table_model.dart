@@ -50,6 +50,11 @@ abstract class TableModel implements Listenable {
   /// person's key, a bot's name — the same on every screen.
   String iconSeedOf(int seat);
 
+  /// What [seat]'s icon takes its initials from, where nothing was
+  /// chosen: its name, except the player's own seat, which is labelled
+  /// "You" but wears the initials of the name on their profile.
+  String iconNameOf(int seat) => names[seat];
+
   /// How [seat] chose to look (avatar.dart); a bot's is its own.
   Avatar avatarOf(int seat);
 

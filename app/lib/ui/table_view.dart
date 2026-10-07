@@ -169,6 +169,7 @@ class TableView extends StatelessWidget {
               seat: controller.seatAt(position),
               position: position,
               name: controller.names[controller.seatAt(position)],
+              iconName: controller.iconNameOf(controller.seatAt(position)),
               game: game,
               onTurn: game.currentSeat == controller.seatAt(position),
               won: pending?.winner == controller.seatAt(position),
@@ -582,6 +583,7 @@ class SeatBadge extends StatelessWidget {
     required this.won,
     required this.maxWidth,
     required this.iconSeed,
+    String? iconName,
     required this.avatar,
     this.clockMs,
     this.oneLine = false,
@@ -589,7 +591,10 @@ class SeatBadge extends StatelessWidget {
     this.onHold,
     required this.iconSize,
     this.position = 0,
-  });
+  }) : iconName = iconName ?? name;
+
+  /// What the icon's initials come from (table_model.dart, iconNameOf).
+  final String iconName;
 
   /// What a long press on the badge offers, if anything.
   final VoidCallback? onHold;
@@ -746,7 +751,7 @@ class SeatBadge extends StatelessWidget {
     // The icon sits beside the name where the badge has the width for
     // it and above it where it does not, so a side badge keeps its room
     // for the name either way.
-    final icon = PlayerIcon(name: name, seed: iconSeed, avatar: avatar, size: iconSize);
+    final icon = PlayerIcon(name: iconName, seed: iconSeed, avatar: avatar, size: iconSize);
     final nameText = _name(context, maxWidth - _padding.horizontal - (oneLine ? iconSize + 6 : 0));
     // A three-digit total beside a two-digit hand is the widest this
     // gets, and it is a hair inside a side badge's room: scaled down

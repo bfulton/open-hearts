@@ -203,7 +203,16 @@ class GameController extends ChangeNotifier implements TableModel {
   Set<Card> get inFlight => const {};
 
   @override
-  String iconSeedOf(int seat) => seat == humanSeat ? 'you' : _bots[seat]!.persona.name;
+  String iconSeedOf(int seat) => seat == humanSeat ? (mySeed.isEmpty ? 'you' : mySeed) : _bots[seat]!.persona.name;
+
+  @override
+  String iconNameOf(int seat) => seat == humanSeat && myName.isNotEmpty ? myName : names[seat];
+
+  /// The player's name and colour as their profile has them (home_page.dart):
+  /// their icon here is the one they chose, or else their initials on
+  /// their account's colour, as on every other screen.
+  String myName = '';
+  String mySeed = '';
 
   /// The player's own avatar, once the page has read it off the
   /// device; the bots' are their own.

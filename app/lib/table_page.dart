@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 
 import 'avatar.dart';
+import 'entitlement.dart';
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
 import 'feedback_page.dart';
@@ -70,6 +71,17 @@ class _TablePageState extends State<TablePage> {
     Identity.avatar().then((a) {
       if (mounted) setState(() => _controller.myAvatar = a);
     });
+    // And your initials on your colour, as the front door's icon has
+    // them (home_page.dart), where you chose no icon.
+    () async {
+      final name = await Identity.name() ?? '';
+      final seed = Entitlement.current.licence?.account ?? (await Identity.signer()).publicKey;
+      if (mounted) {
+        setState(() => _controller
+          ..myName = name
+          ..mySeed = seed);
+      }
+    }();
   }
 
   /// The controller names the player and turns down a card in the
@@ -83,6 +95,7 @@ class _TablePageState extends State<TablePage> {
   void _onGameChanged() => setState(() {});
 
   List<String> get _seeds => [for (var s = 0; s < seatCount; s++) _controller.iconSeedOf(s)];
+  List<String> get _iconNames => [for (var s = 0; s < seatCount; s++) _controller.iconNameOf(s)];
   List<Avatar> get _avatars => [for (var s = 0; s < seatCount; s++) _controller.avatarOf(s)];
 
   @override
@@ -181,12 +194,13 @@ class _TablePageState extends State<TablePage> {
               ),
 
               if (game.phase == Phase.handOver && _controller.sheetDue)
-                HandOverSheet.of(game, names: _controller.names, seeds: _seeds, avatars: _avatars, onNext: _controller.nextHand),
+                HandOverSheet.of(game, names: _controller.names, iconNames: _iconNames, seeds: _seeds, avatars: _avatars, onNext: _controller.nextHand),
               if (game.phase == Phase.gameOver && _controller.sheetDue)
                 GameOverSheet(
                   game: game,
                   names: _controller.names,
                   seeds: _seeds,
+                  iconNames: _iconNames,
                   avatars: _avatars,
                   onNewGame: _controller.newGame,
                   onHome: () => Navigator.of(context).maybePop(),

@@ -23,19 +23,22 @@ class HandOverSheet extends StatelessWidget {
     required this.onNext,
     this.seeds,
     this.avatars,
+    this.iconNames,
     this.mySeat = humanSeat,
     this.action,
   });
 
   /// Takes the numbers rather than the game: at a live table the game
   /// has already moved on to the next deal by the time this shows.
-  factory HandOverSheet.of(HeartsGame game, {required List<String> names, List<String>? seeds, List<Avatar>? avatars, required VoidCallback onNext}) =>
+  factory HandOverSheet.of(HeartsGame game,
+          {required List<String> names, List<String>? iconNames, List<String>? seeds, List<Avatar>? avatars, required VoidCallback onNext}) =>
       HandOverSheet(
         handNumber: game.handNumber,
         scores: game.handScores,
         totals: game.totals,
         moonShooter: game.moonShooter,
         names: names,
+        iconNames: iconNames,
         seeds: seeds,
         avatars: avatars,
         onNext: onNext,
@@ -53,6 +56,9 @@ class HandOverSheet extends StatelessWidget {
 
   /// How each seat chose to look, seat order; nothing when null.
   final List<Avatar>? avatars;
+
+  /// What each icon's initials come from, where not [names] (table_model.dart, iconNameOf).
+  final List<String>? iconNames;
   final VoidCallback onNext;
   final int mySeat;
 
@@ -76,6 +82,7 @@ class HandOverSheet extends StatelessWidget {
         for (var seat = 0; seat < seatCount; seat++)
           (
             name: names[seat],
+            iconName: (iconNames ?? names)[seat],
             seed: (seeds ?? names)[seat],
             avatar: avatars?[seat],
             delta: scores[seat],
@@ -105,6 +112,7 @@ class GameOverSheet extends StatelessWidget {
     this.onHome,
     this.seeds,
     this.avatars,
+    this.iconNames,
     this.rating,
     this.mySeat = humanSeat,
     this.action,
@@ -119,6 +127,9 @@ class GameOverSheet extends StatelessWidget {
 
   /// How each seat chose to look, seat order; nothing when null.
   final List<Avatar>? avatars;
+
+  /// What each icon's initials come from, where not [names] (table_model.dart, iconNameOf).
+  final List<String>? iconNames;
   final VoidCallback onNewGame;
 
   /// What the game moved this player's rating by, at a rated table.
@@ -163,6 +174,7 @@ class GameOverSheet extends StatelessWidget {
         for (var seat = 0; seat < seatCount; seat++)
           (
             name: names[seat],
+            iconName: (iconNames ?? names)[seat],
             seed: (seeds ?? names)[seat],
             avatar: avatars?[seat],
             delta: game.handScores[seat],
@@ -191,7 +203,7 @@ class GameOverSheet extends StatelessWidget {
   }
 }
 
-typedef _Row = ({String name, String seed, Avatar? avatar, int delta, int total, bool you, Color? mark});
+typedef _Row = ({String name, String iconName, String seed, Avatar? avatar, int delta, int total, bool you, Color? mark});
 
 class _Sheet extends StatelessWidget {
   const _Sheet({
@@ -380,7 +392,7 @@ class _ScoreRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 5),
           child: Row(
             children: [
-              PlayerIcon(name: row.name, seed: row.seed, avatar: row.avatar, size: 28),
+              PlayerIcon(name: row.iconName, seed: row.seed, avatar: row.avatar, size: 28),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
