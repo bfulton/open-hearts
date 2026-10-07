@@ -181,6 +181,42 @@ void main() {
     expect(find.text('Your account'), findsNothing);
   });
 
+  testWidgets("the page shows the account's sign-in as the service has it, not as this device last noted it", (tester) async {
+    final stand = standUp();
+    offering([Provider.apple, Provider.google]);
+    final me = await Identity.signer();
+    await Entitlement.current.load(me.publicKey);
+    await licenceThisDevice();
+    // Noted here once, and since taken away (Apple, the person no longer
+    // using Sign in with Apple for the app).
+    await rememberSignIn(Provider.apple);
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+      'signIn': null,
+    });
+    await openPage(tester);
+    expect(find.textContaining('Signed in with Apple.'), findsNothing);
+    expect(find.text('Sign in with Apple'), findsOneWidget, reason: 'it can be linked again');
+    expect(await signedInWith(), isNull, reason: 'the note is the account\'s now');
+
+    // Linked on another of the account's devices: this one shows it.
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+      'signIn': 'google',
+    });
+    await tester.pumpWidget(const SizedBox());
+    await openPage(tester);
+    expect(find.textContaining('Signed in with Google.'), findsOneWidget);
+    expect(await signedInWith(), Provider.google);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('not subscribed: signing in brings this device into the account the sign-in is linked to', (tester) async {
     final stand = standUp();
     final tokens = offering([Provider.apple, Provider.google]);

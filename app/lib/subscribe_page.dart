@@ -108,14 +108,24 @@ class _SubscribePageState extends State<SubscribePage> {
     await _list(me);
   }
 
+  /// Which listing is the latest: one that comes back after a newer one
+  /// was asked for, or after a sign-in, says nothing about now.
+  int _asked = 0;
+
   Future<void> _list(Signer me) async {
+    final asked = ++_asked;
     _listing = true;
     final said = await devicesOn(me);
     _listing = false;
+    if (asked != _asked) return;
+    final household = said.answer;
+    // The account's sign-in as the service has it, over the device's note.
+    final signedIn = household != null && household.toldSignIn ? await noteSignIn(household.signIn) : _signedIn;
     if (!mounted) return;
     setState(() {
-      _household = said.answer;
+      _household = household;
       _unlisted = said.refusal?.say(context.l10n);
+      _signedIn = signedIn;
     });
   }
 
@@ -314,6 +324,7 @@ class _SubscribePageState extends State<SubscribePage> {
       return;
     }
     await rememberSignIn(done.provider);
+    _asked++;
     final wasLive = Entitlement.current.live;
     if (done.licence case final licence?) await Entitlement.current.adopt(licence);
     if (!mounted) return;

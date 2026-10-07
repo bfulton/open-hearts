@@ -1581,7 +1581,11 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       if (!account) return { status: 402, body: { error: 'no subscription' } };
       const inUseNow = (await active.get(account))?.key ?? null;
       const devices = (await devicesOn(store, account)).map((d) => ({ ...d, ...(d.key === inUseNow ? { active: true } : {}) }));
-      return { status: 200, body: { devices, most: S().mostDevices } };
+      // Which sign-in the account is linked to, if any: the account's
+      // word, so a device shows a link made on another device, or one
+      // Apple has since taken away (appleIdNotice), as it is now.
+      const signIn = (await store.get(`ACCOUNT#${account}`, 'LOGIN'))?.provider ?? null;
+      return { status: 200, body: { devices, most: S().mostDevices, signIn } };
     }
     case 'attest':
       return attest(op.who, op.key, store, op.login, { now });

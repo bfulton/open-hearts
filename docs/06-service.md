@@ -32,7 +32,7 @@ None of it is in a game's latency path.
 | `play` | POST | Play real-time developer notifications (Pub/Sub push) |
 | `ticket` | POST, signed | a one-use code another device can join the account with |
 | `claim` | POST, signed | spends a code (a household code or a backup code), brings the device into the account, returns its licence |
-| `devices` | POST, signed | lists the account's devices, which one is in use, and can drop one |
+| `devices` | POST, signed | lists the account's devices, which one is in use, and which sign-in (if any) the account is linked to; can drop one |
 | `backups` | POST, signed | shows, replaces or emails the account's backup codes |
 | `profile` | POST, signed | reads the account's profile, or writes it from the account's device in use ([below](#the-accounts-profile)) |
 | `attest`, `supersede` | POST, signed | links an Apple/Google sign-in to the device's account, or brings the device into the account a sign-in is linked to |

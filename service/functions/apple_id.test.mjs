@@ -214,6 +214,17 @@ test('nothing else of the account is touched: its devices, its subscription, its
   }
 });
 
+test("the account's devices are told which sign-in it is linked to: Apple's, and then none", async () => {
+  const { env, ask } = await linked();
+  // Bao never signed in itself: it learns of Ada's link from the account.
+  const before = await ask(BAO, 'devices');
+  assert.deepEqual([before.status, before.body.signIn], [200, 'apple']);
+  await tell(env, await notice('consent-revoked'));
+  const after = await ask(BAO, 'devices');
+  assert.deepEqual([after.status, after.body.signIn], [200, null]);
+  assert.equal(after.body.devices.length, 2, 'the devices are as they were');
+});
+
 test('the account can be linked again: to the same Apple sign-in, or to another', async () => {
   const { store, env, account, signIn, login } = await linked();
   await tell(env, await notice('consent-revoked'));

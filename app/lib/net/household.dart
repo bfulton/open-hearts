@@ -43,10 +43,16 @@ class Device {
 
 /// The devices on this subscription, and how many it carries.
 class Household {
-  const Household({required this.devices, required this.most});
+  const Household({required this.devices, required this.most, this.signIn, this.toldSignIn = false});
 
   final List<Device> devices;
   final int most;
+
+  /// The sign-in the account is linked to (`apple`, `google`), or null
+  /// for none — as the service has it, which [toldSignIn] says it did: a
+  /// service from before it said so leaves the device's own note.
+  final String? signIn;
+  final bool toldSignIn;
 
   bool get full => devices.length >= most;
 
@@ -61,6 +67,8 @@ class Household {
           if (d is Map && d['key'] is String) Device(key: d['key'] as String, boundAt: d['bound_at'] as String?, inUse: d['active'] == true),
       ],
       most: most,
+      signIn: json['signIn'] is String ? json['signIn'] as String : null,
+      toldSignIn: json.containsKey('signIn'),
     );
   }
 }

@@ -95,3 +95,18 @@ Future<Provider?> signedInWith() async {
 
 Future<void> rememberSignIn(Provider provider) async =>
     (await SharedPreferences.getInstance()).setString(_stored, provider.name);
+
+/// The device's note brought in line with what the service says the
+/// account is linked to ([Household.signIn]): a link made on another of
+/// the account's devices, or one taken away — by Apple, when the person
+/// stops using Sign in with Apple here. Returns what is noted now.
+Future<Provider?> noteSignIn(String? said) async {
+  final provider = Provider.values.where((p) => p.name == said).firstOrNull;
+  final prefs = await SharedPreferences.getInstance();
+  if (provider == null) {
+    await prefs.remove(_stored);
+  } else {
+    await prefs.setString(_stored, provider.name);
+  }
+  return provider;
+}
