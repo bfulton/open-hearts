@@ -378,7 +378,7 @@ stillFlow('every page by its own address: opened, refreshed, and back to the fro
   if (new URL(game.url()).pathname !== '/') throw new Error(`a game's address stayed: ${game.url()}`);
 });
 
-stillFlow('a kept game, opened by its address: checked in the browser, then shown hand by hand', async ({ open, app }) => {
+stillFlow('a kept game, opened by its address: checked in the browser, then shown hand by hand — and one the older library kept', async ({ open, app }) => {
   // A real record, as a player's device sends one: a sealed game of four
   // played out on the simulator (packages/table, tool/game_fixture.dart),
   // kept as the site keeps it. The browser fetches it and replays every
@@ -415,24 +415,22 @@ stillFlow('a kept game, opened by its address: checked in the browser, then show
   await waitFor(page, /^Trick 1$/, { what: 'the hand\'s tricks' });
   await waitFor(page, /^\w+ of \w+, (Ada|Bao|Cy|Dee)$/, { what: 'a card, by name and player' });
   if (await has(page, /does not check out/)) throw new Error('the record did not check out');
+  // And a game as the deal on arkworks 0.3 wrote it — a sealed game of
+  // four (packages/table, tool/kept_records.dart, kept in its test
+  // fixtures) — checked by the page with today's wasm: every proof in it
+  // made by the older library, every one replayed by this one. After the
+  // first is done, so that its page's stillness is measured alone.
+  const packed = readFileSync(join(root, 'packages', 'table', 'test', 'fixtures', 'sealed_four.json.gz'));
+  const older = JSON.parse(gunzipSync(packed).toString()).spec.id;
+  app.records.kept.set(`tables/${older}.json`, packed);
+  const kept = await open({ url: `/table/${older}?e2e=1`, ready: /^The game$/ });
+  await waitFor(kept, /^Hand 1  ·  Pass left$/, { what: 'the older library\'s first hand, checked', timeout: 180000 });
+  await waitGone(kept, /^Checking the rest of the game…$/, { what: 'the rest of the older library\'s game, checked', timeout: 180000 });
+  await waitFor(kept, /^\w+ of \w+, (Ada|Bao|Cy|Dee)$/, { what: 'a card of the older library\'s game' });
+  if (await has(kept, /does not check out/)) throw new Error('the older library\'s record did not check out');
   // An address that is not a table's goes to the front door.
   const nowhere = await open({ url: '/table/not-a-table?e2e=1' });
   if (new URL(nowhere.url()).pathname !== '/') throw new Error(`a bad table address stayed: ${nowhere.url()}`);
-});
-
-stillFlow('a game kept by the older library, opened by its address: it still checks out in the browser', async ({ open, app }) => {
-  // A sealed game of four as the deal on arkworks 0.3 wrote it
-  // (packages/table, tool/kept_records.dart, kept in its test fixtures),
-  // checked by the page with today's wasm: every proof in it made by the
-  // older library, every one replayed by this one.
-  const packed = readFileSync(join(root, 'packages', 'table', 'test', 'fixtures', 'sealed_four.json.gz'));
-  const table = JSON.parse(gunzipSync(packed).toString()).spec.id;
-  app.records.kept.set(`tables/${table}.json`, packed);
-  const page = await open({ url: `/table/${table}?e2e=1`, ready: /^The game$/ });
-  await waitFor(page, /^Hand 1  ·  Pass left$/, { what: 'the first hand, checked', timeout: 180000 });
-  await waitGone(page, /^Checking the rest of the game…$/, { what: 'the rest of the game, checked', timeout: 180000 });
-  await waitFor(page, /^\w+ of \w+, (Ada|Bao|Cy|Dee)$/, { what: 'a card, by name and player' });
-  if (await has(page, /does not check out/)) throw new Error('the older library\'s record did not check out');
 });
 
 stillFlow('a game watched as it is played, from the link a player shares', async ({ open, relay }) => {
