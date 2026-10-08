@@ -38,9 +38,13 @@ names it in every address it opens (`?relay=PORT`, which a build served
 from this machine reads, app/lib/net/relays.dart), so suites run at the
 same time without meeting. `flows.mjs` and `offline.mjs` share their
 flows out among workers (`pool.mjs`), each with a rig of its own —
-relay, server and handlers, browser — so a flow never meets one beside
-it in a pool, on presence or as a juror. A worker's flows run one after
-another; the longest go first, by the last run's times
+server and handlers, browser, a port for a relay — so a flow never
+meets one beside it in a pool, on presence or as a juror. The relay on
+that port is a flow's own, like its devices: a flow whose app talks to
+a relay starts one (`await relay()`), and it is stopped as the flow
+ends, so a flow that asks for none has none, whichever flow ran before
+it, and none passes on a relay another flow left behind. A worker's
+flows run one after another; the longest go first, by the last run's times
 (`app/build/logs/<suite>-times.json`); each flow's lines are printed
 together under its verdict; and each worker's relay and TURN logs are
 `app/build/logs/relay-<suite>-<worker>.log` and `turn-…`.

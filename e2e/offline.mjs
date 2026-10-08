@@ -21,8 +21,8 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { chromium } from './browser.mjs';
-import { act, click, freePort, has, labelOf, licensed, log, logTo, root, serveApp, sleep, startRelay, texts, type, waitFor } from './drive.mjs';
-import { runFlows } from './pool.mjs';
+import { act, click, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor } from './drive.mjs';
+import { flowRelay, runFlows } from './pool.mjs';
 
 const phone = { width: 390, height: 844 };
 const shots = join(root, 'app', 'build', 'offline');
@@ -366,8 +366,8 @@ async function main() {
   mkdirSync(shots, { recursive: true });
   const failed = await runFlows({
     flows,
-    // A worker's rig, as in flows.mjs: its own server, browser, and a
-    // relay on a port of its own, started when a flow asks for one.
+    // A worker's rig, as in flows.mjs: its own server and browser, and
+    // a port for the relay of each flow that asks for one.
     setUp: async ({ tag, say }) => {
       const relayPort = await freePort();
       // A tenth of a table's beats (app/lib/net/address.dart), and the
@@ -378,11 +378,9 @@ async function main() {
       // this suite times.
       const app = await serveApp({ relayPort, tag, pace: 0.1, config: { table: { jurorSilenceMs: 10000, quorumLostMs: 10000 } } });
       const browser = await chromium.launch();
-      let relayOnce = null;
-      const relay = () => (relayOnce ??= logTo.exit(() => startRelay({ port: relayPort, tag, say })));
-      return { app, browser, relay, stop: async () => (await relayOnce)?.stop() };
+      return { app, browser, relay: flowRelay({ port: relayPort, tag, say }) };
     },
-    runFlow: async ({ name: title, run }, { app, browser, relay }) => {
+    runFlow: async ({ name: title, run }, { app, browser, relay: { relay, done } }) => {
       // A flow's devices are that flow's, as in flows.mjs; and each is a
       // device of its own — its own keys, its own kept copy of the app.
       const contexts = [];
@@ -417,12 +415,12 @@ async function main() {
         throw e;
       } finally {
         for (const ctx of contexts) await ctx.close();
+        await done();
       }
     },
-    tearDown: async ({ app, browser, stop }) => {
+    tearDown: async ({ app, browser }) => {
       await browser.close();
       app.stop();
-      await stop();
     },
   });
   log(failed ? `FAIL: ${failed} flow${failed === 1 ? '' : 's'}` : 'PASS');

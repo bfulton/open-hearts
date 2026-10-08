@@ -123,7 +123,9 @@ The slow ones, and why:
   which only a build served from this machine reads). `flows.mjs` and
   `offline.mjs` share their flows among three workers, each with a rig
   of its own, so no flow meets another (e2e/README.md;
-  `--serial` or `--jobs N` to change it). The app is
+  `--serial` or `--jobs N` to change it); a flow that needs a relay
+  starts its own on its worker's port, and it goes when the flow does,
+  so no flow passes on what another left running. The app is
   built once (`e2e/build.sh`, not again until its sources change), and
   the relay and the jurors are compiled ahead of time once, as the
   bench's container runs them.

@@ -20,8 +20,8 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 import { chromium } from './browser.mjs';
-import { act, appDir, click, dismiss, freePort, has, labelOf, licensed, log, logTo, root, serveApp, sleep, startRelay, texts, type, waitFor, waitGone, roomIn } from './drive.mjs';
-import { runFlows } from './pool.mjs';
+import { act, appDir, click, dismiss, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor, waitGone, roomIn } from './drive.mjs';
+import { flowRelay, runFlows } from './pool.mjs';
 
 const portrait = { width: 390, height: 844 };
 const landscape = { width: 844, height: 390 };
@@ -199,9 +199,12 @@ stillFlow('turning the phone mid-hand', async ({ open }) => {
   await playAlone(page, (p) => has(p, /^Next hand$/), 120000);
 });
 
-stillFlow('a game alone, and the record it leaves', async ({ open, context }) => {
+stillFlow('a game alone, and the record it leaves', async ({ open, relay }) => {
   // A game of one hand (`target=1`, app/lib/net/address.dart): its end,
-  // its record and its count are what is looked at, not its length.
+  // its record and its count are what is looked at, not its length. The
+  // game needs no relay; the profile at the end asks the relays for the
+  // rating, so there is one to ask.
+  await relay();
   const page = await open({ url: '/?e2e=1&target=1' });
   await click(page, /^Play solo$/);
   // Hand after hand until the game is over.
@@ -246,12 +249,12 @@ stillFlow('a game alone, and the record it leaves', async ({ open, context }) =>
     if (!record0.some((t) => want.test(t))) throw new Error(`no ${want} on the profile\nsaw: ${record0.join(' | ')}`);
   }
   // Nothing rated has been played here, so there is no rating to show
-  // and the page says which rather than showing the number everyone
-  // starts at — once the relays have answered, or the wait for them
-  // has ended: this flow starts none, and until then the page says it
-  // is still counting.
+  // and the page says why rather than showing the number everyone
+  // starts at, once the relays have answered; until then it says it is
+  // still counting. (With none to answer it says that instead, which
+  // offline.mjs holds it to.)
   if (record0.some((t) => /^1500$/.test(t))) throw new Error('the profile shows the rating nobody earned');
-  await waitFor(page, /Play a rated live game|relays did not answer/, {
+  await waitFor(page, /^Play a rated live game and you will have one$/, {
     what: 'the profile to say why there is no rating',
     timeout: 20000,
   });
@@ -789,23 +792,20 @@ async function main() {
   const failed = await runFlows({
     flows,
     // A worker's rig: its own server and handlers, its own browser, and
-    // a relay of its own on a port of its own. Only the lobby needs a
-    // relay, and it costs a couple of seconds and two processes, so it
-    // is started when a flow asks for one; the pages are told its port
-    // from the start.
+    // a port of its own for a relay, which the pages are told from the
+    // start. The relay itself is a flow's, as its devices are (pool.mjs,
+    // flowRelay): a flow whose app talks to one says so, `await
+    // relay()`, and has one; a flow that does not has none, whatever ran
+    // before it on the worker.
     setUp: async ({ tag, say }) => {
       const relayPort = await freePort();
       // A tenth of a table's beats (app/lib/net/address.dart): the same
       // hands, without the minute a bot's thinking takes over each.
       const app = await serveApp({ relayPort, tag, pace: 0.1 });
       const browser = await chromium.launch();
-      let relayOnce = null;
-      // Started outside any flow's lines: it outlives the flow that
-      // asked for it, and its jurors speak through `say`.
-      const relay = () => (relayOnce ??= logTo.exit(() => startRelay({ port: relayPort, tag, say })));
-      return { app, browser, relay, stop: async () => (await relayOnce)?.stop() };
+      return { app, browser, relay: flowRelay({ port: relayPort, tag, say }) };
     },
-    runFlow: async ({ run, still = false }, { app, browser, relay }) => {
+    runFlow: async ({ run, still = false }, { app, browser, relay: { relay, done } }) => {
       // A flow's devices are that flow's: they go when it does. Left open
       // they stay online — announcing themselves, folding their hearts,
       // holding sockets — and the next flow runs against a relay with a
@@ -845,12 +845,12 @@ async function main() {
         await run({ open, app, relay });
       } finally {
         for (const ctx of contexts) await ctx.close();
+        await done();
       }
     },
-    tearDown: async ({ app, browser, stop }) => {
+    tearDown: async ({ app, browser }) => {
       await browser.close();
       app.stop();
-      await stop();
     },
   });
   log(failed ? `FAIL: ${failed} flow${failed === 1 ? '' : 's'}` : 'PASS');

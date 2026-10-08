@@ -170,9 +170,12 @@ export async function startRelay({ apart = false, port = null, tag = suite, say 
   // the service. Beside rather than inside, because a relay verifies
   // every event it carries and must never wait on a juror's work.
   // The relay's whole log, always, at a known path for a debugging run.
+  // A relay started again under the same tag — a worker's, flow after
+  // flow — adds to the log this run began rather than starting it over.
   const logFile = join(root, 'app', 'build', 'logs', `relay-${tag}.log`);
   mkdirSync(dirname(logFile), { recursive: true });
-  const relayLog = createWriteStream(logFile);
+  const relayLog = createWriteStream(logFile, { flags: relayLogs.has(logFile) ? 'a' : 'w' });
+  relayLogs.add(logFile);
   port ??= await freePort();
   const [relayCmd, ...relayArgs] = await serviceProgram('service');
   const jurorProgram = await serviceProgram('juror');
@@ -198,8 +201,21 @@ export async function startRelay({ apart = false, port = null, tag = suite, say 
     proc.on('exit', (code) => reject(new Error(`relay exited ${code}\n${out}`)));
     setTimeout(() => reject(new Error('relay did not start')), 60000);
   });
-  return { url, port, bench, stop: () => { for (const j of bench) j.kill(); proc.kill(); } };
+  // Stopped, and gone: the port is free again once this resolves, for a
+  // relay started on it after.
+  const stop = async () => {
+    const gone = (p) => (p.exitCode !== null || p.signalCode !== null ? null : new Promise((r) => p.once('exit', r)));
+    const all = [proc, ...bench.map((j) => j.proc)].map(gone);
+    for (const j of bench) j.kill();
+    proc.kill();
+    await Promise.all(all);
+    relayLog.end();
+  };
+  return { url, port, bench, stop };
 }
+
+/// The relay logs this run has written, to add to rather than start over.
+const relayLogs = new Set();
 
 /// A juror process: `size` jurors served from it, each with a key
 /// derived from `secret`. `key` resolves to the eight characters it
@@ -228,7 +244,7 @@ function startJuror([cmd, ...args], relay, secret, relayLog, size, say) {
     }
   });
   juror.stderr.on('data', (d) => process.stderr.write(d));
-  return { key, said, kill: () => juror.kill() };
+  return { key, said, proc: juror, kill: () => juror.kill() };
 }
 
 const types = {

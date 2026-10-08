@@ -18,7 +18,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { argOf, log, logTo, root, suite } from './drive.mjs';
+import { argOf, log, logTo, root, startRelay, suite } from './drive.mjs';
 
 /// How many workers this run asks for.
 export function jobsAsked(fallback = 3) {
@@ -88,4 +88,23 @@ export async function runFlows({ flows, jobs = jobsAsked(), only = argOf('only')
   } catch {}
   log(`${chosen.length} flows in ${((Date.now() - began) / 1000).toFixed(0)}s`);
   return failed;
+}
+
+/// A flow's relay, on its worker's [port]: `relay()` starts it — once,
+/// however often a flow asks — and `done()` stops it, and is waited on
+/// as a flow ends. A flow whose app talks to a relay asks for one; a
+/// flow that does not ask has none, so none passes on a relay another
+/// flow left behind, and none meets another's devices or jurors on it.
+/// Started outside the flow's own lines, as the rig's; its jurors speak
+/// through [say].
+export function flowRelay({ port, tag, say }) {
+  let started = null;
+  return {
+    relay: () => (started ??= logTo.exit(() => startRelay({ port, tag, say }))),
+    done: async () => {
+      const was = started;
+      started = null;
+      await (await was?.catch(() => null))?.stop();
+    },
+  };
 }
