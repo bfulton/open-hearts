@@ -199,14 +199,16 @@ A record that continues past the end of the game is rejected.
 
 ## Cost, and keeping it off the page
 
-Measured natively with the reference crate: a shuffle with its argument
-takes 110 ms, checking one 108 ms, a token 1.1 ms to make and 2.3 ms to
-check, and a sealed token 2.1 ms to make and 3.5 ms to check. A
-four-person hand costs each seat about a second of its own work. In V8
-on one 2.8 GHz core, a shuffle takes 566 ms, checking one 468 ms, and a
-seat's 39 tokens 199 ms to make and 190 ms to check. A phone is two or
-three times slower. Playing a card stays in the noise: one token and
-its proof.
+Measured natively on arkworks 0.6: a shuffle with its argument takes
+106 ms, checking one 72 ms, a token 0.7 ms to make and 1.2 ms to check,
+and a sealed token 1.3 ms to make and 2.1 ms to check. A four-person
+hand costs each seat well under a second of its own work. In V8, a
+shuffle takes 380 ms, checking one 240 ms, and a seat's 39 tokens
+103 ms to make and 92 ms to check. (On the same machine the library on
+arkworks 0.3 took 124 and 108 ms natively, and 548, 455, 177 and
+184 ms in V8, close to what was measured for it on a 2.8 GHz core:
+566, 468, 199 and 190.) A phone is two or three times slower. Playing a
+card stays in the noise: one token and its proof.
 
 Slow calls never run on the page's thread. The page runs the wasm in a
 Web Worker, `app/web/deal_worker.js` (an isolate on the VM;
