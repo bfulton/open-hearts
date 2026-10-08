@@ -17,9 +17,9 @@
 ///                       (review_page.dart)
 ///
 /// A few query parameters are the session's rather than the page's —
-/// `lang`, and the suites' `e2e`, `roomWait` and `updatecheck` — and stay
-/// in the address wherever it goes (pages.dart, [located]), so a refresh
-/// is the same session.
+/// `lang`, and the suites' `e2e`, `seed`, `roomWait`, `relay`, `pace`,
+/// `target` and `updatecheck` — and stay in the address wherever it
+/// goes (pages.dart, [located]), so a refresh is the same session.
 library;
 
 import 'package:flutter/material.dart';
@@ -43,7 +43,7 @@ import 'subscribe_page.dart';
 import 'table_page.dart';
 
 /// The query parameters that belong to the session, not to a page.
-const sessionParams = {'lang', 'e2e', 'seed', 'roomWait', 'updatecheck'};
+const sessionParams = {'lang', 'e2e', 'seed', 'roomWait', 'relay', 'pace', 'target', 'updatecheck'};
 
 /// The home screen is one page whatever room it is in: the same key, so
 /// `/` and `/room/ABCD` are the same screen with the same state, and

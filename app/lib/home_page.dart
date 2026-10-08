@@ -90,6 +90,11 @@ final _debugging = Uri.base.queryParameters.containsKey('e2e');
 /// particular one (`?e2e&seed=156`); with no `e2e`, never.
 final _dealtFrom = _debugging ? int.tryParse(Uri.base.queryParameters['seed'] ?? '') : null;
 
+/// The score the games started here play to, when a browser test asks
+/// for another (`?e2e&target=1`, net/address.dart); with no `e2e`,
+/// never — the device's own choice, which the door still shows.
+final _playsTo = targetIn(Uri.base);
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true});
 
@@ -628,7 +633,7 @@ class _HomePageState extends State<HomePage> {
   /// plays to is part of the pool's own name.
   Future<void> _play() async {
     if (livePaused || _withoutDeal()) return;
-    final options = _options;
+    final options = _options.copyWith(target: _playsTo);
     final transport = await _connect(poolTag(options.pool, target: options.target), _Opening.live);
     if (transport == null) return;
     final ledger = _standing?.ledger ?? Ledger();
@@ -828,7 +833,7 @@ class _HomePageState extends State<HomePage> {
         code: code,
         name: _name,
         avatar: _avatar,
-        target: _options.target,
+        target: _playsTo ?? _options.target,
         timing: RemoteSettings.current.config.table,
         licence: Entitlement.current.licence,
         // Ten seconds, unless the address asks for longer and is
@@ -1042,7 +1047,7 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton(
-          onPressed: () => context.push<void>(located(soloPath), extra: SoloGame(target: _options.target, seed: _dealtFrom)),
+          onPressed: () => context.push<void>(located(soloPath), extra: SoloGame(target: _playsTo ?? _options.target, seed: _dealtFrom)),
           style: _primary(),
           child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),

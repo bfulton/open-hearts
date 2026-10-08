@@ -14,7 +14,8 @@
 ///
 /// The matrix, and what it checks; the suites that run it are
 /// table_fits_test.dart (phones upright), table_fits_wide_test.dart
-/// (everything wider) and table_fits_live_test.dart.
+/// (everything wider), table_fits_live_test.dart (a hand) and
+/// table_fits_live_end_test.dart (to the game's end).
 library;
 
 import 'dart:io';
@@ -598,13 +599,13 @@ void soloMatrix(bool Function(Size size) shown) {
   }
 }
 
-/// The live games.
-void liveMatrix() {
+/// The live games: every other one to the game's end, rated, for the
+/// game's sheet and what it says of the rating. [toTheEnd] picks which
+/// half, so the two run as suites side by side.
+void liveMatrix({required bool toTheEnd}) {
   _setUp();
   for (final (i, (size, scale, locale)) in _live.indexed) {
-    // Every other one to the game's end, rated, for the game's sheet
-    // and what it says of the rating.
-    final toTheEnd = i.isOdd;
+    if (i.isOdd != toTheEnd) continue;
     testWidgets('live, ${_name(size)}, $locale, text ×$scale, ${toTheEnd ? 'to the game\'s end' : 'a hand'}', (tester) async {
       final faults = await _walkLive(tester, size: size, scale: scale, locale: locale, toTheEnd: toTheEnd);
       expect(faults, isEmpty, reason: faults.join('\n'));

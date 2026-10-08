@@ -12,11 +12,13 @@ import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/account_profile.dart';
+import 'net/address.dart' show paceIn;
 import 'net/duty.dart';
 import 'net/in_use.dart';
 import 'net/licence.dart' show serviceKey;
 import 'net/remote_config.dart';
 import 'router.dart';
+import 'table_model.dart' show tableBeats;
 import 'net/store_buying.dart';
 import 'theme.dart';
 import 'ui/in_use_screen.dart';
@@ -35,6 +37,8 @@ Future<void> main() async {
   if (Uri.base.queryParameters.containsKey('e2e')) {
     SemanticsBinding.instance.ensureSemantics();
   }
+  // And may ask for its tables' beats shorter (net/address.dart).
+  tableBeats = paceIn(Uri.base);
   await installFastSchnorr();
   await loadDeal();
   // The service whose word makes a seat an account's, at every table

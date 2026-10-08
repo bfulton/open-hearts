@@ -9,8 +9,9 @@
 /// the page: a build made with `--dart-define=OH_RELAYS=…` — the local
 /// rig against its bridges — uses those, and a build served from
 /// localhost (`flutter run`, the browser suite) uses the local relay
-/// (service/). The remote config may name another relay of ours
-/// (net/remote_config.dart), never anyone else's.
+/// (service/), at the port its address names if it names one. The
+/// remote config may name another relay of ours (net/remote_config.dart),
+/// never anyone else's.
 library;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -34,6 +35,18 @@ int pinnedRelays(List<Uri> relays) => relays.takeWhile(RemoteConfig.ours).length
 /// The local relay, where a build served from this machine looks.
 const localRelay = 'ws://127.0.0.1:7447';
 
+/// The local relay at the port the address names (`?relay=7448`), and
+/// at [localRelay]'s otherwise: each browser suite on a machine starts
+/// its relay on a port of its own (e2e/drive.mjs), so two can run side
+/// by side. A port and nothing more, so the address can move a local
+/// build to another relay on this machine and nowhere else; and only
+/// ever read for a build served from this machine ([appRelays]).
+Uri localRelayAt(Uri at) {
+  final port = int.tryParse(at.queryParameters['relay'] ?? '');
+  final local = Uri.parse(localRelay);
+  return port == null || port < 1 || port > 65535 ? local : local.replace(port: port);
+}
+
 /// A dev loop's shortcut: a build made with `--dart-define=OH_RELAYS=…`
 /// (a comma list) talks to those instead. Unset in a normal build.
 const devRelay = String.fromEnvironment('OH_RELAYS');
@@ -47,8 +60,8 @@ const devRelay = String.fromEnvironment('OH_RELAYS');
 /// build like the site's, not a local one.
 List<Uri> appRelays({Uri? base, RemoteConfig? config, bool web = kIsWeb}) {
   if (devRelay.isNotEmpty) return Relays.parse(devRelay);
-  final host = (base ?? Uri.base).host;
-  if (web && (isLocalHost(host) || host.isEmpty)) return [Uri.parse(localRelay)];
+  final at = base ?? Uri.base;
+  if (web && (isLocalHost(at.host) || at.host.isEmpty)) return [localRelayAt(at)];
   final named = (config ?? RemoteSettings.current.config).relays;
   if (named != null) return named;
   return [for (final r in deployedRelays) Uri.parse(r)];

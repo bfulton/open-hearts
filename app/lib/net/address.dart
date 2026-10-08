@@ -28,6 +28,30 @@ Duration roomWait(Uri at, {required Duration standard, Duration most = const Dur
   return Duration(seconds: asked.clamp(standard.inSeconds, most.inSeconds));
 }
 
+/// How much of its beats a table takes, as this address asks: all of
+/// them, unless the address is under `?e2e` and asks for a share
+/// (`?e2e=1&pace=0.25`), never less than a tenth. The browser suites
+/// play hands by the dozen, and a bot's thinking and a trick held on
+/// the felt are most of a hand's minute; at a quarter the same beats
+/// come in the same order, and the widget tests hold them to their
+/// lengths (game_controller_test.dart).
+double paceIn(Uri at) {
+  if (!at.queryParameters.containsKey('e2e')) return 1;
+  final asked = double.tryParse(at.queryParameters['pace'] ?? '');
+  if (asked == null || asked.isNaN) return 1;
+  return asked.clamp(0.1, 1.0);
+}
+
+/// The score the games this device starts play to, when the address
+/// says, under `?e2e`: a suite that has to see a game's end does not
+/// need fifty points of it (`?e2e=1&target=1`, a game of one hand).
+/// Null otherwise, and the device's own choice stands (game_options.dart).
+int? targetIn(Uri at) {
+  if (!at.queryParameters.containsKey('e2e')) return null;
+  final asked = int.tryParse(at.queryParameters['target'] ?? '');
+  return asked == null || asked < 1 || asked > 100 ? null : asked;
+}
+
 /// Whether [host] is this machine: `localhost`, `127.0.0.1`, or a name
 /// under `.localhost`, which a browser takes to be this machine too. The
 /// browser rig serves the site at openhearts.localhost and the app at

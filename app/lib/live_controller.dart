@@ -273,7 +273,7 @@ class LiveController extends ChangeNotifier implements TableModel {
       _sheetsShownThrough = hand;
       handJustEnded = (hand: hand, scores: _shown.handScores, totals: _shown.totals, moonShooter: _shown.moonShooter);
       _sheetTimer?.cancel();
-      _sheetTimer = Timer(const Duration(seconds: 6), dismissHandSheet);
+      _sheetTimer = Timer(const Duration(seconds: 6) * tableBeats, dismissHandSheet);
     }
     _shown.nextHand();
     _shownPlayed.clear();
@@ -583,7 +583,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   Future<void> _wait(Duration d) {
     final done = Completer<void>();
     _waitTimer?.cancel();
-    _waitTimer = Timer(d, done.complete);
+    _waitTimer = Timer(d * tableBeats, done.complete);
     return done.future;
   }
 

@@ -51,4 +51,17 @@ void main() {
     expect(appRelays(base: Uri.parse('http://localhost:8080/'), web: true).map((r) => r.toString()), [localRelay]);
     expect(appRelays(base: Uri.parse('http://127.0.0.1:41234/?e2e=1'), web: true).map((r) => r.toString()), [localRelay]);
   });
+
+  test('served from localhost, the local relay at the port the address names', () {
+    // Each browser suite's relay is on a port of its own (e2e/drive.mjs).
+    expect(appRelays(base: Uri.parse('http://play.openhearts.localhost:41234/room/AB12?e2e=1&relay=40123'), web: true),
+        [Uri.parse('ws://127.0.0.1:40123')]);
+    // A port and nothing else: anything more is no port, and the usual one.
+    for (final nonsense in ['0', '70000', 'evil.example', 'ws://evil.example:1', '']) {
+      expect(appRelays(base: Uri.parse('http://localhost:8080/?relay=${Uri.encodeComponent(nonsense)}'), web: true),
+          [Uri.parse(localRelay)], reason: nonsense);
+    }
+    // And never read where the build is deployed.
+    expect(appRelays(base: Uri.parse('https://play.openhearts.game/?e2e=1&relay=40123'), web: true), [Uri.parse(ourRelay)]);
+  });
 }

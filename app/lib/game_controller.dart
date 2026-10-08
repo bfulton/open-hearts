@@ -382,7 +382,7 @@ class GameController extends ChangeNotifier implements TableModel {
     if (d > Duration.zero) {
       final done = Completer<void>();
       _waitTimer?.cancel();
-      _waitTimer = Timer(d, done.complete);
+      _waitTimer = Timer(d * tableBeats, done.complete);
       await done.future;
     }
     return !_disposed;

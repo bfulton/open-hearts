@@ -28,6 +28,29 @@ void main() {
     expect(waits('https://play.openhearts.game/?e2e=1&roomWait=99999'), const Duration(minutes: 1));
   });
 
+  test('a driven build takes the share of its beats and the target its address asks for, and no other does', () {
+    double pace(String url) => paceIn(Uri.parse(url));
+    int? target(String url) => targetIn(Uri.parse(url));
+
+    // A page somebody is playing on keeps every beat and its own target.
+    expect(pace('https://play.openhearts.game/?pace=0.25'), 1, reason: 'not without e2e');
+    expect(target('https://play.openhearts.game/?target=1'), isNull, reason: 'not without e2e');
+
+    // The browser suites ask for a quarter, and a game of one hand.
+    expect(pace('http://play.openhearts.localhost:8123/?e2e=1&pace=0.25'), 0.25);
+    expect(target('http://play.openhearts.localhost:8123/?e2e=1&target=1'), 1);
+
+    // Asking for nothing, or nonsense, is the rule; and a beat is never
+    // skipped outright, nor made longer.
+    expect(pace('https://play.openhearts.game/?e2e=1'), 1);
+    expect(pace('https://play.openhearts.game/?e2e=1&pace=soon'), 1);
+    expect(pace('https://play.openhearts.game/?e2e=1&pace=0'), 0.1);
+    expect(pace('https://play.openhearts.game/?e2e=1&pace=3'), 1);
+    expect(target('https://play.openhearts.game/?e2e=1'), isNull);
+    expect(target('https://play.openhearts.game/?e2e=1&target=0'), isNull);
+    expect(target('https://play.openhearts.game/?e2e=1&target=500'), isNull);
+  });
+
   test('a room\'s link is the app\'s own address and the room under it, whatever page made it', () {
     expect(roomLink('KP4T9MXR', Uri.parse('https://play.openhearts.game/')).toString(), 'https://play.openhearts.game/room/KP4T9MXR');
     expect(roomLink('KP4T9MXR', Uri.parse('https://play.openhearts.game/?e2e=1')).toString(), 'https://play.openhearts.game/room/KP4T9MXR');
