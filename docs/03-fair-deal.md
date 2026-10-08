@@ -18,7 +18,7 @@ nobody to prove anything to and use a seeded shuffle instead
 Barnett–Smart (*Mental Poker Revisited*, 2003) with the Bayer–Groth
 shuffle argument (2012). The implementation is the reference crate
 [geometryxyz/mental-poker](https://github.com/geometryxyz/mental-poker)
-on the Starknet curve, with m = 2 and n = 26. It is wrapped as flat
+on the Starknet curve, with the deck folded m = 4 by n = 13. It is wrapped as flat
 functions over bytes in `crypto/deal`.
 
 - **Keys.** Each seat draws a secret `xᵢ`, publishes `hᵢ = xᵢ·G` with a
@@ -55,13 +55,24 @@ silent seat.
 
 One Rust crate builds twice. It builds as a cdylib that the Dart VM
 loads over FFI (tests, the verifier, the service's juror), and as a
-roughly 460 KB wasm that the browser loads with no glue code. Every random
+roughly 500 KB wasm that the browser loads with no glue code. Every random
 value comes in as a seed from the caller. The wasm has no entropy source
-of its own. Two of the reference's proof crates are vendored for one
-fix: a point is normalised before it is written into a proof's
-transcript. Otherwise a proof made from Jacobian coordinates and checked
-from its serialised bytes would hash different values, and every proof
-here crosses a wire.
+of its own. The reference's three crates are vendored (`crypto/vendor`),
+since upstream is unmaintained. They are ported from arkworks 0.3 to
+0.6 with every byte that crosses the wire or is kept unchanged: keys,
+masked cards, shuffles, every proof, and the Fiat–Shamir transcripts
+behind them. 0.3's transcript encoding and ark-marlin's Fiat–Shamir
+generator are kept as they were. A device on the older library and one
+on the newer sit at one table, and every game the older one kept still
+verifies. Golden vectors written by the 0.3 library hold this: the
+deal's every call on fixed seeds, bent inputs and odd encodings among
+them, replayed natively, over FFI and in the committed wasm
+(`crypto/deal/tests/golden.rs`). So do two sealed games the 0.3 library
+kept, verified by the table's tests and by the review page in the
+browser. One fix is the project's own: a point is normalised before it
+is written into a proof's transcript. Otherwise a proof made from
+Jacobian coordinates and checked from its serialised bytes would hash
+different values, and every proof here crosses a wire.
 
 ### A batch of tokens under one argument
 

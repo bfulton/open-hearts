@@ -42,17 +42,19 @@ jobs:
         with:
           workspaces: |
             crypto/deal
+            crypto/vendor
             crypto/schnorr
       - uses: actions/cache@v4
         with:
           path: crypto/deal/target/memo
-          key: deal-memo-app-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*') }}
+          key: deal-memo-app-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
       # The deal's cryptography (docs/03-fair-deal.md): the cdylib the VM
       # tests load.
       # The browser's wasm is committed (app/web/deal.wasm).
-      - name: Deal and Schnorr (Rust — the cdylibs for the VM)
+      - name: Deal and Schnorr (Rust — the cdylibs for the VM; the golden vectors; the vendored proof crates)
         run: |
           cd crypto/deal && cargo build --release && cargo test --release
+          cd ../vendor && cargo test --release
           cd ../schnorr && cargo build --release && cargo test --release
       - name: Engine (pure Dart — rules, bots, 200 seeded games)
         run: cd packages/engine && dart pub get && dart analyze && dart test -j 4
@@ -106,7 +108,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: crypto/deal/target/memo
-          key: deal-memo-table-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*') }}
+          key: deal-memo-table-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
         run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
       - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)

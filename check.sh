@@ -53,7 +53,7 @@ suite_site() { node --test site/build.test.mjs; }
 suite_infra() { node --test infra/*.test.mjs; }
 # The page's own workers, in node, against the committed wasm.
 suite_workers() { node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs; }
-suite_crypto() { (cd crypto/deal && cargo test --release) && (cd crypto/schnorr && cargo test --release); }
+suite_crypto() { (cd crypto/deal && cargo test --release) && (cd crypto/vendor && cargo test --release) && (cd crypto/schnorr && cargo test --release); }
 # The scripts that are not anybody's suite: that each still parses.
 suite_scripts() {
   local f ok=0
