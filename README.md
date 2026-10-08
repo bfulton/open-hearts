@@ -68,7 +68,7 @@ cd service && OH_RELAY=js dart test  # the same suite against the relay the Dura
 cd app && flutter test               # widgets
 
 node --test service/do/*.test.mjs service/functions/*.test.mjs infra/*.test.mjs
-node --test e2e/deal_worker.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
+node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
 
 cd app && flutter run -d chrome      # run the app locally
 ```

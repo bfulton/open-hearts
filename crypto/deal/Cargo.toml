@@ -22,6 +22,10 @@ rand = "0.8"
 rand_chacha = "0.3"
 blake2 = { version = "0.9", default-features = false }
 
+# The golden vectors' file (tests/golden.rs).
+[dev-dependencies]
+serde_json = "1"
+
 # On wasm, rand still wants an entropy source. There is none to give it
 # and none is wanted: every random value comes in as a seed the caller
 # drew. A custom source that refuses keeps wasm-bindgen out and makes
