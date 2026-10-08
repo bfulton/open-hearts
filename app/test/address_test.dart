@@ -41,15 +41,21 @@ void main() {
     expect(pace('http://play.openhearts.localhost:8123/?e2e=1&pace=0.25'), 0.25);
     expect(target('http://play.openhearts.localhost:8123/?e2e=1&target=1'), 1);
 
+    // Production keeps its own, e2e or not: nobody's link starts a game
+    // of one hand there.
+    expect(pace('https://play.openhearts.game/?e2e=1&pace=0.1'), 1);
+    expect(target('https://play.openhearts.game/?e2e=1&target=1'), isNull);
+
     // Asking for nothing, or nonsense, is the rule; and a beat is never
     // skipped outright, nor made longer.
-    expect(pace('https://play.openhearts.game/?e2e=1'), 1);
-    expect(pace('https://play.openhearts.game/?e2e=1&pace=soon'), 1);
-    expect(pace('https://play.openhearts.game/?e2e=1&pace=0'), 0.1);
-    expect(pace('https://play.openhearts.game/?e2e=1&pace=3'), 1);
-    expect(target('https://play.openhearts.game/?e2e=1'), isNull);
-    expect(target('https://play.openhearts.game/?e2e=1&target=0'), isNull);
-    expect(target('https://play.openhearts.game/?e2e=1&target=500'), isNull);
+    const here = 'http://play.openhearts.localhost:8123/';
+    expect(pace('$here?e2e=1'), 1);
+    expect(pace('$here?e2e=1&pace=soon'), 1);
+    expect(pace('$here?e2e=1&pace=0'), 0.1);
+    expect(pace('$here?e2e=1&pace=3'), 1);
+    expect(target('$here?e2e=1'), isNull);
+    expect(target('$here?e2e=1&target=0'), isNull);
+    expect(target('$here?e2e=1&target=500'), isNull);
   });
 
   test('a room\'s link is the app\'s own address and the room under it, whatever page made it', () {
