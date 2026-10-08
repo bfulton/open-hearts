@@ -32,3 +32,6 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# The deal and Schnorr XCFrameworks, built by crypto/build_ios.sh.
+/Frameworks/

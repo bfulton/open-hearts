@@ -99,6 +99,18 @@ key named in `app/android/key.properties` (`storeFile`, `storePassword`,
 `keyAlias`, `keyPassword`), which is never checked in. Without either it
 stops. Debug builds need neither.
 
+### iOS
+
+On a Mac with Xcode, build the deal's native libraries first with
+`crypto/build_ios.sh` (Rust targets `aarch64-apple-ios`,
+`aarch64-apple-ios-sim` and `x86_64-apple-ios`). They go into
+`app/ios/Frameworks` as XCFrameworks, which the Runner target embeds and
+signs. Xcode does not build the app without them, debug or release.
+Then `flutter build ipa`. The `ios` workflow
+(`.github/workflows/ios.yml`) does the same on a Mac runner, and checks
+the libraries on a simulator with
+`app/integration_test/native_libs_test.dart`.
+
 ### Deploying
 
 `./deploy.sh` builds the site and the web app and publishes them to

@@ -1,0 +1,78 @@
+# The iOS app and the deal and Schnorr libraries it embeds
+# (crypto/build_ios.sh): the XCFrameworks built, the app built for a
+# simulator and the libraries loaded there the way the app loads them
+# (app/integration_test/native_libs_test.dart), then the release build,
+# unsigned, as an archive makes it. Without the libraries an iPhone
+# plays no live table.
+#
+# On a Mac, which is minutes the Linux jobs in ci.yml do not wait on,
+# and only when something it builds changed. The repository is public,
+# so the minutes cost nothing.
+name: ios
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/ios.yml
+      - crypto/**
+      - app/ios/**
+      - app/integration_test/**
+      - app/pubspec.*
+      - packages/deal/**
+      - packages/table/lib/src/schnorr_native*
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - .github/workflows/ios.yml
+      - crypto/**
+      - app/ios/**
+      - app/integration_test/**
+      - app/pubspec.*
+      - packages/deal/**
+      - packages/table/lib/src/schnorr_native*
+
+concurrency:
+  group: ios-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.2
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            crypto/deal
+            crypto/schnorr
+      - name: The libraries (crypto/build_ios.sh)
+        run: crypto/build_ios.sh
+      - name: On a simulator (the libraries loaded as the app loads them, and checked)
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          print(next(x["udid"] for r, v in sorted(d.items(), reverse=True) if ".iOS-" in r for x in v if x["name"].startswith("iPhone")))')
+          xcrun simctl boot "$udid"
+          cd app && flutter pub get
+          flutter test integration_test/native_libs_test.dart -d "$udid"
+      - name: The release build, unsigned
+        run: cd app && flutter build ios --release --no-codesign
+      - name: What the release carries
+        run: |
+          app=app/build/ios/iphoneos/Runner.app
+          ls -la "$app/Frameworks"
+          for f in deal schnorr; do
+            otool -L "$app/Frameworks/$f.framework/$f" | head -3
+            lipo -info "$app/Frameworks/$f.framework/$f"
+          done

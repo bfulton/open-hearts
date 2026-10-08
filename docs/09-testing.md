@@ -2,7 +2,11 @@
 
 What runs, how long it takes, and why it takes no longer. Every suite
 is in `./check.sh`; CI runs the same suites in jobs side by side
-(`.github/workflows/ci.yml`).
+(`.github/workflows/ci.yml`). One more needs a Mac, so `./check.sh`
+does not run it: the `ios` workflow (`.github/workflows/ios.yml`) builds
+the deal's frameworks and the app, and checks on a simulator that the
+libraries load as the app loads them and make the same bytes as the
+build the other suites test (`app/integration_test/native_libs_test.dart`).
 
 ## Running them
 

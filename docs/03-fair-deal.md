@@ -230,8 +230,8 @@ Every live table is sealed. A device that cannot load the deal, or whose
 worker does not start, does not go online: it opens no room, joins no
 pool, and is never drawn as a juror. A device that can deal refuses a
 start that is not sealed. The web build ships the wasm. Android release
-builds bundle the native library (`crypto/build_android.sh`). iOS builds
-do not bundle it yet, so they play solo only.
+builds bundle the native library (`crypto/build_android.sh`), and iOS
+builds embed it as a framework (`crypto/build_ios.sh`).
 
 A juror summoned mid-hand replays the whole hand's events, so the VM
 signs with `crypto/schnorr` (k256, as the browser's wasm) instead of

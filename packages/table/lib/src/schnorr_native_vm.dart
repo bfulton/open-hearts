@@ -40,8 +40,10 @@ Future<bool> installNativeSchnorr({String? libraryPath}) async {
 }
 
 String? _find() {
-  // Packed into the app (crypto/build_android.sh), found by name.
+  // Packed into the app (crypto/build_android.sh, crypto/build_ios.sh),
+  // found by name.
   if (Platform.isAndroid) return 'libschnorr.so';
+  if (Platform.isIOS) return 'schnorr.framework/schnorr';
   final here = File.fromUri(Platform.script).parent.path;
   for (final base in [Directory.current.path, here, '${Directory.current.path}/..', '${Directory.current.path}/../..']) {
     for (final name in ['libschnorr.so', 'libschnorr.dylib', 'schnorr.dll']) {
