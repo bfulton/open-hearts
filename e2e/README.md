@@ -9,16 +9,17 @@ taps with a real pointer, so a tap landing in the wrong place shows up.
 
 The rig starts a coturn on 127.0.0.1 for the data channels, which go
 through TURN as in production (`apt-get install coturn`; its log is
-`app/build/logs/turn.log`). Run everything from the repository root,
-after building the app the way the suites expect it:
+`app/build/logs/turn-<suite>.log`). Run everything from the repository
+root, after building the app the way the suites expect it:
 
 ```bash
-./e2e/build.sh                          # app/build/e2e, base / like the site's, keyed to the rig's service
-node e2e/flows.mjs                      # every flow one device can drive
+./e2e/build.sh                          # app/build/e2e, base / like the site's, keyed to the rig's service; once per change
+node e2e/flows.mjs                      # every flow one device can drive, three at a time
 node e2e/flows.mjs --only "a hand alone"
+node e2e/flows.mjs --serial             # one after another, in order (--jobs N for N at a time)
 node e2e/run.mjs                        # four browsers at one table
 node e2e/escrow.mjs                     # one browser and three bot seats; a juror is taken off the air
-node e2e/offline.mjs                    # the network taken away a piece at a time
+node e2e/offline.mjs                    # the network taken away a piece at a time, three flows at a time
 node e2e/offline.mjs --only "airplane"
 node e2e/move.mjs                       # openhearts.game/play/ to play.openhearts.game: old address 404, carry-over, previews
 node e2e/shots.mjs                      # screenshots at docs/05's shapes, in app/build/shots/
@@ -29,7 +30,30 @@ node --test e2e/deal_worker.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.
 ```
 
 Every suite takes `--app-dir <path>` to use a different build. The exit
-code is the verdict.
+code is the verdict. `../check.sh full` runs them all at once, after
+the Dart suites' build (docs/09-testing.md).
+
+**Side by side.** Each suite starts its relay on a port of its own and
+names it in every address it opens (`?relay=PORT`, which a build served
+from this machine reads, app/lib/net/relays.dart), so suites run at the
+same time without meeting. `flows.mjs` and `offline.mjs` share their
+flows out among workers (`pool.mjs`), each with a rig of its own —
+relay, server and handlers, browser — so a flow never meets one beside
+it in a pool, on presence or as a juror. A worker's flows run one after
+another; the longest go first, by the last run's times
+(`app/build/logs/<suite>-times.json`); each flow's lines are printed
+together under its verdict; and each worker's relay and TURN logs are
+`app/build/logs/relay-<suite>-<worker>.log` and `turn-…`.
+
+**Shorter waits, the same cells.** The suites open the app at a tenth
+of its tables' beats (`?pace=0.1`: a bot's thinking, a trick held on
+the felt, the score sheet's stay), and where a cell waits on a table's
+clock — a silent person, a silent juror, a lost quorum — the rig's
+handlers serve a remote config that sets that clock to the least it may
+be (`serveApp({ config })`, docs/06-service.md). The device's own waits
+on the network are the build's, which `offline.mjs` times. A flow that
+has to see a game's end plays a game of one hand (`?target=1`). All
+three are read only under `?e2e` (app/lib/net/address.dart).
 
 The rig (`drive.mjs`, `serveApp`) serves the site and the app as the
 Pages project does: the site built in every language, the app at its
@@ -77,7 +101,9 @@ with Chromium:
 npm i -g playwright && npx playwright install chromium
 ```
 
-The relay starts on port 7447, where a build served from localhost looks
-for it (`app/lib/net/relays.dart`). `e2e/build.sh` compiles the app
+Each suite's relay starts on a free port, which the suite names in the
+address it opens the app at; without one, a build served from
+localhost looks on 7447 (`app/lib/net/relays.dart`), where
+`dart run bin/service.dart` puts it. `e2e/build.sh` compiles the app
 against BIP-340's published test key pair, which the in-process handlers
 sign licences with, so the suites go through the real licence check.

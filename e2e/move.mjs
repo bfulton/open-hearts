@@ -83,7 +83,7 @@ const flows = [
       // Where the app used to be: the site's host, at /play/.
       app.legacy(true);
       try {
-        await page.goto(`${app.site}/play/?e2e=1`);
+        await page.goto(app.at(`${app.site}/play/?e2e=1`));
         await waitFor(page, ready, { what: 'the app at the old address', timeout: 60000 });
         const key = await until('a key at the old address', () => stored(page, 'flutter.identity_secret'));
         // The open house licenses every device that asks (drive.mjs).
@@ -97,9 +97,10 @@ const flows = [
         await context.route(`${app.url}/api/licence`, (route) => route.abort());
 
         // A room at the new host.
-        await page.goto(`${app.url}/room/ABCD2345?e2e=1&x=1`);
+        const link = app.at('/room/ABCD2345?e2e=1&x=1');
+        await page.goto(link);
         const at = new URL(page.url());
-        expect(at.pathname === '/room/ABCD2345' && at.search === '?e2e=1&x=1', `the link landed at ${page.url()}`);
+        expect(at.pathname === '/room/ABCD2345' && at.search === new URL(link).search, `the link landed at ${page.url()}`);
         await waitFor(page, ready, { what: 'the app at the new address', timeout: 60000 });
         expect((await carried(page)) === 'carried', `the carry said ${await carried(page)}`);
         expect((await stored(page, 'flutter.identity_secret')) === key, 'the key is not the same');
@@ -127,7 +128,7 @@ const flows = [
     async run({ app, newContext }) {
       const context = await newContext();
       const page = await context.newPage();
-      await page.goto(`${app.url}/?e2e=1`);
+      await page.goto(app.at('/?e2e=1'));
       await waitFor(page, ready, { what: 'the app', timeout: 60000 });
       const key = await until('a key', () => stored(page, 'flutter.identity_secret'));
       // Then the old origin comes to hold a different device's…
@@ -152,7 +153,7 @@ const flows = [
       const context = await newContext();
       const page = await context.newPage();
       const began = Date.now();
-      await page.goto(`${app.url}/?e2e=1`);
+      await page.goto(app.at('/?e2e=1'));
       expect((await carried(page)) === 'nothing', `the carry said ${await carried(page)}`);
       const took = Date.now() - began;
       log(`      asked and answered: ${took} ms`);
@@ -170,7 +171,7 @@ const flows = [
       await context.route('**/carry', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>silent</title>' }));
       const page = await context.newPage();
       const began = Date.now();
-      await page.goto(`${app.url}/?e2e=1`);
+      await page.goto(app.at('/?e2e=1'));
       expect((await carried(page)) === 'timed out', `the carry said ${await carried(page)}`);
       const took = Date.now() - began;
       log(`      gave up after: ${took} ms`);
@@ -184,7 +185,7 @@ const flows = [
     async run({ app, newContext }) {
       const context = await newContext();
       const page = await context.newPage();
-      await page.goto(`${app.preview}/play/room/ABCD2345?e2e=1`);
+      await page.goto(app.at(`${app.preview}/play/room/ABCD2345?e2e=1`));
       await waitFor(page, ready, { what: 'the app on a preview', timeout: 60000 });
       const at = new URL(page.url());
       expect(at.origin === app.preview && at.pathname === '/play/room/ABCD2345', `the preview went to ${page.url()}`);
@@ -212,8 +213,8 @@ const flows = [
 
 async function main() {
   const only = argOf('only');
-  const app = await serveApp();
   const relay = await startRelay();
+  const app = await serveApp({ relayPort: relay.port });
   const browser = await chromium.launch();
   let failed = 0;
   for (const { name, run } of flows) {

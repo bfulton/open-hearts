@@ -10,13 +10,14 @@ library;
 
 import 'dart:convert';
 
-import 'package:deal/deal.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 
 Future<void> main() async {
   await installNativeSchnorr();
-  final crypto = await DealCrypto.load();
+  // Every proof made and checked, each once: four seats check the same
+  // ones (package:deal/memo.dart).
+  final crypto = await rememberedCrypto();
   // Real keys and a real table id: the browser checks it as a device
   // checks any kept game, and a simulator's fake signature passes only
   // where a simulator is running.

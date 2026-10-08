@@ -3,6 +3,7 @@
 //   ./e2e/build.sh
 //   node e2e/offline.mjs                    # from the repo root
 //   node e2e/offline.mjs --only "airplane"
+//   node e2e/offline.mjs --serial          # one after another (default: three workers)
 //
 // Solo play needs nothing but the device, and everything else needs
 // somebody: the relays for a live game and the ratings, the site's
@@ -15,11 +16,13 @@
 //
 // A screenshot of where each flow ended is left in app/build/offline/,
 // for looking at what a person would see.
+import { AsyncResource } from 'node:async_hooks';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { chromium } from './browser.mjs';
-import { act, argOf, click, has, labelOf, log, root, serveApp, sleep, startRelay, texts, type, waitFor } from './drive.mjs';
+import { act, click, freePort, has, labelOf, licensed, log, logTo, root, serveApp, sleep, startRelay, texts, type, waitFor } from './drive.mjs';
+import { runFlows } from './pool.mjs';
 
 const phone = { width: 390, height: 844 };
 const shots = join(root, 'app', 'build', 'offline');
@@ -166,7 +169,7 @@ flow('opened with no network, once it has been opened with one', async ({ app, c
   await context.setOffline(true);
   const page = await context.newPage();
   const began = Date.now();
-  await page.goto(`${app.url}/?e2e=1`);
+  await page.goto(app.at('/?e2e=1'));
   await waitFor(page, /^Play solo$/, { timeout: 20000, what: 'the door, from what was kept' });
   log(`      the door, offline from a cold start: ${((Date.now() - began) / 1000).toFixed(1)} s`);
   await aHand(page);
@@ -300,7 +303,7 @@ for (const [how, answer, shop] of [
     await twice(page, noService, fast ? 3 : 13, 'a code');
     // Somebody arriving with a code another device showed.
     const arriving = await context.newPage();
-    await arriving.goto(`${app.url}/?e2e=1&claim=0a1b2c3d`);
+    await arriving.goto(app.at('/?e2e=1&claim=0a1b2c3d'));
     // Asked before anything is spent: a link is anybody's to send.
     await waitFor(arriving, /^Join this subscription\?$/, { timeout: 60000, what: 'the question before a code is spent' });
     await click(arriving, /^Join$/);
@@ -360,50 +363,68 @@ flow('the network gone at a live table', async ({ context, open, relay }) => {
 // ---- the runner ----------------------------------------------------------
 
 async function main() {
-  const only = argOf('only');
   mkdirSync(shots, { recursive: true });
-  const app = await serveApp();
-  const browser = await chromium.launch();
-  let failed = 0;
-  let relayOnce = null;
-  const relay = () => (relayOnce ??= startRelay());
-  for (const { name: title, run } of flows) {
-    if (only && !title.includes(only)) continue;
-    // A flow's devices are that flow's, as in flows.mjs; and each is a
-    // device of its own — its own keys, its own kept copy of the app.
-    const contexts = [];
-    const newContext = async () => {
-      const ctx = await browser.newContext({ viewport: phone, locale: 'en-US', hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
-      contexts.push(ctx);
-      return ctx;
-    };
-    const context = await newContext();
-    const open = async ({ fresh = false, query = 'e2e=1', route = null } = {}) => {
-      const ctx = fresh ? await newContext() : context;
-      if (route) await ctx.route(...route);
-      const page = await ctx.newPage();
-      page.on('pageerror', (e) => log(`page error: ${e.message}`));
-      await page.goto(`${app.url}/?${query}`);
-      await waitFor(page, /^Play solo$/, { what: 'the app', timeout: 60000 });
-      return page;
-    };
-    const began = Date.now();
-    const file = join(shots, `${title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()}.png`);
-    try {
-      const page = await run({ app, context, open, relay });
-      await page?.screenshot({ path: file }).catch(() => {});
-      log(`ok    ${title} (${((Date.now() - began) / 1000).toFixed(0)}s)`);
-    } catch (e) {
-      failed++;
-      const last = contexts.flatMap((c) => c.pages()).at(-1);
-      await last?.screenshot({ path: file }).catch(() => {});
-      log(`FAIL  ${title}: ${e.message}`);
-    }
-    for (const ctx of contexts) await ctx.close();
-  }
-  await browser.close();
-  app.stop();
-  (await relayOnce)?.stop();
+  const failed = await runFlows({
+    flows,
+    // A worker's rig, as in flows.mjs: its own server, browser, and a
+    // relay on a port of its own, started when a flow asks for one.
+    setUp: async ({ tag, say }) => {
+      const relayPort = await freePort();
+      // A tenth of a table's beats (app/lib/net/address.dart), and the
+      // operator's word that a table stopped for jurors it cannot hear
+      // ends sooner (docs/06-service.md; the least each may be,
+      // packages/table, timing.dart). The device's own waits — on the
+      // relays, the service, the shop — are the build's, which is what
+      // this suite times.
+      const app = await serveApp({ relayPort, tag, pace: 0.1, config: { table: { jurorSilenceMs: 10000, quorumLostMs: 10000 } } });
+      const browser = await chromium.launch();
+      let relayOnce = null;
+      const relay = () => (relayOnce ??= logTo.exit(() => startRelay({ port: relayPort, tag, say })));
+      return { app, browser, relay, stop: async () => (await relayOnce)?.stop() };
+    },
+    runFlow: async ({ name: title, run }, { app, browser, relay }) => {
+      // A flow's devices are that flow's, as in flows.mjs; and each is a
+      // device of its own — its own keys, its own kept copy of the app.
+      const contexts = [];
+      const newContext = async () => {
+        // Spared motion, as in run.mjs, at one pixel to the point: what is
+        // looked at here is the words a wait ends in, and flows.mjs plays
+        // with the motion on a phone's two.
+        const ctx = await browser.newContext({ viewport: phone, locale: 'en-US', hasTouch: true, isMobile: true, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+        contexts.push(ctx);
+        return ctx;
+      };
+      const context = await newContext();
+      const open = async ({ fresh = false, query = 'e2e=1', route = null } = {}) => {
+        const ctx = fresh ? await newContext() : context;
+        if (route) await ctx.route(...route);
+        const page = await ctx.newPage();
+        page.on('pageerror', AsyncResource.bind((e) => log(`page error: ${e.message}`)));
+        await page.goto(app.at(`/?${query}`));
+        await waitFor(page, /^Play solo$/, { what: 'the app', timeout: 60000 });
+        // Licensed, where the service is there to license it (drive.mjs,
+        // licensed); a flow that takes the service away asks for none.
+        if (!route) await licensed(page);
+        return page;
+      };
+      const file = join(shots, `${title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()}.png`);
+      try {
+        const page = await run({ app, context, open, relay });
+        await page?.screenshot({ path: file }).catch(() => {});
+      } catch (e) {
+        const last = contexts.flatMap((c) => c.pages()).at(-1);
+        await last?.screenshot({ path: file }).catch(() => {});
+        throw e;
+      } finally {
+        for (const ctx of contexts) await ctx.close();
+      }
+    },
+    tearDown: async ({ app, browser, stop }) => {
+      await browser.close();
+      app.stop();
+      await stop();
+    },
+  });
   log(failed ? `FAIL: ${failed} flow${failed === 1 ? '' : 's'}` : 'PASS');
   log(`screenshots in ${shots}`);
   process.exit(failed ? 1 : 0);

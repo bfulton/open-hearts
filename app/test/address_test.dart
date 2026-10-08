@@ -36,7 +36,8 @@ void main() {
     expect(pace('https://play.openhearts.game/?pace=0.25'), 1, reason: 'not without e2e');
     expect(target('https://play.openhearts.game/?target=1'), isNull, reason: 'not without e2e');
 
-    // The browser suites ask for a quarter, and a game of one hand.
+    // The browser suites ask for a tenth, and a game of one hand.
+    expect(pace('http://play.openhearts.localhost:8123/?e2e=1&pace=0.1'), 0.1);
     expect(pace('http://play.openhearts.localhost:8123/?e2e=1&pace=0.25'), 0.25);
     expect(target('http://play.openhearts.localhost:8123/?e2e=1&target=1'), 1);
 

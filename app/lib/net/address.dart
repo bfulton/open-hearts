@@ -30,11 +30,11 @@ Duration roomWait(Uri at, {required Duration standard, Duration most = const Dur
 
 /// How much of its beats a table takes, as this address asks: all of
 /// them, unless the address is under `?e2e` and asks for a share
-/// (`?e2e=1&pace=0.25`), never less than a tenth. The browser suites
+/// (`?e2e=1&pace=0.1`), never less than a tenth. The browser suites
 /// play hands by the dozen, and a bot's thinking and a trick held on
-/// the felt are most of a hand's minute; at a quarter the same beats
-/// come in the same order, and the widget tests hold them to their
-/// lengths (game_controller_test.dart).
+/// the felt are most of a hand's minute; at a tenth the same beats come
+/// in the same order, and the widget tests hold them to their lengths
+/// (game_controller_test.dart).
 double paceIn(Uri at) {
   if (!at.queryParameters.containsKey('e2e')) return 1;
   final asked = double.tryParse(at.queryParameters['pace'] ?? '');

@@ -3,6 +3,8 @@
 //   ./e2e/build.sh
 //   node e2e/flows.mjs                 # from the repo root
 //   node e2e/flows.mjs --only "a hand alone"
+//   node e2e/flows.mjs --jobs 2        # workers side by side (default 3)
+//   node e2e/flows.mjs --serial        # one after another, in order
 //
 // run.mjs is the other half: four browsers at one table, which is the
 // only way to see the live flows. This one is everything else — the
@@ -11,13 +13,15 @@
 // that presses anything with a real pointer rather than through the
 // accessibility tree, so a tap landing in the wrong place has
 // somewhere to show up.
+import { AsyncResource } from 'node:async_hooks';
 import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 import { chromium } from './browser.mjs';
-import { act, appDir, argOf, click, dismiss, has, labelOf, log, root, serveApp, sleep, startRelay, texts, type, waitFor, waitGone, roomIn, records } from './drive.mjs';
+import { act, appDir, click, dismiss, freePort, has, labelOf, licensed, log, logTo, root, serveApp, sleep, startRelay, texts, type, waitFor, waitGone, roomIn } from './drive.mjs';
+import { runFlows } from './pool.mjs';
 
 const portrait = { width: 390, height: 844 };
 const landscape = { width: 844, height: 390 };
@@ -60,8 +64,18 @@ const cardName = /^(2|3|4|5|6|7|8|9|10|jack|queen|king|ace) of (clubs|diamonds|s
 
 const flows = [];
 const flow = (name, run) => flows.push({ name, run });
+/// A flow whose devices ask to be spared motion (prefers-reduced-motion,
+/// which the app honours): the folding heart and the breathing turn pill
+/// hold still, and cards arrive without flying. Every flow but two: a
+/// hand alone and the thumb's taps play with the motion — cards flying
+/// into the fan and off it, tricks swept, the turn's pill breathing, the
+/// table the same widgets alone and live — and the rest spare the
+/// machine it. A page drawing motion in this headless browser is a core
+/// of the machine's four for as long as it moves, and nothing else here
+/// looks at it.
+const stillFlow = (name, run) => flows.push({ name, run, still: true });
 
-flow('the front door', async ({ open }) => {
+stillFlow('the front door', async ({ open }) => {
   const page = await open();
   await waitFor(page, /^Open Hearts$/, { what: 'the home screen' });
   const seen = await texts(page);
@@ -85,7 +99,7 @@ flow('the front door', async ({ open }) => {
   if (seen.some((t) => /^About$/.test(t))) throw new Error('About is in the menu now, not on the door');
 });
 
-flow('the game options', async ({ open }) => {
+stillFlow('the game options', async ({ open }) => {
   const page = await open();
   await waitFor(page, /^50 points · rated$/, { what: 'the options line' });
   await click(page, /^Game options$/);
@@ -119,13 +133,13 @@ flow('a hand alone', async ({ open }) => {
   await waitFor(page, /^Play solo$/, { what: 'the home screen again' });
 });
 
-flow('the rest of a hand left to Auto', async ({ open, app }) => {
+stillFlow('the rest of a hand left to Auto', async ({ open, app }) => {
   // Played by the first legal card until the table offers to play the
   // rest itself, and then left alone: the hand has to end with nobody
   // touching it. Dealt from the deal the app's own test uses
   // (app/test/autopilot_test.dart), whose first hand comes to it, so it
   // is not left to luck; as many hands as it takes, should it not.
-  const page = await open({ url: `${app.url}/?e2e=1&seed=156` });
+  const page = await open({ url: '/?e2e=1&seed=156' });
   await click(page, /^Play solo$/);
   await waitFor(page, /^Choose 3 more to pass$/, { what: 'the pass' });
   const until = Date.now() + 240000;
@@ -168,7 +182,7 @@ flow('a thumb, not the tree', async ({ open }) => {
   }
 });
 
-flow('turning the phone mid-hand', async ({ open }) => {
+stillFlow('turning the phone mid-hand', async ({ open }) => {
   const page = await open();
   await click(page, /^Play solo$/);
   await waitFor(page, /^Choose 3 more to pass$/, { what: 'the pass' });
@@ -185,10 +199,12 @@ flow('turning the phone mid-hand', async ({ open }) => {
   await playAlone(page, (p) => has(p, /^Next hand$/), 120000);
 });
 
-flow('a game alone, and the record it leaves', async ({ open, context }) => {
-  const page = await open();
+stillFlow('a game alone, and the record it leaves', async ({ open, context }) => {
+  // A game of one hand (`target=1`, app/lib/net/address.dart): its end,
+  // its record and its count are what is looked at, not its length.
+  const page = await open({ url: '/?e2e=1&target=1' });
   await click(page, /^Play solo$/);
-  // Hand after hand until somebody reaches fifty.
+  // Hand after hand until the game is over.
   for (let hand = 0; hand < 30; hand++) {
     await playAlone(page, (p) => has(p, /^Next hand$|^New game$/), 180000);
     if (await has(page, /^New game$/)) break;
@@ -241,7 +257,7 @@ flow('a game alone, and the record it leaves', async ({ open, context }) => {
   });
 });
 
-flow('the about page', async ({ open }) => {
+stillFlow('the about page', async ({ open }) => {
   const page = await open();
   await click(page, /^Play solo$/);
   await waitFor(page, /^Menu$/, { what: 'the table' });
@@ -259,7 +275,7 @@ flow('the about page', async ({ open }) => {
   await waitFor(page, /^Menu$/, { what: 'the table again' });
 });
 
-flow('the live area, and a room to share', async ({ open, relay }) => {
+stillFlow('the live area, and a room to share', async ({ open, relay }) => {
   await relay();
   const page = await open();
   await waitFor(page, /^Play friends$/, { what: 'the home screen' });
@@ -298,7 +314,7 @@ flow('the live area, and a room to share', async ({ open, relay }) => {
   if (roomIn(page.url())) throw new Error(`the room is still in the address: ${page.url()}`);
 });
 
-flow('the backup codes, shown on request and copied', async ({ open }) => {
+stillFlow('the backup codes, shown on request and copied', async ({ open }) => {
   // Copy goes through the page (app/web/copy.js) so that Safari allows
   // it; here, that the text that arrives is the codes the page shows.
   const page = await open();
@@ -321,7 +337,7 @@ flow('the backup codes, shown on request and copied', async ({ open }) => {
   if (copied.split('\n').join(',') !== shown.join(',')) throw new Error(`copied ${JSON.stringify(copied)}, shown ${shown.join(',')}`);
 });
 
-flow('a page keeps its address: away to another site and back lands on it', async ({ open }) => {
+stillFlow('a page keeps its address: away to another site and back lands on it', async ({ open }) => {
   // Stripe's checkout and portal are whole pages of their own. The back
   // button from there loads the app again, and it has to come back to
   // the page that left (app/lib/pages.dart), not to the front door.
@@ -343,10 +359,10 @@ flow('a page keeps its address: away to another site and back lands on it', asyn
   if (await has(page, /^This device$/)) throw new Error('still on the subscription page');
 });
 
-flow('every page by its own address: opened, refreshed, and back to the front door', async ({ open, app }) => {
+stillFlow('every page by its own address: opened, refreshed, and back to the front door', async ({ open, app }) => {
   // A link to a page, a refresh on it, or history landing on it opens
   // that page over the front door (app/lib/router.dart).
-  const page = await open({ url: `${app.url}/about?e2e=1`, ready: /^Build$/ });
+  const page = await open({ url: '/about?e2e=1', ready: /^Build$/ });
   await page.reload();
   await waitFor(page, /^Build$/, { what: 'the about page, after a refresh', timeout: 60000 });
   if (new URL(page.url()).searchParams.get('e2e') !== '1') throw new Error(`the session's parameters went: ${page.url()}`);
@@ -354,20 +370,20 @@ flow('every page by its own address: opened, refreshed, and back to the front do
   await waitFor(page, /^Play solo$/, { what: 'the front door, under it' });
   if (new URL(page.url()).pathname !== '/') throw new Error(`the address did not come home: ${page.url()}`);
   // A game is reached only by playing: its address alone is the front door.
-  const game = await open({ url: `${app.url}/live?e2e=1` });
+  const game = await open({ url: '/live?e2e=1' });
   await waitFor(game, /^Play solo$/, { what: 'the front door, for a game\'s address' });
   if (new URL(game.url()).pathname !== '/') throw new Error(`a game's address stayed: ${game.url()}`);
 });
 
-flow('a kept game, opened by its address: checked in the browser, then shown hand by hand', async ({ open, app }) => {
+stillFlow('a kept game, opened by its address: checked in the browser, then shown hand by hand', async ({ open, app }) => {
   // A real record, as a player's device sends one: a sealed game of four
   // played out on the simulator (packages/table, tool/game_fixture.dart),
   // kept as the site keeps it. The browser fetches it and replays every
   // signature and every step of the deal before showing a card.
   const json = execFileSync('dart', ['run', 'tool/game_fixture.dart'], { cwd: join(root, 'packages', 'table'), maxBuffer: 16 << 20 }).toString().trim();
   const table = JSON.parse(json).spec.id;
-  records.kept.set(`tables/${table}.json`, gzipSync(Buffer.from(json)));
-  const page = await open({ url: `${app.url}/table/${table}?e2e=1`, ready: /^The game$/ });
+  app.records.kept.set(`tables/${table}.json`, gzipSync(Buffer.from(json)));
+  const page = await open({ url: `/table/${table}?e2e=1`, ready: /^The game$/ });
   const began = Date.now();
   // The check runs in a worker of its own (app/worker/review_worker.dart):
   // the page's thread stays free the whole time, which a script asking
@@ -397,11 +413,11 @@ flow('a kept game, opened by its address: checked in the browser, then shown han
   await waitFor(page, /^\w+ of \w+, (Ada|Bao|Cy|Dee)$/, { what: 'a card, by name and player' });
   if (await has(page, /does not check out/)) throw new Error('the record did not check out');
   // An address that is not a table's goes to the front door.
-  const nowhere = await open({ url: `${app.url}/table/not-a-table?e2e=1` });
+  const nowhere = await open({ url: '/table/not-a-table?e2e=1' });
   if (new URL(nowhere.url()).pathname !== '/') throw new Error(`a bad table address stayed: ${nowhere.url()}`);
 });
 
-flow('a game watched as it is played, from the link a player shares', async ({ open, relay }) => {
+stillFlow('a game watched as it is played, from the link a player shares', async ({ open, relay }) => {
   // Ada alone in the pool is seated with three bots. Her menu shares the
   // table's address; whoever opens it watches the game from outside it
   // (packages/table, watch.dart): one seated player's device answers
@@ -439,14 +455,16 @@ flow('a game watched as it is played, from the link a player shares', async ({ o
   if (bare.length) throw new Error(`cards with nobody's play to them, seen from outside: ${bare.join(', ')}`);
 });
 
-flow('a live game played to its end, then looked at from its end', async ({ open, relay }) => {
-  // Ada alone in the pool, with three bots, plays a game to fifty by the
-  // first legal card. At its end the sheet offers the whole game: the
-  // account has got up from the table, and the service has heard so
-  // before it is asked, so it is shown — not turned away as a game the
-  // account is still playing (net/game_records.dart, net/in_use.dart).
+stillFlow('a live game played to its end, then looked at from its end', async ({ open, relay }) => {
+  // Ada alone in the pool, with three bots, plays a game by the first
+  // legal card: a game of one hand (`target=1`, app/lib/net/address.dart),
+  // since its end is the point. At its end the sheet offers the whole
+  // game: the account has got up from the table, and the service has
+  // heard so before it is asked, so it is shown — not turned away as a
+  // game the account is still playing (net/game_records.dart,
+  // net/in_use.dart).
   await relay();
-  const ada = await open();
+  const ada = await open({ url: '/?e2e=1&target=1' });
   await waitFor(ada, /^Play live/, { what: 'live play open', timeout: 40000 });
   await click(ada, /^Your profile$/);
   await waitFor(ada, /^Rocket$/, { what: 'the profile' });
@@ -465,11 +483,14 @@ flow('a live game played to its end, then looked at from its end', async ({ open
   }
   await click(ada, /^See the whole game$/);
   await waitFor(ada, /^The game$/, { what: 'the game\'s page' });
-  await waitFor(ada, /^Hand 1  ·  Pass left$/, { what: 'the game, shown from its end', timeout: 180000 });
+  // Its first hand shown — the first, unless a busy machine had the
+  // table give one up undealt (packages/table, undealt_hand_test.dart),
+  // which has nothing to show.
+  await waitFor(ada, /^Hand \d+  ·  /, { what: 'the game, shown from its end', timeout: 180000 });
   if (await has(ada, /This is your own game/)) throw new Error('the game was turned away as one still being played');
 });
 
-flow('a reaction at a live table: one player sends 👍, and the other sees it by her seat', async ({ open, app, relay }) => {
+stillFlow('a reaction at a live table: one player sends 👍, and the other sees it by her seat', async ({ open, app, relay }) => {
   // Two people at a friends' table, two bots with them. Ada presses the
   // speech bubble beside her badge and picks Nice; it goes on the
   // table's tag, signed by her device, and Bao's screen shows it beside
@@ -488,7 +509,7 @@ flow('a reaction at a live table: one player sends 👍, and the other sees it b
   await click(ada, /^Play friends$/);
   await waitFor(ada, /^Share the link$/, { what: 'the room', timeout: 60000 });
   const code = roomIn(ada.url());
-  await bao.goto(`${app.url}/room/${code}?e2e=1`);
+  await bao.goto(app.at(`/room/${code}?e2e=1`));
   // The room starts ten seconds after the last arrival.
   for (const page of [ada, bao]) await waitFor(page, /^2 of 2 here/, { what: 'the live table', timeout: 90000 });
 
@@ -499,9 +520,14 @@ flow('a reaction at a live table: one player sends 👍, and the other sees it b
   await waitFor(ada, /^Good game$/, { what: 'the reactions to pick from' });
   await click(ada, /^Nice$/);
   await waitFor(ada, /^You: Nice$/, { what: 'Ada\'s own reaction, in the button\'s place', timeout: 5000 });
-  await waitFor(bao, /^Ada: Nice$/, { what: 'Ada\'s reaction on Bao\'s screen', timeout: 5000 });
-  // Beside Ada's badge on Bao's screen: nearer it than any other seat's.
-  const bubble = await rectOf(bao, /^Ada: Nice$/);
+  // On Bao's screen, beside Ada's badge: nearer it than any other
+  // seat's. Measured as soon as it shows, in the one look: it is there
+  // for a few seconds, and a busy machine can spend them between two.
+  let bubble = null;
+  for (const until = Date.now() + 5000; !bubble && Date.now() < until; await sleep(100)) {
+    bubble = await rectOf(bao, /^Ada: Nice$/).catch(() => null);
+  }
+  if (!bubble) throw new Error(`no reaction on Bao's screen within 5 s\nBao saw: ${(await texts(bao)).join(' | ')}`);
   const centre = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
   const away = (r) => Math.hypot(centre(r).x - centre(bubble).x, centre(r).y - centre(bubble).y);
   const badges = (await texts(bao)).filter((t) => /^[^:]+: \d+ in the game/.test(t));
@@ -512,7 +538,7 @@ flow('a reaction at a live table: one player sends 👍, and the other sees it b
   await waitFor(ada, /^React$/, { what: 'the button back', timeout: 8000 });
 });
 
-flow('a reload mid-hand comes back to the seat, and the hand plays on', async ({ open, relay }) => {
+stillFlow('a reload mid-hand comes back to the seat, and the hand plays on', async ({ open, relay }) => {
   // The page keeps what it signed and its deal secret as it plays
   // (app/lib/net/seat_store.dart); reloaded, it goes straight back to
   // the table, is caught up by it, and plays the hand out in its own
@@ -558,7 +584,7 @@ flow('a reload mid-hand comes back to the seat, and the hand plays on', async ({
   }
 });
 
-flow('a second device, brought in by the code the first one shows', async ({ open }) => {
+stillFlow('a second device, brought in by the code the first one shows', async ({ open }) => {
   // A subscription is a person's, not a device's (docs/06-service.md).
   // The first device shows a code; the second arrives carrying it, and
   // ends up on the same subscription rather than one of its own — which
@@ -602,7 +628,7 @@ flow('a second device, brought in by the code the first one shows', async ({ ope
   await waitFor(first, /^2 of 5$/, { what: 'both devices on the subscription, after a reload', timeout: 40000 });
 });
 
-flow('one device at a time: the newest opened wins, and the other takes it back — asked first when it is at a table', async ({ open, relay }) => {
+stillFlow('one device at a time: the newest opened wins, and the other takes it back — asked first when it is at a table', async ({ open, relay }) => {
   // An account plays on one device at a time (docs/06-service.md). The
   // second device comes into the first one's account by its code, and
   // opening it is taking the account up: the first steps back, off the
@@ -671,7 +697,7 @@ async function profileShown(page) {
   return { name, rocket };
 }
 
-flow('the profile is the account\'s: changed on one device, the other shows it at its next start', async ({ open, relay }) => {
+stillFlow('the profile is the account\'s: changed on one device, the other shows it at its next start', async ({ open, relay }) => {
   // The name and how you look are the account's (docs/06-service.md):
   // kept by the service with the account, written from the device in
   // use, and read by the others when they start. Two devices of one
@@ -759,60 +785,74 @@ async function checkFresh() {
 }
 
 async function main() {
-  const only = argOf('only');
   await checkFresh();
-  const app = await serveApp();
-  const browser = await chromium.launch();
-  let failed = 0;
-  // A flow's devices are that flow's: they go when it does. Left open
-  // they stay online — announcing themselves, folding their hearts,
-  // holding sockets — and the next flow runs against a relay with a
-  // crowd on it and a machine with nothing left to give.
-  let contexts = [];
-  // Only the lobby needs a relay, and it costs a couple of seconds and
-  // two processes, so it is started when something asks for one.
-  let relayOnce = null;
-  const relay = () => (relayOnce ??= startRelay());
-  const open = async ({ viewport = portrait, pointer = false, url = null, ready = /^Open Hearts$|^Play solo$/ } = {}) => {
-    const ctx = await browser.newContext({
-      viewport,
-      locale: 'en-US',
-      hasTouch: true,
-      isMobile: true,
-      deviceScaleFactor: 2,
-      // The record flow reads what Copy record put there.
-      permissions: ['clipboard-read', 'clipboard-write'],
-    });
-    contexts.push(ctx);
-    const page = await ctx.newPage();
-    page.on('pageerror', (e) => log(`page error: ${e.message}\n${(e.stack || '').slice(0, 900)}`));
-    await page.goto(url ?? `${app.url}/?e2e=1`);
-    // For a flow that presses with the pointer, the nodes are read for
-    // their labels and their geometry and take no clicks, so every
-    // press goes through the app's own hit test. The rest keep them:
-    // typing into a field goes through the node's own input.
-    if (pointer) {
-      await page.addStyleTag({ content: 'flt-semantics, flt-semantics * { pointer-events: none !important; }' });
-    }
-    await waitFor(page, ready, { what: 'the app', timeout: 60000 });
-    return page;
-  };
-  for (const { name, run } of flows) {
-    if (only && !name.includes(only)) continue;
-    const began = Date.now();
-    try {
-      await run({ open, app, relay });
-      log(`ok    ${name} (${((Date.now() - began) / 1000).toFixed(0)}s)`);
-    } catch (e) {
-      failed++;
-      log(`FAIL  ${name}: ${e.message}`);
-    }
-    for (const ctx of contexts) await ctx.close();
-    contexts = [];
-  }
-  await browser.close();
-  app.stop();
-  (await relayOnce)?.stop();
+  const failed = await runFlows({
+    flows,
+    // A worker's rig: its own server and handlers, its own browser, and
+    // a relay of its own on a port of its own. Only the lobby needs a
+    // relay, and it costs a couple of seconds and two processes, so it
+    // is started when a flow asks for one; the pages are told its port
+    // from the start.
+    setUp: async ({ tag, say }) => {
+      const relayPort = await freePort();
+      // A tenth of a table's beats (app/lib/net/address.dart): the same
+      // hands, without the minute a bot's thinking takes over each.
+      const app = await serveApp({ relayPort, tag, pace: 0.1 });
+      const browser = await chromium.launch();
+      let relayOnce = null;
+      // Started outside any flow's lines: it outlives the flow that
+      // asked for it, and its jurors speak through `say`.
+      const relay = () => (relayOnce ??= logTo.exit(() => startRelay({ port: relayPort, tag, say })));
+      return { app, browser, relay, stop: async () => (await relayOnce)?.stop() };
+    },
+    runFlow: async ({ run, still = false }, { app, browser, relay }) => {
+      // A flow's devices are that flow's: they go when it does. Left open
+      // they stay online — announcing themselves, folding their hearts,
+      // holding sockets — and the next flow runs against a relay with a
+      // crowd on it and a machine with nothing left to give.
+      const contexts = [];
+      const open = async ({ viewport = portrait, pointer = false, url = null, ready = /^Open Hearts$|^Play solo$/ } = {}) => {
+        const ctx = await browser.newContext({
+          viewport,
+          locale: 'en-US',
+          hasTouch: true,
+          isMobile: true,
+          // A phone's two pixels to the point where the table moves; one
+          // where it holds still, which is a quarter of the drawing.
+          deviceScaleFactor: still ? 1 : 2,
+          reducedMotion: still ? 'reduce' : 'no-preference',
+          // The record flow reads what Copy record put there.
+          permissions: ['clipboard-read', 'clipboard-write'],
+        });
+        contexts.push(ctx);
+        const page = await ctx.newPage();
+        page.on('pageerror', AsyncResource.bind((e) => log(`page error: ${e.message}\n${(e.stack || '').slice(0, 900)}`)));
+        await page.goto(app.at(url ?? '/?e2e=1'));
+        // For a flow that presses with the pointer, the nodes are read for
+        // their labels and their geometry and take no clicks, so every
+        // press goes through the app's own hit test. The rest keep them:
+        // typing into a field goes through the node's own input.
+        if (pointer) {
+          await page.addStyleTag({ content: 'flt-semantics, flt-semantics * { pointer-events: none !important; }' });
+        }
+        await waitFor(page, ready, { what: 'the app', timeout: 60000 });
+        // At the front door, licensed: every flow here plays on the rig's
+        // open house (drive.mjs, licensed).
+        if (url === null || /^\/\?/.test(url)) await licensed(page);
+        return page;
+      };
+      try {
+        await run({ open, app, relay });
+      } finally {
+        for (const ctx of contexts) await ctx.close();
+      }
+    },
+    tearDown: async ({ app, browser, stop }) => {
+      await browser.close();
+      app.stop();
+      await stop();
+    },
+  });
   log(failed ? `FAIL: ${failed} flow${failed === 1 ? '' : 's'}` : 'PASS');
   process.exit(failed ? 1 : 0);
 }

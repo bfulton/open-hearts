@@ -5,7 +5,7 @@
 //
 // The app's relays are the build's, never typed in (app/lib/net/
 // relays.dart); served from localhost it looks for the local relay at
-// its usual port, which is where the suite starts one.
+// the port its address names, which is where the suite starts one.
 //
 // Starts the local relay and a static server for the built app, opens
 // four headless Chromium contexts — four devices, four keys — and
@@ -22,6 +22,7 @@ import {
   dismiss,
   has,
   labelOf,
+  licensed,
   log,
   playUntil,
   serveApp,
@@ -70,7 +71,13 @@ const aHand = 480000;
 
 async function main() {
   const relay = await startRelay();
-  const app = await serveApp();
+  // A tenth of a table's beats (app/lib/net/address.dart), and the
+  // operator's word on the clocks (docs/06-service.md): a person silent
+  // for half a minute rather than two is gone, and a bank of ten
+  // seconds rather than forty-five is spent — the least either may be
+  // (packages/table, timing.dart). The cells are the same; their waits
+  // are shorter.
+  const app = await serveApp({ relayPort: relay.port, pace: 0.1, config: { table: { silenceMs: 30000, bankMs: 10000 } } });
   log(`relay ${relay.url}, app ${app.url}`);
   const browser = await chromium.launch();
   const contexts = [];
@@ -92,7 +99,12 @@ async function main() {
   let failed = false;
   try {
     for (let i = 0; i < 4; i++) {
-      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' });
+      // As a reader who asks to be spared motion (prefers-reduced-motion,
+      // which the app honours): the folding heart and the breathing turn
+      // pill hold still, and the cards arrive without flying. Here the
+      // motion is not what is looked at — flows.mjs plays with it — and
+      // four pages drawing it are a core each on a machine with four.
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US', reducedMotion: 'reduce' });
       const tasks = [];
       held.push(tasks);
       await ctx.exposeBinding('ohLongTask', (_, ms) => playing && tasks.push(ms));
@@ -143,9 +155,12 @@ async function main() {
         const verbose = /$^/;
         if (m.type() === 'error' || verbose.test(t) || /^mesh: /.test(t) || /^duty: (?!.*emit )/.test(t) || /^table: .*(jury|juror|verdict|appeal|nobody online|summon)/.test(t)) log(`page ${names[i]}: ${t}`);
       });
-      await page.goto(`${app.url}/?${driven}`);
+      await page.goto(app.at(`/?${driven}`));
       contexts.push(ctx);
       pages.push(page);
+      // One app at a time, as four people open theirs, each licensed
+      // before the next starts (drive.mjs, licensed).
+      await licensed(page);
     }
     // Everyone names themselves in their profile, behind the icon in
     // the corner of the front door: the name and the avatar are one
@@ -228,7 +243,7 @@ async function main() {
     // time the last is looked at that fourth arrival may already have
     // started the table, so either screen is arriving.
     for (let i = 1; i < 4; i++) {
-      await pages[i].goto(`${app.url}/room/${code}?${driven}`);
+      await pages[i].goto(app.at(`/room/${code}?${driven}`));
       await waitFor(pages[i], /^Share the link$|^\d of 4 here/, { what: `the room, by its link (${names[i]})`, timeout: 60000 });
     }
     // Four in a room is a table at once, whoever leads.
@@ -248,7 +263,7 @@ async function main() {
 
     // Cell 2: Dee's browser goes, mid-hand. The others see three, and a
     // bot in her seat once her turn comes and the silence is answered —
-    // two minutes of it.
+    // half a minute of it, as the rig's config sets it.
     await contexts[3].close();
     log('Dee closed her browser');
     const others = pages.slice(0, 3);
@@ -256,8 +271,10 @@ async function main() {
     await playUntil(others, async (p) => (await texts(p)).some((t) => roster.test(t)), { timeout: 150000 });
     log('a bot took Dee\'s seat');
 
-    // Cell 3: Cara stops acting. On her turn the clock runs; at fifteen
-    // seconds the others get the Boot button, and one press does it.
+    // Cell 3: Cara stops acting. On her turn the clock runs; once her
+    // grace and her bank are spent (sixteen seconds at most, with the
+    // rig's bank of ten) the others get the Boot button, and one press
+    // does it.
     // Her turn can be most of a trick away, and on two cores the whole
     // of it can take 69 s.
     await playUntil(others, (p, i) => i === 2 || has(p, /^Boot Cara$/), { timeout: 180000, idle: [2] });
@@ -272,15 +289,16 @@ async function main() {
     // waits on a vote that will never come, and the table asks the
     // jury — the service's juror of last resort, called for when this
     // table found nobody else online. It rules once Bao has been
-    // silent two minutes: Ada's play stands, and at Bao's own turn his
-    // seat goes to a bot. Ada finishes the hand with three bots.
+    // silent half a minute (the rig's config): Ada's play stands, and at
+    // Bao's own turn his seat goes to a bot. Ada finishes the hand with
+    // three bots.
     await contexts[1].close();
     log("Bao's browser closed off his turn");
     await playUntil([pages[0]], (p) => has(p, /^Asking the jury$/), { timeout: 150000 });
     log('Ada is asking the jury');
     // The ruling is Bao's badge going to a bot, and nothing sooner. Not
     // "1 of 4 here", which counts who is connected and says so the
-    // moment his browser closes, two minutes before the jury rules. All
+    // moment his browser closes, half a minute before the jury rules. All
     // four badges on the screen and none of them his, so a moment with
     // no badges drawn is not taken for one without Bao.
     await playUntil([pages[0]], async (p) => {

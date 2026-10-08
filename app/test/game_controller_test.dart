@@ -59,7 +59,7 @@ void main() {
   });
 
   test('at the share of its beats a driven build asks for, every beat is there, that much shorter', () {
-    // `?e2e=1&pace=0.25` (net/address.dart): the browser suites' tables.
+    // `?e2e=1&pace=0.25` (net/address.dart), as a browser suite asks.
     tableBeats = 0.25;
     addTearDown(() => tableBeats = 1);
     fakeAsync((async) {

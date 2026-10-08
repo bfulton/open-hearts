@@ -20,7 +20,7 @@
 // seat is drawn, and the deal says so.
 
 import { chromium } from './browser.mjs';
-import { act, click, has, log, serveApp, sleep, startRelay, texts, type, waitFor } from './drive.mjs';
+import { act, click, has, licensed, log, serveApp, sleep, startRelay, texts, type, waitFor } from './drive.mjs';
 
 const driven = 'e2e=1';
 
@@ -42,12 +42,17 @@ async function traced(lines, what, { what: name, page, timeout = 120000 } = {}) 
 
 async function main() {
   const relay = await startRelay({ apart: true });
-  const app = await serveApp();
+  // A tenth of a table's beats (app/lib/net/address.dart), and a juror
+  // silent for ten seconds rather than thirty is gone (the operator's
+  // word on the clocks, docs/06-service.md; the least it may be,
+  // packages/table, timing.dart).
+  const app = await serveApp({ relayPort: relay.port, pace: 0.1, config: { table: { jurorSilenceMs: 10000 } } });
   log(`relay ${relay.url}, app ${app.url}`);
   const browser = await chromium.launch();
   let failed = false;
   try {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' });
+    // Spared motion, as in run.mjs: the escrow is what is looked at.
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US', reducedMotion: 'reduce' });
     const page = await ctx.newPage();
     // Every line the table writes, kept whether or not it is logged:
     // this suite reads what the browser saw, which is more than is
@@ -59,7 +64,8 @@ async function main() {
       if (t.startsWith('table: ')) said.push(t);
       if (m.type() === 'error' || /^table: .*(jury|juror|escrow|piece|verdict)/.test(t)) log(`page: ${t}`);
     });
-    await page.goto(`${app.url}/?${driven}`);
+    await page.goto(app.at(`/?${driven}`));
+    await licensed(page);
     await waitFor(page, /^Play friends$/, { what: 'the home screen' });
     await click(page, /^Your profile$/);
     await waitFor(page, /^Rocket$/, { what: 'the profile' });
@@ -100,9 +106,10 @@ async function main() {
     // Either way of being gone. A juror taken off the air stops
     // speaking and stops playing at the same instant, and which of
     // the two the table notices first is a race the deadline usually
-    // wins: fifteen seconds with the turn in front of it against thirty
-    // without a heartbeat (packages/table, client.dart
-    // botActsWithinMs, docs/04-live-play.md). Both are the same
+    // wins: fifteen seconds with the turn in front of it against ten
+    // without a heartbeat here, thirty on a standard table
+    // (packages/table, client.dart botActsWithinMs, timing.dart
+    // jurorSilenceMs, docs/04-live-play.md). Both are the same
     // judgement and both say so in the same line, so this watches for
     // the line rather than for one of its reasons.
     await traced(said, new RegExp(`bot seat ${gone.seat}: its juror .*; claimed for the escrow`),
