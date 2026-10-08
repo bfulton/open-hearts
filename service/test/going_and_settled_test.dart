@@ -31,7 +31,11 @@ void main() {
     final a = RelayPresence(relays: [relay.url], signer: SchnorrSigner.generate(), everyMs: 300);
     final b = RelayPresence(relays: [relay.url], signer: SchnorrSigner.generate(), everyMs: 300);
     await Future.wait([a.ready, b.ready]).timeout(const Duration(seconds: 10));
-    await until('the two did not see each other', () => a.online(withinMs: 60000).contains(b.signer.publicKey));
+    // Each way round: a device hears another at the other's next beat,
+    // and one that was not listening yet when the other first spoke
+    // waits for it. Seen one way is not heard the other.
+    await until('the two did not see each other',
+        () => a.online(withinMs: 60000).contains(b.signer.publicKey) && b.online(withinMs: 60000).contains(a.signer.publicKey));
 
     b.leaving();
     await until('a going was not heard', () => !a.online(withinMs: 60000).contains(b.signer.publicKey));
@@ -69,10 +73,12 @@ void main() {
     final later = RelayPresence(relays: [relay.url], signer: SchnorrSigner.generate(), everyMs: 300, canServe: () => able);
     await Future.wait([watcher.ready, never.ready, later.ready]).timeout(const Duration(seconds: 10));
     await until('the one that can serve was not seen', () => watcher.online(withinMs: 60000).contains(later.signer.publicKey));
+    // And the others heard by the one that cannot, at their next beat if
+    // it was not listening yet at their first.
+    await until('the one that cannot serve did not hear the others', () => never.online(withinMs: 60000).contains(watcher.signer.publicKey));
     expect(watcher.online(withinMs: 60000).contains(never.signer.publicKey), isFalse,
         reason: 'a device that cannot deal said it was here, and a table could draw it');
     expect(never.online(withinMs: 60000), isNot(contains(never.signer.publicKey)), reason: 'nor counts itself');
-    expect(never.online(withinMs: 60000), contains(watcher.signer.publicKey), reason: 'it still hears the others');
 
     able = false;
     await until('it did not say it was going', () => !watcher.online(withinMs: 60000).contains(later.signer.publicKey));
