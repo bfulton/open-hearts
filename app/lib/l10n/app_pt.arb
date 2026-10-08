@@ -52,7 +52,7 @@
   "copyRecord": "Copiar registro",
   "ratingNow": "Rating {rating}",
   "ratingMoved": "Rating {before} → {after}",
-  "tagline": "Jogo de cartas Copas de código aberto, sem anúncios",
+  "tagline": "Jogo de cartas de código aberto, sem anúncios",
   "playSolo": "Jogar sozinho",
   "stillLookingForRelay": "Ainda procurando um relay…",
   "noRelayTakesEvents": "Nenhum relay aceita as mensagens deste aparelho: {reason}",

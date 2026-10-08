@@ -60,7 +60,7 @@ void main() {
         body: Doorway(
           heart: FoldingHeart(key: GlobalKey(), size: 46, color: Palette.mark),
           title: true,
-          tagline: 'Open source Hearts card game, no ads',
+          tagline: 'Open source card game, no ads',
           child: const SizedBox(height: 240, child: Placeholder()),
         ),
       )));
@@ -68,7 +68,7 @@ void main() {
       final name = tester.getRect(find.text('Open Hearts'));
       final buttons = tester.getRect(find.byType(Placeholder));
       expect(name.right, lessThan(buttons.left), reason: '$size: the name to the left of the buttons');
-      expect(tester.getRect(find.text('Open source Hearts card game, no ads')).right, lessThan(buttons.left), reason: '$size: and the tagline with it');
+      expect(tester.getRect(find.text('Open source card game, no ads')).right, lessThan(buttons.left), reason: '$size: and the tagline with it');
       for (final scroll in tester.stateList<ScrollableState>(find.byType(Scrollable))) {
         expect(scroll.position.maxScrollExtent, 0, reason: '$size: nothing to scroll');
       }

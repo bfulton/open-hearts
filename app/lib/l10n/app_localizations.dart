@@ -419,7 +419,7 @@ abstract class AppLocalizations {
   /// Under the app's name on the front door.
   ///
   /// In en, this message translates to:
-  /// **'Open source Hearts card game, no ads'**
+  /// **'Open source card game, no ads'**
   String get tagline;
 
   /// Button: a game against three bots.

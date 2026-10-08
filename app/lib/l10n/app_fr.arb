@@ -52,7 +52,7 @@
   "copyRecord": "Copier le relevé",
   "ratingNow": "Classement {rating}",
   "ratingMoved": "Classement {before} → {after}",
-  "tagline": "Jeu de cartes Dame de pique open source, sans pub",
+  "tagline": "Jeu de cartes open source, sans pub",
   "playSolo": "Jouer seul",
   "stillLookingForRelay": "Recherche d'un relais…",
   "noRelayTakesEvents": "Aucun relais n'accepte les messages de cet appareil : {reason}",

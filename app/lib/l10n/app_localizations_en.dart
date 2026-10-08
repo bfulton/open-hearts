@@ -281,7 +281,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get tagline => 'Open source Hearts card game, no ads';
+  String get tagline => 'Open source card game, no ads';
 
   @override
   String get playSolo => 'Play solo';

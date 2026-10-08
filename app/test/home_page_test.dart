@@ -402,7 +402,7 @@ void main() {
     expect(find.text('Checking online players…'), findsOneWidget);
     expect(find.textContaining('Four seats, filled'), findsNothing);
     expect(find.textContaining('A new table, and a link to send'), findsNothing);
-    expect(find.text('Open source Hearts card game, no ads'), findsOneWidget);
+    expect(find.text('Open source card game, no ads'), findsOneWidget);
   });
 
   testWidgets('back from paying: said so at once, and live play opens when the licence comes', (tester) async {

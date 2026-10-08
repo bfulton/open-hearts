@@ -23,7 +23,7 @@ try {
   await page.goto(`${app.url}/?e2e=1`);
   await waitFor(page, /^Play solo$/, { what: 'the app', timeout: 90000 });
   console.log('navigator.platform:', await page.evaluate('navigator.platform'));
-  const node = await page.evaluateHandle(`[...document.querySelectorAll('flt-semantics')].find((e) => (e.textContent || '').trim() === 'Open source Hearts card game, no ads')`);
+  const node = await page.evaluateHandle(`[...document.querySelectorAll('flt-semantics')].find((e) => (e.textContent || '').trim() === 'Open source card game, no ads')`);
   const box = await node.asElement().boundingBox();
   const x = box.x + box.width * 0.2, y = box.y + box.height / 2;
   const cdp = await ctx.newCDPSession(page);
@@ -42,7 +42,7 @@ try {
     await new Promise((r) => setTimeout(r, 800));
     const clip = await page.evaluate('navigator.clipboard.readText()');
     console.log('clipboard:', JSON.stringify(clip));
-    ok = clip.length > 0 && 'Open source Hearts card game, no ads'.includes(clip.trim());
+    ok = clip.length > 0 && 'Open source card game, no ads'.includes(clip.trim());
   }
   await page.screenshot({ path: new URL('../app/build/longpress.png', import.meta.url).pathname });
 } catch (e) { console.log('FAIL', e.message); }

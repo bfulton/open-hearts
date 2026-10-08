@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#06231A",
     "theme_color": "#06231A",
-    "description": "Open source Hearts card game, no ads",
+    "description": "Open source card game, no ads",
     "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
