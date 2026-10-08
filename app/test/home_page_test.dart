@@ -10,6 +10,7 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
+import 'package:deal/memo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
@@ -86,7 +87,7 @@ void main() {
   // is — the primitives and the worker that makes the slow ones: the
   // one that cannot is a test of its own (below).
   setUpAll(() async {
-    dealCrypto = await DealCrypto.load();
+    dealCrypto = await rememberedCrypto();
     dealWorker = await DealWorker.start();
   });
   tearDownAll(() => dealWorker?.close());

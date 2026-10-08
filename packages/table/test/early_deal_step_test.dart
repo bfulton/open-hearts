@@ -22,7 +22,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   // Seed 1 is one of the hands where the order goes the wrong way. Kept
   // rather than dropped, its step deals in about 6.6 s, as the hands

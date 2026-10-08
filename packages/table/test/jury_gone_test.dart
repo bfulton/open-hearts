@@ -19,7 +19,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('the whole jury gone at a held seat\'s turn: the table says it waits for the jury, and goes on when one is back', () {
     // Exactly a jury's worth online, so there is nobody to draw again.

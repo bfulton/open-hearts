@@ -24,7 +24,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   /// Two people with a jury of their own and strangers to spare, the
   /// whole jury gone once the hand is being played: the table stops at

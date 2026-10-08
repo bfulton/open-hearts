@@ -22,7 +22,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a juror topped up mid-hand, its deal built again, goes on past the keys', () {
     final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4, target: 1);

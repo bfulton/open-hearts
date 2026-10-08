@@ -10,6 +10,7 @@
 /// verify nothing shuffled from them. So it has no part in the hands
 /// before its first summons ([SimTable.sweepJurors] lets go of a
 /// juror's client as the duty does).
+@Tags(['slow'])
 library;
 
 import 'package:deal/deal.dart';
@@ -20,7 +21,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a juror summoned again holds its seat, and has no part in the hands before', () {
     // More strangers than a jury, so a juror sits some hands out and is

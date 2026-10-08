@@ -6,6 +6,7 @@
 /// never went out there is not even an escrow holding pieces of it.
 /// The hand is given up unscored and the next dealt in its place
 /// (docs/04-live-play.md).
+@Tags(['slow'])
 library;
 
 import 'package:deal/deal.dart';
@@ -16,7 +17,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   // Both sides of it: the holder goes before its keys are out, so
   // there is no escrow at all; and after them, so there is one and it

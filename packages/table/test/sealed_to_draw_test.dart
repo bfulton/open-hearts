@@ -17,7 +17,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a juror makes no keys until the record has said which draw the hand is sealed to', () {
     final t = SimTable(humans: 2, seed: 7, crypto: crypto, jurors: jurySize);

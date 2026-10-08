@@ -16,6 +16,7 @@
 /// the record has said here which draw the hand is sealed to: keys
 /// this side cannot take yet are kept, and the verdict on them now is
 /// too (`--sealed-only 9`).
+@Tags(['slow'])
 library;
 
 import 'package:deal/deal.dart';
@@ -26,7 +27,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a juror summoned after the jury ruled a seat out reads the table\'s bot seats', () {
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 2);

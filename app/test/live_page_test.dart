@@ -464,7 +464,7 @@ void main() {
     // no hand to show it (docs/04-live-play.md), so its moves have to
     // come off the record like a person's — and a screen that waited
     // for the hand instead would stop at the pass and never play.
-    final crypto = await DealCrypto.load();
+    final crypto = await rememberedCrypto();
     final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: 4);
     for (var guard = 0; guard < 200 && live.controller.game.phase == engine.Phase.dealing; guard++) {
       await live.advance(tester, 500);
@@ -497,7 +497,7 @@ void main() {
     // made in a worker, here one taking a browser's time over each on
     // the virtual clock. The screen's table waits for them, and the
     // deal it shows is the one it would have shown making them itself.
-    final crypto = await DealCrypto.load();
+    final crypto = await rememberedCrypto();
     final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: 4, workers: true);
     var sawShuffling = false;
     for (var guard = 0; guard < 200 && live.controller.game.phase == engine.Phase.dealing; guard++) {
@@ -518,7 +518,7 @@ void main() {
   });
 
   testWidgets('a device whose deal worker fails for good says so, leaves the table, and the others play on', (tester) async {
-    final crypto = await DealCrypto.load();
+    final crypto = await rememberedCrypto();
     // What is raised where nothing catches it — the worker's failure —
     // is kept here. The body's own failures come back out as a value:
     // an error does not cross from a zone with a handler of its own
@@ -559,7 +559,7 @@ void main() {
     // table stops at a held seat's turn and says it waits for the
     // jury, and when none has come back in the time a silent person
     // is given, the game ends — unscored, and said so plainly.
-    final crypto = await DealCrypto.load();
+    final crypto = await rememberedCrypto();
     final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: 4);
     for (var guard = 0; guard < 200 && live.controller.game.phase != engine.Phase.playing; guard++) {
       await act(tester, live);
@@ -583,7 +583,7 @@ void main() {
   });
 
   testWidgets('at a sealed table the deal shows, the others\' cards are backs, and the hand plays out', (tester) async {
-    final crypto = await DealCrypto.load();
+    final crypto = await rememberedCrypto();
     final live = await pumpLive(tester, crypto: crypto);
     // The deal runs on the virtual clock: keys wait up to ten seconds
     // for a jury there is none of here, then the shuffles and the
@@ -632,7 +632,7 @@ void main() {
     // undealt_hand_test.dart). A screen that stayed in the old hand's
     // deal would wait for a lead that deal never names, and never offer
     // the pass the table then waits on.
-    final crypto = await DealCrypto.load();
+    final crypto = await rememberedCrypto();
     final live = await pumpLive(tester, crypto: crypto, botSeats: const {1, 3}, jurors: jurySize + 4);
     final c = live.controller;
     for (var guard = 0; guard < 200 && c.client.botHolders(0).isEmpty; guard++) {

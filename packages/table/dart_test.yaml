@@ -1,0 +1,14 @@
+# How the table's tests run (docs/09-testing.md).
+#
+# Four files side by side. Each file plays its tables in an isolate of
+# its own on the simulator's clock, so they share nothing but the
+# deal's answers kept on disk (package:deal/memo.dart), which any of
+# them may read and none can spoil.
+concurrency: 4
+
+tags:
+  # Whole sealed games played out under every departure, the chaos
+  # walks past the first eight, the long sweeps: run by `dart test`, in
+  # CI and before a deploy, and left out of the quick loop
+  # (`dart test -x slow`, ../../check.sh quick).
+  slow:

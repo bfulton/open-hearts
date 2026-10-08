@@ -16,7 +16,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('the other person goes silent as a held seat is to move: the jury carries the move, and the hand goes on', () {
     final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4);

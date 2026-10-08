@@ -17,7 +17,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   /// The table at the start of play, and the held seat that plays
   /// soonest from there, with its juror and the turn it plays at.

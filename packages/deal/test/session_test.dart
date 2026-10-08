@@ -12,6 +12,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:deal/deal.dart';
+import 'package:deal/memo.dart';
 import 'package:test/test.dart';
 
 /// The simulator's shared secret: a hash of the two keys, symmetric.
@@ -24,7 +25,7 @@ const leadCard = 0; // the deck index the lead card has, whatever it is
 
 void main() {
   late DealCrypto d;
-  setUpAll(() async => d = await DealCrypto.load());
+  setUpAll(() async => d = await rememberedCrypto());
 
   /// Delivers a message to every session but the sender's.
   void broadcast(List<DealSession> all, int from, bool Function(DealSession) accept) {

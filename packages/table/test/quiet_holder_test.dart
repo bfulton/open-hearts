@@ -21,7 +21,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a bot seat is played on after the juror holding it goes quiet, and stays shut to the table', () {
     final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4);

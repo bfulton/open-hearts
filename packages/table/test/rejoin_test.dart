@@ -3,6 +3,7 @@
 /// own word back, picks up its deal secret, is carried forward by the
 /// table, and plays on in the seat — the record of the game as sound
 /// as one nobody left.
+@Tags(['slow'])
 library;
 
 import 'package:deal/deal.dart';
@@ -13,7 +14,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   // Where in a hand the page goes: in the deal, in the pass, in the
   // middle of the play, and in hand two, with a whole hand behind it.

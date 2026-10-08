@@ -63,7 +63,11 @@ void main() {
     tearDown(() => relay.close());
 
     Future<(RelayTransport, WaitingRoom)> join(String name,
-        {int rating = 1500, int target = gameOverScore, TableTiming timing = TableTiming.standard, SchnorrSigner? signer}) async {
+        {int rating = 1500,
+        int target = gameOverScore,
+        TableTiming timing = TableTiming.standard,
+        SchnorrSigner? signer,
+        void Function(String)? log}) async {
       final s = signer ?? SchnorrSigner.generate();
       final t = RelayTransport(relays: [relay.url], signer: s, table: poolTag('unrated', target: target));
       await t.ready;
@@ -77,7 +81,8 @@ void main() {
           roundMs: 2000,
           botsAfterMs: 3000,
           heartbeatMs: 500,
-          staleMs: 2000);
+          staleMs: 2000,
+          log: log);
       return (t, room);
     }
 
@@ -98,15 +103,28 @@ void main() {
       // Three devices whose remote configs say three different clocks.
       // Whoever hosts the round seats the table, and every seat plays
       // by the host's — none by its own.
+      //
+      // Normally that is the lowest key, alone. On a machine busy enough
+      // that the host's seating reaches the next in line after its own
+      // turn to host has come, both seat the round and everyone takes
+      // the lower table id (matching.dart): the table plays by the clocks
+      // of a device that seated it, and still of no other.
       final timings = [
         for (final grace in [3000, 4000, 5000]) TableTiming.parse({'graceMs': grace}),
       ];
-      final rooms = [for (var i = 0; i < 3; i++) await join('T$i', timing: timings[i])];
+      final hosted = <int>{};
+      final rooms = [
+        for (var i = 0; i < 3; i++)
+          await join('T$i', timing: timings[i], log: (line) {
+            if (line.contains(': hosting,')) hosted.add(i);
+          }),
+      ];
       final specs = await Future.wait(rooms.map((r) => r.$2.seated.first.timeout(const Duration(seconds: 15))));
       expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table');
-      final host = rooms.map((r) => r.$2).reduce((a, b) => a.me.compareTo(b.me) <= 0 ? a : b);
+      expect(hosted, isNotEmpty, reason: 'somebody hosted the round');
       for (final spec in specs) {
-        expect(spec.timing, host.timing);
+        expect(spec.timing, anyOf([for (final h in hosted) timings[h]]),
+            reason: 'the clocks of the seating\'s host, of ${hosted.toList()..sort()}');
       }
       for (final r in rooms) {
         r.$2.close();

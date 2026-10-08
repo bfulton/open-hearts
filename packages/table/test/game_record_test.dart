@@ -1,6 +1,7 @@
 /// A game's record written out and read back is the same game: it
 /// verifies as the one played did, to the end — and a copy tampered
 /// with does not read at all.
+@Tags(['slow'])
 library;
 
 import 'dart:convert';
@@ -14,7 +15,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   /// Plays [t] out and returns the first person's record, written out.
   String playedOut(SimTable t) {

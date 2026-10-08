@@ -25,7 +25,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a juror whose seat the table gave to the escrow follows the table past that seat\'s audit', () {
     // Two hands at least: nobody reaches 27 in one.

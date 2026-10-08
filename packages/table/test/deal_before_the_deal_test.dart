@@ -25,7 +25,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a deal step that arrives before the hand is built is taken up when it is', () {
     final t = SimTable(humans: 2, seed: 5, crypto: crypto, jurors: jurySize);

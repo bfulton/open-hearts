@@ -123,7 +123,7 @@ void main() {
 
   group('sealed, with a jury', () {
     late DealCrypto crypto;
-    setUpAll(() async => crypto = await DealCrypto.load());
+    setUpAll(() async => crypto = await rememberedCrypto());
 
     test('the jurors play by the starter\'s clocks too: a held seat gone idle goes to the escrow at its five seconds', () {
       final fast = TableTiming.parse({'botActsMs': 5000});

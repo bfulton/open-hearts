@@ -7,6 +7,7 @@
 /// where the time goes — none of the slow calls made on the thread the
 /// table runs on. And a worker that fails, or stops, costs time and
 /// nothing else.
+@Tags(['slow'])
 library;
 
 import 'dart:async';
@@ -18,7 +19,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   /// Every client there has been at [t]: the people's, and each
   /// juror's that was summoned.

@@ -29,7 +29,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   // With jurors online beyond the jury, the table draws again the
   // moment it stops hearing its own — and a juror drawn after the

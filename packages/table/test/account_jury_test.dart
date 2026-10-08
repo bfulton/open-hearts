@@ -3,7 +3,6 @@
 /// their phone sits at the table is the player, not a stranger.
 library;
 
-import 'package:deal/deal.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
@@ -40,7 +39,7 @@ void main() {
   test('at a sealed table the snapshot a jury is drawn from holds no device of a seated account', () async {
     // A held bot seat's cards go to its juror: the player's other device
     // holding one would be the player seeing a bot's hand.
-    final crypto = await DealCrypto.load();
+    final crypto = await rememberedCrypto();
     final t = SimTable(humans: 3, seed: 9, jurors: 6, crypto: crypto);
     final p = t.presence!;
     final seated = t.people[1].client.signer.publicKey;

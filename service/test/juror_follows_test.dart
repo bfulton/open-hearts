@@ -11,6 +11,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:deal/deal.dart';
+import 'package:deal/memo.dart';
 import 'package:service/service.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
@@ -20,7 +21,7 @@ void main() {
   setUpAll(() => installNativeSchnorr());
   late Relay relay;
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto(kept: false));
   setUp(() async {
     relay = Relay();
     await relay.serve();

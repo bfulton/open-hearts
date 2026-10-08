@@ -15,7 +15,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a redraw with the lower id is still not the draw the seats were dealt to', () {
     final t = SimTable(humans: 1, seed: 4, crypto: crypto, jurors: jurySize, target: 1);

@@ -5,7 +5,6 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:deal/deal.dart';
 import 'package:flutter/material.dart' hide Card;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
@@ -22,7 +21,7 @@ void main() {
   // The hands as the real check gives them, to hand over one at a time.
   final checked = <RecordCheck>[];
   setUpAll(() async {
-    dealCrypto = await DealCrypto.load();
+    dealCrypto = await rememberedCrypto();
     final t = SimTable(humans: 4, seed: 3, crypto: dealCrypto);
     t.start();
     expect(t.run(), isTrue);

@@ -16,6 +16,7 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
+import 'package:deal/memo.dart';
 import 'package:engine/engine.dart';
 import 'package:service/service.dart';
 import 'package:table/table.dart';
@@ -25,7 +26,7 @@ void main() {
   setUpAll(() => installNativeSchnorr());
   late Relay relay;
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto(kept: false));
   setUp(() async {
     relay = Relay();
     await relay.serve();
@@ -37,11 +38,16 @@ void main() {
     final signers = [for (var i = 0; i < 4; i++) FakeSigner('device$i')];
     // Three together with a bot, and one alone with three: the shapes
     // matchmaking makes of four people who asked for different games.
-    final many = TableSpec(id: 'table-many', seed: 3, sealed: true, seats: [
+    // To 27, not 50: no hand can take a seat past 26, so every game is
+    // at least two hands — a second deal, its bot seats held again by
+    // jurors from the other table — and seldom more than three, where
+    // fifty is two to six. What is held is the same: both games end,
+    // neither stands still, each hand in its time.
+    final many = TableSpec(id: 'table-many', seed: 3, sealed: true, target: 27, seats: [
       for (final s in signers.take(3)) HumanSeat(s.publicKey),
       BotSeat(Persona.roster[2]),
     ]);
-    final one = TableSpec(id: 'table-one', seed: 4, sealed: true, seats: [
+    final one = TableSpec(id: 'table-one', seed: 4, sealed: true, target: 27, seats: [
       HumanSeat(signers[3].publicKey),
       for (var i = 0; i < 3; i++) BotSeat(Persona.roster[i]),
     ]);
@@ -87,8 +93,8 @@ void main() {
     // before any clock on the whole game runs out. And a hand takes no
     // more than forty-five seconds on average, a person's wait at a
     // screen. The bound is per hand, not per game, because a game is as
-    // many hands as its deal takes to reach the target: two to six, at
-    // thirty-odd seconds a hand here.
+    // many hands as its deal takes to reach the target: two or three
+    // here, at thirty-odd seconds a hand.
     final started = DateTime.now();
     final finishedAt = <String, Duration>{};
     final moved = {for (final c in clients) c.spec.id: DateTime.now()};

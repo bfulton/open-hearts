@@ -5,6 +5,7 @@
 /// the seat's holder goes (docs/04-live-play.md). Bringing somebody on
 /// is the lever, and it is worth nothing unless the newcomer is given
 /// a share of what the others hold.
+@Tags(['slow'])
 library;
 
 import 'package:deal/deal.dart';
@@ -15,7 +16,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a juror drawn after the deal is given a share of an escrow it was never sealed to', () {
     // More jurors online than a jury takes, so there is somebody to

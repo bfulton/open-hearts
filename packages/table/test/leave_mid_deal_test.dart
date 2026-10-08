@@ -20,7 +20,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a leave heard late by two jurors does not move the bot seats under them', () {
     final t = SimTable(humans: 3, seed: 12, crypto: crypto, jurors: jurySize);
