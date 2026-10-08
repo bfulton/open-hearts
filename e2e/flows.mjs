@@ -522,15 +522,21 @@ stillFlow('a reaction at a live table: one player sends 👍, and the other sees
   await click(ada, /^React$/);
   await waitFor(ada, /^Good game$/, { what: 'the reactions to pick from' });
   await click(ada, /^Nice$/);
-  await waitFor(ada, /^You: Nice$/, { what: 'Ada\'s own reaction, in the button\'s place', timeout: 5000 });
   // On Bao's screen, beside Ada's badge: nearer it than any other
-  // seat's. Measured as soon as it shows, in the one look: it is there
-  // for a few seconds, and a busy machine can spend them between two.
-  let bubble = null;
-  for (const until = Date.now() + 5000; !bubble && Date.now() < until; await sleep(100)) {
-    bubble = await rectOf(bao, /^Ada: Nice$/).catch(() => null);
-  }
-  if (!bubble) throw new Error(`no reaction on Bao's screen within 5 s\nBao saw: ${(await texts(bao)).join(' | ')}`);
+  // seat's. Looked for from the moment it is said, and measured as soon
+  // as it shows, in the one look: it is there for three seconds, and a
+  // busy machine can spend them on Ada's screen first, or between two
+  // looks.
+  const onBao = (async () => {
+    for (const until = Date.now() + 5000; Date.now() < until; await sleep(100)) {
+      const r = await rectOf(bao, /^Ada: Nice$/).catch(() => null);
+      if (r) return r;
+    }
+    return null;
+  })();
+  await waitFor(ada, /^You: Nice$/, { what: 'Ada\'s own reaction, in the button\'s place', timeout: 5000 });
+  const bubble = await onBao;
+  if (!bubble) throw new Error(`no reaction on Bao's screen within 5 s of its saying\nBao saw: ${(await texts(bao)).join(' | ')}`);
   const centre = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
   const away = (r) => Math.hypot(centre(r).x - centre(bubble).x, centre(r).y - centre(bubble).y);
   const badges = (await texts(bao)).filter((t) => /^[^:]+: \d+ in the game/.test(t));
