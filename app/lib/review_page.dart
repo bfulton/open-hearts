@@ -724,19 +724,23 @@ class _HandChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
-        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: selected ? Palette.gold.withValues(alpha: 0.18) : null,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: selected ? Palette.gold : Palette.chromeDim.withValues(alpha: 0.5)),
         ),
-        child: Text(
-          '${number + 1}',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected ? Palette.gold : Palette.chrome,
+        // As wide as its number, not as the line it is on.
+        child: Align(
+          widthFactor: 1,
+          heightFactor: 1,
+          child: Text(
+            '${number + 1}',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? Palette.gold : Palette.chrome,
+            ),
           ),
         ),
       ),
