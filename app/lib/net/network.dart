@@ -16,3 +16,9 @@ import 'network_io.dart' if (dart.library.js_interop) 'network_web.dart' as plat
 /// service's address (licence.dart): a widget test has no browser to
 /// ask, and stands its own answer here.
 bool Function() deviceOffline = platform.offline;
+
+/// Calls [then] each time the device says it has a network again: the
+/// browser's `online` event. Off the web nothing is told, so nothing is
+/// called — and such a device is never taken to be offline either.
+/// Settable, like [deviceOffline].
+void Function(void Function() then) whenOnline = platform.whenOnline;

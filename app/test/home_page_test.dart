@@ -498,8 +498,9 @@ class _LicenceOnAsk extends Entitlement {
   int asks = 0;
 
   @override
-  Future<void> refresh(Signer signer, {Uri? endpoint}) async {
+  Future<bool> refresh(Signer signer, {Uri? endpoint}) async {
     asks++;
     if (on != null && asks >= on!) await licenceThisDevice();
+    return true;
   }
 }

@@ -3,3 +3,5 @@
 library;
 
 bool offline() => false;
+
+void whenOnline(void Function() then) {}

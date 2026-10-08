@@ -23,7 +23,6 @@ import 'dart:convert';
 import 'package:table/table.dart';
 
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
-import 'remote_config.dart' show waits;
 
 /// The service this build will take a licence from, and no other. A
 /// licence signed by anything else is not a licence, which is the whole
@@ -82,28 +81,48 @@ Map<String, Object?> signedAsk(Signer signer, String handler, {String what = '',
 String requestDigest(String handler, PublicKey key, int at, [String what = '']) =>
     sha256Hex(utf8.encode('oh-request/1\n$handler\n$key\n$at\n$what'));
 
-/// This device's licence as the service will give it: the current one,
-/// or null when the service says there is no subscription behind the
-/// key, when it cannot be reached, or when what comes back is not a
-/// licence signed for this device.
+/// What the service said when it was asked for this device's licence.
+/// [answered] when it said anything at all — a licence, or that there
+/// is none behind the key — and false when it could not be reached or
+/// could not answer just then; [licence] the licence, when it gave one
+/// signed for this device.
+typedef LicenceAnswer = ({bool answered, Licence? licence});
+
+const LicenceAnswer _unanswered = (answered: false, licence: null);
+
+/// This device's licence as the service will give it, however long the
+/// service takes to say so: the caller decides how long to wait
+/// (Entitlement.refresh), and an answer that comes after it stopped
+/// waiting is still an answer.
+///
+/// A refusal for the request itself — no subscription behind the key,
+/// a request the handler will not take — is an answer, and asking again
+/// would get the same one. A service that is down or busy (a 5xx, a
+/// 429) or out of reach is not, and is worth asking again.
 ///
 /// Never throws: a front door that fell over because a handler was slow
 /// would be worse than one that waits for the date on the licence it
 /// already has.
-Future<Licence?> fetchLicence(Signer signer,
-    {Uri? endpoint, String service = serviceKey, Duration? timeout}) async {
-  timeout ??= waits.licence;
+Future<LicenceAnswer> askLicence(Signer signer, {Uri? endpoint, String service = serviceKey}) async {
   final url = endpoint ?? handlerAt('licence');
-  if (url == null) return null;
+  if (url == null) return (answered: true, licence: null);
+  final ({int status, String body}) answer;
   try {
-    final body = await http.postJson(url, jsonEncode(signedAsk(signer, 'licence'))).timeout(timeout);
-    if (body == null) return null;
-    final json = jsonDecode(body);
-    if (json is! Map) return null;
-    final licence = Licence.parse(json['licence']);
-    if (licence == null) return null;
-    return licence.holdsFor(signer.publicKey, service: service) ? licence : null;
+    answer = await http.post(url, jsonEncode(signedAsk(signer, 'licence')));
   } catch (_) {
-    return null;
+    return _unanswered;
   }
+  if (answer.status >= 500 || answer.status == 429) return _unanswered;
+  if (answer.status != 200) return (answered: true, licence: null);
+  // A page that is not the service's — a captive portal's, a proxy's —
+  // is not its answer either.
+  final Object? json;
+  try {
+    json = jsonDecode(answer.body);
+  } catch (_) {
+    return _unanswered;
+  }
+  if (json is! Map) return _unanswered;
+  final licence = Licence.parse(json['licence']);
+  return (answered: true, licence: licence != null && licence.holdsFor(signer.publicKey, service: service) ? licence : null);
 }

@@ -459,25 +459,15 @@ export async function waitFor(page, re, { timeout = 30000, what = String(re) } =
   throw new Error(`timed out waiting for ${what}\nsaw: ${(await texts(page)).join(' | ')}`);
 }
 
-/// Waits for the front door to say this device may play live, and opens
-/// the page again if it started without its licence. The rig licenses
-/// every device that asks (localService), but an app asks once, as it
-/// starts, and gives up after a few seconds (app/lib/net/licence.dart);
-/// a page starting on a machine busy enough can miss the answer, and
-/// then it is the machine that was tested. Twice more at most, and said
-/// in the log each time.
-export async function licensed(page, { tries = 3, wait = 15000 } = {}) {
-  for (let i = 1; ; i++) {
-    await waitFor(page, /^Play solo$/, { what: 'the front door', timeout: 60000 });
-    const until = Date.now() + wait;
-    while (Date.now() < until) {
-      if (await has(page, /^Play live/)) return;
-      await sleep(250);
-    }
-    if (i >= tries) throw new Error(`no licence at the front door after ${tries} starts\nsaw: ${(await texts(page)).join(' | ')}`);
-    log(`      the page started without its licence (a busy machine); opening it again`);
-    await page.reload();
-  }
+/// Waits for the front door to say this device may play live. The rig
+/// licenses every device that asks (localService), and the app asks as
+/// it starts and again, a little further apart each time, until the
+/// service answers (app/lib/entitlement.dart, keepAsking) — and takes
+/// an answer that comes late — so a page on a busy machine is licensed
+/// a little later, never not at all.
+export async function licensed(page, { timeout = 30000 } = {}) {
+  await waitFor(page, /^Play solo$/, { what: 'the front door', timeout: 60000 });
+  await waitFor(page, /^Play live/, { what: 'the licence at the front door', timeout });
 }
 
 /// Waits for nothing on the screen to match [re] any longer.

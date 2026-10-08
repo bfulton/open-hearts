@@ -14,3 +14,8 @@ extension type _Navigator._(JSObject _) implements JSObject {
 }
 
 bool offline() => !_navigator.onLine;
+
+@JS('addEventListener')
+external void _addEventListener(JSString type, JSFunction listener);
+
+void whenOnline(void Function() then) => _addEventListener('online'.toJS, ((JSAny? _) => then()).toJS);

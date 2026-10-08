@@ -52,14 +52,17 @@ Future<void> main() async {
   Entitlement.current.addListener(InUse.current.licenceChanged);
   // What this device may do, before the front door is drawn: read off
   // the device, so a device that cannot reach us answers anyway, and
-  // asked of the service behind the first frame (docs/06-service.md).
+  // asked of the service behind the first frame (docs/06-service.md) —
+  // and asked again, a little further apart each time, until the
+  // service answers: a start on a slow network is not a start without
+  // a subscription.
   final signer = await Identity.signer();
   await Entitlement.current.load(signer.publicKey);
   // And who this device is, which is its account's (net/account_profile.dart):
   // read behind the licence, and again whenever this device becomes
   // the one in use or comes into another account.
   AccountProfile.current.watch();
-  unawaited(Entitlement.current.refresh(signer).whenComplete(AccountProfile.current.sync));
+  unawaited(Entitlement.current.keepAsking(signer).whenComplete(AccountProfile.current.sync));
   // In a store build, the store: what the product costs, and anything
   // it is holding for this app — a renewal, or a purchase the service
   // did not take last time — handed over as soon as it is listened for
@@ -109,8 +112,10 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
         case AppLifecycleState.resumed:
           Duty.back();
           // Back from the background, perhaps after a long sleep: still
-          // the device in use, or not.
+          // the device in use, or not; and its licence asked for now, if
+          // the service has not answered yet.
           unawaited(InUse.current.renew());
+          Entitlement.current.askAgain();
           unawaited(AccountProfile.current.retry());
         // Hidden is a tab switched away from or a phone's home button:
         // timers throttle, sockets may go, and this device is not
