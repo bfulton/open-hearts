@@ -19,6 +19,7 @@ import '../entitlement.dart';
 import '../identity.dart';
 import 'household.dart' show askHandler;
 import 'in_use.dart';
+import 'record_check.dart' show KeptGame;
 import 'seat_store.dart';
 
 /// Sends [record] to be kept, signed by [signer] for its table. True
@@ -50,10 +51,12 @@ class GameNotShown implements Exception {
   String toString() => 'not shown: ${why.name}';
 }
 
-/// The game kept for [table], read but not yet checked; null when none
-/// is kept, or it cannot be reached, or what came back is not a record.
-/// Throws [GameNotShown] when the service will not show it here.
-Future<GameRecord?> gameOf(String table, {Signer? signer, Uri? endpoint}) async {
+/// The game kept for [table], as it came: its table and names read, its
+/// record left for the check to read and check (net/record_check.dart,
+/// KeptGame), and nothing of it shown until the check says so. Null when
+/// none is kept, or it cannot be reached, or what came back is not a
+/// record. Throws [GameNotShown] when the service will not show it here.
+Future<KeptGame?> gameOf(String table, {Signer? signer, Uri? endpoint}) async {
   final asking = signer ?? await Identity.signer();
   final answer = await askHandler('review', asking, {'table': table}, endpoint, what: table, timeout: const Duration(seconds: 30));
   switch (answer?.status) {
@@ -68,12 +71,8 @@ Future<GameRecord?> gameOf(String table, {Signer? signer, Uri? endpoint}) async 
     default:
       return null;
   }
-  try {
-    final record = GameRecord.parse(jsonDecode(answer!.body));
-    return record?.spec.id == table ? record : null;
-  } catch (_) {
-    return null;
-  }
+  final kept = KeptGame.read(answer!.body);
+  return kept?.spec.id == table ? kept : null;
 }
 
 /// The game kept for [table], for this device to look at: asked of the
@@ -82,7 +81,7 @@ Future<GameRecord?> gameOf(String table, {Signer? signer, Uri? endpoint}) async 
 /// is in a game on another device (net/in_use.dart). Throws
 /// [GameNotShown] for a device with no subscription, one whose account
 /// is in use elsewhere, and one seated at that very table.
-Future<GameRecord?> gameShownHere(String table) async {
+Future<KeptGame?> gameShownHere(String table) async {
   final signer = await Identity.signer();
   // Opened by its address, the app may not have heard back about its
   // licence yet.

@@ -21,7 +21,7 @@ extension type _Message._(JSObject _) implements JSObject {
 
 /// In a worker of its own (worker/review_worker.dart), beside the app;
 /// gone when the page stops listening, and when the verdict is in.
-Stream<RecordCheck> checkRecord(GameRecord record) {
+Stream<RecordCheck> checkRecord(KeptGame game) {
   late final StreamController<RecordCheck> out;
   _Worker? worker;
   void end(RecordCheck last) {
@@ -51,9 +51,11 @@ Stream<RecordCheck> checkRecord(GameRecord record) {
         }).toJS;
         // The worker's script not served, or broken: not checked here.
         w.onerror = ((JSAny? _) => end(const RecordChecked(ok: false))).toJS;
-        // With the service whose word makes each seat an account's: the
-        // worker is a program of its own, and checks the seats by it.
-        w.postMessage(jsonEncode({'record': record.toJson(), 'service': licenceService}).toJS);
+        // The record as it came, for the worker to read — not read here
+        // and written out again — with the service whose word makes each
+        // seat an account's: the worker is a program of its own, and
+        // checks the seats by it.
+        w.postMessage({'record': game.text, 'service': licenceService}.jsify());
       } catch (_) {
         end(const RecordChecked(ok: false));
       }

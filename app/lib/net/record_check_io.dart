@@ -5,8 +5,13 @@ import 'record_check.dart';
 
 /// Here, on this thread, after a frame has had its chance to say the
 /// check has begun.
-Stream<RecordCheck> checkRecord(GameRecord record) async* {
+Stream<RecordCheck> checkRecord(KeptGame game) async* {
   await Future<void>.delayed(Duration.zero);
+  final (:record, :failed) = readRecord(game.text);
+  if (record == null) {
+    yield failed!;
+    return;
+  }
   final crypto = dealCrypto;
   if (record.spec.sealed && crypto == null) {
     yield const RecordChecked(ok: false);

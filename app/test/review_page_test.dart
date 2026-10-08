@@ -16,8 +16,13 @@ import 'package:open_hearts/theme.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 
+/// Long enough for the next of a hand's rows to be drawn (review_page.dart,
+/// _HandRows).
+const rowsLater = Duration(milliseconds: 20);
+
 void main() {
   late GameRecord played;
+  late KeptGame kept;
   // The hands as the real check gives them, to hand over one at a time.
   final checked = <RecordCheck>[];
   setUpAll(() async {
@@ -27,10 +32,11 @@ void main() {
     expect(t.run(), isTrue);
     played = GameRecord.of(t.people.first.client, names: {0: 'Ada', 1: 'Bao', 2: 'Cy', 3: 'Dee'});
     t.stop();
-    await checkRecord(played).forEach(checked.add);
+    kept = KeptGame.of(played);
+    await checkRecord(kept).forEach(checked.add);
   });
 
-  Future<void> pumpReview(WidgetTester tester, GameRecord? record) async {
+  Future<void> pumpReview(WidgetTester tester, KeptGame? record) async {
     tester.view
       ..physicalSize = const Size(390, 1600)
       ..devicePixelRatio = 1.0;
@@ -42,13 +48,13 @@ void main() {
   }
 
   testWidgets('a kept game is checked, then shown hand by hand: the deal, the passes, every trick', (tester) async {
-    await pumpReview(tester, played);
+    await pumpReview(tester, kept);
     for (final name in ['Ada', 'Bao', 'Cy', 'Dee']) {
       expect(find.text(name), findsWidgets, reason: name);
     }
     expect(find.text('Hand 1  ·  Pass left'), findsOneWidget);
     expect(find.text('Trick 13'), findsOneWidget, reason: 'every trick of the hand');
-    await tester.tap(find.widgetWithText(ChoiceChip, '4'));
+    await tester.tap(find.bySemanticsLabel('Hand 4'));
     await tester.pumpAndSettle();
     expect(find.text('Hand 4  ·  No pass'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -56,7 +62,7 @@ void main() {
 
   testWidgets('a screen reader reads it piece by piece, every card by its name and who played it', (tester) async {
     final semantics = tester.ensureSemantics();
-    await pumpReview(tester, played);
+    await pumpReview(tester, kept);
     expect(find.bySemanticsLabel('Hand 1  ·  Pass left'), findsOneWidget);
     // Each trick by its number, each card by its name and who played it.
     expect(find.bySemanticsLabel('Trick 1'), findsOneWidget);
@@ -71,8 +77,21 @@ void main() {
     final a = record[30];
     record[30] = record[31];
     record[31] = a;
-    await pumpReview(tester, GameRecord.parse(json));
+    await pumpReview(tester, KeptGame.read(jsonEncode(json)));
     expect(find.textContaining('does not check out'), findsOneWidget);
+    expect(find.text('Trick 1'), findsNothing);
+  });
+
+  testWidgets('a record with a signature that does not check does not check out: the page reads none of them, the check every one', (tester) async {
+    final json = jsonDecode(jsonEncode(played.toJson())) as Map<String, Object?>;
+    final event = ((json['record'] as List)[30] as Map)['event'] as Map;
+    final sig = event['sig'] as String;
+    event['sig'] = '${sig.substring(0, sig.length - 1)}${sig.endsWith('0') ? '1' : '0'}';
+    final forged = KeptGame.read(jsonEncode(json));
+    expect(forged, isNotNull, reason: 'the page reads the table and the names, and nothing it would have to check');
+    await pumpReview(tester, forged);
+    expect(find.textContaining('does not check out'), findsOneWidget);
+    expect(find.textContaining(unsignedRecord), findsOneWidget);
     expect(find.text('Trick 1'), findsNothing);
   });
 
@@ -94,7 +113,7 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(MaterialApp(
         theme: buildTheme(),
-        home: ReviewPage(key: UniqueKey(), table: played.spec.id, load: (_) async => played, check: (_) => checking.stream),
+        home: ReviewPage(key: UniqueKey(), table: played.spec.id, load: (_) async => kept, check: (_) => checking.stream),
       ));
       await tester.pump();
       await tester.pump();
@@ -107,20 +126,34 @@ void main() {
     await tester.pump();
     expect(find.text('Hand 1  ·  Pass left'), findsOneWidget, reason: 'the first hand, as soon as it is checked');
     expect(find.text('Checking the rest of the game…'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '2'), findsNothing, reason: 'no hand not yet checked');
+    expect(find.bySemanticsLabel('Hand 2'), findsNothing, reason: 'no hand not yet checked');
+    // The hand's hundred cards a few rows a frame, from the top, so the
+    // page answers between them: the page around them first, then a
+    // seat's thirteen, then the rest.
+    expect(find.bySemanticsLabel(RegExp(r'^\w+ of \w+$')), findsNothing, reason: 'the page around the hand first');
+    await tester.pump(rowsLater);
+    expect(find.bySemanticsLabel(RegExp(r'^\w+ of \w+$')), findsNWidgets(13), reason: 'then one seat\'s hand');
+    expect(find.text('Trick 1'), findsNothing);
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(rowsLater);
+    }
+    expect(find.bySemanticsLabel(RegExp(r'^\w+ of \w+$')), findsNWidgets(52), reason: 'every seat\'s, a few frames on');
+    expect(find.text('Trick 13'), findsOneWidget, reason: 'and every trick');
     for (final h in hands.skip(1)) {
       checking.add(h);
     }
     checking.add(verdict);
     await tester.pumpAndSettle();
     expect(find.text('Checking the rest of the game…'), findsNothing, reason: 'all checked');
-    expect(find.widgetWithText(ChoiceChip, '4'), findsOneWidget);
+    expect(find.bySemanticsLabel('Hand 4'), findsOneWidget);
     await checking.close();
 
     // A record that fails after its first hands were shown: none of it stays.
     checking = await open();
     checking.add(hands.first);
-    await tester.pump();
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(rowsLater);
+    }
     expect(find.text('Trick 1'), findsOneWidget);
     checking.add(const RecordChecked(ok: false, reason: 'a play out of turn'));
     await tester.pumpAndSettle();
@@ -134,7 +167,7 @@ void main() {
       ..physicalSize = const Size(390, 1600)
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    GameRecord? kept;
+    KeptGame? keptNow;
     final views = StreamController<Watched>();
     final hands = checked.whereType<HandChecked>().toList();
     final verdict = checked.last as RecordChecked;
@@ -143,7 +176,7 @@ void main() {
       theme: buildTheme(),
       home: ReviewPage(
         table: played.spec.id,
-        load: (_) async => kept,
+        load: (_) async => keptNow,
         watch: (_) => views.stream,
         check: (_) => checking.stream,
       ),
@@ -179,7 +212,7 @@ void main() {
     views.add(Viewed(view(400, Phase.gameOver, const [], totals: const [12, 55, 30, 8])));
     await tester.pump();
     await tester.pump(ReviewPage.recordAgain);
-    kept = played;
+    keptNow = kept;
     await tester.pump(ReviewPage.recordAgain);
     await tester.pump();
     for (final h in hands) {
@@ -188,7 +221,7 @@ void main() {
     checking.add(verdict);
     await tester.pumpAndSettle();
     expect(find.text('Live'), findsNothing);
-    expect(find.widgetWithText(ChoiceChip, '4'), findsOneWidget, reason: 'the whole game, checked');
+    expect(find.bySemanticsLabel('Hand 4'), findsOneWidget, reason: 'the whole game, checked');
     // Let go by the page once the game was over: closed, not waited on.
     unawaited(views.close());
     await checking.close();

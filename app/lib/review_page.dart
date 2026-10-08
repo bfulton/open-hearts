@@ -50,10 +50,10 @@ class ReviewPage extends StatefulWidget {
   /// How the record is fetched: the service's, and a test's to replace.
   /// Throws [GameNotShown] when the service will not show it here; then
   /// the page watches nothing either.
-  final Future<GameRecord?> Function(String table) load;
+  final Future<KeptGame?> Function(String table) load;
 
   /// How it is checked: [checkRecord] unless a test says otherwise.
-  final Stream<RecordCheck> Function(GameRecord record)? check;
+  final Stream<RecordCheck> Function(KeptGame game)? check;
 
   /// How a game still being played is watched: [watchTable] unless a
   /// test says otherwise.
@@ -100,8 +100,8 @@ class _Failed extends _Shown {
 }
 
 class _Game extends _Shown {
-  const _Game(this.record, this.hands, {required this.done, this.winners = const []});
-  final GameRecord record;
+  const _Game(this.game, this.hands, {required this.done, this.winners = const []});
+  final KeptGame game;
 
   /// The hands checked so far, in order.
   final List<TableReplayHand> hands;
@@ -180,7 +180,7 @@ class _ReviewPageState extends State<ReviewPage> {
   }
 
   /// The record, or why this device is not shown it (null for none).
-  Future<GameRecord?> _load() async {
+  Future<KeptGame?> _load() async {
     try {
       return await widget.load(widget.table);
     } on GameNotShown catch (e) {
@@ -193,7 +193,7 @@ class _ReviewPageState extends State<ReviewPage> {
     // Opened as the game ends, the copy may still be on its way from a
     // player's device (home_page.dart): asked again a few times before
     // there is said to be none.
-    GameRecord? record;
+    KeptGame? record;
     try {
       record = await _load();
       // None kept: a game still being played, perhaps — watched while
@@ -240,7 +240,7 @@ class _ReviewPageState extends State<ReviewPage> {
     for (var i = 0; i < ReviewPage.recordTries && mounted && _checking == null; i++) {
       await Future<void>.delayed(ReviewPage.recordAgain);
       if (!mounted || _checking != null) return;
-      final GameRecord? record;
+      final KeptGame? record;
       try {
         record = await _load();
       } on GameNotShown {
@@ -250,10 +250,12 @@ class _ReviewPageState extends State<ReviewPage> {
     }
   }
 
-  void _verify(GameRecord kept) {
+  void _verify(KeptGame kept) {
     if (_checking != null) return;
     _watching?.cancel();
-    setState(() => _shown = const _Checking());
+    // Who played, as soon as the record is read, and that it is being
+    // checked; the hands as their checks come in.
+    setState(() => _shown = _Game(kept, const [], done: false));
     final hands = <int, TableReplayHand>{};
     List<TableReplayHand> inOrder() => [for (final n in hands.keys.toList()..sort()) hands[n]!];
     _checking = (widget.check ?? checkRecord)(kept).listen((c) {
@@ -306,27 +308,29 @@ class _ReviewPageState extends State<ReviewPage> {
     await _check();
   }
 
+  /// Each checked hand's rows, made once (_review).
+  final _handRows = Expando<_HandRows>();
+
   Widget _review(BuildContext context, _Game g) {
     final l10n = context.l10n;
-    final spec = g.record.spec;
-    String nameOf(int seat) => switch (spec.seats[seat]) {
-      BotSeat(:final persona) => persona.name,
-      HumanSeat() => g.record.names[seat] ?? l10n.seatPlayer(seat + 1),
-    };
+    final spec = g.game.spec;
+    String nameOf(int seat) => _seatName(l10n, g.game, seat);
     String seedOf(int seat) => switch (spec.seats[seat]) {
       BotSeat(:final persona) => persona.name,
       HumanSeat(:final account) => account,
     };
     final hands = g.hands;
-    if (hands.isEmpty) return _Note(l10n.checkingGame, busy: true);
-    final hand = hands[_hand.clamp(0, hands.length - 1)];
-    final totals = hands.lastWhere((h) => h.totals.isNotEmpty, orElse: () => hand).totals;
+    final hand = hands.isEmpty ? null : hands[_hand.clamp(0, hands.length - 1)];
+    final totals = hand == null ? const <int>[] : hands.lastWhere((h) => h.totals.isNotEmpty, orElse: () => hand).totals;
     Color markOf(int seat) =>
         g.winners.contains(seat) ? Palette.win : (totals.isNotEmpty && totals[seat] >= spec.target ? Palette.danger : Palette.chrome);
 
     // A column in a scroll view, not a lazy list: a lazy list builds rows
     // it has not laid out, and the browser's focus walk, when the window
-    // gains focus, asks a chip in one of them where it is.
+    // gains focus, asks a chip in one of them where it is. Drawn a piece
+    // at a time, each in a frame of its own: who played, while the first
+    // hand is checked; the hands and the first hand's title when it is;
+    // its cards a few rows a frame after that (_HandRows).
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       child: Column(
@@ -339,9 +343,14 @@ class _ReviewPageState extends State<ReviewPage> {
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
                 children: [
-                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: 14, height: 14, child: _Busy(strokeWidth: 2)),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(l10n.stillCheckingGame, style: const TextStyle(fontSize: 13, color: Palette.chromeDim))),
+                  Expanded(
+                    child: Text(
+                      hand == null ? l10n.checkingGame : l10n.stillCheckingGame,
+                      style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -367,94 +376,32 @@ class _ReviewPageState extends State<ReviewPage> {
                 ],
               ),
             ),
-          const SizedBox(height: 14),
-          // Which hand.
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final h in hands)
-                ChoiceChip(
-                  label: Text('${h.number + 1}'),
-                  selected: h.number == hand.number,
-                  onSelected: (_) => setState(() => _hand = h.number),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '${l10n.handNumber(hand.number + 1)}  ·  ${l10n.passDirection(PassDirection.forHand(hand.number).name)}',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome),
-          ),
-          const SizedBox(height: 8),
-          // Each seat's thirteen as dealt; what it passed, marked.
-          if (hand.dealt case final dealt?)
-            for (var s = 0; s < seatCount; s++)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 74,
-                      child: Text(
-                        nameOf(s),
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
-                      ),
-                    ),
-                    Expanded(
-                      child: Wrap(
-                        spacing: 3,
-                        runSpacing: 3,
-                        children: [
-                          for (final (i, c) in dealt[s].indexed) ...[
-                            // A little room between suits.
-                            if (i > 0 && dealt[s][i - 1].suit != c.suit) const SizedBox(width: 4),
-                            _Pip(card: c, passed: hand.passedBy(s).contains(c)),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (hand.scores.isNotEmpty)
-                      SizedBox(
-                        width: 30,
-                        child: Text(
-                          '+${hand.scores[s]}',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(fontSize: 12.5, color: hand.scores[s] == 0 ? Palette.chromeDim : Palette.danger),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-          const SizedBox(height: 10),
-          // The tricks, in order: who led, what each played, who took it.
-          for (final (i, trick) in hand.tricks.indexed)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 74,
-                    child: Text(l10n.trickNumber(i + 1), style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
+          if (hand != null) ...[
+            const SizedBox(height: 14),
+            // Which hand.
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final h in hands)
+                  _HandChip(
+                    number: h.number,
+                    selected: h.number == hand.number,
+                    onTap: () => setState(() => _hand = h.number),
                   ),
-                  for (final p in trick)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: _Pip(card: p.card, by: nameOf(p.seat), taken: trick.length == seatCount && p.seat == _takerOf(trick)),
-                    ),
-                  if (trick.length == seatCount)
-                    Expanded(
-                      child: Text(
-                        nameOf(_takerOf(trick)),
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
+            const SizedBox(height: 12),
+            Text(
+              '${l10n.handNumber(hand.number + 1)}  ·  ${l10n.passDirection(PassDirection.forHand(hand.number).name)}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome),
+            ),
+            const SizedBox(height: 8),
+            // The hand itself: made once for each hand as it is checked, so
+            // the next hand's check arriving rebuilds the page around it and
+            // not its hundred cards.
+            _handRows[hand] ??= _HandRows(key: ValueKey(hand.number), game: g.game, hand: hand),
+          ],
         ],
       ),
     );
@@ -577,6 +524,208 @@ class _ReviewPageState extends State<ReviewPage> {
   }
 }
 
+/// What a seat is called in [game]: a bot by its persona, a person by
+/// the name their device gave, or by the seat.
+String _seatName(AppLocalizations l10n, KeptGame game, int seat) => switch (game.spec.seats[seat]) {
+  BotSeat(:final persona) => persona.name,
+  HumanSeat() => game.names[seat] ?? l10n.seatPlayer(seat + 1),
+};
+
+/// A checked hand: each seat's thirteen as dealt, what it passed, and
+/// the tricks in order.
+///
+/// A hundred cards and more, each a few widgets and a line of text, is
+/// a frame that holds a slow phone's page still for seconds, so they
+/// come a few rows a frame — a seat's thirteen, or a few tricks — from
+/// the top, which is where the reader starts, beginning the frame after
+/// the page around them. Between two frames the page answers whatever
+/// has been waiting: a tap, the next hand's check.
+class _HandRows extends StatefulWidget {
+  const _HandRows({super.key, required this.game, required this.hand});
+
+  final KeptGame game;
+  final TableReplayHand hand;
+
+  /// About as many cards as one frame draws of the hand.
+  static const cardsAFrame = 16;
+
+  /// How long the page is left to itself between two frames of rows: a
+  /// frame asked for at once is drawn before anything else waiting, and
+  /// a slow page would answer nothing until the last row was in.
+  static const breath = Duration(milliseconds: 20);
+
+  @override
+  State<_HandRows> createState() => _HandRowsState();
+}
+
+class _HandRowsState extends State<_HandRows> {
+  /// How many of the rows are drawn so far.
+  int _shown = 0;
+  bool _asked = false;
+
+  /// The rows, each with how many cards it draws.
+  List<({Widget row, int cards})> _rows(BuildContext context) {
+    final l10n = context.l10n;
+    final hand = widget.hand;
+    String nameOf(int seat) => _seatName(l10n, widget.game, seat);
+    return [
+      // Each seat's thirteen as dealt; what it passed, marked.
+      if (hand.dealt case final dealt?)
+        for (var s = 0; s < seatCount; s++)
+          (
+            cards: dealt[s].length,
+            row: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 74,
+                    child: Text(
+                      nameOf(s),
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
+                    ),
+                  ),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 3,
+                      runSpacing: 3,
+                      children: [
+                        for (final (i, c) in dealt[s].indexed) ...[
+                          // A little room between suits.
+                          if (i > 0 && dealt[s][i - 1].suit != c.suit) const SizedBox(width: 4),
+                          _Pip(card: c, passed: hand.passedBy(s).contains(c)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (hand.scores.isNotEmpty)
+                    SizedBox(
+                      width: 30,
+                      child: Text(
+                        '+${hand.scores[s]}',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontSize: 12.5, color: hand.scores[s] == 0 ? Palette.chromeDim : Palette.danger),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      (cards: 0, row: const SizedBox(height: 10)),
+      // The tricks, in order: who led, what each played, who took it.
+      for (final (i, trick) in hand.tricks.indexed)
+        (
+          cards: trick.length,
+          row: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 74,
+                  child: Text(l10n.trickNumber(i + 1), style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim)),
+                ),
+                for (final p in trick)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _Pip(card: p.card, by: nameOf(p.seat), taken: trick.length == seatCount && p.seat == _ReviewPageState._takerOf(trick)),
+                  ),
+                if (trick.length == seatCount)
+                  Expanded(
+                    child: Text(
+                      nameOf(_ReviewPageState._takerOf(trick)),
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+    ];
+  }
+
+  /// Up to the next row that takes the frame past [_HandRows.cardsAFrame]
+  /// cards, and at least one row.
+  void _more(List<({Widget row, int cards})> rows) {
+    var cards = 0;
+    do {
+      cards += rows[_shown++].cards;
+    } while (_shown < rows.length && cards + rows[_shown].cards <= _HandRows.cardsAFrame);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = _rows(context);
+    _shown = _shown.clamp(0, rows.length);
+    // The next rows a moment after this frame is drawn — none in the
+    // first, which draws the page around them — so that whatever has been
+    // waiting for the page goes first, rather than frame on frame.
+    if (_shown < rows.length && !_asked) {
+      _asked = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Timer(_HandRows.breath, () {
+          _asked = false;
+          if (mounted) setState(() => _more(_rows(context)));
+        });
+      });
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      // Each row drawn once, on a layer of its own: the next rows, or the
+      // next hand's check arriving, do not draw the rows already there.
+      children: [for (final r in rows.take(_shown)) RepaintBoundary(child: r.row)],
+    );
+  }
+}
+
+/// Which hand is shown: one of these for each hand checked, read and
+/// pressed as a button named by its hand. Not a Material chip: a chip
+/// is dozens of widgets and four animations, a long game has twenty,
+/// and they are built on the page's thread while the rest of the game
+/// is still being checked — on a slow phone, a second or more of a page
+/// that answers nothing.
+class _HandChip extends StatelessWidget {
+  const _HandChip({required this.number, required this.selected, required this.onTap});
+
+  /// The hand, from 0.
+  final int number;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    label: context.l10n.handNumber(number + 1),
+    onTap: onTap,
+    excludeSemantics: true,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: selected ? Palette.gold.withValues(alpha: 0.18) : null,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? Palette.gold : Palette.chromeDim.withValues(alpha: 0.5)),
+        ),
+        child: Text(
+          '${number + 1}',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? Palette.gold : Palette.chrome,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 /// A card, small: its rank and suit, red or black; ringed when it was
 /// passed, gold when it took the trick.
 class _Pip extends StatelessWidget {
@@ -620,6 +769,24 @@ class _Pip extends StatelessWidget {
   );
 }
 
+/// The spinner for a check under way, which can be most of a minute on
+/// a phone: drawn on a layer of its own, so that turning it does not
+/// draw the game around it again sixty times a second, and still for a
+/// reader who asked for no motion.
+class _Busy extends StatelessWidget {
+  const _Busy({this.strokeWidth = 4});
+
+  final double strokeWidth;
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: CircularProgressIndicator(
+      strokeWidth: strokeWidth,
+      value: MediaQuery.maybeOf(context)?.disableAnimations ?? false ? 0.3 : null,
+    ),
+  );
+}
+
 class _Note extends StatelessWidget {
   const _Note(this.text, {this.busy = false, this.danger = false, this.action});
 
@@ -637,7 +804,7 @@ class _Note extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (busy) ...[const CircularProgressIndicator(), const SizedBox(height: 16)],
+          if (busy) ...[const _Busy(), const SizedBox(height: 16)],
           Text(
             text,
             textAlign: TextAlign.center,

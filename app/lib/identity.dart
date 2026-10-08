@@ -25,8 +25,17 @@ class Identity {
       secret = List.generate(32, (_) => rng.nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
       await prefs.setString(_key, secret);
     }
-    return signerFromSecret(secret);
+    // The same signer for the same secret: making one works out its
+    // public key on the curve in Dart, a tenth of a second on the page's
+    // thread and more on a slow phone, and this is asked for everywhere.
+    final made = _made;
+    if (made != null && made.secret == secret) return made.signer;
+    final signer = signerFromSecret(secret);
+    _made = (secret: secret, signer: signer);
+    return signer;
   }
+
+  static ({String secret, Signer signer})? _made;
 
   static Future<String?> name() async => (await SharedPreferences.getInstance()).getString(_nameKey);
 
