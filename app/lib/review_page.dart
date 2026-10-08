@@ -21,7 +21,7 @@
 library;
 
 import 'dart:async';
-import 'dart:math' show min;
+import 'dart:math' show max, min;
 
 import 'package:engine/engine.dart' hide Replay;
 import 'package:flutter/material.dart' hide Card;
@@ -139,6 +139,9 @@ class _ReviewPageState extends State<ReviewPage> {
   @override
   void initState() {
     super.initState();
+    // The suits' outlines while the game is fetched, not in the frame
+    // that first draws a card.
+    warmPips();
     InUse.current.addListener(_inUse);
     ReactionMute.current.addListener(_muted);
     unawaited(ReactionMute.current.load());
@@ -563,6 +566,23 @@ class _HandRowsState extends State<_HandRows> {
   int _shown = 0;
   bool _asked = false;
 
+  /// The rows, made once for the hand and the words they are in: the
+  /// same widgets frame after frame, so the rows already drawn are not
+  /// built again with each new one.
+  List<({Widget row, int cards})> _made = const [];
+  (TableReplayHand, AppLocalizations)? _madeFor;
+
+  List<({Widget row, int cards})> _rowsNow(BuildContext context) {
+    final key = (widget.hand, context.l10n);
+    if (_madeFor != key) {
+      // Each row on a layer of its own, drawn once: the next rows, or the
+      // next hand's check arriving, do not draw the rows already there.
+      _made = [for (final r in _rows(context)) (row: RepaintBoundary(child: r.row), cards: r.cards)];
+      _madeFor = key;
+    }
+    return _made;
+  }
+
   /// The rows, each with how many cards it draws.
   List<({Widget row, int cards})> _rows(BuildContext context) {
     final l10n = context.l10n;
@@ -657,7 +677,7 @@ class _HandRowsState extends State<_HandRows> {
 
   @override
   Widget build(BuildContext context) {
-    final rows = _rows(context);
+    final rows = _rowsNow(context);
     _shown = _shown.clamp(0, rows.length);
     // The next rows a moment after this frame is drawn — none in the
     // first, which draws the page around them — so that whatever has been
@@ -667,15 +687,13 @@ class _HandRowsState extends State<_HandRows> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Timer(_HandRows.breath, () {
           _asked = false;
-          if (mounted) setState(() => _more(_rows(context)));
+          if (mounted) setState(() => _more(_rowsNow(context)));
         });
       });
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      // Each row drawn once, on a layer of its own: the next rows, or the
-      // next hand's check arriving, do not draw the rows already there.
-      children: [for (final r in rows.take(_shown)) RepaintBoundary(child: r.row)],
+      children: [for (final r in rows.take(_shown)) r.row],
     );
   }
 }
@@ -743,30 +761,69 @@ class _Pip extends StatelessWidget {
     // Read as the table reads a card: "two of clubs". The suit is a
     // drawing, which says nothing to a screen reader.
     label: by == null ? context.l10n.card(card) : '${context.l10n.card(card)}, $by',
-    child: ExcludeSemantics(child: _face()),
+    child: ExcludeSemantics(child: _face(context)),
   );
 
-  Widget _face() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-    decoration: BoxDecoration(
-      color: Palette.cardFace,
-      borderRadius: BorderRadius.circular(4),
-      border: Border.all(color: taken ? Palette.gold : (passed ? Palette.danger : Colors.transparent), width: 1.6),
-    ),
-    // The suit drawn as the table draws it (ui/pip.dart): a font's
-    // suit characters are not in every font the page may have.
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          card.rank.label,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorOf(card.suit)),
-        ),
-        const SizedBox(width: 1),
-        Pip(suit: card.suit, size: 11, color: colorOf(card.suit)),
-      ],
-    ),
-  );
+  // One painted box a card, its rank's line laid out once for the whole
+  // page and only drawn after (_rankLines): a hand on the page is a
+  // hundred cards and more, and a line of text each, laid out afresh, was
+  // most of what each new row cost a slow page.
+  Widget _face(BuildContext context) {
+    final rank = _rankLine(card, DefaultTextStyle.of(context).style, MediaQuery.textScalerOf(context));
+    return CustomPaint(
+      size: Size(rank.width + _pipSize + 1 + 2 * (_padX + _edge), max(rank.height, _pipSize) + 2 * (_padY + _edge)),
+      painter: _CardFace(card: card, rank: rank, edge: taken ? Palette.gold : (passed ? Palette.danger : null)),
+    );
+  }
+
+  static const _padX = 4.0, _padY = 2.0, _edge = 1.6, _pipSize = 11.0;
+
+  /// Each rank's line, laid out, by what it is drawn in.
+  static final _rankLines = <(String, Color, TextStyle, TextScaler), TextPainter>{};
+
+  static TextPainter _rankLine(Card card, TextStyle base, TextScaler scaler) {
+    final color = colorOf(card.suit);
+    return _rankLines.putIfAbsent((card.rank.label, color, base, scaler), () {
+      return TextPainter(
+        text: TextSpan(text: card.rank.label, style: base.merge(TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color))),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      )..layout();
+    });
+  }
+}
+
+/// A card's face, small: the box, ringed in [edge] when there is one, the
+/// rank's line and the suit drawn after it — as the table draws a suit
+/// (ui/pip.dart), since a font's suit characters are not in every font
+/// the page may have.
+class _CardFace extends CustomPainter {
+  const _CardFace({required this.card, required this.rank, this.edge});
+
+  final Card card;
+  final TextPainter rank;
+  final Color? edge;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const e = _Pip._edge;
+    final box = RRect.fromRectAndRadius((Offset.zero & size).deflate(e / 2), const Radius.circular(4));
+    canvas.drawRRect(box, Paint()..color = Palette.cardFace);
+    if (edge case final edge?) {
+      canvas.drawRRect(box, Paint()..color = edge..style = PaintingStyle.stroke..strokeWidth = e);
+    }
+    final x = e + _Pip._padX;
+    rank.paint(canvas, Offset(x, (size.height - rank.height) / 2));
+    const pip = _Pip._pipSize;
+    canvas.save();
+    canvas.translate(x + rank.width + 1, (size.height - pip) / 2);
+    canvas.scale(pip / 100);
+    canvas.drawPath(pipPath(card.suit), Paint()..color = colorOf(card.suit)..isAntiAlias = true);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_CardFace old) => old.card != card || old.rank != rank || old.edge != edge;
 }
 
 /// The spinner for a check under way, which can be most of a minute on

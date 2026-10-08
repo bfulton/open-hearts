@@ -7,6 +7,8 @@
 /// at the 12 logical pixels an inline pip gets.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import 'package:engine/engine.dart' as engine;
@@ -62,6 +64,18 @@ class _PipPainter extends CustomPainter {
   @override
   bool shouldRepaint(_PipPainter old) =>
       old.suit != suit || old.color != color;
+}
+
+/// Works each suit's outline out ahead of the first frame that draws
+/// one, a suit at a time, each in a turn of the event loop of its own:
+/// the spade and the club are unions of shapes, and on the web the first
+/// to draw each works the union out on the page's thread — a frame's
+/// worth of work on a slow phone, better done while the page waits for
+/// something else (review_page.dart, while a game is fetched).
+void warmPips() {
+  for (final (i, suit) in engine.Suit.values.indexed) {
+    Timer(Duration(milliseconds: i), () => pipPath(suit).getBounds());
+  }
 }
 
 /// The suit outline in a 100x100 box, centred with a little margin.
