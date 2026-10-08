@@ -9,9 +9,9 @@ description = "The verifiable deal (docs/03-fair-deal.md): Barnett–Smart menta
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-barnett-smart-card-protocol = { git = "https://github.com/geometryxyz/mental-poker.git", rev = "b1313f3" }
-# The proof library and the curve, vendored (crypto/vendor) with one
-# fix: points in a transcript normalised, so proofs survive their bytes.
+# The reference crates, vendored (crypto/vendor): Barnett–Smart, the
+# proof library and the curve.
+barnett-smart-card-protocol = { path = "../vendor/barnett-smart-card-protocol" }
 proof-essentials = { path = "../vendor/proof-essentials" }
 starknet-curve = { path = "../vendor/starknet-curve" }
 ark-ec = "0.3.0"
@@ -32,12 +32,6 @@ serde_json = "1"
 # any accidental use fail loudly.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }
-
-# The reference crate pins its sibling crates by ssh URL; give it the
-# vendored ones.
-[patch."ssh://git@github.com/geometryresearch/proof-toolbox.git"]
-proof-essentials = { path = "../vendor/proof-essentials" }
-starknet-curve = { path = "../vendor/starknet-curve" }
 
 [profile.release]
 opt-level = 3

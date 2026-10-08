@@ -1,5 +1,10 @@
 # Vendored proof crates
 
+`barnett-smart-card-protocol` is Geometry's reference
+[mental-poker](https://github.com/geometryxyz/mental-poker) at `b1313f3`,
+unmaintained upstream, copied here under its own licence (the files in
+its directory) and otherwise unchanged; its examples are left out.
+
 Two crates from Geometry's [proof-toolbox](https://github.com/geometryresearch/proof-toolbox)
 at commit `ada5873`, the revision the reference
 [mental-poker](https://github.com/geometryxyz/mental-poker) (`b1313f3`)
