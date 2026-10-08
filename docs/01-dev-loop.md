@@ -3,6 +3,21 @@
 Any commit can be published and opened on a phone within a minute, and
 the running build always says which commit it is.
 
+## Checking a change
+
+```bash
+./check.sh quick             # what changed since origin/claude/launch-punch-list, at its fast tier
+./check.sh full              # everything, the browser suites too, before a deploy
+```
+
+`quick` runs the suites a change is in — the app tests whose imports
+reach a changed file, a package's fast tier — and takes under a minute
+for a change to one package. `full` runs every suite side by side and
+ends with a table of verdicts and times. CI runs the same on every push
+to a `claude/**` branch, to `main` and on pull requests, a newer push
+cancelling the run it supersedes. [Doc 09](09-testing.md) has what each
+suite costs and why.
+
 ## Publishing
 
 ```bash

@@ -42,6 +42,7 @@ Design docs: [01 dev loop](docs/01-dev-loop.md) ·
 [06 service](docs/06-service.md) ·
 [07 table states](docs/07-states.md) ·
 [08 relay](docs/08-own-relays.md) ·
+[09 testing](docs/09-testing.md) ·
 [security model](docs/security-review.md)
 
 ## Building and testing
@@ -56,9 +57,12 @@ before testing it.
 crypto/deal/build.sh                 # the deal: a cdylib for the VM, and app/web/deal.wasm
 crypto/schnorr/build.sh              # signatures for the VM (optional: pure Dart is the fallback)
 
+./check.sh quick                     # what you changed, at each package's fast tier
+./check.sh full                      # everything below, side by side, with a table of times
+
 cd packages/engine && dart test      # rules and bots, including 200 seeded games
 cd packages/deal && dart test        # the deal's primitives and a four-seat deal
-cd packages/table && dart test       # the protocol on a simulated network
+cd packages/table && dart test       # the protocol on a simulated network (-x slow: the fast tier)
 cd service && dart test              # the local relay, and hands played over real sockets
 cd service && OH_RELAY=js dart test  # the same suite against the relay the Durable Object runs
 cd app && flutter test               # widgets
@@ -71,13 +75,15 @@ cd app && flutter run -d chrome      # run the app locally
 
 The deal's wasm is committed at `app/web/deal.wasm`, so the web build
 needs no Rust. VM tests that deal a sealed hand load the cdylib from
-`crypto/deal/target/release/`. The browser suites run from the
-repository root, start the local relay on port 7447, and run the
-service's handlers in-process ([e2e/README.md](e2e/README.md)):
+`crypto/deal/target/release/`, and keep its answers beside it in
+`crypto/deal/target/memo/` ([doc 09](docs/09-testing.md)). The browser
+suites run from the repository root, each start a local relay on a port
+of their own, and run the service's handlers in-process
+([e2e/README.md](e2e/README.md)):
 
 ```bash
 ./e2e/build.sh
-node e2e/flows.mjs     # every flow one device can drive
+node e2e/flows.mjs     # every flow one device can drive, three at a time
 node e2e/run.mjs       # four browsers at one table
 node e2e/escrow.mjs    # a bot seat's juror goes, and the escrow opens the seat
 node e2e/offline.mjs   # no network, relay or worker: solo still plays

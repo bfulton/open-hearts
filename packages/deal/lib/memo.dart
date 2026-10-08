@@ -60,7 +60,16 @@ String? _keepingDir() {
       final lib = File('$base/crypto/deal/target/release/$name');
       if (!lib.existsSync()) continue;
       final hash = sha256.convert(lib.readAsBytesSync()).toString().substring(0, 16);
-      return '${lib.parent.parent.path}/memo/$hash';
+      final memo = Directory('${lib.parent.parent.path}/memo');
+      // What an older build of the library said is no use to this one.
+      try {
+        for (final old in memo.listSync().whereType<Directory>()) {
+          if (!old.path.endsWith('/$hash')) old.deleteSync(recursive: true);
+        }
+      } on FileSystemException {
+        // Not there yet, or another file's isolate got to it first.
+      }
+      return '${memo.path}/$hash';
     }
   }
   return null;

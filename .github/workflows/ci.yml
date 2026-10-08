@@ -1,22 +1,31 @@
-# Analyze, test, and prove the web build still builds.
+# Analyze, test, and prove the web build still builds: everything
+# ./check.sh full runs (docs/09-testing.md), in jobs side by side.
 #
-# Pull requests and main only: a build on every push to a working
-# branch would be noise that costs minutes.
+# On pull requests, main, and every push to a claude/** working branch,
+# where the work is done between pull requests. The repository is
+# public, so the minutes cost nothing; a push that supersedes another on
+# the same branch cancels it, except on main, where every push is kept.
 name: ci
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'claude/**']
 
-# Jobs side by side: on a hosted runner the table's suite alone takes
-# about twenty-five minutes and the relay's two about twelve, too long
-# for one job to run everything in turn. Each builds the Rust libraries
-# its suites load over FFI.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# Each job builds the Rust libraries its suites load over FFI, from a
+# cache of the last build when nothing in them changed. The sealed
+# tables' suites keep the deal's answers beside the library
+# (crypto/deal/target/memo, package:deal/memo.dart), cached under the
+# deal's sources: a run after one that changed nothing in crypto/deal
+# reads its proofs rather than making them.
 #
-# And with room for a slow machine. Runners differ: the same table suite
-# takes 25 minutes on one and 43 on another, every test in it 1.6 to 1.8
-# times slower, so each limit here is well clear of the slow end.
+# And with room for a slow machine. Runners differ: the same suite
+# takes 1.6 to 1.8 times as long on one as on another, so each limit
+# here is well clear of the slow end.
 jobs:
   app:
     runs-on: ubuntu-latest
@@ -34,6 +43,10 @@ jobs:
           workspaces: |
             crypto/deal
             crypto/schnorr
+      - uses: actions/cache@v4
+        with:
+          path: crypto/deal/target/memo
+          key: deal-memo-app-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*') }}
       # The deal's cryptography (docs/03-fair-deal.md): the cdylib the VM
       # tests load.
       # The browser's wasm is committed (app/web/deal.wasm).
@@ -42,32 +55,41 @@ jobs:
           cd crypto/deal && cargo build --release && cargo test --release
           cd ../schnorr && cargo build --release && cargo test --release
       - name: Engine (pure Dart — rules, bots, 200 seeded games)
-        run: cd packages/engine && dart pub get && dart analyze && dart test
+        run: cd packages/engine && dart pub get && dart analyze && dart test -j 4
       - name: Deal (the primitives over FFI, and a hand's deal among four sessions)
-        run: cd packages/deal && dart pub get && dart analyze && dart test
+        run: cd packages/deal && dart pub get && dart analyze && dart test -j 4
       - name: Analyze
         run: cd app && flutter pub get && flutter analyze
       - name: Test (widgets)
-        run: cd app && flutter test
+        run: cd app && flutter test -j 4
+
+  # The web build as deploy.sh makes it, on a runner of its own: it is
+  # minutes of compiling that nothing else here waits for.
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.2
+          cache: true
       # --no-web-resources-cdn keeps CanvasKit local: the app must render
       # on a filtered network, and the suit pips are drawn paths rather
       # than glyphs for the same reason.
       - name: Build web
         run: |
-          cd app
+          cd app && flutter pub get
           flutter build web --release --no-web-resources-cdn \
             --base-href /
 
-  # In two halves, on two runners: each takes the first or second half
-  # of every test file (dart test's shards), about 13 minutes a half, 22
-  # on a slow runner.
+  # Every tier: the fast one, then the whole sealed games and long
+  # sweeps tagged slow (packages/table/dart_test.yaml), four files at a
+  # time.
   table:
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1]
     steps:
       - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
@@ -81,14 +103,20 @@ jobs:
           workspaces: |
             crypto/deal
             crypto/schnorr
+      - uses: actions/cache@v4
+        with:
+          path: crypto/deal/target/memo
+          key: deal-memo-table-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*') }}
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
         run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
       - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
-        run: cd packages/table && dart pub get && dart analyze && dart test --total-shards 2 --shard-index ${{ matrix.shard }}
+        run: cd packages/table && dart pub get && dart analyze && dart test -x slow
+      - name: Table, the slow tier (whole sealed games under every departure, the chaos walks)
+        run: cd packages/table && dart test -t slow
 
   service:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
@@ -114,16 +142,41 @@ jobs:
       - name: Service, against the object's relay (the same suite, the other implementation)
         run: cd service && OH_RELAY=js dart test
       - name: The object's relay (its own tests, in node's test runner)
-        run: node --test service/do/relay.test.mjs service/do/host.test.mjs
+        run: node --test service/do/*.test.mjs
 
-  # Four real browsers at one table: the local relay, the built app,
-  # WebRTC between headless Chromiums, and the departure cells only a
-  # browser can show (e2e/README.md). Then one browser alone against
-  # three bot seats the jury holds, for the escrow that opens one when
-  # its juror goes.
+  # What runs in node alone: no Flutter, no Rust, no browser.
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Handlers (the Pages worker, in node's test runner)
+        run: node --test service/functions/*.test.mjs
+      - name: The site (every page in every language, every string accounted for)
+        run: node --test site/build.test.mjs
+      - name: Infrastructure definitions (what infra/apply.mjs compares; no network)
+        run: node --test infra/*.test.mjs
+      - name: The page's workers (in node's test runner, against the committed wasm)
+        run: node --test e2e/deal_worker.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
+
+  # The browser suites (e2e/README.md), three runners at once: the flows
+  # one device can drive; four browsers at one table; and the rest — the
+  # escrow opening a bot seat whose juror goes, the network taken away a
+  # piece at a time, the move to play.openhearts.game, and the site.
+  # Each builds the app the suites drive (e2e/build.sh), or takes the
+  # last build of the same sources from the cache, and runs its suites
+  # on a relay of its own.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        suites: ['flows', 'run', 'escrow offline move site']
+    name: e2e (${{ matrix.suites }})
     steps:
       - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
@@ -146,23 +199,16 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y coturn
       - name: Playwright
         run: npm i -g playwright@1.56.1 && npx playwright install --with-deps chromium
-      - name: Build the app for the suite
-        run: cd app && flutter pub get && cd .. && ./e2e/build.sh
-      - name: Handlers (the Pages worker, in node's test runner)
-        run: node --test service/functions/*.test.mjs
-      - name: The site (every page in every language, every string accounted for)
-        run: node --test site/build.test.mjs
-      - name: Infrastructure definitions (what infra/apply.mjs compares; no network)
-        run: node --test infra/*.test.mjs
-      - name: The page's deal worker (in node's test runner, against the committed wasm)
-        run: node --test e2e/deal_worker.test.mjs
-      - name: The service worker that keeps the app for a load with no network (in node's test runner)
-        run: node --test e2e/offline_worker.test.mjs
-      - name: The site in a browser (each language, a choice that sticks, nothing wider than a phone)
-        run: node e2e/site.mjs
+      - uses: actions/cache@v4
+        with:
+          path: app/build/e2e
+          key: e2e-build-${{ hashFiles('app/lib/**', 'app/web/**', 'app/worker/**', 'app/pubspec.*', 'app/l10n.yaml', 'packages/*/lib/**', 'packages/*/pubspec.yaml', 'e2e/build.sh') }}
       - name: Relay dependencies
         run: cd service && dart pub get
-      - name: Four browsers, one table
-        run: node e2e/run.mjs
-      - name: A bot seat's juror goes, and the escrow opens the seat
-        run: node e2e/escrow.mjs
+      - name: Build the app for the suites (and the relay and the juror they start)
+        run: cd app && flutter pub get && cd .. && ./e2e/build.sh
+      - name: The suites
+        run: |
+          failed=0
+          for s in ${{ matrix.suites }}; do node "e2e/$s.mjs" || failed=1; done
+          exit $failed
