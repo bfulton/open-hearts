@@ -20,6 +20,8 @@ import 'package:deal/deal.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
 
+import '../tool/kept_records.dart' show threeAndALeaver, threeNames;
+
 Map<String, Object?> fixture(String name) =>
     jsonDecode(utf8.decode(gzip.decode(File('test/fixtures/$name.json.gz').readAsBytesSync()))) as Map<String, Object?>;
 
@@ -72,6 +74,16 @@ void main() {
       expect(v.complete, isTrue);
     });
   }
+
+  test('the escrow\'s game, played again today, is the same record to the byte', () {
+    // Every key, shuffle, token, seal, share and proof in it made again
+    // by this library from the same seeds, and the record they make the
+    // one the older library kept.
+    final t = threeAndALeaver(crypto);
+    final again = jsonEncode(GameRecord.of(t.people.first.client, names: threeNames).toJson());
+    t.stop();
+    expect(again, utf8.decode(gzip.decode(File('test/fixtures/sealed_three_leave.json.gz').readAsBytesSync())));
+  });
 
   test('the escrow\'s game carries its jury and its released pieces', () {
     final json = fixture('sealed_three_leave');

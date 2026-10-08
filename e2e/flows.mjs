@@ -15,9 +15,9 @@
 // somewhere to show up.
 import { AsyncResource } from 'node:async_hooks';
 import { execFileSync } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 import { chromium } from './browser.mjs';
 import { act, appDir, click, dismiss, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor, waitGone, roomIn } from './drive.mjs';
@@ -418,6 +418,21 @@ stillFlow('a kept game, opened by its address: checked in the browser, then show
   // An address that is not a table's goes to the front door.
   const nowhere = await open({ url: '/table/not-a-table?e2e=1' });
   if (new URL(nowhere.url()).pathname !== '/') throw new Error(`a bad table address stayed: ${nowhere.url()}`);
+});
+
+stillFlow('a game kept by the older library, opened by its address: it still checks out in the browser', async ({ open, app }) => {
+  // A sealed game of four as the deal on arkworks 0.3 wrote it
+  // (packages/table, tool/kept_records.dart, kept in its test fixtures),
+  // checked by the page with today's wasm: every proof in it made by the
+  // older library, every one replayed by this one.
+  const packed = readFileSync(join(root, 'packages', 'table', 'test', 'fixtures', 'sealed_four.json.gz'));
+  const table = JSON.parse(gunzipSync(packed).toString()).spec.id;
+  app.records.kept.set(`tables/${table}.json`, packed);
+  const page = await open({ url: `/table/${table}?e2e=1`, ready: /^The game$/ });
+  await waitFor(page, /^Hand 1  ·  Pass left$/, { what: 'the first hand, checked', timeout: 180000 });
+  await waitGone(page, /^Checking the rest of the game…$/, { what: 'the rest of the game, checked', timeout: 180000 });
+  await waitFor(page, /^\w+ of \w+, (Ada|Bao|Cy|Dee)$/, { what: 'a card, by name and player' });
+  if (await has(page, /does not check out/)) throw new Error('the older library\'s record did not check out');
 });
 
 stillFlow('a game watched as it is played, from the link a player shares', async ({ open, relay }) => {
