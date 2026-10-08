@@ -2,11 +2,11 @@ use crate::discrete_log_cards::RevealToken;
 use crate::error::CardProtocolError;
 use crate::Reveal;
 
-use ark_ec::ProjectiveCurve;
+use proof_essentials::to_bytes::TranscriptCurve;
 use ark_ff::One;
 use proof_essentials::homomorphic_encryption::{el_gamal, el_gamal::ElGamal};
 
-impl<C: ProjectiveCurve> Reveal<C::ScalarField, ElGamal<C>> for RevealToken<C> {
+impl<C: TranscriptCurve> Reveal<C::ScalarField, ElGamal<C>> for RevealToken<C> {
     fn reveal(
         &self,
         cipher: &el_gamal::Ciphertext<C>,

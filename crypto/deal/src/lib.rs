@@ -14,13 +14,14 @@
 //! sealed token 64. A shuffle proof is a few kilobytes; its length is
 //! returned. A deck is 52 masked cards, 3328 bytes.
 
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{to_bytes, Field, PrimeField, UniformRand};
+use ark_ec::{AffineRepr, CurveGroup};
+use ark_ff::{Field, PrimeField, UniformRand};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{One, Zero};
 use barnett_smart_card_protocol::discrete_log_cards::{self, DLCards, Parameters};
 use barnett_smart_card_protocol::{BarnettSmartProtocol, Reveal};
 use proof_essentials::homomorphic_encryption::el_gamal::{self, Plaintext};
+use proof_essentials::to_bytes;
 use proof_essentials::utils::permutation::Permutation;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -129,21 +130,21 @@ fn generator() -> Affine {
     static G: OnceLock<Affine> = OnceLock::new();
     *G.get_or_init(|| {
         let (pk, sk) = keys(b"open-hearts generator probe v1  ").expect("probe keys");
-        pk.mul(sk.inverse().expect("a key's secret is not zero").into_repr()).into_affine()
+        (pk * sk.inverse().expect("a key's secret is not zero")).into_affine()
     })
 }
 
 fn write<T: CanonicalSerialize>(v: &T, out: &mut [u8]) -> Option<usize> {
-    let n = v.serialized_size();
+    let n = v.compressed_size();
     if out.len() < n {
         return None;
     }
-    v.serialize(&mut out[..n]).ok()?;
+    v.serialize_compressed(&mut out[..n]).ok()?;
     Some(n)
 }
 
 fn read<T: CanonicalDeserialize>(bytes: &[u8]) -> Option<T> {
-    T::deserialize(bytes).ok()
+    T::deserialize_compressed(bytes).ok()
 }
 
 fn read_deck(bytes: &[u8]) -> Option<Vec<Masked>> {
@@ -196,7 +197,7 @@ pub fn aggregate(pks: &[u8], out: &mut [u8]) -> Option<usize> {
     let mut acc = Curve::zero();
     for chunk in pks.chunks(POINT) {
         let pk = read::<Affine>(chunk)?;
-        acc += pk.into_projective();
+        acc += pk.into_group();
     }
     write(&acc.into_affine(), out)
 }
@@ -309,15 +310,15 @@ pub fn reveal_tokens(secret: &[u8], masked_many: &[u8], seed: &[u8], out: &mut [
         cards.push(read::<Masked>(&masked_many[i * MASKED..(i + 1) * MASKED])?);
     }
     for (i, m) in cards.iter().enumerate() {
-        let token: Token = el_gamal::Plaintext(m.0.mul(sk.into_repr()).into_affine());
+        let token: Token = el_gamal::Plaintext((m.0 * sk).into_affine());
         write(&token, &mut out[i * POINT..(i + 1) * POINT])?;
     }
     let (h, b) = batch_points(&pk, &cards, &out[..n * POINT])?;
 
     let mut rng = rng_from(seed);
     let a = Scalar::rand(&mut rng);
-    let a1 = g.mul(a.into_repr()).into_affine();
-    let a2 = h.mul(a.into_repr()).into_affine();
+    let a1 = (g * a).into_affine();
+    let a2 = (h * a).into_affine();
     let c = batch_challenge(&pk, &h, &b, &a1, &a2)?;
     let z = a + c * sk;
 
@@ -354,8 +355,8 @@ pub fn verify_tokens(pk: &[u8], masked_many: &[u8], tokens: &[u8]) -> bool {
         return false;
     };
     let Some(c) = batch_challenge(&pk, &h, &b, &a1, &a2) else { return false };
-    g.mul(z.into_repr()) == a1.into_projective() + pk.mul(c.into_repr())
-        && h.mul(z.into_repr()) == a2.into_projective() + b.mul(c.into_repr())
+    (g * z) == a1.into_group() + (pk * c)
+        && (h * z) == a2.into_group() + (b * c)
 }
 
 /// The two points a batch argues about: H, the cards' first halves
@@ -364,7 +365,7 @@ pub fn verify_tokens(pk: &[u8], masked_many: &[u8], tokens: &[u8]) -> bool {
 /// and the tokens together, so a seat cannot know one before it has
 /// committed to all of them.
 fn batch_points(pk: &Affine, cards: &[Masked], tokens: &[u8]) -> Option<(Affine, Affine)> {
-    use blake2::{Blake2b, Digest};
+    use blake2::{Blake2b512 as Blake2b, Digest};
     let mut bytes = b"open-hearts batch tokens v1".to_vec();
     bytes.extend(to_bytes![pk].ok()?);
     for m in cards {
@@ -377,14 +378,14 @@ fn batch_points(pk: &Affine, cards: &[Masked], tokens: &[u8]) -> Option<(Affine,
     for (i, m) in cards.iter().enumerate() {
         let rho = Scalar::rand(&mut rng);
         let t = read::<Token>(&tokens[i * POINT..(i + 1) * POINT])?;
-        h += m.0.mul(rho.into_repr());
-        b += t.0.mul(rho.into_repr());
+        h += m.0 * rho;
+        b += t.0 * rho;
     }
     Some((h.into_affine(), b.into_affine()))
 }
 
 fn batch_challenge(pk: &Affine, h: &Affine, b: &Affine, a1: &Affine, a2: &Affine) -> Option<Scalar> {
-    use blake2::{Blake2b, Digest};
+    use blake2::{Blake2b512 as Blake2b, Digest};
     let mut bytes = b"open-hearts batch challenge v1".to_vec();
     bytes.extend(to_bytes![pk, h, b, a1, a2].ok()?);
     Some(Scalar::from_le_bytes_mod_order(&Blake2b::digest(&bytes)))
@@ -637,14 +638,14 @@ pub fn scalar_sum(parts: &[u8], out: &mut [u8]) -> Option<usize> {
 pub fn point_scale(point: &[u8], scalar: &[u8], out: &mut [u8]) -> Option<usize> {
     let p = read::<Affine>(point)?;
     let s = read::<Scalar>(scalar)?;
-    write(&p.mul(s.into_repr()).into_affine(), out)
+    write(&(p * s).into_affine(), out)
 }
 
 /// One share's public key: what that share's token is checked
 /// against, and one of the keys the seat's own is the sum of.
 pub fn share_key(share: &[u8], out: &mut [u8]) -> Option<usize> {
     let s = read::<Scalar>(share)?;
-    write(&generator().mul(s.into_repr()).into_affine(), out)
+    write(&(generator() * s).into_affine(), out)
 }
 
 /// One share's part of opening a masked card, proved against that
@@ -658,7 +659,7 @@ pub fn share_key(share: &[u8], out: &mut [u8]) -> Option<usize> {
 pub fn share_token(share: &[u8], masked: &[u8], seed: &[u8], out: &mut [u8]) -> Option<usize> {
     let f = fixed();
     let sk = read::<Scalar>(share)?;
-    let pk = generator().mul(sk.into_repr()).into_affine();
+    let pk = (generator() * sk).into_affine();
     let masked = read::<Masked>(masked)?;
     let mut rng = rng_from(seed);
     let (token, proof) = Protocol::compute_reveal_token(&mut rng, &f.pp, &sk, &pk, &masked).ok()?;
@@ -731,16 +732,16 @@ pub fn seal(secret: &[u8], pk_to: &[u8], masked: &[u8], seed: &[u8], out: &mut [
     let mut rng = rng_from(seed);
     let r = Scalar::rand(&mut rng);
 
-    let token = m.0.mul(sk.into_repr());
-    let c1 = g.mul(r.into_repr());
-    let c2 = token + to.mul(r.into_repr());
+    let token = m.0 * sk;
+    let c1 = g * r;
+    let c2 = token + (to * r);
     let sealed: Masked = el_gamal::Ciphertext(c1.into_affine(), c2.into_affine());
 
     let a = Scalar::rand(&mut rng);
     let b = Scalar::rand(&mut rng);
-    let a1 = g.mul(a.into_repr()).into_affine();
-    let a2 = g.mul(b.into_repr()).into_affine();
-    let a3 = (m.0.mul(a.into_repr()) + to.mul(b.into_repr())).into_affine();
+    let a1 = (g * a).into_affine();
+    let a2 = (g * b).into_affine();
+    let a3 = ((m.0 * a) + (to * b)).into_affine();
     let c = seal_challenge(&m, &pk, &to, &sealed, &a1, &a2, &a3)?;
     let z1 = a + c * sk;
     let z2 = b + c * r;
@@ -780,10 +781,10 @@ pub fn verify_seal(pk_owner: &[u8], pk_to: &[u8], masked: &[u8], sealed: &[u8]) 
     let Some(c) = seal_challenge(&m, &pk, &to, &s, &a1, &a2, &a3) else {
         return false;
     };
-    g.mul(z1.into_repr()) == a1.into_projective() + pk.mul(c.into_repr())
-        && g.mul(z2.into_repr()) == a2.into_projective() + s.0.mul(c.into_repr())
-        && m.0.mul(z1.into_repr()) + to.mul(z2.into_repr())
-            == a3.into_projective() + s.1.mul(c.into_repr())
+    (g * z1) == a1.into_group() + (pk * c)
+        && (g * z2) == a2.into_group() + (s.0 * c)
+        && (m.0 * z1) + (to * z2)
+            == a3.into_group() + (s.1 * c)
 }
 
 /// The challenge a sealed token's argument answers: every public part
@@ -800,7 +801,7 @@ fn seal_challenge(
     a2: &Affine,
     a3: &Affine,
 ) -> Option<Scalar> {
-    use blake2::{Blake2b, Digest};
+    use blake2::{Blake2b512 as Blake2b, Digest};
     let bytes = to_bytes![
         b"open-hearts sealed token v1",
         masked.0,
@@ -822,12 +823,12 @@ fn seal_challenge(
 /// bytes; what a seat keeps for another — a share of its deal secret,
 /// held against its leaving — is encrypted with it (packages/deal).
 pub fn shared_secret(secret: &[u8], pk: &[u8], out: &mut [u8]) -> Option<usize> {
-    use blake2::{Blake2s, Digest};
+    use blake2::{Blake2s256 as Blake2s, Digest};
     let (_, sk) = keys(secret)?;
     let pk = read::<Affine>(pk)?;
-    let point = pk.mul(sk.into_repr()).into_affine();
+    let point = (pk * sk).into_affine();
     let mut bytes = Vec::with_capacity(POINT);
-    point.serialize(&mut bytes).ok()?;
+    point.serialize_compressed(&mut bytes).ok()?;
     let digest = Blake2s::digest(&bytes);
     if out.len() < 32 {
         return None;
@@ -840,8 +841,8 @@ pub fn shared_secret(secret: &[u8], pk: &[u8], out: &mut [u8]) -> Option<usize> 
 pub fn open(secret: &[u8], sealed: &[u8], out: &mut [u8]) -> Option<usize> {
     let (_, sk) = keys(secret)?;
     let c = read::<Masked>(sealed)?;
-    let s = c.0.mul(sk.into_repr()).into_affine();
-    let m = c.1 + (-s);
+    let s = (c.0 * sk).into_affine();
+    let m = (c.1 + (-s)).into_affine();
     write(&Plaintext::<Curve>(m), out)
 }
 
@@ -857,9 +858,9 @@ pub fn open_shared(sealed: &[u8], parts: &[u8], out: &mut [u8]) -> Option<usize>
     let c = read::<Masked>(sealed)?;
     let mut sum = Curve::zero();
     for chunk in parts.chunks(POINT) {
-        sum += read::<Affine>(chunk)?.into_projective();
+        sum += read::<Affine>(chunk)?.into_group();
     }
-    let m = c.1 + (-sum.into_affine());
+    let m = (c.1 + (-sum.into_affine())).into_affine();
     write(&Plaintext::<Curve>(m), out)
 }
 
@@ -1195,7 +1196,7 @@ mod tests {
         {
             let honest = read::<Masked>(&sealed[..SEALED]).unwrap();
             let elsewhere = read::<Masked>(&deck[MASKED..2 * MASKED]).unwrap();
-            let c2 = (honest.1.into_projective() + elsewhere.1.into_projective()).into_affine();
+            let c2 = (honest.1.into_group() + elsewhere.1.into_group()).into_affine();
             write(&el_gamal::Ciphertext::<Curve>(honest.0, c2), &mut lie[..SEALED]).unwrap();
         }
         let mut got = vec![0u8; POINT];
@@ -1376,7 +1377,7 @@ mod seal_tests {
             secret[0] = i;
             secret[17] = 200 - i;
             let (pk, sk) = keys(&secret).expect("a pair");
-            assert_eq!(g.mul(sk.into_repr()).into_affine(), pk, "pair {i}");
+            assert_eq!((g * sk).into_affine(), pk, "pair {i}");
         }
     }
 }

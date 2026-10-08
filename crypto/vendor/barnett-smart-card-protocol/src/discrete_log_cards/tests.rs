@@ -5,7 +5,8 @@ mod test {
     use crate::BarnettSmartProtocol;
 
     use ark_ff::UniformRand;
-    use ark_std::{rand::Rng, Zero};
+    use ark_ec::{AffineRepr, CurveGroup};
+    use ark_std::rand::Rng;
     use proof_essentials::error::CryptoError;
     use proof_essentials::utils::permutation::Permutation;
     use proof_essentials::utils::rand::sample_vector;
@@ -39,7 +40,7 @@ mod test {
             let (pk, sk) = CardProtocol::player_keygen(rng, &parameters).unwrap();
             let player_info = Scalar::rand(rng);
             players.push((pk, sk, player_info));
-            expected_shared_key = expected_shared_key + players[i].0
+            expected_shared_key = (expected_shared_key + players[i].0).into_affine()
         }
 
         (players, expected_shared_key)

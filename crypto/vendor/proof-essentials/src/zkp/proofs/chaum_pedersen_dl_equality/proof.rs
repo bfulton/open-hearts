@@ -1,26 +1,25 @@
 use crate::error::CryptoError;
+use crate::to_bytes;
+use crate::to_bytes::TranscriptCurve;
+use crate::zkp::FiatShamirRng;
 
 use super::{Parameters, Statement};
 
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::to_bytes;
-use ark_marlin::rng::FiatShamirRng;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use ark_std::io::{Read, Write};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::UniformRand;
 use digest::Digest;
 
 #[derive(CanonicalDeserialize, CanonicalSerialize)]
 pub struct Proof<C>
 where
-    C: ProjectiveCurve,
+    C: TranscriptCurve,
 {
     pub(crate) a: C,
     pub(crate) b: C,
     pub(crate) r: C::ScalarField,
 }
 
-impl<C: ProjectiveCurve> Proof<C> {
+impl<C: TranscriptCurve> Proof<C> {
     pub fn verify<D: Digest>(
         &self,
         parameters: &Parameters<C>,
@@ -39,14 +38,14 @@ impl<C: ProjectiveCurve> Proof<C> {
         let c = C::ScalarField::rand(fs_rng);
 
         // g * r ==? a + x*c
-        if parameters.g.mul(self.r) != self.a + statement.0.mul(c) {
+        if *parameters.g * self.r != self.a + *statement.0 * c {
             return Err(CryptoError::ProofVerificationError(String::from(
                 "Chaum-Pedersen",
             )));
         }
 
         // h * r ==? b + y*c
-        if parameters.h.mul(self.r) != self.b + statement.1.mul(c) {
+        if *parameters.h * self.r != self.b + *statement.1 * c {
             return Err(CryptoError::ProofVerificationError(String::from(
                 "Chaum-Pedersen",
             )));

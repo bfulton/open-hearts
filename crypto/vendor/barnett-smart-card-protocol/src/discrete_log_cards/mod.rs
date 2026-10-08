@@ -3,13 +3,13 @@ use super::{Mask, Remask, Reveal};
 
 use crate::error::CardProtocolError;
 
-use anyhow::Result;
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{to_bytes, One, PrimeField, ToBytes};
-use ark_marlin::rng::FiatShamirRng;
+use ark_ec::AffineRepr;
+use ark_ff::{One, Zero};
 use ark_std::rand::Rng;
-use ark_std::Zero;
-use blake2::Blake2s;
+use blake2::Blake2s256 as Blake2s;
+use proof_essentials::to_bytes;
+use proof_essentials::to_bytes::{ToBytes, TranscriptCurve};
+use proof_essentials::zkp::FiatShamirRng;
 use proof_essentials::error::CryptoError;
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
@@ -30,11 +30,11 @@ mod remasking;
 mod reveal;
 mod tests;
 
-pub struct DLCards<C: ProjectiveCurve> {
+pub struct DLCards<C: TranscriptCurve> {
     _group: PhantomData<&'static C>,
 }
 
-pub struct Parameters<C: ProjectiveCurve> {
+pub struct Parameters<C: TranscriptCurve> {
     m: usize,
     n: usize,
     enc_parameters: el_gamal::Parameters<C>,
@@ -42,7 +42,7 @@ pub struct Parameters<C: ProjectiveCurve> {
     generator: el_gamal::Generator<C>,
 }
 
-impl<C: ProjectiveCurve> Parameters<C> {
+impl<C: TranscriptCurve> Parameters<C> {
     pub fn new(
         m: usize,
         n: usize,
@@ -83,7 +83,7 @@ const REMASKING_RNG_SEED: &'static [u8] = b"Remasking Proof";
 const REVEAL_RNG_SEED: &'static [u8] = b"Reveal Proof";
 const SHUFFLE_RNG_SEED: &'static [u8] = b"Shuffle Proof";
 
-impl<C: ProjectiveCurve> BarnettSmartProtocol for DLCards<C> {
+impl<C: TranscriptCurve> BarnettSmartProtocol for DLCards<C> {
     type Scalar = C::ScalarField;
     type Enc = ElGamal<C>;
     type Comm = PedersenCommitment<C>;
@@ -173,7 +173,7 @@ impl<C: ProjectiveCurve> BarnettSmartProtocol for DLCards<C> {
         let mut acc = zero;
         for (pk, proof, player_public_info) in player_keys_proof_info {
             Self::verify_key_ownership(pp, pk, player_public_info, proof)?;
-            acc = acc + *pk;
+            acc = (acc + *pk).into_affine();
         }
 
         Ok(acc)
@@ -194,8 +194,8 @@ impl<C: ProjectiveCurve> BarnettSmartProtocol for DLCards<C> {
 
         // Map to Chaum-Pedersen statement
         let minus_one = -Self::Scalar::one();
-        let negative_original = original_card.0.mul(minus_one).into_affine();
-        let statement_cipher = masked_card.1 + negative_original;
+        let negative_original = (original_card.0 * minus_one).into_affine();
+        let statement_cipher = (masked_card.1 + negative_original).into_affine();
         let cp_statement =
             chaum_pedersen_dl_equality::Statement::new(&masked_card.0, &statement_cipher);
 
@@ -224,8 +224,8 @@ impl<C: ProjectiveCurve> BarnettSmartProtocol for DLCards<C> {
 
         // Map to Chaum-Pedersen statement
         let minus_one = -Self::Scalar::one();
-        let negative_original = card.0.mul(minus_one).into_affine();
-        let statement_cipher = masked_card.1 + negative_original;
+        let negative_original = (card.0 * minus_one).into_affine();
+        let statement_cipher = (masked_card.1 + negative_original).into_affine();
         let cp_statement =
             chaum_pedersen_dl_equality::Statement::new(&masked_card.0, &statement_cipher);
 
@@ -305,7 +305,7 @@ impl<C: ProjectiveCurve> BarnettSmartProtocol for DLCards<C> {
         masked_card: &Self::MaskedCard,
     ) -> Result<(Self::RevealToken, Self::ZKProofReveal), CardProtocolError> {
         let reveal_token: RevealToken<C> =
-            el_gamal::Plaintext(masked_card.0.into().mul(sk.into_repr()).into_affine());
+            el_gamal::Plaintext((masked_card.0.into_group() * sk).into_affine());
 
         // Map to Chaum-Pedersen parameters
         let cp_parameters = chaum_pedersen_dl_equality::Parameters::new(

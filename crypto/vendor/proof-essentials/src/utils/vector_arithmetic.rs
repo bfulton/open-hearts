@@ -55,7 +55,7 @@ mod tests {
     use crate::homomorphic_encryption::el_gamal;
     use crate::utils::rand::sample_vector;
     use ark_ff::{One, Zero};
-    use ark_std::rand::thread_rng;
+    use rand::thread_rng;
     use starknet_curve;
 
     type Scalar = starknet_curve::Fr;

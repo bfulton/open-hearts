@@ -5,10 +5,10 @@ use crate::vector_commitment::HomomorphicCommitmentScheme;
 use crate::zkp::arguments::{zero_value_bilinear_map, zero_value_bilinear_map::YMapping};
 use crate::zkp::{arguments::scalar_powers, ArgumentOfKnowledge};
 
-use ark_ff::{to_bytes, Field, Zero};
-use ark_marlin::rng::FiatShamirRng;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use ark_std::io::{Read, Write};
+use ark_ff::{Field, Zero};
+use crate::to_bytes;
+use crate::zkp::FiatShamirRng;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use digest::Digest;
 
 #[derive(CanonicalDeserialize, CanonicalSerialize)]

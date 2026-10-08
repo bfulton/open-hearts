@@ -1,7 +1,8 @@
 pub mod pedersen;
 
 use crate::error::CryptoError;
-use ark_ff::{Field, ToBytes, Zero};
+use crate::to_bytes::ToBytes;
+use ark_ff::{Field, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::Rng;
 use std::{iter::Sum, ops};

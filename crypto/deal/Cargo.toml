@@ -9,18 +9,19 @@ description = "The verifiable deal (docs/03-fair-deal.md): Barnett–Smart menta
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# The reference crates, vendored (crypto/vendor): Barnett–Smart, the
-# proof library and the curve.
+# The reference crates, vendored (crypto/vendor) and ported to arkworks
+# 0.6 with every byte on the wire as 0.3 made it (tests/golden.rs):
+# Barnett–Smart, the proof library and the curve.
 barnett-smart-card-protocol = { path = "../vendor/barnett-smart-card-protocol" }
 proof-essentials = { path = "../vendor/proof-essentials" }
 starknet-curve = { path = "../vendor/starknet-curve" }
-ark-ec = "0.3.0"
-ark-ff = "0.3.0"
-ark-serialize = "0.3.0"
-ark-std = { version = "0.3.0", features = ["std"] }
+ark-ec = { version = "0.6.0", features = ["std"] }
+ark-ff = { version = "0.6.0", features = ["std"] }
+ark-serialize = { version = "0.6.0", features = ["std"] }
+ark-std = { version = "0.6.0", features = ["std"] }
 rand = "0.8"
 rand_chacha = "0.3"
-blake2 = { version = "0.9", default-features = false }
+blake2 = { version = "0.10", default-features = false }
 
 # The golden vectors' file (tests/golden.rs).
 [dev-dependencies]

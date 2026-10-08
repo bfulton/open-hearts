@@ -3,11 +3,12 @@ mod test {
 
     use crate::error::CryptoError;
     use crate::zkp::{proofs::schnorr_identification, ArgumentOfKnowledge};
-    use ark_ec::{AffineCurve, ProjectiveCurve};
-    use ark_marlin::rng::FiatShamirRng;
-    use ark_std::rand::thread_rng;
+    use ark_ec::CurveGroup;
+    use std::ops::Mul;
+    use crate::zkp::FiatShamirRng;
+    use rand::thread_rng;
     use ark_std::UniformRand;
-    use blake2::Blake2s;
+    use blake2::Blake2s256 as Blake2s;
     use rand::{prelude::ThreadRng, Rng};
     use starknet_curve;
 

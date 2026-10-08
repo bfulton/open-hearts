@@ -1,6 +1,7 @@
 use crate::error::CardProtocolError;
 
-use ark_ff::{Field, ToBytes};
+use ark_ff::Field;
+use proof_essentials::to_bytes::ToBytes;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::Rng;
 use proof_essentials::error::CryptoError;

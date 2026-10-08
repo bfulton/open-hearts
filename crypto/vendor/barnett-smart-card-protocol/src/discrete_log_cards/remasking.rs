@@ -2,11 +2,11 @@ use crate::discrete_log_cards::MaskedCard;
 use crate::error::CardProtocolError;
 use crate::{Mask, Remask};
 
-use ark_ec::ProjectiveCurve;
+use proof_essentials::to_bytes::TranscriptCurve;
 use ark_ff::Zero;
 use proof_essentials::homomorphic_encryption::{el_gamal, el_gamal::ElGamal};
 
-impl<C: ProjectiveCurve> Remask<C::ScalarField, ElGamal<C>> for MaskedCard<C> {
+impl<C: TranscriptCurve> Remask<C::ScalarField, ElGamal<C>> for MaskedCard<C> {
     fn remask(
         &self,
         pp: &el_gamal::Parameters<C>,
@@ -27,7 +27,8 @@ mod test {
     use crate::BarnettSmartProtocol;
 
     use ark_ff::UniformRand;
-    use ark_std::{rand::Rng, Zero};
+    use ark_ec::{AffineRepr, CurveGroup};
+    use ark_std::rand::Rng;
     use proof_essentials::error::CryptoError;
     use proof_essentials::zkp::proofs::chaum_pedersen_dl_equality;
     use rand::thread_rng;
@@ -56,7 +57,7 @@ mod test {
 
         for i in 0..parameters.n {
             players.push(CardProtocol::player_keygen(rng, &parameters).unwrap());
-            expected_shared_key = expected_shared_key + players[i].0
+            expected_shared_key = (expected_shared_key + players[i].0).into_affine()
         }
 
         (players, expected_shared_key)

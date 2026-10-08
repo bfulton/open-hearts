@@ -7,8 +7,9 @@ use crate::vector_commitment::HomomorphicCommitmentScheme;
 use crate::zkp::arguments::{zero_value_bilinear_map, zero_value_bilinear_map::YMapping};
 use crate::zkp::ArgumentOfKnowledge;
 
-use ark_ff::{to_bytes, Field, Zero};
-use ark_marlin::rng::FiatShamirRng;
+use ark_ff::{Field, Zero};
+use crate::to_bytes;
+use crate::zkp::FiatShamirRng;
 use digest::Digest;
 use rand::Rng;
 use std::iter;

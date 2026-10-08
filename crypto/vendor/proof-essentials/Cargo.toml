@@ -3,27 +3,24 @@ name = "proof-essentials"
 version = "0.1.0"
 edition = "2021"
 
+# Open Hearts: ported from arkworks 0.3 to 0.6 (see ../README.md). What
+# 0.3 and ark-marlin provided and 0.6 no longer does — the byte form a
+# transcript hashes, and the Fiat–Shamir generator — is kept here, as it
+# was (to_bytes.rs, zkp/fiat_shamir.rs).
+
 [dependencies]
-ark-crypto-primitives = "0.3.0"
-ark-ec = "0.3.0"
-ark-ff = "0.3.0"
-ark-marlin = "0.3.0"
-ark-serialize = "0.3.0"
-ark-std = { version = "0.3.0", features = ["std"] }
-merlin = "3.0.0"
+ark-ec = { version = "0.6.0", features = ["std"] }
+ark-ff = { version = "0.6.0", features = ["std"] }
+ark-serialize = { version = "0.6.0", features = ["std", "derive"] }
+ark-std = { version = "0.6.0", features = ["std"] }
 rand = "0.8.4"
+rand_chacha = "0.3"
 starknet-curve = { path = "../starknet-curve" }
 thiserror = "1.0.30"
-blake2 = { version = "0.9", default-features = false }
-digest = { version = "0.9" }
+digest = "0.10"
 
 # Open Hearts: no getrandom on wasm — every random value comes in as a
 # seed the caller drew, and the feature dragged wasm-bindgen imports in.
 
 [dev-dependencies]
-criterion = "0.3"
-wasm-bindgen-test = "0.3.29"
-
-[[bench]]
-name = "shuffle"
-harness = false
+blake2 = "0.10"

@@ -9,7 +9,7 @@ use crate::vector_commitment::HomomorphicCommitmentScheme;
 use crate::zkp::ArgumentOfKnowledge;
 
 use ark_ff::Field;
-use ark_marlin::rng::FiatShamirRng;
+use crate::zkp::FiatShamirRng;
 use ark_std::rand::Rng;
 use digest::Digest;
 use std::marker::PhantomData;
