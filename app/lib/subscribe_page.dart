@@ -10,6 +10,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math' show min;
 
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart' show SignInWithAppleButton, SignInWithAppleButtonStyle;
@@ -68,19 +69,40 @@ class _SubscribePageState extends State<SubscribePage> {
   /// another device, kept while the page asks whether to move it here.
   ({Provider provider, String token})? _elsewhere;
 
+  /// A listing that did not reach the service is asked for again by
+  /// itself, as the licence is (entitlement.dart): after
+  /// [Entitlement.firstAgain], then twice as long each time up to
+  /// [Entitlement.mostAgain], and at once when the app is back in the
+  /// foreground. One the service refused in its own words is not.
+  Timer? _again;
+  Duration _gap = Entitlement.firstAgain;
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(onResume: _listAgainNow);
+
   @override
   void initState() {
     super.initState();
     Entitlement.current.addListener(_changed);
     StoreShop.current.addListener(_changed);
+    _lifecycle;
     unawaited(_load());
   }
 
   @override
   void dispose() {
+    _again?.cancel();
+    _lifecycle.dispose();
     Entitlement.current.removeListener(_changed);
     StoreShop.current.removeListener(_changed);
     super.dispose();
+  }
+
+  /// Back in the foreground with the list still missing: asked for now,
+  /// and the waits start short again.
+  void _listAgainNow() {
+    final me = _me;
+    if (_again == null || me == null || _listing) return;
+    _gap = Entitlement.firstAgain;
+    unawaited(_list(me));
   }
 
   void _changed() {
@@ -114,6 +136,8 @@ class _SubscribePageState extends State<SubscribePage> {
 
   Future<void> _list(Signer me) async {
     final asked = ++_asked;
+    _again?.cancel();
+    _again = null;
     _listing = true;
     final said = await devicesOn(me);
     _listing = false;
@@ -127,6 +151,12 @@ class _SubscribePageState extends State<SubscribePage> {
       _unlisted = said.refusal?.say(context.l10n);
       _signedIn = signedIn;
     });
+    if (said.refusal?.reason == 'unreachable') {
+      _again = Timer(_gap, () => unawaited(_list(me)));
+      _gap = Duration(milliseconds: min(_gap.inMilliseconds * 2, Entitlement.mostAgain.inMilliseconds));
+    } else {
+      _gap = Entitlement.firstAgain;
+    }
   }
 
   Future<void> _buy() async {

@@ -309,6 +309,71 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a list that did not reach the service is asked for again by itself, waiting longer each time', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    await licenceThisDevice();
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-09-01'},
+      ],
+      'most': 5,
+    });
+    var asked = 0;
+    askService = (url, body) {
+      if (url.path == '/api/devices') asked++;
+      return stand.ask(url, body);
+    };
+    stand.reachable = false;
+    await tester.pumpWidget(routed('/subscription'));
+    await tester.pump();
+    await tester.pump();
+    expect(asked, 1);
+    expect(find.text('Could not reach the service. Try again in a moment.'), findsOneWidget);
+
+    // Two seconds, then four: the waits double.
+    await tester.pump(const Duration(milliseconds: 1900));
+    expect(asked, 1);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(asked, 2);
+    await tester.pump(const Duration(milliseconds: 3800));
+    expect(asked, 2, reason: 'the second wait is twice the first');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(asked, 3);
+
+    // Back in the foreground: asked at once, not at the end of the wait.
+    stand.reachable = true;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+    expect(asked, 4);
+    expect(find.text('This device'), findsOneWidget);
+    expect(find.text('Could not reach the service. Try again in a moment.'), findsNothing);
+
+    // Listed: nothing more is asked.
+    await tester.pump(const Duration(minutes: 5));
+    expect(asked, 4);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a list the service refused in its own words is not asked for again', (tester) async {
+    final stand = standUp();
+    await licenceThisDevice();
+    stand.says('devices', {'error': 'not a device on this subscription'}, status: 403);
+    var asked = 0;
+    askService = (url, body) {
+      if (url.path == '/api/devices') asked++;
+      return stand.ask(url, body);
+    };
+    await tester.pumpWidget(routed('/subscription'));
+    await tester.pumpAndSettle();
+    expect(asked, 1);
+    await tester.pump(const Duration(minutes: 5));
+    expect(asked, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a service that never answers is waited for ten seconds, and then said to be out of reach', (tester) async {
     standUp();
     askService = (url, body) => Completer<({int status, String body})>().future;
