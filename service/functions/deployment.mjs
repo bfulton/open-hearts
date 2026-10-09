@@ -38,3 +38,19 @@ export function configEnv(config) {
 
 /// env with the file beneath it.
 export const withConfig = (env, config) => ({ ...configEnv(config), ...env });
+
+/// What a phone build is compiled with, out of the same file
+/// (`--dart-define-from-file`, build_phone.sh): the service key it takes
+/// a licence from, the sign-in providers' identifiers, and the store
+/// products. The web build is given the first three by deploy.sh.
+export function appDefines(config) {
+  const { apple = {}, google = {} } = config ?? {};
+  const named = {
+    OH_SERVICE_KEY: config?.serviceKey,
+    OH_APPLE_SERVICE_ID: apple.servicesId,
+    OH_GOOGLE_CLIENT_ID: google.webClientId,
+    OH_APPLE_PRODUCT: apple.product,
+    OH_PLAY_PRODUCT: google.product,
+  };
+  return Object.fromEntries(Object.entries(named).filter(([, v]) => typeof v === 'string' && v));
+}

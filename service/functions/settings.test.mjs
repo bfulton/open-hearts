@@ -76,7 +76,7 @@ test('a code handed back again always has time left in it', () => {
 
 test('a Stripe price is a price id or a lookup key, and nothing else', () => {
   assert.equal(serviceSettingsOf({ stripePrice: 'price_1QxYz' }).stripePrice, 'price_1QxYz');
-  assert.equal(serviceSettingsOf({ stripePrice: 'live_play_yearly' }).stripePrice, 'live_play_yearly');
+  assert.equal(serviceSettingsOf({ stripePrice: 'openhearts_annual' }).stripePrice, 'openhearts_annual');
   for (const bad of ['', 'price_', 'price_1&mode=payment', 'live play', 'a/b', 'x'.repeat(201), 42]) {
     assert.equal(serviceSettingsOf({ stripePrice: bad }).stripePrice, null, String(bad));
   }
@@ -145,11 +145,11 @@ test('a lookup key is asked of Stripe once, for its active price, and sold by id
     sold.push(new URLSearchParams(init.body).get('line_items[0][price]'));
     return Response.json({ url: 'https://checkout.stripe.com/c/pay/cs_1' });
   };
-  const env = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'live_play_yearly' };
+  const env = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'openhearts_annual' };
   for (let i = 0; i < 2; i++) assert.equal((await checkout(KEY, 'https://x/', 'https://x/', env, stripe)).status, 200);
   assert.deepEqual(sold, ['price_Yearly599', 'price_Yearly599']);
   assert.equal(asked.length, 1, 'kept, not asked for every checkout');
-  assert.equal(asked[0].get('lookup_keys[]'), 'live_play_yearly');
+  assert.equal(asked[0].get('lookup_keys[]'), 'openhearts_annual');
   assert.equal(asked[0].get('active'), 'true');
 });
 

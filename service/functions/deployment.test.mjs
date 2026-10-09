@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { configEnv, withConfig } from './deployment.mjs';
+import { appDefines, configEnv, withConfig } from './deployment.mjs';
 
 const committed = JSON.parse(readFileSync(new URL('../../config/openhearts.json', import.meta.url), 'utf8'));
 
@@ -44,4 +44,17 @@ test('a name set on the project, or by a test, wins over the file', () => {
   assert.equal(env.OH_STRIPE_PRICE, 'other');
   assert.equal(env.OH_SERVICE_KEY, 'k');
   assert.equal(env.OH_STORE, 'kv');
+});
+
+test('a phone build is compiled with the key, the sign-in identifiers and the products, from the same file', () => {
+  const defines = appDefines(committed);
+  assert.equal(defines.OH_SERVICE_KEY, committed.serviceKey);
+  assert.equal(defines.OH_APPLE_SERVICE_ID, 'game.openhearts.play');
+  // The products are the ones made in App Store Connect and Play
+  // Console, and the web's Stripe price has the same name.
+  assert.equal(defines.OH_APPLE_PRODUCT, 'openhearts_annual');
+  assert.equal(defines.OH_PLAY_PRODUCT, 'openhearts_annual');
+  assert.equal(committed.stripePrice, 'openhearts_annual');
+  // A field left null is left out, so the build's own default stands.
+  assert.deepEqual(appDefines({ serviceKey: 'k', google: { webClientId: null } }), { OH_SERVICE_KEY: 'k' });
 });

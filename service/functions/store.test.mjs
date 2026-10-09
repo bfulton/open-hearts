@@ -32,7 +32,7 @@ const der = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 const b64url = (bytes) => Buffer.from(bytes).toString('base64url');
 
 const BUNDLE = 'game.openhearts.app';
-const PRODUCT = 'live_play_yearly';
+const PRODUCT = 'openhearts_annual';
 const PACKAGE = 'game.openhearts.app';
 const DAY = 86400000;
 

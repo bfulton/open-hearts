@@ -36,11 +36,12 @@ enum StoreKind {
   apple,
   google;
 
-  /// The product bought there. Named at build time, since the product
-  /// is made in the store's console and not here.
+  /// The product bought there. Named at build time from
+  /// config/openhearts.json (build_phone.sh), since the product is made
+  /// in the store's console and not here; the default is the same name.
   String get product => switch (this) {
-        apple => const String.fromEnvironment('OH_APPLE_PRODUCT', defaultValue: 'live_play_yearly'),
-        google => const String.fromEnvironment('OH_PLAY_PRODUCT', defaultValue: 'live_play_yearly'),
+        apple => const String.fromEnvironment('OH_APPLE_PRODUCT', defaultValue: 'openhearts_annual'),
+        google => const String.fromEnvironment('OH_PLAY_PRODUCT', defaultValue: 'openhearts_annual'),
       };
 
   /// The store's own page for a subscriber's subscriptions, which is

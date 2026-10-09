@@ -57,8 +57,8 @@ suite_crypto() { (cd crypto/deal && cargo test --release) && (cd crypto/vendor &
 # The scripts that are not anybody's suite: that each still parses.
 suite_scripts() {
   local f ok=0
-  for f in check.sh deploy.sh e2e/*.sh; do bash -n "$f" || ok=1; done
-  for f in e2e/*.mjs; do node --check "$f" || ok=1; done
+  for f in check.sh deploy.sh build_phone.sh e2e/*.sh crypto/*.sh app/ios/*.sh; do bash -n "$f" || ok=1; done
+  for f in e2e/*.mjs app/tool/*.mjs; do node --check "$f" || ok=1; done
   if python3 -c 'import yaml' 2> /dev/null; then
     python3 -c 'import sys, yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]' .github/workflows/*.yml || ok=1
   fi

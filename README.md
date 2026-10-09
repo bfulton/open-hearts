@@ -91,25 +91,29 @@ node e2e/move.mjs      # openhearts.game/play/ to play.openhearts.game: nothing 
 node e2e/shots.mjs     # screenshots at the shapes docs/05 names
 ```
 
-### Android
+### Phone releases
 
-A release build needs the deal's native libraries, built by
-`crypto/build_android.sh` (NDK and Rust Android targets), and a signing
-key named in `app/android/key.properties` (`storeFile`, `storePassword`,
-`keyAlias`, `keyPassword`), which is never checked in. Without either it
-stops. Debug builds need neither.
+`./build_phone.sh ios` or `./build_phone.sh android` makes a store
+build. It builds the deal's native libraries, then the release, compiled
+with what `config/openhearts.json` names (`app/tool/defines.mjs`): the
+service key the app takes a licence from, the sign-in identifiers and the
+store products. A release built without the service key is refused, by
+Xcode (`app/ios/release_check.sh`) and by Gradle, since it would have
+live play shut.
 
-### iOS
+Android needs the NDK, the Rust Android targets, and a signing key named
+in `app/android/key.properties` (`storeFile`, `storePassword`,
+`keyAlias`, `keyPassword`), which is never checked in. Debug builds need
+neither the libraries nor the key.
 
-On a Mac with Xcode, build the deal's native libraries first with
-`crypto/build_ios.sh` (Rust targets `aarch64-apple-ios`,
-`aarch64-apple-ios-sim` and `x86_64-apple-ios`). They go into
-`app/ios/Frameworks` as XCFrameworks, which the Runner target embeds and
-signs. Xcode does not build the app without them, debug or release.
-Then `flutter build ipa`. The `ios` workflow
-(`.github/workflows/ios.yml`) does the same on a Mac runner, and checks
-the libraries on a simulator with
-`app/integration_test/native_libs_test.dart`.
+iOS needs a Mac with Xcode and the Rust targets `aarch64-apple-ios`,
+`aarch64-apple-ios-sim` and `x86_64-apple-ios`. The libraries go into
+`app/ios/Frameworks` as XCFrameworks (`crypto/build_ios.sh`), which the
+Runner target embeds and signs, so Xcode builds nothing without them,
+debug included. The `ios` workflow (`.github/workflows/ios.yml`) builds
+them on a Mac runner, checks them on a simulator
+(`app/integration_test/native_libs_test.dart`), and builds the release
+unsigned, once without the key to see it refused.
 
 ### Deploying
 

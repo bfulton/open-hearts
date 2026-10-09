@@ -19,6 +19,10 @@ on:
       - app/ios/**
       - app/integration_test/**
       - app/pubspec.*
+      - build_phone.sh
+      - app/tool/defines.mjs
+      - config/**
+      - service/functions/deployment.mjs
       - packages/deal/**
       - packages/table/lib/src/schnorr_native*
   push:
@@ -29,6 +33,10 @@ on:
       - app/ios/**
       - app/integration_test/**
       - app/pubspec.*
+      - build_phone.sh
+      - app/tool/defines.mjs
+      - config/**
+      - service/functions/deployment.mjs
       - packages/deal/**
       - packages/table/lib/src/schnorr_native*
 
@@ -66,8 +74,17 @@ jobs:
           xcrun simctl boot "$udid"
           cd app && flutter pub get
           flutter test integration_test/native_libs_test.dart -d "$udid"
-      - name: The release build, unsigned
-        run: cd app && flutter build ios --release --no-codesign
+      - name: A release without the service key is refused (app/ios/release_check.sh)
+        run: |
+          cd app
+          if flutter build ios --release --no-codesign > ../no-key.log 2>&1; then
+            echo "a release built without the service key" >&2; exit 1
+          fi
+          grep -q "a Release build needs the service key" ../no-key.log || { cat ../no-key.log; exit 1; }
+      - name: The release build, unsigned, with what the config names (as build_phone.sh makes it)
+        run: |
+          node app/tool/defines.mjs app/build/defines.json
+          cd app && flutter build ios --release --no-codesign --dart-define-from-file=build/defines.json
       - name: What the release carries
         run: |
           app=app/build/ios/iphoneos/Runner.app

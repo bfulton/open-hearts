@@ -11,6 +11,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -133,7 +134,13 @@ void main() {
   test('the store\'s own subscription page is where a store subscriber is sent to manage it', () {
     expect(StoreKind.apple.manage.toString(), 'https://apps.apple.com/account/subscriptions');
     expect(StoreKind.google.manage.toString(),
-        'https://play.google.com/store/account/subscriptions?sku=live_play_yearly&package=game.openhearts');
+        'https://play.google.com/store/account/subscriptions?sku=openhearts_annual&package=game.openhearts');
+  });
+
+  test('the products a build names by default are the ones the config names', () {
+    final config = jsonDecode(File('../config/openhearts.json').readAsStringSync()) as Map<String, dynamic>;
+    expect(StoreKind.apple.product, (config['apple'] as Map)['product']);
+    expect(StoreKind.google.product, (config['google'] as Map)['product']);
   });
 
   test('the proof is shown to the service signed over, and comes back a licence for this device', () async {

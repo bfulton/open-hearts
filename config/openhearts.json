@@ -4,12 +4,12 @@
   "stripePrice": "openhearts_annual",
   "apple": {
     "bundleId": "game.openhearts",
-    "product": "live_play_yearly",
+    "product": "openhearts_annual",
     "servicesId": "game.openhearts.play"
   },
   "google": {
     "package": "game.openhearts",
-    "product": "live_play_yearly",
+    "product": "openhearts_annual",
     "webClientId": null,
     "playPushAudience": null,
     "playPushEmail": null

@@ -1,4 +1,5 @@
 import java.io.FileInputStream
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -69,6 +70,16 @@ gradle.taskGraph.whenReady {
     val missing = listOf("arm64-v8a", "armeabi-v7a", "x86_64").filter { !file("src/main/jniLibs/$it/libdeal.so").exists() }
     if (releasing && missing.isNotEmpty()) {
         throw GradleException("No libdeal.so for ${missing.joinToString()}: run crypto/build_android.sh first.")
+    }
+    // The service's public key, which the app takes a licence from
+    // (config/openhearts.json, passed by build_phone.sh): without it live
+    // play is shut, which Play's review would find first. Flutter hands
+    // the build its --dart-define values base64'd, comma between.
+    val defines = (project.findProperty("dart-defines") as String?).orEmpty().split(",").filter { it.isNotEmpty() }
+        .map { String(Base64.getDecoder().decode(it)) }
+    val serviceKey = defines.firstOrNull { it.startsWith("OH_SERVICE_KEY=") }?.removePrefix("OH_SERVICE_KEY=").orEmpty()
+    if (releasing && !Regex("^[0-9a-f]{64}$").matches(serviceKey)) {
+        throw GradleException("A release needs the service key: build with ./build_phone.sh android, which passes config/openhearts.json's serviceKey.")
     }
     if (releaseKeys == null && releasing) {
         throw GradleException(
