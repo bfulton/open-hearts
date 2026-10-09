@@ -45,6 +45,22 @@
       height: 100%;
       touch-action: manipulation;
       overscroll-behavior: none;
+      /* Safari on a phone otherwise selects the page itself on some taps
+         and long presses, which washes the whole table grey until the
+         page is laid out again. What the app lets you select and copy is
+         its own (ui/selection.dart), drawn by the app, not the browser's. */
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Except where typing goes: Flutter's text fields are fields of the
+       page underneath, and Safari will not type into one it cannot
+       select in. */
+    input, textarea, [contenteditable] {
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
     }
     /* Safari on a phone zooms the page into any text field whose type is
        smaller than 16px as it takes focus, and in an app added to the
