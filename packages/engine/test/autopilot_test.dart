@@ -123,6 +123,41 @@ void main() {
     });
   });
 
+  group('cannot win', () {
+    test('as on the table: void in hearts led, the 3-4♣ over a 2♣ long gone, the 2♦', () {
+      // Seat 1 led; seats 2 and 3 have played; the player is last.
+      expect(why('3C 4C 2D', trick: plays(1, '8H 10H 7D')), PlaysItself.cannotWin);
+    });
+
+    test('following low in the suit led, under what is already on the felt', () {
+      expect(why('2D 3D 2S', trick: plays(1, '9D')), PlaysItself.cannotWin);
+      // With the 2♦ still to come, a 2♦ led would lose to the 3♦.
+      expect(why('3D 4D 2S', trick: plays(1, '9D')), isNull);
+    });
+
+    test('a card that could take the trick on the felt', () {
+      expect(why('3D 4D 2S', trick: plays(1, '2D')), isNull, reason: 'the 3♦ or 4♦ beats the 2♦ led');
+    });
+
+    test('a card some lower one could still be led under', () {
+      // The 4♦ is beaten only by what is above it: a 2♦ or 3♦ led by
+      // someone else would lose to it.
+      expect(why('4D 3C', trick: plays(1, '9H')), isNull);
+      // Unless the table shows them gone.
+      expect(why('4D 3C', trick: plays(1, '9H'), lastTrick: plays(0, '2D 3D 7D 8D')), PlaysItself.cannotWin);
+    });
+
+    test('points held go somewhere, so where matters', () {
+      expect(why('2H 3C', trick: plays(1, '9D')), isNull);
+      expect(why('2D 3C QS', trick: plays(1, '9H')), isNull);
+    });
+
+    test('leading, or not the player\'s turn', () {
+      expect(why('3C 2D'), isNull, reason: 'leading: whatever is led may go unfollowed');
+      expect(why('3C 2D', trick: plays(1, '9H'), toPlay: false), isNull);
+    });
+  });
+
   group('fewer than two cards', () {
     test('one card is never offered', () {
       expect(why('AC', pointsTaken: 26), isNull);
@@ -186,7 +221,11 @@ void main() {
                   ) ==
                   target;
           card = !settled
-              ? (deal.isEven ? legal[before.nextInt(legal.length)] : legal.first)
+              ? target == PlaysItself.cannotWin
+                  // Shedding the highest card it may leaves the low ones
+                  // this reason is about; at random it is seldom reached.
+                  ? legal.reduce((a, b) => b.rank.value > a.rank.value ? b : a)
+                  : (deal.isEven ? legal[before.nextInt(legal.length)] : legal.first)
               : switch (variant) {
                   0 => autoPlayCard(hand, legal),
                   1 => legal.first,

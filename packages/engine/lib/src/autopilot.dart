@@ -14,6 +14,8 @@
 /// about the player's own choices only: what the others do is theirs.
 library;
 
+import 'dart:math' show max;
+
 import 'card.dart';
 import 'rules.dart';
 
@@ -40,6 +42,13 @@ enum PlaysItself {
   /// out of the suit, and that suit is all the player has left: they
   /// lead every trick to come and nobody can follow.
   shownOut,
+
+  /// The player can take no trick from here on, and holds no points.
+  /// They cannot take the trick on the felt; every card they hold is
+  /// the lowest of its suit that is still to be played, so any card
+  /// anyone else leads in it is higher; and taking nothing, they lead
+  /// nothing. Their cards fall where they may, worth nothing to anyone.
+  cannotWin,
 }
 
 /// Why nothing [seat] still holds in [hand] can change how the hand
@@ -48,7 +57,8 @@ enum PlaysItself {
 ///
 /// [trick] is the trick on the felt. [toPlay] says it is [seat]'s turn
 /// to play to it — whether they are leading or following is only known
-/// then, so [PlaysItself.unbeatable] is only judged then. [lastTrick] is
+/// then, so [PlaysItself.unbeatable] and [PlaysItself.cannotWin] are
+/// only judged then. [lastTrick] is
 /// the trick most recently taken this hand, all four cards (empty
 /// before the first is taken). [pointsTaken] is the points every seat
 /// has taken this hand, the trick being taken included.
@@ -96,7 +106,29 @@ PlaysItself? whyHandPlaysItself({
     if (shown && hand.every((c) => c.suit == led)) return PlaysItself.shownOut;
   }
 
+  // 5. Following, with nothing that can take a trick now or later, and
+  // nothing worth a point to put anywhere.
+  if (toPlay && trick.isNotEmpty && pointsIn(hand) == 0) {
+    final led = trick.first.card.suit;
+    final top = trick.where((p) => p.card.suit == led).map((p) => p.card.rank.value).reduce(max);
+    final takesThis = hand.any((c) => c.suit == led && c.rank.value > top);
+    // Gone, as the table shows it: on the felt, in the trick just
+    // taken, or the 2♣, which opens every hand.
+    final gone = {for (final p in trick) p.card, for (final p in lastTrick) p.card, twoOfClubs};
+    if (!takesThis && hand.every((c) => _bottomOfItsSuit(c, hand, gone))) return PlaysItself.cannotWin;
+  }
+
   return null;
+}
+
+/// Whether every card of [card]'s suit below it is in [hand] or [gone]:
+/// then any card of the suit anyone else can still play is higher.
+bool _bottomOfItsSuit(Card card, List<Card> hand, Set<Card> gone) {
+  for (var v = Rank.two.value; v < card.rank.value; v++) {
+    final below = Card.of(card.suit, Rank.values[v - 2]);
+    if (!hand.contains(below) && !gone.contains(below)) return false;
+  }
+  return true;
 }
 
 /// Whether [card] is the ace of its suit or sits under an unbroken run
