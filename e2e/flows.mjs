@@ -14,14 +14,22 @@
 // accessibility tree, so a tap landing in the wrong place has
 // somewhere to show up.
 import { AsyncResource } from 'node:async_hooks';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { gunzipSync, gzipSync } from 'node:zlib';
 
 import { chromium } from './browser.mjs';
 import { act, appDir, click, dismiss, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor, waitGone, roomIn } from './drive.mjs';
 import { flowRelay, runFlows } from './pool.mjs';
+
+/// A tool run while flows are running: never with execFileSync, which
+/// holds this whole process still — every flow's server with it — for
+/// as long as the tool takes. A sealed game's fixture takes longer than
+/// the app waits for an answer, so another flow's request went
+/// unanswered and its page said the service could not be reached.
+const run = promisify(execFile);
 
 const portrait = { width: 390, height: 844 };
 const landscape = { width: 844, height: 390 };
@@ -226,7 +234,7 @@ stillFlow('a game alone, and the record it leaves', async ({ open, relay }) => {
   if (!/^oh2:[0-9a-f]{64}:/.test(record ?? '')) throw new Error(`the record does not look like one: ${JSON.stringify((record ?? '').slice(0, 80))}`);
   // And it is a record the tool can read: every trick, from the seed
   // and the player's own choices.
-  const out = execFileSync('dart', ['run', 'tool/replay.dart', record], { cwd: join(root, 'packages', 'engine'), encoding: 'utf8' });
+  const { stdout: out } = await run('dart', ['run', 'tool/replay.dart', record], { cwd: join(root, 'packages', 'engine'), encoding: 'utf8' });
   if (!/^seed [0-9a-f]{64}: /m.test(out) || !/^hand 1: scores/m.test(out) || !/^final: /m.test(out)) {
     throw new Error(`replay did not read it back:\n${out.slice(0, 300)}`);
   }
@@ -383,7 +391,7 @@ stillFlow('a kept game, opened by its address: checked in the browser, then show
   // played out on the simulator (packages/table, tool/game_fixture.dart),
   // kept as the site keeps it. The browser fetches it and replays every
   // signature and every step of the deal before showing a card.
-  const json = execFileSync('dart', ['run', 'tool/game_fixture.dart'], { cwd: join(root, 'packages', 'table'), maxBuffer: 16 << 20 }).toString().trim();
+  const json = (await run('dart', ['run', 'tool/game_fixture.dart'], { cwd: join(root, 'packages', 'table'), maxBuffer: 16 << 20, encoding: 'utf8' })).stdout.trim();
   const table = JSON.parse(json).spec.id;
   app.records.kept.set(`tables/${table}.json`, gzipSync(Buffer.from(json)));
   const page = await open({ url: `/table/${table}?e2e=1`, ready: /^The game$/ });
