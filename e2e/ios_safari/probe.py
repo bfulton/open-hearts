@@ -150,10 +150,11 @@ def press(*names, wait=2.0, required=True):
     return True
 
 
-def read(name, phrase, lowest=False):
+def read(name, phrase, lowest=False, rightmost=False):
     """Where [phrase] is written on the screen, in points, read by OCR:
     the share sheet is drawn by another process, which idb's tree does
-    not reach. The lowest of several when [lowest]."""
+    not reach. The lowest of several when [lowest], the rightmost when
+    [rightmost]."""
     path = OUT / f'{name}.png'
     shot(name)
     image = Image.open(path)
@@ -185,7 +186,27 @@ def read(name, phrase, lowest=False):
     if not found:
         print(f'no "{phrase}" read on the screen; read: {" ".join(w[0] for w in words)[:400]}', flush=True)
         return None
+    if rightmost:
+        return max(found, key=lambda f: f[0])
     return max(found, key=lambda f: f[1]) if lowest else found[0]
+
+
+def blue_button(name, above=0.25):
+    """The middle, in points, of the system blue in the top [above] of
+    the screen: the sheet's Add, white on blue, which OCR reads as
+    nothing."""
+    path = OUT / f'{name}.png'
+    shot(name)
+    image = Image.open(path).convert('RGB')
+    scale = 3 if image.size[0] > 1000 else 2
+    small = image.resize((image.size[0] // scale, image.size[1] // scale))
+    px = small.load()
+    hits = [(x, y) for y in range(int(small.size[1] * above)) for x in range(small.size[0])
+            if px[x, y][2] > 200 and px[x, y][0] < 90 and 90 < px[x, y][1] < 170]
+    if len(hits) < 40:
+        print(f'no blue button on the screen', flush=True)
+        return None
+    return sum(h[0] for h in hits) / len(hits), sum(h[1] for h in hits) / len(hits)
 
 
 def add_to_home_screen():
@@ -216,14 +237,23 @@ def add_to_home_screen():
             raise SystemExit(1)
     tap(*at)
     time.sleep(3)
-    add = read('h3-add', 'Add')
+    # The blue button at the top right, not the Add in the sheet's title.
+    add = blue_button('h3-add')
     if not add:
         raise SystemExit(1)
     tap(*add)
     time.sleep(3)
-    shot('h4-home-screen')
-    print('home screen:', labels(), flush=True)
-    press('Open Hearts', wait=12)
+    # Safari stays in front: home, to the icon.
+    idb('ui', 'button', 'HOME')
+    time.sleep(3)
+    for page in range(4):
+        shot(f'h4-home-screen-{page}')
+        print('home screen:', labels(), flush=True)
+        if press('Open Hearts', wait=12, required=False):
+            return
+        idb('ui', 'swipe', '350', '450', '50', '450', '--duration', '0.3')
+        time.sleep(1.5)
+    raise SystemExit(1)
 
 
 def open_app(timeout=90):
