@@ -21,3 +21,6 @@ service.secret
 
 # OS
 .DS_Store
+
+# Python bytecode (e2e/ios_safari).
+__pycache__/
