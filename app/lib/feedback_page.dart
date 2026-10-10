@@ -173,7 +173,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(10)),
-                    child: SelectableText(
+                    child: Text(
                       [for (final MapEntry(:key, :value) in about.entries) '$key: $value'].join('\n'),
                       style: const TextStyle(fontSize: 12, height: 1.45, color: Palette.chromeDim, fontFamily: 'monospace'),
                     ),

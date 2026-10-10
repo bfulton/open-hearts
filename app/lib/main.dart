@@ -23,7 +23,6 @@ import 'net/report_error.dart';
 import 'net/store_buying.dart';
 import 'theme.dart';
 import 'ui/in_use_screen.dart';
-import 'ui/selection.dart';
 import 'ui/touch_probe.dart';
 
 Future<void> main() async {
@@ -165,9 +164,10 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: language,
-        // Any words on any screen can be selected and copied: a name, a
-        // rule, an error to send us.
-        builder: (context, child) => TouchProbe(child: CopyableSelection(child: InUseScreen(child: child ?? const SizedBox()))),
+        // No app-wide text selection: on a table played by touch it took
+        // taps meant for the game, and what is worth copying (a code, a
+        // link, a report) has its own Copy button.
+        builder: (context, child) => TouchProbe(child: InUseScreen(child: child ?? const SizedBox())),
         routerConfig: _router,
       ),
     );
