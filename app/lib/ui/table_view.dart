@@ -72,12 +72,33 @@ Offset? passesFrom(TableModel controller) {
   return seatDirection[controller.positionOf(controller.game.passerTo(controller.mySeat))];
 }
 
+/// The trick upright, as a pinwheel: north stepped to the west and
+/// south to the east, so that west and east can come in beside them.
+/// A phone upright is narrow before it is short, and the side badges
+/// need their room beside the trick: a cross, north and south in the
+/// middle, kept its cards smaller than the hand's (68 points to 76 on a
+/// 390-point phone). This way they are the hand's size.
+///
+/// No card covers another's corner, where its rank and suit are, in
+/// whichever order they are played. Taking a corner as the top left
+/// 0.36 of a card's width and 0.45 of its height, centres in card
+/// widths across and heights down: west at 0.72 is clear of north's
+/// right edge with north 0.30 aside (0.72 ≥ 1 − 0.30), its own corner
+/// clear of north's left edge (0.30 ≤ 0.72 − 0.36), and the far side
+/// of the corner it would cover on south (0.72 ≥ 0.30 + 0.36); north
+/// and south 0.6 out are clear of the middle row's tops and of each
+/// other (0.6 ≥ 0.45, ≥ 0.5). The offsets are in steps of 1.15 card
+/// widths and 1.02 heights (_Trick).
 const _trickOffset = <int, Offset>{
-  0: Offset(0, 0.78),
-  1: Offset(-0.86, 0),
-  2: Offset(0, -0.78),
-  3: Offset(0.86, 0),
+  0: Offset(0.30 / 1.15, 0.6 / 1.02),
+  1: Offset(-0.72 / 1.15, 0),
+  2: Offset(-0.30 / 1.15, -0.6 / 1.02),
+  3: Offset(0.72 / 1.15, 0),
 };
+
+/// How tall the upright trick's block is, in card heights: its cards'
+/// reach, 0.6 out each way and a card, and the margin the cross kept.
+const _trickTall = 2 * 0.6 + 1 + 0.11;
 const _wideTrickOffset = <int, Offset>{
   0: Offset(0, 0.62),
   1: Offset(-1.12, 0),
@@ -164,7 +185,7 @@ class TableView extends StatelessWidget {
         // as a face wants unless that would leave the cards under what
         // a card can be read at, where it takes the smaller size back.
         double cardsUnder(double line) =>
-            (box.height - noteRow - 2 * (line + badgeGap) - (wide ? 0.0 : pillRoom)) / ((wide ? 2.3 : 2.7) / cardAspect);
+            (box.height - noteRow - 2 * (line + badgeGap) - (wide ? 0.0 : pillRoom)) / ((wide ? 2.3 : _trickTall) / cardAspect);
         final line = (cardsUnder(SeatBadge.line * scale) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine) * scale;
         // The biggest a card is allowed to be, from the felt's own
         // size. A phone is held at arm's length and its felt is small,
@@ -191,13 +212,18 @@ class TableView extends StatelessWidget {
         }
         final sideRoom = sideRoomFor(cardWidth).clamp(leastRoom, box.width);
         final cardHeight = cardHeightFor(cardWidth);
-        final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
+        final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * _trickTall);
 
         // A badge hugs what it says, up to the room it has: the width
         // of the trick's own column for the seat across the felt and
         // your own, and the strip between a card and the felt's edge
         // for the two at the sides.
         final facing = trickBox.width;
+        // The side strips start nearer the middle than the far and near
+        // badges may reach, the pinwheel having brought the side cards
+        // in: a side seat's reaction, which can run up or down into those
+        // badges' rows, keeps this far in from its strip's inner edge.
+        final clearOfFacing = math.max(0.0, facing / 2 - cardWidth * reach);
 
         // A badge is laid out at a phone's scale and drawn at the
         // table's, so the room it is given here is in a phone's points.
@@ -400,6 +426,7 @@ class TableView extends StatelessWidget {
                         anchoredRight: true,
                         up: false,
                         gap: badgeGap,
+                        clear: clearOfFacing,
                       ),
                     ),
                     Positioned(
@@ -414,6 +441,7 @@ class TableView extends StatelessWidget {
                         anchoredRight: false,
                         up: true,
                         gap: badgeGap,
+                        clear: clearOfFacing,
                       ),
                     ),
                     Align(alignment: Alignment.center, child: trick),
@@ -543,6 +571,7 @@ class _SideSeat extends StatelessWidget {
     required this.anchoredRight,
     required this.up,
     required this.gap,
+    this.clear = 0,
   });
 
   final Widget badge;
@@ -557,9 +586,13 @@ class _SideSeat extends StatelessWidget {
   final bool up;
   final double gap;
 
+  /// How far in from the strip's inner edge the reaction keeps: clear of
+  /// the far and near badges' column, which it can run alongside.
+  final double clear;
+
   @override
   Widget build(BuildContext context) => CustomMultiChildLayout(
-        delegate: _SideSeatLayout(home: home, anchoredRight: anchoredRight, up: up, gap: gap),
+        delegate: _SideSeatLayout(home: home, anchoredRight: anchoredRight, up: up, gap: gap, clear: clear),
         children: [
           LayoutId(id: _SideSeatLayout.badge, child: badge),
           LayoutId(id: _SideSeatLayout.bubble, child: bubble),
@@ -568,7 +601,7 @@ class _SideSeat extends StatelessWidget {
 }
 
 class _SideSeatLayout extends MultiChildLayoutDelegate {
-  _SideSeatLayout({required this.home, required this.anchoredRight, required this.up, required this.gap});
+  _SideSeatLayout({required this.home, required this.anchoredRight, required this.up, required this.gap, required this.clear});
 
   static const badge = 'badge';
   static const bubble = 'bubble';
@@ -577,6 +610,7 @@ class _SideSeatLayout extends MultiChildLayoutDelegate {
   final bool anchoredRight;
   final bool up;
   final double gap;
+  final double clear;
 
   @override
   void performLayout(Size size) {
@@ -586,15 +620,19 @@ class _SideSeatLayout extends MultiChildLayoutDelegate {
     // From a gap off the badge to the end of the box, the strip's width.
     final top = up ? 0.0 : at.dy + b.height + gap;
     final bottom = up ? at.dy - gap : size.height;
-    final r = layoutChild(bubble, BoxConstraints.loose(Size(size.width, math.max(0.0, bottom - top))));
+    // The strip less what it keeps clear of on its inner side: the left
+    // of the right-hand strip, the right of the left-hand one.
+    final from = anchoredRight ? 0.0 : clear;
+    final to = anchoredRight ? size.width - clear : size.width;
+    final r = layoutChild(bubble, BoxConstraints.loose(Size(math.max(0.0, to - from), math.max(0.0, bottom - top))));
     // Over or under the middle of the badge, inside the strip.
-    final x = (at.dx + b.width / 2 - r.width / 2).clamp(0.0, math.max(0.0, size.width - r.width)).toDouble();
+    final x = (at.dx + b.width / 2 - r.width / 2).clamp(from, math.max(from, to - r.width)).toDouble();
     positionChild(bubble, Offset(x, up ? bottom - r.height : top));
   }
 
   @override
   bool shouldRelayout(_SideSeatLayout old) =>
-      old.home != home || old.anchoredRight != anchoredRight || old.up != up || old.gap != gap;
+      old.home != home || old.anchoredRight != anchoredRight || old.up != up || old.gap != gap || old.clear != clear;
 }
 
 /// The middle of the felt: four slots that hold their place, whatever
@@ -942,6 +980,10 @@ class SeatBadge extends StatelessWidget {
 
   EdgeInsets get _padding => oneLine ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : _stacked;
 
+  /// The border's width on the seat whose turn it is, or that just took
+  /// the trick; a point otherwise.
+  static const _borderMost = 1.6;
+
   /// The name, in the room it has, at one size wherever it is: every
   /// player's name is the same size as every other's, so a long one is
   /// not a smaller one. On one line when it fits; wrapped at its
@@ -1012,7 +1054,10 @@ class SeatBadge extends StatelessWidget {
     // it and above it where it does not, so a side badge keeps its room
     // for the name either way.
     final icon = PlayerIcon(name: iconName, seed: iconSeed, avatar: avatar, size: iconSize);
-    final nameText = _name(context, maxWidth - _padding.horizontal - (oneLine ? iconSize + 6 : 0));
+    // Inside the padding and the border, at its widest: the gold one on
+    // the seat whose turn it is. A name given the room the border takes
+    // comes out wider than the badge, and the badge scales it to fit.
+    final nameText = _name(context, maxWidth - _padding.horizontal - 2 * _borderMost - (oneLine ? iconSize + 6 : 0));
     // A three-digit total beside a two-digit hand is the widest this
     // gets, and it is a hair inside a side badge's room: scaled down
     // rather than clipped should a font run wider.
@@ -1062,7 +1107,7 @@ class SeatBadge extends StatelessWidget {
             // that just took the trick, which is the same news the pill
             // carries and had better not disagree with it.
             color: onTurn ? Palette.gold : (won ? Palette.chrome : Colors.white.withValues(alpha: 0.10)),
-            width: onTurn || won ? 1.6 : 1,
+            width: onTurn || won ? _borderMost : 1,
           ),
         ),
         // Scaled into the box rather than overflowing it: a badge is

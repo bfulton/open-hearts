@@ -697,7 +697,7 @@ void main() {
     }
     // Shrunk from what the width alone would allow: 340 × 0.21 = 71.
     final slotWidth = slots.map((r) => r.width).reduce((a, b) => a > b ? a : b);
-    expect(slotWidth, lessThan(60));
+    expect(slotWidth, lessThan(340 * 0.21 - 1));
   });
 
   for (final shape in [_phone, _sideways, const Size(1280, 800), const Size(340, 720)]) {
