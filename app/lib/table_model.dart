@@ -156,11 +156,18 @@ class AutoPilot {
   bool _settled = false;
   bool _on = false;
 
+  /// Whether the switch has been up this hand. It comes with two cards
+  /// or more, and then stays: the player turns it on and off as they
+  /// like, down to the last card, rather than watch it go from under
+  /// their finger as it plays.
+  bool _shown = false;
+
   /// Called on every change the table shows: takes the judgement while
   /// the hand is in play, and starts over when a new one is dealt.
   void watch(TableModel table) {
     final game = table.game;
     if (game.handNumber != _hand) reset(game.handNumber);
+    if (_settled && game.phase == Phase.playing && table.handShown.length >= 2) _shown = true;
     if (_settled || game.phase != Phase.playing || !game.knowsHand(table.mySeat)) return;
     final pending = game.pendingTrick;
     // Leading or following is only known on the player's own turn, with
@@ -177,6 +184,7 @@ class AutoPilot {
           pointsTaken: game.taken.fold(0, (a, b) => a + b) + (pending == null ? 0 : pointsIn(pending.plays.map((p) => p.card))),
         ) !=
         null;
+    if (_settled && table.handShown.length >= 2) _shown = true;
   }
 
   /// A new hand, or a new game: the switch is down and off.
@@ -184,14 +192,15 @@ class AutoPilot {
     _hand = hand;
     _settled = false;
     _on = false;
+    _shown = false;
   }
 
-  /// Whether the switch is up: offered this hand, in play, and more
-  /// than one card left — with one, there is nothing to save.
-  bool offered(TableModel table) => _settled && table.game.phase == Phase.playing && table.handShown.length >= 2;
+  /// Whether the switch is up: offered this hand and in play, with a
+  /// card still to play. It first comes with two or more — with one
+  /// there is nothing to save — and once up stays to the hand's end.
+  bool offered(TableModel table) => _shown && table.game.phase == Phase.playing && table.handShown.isNotEmpty;
 
-  /// Whether it is on. On stays on through the last card, which the
-  /// switch is no longer shown for: it was turned on for the hand.
+  /// Whether it is on.
   bool get on => _on;
 
   /// The player's switch. Only turned on where it is offered.

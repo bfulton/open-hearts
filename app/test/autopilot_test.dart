@@ -168,8 +168,9 @@ void main() {
     expect(find.byType(AutoSwitch), findsNothing);
 
     // The second hand is played by hand to its end: nothing plays itself,
-    // and wherever the switch is up it is off — and it is never up with
-    // one card left.
+    // and wherever the switch is up it is off — and it never first comes
+    // with one card left.
+    var appeared = false;
     for (var guard = 0; guard < 400 && find.text('Next hand').evaluate().isEmpty; guard++) {
       if (c.awaitingPass) {
         for (final card in c.handShown.take(engine.passSize)) {
@@ -177,8 +178,9 @@ void main() {
         }
         c.confirmPass();
       } else if (c.awaitingPlay) {
-        if (c.handShown.length < 2) expect(find.byType(AutoSwitch), findsNothing);
+        if (c.handShown.length < 2 && !appeared) expect(find.byType(AutoSwitch), findsNothing);
         if (find.byType(AutoSwitch).evaluate().isNotEmpty) {
+          appeared = true;
           expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
         }
         c.playCard(c.handShown.firstWhere(c.legalNow.contains));
@@ -202,6 +204,41 @@ void main() {
     expect(c.awaitingPlay, isTrue, reason: 'the next turn is the player\'s to take');
     expect(find.byType(AutoSwitch), findsOneWidget, reason: 'and the switch is still there to turn back on');
     expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+  });
+
+  testWidgets('once offered it stays for the hand: on and off at will, down to the last card', (tester) async {
+    final c = await _pumpTable(tester, paced: true);
+    await _playToOffer(tester, c, paced: true);
+    expect(c.handShown.length, greaterThanOrEqualTo(3));
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    // On, through every turn of the hand: the switch is there to turn off.
+    for (var t = 0; t < 400 && c.handShown.length > 1; t++) {
+      expect(find.byType(AutoSwitch), findsOneWidget, reason: '${c.handShown.length} cards left, on');
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(c.handShown, hasLength(1));
+    expect(find.byType(AutoSwitch), findsOneWidget, reason: 'one card left, and still the player\'s to turn off');
+    // Off before the last card's turn: it waits for the player.
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    expect(c.autoPlay, isFalse);
+    for (var t = 0; t < 400 && !c.awaitingPlay; t++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(c.awaitingPlay, isTrue);
+    await tester.pump(const Duration(seconds: 2));
+    expect(c.handShown, hasLength(1), reason: 'off: the last card is the player\'s to play');
+    expect(find.byType(AutoSwitch), findsOneWidget);
+    // And on again: played at once.
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    expect(c.handShown, isEmpty);
+    expect(find.byType(AutoSwitch), findsNothing, reason: 'no cards left, no switch');
+    for (var t = 0; t < 400 && c.game.phase == engine.Phase.playing; t++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('on, the player\'s turn is played at once, without a beat', (tester) async {
