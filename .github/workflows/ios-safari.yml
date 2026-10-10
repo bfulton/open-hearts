@@ -44,11 +44,11 @@ jobs:
           xcrun simctl list devices | grep "$udid"
           idb connect "$udid" || true
           echo "UDID=$udid" >> "$GITHUB_ENV"
-      - name: With the app's accessibility tree in the page (?e2e)
-        run: python3 e2e/ios_safari/probe.py "$UDID" out/e2e "https://play.openhearts.game/?e2e=1"
-      - name: As production
+      - name: From the Home Screen, as a web app (as an iPhone's owner plays it)
+        run: python3 e2e/ios_safari/probe.py "$UDID" out/home "https://play.openhearts.game/" home
+      - name: In a Safari tab
         if: always()
-        run: python3 e2e/ios_safari/probe.py "$UDID" out/prod "https://play.openhearts.game/"
+        run: python3 e2e/ios_safari/probe.py "$UDID" out/tab "https://play.openhearts.game/"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -8,7 +8,11 @@ gesture: a screenshot, the screen's brightness against the one before
 it, and any native menu the accessibility tree shows (Copy, Select
 All, Look Up), which only Safari draws.
 
-    python3 e2e/ios_safari/probe.py <udid> <out dir> <url>
+    python3 e2e/ios_safari/probe.py <udid> <out dir> <url> [home]
+
+With `home`, the page is first added to the Home Screen through
+Safari's own Share menu and opened from its icon, as a web app: no
+Safari around it, as an iPhone's owner plays it.
 
 idb's accessibility tree is Safari's own controls, not the page's, so
 the page is found in its screenshots: Play solo is the gold button, the
@@ -24,6 +28,7 @@ from pathlib import Path
 from PIL import Image, ImageStat
 
 UDID, OUT, URL = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
+HOME = len(sys.argv) > 4 and sys.argv[4] == 'home'
 DISMISS = ('Close', 'dismiss popup', 'Continue', 'Not Now', 'OK')
 OUT.mkdir(parents=True, exist_ok=True)
 NATIVE = ('Copy', 'Select All', 'Select', 'Look Up', 'Share', 'Translate', 'Search Web', 'Speak')
@@ -127,8 +132,60 @@ gold = lambda p: p[0] > 200 and 150 < p[1] < 200 and p[2] < 130
 face = lambda p: p[0] > 235 and p[1] > 232 and p[2] > 220
 
 
-def open_app(timeout=90):
+def labels():
+    return sorted({label(e) for e in elements() if label(e)})
+
+
+def press(*names, wait=2.0, required=True):
+    """Taps the first of Safari's or the Home Screen's own controls
+    named [names]."""
+    at = find(lambda t: t in names)
+    if not at:
+        print(f'no {names}; on the screen: {labels()}', flush=True)
+        if required:
+            raise SystemExit(1)
+        return False
+    tap(*at)
+    time.sleep(wait)
+    return True
+
+
+def add_to_home_screen():
+    """Safari's Share menu, Add to Home Screen, Add; then the icon."""
     subprocess.run(['xcrun', 'simctl', 'openurl', UDID, URL], check=True)
+    time.sleep(12)
+    dismiss()
+    shot('h0-in-safari')
+    print('safari:', labels(), flush=True)
+    if not press('Share', wait=2, required=False):
+        press('More', 'Page Menu', 'View Bookmarks, Share Menu, and Open Tabs')
+        shot('h1-menu')
+        print('menu:', labels(), flush=True)
+        press('Share')
+    shot('h2-share')
+    print('share sheet:', labels(), flush=True)
+    if not press('Add to Home Screen', required=False):
+        # Below the fold of the sheet's actions.
+        idb('ui', 'swipe', '200', '780', '200', '420', '--duration', '0.4')
+        time.sleep(1.5)
+        print('share sheet, scrolled:', labels(), flush=True)
+        press('Add to Home Screen')
+    shot('h3-add')
+    print('add:', labels(), flush=True)
+    # Opened as a web app: iOS asks, or it is the default.
+    press('Open as Web App', wait=0.5, required=False)
+    press('Add')
+    time.sleep(3)
+    shot('h4-home-screen')
+    print('home screen:', labels(), flush=True)
+    press('Open Hearts', wait=12)
+
+
+def open_app(timeout=90):
+    if HOME:
+        add_to_home_screen()
+    else:
+        subprocess.run(['xcrun', 'simctl', 'openurl', UDID, URL], check=True)
     began = time.time()
     while time.time() - began < timeout:
         time.sleep(3)
@@ -176,7 +233,13 @@ def main():
         'header': (w * 0.5, felt_y * 0.2),
         'side': (w * 0.12, felt_y),
     }
+    def swipe(x, y, dx, dy, duration=0.3):
+        idb('ui', 'swipe', str(round(x)), str(round(y)), str(round(x + dx)), str(round(y + dy)), '--duration', str(duration))
+
     gestures = [
+        ('swipe-across', lambda x, y: swipe(x - 120, y, 240, 0)),
+        ('swipe-down', lambda x, y: swipe(x, y - 60, 0, 160)),
+        ('drag-up', lambda x, y: swipe(x, y, 0, -200, 0.8)),
         ('tap', lambda x, y: tap(x, y)),
         ('double-tap', lambda x, y: taps(x, y, 2)),
         ('triple-tap', lambda x, y: taps(x, y, 3)),
