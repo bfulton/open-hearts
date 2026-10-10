@@ -18,6 +18,14 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+      # idb's companion is built here, and only with Xcode 26.
+      - name: Xcode 26
+        run: |
+          ls -d /Applications/Xcode*.app
+          xcode=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [[ -n "$xcode" ]] || { echo "no Xcode 26 on this image" >&2; exit 1; }
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
       - name: idb
         run: |
           brew tap facebook/fb
@@ -39,7 +47,6 @@ jobs:
       - name: With the accessibility tree (?e2e), which says where things are
         run: python3 e2e/ios_safari/probe.py "$UDID" out/e2e "https://play.openhearts.game/?e2e=1" out/solo.json
       - name: As production, at the same places
-        if: always()
         run: python3 e2e/ios_safari/probe.py "$UDID" out/prod "https://play.openhearts.game/" out/solo.json
       - uses: actions/upload-artifact@v4
         if: always()
