@@ -150,6 +150,44 @@ def press(*names, wait=2.0, required=True):
     return True
 
 
+def read(name, phrase, lowest=False):
+    """Where [phrase] is written on the screen, in points, read by OCR:
+    the share sheet is drawn by another process, which idb's tree does
+    not reach. The lowest of several when [lowest]."""
+    path = OUT / f'{name}.png'
+    shot(name)
+    image = Image.open(path)
+    scale = 3 if image.size[0] > 1000 else 2
+    # Grey, and read as scattered words: the sheet's small labels over
+    # its translucent ground are lost otherwise.
+    grey = OUT / f'{name}-grey.png'
+    image.convert('L').save(grey)
+    tsv = subprocess.run(['tesseract', str(grey), '-', '--psm', '11', 'tsv'], capture_output=True, text=True).stdout
+    words = []
+    for line in tsv.splitlines()[1:]:
+        cols = line.split('\t')
+        if len(cols) == 12 and cols[11].strip():
+            left, top, width, height = map(int, cols[6:10])
+            words.append((cols[11].strip(), left, top, width, height))
+    # A phrase is its words in reading order, side by side on one line.
+    words.sort(key=lambda w: (round(w[2] / 20), w[1]))
+    want = phrase.split()
+    found = []
+    for i in range(len(words) - len(want) + 1):
+        run = words[i:i + len(want)]
+        if [w[0] for w in run] != want:
+            continue
+        if any(abs(b[2] - a[2]) > a[4] or b[1] < a[1] for a, b in zip(run, run[1:])):
+            continue
+        x0, y0 = run[0][1], min(w[2] for w in run)
+        x1, y1 = run[-1][1] + run[-1][3], max(w[2] + w[4] for w in run)
+        found.append(((x0 + x1) / 2 / scale, (y0 + y1) / 2 / scale))
+    if not found:
+        print(f'no "{phrase}" read on the screen; read: {" ".join(w[0] for w in words)[:400]}', flush=True)
+        return None
+    return max(found, key=lambda f: f[1]) if lowest else found[0]
+
+
 def add_to_home_screen():
     """Safari's Share menu, Add to Home Screen, Add; then the icon."""
     subprocess.run(['xcrun', 'simctl', 'openurl', UDID, URL], check=True)
@@ -165,17 +203,23 @@ def add_to_home_screen():
         press('Share')
     shot('h2-share')
     print('share sheet:', labels(), flush=True)
-    if not press('Add to Home Screen', required=False):
-        # Below the fold of the sheet's actions.
-        idb('ui', 'swipe', '200', '780', '200', '420', '--duration', '0.4')
-        time.sleep(1.5)
-        print('share sheet, scrolled:', labels(), flush=True)
-        press('Add to Home Screen')
-    shot('h3-add')
-    print('add:', labels(), flush=True)
-    # Opened as a web app: iOS asks, or it is the default.
-    press('Open as Web App', wait=0.5, required=False)
-    press('Add')
+    at = read('h2-share', 'Add to Home Screen')
+    if not at:
+        # Behind the More at the end of the sheet's row of actions.
+        more = read('h2-share', 'More', lowest=True)
+        if not more:
+            raise SystemExit(1)
+        tap(*more)
+        time.sleep(2)
+        at = read('h2b-actions', 'Add to Home Screen')
+        if not at:
+            raise SystemExit(1)
+    tap(*at)
+    time.sleep(3)
+    add = read('h3-add', 'Add')
+    if not add:
+        raise SystemExit(1)
+    tap(*add)
     time.sleep(3)
     shot('h4-home-screen')
     print('home screen:', labels(), flush=True)

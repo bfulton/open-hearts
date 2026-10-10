@@ -29,7 +29,7 @@ jobs:
       - name: idb
         run: |
           brew tap facebook/fb
-          brew install facebook/fb/idb-companion
+          brew install facebook/fb/idb-companion tesseract
           python3 -m venv "$RUNNER_TEMP/v"
           "$RUNNER_TEMP/v/bin/pip" install --quiet fb-idb pillow
           echo "$RUNNER_TEMP/v/bin" >> "$GITHUB_PATH"
