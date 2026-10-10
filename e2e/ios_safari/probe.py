@@ -137,9 +137,9 @@ def labels():
 
 
 def press(*names, wait=2.0, required=True):
-    """Taps the first of Safari's or the Home Screen's own controls
-    named [names]."""
-    at = find(lambda t: t in names)
+    """Taps the Safari or Home Screen control named the first of
+    [names] that is on the screen: in that order, not the screen's."""
+    at = next((a for a in (find(lambda t, n=n: t == n) for n in names) if a), None)
     if not at:
         print(f'no {names}; on the screen: {labels()}', flush=True)
         if required:
@@ -158,7 +158,8 @@ def add_to_home_screen():
     shot('h0-in-safari')
     print('safari:', labels(), flush=True)
     if not press('Share', wait=2, required=False):
-        press('More', 'Page Menu', 'View Bookmarks, Share Menu, and Open Tabs')
+        # The … button: Share is in it (Safari says so on first run).
+        press('More', 'View Bookmarks, Share Menu, and Open Tabs')
         shot('h1-menu')
         print('menu:', labels(), flush=True)
         press('Share')
