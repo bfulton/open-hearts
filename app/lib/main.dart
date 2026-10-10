@@ -19,6 +19,7 @@ import 'net/licence.dart' show serviceKey;
 import 'net/remote_config.dart';
 import 'router.dart';
 import 'table_model.dart' show tableBeats;
+import 'net/report_error.dart';
 import 'net/store_buying.dart';
 import 'theme.dart';
 import 'ui/in_use_screen.dart';
@@ -27,6 +28,8 @@ import 'ui/touch_probe.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // What goes wrong is told, not only printed (net/report_error.dart).
+  reportErrors();
   // Addresses are paths, `/subscription`, not `/#/subscription`: the
   // site's worker answers every address of play.openhearts.game (and of
   // /play/ on a preview) with the app (service/functions/worker.mjs),

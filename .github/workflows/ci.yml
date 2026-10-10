@@ -64,6 +64,8 @@ jobs:
         run: cd app && flutter pub get && flutter analyze
       - name: Test (widgets)
         run: cd app && flutter test -j 4
+      - name: Test (on a page, in Chrome)
+        run: cd app && flutter test --platform chrome test/web
 
   # The web build as deploy.sh makes it, on a runner of its own: it is
   # minutes of compiling that nothing else here waits for.

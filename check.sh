@@ -67,7 +67,15 @@ suite_scripts() {
 suite_app_analyze() { cd app && flutter analyze; }
 # The app's tests: all of them, or those $app_tests names, with
 # $app_flags (quick leaves the layout matrix out: app/dart_test.yaml).
-suite_app() { cd app && flutter test -j "$cores" ${app_flags:-} ${app_tests:-}; }
+# And those that need a page under them (test/web), in Chrome, or the
+# Chromium Playwright brought where there is no Chrome.
+suite_app() {
+  local chrome=${CHROME_EXECUTABLE:-$(ls -d /opt/pw-browsers/chromium-*/chrome-linux*/chrome 2> /dev/null | head -1)}
+  [ -n "$chrome" ] && export CHROME_EXECUTABLE=$chrome
+  cd app || return 1
+  if [ "${app_tests:-}" != none ]; then flutter test -j "$cores" ${app_flags:-} ${app_tests:-} || return 1; fi
+  flutter test --platform chrome test/web
+}
 # The browser suites (e2e/README.md), on the one build e2e/build.sh
 # makes for all of them, and not again while its sources are unchanged.
 # Each starts its own relay on a port of its own, so they run together.
@@ -209,8 +217,17 @@ quick() {
   if [ ${#app_files[@]} -gt 0 ]; then
     local hit
     hit=$(node app/tool/affected_tests.mjs "${app_files[@]}")
+    # Those on a page (test/web) run in Chrome after the rest, every
+    # time the app suite runs: not on the VM, which skips them.
+    local web=no
+    if [ "$hit" != all ] && grep -q '^test/web/' <<< "$hit"; then
+      web=yes
+      hit=$(grep -v '^test/web/' <<< "$hit" || true)
+    fi
     if [ "$hit" = all ]; then
       app_tests=''
+    elif [ -z "$hit" ] && [ $web = yes ]; then
+      app_tests=none
     elif [ -z "$hit" ]; then
       local kept=() s
       for s in "${suites[@]}"; do [ "$s" = app ] || kept+=("$s"); done

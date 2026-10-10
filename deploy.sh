@@ -201,8 +201,12 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
 # play.openhearts.game. A preview, which has no such host, serves the
 # same files at /play/, its worker moving the page's base there
 # (service/functions/worker.mjs, serveStatic).
+# --source-maps publishes main.dart.js.map beside it, so a stack the
+# browser agent sends (app/lib/net/report_error.dart) can be read back to
+# the Dart that threw. The source is public already.
 ( cd app && "$FLUTTER" build web \
     --release \
+    --source-maps \
     --no-web-resources-cdn \
     --base-href / \
     --dart-define=OH_RELAYS="${OH_RELAYS:-}" \
