@@ -23,7 +23,6 @@ node e2e/offline.mjs                    # the network taken away a piece at a ti
 node e2e/offline.mjs --only "airplane"
 node e2e/move.mjs                       # openhearts.game/play/ to play.openhearts.game: old address 404, carry-over, previews
 node e2e/shots.mjs                      # screenshots at docs/05's shapes, in app/build/shots/
-node e2e/longpress_copy.mjs             # long-press Copy on an iPhone user agent
 node e2e/site.mjs                       # the marketing site in each language: redirect, choice kept, fits a phone
 node e2e/site_shots.mjs                 # the site's pictures of the game, into site/public/img/ (after a menu change)
 node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
