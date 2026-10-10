@@ -33,6 +33,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const shapes = [
   { name: 'phone-portrait', width: 390, height: 844 },
+  // The width most Android phones have.
+  { name: 'android-portrait', width: 360, height: 800 },
   { name: 'phone-landscape', width: 844, height: 390 },
   { name: 'tablet-portrait', width: 1024, height: 1366 },
   { name: 'tablet-landscape', width: 1366, height: 1024 },

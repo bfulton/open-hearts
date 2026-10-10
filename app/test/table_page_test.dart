@@ -17,6 +17,7 @@ import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
 import 'package:open_hearts/ui/header.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+import 'package:open_hearts/ui/scaled.dart';
 import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
@@ -695,9 +696,10 @@ void main() {
         expect(badge.overlaps(slot), isFalse, reason: '${names[seat]}\'s badge stays clear of the trick');
       }
     }
-    // Shrunk from what the width alone would allow: 340 × 0.21 = 71.
+    // Shrunk from the hand's size, which a 360-point felt has room for:
+    // 340 leaves the side badges their least only at a card of 69.
     final slotWidth = slots.map((r) => r.width).reduce((a, b) => a > b ? a : b);
-    expect(slotWidth, lessThan(340 * 0.21 - 1));
+    expect(slotWidth, lessThan(TableScale.phoneCard - 1));
   });
 
   for (final shape in [_phone, _sideways, const Size(1280, 800), const Size(340, 720)]) {

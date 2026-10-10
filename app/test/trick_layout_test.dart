@@ -20,8 +20,11 @@ Rect corner(Rect card) => Rect.fromLTWH(card.left, card.top, card.width * 0.36, 
 
 void main() {
   // The iPhones of the last few years and an SE, and one in a Home Screen
-  // web app, whose status bar the page does not get.
+  // web app, whose status bar the page does not get; and the 360-point
+  // width most Android phones have.
   for (final size in const [
+    Size(360, 780),
+    Size(360, 800),
     Size(375, 667),
     Size(390, 844),
     Size(393, 852),

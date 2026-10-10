@@ -168,7 +168,18 @@ class TableView extends StatelessWidget {
         // it. Drawn at the table's scale.
         final note = corner;
         final noteSize = note == null ? Size.zero : FeltCorner.sizeOf(context, note.text, (box.width - 2 * edge) / scale) * scale;
-        final widest = (wide ? 3.6 : 2.9) * math.min(box.width * (wide ? 0.16 : 0.21), TableScale.phoneCard * scale);
+        // The side badges' room: from the felt's edge to the trick's
+        // outer card, less a gap. A name has to fit it, wrapped if it
+        // must; and on a felt too narrow for both, the trick gives way
+        // rather than running under the badges. Upright, that is what
+        // holds a card's width: as wide as leaves the side badges their
+        // least, which is the hand's size from a 360-point phone up. On
+        // a wide felt the trick lies flat and a share of the width does.
+        final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
+        double sideRoomFor(double cw) => box.width / 2 - cw * reach - edge - badgeGap;
+        final leastRoom = SeatBadge.leastWidth * scale;
+        final across = wide ? box.width * 0.16 : (box.width / 2 - edge - badgeGap - leastRoom) / reach;
+        final widest = (wide ? 3.6 : 2.9) * math.min(across, TableScale.phoneCard * scale);
         final tight = SeatBadge.tightLine * scale;
         final sidesFrom = tight + (wide ? math.max(0.0, (cardHeightFor(34) * 2.3 - tight) / 2) : 0.0);
         final beside = edge + noteSize.width + badgeGap <= (box.width - widest) / 2 && edge + noteSize.height + badgeGap <= sidesFrom;
@@ -196,17 +207,10 @@ class TableView extends StatelessWidget {
         // one its type is drawn at too.
         final most = TableScale.phoneCard * scale;
         var cardWidth = [
-          box.width * (wide ? 0.16 : 0.21),
+          across,
           cardsUnder(line),
           most,
         ].reduce((a, b) => a < b ? a : b).clamp(34.0, most);
-        // The side badges' room: from the felt's edge to the trick's
-        // outer card, less a gap. A name has to fit it, wrapped if it
-        // must; and on a felt too narrow for both, the trick gives way
-        // rather than running under the badges.
-        final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
-        double sideRoomFor(double cw) => box.width / 2 - cw * reach - edge - badgeGap;
-        final leastRoom = SeatBadge.minWidth * scale;
         if (sideRoomFor(cardWidth) < leastRoom) {
           cardWidth = ((box.width / 2 - edge - badgeGap - leastRoom) / reach).clamp(34.0, cardWidth);
         }
@@ -930,6 +934,16 @@ class SeatBadge extends StatelessWidget {
   /// the roster's one-word names on a line, at 58 points of text.
   static const minWidth = 80.0;
 
+  /// A stacked badge's padding at either side, and the least it gives
+  /// way to where its strip is narrower than [minWidth] — a 360-point
+  /// phone, upright — so that what is inside keeps the room it has at
+  /// [minWidth], and the cards keep the hand's size.
+  static const _side = 11.0;
+  static const _sideLeast = 7.0;
+
+  /// The narrowest a side badge's strip is let be.
+  static const leastWidth = minWidth - 2 * (_side - _sideLeast);
+
   /// What a badge on one line is, exactly: the felt sizes the trick
   /// from the height the seats leave it, so a badge that grew with its
   /// name or the reader's text size would push the cards off the
@@ -950,7 +964,6 @@ class SeatBadge extends StatelessWidget {
   static const nameSize = 13.0;
   static const _numberSize = 12.5;
 
-  static const _stacked = EdgeInsets.symmetric(horizontal: 11, vertical: 7);
 
   @override
   Widget build(BuildContext context) {
@@ -978,7 +991,9 @@ class SeatBadge extends StatelessWidget {
     return GestureDetector(behavior: HitTestBehavior.opaque, onLongPress: onHold, child: badge);
   }
 
-  EdgeInsets get _padding => oneLine ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : _stacked;
+  EdgeInsets get _padding => oneLine
+      ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4)
+      : EdgeInsets.symmetric(horizontal: ((maxWidth - (minWidth - 2 * _side)) / 2).clamp(_sideLeast, _side), vertical: 7);
 
   /// The border's width on the seat whose turn it is, or that just took
   /// the trick; a point otherwise.
