@@ -8,11 +8,11 @@ gesture: a screenshot, the screen's brightness against the one before
 it, and any native menu the accessibility tree shows (Copy, Select
 All, Look Up), which only Safari draws.
 
-    python3 e2e/ios_safari/probe.py <udid> <out dir> <url> [<where Play solo is>.json]
+    python3 e2e/ios_safari/probe.py <udid> <out dir> <url>
 
-With ?e2e the app builds its accessibility tree, and Play solo is found
-there and written down; without it (as in production) there is none,
-and the place written down by an ?e2e run is used.
+idb's accessibility tree is Safari's own controls, not the page's, so
+the page is found in its screenshots: Play solo is the gold button, the
+hand is the light card faces at the bottom.
 """
 
 import json
@@ -24,7 +24,7 @@ from pathlib import Path
 from PIL import Image, ImageStat
 
 UDID, OUT, URL = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
-KNOWN = Path(sys.argv[4]) if len(sys.argv) > 4 else None
+DISMISS = ('Close', 'dismiss popup', 'Continue', 'Not Now', 'OK')
 OUT.mkdir(parents=True, exist_ok=True)
 NATIVE = ('Copy', 'Select All', 'Select', 'Look Up', 'Share', 'Translate', 'Search Web', 'Speak')
 
@@ -86,28 +86,64 @@ def taps(x, y, n, gap=0.12):
         p.wait()
 
 
-def open_page(url, ready, timeout=90):
-    subprocess.run(['xcrun', 'simctl', 'openurl', UDID, url], check=True)
+def dismiss():
+    """Safari's own first-run notes, over the page."""
+    for _ in range(4):
+        at = find(lambda t: t in DISMISS)
+        if not at:
+            return
+        tap(*at)
+        time.sleep(1)
+
+
+def region(path, keep, below=0.0, filled=0.4):
+    """The bounding box, in points, of the rows at least [filled] of
+    whose width is pixels [keep] says are part of it, at or under
+    [below] of the screen's height: a filled shape, not an outline or a
+    small badge of the same colour. None if there is none."""
+    image = Image.open(path).convert('RGB')
+    scale = 3 if image.size[0] > 1000 else 2
+    small = image.resize((image.size[0] // scale, image.size[1] // scale))
+    px = small.load()
+    # The tallest run of such rows one under another: a line of the
+    # same colour elsewhere (an outline's edge) is a run of one.
+    runs, run = [], []
+    for y in range(int(small.size[1] * below), small.size[1]):
+        row = [x for x in range(small.size[0]) if keep(px[x, y])]
+        if len(row) >= small.size[0] * filled:
+            run.append((y, row[0], row[-1]))
+        elif run:
+            runs.append(run)
+            run = []
+    if run:
+        runs.append(run)
+    best = max(runs, key=len, default=[])
+    if len(best) < 4:
+        return None
+    return min(r[1] for r in best), best[0][0], max(r[2] for r in best), best[-1][0]
+
+
+gold = lambda p: p[0] > 200 and 150 < p[1] < 200 and p[2] < 130
+face = lambda p: p[0] > 235 and p[1] > 232 and p[2] > 220
+
+
+def open_app(timeout=90):
+    subprocess.run(['xcrun', 'simctl', 'openurl', UDID, URL], check=True)
     began = time.time()
     while time.time() - began < timeout:
-        at = find(ready)
-        if at:
-            return at
-        time.sleep(2)
+        time.sleep(3)
+        dismiss()
+        shot('00-loading')
+        box = region(OUT / '00-loading.png', gold)
+        if box:
+            return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
     return None
 
 
 def main():
     report = []
     e2e = '?e2e=1' in URL
-    if e2e:
-        solo = open_page(URL, lambda t: t == 'Play solo')
-        if solo and KNOWN:
-            KNOWN.write_text(json.dumps(solo))
-    else:
-        subprocess.run(['xcrun', 'simctl', 'openurl', UDID, URL], check=True)
-        time.sleep(30)
-        solo = tuple(json.loads(KNOWN.read_text())) if KNOWN and KNOWN.exists() else None
+    solo = open_app()
     if not solo:
         shot('00-no-app')
         print('the app did not come up; labels seen:', sorted({label(e) for e in elements()})[:60], flush=True)
@@ -116,22 +152,29 @@ def main():
     print(f'home: brightness {base:.1f}', flush=True)
     tap(*solo)
     time.sleep(6)
+    dismiss()
     base = shot('01-table')
     labels = sorted({label(e) for e in elements() if label(e)})
     print('table labels:', labels[:80], flush=True)
     (OUT / 'table-elements.json').write_text(json.dumps(elements(), indent=1))
 
-    # Where things are: from the accessibility tree where the app builds
-    # it (?e2e), else the fractions of the screen they took there.
+    # Where things are: the hand is the card faces in the bottom third;
+    # the rest is laid out around the middle of the felt above it.
     size = Image.open(OUT / '01-table.png').size
     scale = 3 if size[0] > 1000 else 2
     w, h = size[0] / scale, size[1] / scale
+    hand = region(OUT / '01-table.png', face, below=0.6)
+    if not hand:
+        print('no hand on the screen: not at the table', flush=True)
+        sys.exit(1)
+    print(f'hand at {hand} on a {w:.0f}x{h:.0f} screen', flush=True)
+    felt_y = hand[1] * 0.55
     spots = {
-        'felt': (w * 0.5, h * 0.48),
-        'card': (w * 0.5, h * 0.9),
-        'name': (w * 0.5, h * 0.27),
-        'header': (w * 0.5, h * 0.11),
-        'side': (w * 0.12, h * 0.45),
+        'felt': (w * 0.5, felt_y),
+        'card': ((hand[0] + hand[2]) / 2, (hand[1] + hand[3]) / 2),
+        'name': (w * 0.5, felt_y * 0.55),
+        'header': (w * 0.5, felt_y * 0.2),
+        'side': (w * 0.12, felt_y),
     }
     gestures = [
         ('tap', lambda x, y: tap(x, y)),
