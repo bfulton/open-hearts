@@ -32,4 +32,45 @@ void main() {
     expect('Hearts is a card game'.contains(copied!.trim()), isTrue, reason: 'a word of the text: "$copied"');
     expect(copied!.trim(), isNotEmpty);
   }, variant: const TargetPlatformVariant({TargetPlatform.iOS, TargetPlatform.android}));
+
+  // Words selected, then gone from the screen (a menu that closed, a line
+  // of the table rewritten), and then a drag across the screen: Flutter
+  // raises the toolbar for the selection that is no longer there, and a
+  // toolbar that asks where to go throws. In a release the error's
+  // stand-in, grey, covers the whole screen.
+  for (final select in const ['long press', 'double tap']) {
+    testWidgets('a $select on words that then go, and a drag: no toolbar, and nothing thrown', (tester) async {
+      final shown = ValueNotifier(true);
+      addTearDown(shown.dispose);
+      await tester.pumpWidget(MaterialApp(
+        builder: (context, child) => CopyableSelection(child: child ?? const SizedBox()),
+        home: Scaffold(
+          body: Column(children: [
+            const SizedBox(height: 100),
+            ValueListenableBuilder(
+              valueListenable: shown,
+              builder: (context, shown, _) => shown ? const Text('Your turn') : const SizedBox(height: 20),
+            ),
+            const SizedBox(height: 300),
+          ]),
+        ),
+      ));
+      final at = tester.getCenter(find.text('Your turn'));
+      if (select == 'long press') {
+        await tester.longPressAt(at);
+      } else {
+        await tester.tapAt(at);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tapAt(at);
+      }
+      await tester.pumpAndSettle();
+      shown.value = false;
+      await tester.pumpAndSettle();
+      await tester.dragFrom(const Offset(300, 350), const Offset(-80, 0));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(ErrorWidget), findsNothing);
+      expect(find.text('Copy'), findsNothing, reason: 'nothing selected, nothing to copy');
+    }, variant: const TargetPlatformVariant({TargetPlatform.iOS, TargetPlatform.android}));
+  }
 }

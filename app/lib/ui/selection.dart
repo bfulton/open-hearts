@@ -4,7 +4,7 @@ library;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show Selectable, SelectionRegistrar;
+import 'package:flutter/rendering.dart' show Selectable, SelectionHandler, SelectionRegistrar;
 
 import '../net/copy.dart';
 
@@ -32,6 +32,10 @@ class _CopyableSelectionState extends State<CopyableSelection> {
   /// the first frame is laid out, when asking throws.
   final _focus = FocusNode(debugLabel: 'selection', skipTraversal: true);
 
+  /// The selection itself, as the words in it see it: where its two ends
+  /// are.
+  SelectionHandler? _selection;
+
   @override
   void dispose() {
     _focus.dispose();
@@ -55,6 +59,15 @@ class _CopyableSelectionState extends State<CopyableSelection> {
       // the only way Safari lets it reach the clipboard. Elsewhere the
       // framework's own toolbar does.
       contextMenuBuilder: (context, region) {
+        // Flutter raises the toolbar at the end of a drag even when the
+        // words selected have since left the screen (the menu they were
+        // in closed, the line of the table they were on was rewritten),
+        // and asking where such a toolbar goes throws. The error's
+        // stand-in fills the overlay the toolbar is in, which is the
+        // whole screen: grey, in a release, until the phone is turned.
+        // A selection without both its ends has no toolbar.
+        final ends = _selection?.value;
+        if (ends?.startSelectionPoint == null || ends?.endSelectionPoint == null) return const SizedBox.shrink();
         final items = [
           for (final item in region.contextMenuButtonItems)
             if (kIsWeb && item.type == ContextMenuButtonType.copy)
@@ -67,7 +80,11 @@ class _CopyableSelectionState extends State<CopyableSelection> {
         ];
         return AdaptiveTextSelectionToolbar.buttonItems(anchors: region.contextMenuAnchors, buttonItems: items);
       },
-      child: widget.child,
+      child: Builder(builder: (context) {
+        final registrar = SelectionContainer.maybeOf(context);
+        _selection = registrar is SelectionHandler ? registrar as SelectionHandler : null;
+        return widget.child;
+      }),
     );
   }
 }
