@@ -122,7 +122,10 @@ void main() {
     expect(w.household, AppWaits.standard.household, reason: 'under its least');
     expect(w.configEvery, const Duration(hours: 1));
     expect(w.meshAnswer, AppWaits.standard.meshAnswer, reason: 'not a number');
+    const record = {'recordAgainMs', 'recordForMs', 'recordSoonMs'};
     for (final MapEntry(key: name, value: (least, most)) in AppWaits.bounds.entries) {
+      // The record's three go together, so are checked together (below).
+      if (record.contains(name)) continue;
       expect(AppWaits.parse({name: least}), isNot(AppWaits.standard), reason: '$name at its least');
       expect(AppWaits.parse({name: most}), isNot(AppWaits.standard), reason: '$name at its most');
       expect(AppWaits.parse({name: least - 1}), AppWaits.standard, reason: '$name under');
@@ -132,6 +135,32 @@ void main() {
     // the operator's.
     final upside = AppWaits.parse({'relaySlowMs': 20000, 'relayGiveUpMs': 15000});
     expect((upside.relaySlow, upside.relayGiveUp), (AppWaits.standard.relaySlow, AppWaits.standard.relayGiveUp));
+    // Asking for a record again comes within the spans it is asked over,
+    // or none of the three is the operator's.
+    final standardRecord = (AppWaits.standard.recordAgain, AppWaits.standard.recordFor, AppWaits.standard.recordSoon);
+    final slowAgain = AppWaits.parse({'recordAgainMs': 30000, 'recordSoonMs': 2000});
+    expect((slowAgain.recordAgain, slowAgain.recordFor, slowAgain.recordSoon), standardRecord, reason: 'past the short span');
+    final pastFor = AppWaits.parse({'recordAgainMs': 20000, 'recordForMs': 10000, 'recordSoonMs': 30000});
+    expect((pastFor.recordAgain, pastFor.recordFor, pastFor.recordSoon), standardRecord, reason: 'past the long span');
+    final within = AppWaits.parse({'recordAgainMs': 5000, 'recordForMs': 20000, 'recordSoonMs': 5000});
+    expect((within.recordAgain, within.recordFor, within.recordSoon),
+        (const Duration(seconds: 5), const Duration(seconds: 20), const Duration(seconds: 5)));
+    // Each of the three at its bounds, beside the other two where every
+    // one of its bounds fits.
+    const around = {'recordAgainMs': 2000, 'recordForMs': 100000, 'recordSoonMs': 45000};
+    Duration of(AppWaits w, String name) => switch (name) {
+          'recordAgainMs' => w.recordAgain,
+          'recordForMs' => w.recordFor,
+          _ => w.recordSoon,
+        };
+    for (final name in record) {
+      final (least, most) = AppWaits.bounds[name]!;
+      Duration at(int v) => of(AppWaits.parse({...around, name: v}), name);
+      expect(at(least), Duration(milliseconds: least), reason: '$name at its least');
+      expect(at(most), Duration(milliseconds: most), reason: '$name at its most');
+      expect(at(least - 1), of(AppWaits.standard, name), reason: '$name under');
+      expect(at(most + 1), of(AppWaits.standard, name), reason: '$name over');
+    }
   });
 
   testWidgets('a relay is called slow, and given up on, when the operator\'s waits say', (tester) async {
