@@ -540,6 +540,16 @@ stillFlow('a reaction at a live table: one player sends 👍, and the other sees
   // Nobody at the table but its players has the button; Ada's opens the
   // six, and her pick goes.
   await waitFor(ada, /^React$/, { what: 'the speech bubble beside Ada\'s badge' });
+  // A relay keeps no reaction: it goes to whoever is subscribed when it
+  // is said (packages/table, reactions.dart), and a screen showing the
+  // table may not have its subscription in place yet on a busy machine
+  // (on CI, Bao's screen was still on the deal's first step, with only
+  // its own part of it, five seconds after she reacted). Bao's screen
+  // hears the table and its reactions on one subscription
+  // (relay_transport.dart), and its hand is dealt only once it has heard
+  // Ada's steps of the deal: with its cards showing, a reaction said now
+  // reaches it.
+  await waitFor(bao, cardName, { what: 'Bao\'s hand, dealt', timeout: 120000 });
   await click(ada, /^React$/);
   await waitFor(ada, /^Good game$/, { what: 'the reactions to pick from' });
   await click(ada, /^Nice$/);
