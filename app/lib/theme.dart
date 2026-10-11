@@ -51,6 +51,22 @@ abstract final class Palette {
   static const mark = chrome;
 }
 
+/// A section's heading, the same on every page: dim, bold and spaced.
+/// Written as it is read: a heading put through toUpperCase is read out
+/// as shouting by anything that reads the screen aloud, and the weight
+/// and the spacing set it apart well enough without it.
+class SectionHeading extends StatelessWidget {
+  const SectionHeading(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Palette.chromeDim, letterSpacing: 0.6),
+      );
+}
+
 ThemeData buildTheme() {
   final base = ThemeData.dark(useMaterial3: true);
   return base.copyWith(

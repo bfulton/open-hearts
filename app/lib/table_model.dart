@@ -16,12 +16,6 @@ import 'l10n/l10n.dart';
 /// second 👍 from the same seat is a new bubble, said aloud again.
 typedef SeatReaction = ({Reaction reaction, int n});
 
-/// The share of its beats a table takes — a bot's thinking, a trick
-/// held on the felt, the score sheet's stay: all of them, but for a
-/// build the browser suites drive and ask for less (net/address.dart,
-/// [paceIn]). Set once, at startup (main.dart).
-double tableBeats = 1;
-
 abstract class TableModel implements Listenable {
   HeartsGame get game;
 

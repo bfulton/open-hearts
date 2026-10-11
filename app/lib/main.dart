@@ -18,7 +18,7 @@ import 'net/in_use.dart';
 import 'net/licence.dart' show serviceKey;
 import 'net/remote_config.dart';
 import 'router.dart';
-import 'table_model.dart' show tableBeats;
+import 'pacing.dart' show tableBeats;
 import 'net/report_error.dart';
 import 'net/store_buying.dart';
 import 'theme.dart';

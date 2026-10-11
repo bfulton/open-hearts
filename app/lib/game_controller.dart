@@ -15,6 +15,7 @@ import 'package:engine/engine.dart';
 
 import 'avatar.dart';
 import 'l10n/l10n.dart';
+import 'pacing.dart';
 import 'record_store.dart';
 import 'table_model.dart';
 
@@ -128,21 +129,14 @@ class GameController extends ChangeNotifier implements TableModel {
   /// How long [seat]'s bot appears to think: its persona's rhythm.
   Duration _botThink(int seat) {
     if (!paced) return Duration.zero;
-    final pace = _bots[seat]!.persona.pace;
-    return Duration(milliseconds: pace.minMs + _rhythm.nextInt(pace.maxMs - pace.minMs + 1));
+    return Pacing.think(_bots[seat]!.persona, _rhythm);
   }
-  Duration get _trickHold => paced ? const Duration(milliseconds: 950) : Duration.zero;
+
+  Duration get _trickHold => paced ? Pacing.trickHold : Duration.zero;
   /// How long the player's three sit on the line, gone from the hand,
   /// before the others' come back: the swap is seen as a swap.
   Duration get _passBeat => paced ? const Duration(milliseconds: 900) : Duration.zero;
-
-  /// After the last trick of a hand is swept, a beat of bare felt
-  /// before the sheet. Long enough to watch the last trick go to
-  /// whoever took it and to take the felt in after: a sheet that comes
-  /// down on the tail of the cards leaves the hand's last thing
-  /// unseen, and the score it is about unexplained.
-  static const sweepBeat = Duration(milliseconds: 1200);
-  Duration get _sweepBeat => paced ? sweepBeat : Duration.zero;
+  Duration get _sweepBeat => paced ? Pacing.sweepBeat : Duration.zero;
 
   /// Whether the score sheet may show: the hand (or the game) is over
   /// and its last trick has been seen off the table.

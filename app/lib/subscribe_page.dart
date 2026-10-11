@@ -10,7 +10,6 @@
 library;
 
 import 'dart:async';
-import 'dart:math' show min;
 
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart' show SignInWithAppleButton, SignInWithAppleButtonStyle;
@@ -21,6 +20,7 @@ import 'activate_page.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
+import 'net/backoff.dart';
 import 'net/copy.dart';
 import 'net/buying.dart';
 import 'net/household.dart';
@@ -70,12 +70,11 @@ class _SubscribePageState extends State<SubscribePage> {
   ({Provider provider, String token})? _elsewhere;
 
   /// A listing that did not reach the service is asked for again by
-  /// itself, as the licence is (entitlement.dart): after
-  /// [Entitlement.firstAgain], then twice as long each time up to
-  /// [Entitlement.mostAgain], and at once when the app is back in the
-  /// foreground. One the service refused in its own words is not.
+  /// itself, as the licence is (entitlement.dart): after a wait that
+  /// doubles each time ([Backoff]), and at once when the app is back in
+  /// the foreground. One the service refused in its own words is not.
   Timer? _again;
-  Duration _gap = Entitlement.firstAgain;
+  final _backoff = Backoff();
   late final AppLifecycleListener _lifecycle = AppLifecycleListener(onResume: _listAgainNow);
 
   @override
@@ -101,7 +100,7 @@ class _SubscribePageState extends State<SubscribePage> {
   void _listAgainNow() {
     final me = _me;
     if (_again == null || me == null || _listing) return;
-    _gap = Entitlement.firstAgain;
+    _backoff.reset();
     unawaited(_list(me));
   }
 
@@ -152,10 +151,9 @@ class _SubscribePageState extends State<SubscribePage> {
       _signedIn = signedIn;
     });
     if (said.refusal?.reason == 'unreachable') {
-      _again = Timer(_gap, () => unawaited(_list(me)));
-      _gap = Duration(milliseconds: min(_gap.inMilliseconds * 2, Entitlement.mostAgain.inMilliseconds));
+      _again = Timer(_backoff.next(), () => unawaited(_list(me)));
     } else {
-      _gap = Entitlement.firstAgain;
+      _backoff.reset();
     }
   }
 
@@ -523,7 +521,7 @@ class _SubscribePageState extends State<SubscribePage> {
         style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim),
       ),
       const SizedBox(height: 22),
-      _Heading(l10n.yourDevices),
+      SectionHeading(l10n.yourDevices),
       const SizedBox(height: 8),
       if (house == null && _unlisted != null)
         Text(_unlisted!, style: const TextStyle(fontSize: 13, color: Palette.danger))
@@ -577,7 +575,7 @@ class _SubscribePageState extends State<SubscribePage> {
         ),
       ],
       const SizedBox(height: 26),
-      _Heading(l10n.backupCodes),
+      SectionHeading(l10n.backupCodes),
       const SizedBox(height: 8),
       Text(l10n.backupCodesHint, style: const TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim)),
       const SizedBox(height: 12),
@@ -661,7 +659,7 @@ class _SubscribePageState extends State<SubscribePage> {
     const hint = TextStyle(fontSize: 13, height: 1.5, color: Palette.chromeDim);
     return [
       SizedBox(height: subscribed ? 26 : 18),
-      if (subscribed) ...[_Heading(l10n.yourAccount), const SizedBox(height: 8)],
+      if (subscribed) ...[SectionHeading(l10n.yourAccount), const SizedBox(height: 8)],
       if (signedIn != null)
         Text(subscribed ? l10n.signedInWith(signedIn.name) : l10n.signedInBeforeBuying(signedIn.name),
             textAlign: subscribed ? TextAlign.start : TextAlign.center, style: hint)
@@ -759,18 +757,6 @@ class _SignInButton extends StatelessWidget {
         ),
     };
   }
-}
-
-class _Heading extends StatelessWidget {
-  const _Heading(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Palette.chromeDim, letterSpacing: 0.6),
-      );
 }
 
 class _DeviceLine extends StatelessWidget {

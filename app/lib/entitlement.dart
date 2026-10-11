@@ -12,12 +12,12 @@
 library;
 
 import 'dart:async';
-import 'dart:math' show min;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
+import 'net/backoff.dart';
 import 'net/licence.dart';
 import 'net/network.dart';
 import 'net/remote_config.dart' show waits;
@@ -37,11 +37,6 @@ class Entitlement extends ChangeNotifier {
 
   /// How the service is asked: [askLicence], unless a test stands in.
   final Future<LicenceAnswer> Function(Signer signer, {Uri? endpoint, String service}) ask;
-
-  /// How long after an ask that went unanswered the next one goes, the
-  /// first time; twice as long each time after that, up to [mostAgain].
-  static const firstAgain = Duration(seconds: 2);
-  static const mostAgain = Duration(minutes: 2);
 
   Licence? _licence;
   PublicKey? _device;
@@ -91,13 +86,12 @@ class Entitlement extends ChangeNotifier {
   bool _answered = false;
   bool _asking = false;
   bool _listening = false;
-  Duration _gap = firstAgain;
+  final _backoff = Backoff();
   Timer? _again;
 
   /// Asks the service for this device's licence until it answers, as
   /// the app starts: at once, and while nothing has come back, again
-  /// after [firstAgain], then twice as long each time up to [mostAgain]
-  /// — one ask at a time, and none while the device says it has no
+  /// after a wait that doubles each time ([Backoff]) — one ask at a time, and none while the device says it has no
   /// network. Back on a network, or back in the foreground ([askAgain]),
   /// it asks at once and the waits start short again. Once the service
   /// has answered, licence or none, it is not asked again this start.
@@ -117,7 +111,7 @@ class Entitlement extends ChangeNotifier {
   /// in the foreground, or on a network again.
   void askAgain() {
     if (_signer == null || _answered) return;
-    _gap = firstAgain;
+    _backoff.reset();
     unawaited(_askNow());
   }
 
@@ -135,8 +129,7 @@ class Entitlement extends ChangeNotifier {
       _asking = false;
     }
     if (!answered && !_answered) {
-      _again = Timer(_gap, () => unawaited(_askNow()));
-      _gap = Duration(milliseconds: min(_gap.inMilliseconds * 2, mostAgain.inMilliseconds));
+      _again = Timer(_backoff.next(), () => unawaited(_askNow()));
     }
     return answered;
   }

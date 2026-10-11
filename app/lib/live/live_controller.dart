@@ -31,6 +31,7 @@ import '../avatar.dart';
 import '../l10n/l10n.dart';
 import '../pictures.dart';
 import '../reaction_mute.dart';
+import '../pacing.dart';
 import '../table_model.dart';
 
 class LiveController extends ChangeNotifier implements TableModel {
@@ -153,23 +154,14 @@ class LiveController extends ChangeNotifier implements TableModel {
   final _rhythm = Random();
   int _lastCardAt = 0;
 
-  static const _trickHold = Duration(milliseconds: 950);
   static const _cardBeat = Duration(milliseconds: 320);
-
-  /// After the last trick of a hand is swept, a beat of bare felt
-  /// before the sheet, as at the solo table: the cards fade out as
-  /// every trick's do, and the hand is seen to end rather than cut.
-  static const sweepBeat = Duration(milliseconds: 1200);
 
   /// The game is over as shown, and its last trick has been seen off
   /// the table: the game's sheet may show.
   bool get gameOverDue => _gameOverDue;
   bool _gameOverDue = false;
 
-  Duration _botThink(int seat) {
-    final pace = (_shownHolders[seat] as BotSeat).persona.pace;
-    return Duration(milliseconds: pace.minMs + _rhythm.nextInt(pace.maxMs - pace.minMs + 1));
-  }
+  Duration _botThink(int seat) => Pacing.think((_shownHolders[seat] as BotSeat).persona, _rhythm);
 
   /// Enough of a pause after the last card shown that two cards never
   /// land as one.
@@ -242,7 +234,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// moved on to the next hand's pass, which a view still waiting here
   /// would never offer.
   ({Duration delay, void Function() act})? _dealNotShown(int hand) => switch (client.handOutcome(hand)) {
-        HandState.abandoned || HandState.givenUp => (delay: sweepBeat, act: _giveUpShownHand),
+        HandState.abandoned || HandState.givenUp => (delay: Pacing.sweepBeat, act: _giveUpShownHand),
         _ => null,
       };
 
@@ -437,7 +429,7 @@ class LiveController extends ChangeNotifier implements TableModel {
           return (delay: Duration.zero, act: () => _botActs(s, passing: true));
         }
       }
-      if (_givenUp(record)) return (delay: sweepBeat, act: _giveUpShownHand);
+      if (_givenUp(record)) return (delay: Pacing.sweepBeat, act: _giveUpShownHand);
       if (_consumed.length >= record.length) return null; // a person's pass is owed
       final d = record[_consumed.length];
       if (d.event.kind != EventKind.pass) return null; // not what the replay expects: leave it to a rebuild
@@ -456,7 +448,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     // hand, and then its sheet.
     if (_shown.phase == Phase.gameOver) {
       if (_gameOverDue) return null;
-      return (delay: sweepBeat, act: () => _gameOverDue = true);
+      return (delay: Pacing.sweepBeat, act: () => _gameOverDue = true);
     }
     // The hand is over as shown: the same beat, then the sheet with the
     // next hand dealt under it.
@@ -468,14 +460,14 @@ class LiveController extends ChangeNotifier implements TableModel {
     // that never ends: the table deals and passes the next hand while
     // this screen holds, and every decision it hears is another
     // rebuild.
-    if (_shown.phase == Phase.handOver) return (delay: sweepBeat, act: _endOfHand);
-    if (_shown.pendingTrick != null) return (delay: _trickHold, act: _shown.collectTrick);
+    if (_shown.phase == Phase.handOver) return (delay: Pacing.sweepBeat, act: _endOfHand);
+    if (_shown.pendingTrick != null) return (delay: Pacing.trickHold, act: _shown.collectTrick);
     final seat = _shown.currentSeat!;
     if (_worksOutMove(seat)) {
       if (!_seesHand(seat)) return null; // a departed seat's hand, not open here yet
       return (delay: _botThink(seat), act: () => _botActs(seat, passing: false));
     }
-    if (_givenUp(record)) return (delay: sweepBeat, act: _giveUpShownHand);
+    if (_givenUp(record)) return (delay: Pacing.sweepBeat, act: _giveUpShownHand);
     if (_consumed.length >= record.length) return null; // a person's play is owed
     final d = record[_consumed.length];
     if (d.event.kind != EventKind.play || d.event.seat != seat) return null;
