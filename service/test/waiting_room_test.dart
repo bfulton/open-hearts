@@ -123,9 +123,14 @@ void main() {
       // waited a round longer (planned first) and is far from the host's
       // rating (neither takes the other along): held to the host's choice,
       // the other would be seated alone with bots at the host's first round.
+      //
+      // Far for as long as this test runs: a window widens 100 points a
+      // round of two seconds, so 3000 apart is a minute's wait. At 500,
+      // the other's window reached the host as its wait ran out, and a
+      // host slow to choose seated them together.
       final signers = [SchnorrSigner.generate(), SchnorrSigner.generate()]..sort((a, b) => a.publicKey.compareTo(b.publicKey));
       const pool = 8000;
-      final other = await join('Other', signer: signers[1], rating: 2000, botsAfterMs: pool);
+      final other = await join('Other', signer: signers[1], rating: 4500, botsAfterMs: pool);
       await Future<void>.delayed(const Duration(milliseconds: 2500));
       final host = await join('Host', signer: signers[0], botsAfterMs: pool);
       while (host.$2.present.length < 2) {
