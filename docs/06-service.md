@@ -313,18 +313,6 @@ previews, an in-memory queue in the isolate does the same. An account
 is limited to 20 changes, 60 reads, 600 activations and 30 profile
 writes an hour, and Apple's unlinks to 20 of their own.
 
-**Before accounts.** A subscription from before accounts is made an
-account the first time any of its devices, its store or Stripe is heard
-from, in the subscription's own turn: its devices, their rows and its
-backup codes move under a new account, and every licence after that
-names it. `node service/tool/accounts.mjs --apply` (Cloudflare API
-token and account id in the environment) does all of them at the deploy
-that brings accounts in; it is run before the new worker goes live, and
-the worker moves anything the old one added in between. Nobody's
-subscription is lost. A sign-in linked before accounts named a device;
-it is read as that device's account. Codes made before are for ten
-minutes, and are gone.
-
 ### When Apple says a sign-in is gone
 
 Sign in with Apple tells `apple-id` when a person stops using it with the
@@ -706,7 +694,6 @@ container. The image is built from the repository on every relay deploy
 |---|---|
 | Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)) |
 | Relay, Household, Bench | `cd service/do && npx wrangler@4.130.0 deploy` (`wrangler.toml`: the `TABLE`, `HOUSEHOLD` and `BENCH` objects, the container, `OH_STORE`, `EMAIL`, `OH_SERVICE_KEY`, the domain `relay.openhearts.game`) |
-| Accounts from before | `node service/tool/accounts.mjs`, a dry run unless given `--apply`; once, before the deploy that brings accounts in |
 | An account's data, deleted on request | `node service/tool/forget.mjs <account>`, a dry run unless given `--apply` ([above](#deleting-an-accounts-data)) |
 | Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../infra/README.md)) |
 | Monitoring | `node observability/apply.mjs` |
