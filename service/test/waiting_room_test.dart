@@ -149,17 +149,132 @@ void main() {
       }
     });
 
-    test('three waiting are seated together by whoever has the lowest key, with one bot', () async {
-      final rooms = [for (final n in ['A', 'B', 'C']) await join(n)];
+    test('three waiting: one host seats them at one table with a bot, and two hosts each at a table that names them',
+        () async {
+      // Normally the lowest key alone seats the round. On a machine busy
+      // enough that its seating reaches the next in line after that one's
+      // turn to host has come, both seat it, and each device takes the
+      // lowest table id it has heard in time (matching.dart): together,
+      // or apart. A device stops hosting once it is seated, so once all
+      // three are, the hostings counted here are all there were.
+      var hostings = 0;
+      final rooms = [
+        for (final n in ['A', 'B', 'C'])
+          await join(n, log: (line) {
+            if (line.contains(': hosting,')) hostings++;
+          }),
+      ];
       final specs = await Future.wait(rooms.map((r) => r.$2.seated.first.timeout(const Duration(seconds: 15))));
-      expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table');
-      expect(specs.first.seats.whereType<HumanSeat>().length, 3);
-      expect(specs.first.seats.whereType<BotSeat>().length, 1);
-      expect(specs.first.rated, isFalse);
+      expect(hostings, greaterThan(0), reason: 'somebody hosted the round');
+      for (var i = 0; i < rooms.length; i++) {
+        expect(specs[i].seats.whereType<HumanSeat>().map((h) => h.key), contains(rooms[i].$2.me),
+            reason: 'each sits at a table that names it');
+        expect(specs[i].rated, isFalse);
+      }
+      if (hostings == 1) {
+        expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one seating, so one table');
+        expect(specs.first.seats.whereType<HumanSeat>().length, 3);
+        expect(specs.first.seats.whereType<BotSeat>().length, 1);
+      } else {
+        printOnFailure('$hostings hostings: the round was seated more than once');
+      }
       for (final r in rooms) {
         r.$2.close();
         r.$1.close();
       }
+    });
+
+    // A seating as a host says it (matching.dart, _hostRound): these
+    // keys, and bots in the other seats.
+    Map<String, Object?> seating(String id, List<PublicKey> keys) => {
+          'kind': 'match',
+          'round': DateTime.now().millisecondsSinceEpoch ~/ 2000,
+          'table': id,
+          'seed': 1,
+          'rated': false,
+          'sealed': false,
+          'target': gameOverScore,
+          'timing': TableTiming.standard.toJson(),
+          'seats': [
+            for (final k in keys) {'key': k, 'name': 'W'},
+            for (var s = keys.length; s < seatCount; s++) {'bot': Persona.roster[s].id},
+          ],
+          'policy': botPolicyVersion,
+        };
+
+    // The test as a host of its own, its seatings stored on the relay
+    // before it returns: a device that joins after is handed them with
+    // the relay's stored history, all at once.
+    Future<RelayTransport> host() async {
+      final t = RelayTransport(relays: [relay.url], signer: SchnorrSigner.generate(), table: poolTag('unrated'));
+      await t.ready;
+      return t;
+    }
+
+    Future<void> publish(RelayTransport host, List<Map<String, Object?>> seatings) async {
+      final ids = {for (final s in seatings) s['table']};
+      final echoed = host.lobby.where((e) => ids.contains((jsonDecode(e.content) as Map)['table'])).take(ids.length).toList();
+      for (final s in seatings) {
+        host.announce(s);
+      }
+      await echoed.timeout(const Duration(seconds: 15));
+    }
+
+    // Waiters nobody else seats: nobody is due bots for a minute, so no
+    // room hosts a table of its own. Each with its seating listened for
+    // as it is made: one handed its seatings with the relay's stored
+    // history takes one a tenth of a round later, maybe while the next
+    // is still joining, and `seated` keeps nothing for a late listener.
+    Future<List<(RelayTransport, WaitingRoom, Future<TableSpec>)>> waiters(List<SchnorrSigner> signers) async => [
+          for (final s in signers)
+            await join('W', signer: s, botsAfterMs: 60000).then((r) => (r.$1, r.$2, r.$2.seated.first)),
+        ];
+
+    test('a device takes the lowest table id among the seatings it has in time, whichever came first', () async {
+      final signers = [for (var i = 0; i < 3; i++) SchnorrSigner.generate()];
+      final keys = [for (final s in signers) s.publicKey];
+      final ids = [newTableId(), newTableId()]..sort();
+      final h = await host();
+      await publish(h, [seating(ids[1], keys), seating(ids[0], keys)]);
+      final rooms = await waiters(signers);
+      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
+      expect(specs.map((s) => s.id), everyElement(ids[0]), reason: 'the lower id, though it came second');
+      for (final r in rooms) {
+        r.$2.close();
+        r.$1.close();
+      }
+      h.close();
+    });
+
+    test('a seating that comes after a device has taken one does not move it', () async {
+      // What parts people seated together, when a second host's seating
+      // reaches some of them in time and the rest too late.
+      final signers = [for (var i = 0; i < 3; i++) SchnorrSigner.generate()];
+      final keys = [for (final s in signers) s.publicKey];
+      final ids = [newTableId(), newTableId()]..sort();
+      final h = await host();
+      await publish(h, [seating(ids[1], keys)]);
+      final rooms = await waiters(signers);
+      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
+      expect(specs.map((s) => s.id), everyElement(ids[1]));
+      final heard = [
+        for (final r in rooms) r.$1.lobby.firstWhere((e) => (jsonDecode(e.content) as Map)['table'] == ids[0]),
+      ];
+      await publish(h, [seating(ids[0], keys)]);
+      await Future.wait(heard).timeout(const Duration(seconds: 15));
+      // A device that took it would within a tenth of a round of hearing
+      // it (matching.dart); three tenths on, none has. One that drops it
+      // as it arrives, as each must, cannot fail this however slow the
+      // machine: the wait only gives a wrong one time to show itself.
+      await Future<void>.delayed(Duration(milliseconds: rooms.first.$2.roundMs * 3 ~/ 10));
+      for (final r in rooms) {
+        expect(r.$2.spec!.id, ids[1], reason: 'every device heard the lower id, and none moved to it');
+      }
+      for (final r in rooms) {
+        r.$2.close();
+        r.$1.close();
+      }
+      h.close();
     });
 
     test('the host\'s clocks are the table\'s: the seating carries them to every seat', () async {
@@ -168,10 +283,10 @@ void main() {
       // by the host's — none by its own.
       //
       // Normally that is the lowest key, alone. On a machine busy enough
-      // that the host's seating reaches the next in line after its own
-      // turn to host has come, both seat the round and everyone takes
-      // the lower table id (matching.dart): the table plays by the clocks
-      // of a device that seated it, and still of no other.
+      // that the host's seating reaches the next in line after that one's
+      // turn to host has come, both seat the round (matching.dart): each
+      // table plays by the clocks of the device that seated it, and still
+      // of no other.
       final timings = [
         for (final grace in [3000, 4000, 5000]) TableTiming.parse({'graceMs': grace}),
       ];
@@ -183,7 +298,6 @@ void main() {
           }),
       ];
       final specs = await Future.wait(rooms.map((r) => r.$2.seated.first.timeout(const Duration(seconds: 15))));
-      expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table');
       expect(hosted, isNotEmpty, reason: 'somebody hosted the round');
       for (final spec in specs) {
         expect(spec.timing, anyOf([for (final h in hosted) timings[h]]),

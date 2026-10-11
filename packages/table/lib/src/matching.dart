@@ -12,10 +12,15 @@
 /// seconds; it cannot forge a play, since every play is signed by its
 /// seat and checked by every other.
 ///
-/// Two hosts with different views may seat someone twice. They take
-/// the seating with the lower table id, and the other table's empty
-/// seat is booted at its first turn and a bot takes it, as for a
-/// friend who joined and closed the app.
+/// Two hosts with different views may both seat a round: the next in
+/// line steps in when the host's seating has not reached it in time. A
+/// player takes the lowest table id among the seatings naming it that
+/// arrive within a tenth of a round of the first, and no later one, so
+/// players seated together are parted when a seating reaches some of
+/// them in time and others not. Each still sits at one table, and the
+/// other table's empty seat is booted at its first turn and a bot takes
+/// it, as for a friend who joined and closed the app. Only something in
+/// charge could rule that out, and nothing here is.
 library;
 
 import 'dart:async';
@@ -300,9 +305,9 @@ class WaitingRoom {
   final _seated = StreamController<TableSpec>.broadcast();
   Stream<TableSpec> get seated => _seated.stream;
 
-  /// Seatings that name this player, gathered for a moment before one
-  /// is taken: two hosts with different views may both have seated
-  /// them, and everyone takes the lowest table id.
+  /// Seatings that name this player, gathered for a tenth of a round
+  /// before one is taken: two hosts with different views may both have
+  /// seated them, and the lowest table id heard by then is taken.
   final List<(TableSpec, Map<int, String>, Map<int, Map<String, Object?>>)> _offers = [];
   Timer? _commit;
 
