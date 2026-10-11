@@ -48,7 +48,7 @@ The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observabilit
 1. Fix each `by hand:` line. The common ones:
 
    - **The relay worker differs from `service/do/wrangler.toml`.** Deploy the relay worker, as [Deploy the site, app and service](deploy.md) shows.
-   - **A Pages secret is not set.** Run the `npx wrangler pages secret put` command that the line gives, with `--project-name open-hearts`. For a secret of the preview environment, add `--env preview`, which the printed command leaves out.
+   - **A Pages secret is not set.** Run the `npx wrangler pages secret put` command that the line gives, which names the project and, for a preview secret, `--env preview`. Use `npx wrangler@"$WRANGLER_VERSION"` for `npx wrangler`.
    - **The relay's `OH_JUROR_SECRET` is not set.** In `service/do`, run `npx wrangler@"$WRANGLER_VERSION" secret put OH_JUROR_SECRET` and paste 64 hex characters, such as the output of `openssl rand -hex 32`. The backup jurors derive their keys from it, so a new value gives them new keys.
    - **No Stripe webhook, or one on another API version.** See [Register the payment and sign-in webhooks](set-up-webhooks.md#register-the-stripe-webhook).
    - **A spend alert or an email forward that needs an address.** Set `OH_ALERT_EMAIL` or `OH_HELP_FORWARD`, and run the script again.

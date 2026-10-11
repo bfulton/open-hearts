@@ -248,6 +248,17 @@ test('Pages: a missing secret is set by hand, and nothing is patched for it', ()
   assert.doesNotMatch(plan.owner.join(' '), /oops/);
 });
 
+test('Pages: the command for a missing secret sets it in its own environment', () => {
+  const production = liveProduction();
+  delete production.env_vars.OH_ID_HMAC;
+  const [prod] = pagesEnvPlan(pages.environments.production, production, ids, 'production').owner;
+  assert.match(prod, /secret put OH_ID_HMAC --project-name <project>`$/);
+  const preview = liveProduction();
+  delete preview.env_vars.OH_ID_HMAC;
+  const [prev] = pagesEnvPlan(pages.environments.production, preview, ids, 'preview').owner;
+  assert.match(prev, /secret put OH_ID_HMAC --project-name <project> --env preview`$/);
+});
+
 test("Pages: a secret's value is never in a line", () => {
   const have = liveProduction();
   have.env_vars.OH_STRAY = { type: 'secret_text', value: 'hunter2' };
