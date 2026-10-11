@@ -573,7 +573,8 @@ next start, and asks again every fifteen minutes while open.
 `waits` sets how long the app waits on the network — the licence, a
 household, a checkout, TURN, this config and how often it is asked
 again, the relays, the standings, a friends' room's start, a direct
-connection — each in milliseconds (`configEveryMin` in minutes). Each
+connection, a game's record and how long one just over is asked for —
+each in milliseconds (`configEveryMin` in minutes). Each
 field is taken on its own if it is a whole number within its bounds
 (`WAITS_BOUNDS` in the worker, `AppWaits.bounds` in the app, kept equal
 by a test), and the relay's slow and give-up pair only in that order.

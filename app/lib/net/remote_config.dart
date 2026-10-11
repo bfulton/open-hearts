@@ -79,6 +79,10 @@ class AppWaits {
     this.standingAll = const Duration(seconds: 4),
     this.roomStart = const Duration(seconds: 10),
     this.meshAnswer = const Duration(seconds: 20),
+    this.record = const Duration(seconds: 30),
+    this.recordAgain = const Duration(seconds: 3),
+    this.recordFor = const Duration(seconds: 60),
+    this.recordSoon = const Duration(seconds: 9),
   });
 
   /// The build's own.
@@ -118,6 +122,18 @@ class AppWaits {
   /// A direct connection to a peer not up by now is left to the relay.
   final Duration meshAnswer;
 
+  /// Keeping a game's record, or fetching one (net/game_records.dart).
+  final Duration record;
+
+  /// While a game just over is sent to be kept by its players' devices
+  /// (review_page.dart): how often it is asked for again, and for how
+  /// long — once it was watched to its end, and once it was opened just
+  /// as it ended. The second is short, so that an address with no game
+  /// behind it is said to be one soon.
+  final Duration recordAgain;
+  final Duration recordFor;
+  final Duration recordSoon;
+
   /// Least and most, in milliseconds (minutes for configEvery).
   static const bounds = <String, (int, int)>{
     'licenceMs': (2000, 30000),
@@ -132,6 +148,10 @@ class AppWaits {
     'standingAllMs': (1000, 20000),
     'roomStartMs': (3000, 60000),
     'meshAnswerMs': (5000, 60000),
+    'recordMs': (5000, 120000),
+    'recordAgainMs': (1000, 30000),
+    'recordForMs': (10000, 600000),
+    'recordSoonMs': (2000, 60000),
   };
 
   static AppWaits parse(Object? json) {
@@ -161,6 +181,10 @@ class AppWaits {
       standingAll: take('standingAllMs', s.standingAll),
       roomStart: take('roomStartMs', s.roomStart),
       meshAnswer: take('meshAnswerMs', s.meshAnswer),
+      record: take('recordMs', s.record),
+      recordAgain: take('recordAgainMs', s.recordAgain),
+      recordFor: take('recordForMs', s.recordFor),
+      recordSoon: take('recordSoonMs', s.recordSoon),
     );
   }
 
@@ -178,7 +202,11 @@ class AppWaits {
       other.standing == standing &&
       other.standingAll == standingAll &&
       other.roomStart == roomStart &&
-      other.meshAnswer == meshAnswer;
+      other.meshAnswer == meshAnswer &&
+      other.record == record &&
+      other.recordAgain == recordAgain &&
+      other.recordFor == recordFor &&
+      other.recordSoon == recordSoon;
 
   @override
   int get hashCode => Object.hash(
@@ -194,6 +222,10 @@ class AppWaits {
     standingAll,
     roomStart,
     meshAnswer,
+    record,
+    recordAgain,
+    recordFor,
+    recordSoon,
   );
 }
 

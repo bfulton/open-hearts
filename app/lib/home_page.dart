@@ -96,6 +96,12 @@ final _dealtFrom = _debugging ? int.tryParse(Uri.base.queryParameters['seed'] ??
 /// the device's own choice, which the door still shows.
 final _playsTo = targetIn(Uri.base);
 
+/// How often a seated device notes that it is still at its table
+/// (net/seat_store.dart, here): often enough that the note is never far
+/// behind against SeatStore.comeBackWithin, rarely enough that a busy
+/// table is not a write to the device's storage at every event.
+const _seatSavedEvery = Duration(seconds: 10);
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true});
 
@@ -777,7 +783,7 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       final now = DateTime.now().millisecondsSinceEpoch;
-      if (now - hereAt < 10000) return;
+      if (now - hereAt < _seatSavedEvery.inMilliseconds) return;
       hereAt = now;
       seats.here();
     });
