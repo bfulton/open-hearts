@@ -208,7 +208,7 @@ void main() {
       expect(given.licence?.encoded, licence.encoded);
       expect(await asked(402, '{"error":"no subscription"}'), _none);
       expect(await asked(401, '{"error":"bad signature"}'), _none, reason: 'asked again, the same request is refused again');
-      expect(await asked(503, '{"error":"licensing not configured"}'), _down);
+      expect(await asked(503, '{"error":"service not configured: OH_STORE"}'), _down);
       expect(await asked(429, ''), _down);
       expect(await asked(200, '<html>a captive portal</html>'), _down, reason: 'not the service talking');
       expect(await askLicence(device, endpoint: Uri.parse('http://127.0.0.1:1/api/licence'), service: _service), _down);

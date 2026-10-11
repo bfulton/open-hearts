@@ -5,6 +5,14 @@ library;
 
 import 'address_io.dart' if (dart.library.js_interop) 'address_web.dart' as platform;
 
+/// Whether [at] is a build being driven by the browser suites rather
+/// than played: `?e2e` in the address of a page served from this
+/// machine. Everything a suite may ask of the app — a fixed deal,
+/// shorter beats, a longer room, a game of one hand, the accessibility
+/// tree grown and the table's state written into it — is asked under
+/// this, so that the same address in production asks nothing.
+bool driven(Uri at) => at.queryParameters.containsKey('e2e') && isLocalHost(at.host);
+
 /// How long a room waits for one more arrival before its leader starts
 /// it, as this address asks for it.
 ///
@@ -15,43 +23,38 @@ import 'address_io.dart' if (dart.library.js_interop) 'address_web.dart' as plat
 /// whatever the wait; all a longer one does is stop a room starting
 /// short.
 ///
-/// Only under `?e2e`, which is the address saying this build is being
-/// driven rather than played, and never shorter than [standard] nor
+/// Only for a build being [driven], and never shorter than [standard] nor
 /// longer than [most]. It is one device's read of a shared clock — the
 /// leader's is the one that counts — so the most it can do to anyone
 /// else's room is make it wait a minute for a fourth, which is what
 /// the leader's own Start now is there to cut short.
 Duration roomWait(Uri at, {required Duration standard, Duration most = const Duration(minutes: 1)}) {
-  if (!at.queryParameters.containsKey('e2e')) return standard;
+  if (!driven(at)) return standard;
   final asked = int.tryParse(at.queryParameters['roomWait'] ?? '');
   if (asked == null) return standard;
   return Duration(seconds: asked.clamp(standard.inSeconds, most.inSeconds));
 }
 
 /// How much of its beats a table takes, as this address asks: all of
-/// them, unless the address is under `?e2e` and asks for a share
+/// them, unless the build is [driven] and asks for a share
 /// (`?e2e=1&pace=0.1`), never less than a tenth. The browser suites
 /// play hands by the dozen, and a bot's thinking and a trick held on
 /// the felt are most of a hand's minute; at a tenth the same beats come
 /// in the same order, and the widget tests hold them to their lengths
 /// (game_controller_test.dart).
 double paceIn(Uri at) {
-  // A build served from this machine only: a production page under
-  // `?e2e` plays at the table's own pace.
-  if (!at.queryParameters.containsKey('e2e') || !isLocalHost(at.host)) return 1;
+  if (!driven(at)) return 1;
   final asked = double.tryParse(at.queryParameters['pace'] ?? '');
   if (asked == null || asked.isNaN) return 1;
   return asked.clamp(0.1, 1.0);
 }
 
-/// The score the games this device starts play to, when the address
-/// says, under `?e2e`: a suite that has to see a game's end does not
+/// The score the games this device starts play to, when a [driven]
+/// build's address says: a suite that has to see a game's end does not
 /// need fifty points of it (`?e2e=1&target=1`, a game of one hand).
 /// Null otherwise, and the device's own choice stands (game_options.dart).
 int? targetIn(Uri at) {
-  // A build served from this machine only: nobody's link starts a live
-  // game of one hand in production.
-  if (!at.queryParameters.containsKey('e2e') || !isLocalHost(at.host)) return null;
+  if (!driven(at)) return null;
   final asked = int.tryParse(at.queryParameters['target'] ?? '');
   return asked == null || asked < 1 || asked > 100 ? null : asked;
 }

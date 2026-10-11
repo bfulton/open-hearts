@@ -1,16 +1,16 @@
 // The operator told, by email, while there are few enough subscribers
 // to hear about one at a time (config/openhearts.json, `alerts`): each
-// subscription as it is bought, and each subscriber coming online,
-// which is a device on a subscription asking for its licence, as the
-// app does when it opens. Each is written down for a while under its
-// subscription, so a webhook delivered twice, or an app opened twice in
-// an hour, is told once.
+// subscription as it is bought, and each subscriber who, finding the
+// pool empty, chose to wait for a person rather than play bots — so
+// that someone can come and play. Each is written down for a while
+// under its subscription, so a webhook delivered twice, or a wait
+// chosen twice in a few minutes, is told once.
 //
 // The mail goes from the relay worker, which holds the EMAIL binding (a
 // Pages project cannot bind one), through an object of the Household
 // class with a name of its own, so no household's queue waits on it.
-// What it says is which store, a few characters of the subscription and
-// the device, and dates: nobody's email or name.
+// What it says is which store or pool, a few characters of the
+// subscription and the device, and dates: nobody's email or name.
 
 /// The Household object the mail goes through.
 export const ALERTS_OBJECT = 'operator-alerts';
@@ -24,29 +24,19 @@ const ours = (to) => typeof to === 'string' && /^[^@\s]+@openhearts\.game$/.test
 /// Stripe goes on redelivering a webhook.
 const SUBSCRIBED_DAYS = 30;
 
+/// How long a subscriber's wait is remembered: a person waits five
+/// minutes at most, and one who goes back to waiting has been told of.
+const WAITING_MINUTES = 10;
+
 /// What `alerts` in the config says, off env (deployment.mjs): null
 /// when nobody is to be told.
 export function alertsOf(env) {
   const to = env.OH_ALERTS_TO;
   if (!ours(to)) return null;
-  const minutes = Number(env.OH_ALERT_QUIET_MINUTES);
-  return {
-    to,
-    subscribed: env.OH_ALERT_SUBSCRIBED === 'on',
-    online: env.OH_ALERT_ONLINE === 'on',
-    quietMinutes: Number.isFinite(minutes) && minutes >= 1 ? minutes : 60,
-    notOnline: (env.OH_ALERT_NOT_ONLINE ?? '').split(',').filter((h) => /^[0-9a-f]{16}$/.test(h)),
-  };
+  return { to, subscribed: env.OH_ALERT_SUBSCRIBED === 'on', waiting: env.OH_ALERT_WAITING === 'on' };
 }
 
 const short = (s) => String(s ?? '').slice(0, 8);
-
-/// How the config names a subscription without saying it, the repository
-/// being public: the first 16 hex of the SHA-256 of its id.
-export async function hashOf(subscription) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(subscription));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
-}
 
 /// Sends [subject] and [text] to the alerts address, through the
 /// relay's object where the project binds one. Never throws: an alert
@@ -88,27 +78,20 @@ export async function alertSubscribed(env, store, { subscription, source, key = 
   ].filter((l) => l !== null).join('\n'));
 }
 
-/// A device on [held]'s subscription asking for its licence: online,
-/// told at most once in the configured quiet time per subscription, and
-/// never for one the config's `notOnline` names.
-export async function alertOnline(env, store, key, held, { now = Date.now() } = {}) {
+/// A subscriber's device [key], on [account], waiting for a person in
+/// [pool] for a game to [target]: told at most once in a few minutes a
+/// subscription.
+export async function alertWaiting(env, store, { key, account, pool, target, now = Date.now() }) {
   const alerts = alertsOf(env);
-  if (!alerts?.online || !store || !held) return false;
-  // A device's row names its account, whose subscription is the one
-  // told of; a row from before accounts names the subscription itself.
-  const account = typeof held.account === 'string' ? held.account : null;
-  const subscription = account ? (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription : held.subscription;
+  if (!alerts?.waiting || !store || !account) return false;
+  const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   if (!subscription) return false;
-  // The operator's own, and anyone else they would rather not hear of.
-  if (alerts.notOnline.includes(await hashOf(subscription))) return false;
-  if (!(await fresh(store, 'online', subscription, Math.max(60, Math.round(alerts.quietMinutes * 60))))) return false;
-  const meta = await store.get(`SUB#${subscription}`, 'META');
-  const devices = (await store.under(account ? `ACCOUNT#${account}` : `SUB#${subscription}`, 'DEVICE#')).length;
-  return tell(env, alerts, 'Open Hearts: a subscriber is online', [
-    `Device ${short(key)}… on subscription ${short(subscription)}… opened the app at ${new Date(now).toISOString()}.`,
-    `${meta?.source ?? 'unknown'} subscription, ${devices} device${devices === 1 ? '' : 's'}, paid up to ${meta?.renews_at ?? held.licensed_until ?? 'unknown'}.`,
+  if (!(await fresh(store, 'waiting', subscription, WAITING_MINUTES * 60))) return false;
+  return tell(env, alerts, 'Open Hearts: someone is waiting for a person', [
+    `Device ${short(key)}… on subscription ${short(subscription)}… is waiting in the ${pool} pool for a game to ${target}, since ${new Date(now).toISOString()}.`,
+    'They wait five minutes at most, and then play bots.',
     '',
-    `Told at most once in ${alerts.quietMinutes} minutes for a subscription. To stop these, set alerts.online to false in config/openhearts.json and deploy.`,
+    'To stop these, set alerts.waiting to false in config/openhearts.json and deploy.',
   ].join('\n'));
 }
 

@@ -403,6 +403,34 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get playNowWithBots => 'Play now with bots';
+
+  @override
+  String get waitForPerson => 'Wait for a person';
+
+  @override
+  String get waitForPersonHint =>
+      'Up to five minutes. We\'re told someone is waiting, and may come and play.';
+
+  @override
+  String get waitingForPerson => 'Waiting for a person';
+
+  @override
+  String waitingForPersonLine(String waited, int others) {
+    String _temp0 = intl.Intl.pluralLogic(
+      others,
+      locale: localeName,
+      other: ', $others others waiting',
+      one: ', 1 other waiting',
+      zero: '',
+    );
+    return '$waited of 5:00$_temp0 — then bots fill the empty seats';
+  }
+
+  @override
+  String get seatingWithBots => 'Seating you with bots';
+
+  @override
   String get cancel => 'Cancel';
 
   @override

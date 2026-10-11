@@ -1610,14 +1610,26 @@ class TableClient {
     final again = List.of(_future);
     _future.clear();
     _futureIds.clear();
+    // One that throws does not cost the rest: each is taken up on its
+    // own, a failure is traced and then thrown once they all have been,
+    // as it would have been had it arrived just now.
+    (Object, StackTrace)? failed;
     for (final e in again) {
       // Seen, until it is taken up here: the copy held is the event
       // itself, so a repeat of it is not read afresh, and does not cost
       // another signature check — a peer far behind holds hundreds of
       // them, and would pay for all of them at every carry.
       _seen.remove(e.id);
-      _accept(e);
+      try {
+        _accept(e);
+      } catch (error, stack) {
+        // Not seen, so that the same event said again is read again.
+        _seen.remove(e.id);
+        _trace('held ${e.kind.name} ${e.id.substring(0, 6)} failed: $error');
+        failed ??= (error, stack);
+      }
     }
+    if (failed != null) Error.throwWithStackTrace(failed.$1, failed.$2);
   }
 
   bool _isParticipant(PublicKey key) => _humans.contains(key) && !_removedAt.containsKey(key);
@@ -5301,14 +5313,12 @@ class TableClient {
   }
 
   void _onJury(TableEvent event) {
-    try {
-      // A jury proposed is a set of keys a deal step may seal its
-      // escrow to ([_validDeal]), so a deal step held back for want
-      // of them is worth looking at again the moment they arrive.
-      final before = _everProposed.length;
-      _everProposed.addAll(event.jurors);
-      if (_everProposed.length != before) _drainFuture();
-    } catch (_) {}
+    // A jury proposed is a set of keys a deal step may seal its escrow
+    // to ([_validDeal]), so a deal step held back for want of them is
+    // worth looking at again the moment they arrive.
+    final before = _everProposed.length;
+    _everProposed.addAll(event.jurors);
+    if (_everProposed.length != before) _drainFuture();
     if (event.hand > game.handNumber) return _defer(event);
     if (event.hand < game.handNumber || !_isParticipant(event.author)) return;
     final race = _proposals.putIfAbsent(event.id, () => _Race()..action = event);

@@ -50,6 +50,7 @@ test('no row is the defaults', () => {
     householdReadsPerHour: 60,
     activationsPerHour: 600,
     profileWritesPerHour: 30,
+    recordsPerHour: 12,
     stripePrice: null,
   });
   for (const raw of [[], 'x', 7]) assert.deepEqual(serviceSettingsOf(raw), { ...SERVICE_DEFAULTS });
@@ -180,4 +181,13 @@ test('a household is held to the row\'s allowance an hour', async () => {
   const said = [];
   for (let i = 0; i < 7; i++) said.push((await next('change', async () => ({ status: 200 }))).status);
   assert.deepEqual(said, [200, 200, 200, 200, 200, 429, 429]);
+});
+
+test('records sent to be kept have an allowance of their own', async () => {
+  useSettings({ recordsPerHour: 2, householdChangesPerHour: 5 });
+  const next = sequencer({ now: () => now });
+  const said = [];
+  for (let i = 0; i < 3; i++) said.push((await next('record', async () => ({ status: 200 }))).status);
+  assert.deepEqual(said, [200, 200, 429]);
+  assert.equal((await next('change', async () => ({ status: 200 }))).status, 200, 'and spend none of the changes\'');
 });

@@ -19,6 +19,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -82,17 +83,17 @@ bool get livePaused => !RemoteSettings.current.config.live;
 /// relays is the build's business (net/relays.dart), not the page's.
 void _relayLog(String line) => debugPrint('relay: $line');
 
-/// With `?e2e` in the address the table's every transition and the
-/// mesh's every channel change go to the console too.
-final _debugging = Uri.base.queryParameters.containsKey('e2e');
+/// In a build being driven (net/address.dart) the table's every
+/// transition and the mesh's every channel change go to the console too.
+final _debugging = driven(Uri.base);
 
 /// The deal a solo game starts from, for a browser test that needs a
-/// particular one (`?e2e&seed=156`); with no `e2e`, never.
+/// particular one (`?e2e&seed=156`); in a build not being driven, never.
 final _dealtFrom = _debugging ? int.tryParse(Uri.base.queryParameters['seed'] ?? '') : null;
 
 /// The score the games started here play to, when a browser test asks
-/// for another (`?e2e&target=1`, net/address.dart); with no `e2e`,
-/// never — the device's own choice, which the door still shows.
+/// for another (`?e2e&target=1`, net/address.dart); otherwise never —
+/// the device's own choice, which the door still shows.
 final _playsTo = targetIn(Uri.base);
 
 class HomePage extends StatefulWidget {
@@ -674,6 +675,10 @@ class _HomePageState extends State<HomePage> {
       }
       _toTable(spec, queue.seatNames, avatars, again: _play);
     });
+    // The longest this queue has been willing to wait past the pool's
+    // own wait, kept once chosen: taking bots after waiting for a person
+    // comes back to the next round, not to a deadline already passed.
+    var patience = 0;
     _waitClock = Timer.periodic(const Duration(seconds: 1), (_) {
       // Bots take every seat still empty at ten seconds, so a device
       // the relays can hear is seated a round or two after that. One
@@ -681,7 +686,10 @@ class _HomePageState extends State<HomePage> {
       // went offline, or its relays did — and even the seating it
       // hosts itself has to come back to it off a relay: the spinner
       // would turn for ever. So back to the door, saying why.
-      if (DateTime.now().millisecondsSinceEpoch - queue.since >= stopWaiting.inMilliseconds) {
+      // Counted from when bots were due, for one who chose to wait
+      // for a person.
+      patience = max(patience, queue.botsAfterMs - queue.poolBotsAfterMs);
+      if (DateTime.now().millisecondsSinceEpoch - queue.since >= stopWaiting.inMilliseconds + patience) {
         setState(() {
           _closeLobby();
           _error = context.l10n.noRelayAnswered;
@@ -691,6 +699,19 @@ class _HomePageState extends State<HomePage> {
       setState(() {});
     });
     setState(() => _queue = queue);
+  }
+
+  /// Waits up to five minutes for a person rather than bots at ten
+  /// seconds, and tells the service, so the people who run the game
+  /// hear someone is waiting (service/functions/alerts.mjs).
+  void _waitForPerson() {
+    final queue = _queue;
+    final signer = _signer;
+    // Offered only at an empty pool (_WaitingView), and only then are we
+    // told (the privacy policy): somebody may have arrived since.
+    if (queue == null || signer == null || queue.present.length > 1) return;
+    setState(queue.waitForPerson);
+    unawaited(askHandler('waiting', signer, {'pool': queue.pool, 'target': queue.target}, null, what: '${queue.pool} ${queue.target}'));
   }
 
   /// The seated table has its own tag on the relays: a fresh transport
@@ -956,7 +977,12 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           queue != null
-                              ? _WaitingView(queue: queue, onCancel: () => setState(_closeLobby))
+                              ? _WaitingView(
+                                  queue: queue,
+                                  onCancel: () => setState(_closeLobby),
+                                  onWaitForPerson: _waitForPerson,
+                                  onPlayWithBots: () => setState(queue.playWithBots),
+                                )
                               : room == null
                                   ? _entry()
                                   : RoomView(
@@ -1449,19 +1475,34 @@ class OperatorNotes extends StatelessWidget {
       );
 }
 
-/// Waiting to be seated. Nothing to do but wait, and it is not long:
-/// a round every five seconds, and bots after ten.
+/// Waiting to be seated: a round every five seconds, and bots after
+/// ten. Until then a person alone in the pool can take bots at once, or
+/// wait up to five minutes for another person; one waiting for a person
+/// can still take bots whenever they like.
 class _WaitingView extends StatelessWidget {
-  const _WaitingView({required this.queue, required this.onCancel});
+  const _WaitingView({required this.queue, required this.onCancel, required this.onWaitForPerson, required this.onPlayWithBots});
 
   final WaitingRoom queue;
   final VoidCallback onCancel;
+  final VoidCallback onWaitForPerson;
+  final VoidCallback onPlayWithBots;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final waited = (DateTime.now().millisecondsSinceEpoch - queue.since) ~/ 1000;
-    final others = queue.present.length - 1;
+    final waitedMs = DateTime.now().millisecondsSinceEpoch - queue.since;
+    final waited = waitedMs ~/ 1000;
+    final others = queue.present.length - 1 < 0 ? 0 : queue.present.length - 1;
+    final patient = queue.botsAfterMs == WaitingRoom.personAtMostMs;
+    final eager = queue.botsAfterMs == 0;
+    // Offered while the pool is empty: with somebody else waiting, the
+    // two are seated together at the pool's ten seconds.
+    final choosing = !patient && !eager && others == 0 && waitedMs < queue.botsAfterMs;
+    final line = patient
+        ? l10n.waitingForPersonLine('${waited ~/ 60}:${(waited % 60).toString().padLeft(2, '0')}', others)
+        : eager
+            ? null
+            : l10n.waitedLine(waited, others);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1471,13 +1512,26 @@ class _WaitingView extends StatelessWidget {
         const SizedBox(height: 26),
         const Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Palette.gold, strokeWidth: 2.5))),
         const SizedBox(height: 22),
-        Text(l10n.findingPlayers,
+        Text(eager ? l10n.seatingWithBots : patient ? l10n.waitingForPerson : l10n.findingPlayers,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.chrome)),
-        const SizedBox(height: 6),
-        Text(l10n.waitedLine(waited, others < 0 ? 0 : others),
-            textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
-        const SizedBox(height: 26),
+        if (line != null) ...[
+          const SizedBox(height: 6),
+          Text(line, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
+        ],
+        if (choosing) ...[
+          const SizedBox(height: 22),
+          FilledButton(onPressed: onPlayWithBots, style: _HomePageState._primary(), child: Text(l10n.playNowWithBots)),
+          const SizedBox(height: 10),
+          OutlinedButton(onPressed: onWaitForPerson, style: _HomePageState._secondary(), child: Text(l10n.waitForPerson)),
+          const SizedBox(height: 6),
+          Text(l10n.waitForPersonHint, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
+        ],
+        if (patient) ...[
+          const SizedBox(height: 22),
+          OutlinedButton(onPressed: onPlayWithBots, style: _HomePageState._secondary(), child: Text(l10n.playNowWithBots)),
+        ],
+        const SizedBox(height: 18),
         TextButton(onPressed: onCancel, child: Text(l10n.cancel, style: const TextStyle(color: Palette.chromeDim))),
       ],
     );

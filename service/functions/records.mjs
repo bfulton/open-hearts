@@ -7,10 +7,14 @@
 // whoever looks at one replays it through the verifier — every
 // signature, every step of the deal — before showing a card of it
 // (packages/table, game_record.dart, record.dart). What is checked here
-// is only what keeps the bucket from being anybody's: the one sending
-// it sat at the table, the table's id is one a table has, and it is no
-// bigger than a game is. The first copy is kept; a table's other
-// players send theirs and are told it is in.
+// is what decides whose copy is kept, since the first copy is the one
+// kept and a table's other players are told it is in: the sender is
+// a subscriber's device in use (worker.mjs, recordRoute), a seat at
+// the table, and has signed moves of its own at this table into it —
+// an event of the record whose author is the sender, whose id is the
+// hash of its own content, and whose signature checks. A record made
+// up by somebody who never played there has none, and neither has a
+// copy of somebody else's game with one's key written into a seat.
 
 /// A table's id (packages/table, spec.dart, newTableId).
 export const tableIdShape = /^[0-9a-f]{32}$/;
@@ -22,8 +26,37 @@ export const recordMost = 2 * 1024 * 1024;
 
 const keyIn = (table) => `tables/${table}.json`;
 
+/// The id an event of [table] has: the hash of what it says, as the
+/// table writes it (packages/table, events.dart, `_canonical`) — the
+/// body's own keys in order, nothing else reordered.
+export async function eventIdOf(table, event) {
+  const body = Object.fromEntries(Object.entries(event.body).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  const text = JSON.stringify([table, event.author, event.kind, body]);
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/// How many of the sender's own events are looked at before giving up:
+/// any one that checks is enough, and a record is mostly the sender's.
+const triedAtMost = 8;
+
+/// Whether [record] holds an event [key] signed at [table]. [verify] is
+/// the service's BIP-340 check (worker.mjs, signerOn).
+async function signedInto(record, key, table, verify) {
+  let tried = 0;
+  for (const d of record.record) {
+    const e = d?.event;
+    if (e?.author !== key || typeof e.id !== 'string' || typeof e.sig !== 'string' || typeof e.kind !== 'string') continue;
+    if (!e.body || typeof e.body !== 'object' || Array.isArray(e.body)) continue;
+    if (tried++ >= triedAtMost) return false;
+    if ((await eventIdOf(table, e)) === e.id && /^[0-9a-f]{128}$/.test(e.sig) && verify(key, e.id, e.sig)) return true;
+  }
+  return false;
+}
+
 /// Keeps [text], a record [key] sent for [table]: {status, body}.
-export async function keepRecord(bucket, key, table, text) {
+/// [verify] checks a signature: (key, digest, signature) => bool.
+export async function keepRecord(bucket, key, table, text, { verify }) {
   if (!bucket) return { status: 503, body: { error: 'records are not kept here' } };
   if (typeof table !== 'string' || !tableIdShape.test(table)) return { status: 400, body: { error: 'a table id, 32 hex' } };
   if (typeof text !== 'string' || text.length > recordMost) return { status: 413, body: { error: 'not a record this size' } };
@@ -38,6 +71,9 @@ export async function keepRecord(bucket, key, table, text) {
     return { status: 400, body: { error: 'not this table\'s record' } };
   }
   if (!spec.seats.some((s) => s?.key === key)) return { status: 403, body: { error: 'only a player at the table sends its record' } };
+  if (!(await signedInto(record, key, table, verify))) {
+    return { status: 403, body: { error: 'a record with none of your own moves in it' } };
+  }
   if (await bucket.head(keyIn(table))) return { status: 200, body: { kept: true, already: true } };
   const packed = await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
   await bucket.put(keyIn(table), packed, {

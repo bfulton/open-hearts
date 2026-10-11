@@ -52,6 +52,17 @@ void main() {
       expect(p.tables.first.map((x) => x.name), ['solo', 'near']);
       expect(p.leftOver.map((x) => x.name), ['far']);
     });
+
+    test('each waiter\'s own wait for people is kept: up to five minutes for a person, or none', () {
+      final patient = w('patient')..botsAfterMs = WaitingRoom.personAtMostMs;
+      expect(plan([patient], nowMs: 60000, roundMs: round, botsAfterMs: 10000, random: rng).tables, isEmpty,
+          reason: 'a minute in, still waiting for a person');
+      expect(plan([patient], nowMs: WaitingRoom.personAtMostMs, roundMs: round, botsAfterMs: 10000, random: rng).tables.length, 1,
+          reason: 'and at five minutes, bots');
+      final eager = w('eager', since: 1000)..botsAfterMs = 0;
+      expect(plan([eager], nowMs: 1000, roundMs: round, botsAfterMs: 10000, random: rng).tables.single.map((x) => x.name), ['eager'],
+          reason: 'bots at once, when asked for');
+    });
   });
 
   group('over the relay', () {
@@ -67,6 +78,7 @@ void main() {
         int target = gameOverScore,
         TableTiming timing = TableTiming.standard,
         SchnorrSigner? signer,
+        int botsAfterMs = 3000,
         void Function(String)? log}) async {
       final s = signer ?? SchnorrSigner.generate();
       final t = RelayTransport(relays: [relay.url], signer: s, table: poolTag('unrated', target: target));
@@ -79,12 +91,63 @@ void main() {
           name: name,
           rating: rating,
           roundMs: 2000,
-          botsAfterMs: 3000,
+          botsAfterMs: botsAfterMs,
           heartbeatMs: 500,
           staleMs: 2000,
           log: log);
       return (t, room);
     }
+
+    test('two waiting for a person are left waiting, whoever hosts, until one of them takes bots', () async {
+      final a = await join('A');
+      final b = await join('B');
+      a.$2.waitForPerson();
+      b.$2.waitForPerson();
+      // Past the pool's wait for bots (three seconds here), and nobody is
+      // seated: whoever hosts has heard the other wants a person.
+      final early = Future.any([a.$2.seated.first, b.$2.seated.first]);
+      expect(await early.then((_) => true).timeout(const Duration(seconds: 7), onTimeout: () => false), isFalse);
+      b.$2.playWithBots();
+      final specs = await Future.wait([a.$2.seated.first, b.$2.seated.first].map((f) => f.timeout(const Duration(seconds: 15))));
+      expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table, the two of them and two bots');
+      expect(specs.first.seats.whereType<HumanSeat>().length, 2);
+      for (final r in [a, b]) {
+        r.$2.close();
+        r.$1.close();
+      }
+    });
+
+    test('whoever hosts, a waiter who said nothing waits the pool\'s time', () async {
+      // The host takes bots at once; the other said nothing, so waits the
+      // pool's eight seconds here, not the host's none. The other has
+      // waited a round longer (planned first) and is far from the host's
+      // rating (neither takes the other along): held to the host's choice,
+      // the other would be seated alone with bots at the host's first round.
+      //
+      // Far for as long as this test runs: a window widens 100 points a
+      // round of two seconds, so 3000 apart is a minute's wait. At 500,
+      // the other's window reached the host as its wait ran out, and a
+      // host slow to choose seated them together.
+      final signers = [SchnorrSigner.generate(), SchnorrSigner.generate()]..sort((a, b) => a.publicKey.compareTo(b.publicKey));
+      const pool = 8000;
+      final other = await join('Other', signer: signers[1], rating: 4500, botsAfterMs: pool);
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      final host = await join('Host', signer: signers[0], botsAfterMs: pool);
+      while (host.$2.present.length < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      final otherSeated = other.$2.seated.first.then((spec) => (spec, DateTime.now().millisecondsSinceEpoch));
+      host.$2.playWithBots();
+      final hosted = await host.$2.seated.first.timeout(const Duration(seconds: 10));
+      expect(hosted.seats.whereType<HumanSeat>().single.key, signers[0].publicKey, reason: 'the host alone, with bots');
+      final (seated, at) = await otherSeated.timeout(const Duration(seconds: 20));
+      expect(at - other.$2.since, greaterThanOrEqualTo(pool), reason: 'not before the pool\'s wait');
+      expect(seated.seats.whereType<HumanSeat>().single.key, signers[1].publicKey);
+      for (final r in [host, other]) {
+        r.$2.close();
+        r.$1.close();
+      }
+    });
 
     test('three waiting are seated together by whoever has the lowest key, with one bot', () async {
       final rooms = [for (final n in ['A', 'B', 'C']) await join(n)];

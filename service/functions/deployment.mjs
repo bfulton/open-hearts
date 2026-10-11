@@ -29,9 +29,7 @@ export function configEnv(config) {
     // The operator's own alerts (alerts.mjs).
     OH_ALERTS_TO: alerts.to,
     OH_ALERT_SUBSCRIBED: on(alerts.subscribed),
-    OH_ALERT_ONLINE: on(alerts.online),
-    OH_ALERT_NOT_ONLINE: Array.isArray(alerts.notOnline) && alerts.notOnline.length ? alerts.notOnline.join(',') : null,
-    OH_ALERT_QUIET_MINUTES: alerts.onlineQuietMinutes == null ? null : String(alerts.onlineQuietMinutes),
+    OH_ALERT_WAITING: on(alerts.waiting),
   };
   return Object.fromEntries(Object.entries(named).filter(([, v]) => typeof v === 'string' && v));
 }

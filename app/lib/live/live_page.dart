@@ -26,6 +26,7 @@ import '../ui/gone.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
 import '../ui/reactions.dart';
+import '../net/address.dart' show driven;
 import '../net/copy.dart';
 import '../net/in_use.dart';
 import '../net/share.dart';
@@ -178,12 +179,12 @@ class _LivePageState extends State<LivePage> {
     Navigator.of(context).pop();
   }
 
-  /// With `?e2e` in the address, the client's own account of the table
+  /// In a build being driven (net/address.dart), the client's own account of the table
   /// (participants, open races, who was heard when) sits in the
   /// accessibility tree, invisible: for a test or a tool driving the
   /// app, and for anyone reading a stuck table.
   Widget _debugState() {
-    if (!Uri.base.queryParameters.containsKey('e2e')) return const SizedBox.shrink();
+    if (!driven(Uri.base)) return const SizedBox.shrink();
     return Opacity(
       opacity: 0,
       alwaysIncludeSemantics: true,

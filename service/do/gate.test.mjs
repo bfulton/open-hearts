@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { activationOf, authKind, benchMark, createRelay, objectRelay, schnorrVerifier, serviceGate } from './relay.mjs';
+import { activationOf, authKind, benchMark, createRelay, isBenchMark, objectRelay, schnorrVerifier, serviceGate } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
 
@@ -195,6 +195,18 @@ test('the bench by its mark, and nobody else by it', async () => {
   await relay.message(forged, JSON.stringify(['AUTH', await answer(BAO, forged, [['bench', await benchMark('the bench secret', ADA.public)]])]));
   assert.match(forged.of('OK')[0][3], /^restricted:/);
   assert.equal(forged.closed?.code, 4001);
+});
+
+test('a mark is checked as an HMAC is, and anything not a mark is not one', async () => {
+  const mark = await benchMark('the bench secret', ADA.public);
+  assert.equal(await isBenchMark('the bench secret', ADA.public, mark), true);
+  assert.equal(await isBenchMark('the bench secret', BAO.public, mark), false, 'another key\'s');
+  assert.equal(await isBenchMark('another secret', ADA.public, mark), false, 'under another secret');
+  const flipped = (mark[0] === '0' ? '1' : '0') + mark.slice(1);
+  assert.equal(await isBenchMark('the bench secret', ADA.public, flipped), false, 'one digit off');
+  for (const bad of [mark.toUpperCase(), mark.slice(2), `${mark}00`, '', null, 7]) {
+    assert.equal(await isBenchMark('the bench secret', ADA.public, bad), false, `not a mark: ${bad}`);
+  }
 });
 
 test('an answer that runs out is asked for again, and the device answers with the one it has now', async () => {

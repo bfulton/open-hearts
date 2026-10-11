@@ -130,11 +130,44 @@ class TableEvent {
       final sig = json['sig'] as String;
       final id = digestOf(_canonical(table, author, kind, body));
       if (id != json['id']) return null;
+      if (!wellFormed(kind, body)) return null;
       if (verifySignature && !verify(author, id, sig)) return null;
       return TableEvent._(id: id, table: table, author: author, kind: kind, body: Map.unmodifiable(body), sig: sig);
-    } catch (_) {
+    } on TypeError {
+      // A field of the envelope missing or of the wrong type.
+      return null;
+    } on ArgumentError {
+      // A kind this build does not know (EventKind.values.byName).
       return null;
     }
+  }
+
+  /// Whether [body] has every field the typed views below read for
+  /// [kind], each of its type, so that an event signed with a body
+  /// that has not — by a peer of another build, or one that lies —
+  /// is dropped here like any malformed event, and nothing past the
+  /// parser meets a field that is missing. What a deal step, a pass or
+  /// a release carries for the deal itself is the deal session's to
+  /// check (DealSession), and is not looked at here.
+  static bool wellFormed(EventKind kind, Map<String, Object?> body) {
+    bool ints(List<String> keys) => keys.every((k) => body[k] is int);
+    bool text(String key) => body[key] is String;
+    bool list<T>(String key) => body[key] is List && (body[key] as List).every((e) => e is T);
+    final atTurn = ints(const ['hand', 'turn', 'seat']);
+    return switch (kind) {
+      EventKind.pass => atTurn && (!body.containsKey('cards') || list<String>('cards')),
+      EventKind.play => atTurn && text('card'),
+      EventKind.leave || EventKind.boot || EventKind.absent || EventKind.appeal || EventKind.escrow => atTurn,
+      EventKind.witness => atTurn && text('event'),
+      EventKind.jury => atTurn && list<String>('jurors') && list<String>('snapshot'),
+      EventKind.verdict => atTurn && text('side') && body['event'] is Map,
+      EventKind.deal => atTurn && ints(const ['round']),
+      EventKind.ended => atTurn && body['vote'] is bool,
+      EventKind.heartbeat => ints(const ['hand', 'step']),
+      EventKind.serve => ints(const ['hand', 'step']) && list<int>('serving'),
+      EventKind.release => ints(const ['hand', 'about']),
+      EventKind.topup => ints(const ['hand', 'about', 'at']) && list<int>('have'),
+    };
   }
 
   final String id;

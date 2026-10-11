@@ -46,7 +46,8 @@ class SoloGame {
 class TablePage extends StatefulWidget {
   const TablePage({super.key, this.seed, this.paced = true, this.target = gameOverScore});
 
-  /// Fixes the shuffle. Tests pass one; the app never does.
+  /// Fixes the shuffle: a test's, or a browser suite's under `?e2e&seed=`
+  /// (home_page.dart); in play, never.
   final int? seed;
 
   /// The score the game runs to, as the front door's options ask for

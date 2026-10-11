@@ -410,6 +410,34 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get playNowWithBots => 'Jetzt mit Bots spielen';
+
+  @override
+  String get waitForPerson => 'Auf einen Menschen warten';
+
+  @override
+  String get waitForPersonHint =>
+      'Bis zu fünf Minuten. Wir erfahren, dass jemand wartet, und kommen vielleicht zum Spielen.';
+
+  @override
+  String get waitingForPerson => 'Warte auf einen Menschen';
+
+  @override
+  String waitingForPersonLine(String waited, int others) {
+    String _temp0 = intl.Intl.pluralLogic(
+      others,
+      locale: localeName,
+      other: ', $others weitere warten',
+      one: ', 1 weitere Person wartet',
+      zero: '',
+    );
+    return '$waited von 5:00$_temp0 — dann füllen Bots die leeren Plätze';
+  }
+
+  @override
+  String get seatingWithBots => 'Du bekommst einen Tisch mit Bots';
+
+  @override
   String get cancel => 'Abbrechen';
 
   @override

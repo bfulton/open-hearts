@@ -55,7 +55,7 @@ void main() {
   });
 
   test('a handler with none to give, or unreachable, leaves no servers, and so no channels', () async {
-    final h = await handler(503, jsonEncode({'error': 'turn not configured'}));
+    final h = await handler(503, jsonEncode({'error': 'service not configured: OH_TURN_KEY_ID and OH_TURN_API_TOKEN'}));
     try {
       expect(await iceServersFor(signer, endpoint: h.url), isEmpty);
     } finally {

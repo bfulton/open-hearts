@@ -12,7 +12,7 @@ import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/account_profile.dart';
-import 'net/address.dart' show paceIn;
+import 'net/address.dart' show driven, paceIn;
 import 'net/duty.dart';
 import 'net/in_use.dart';
 import 'net/licence.dart' show serviceKey;
@@ -36,7 +36,7 @@ Future<void> main() async {
   usePathUrlStrategy();
   // The end-to-end suite drives the app through its accessibility
   // tree, which the web build only grows on request.
-  if (Uri.base.queryParameters.containsKey('e2e')) {
+  if (driven(Uri.base)) {
     SemanticsBinding.instance.ensureSemantics();
   }
   // And may ask for its tables' beats shorter (net/address.dart).

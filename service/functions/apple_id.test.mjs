@@ -349,7 +349,7 @@ test('a body past a token\'s size is not read; unconfigured, it says so', async 
   const { OH_APPLE_AUDIENCE: _, ...noAudience } = env;
   assert.deepEqual(await tell(noAudience, payload), { status: 503, body: { error: 'sign-in is not set up yet' } });
   const { OH_ID_HMAC: __, ...noSecret } = env;
-  assert.deepEqual(await tell(noSecret, payload), { status: 503, body: { error: 'sign-in is not configured' } });
+  assert.deepEqual(await tell(noSecret, payload), { status: 503, body: { error: 'service not configured: OH_ID_HMAC' } });
   const { OH_STORE: ___, ...noStore } = env;
   assert.equal((await tell(noStore, payload)).status, 503);
 });
@@ -384,7 +384,7 @@ test('it is counted under its own name, and the operator is not mailed', async (
     OH_METRICS: { writeDataPoint: (line) => lines.push(line) },
     OH_ALERTS_TO: 'alerts@openhearts.game',
     OH_ALERT_SUBSCRIBED: 'on',
-    OH_ALERT_ONLINE: 'on',
+    OH_ALERT_WAITING: 'on',
   };
   await tell(watched, await notice('account-deleted'));
   await tell(watched, await notice('email-disabled'));

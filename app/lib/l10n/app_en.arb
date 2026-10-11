@@ -511,6 +511,39 @@
       }
     }
   },
+  "playNowWithBots": "Play now with bots",
+  "@playNowWithBots": {
+    "description": "Button while waiting to be seated: stop waiting for people and fill the empty seats with bots now."
+  },
+  "waitForPerson": "Wait for a person",
+  "@waitForPerson": {
+    "description": "Button while waiting to be seated: wait up to five minutes for another person instead of playing bots at ten seconds."
+  },
+  "waitForPersonHint": "Up to five minutes. We're told someone is waiting, and may come and play.",
+  "@waitForPersonHint": {
+    "description": "Under waitForPerson: how long it waits, and that the people who run the game are emailed that someone is waiting (no name or address)."
+  },
+  "waitingForPerson": "Waiting for a person",
+  "@waitingForPerson": {
+    "description": "Heading while waiting up to five minutes for another person."
+  },
+  "waitingForPersonLine": "{waited} of 5:00{others, plural, =0{} =1{, 1 other waiting} other{, {others} others waiting}} — then bots fill the empty seats",
+  "@waitingForPersonLine": {
+    "description": "While waiting for a person: time waited as minutes:seconds out of five minutes, how many others are waiting, and that bots fill the empty seats after.",
+    "placeholders": {
+      "waited": {
+        "type": "String",
+        "example": "1:05"
+      },
+      "others": {
+        "type": "int"
+      }
+    }
+  },
+  "seatingWithBots": "Seating you with bots",
+  "@seatingWithBots": {
+    "description": "Heading after choosing to play now with bots, until the table is ready."
+  },
   "cancel": "Cancel",
   "@cancel": {
     "description": "Button: stop waiting."
