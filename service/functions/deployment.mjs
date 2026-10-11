@@ -47,6 +47,7 @@ export function appDefines(config) {
   const { apple = {}, google = {} } = config ?? {};
   const named = {
     OH_SERVICE_KEY: config?.serviceKey,
+    OH_APP_ORIGIN: config?.appOrigin,
     OH_APPLE_SERVICE_ID: apple.servicesId,
     OH_GOOGLE_CLIENT_ID: google.webClientId,
     OH_APPLE_PRODUCT: apple.product,

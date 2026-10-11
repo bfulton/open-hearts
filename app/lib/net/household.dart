@@ -94,15 +94,17 @@ class Ticket {
 /// nothing that belonged to this device's session.
 String claimLink(String code, [Uri? base]) {
   final at = base ?? Uri.base;
+  // The app's own address, which on a phone is not the page's (it has
+  // none): address_io.dart.
   final root = base ?? appBase();
   final params = Map<String, String>.from(at.queryParameters)
     ..remove('room')
     ..remove('bought')
     ..['claim'] = code;
   return Uri(
-    scheme: at.scheme,
-    host: at.host,
-    port: at.hasPort ? at.port : null,
+    scheme: root.scheme,
+    host: root.host,
+    port: root.hasPort ? root.port : null,
     path: root.path.isEmpty ? '/' : root.path,
     queryParameters: params,
   ).toString();

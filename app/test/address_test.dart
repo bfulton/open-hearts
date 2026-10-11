@@ -4,7 +4,11 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/net/address.dart';
+import 'package:open_hearts/net/address_io.dart' show appBaseFrom;
+import 'package:open_hearts/net/household.dart' show claimLink;
+import 'package:open_hearts/net/licence.dart' show handlerFor;
 import 'package:open_hearts/net/share.dart';
+import 'package:open_hearts/net/turn.dart' show turnEndpoint;
 
 void main() {
   test('the room waits as long as the address asks, within reason and only under e2e', () {
@@ -67,5 +71,22 @@ void main() {
         'https://dev.open-hearts.pages.dev/play/room/KP4T9MXR');
     expect(tableLink('0a1b2c3d4e5f60718293a4b5c6d7e8f9', Uri.parse('https://play.openhearts.game/')).toString(),
         'https://play.openhearts.game/table/0a1b2c3d4e5f60718293a4b5c6d7e8f9');
+  });
+
+  test('a phone build asks the service, and shares links, at the address its build names', () {
+    // An iPhone's or an Android phone's own address is a file's, with no
+    // host: nothing is asked of it and no link is built from it.
+    final served = Uri.parse('file:///');
+    expect(handlerFor('licence', appBaseFrom('', served)), isNull);
+    expect(turnEndpoint(appBaseFrom('', served)), isNull);
+
+    // With the config's appOrigin (build_phone.sh), the service is there
+    // and so is every link a player sends.
+    final base = appBaseFrom('https://play.openhearts.game', served);
+    expect(handlerFor('licence', base).toString(), 'https://play.openhearts.game/api/licence');
+    expect(turnEndpoint(base).toString(), 'https://play.openhearts.game/api/turn');
+    expect(roomLink('ABCD', base).toString(), 'https://play.openhearts.game/room/ABCD');
+    expect(tableLink('f00d', base).toString(), 'https://play.openhearts.game/table/f00d');
+    expect(claimLink('XY12', base), 'https://play.openhearts.game/?claim=XY12');
   });
 }

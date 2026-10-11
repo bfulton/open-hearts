@@ -49,6 +49,9 @@ test('a name set on the project, or by a test, wins over the file', () => {
 test('a phone build is compiled with the key, the sign-in identifiers and the products, from the same file', () => {
   const defines = appDefines(committed);
   assert.equal(defines.OH_SERVICE_KEY, committed.serviceKey);
+  // A phone has no address it was served from: the service it asks,
+  // and the links it shares, are at the app's own.
+  assert.equal(defines.OH_APP_ORIGIN, 'https://play.openhearts.game');
   assert.equal(defines.OH_APPLE_SERVICE_ID, 'game.openhearts.play');
   // The products are the ones made in App Store Connect and Play
   // Console, and the web's Stripe price has the same name.

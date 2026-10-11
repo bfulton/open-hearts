@@ -22,6 +22,7 @@ import 'dart:convert';
 
 import 'package:table/table.dart';
 
+import 'address.dart' show appBase;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 
 /// The service this build will take a licence from, and no other. A
@@ -42,7 +43,8 @@ const serviceKey = String.fromEnvironment('OH_SERVICE_KEY');
 // there): every peer at a table checks every seat's by it.
 
 /// Where the service's handlers are, by name: the origin this app was
-/// served by, which is the site the worker runs beside. Over http as
+/// served by, which is the site the worker runs beside — or on a phone,
+/// the app's address its build names (address_io.dart). Over http as
 /// well as https — the browser suite serves the app and the handlers
 /// together on localhost (docs/06-service.md) — and nowhere at all
 /// when there is no origin, which is a build asking nobody rather than
@@ -51,7 +53,7 @@ const serviceKey = String.fromEnvironment('OH_SERVICE_KEY');
 /// Settable, the way the signature verifier is (table's signing.dart):
 /// one seam for the tests to stand their own service in, rather than
 /// one per call.
-Uri? Function(String handler) handlerAt = (handler) => handlerFor(handler, Uri.base);
+Uri? Function(String handler) handlerAt = (handler) => handlerFor(handler, appBase());
 
 Uri? handlerFor(String handler, Uri at) {
   if (at.host.isEmpty) return null;
