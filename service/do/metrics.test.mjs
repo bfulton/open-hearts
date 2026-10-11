@@ -65,6 +65,22 @@ test('a flood is counted as what it is, before it costs a signature', async () =
   assert.equal(counts.counts.tooBig, 1);
 });
 
+test('the last socket gone writes the counts so far, inside the minute', () => {
+  let t = 0;
+  const points = [];
+  const counts = tally({ writeDataPoint: (p) => points.push(p) }, { now: () => t });
+  counts.count('opened', 2);
+  t = 5000;
+  counts.closed(1);
+  assert.equal(points.length, 0, 'another still on: the minute runs on');
+  t = 9000;
+  counts.closed(0);
+  assert.equal(points.length, 1, 'nobody left: written before the object can be evicted');
+  assert.equal(points[0].doubles[tallied.indexOf('opened')], 2);
+  assert.equal(points[0].doubles[tallied.indexOf('closed')], 2);
+  assert.equal(points[0].doubles.at(-1), 9, 'the seconds it covers');
+});
+
 test('no dataset is no writing, and a quiet minute writes no line', () => {
   let t = 0;
   const points = [];

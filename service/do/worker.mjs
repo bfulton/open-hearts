@@ -211,13 +211,16 @@ export class TagRelay {
   }
 
   async webSocketClose(socket) {
-    (await this.ready()).close(socket);
-    this.tally.count('closed');
+    await this.gone(socket);
   }
 
   async webSocketError(socket) {
+    await this.gone(socket);
+  }
+
+  async gone(socket) {
     (await this.ready()).close(socket);
-    this.tally.count('closed');
+    this.tally.closed(this.state.getWebSockets().filter((s) => s !== socket).length);
   }
 }
 

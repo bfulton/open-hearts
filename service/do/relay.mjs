@@ -878,11 +878,19 @@ export function tally(sink, { every = 60000, now = Date.now } = {}) {
     counts = Object.fromEntries(tallied.map((k) => [k, 0]));
     since = t;
   };
+  const count = (what, n = 1) => {
+    if (!(what in counts)) return;
+    counts[what] += n;
+    if (now() - since >= every) flush();
+  };
   return {
-    count(what, n = 1) {
-      if (!(what in counts)) return;
-      counts[what] += n;
-      if (now() - since >= every) flush();
+    count,
+    /// A socket gone, with [left] still open: when it was the last, the
+    /// counts so far are written at once, since an object with nobody
+    /// on it may be evicted before its minute is up and take them with it.
+    closed(left) {
+      count('closed');
+      if (left === 0) flush();
     },
     flush,
     get counts() {
