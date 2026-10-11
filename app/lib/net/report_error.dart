@@ -11,7 +11,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 
-import '../build_info.g.dart' show generatedBuildTag;
+import '../build_info.dart' show buildTag;
 import 'report_error_io.dart' if (dart.library.js_interop) 'report_error_web.dart' as platform;
 
 /// How many are sent from one page load.
@@ -25,7 +25,7 @@ void reportError(Object error, StackTrace? stack, {String? where}) {
   _reported++;
   platform.notice('$error', '${stack ?? ''}', {
     'where': where ?? '',
-    'build': generatedBuildTag,
+    'build': buildTag,
   });
 }
 

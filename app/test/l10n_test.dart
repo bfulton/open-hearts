@@ -27,7 +27,7 @@ import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/l10n/l10n.dart';
-import 'package:open_hearts/live/options_sheet.dart';
+import 'package:open_hearts/options_sheet.dart';
 import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/net/sign_in.dart' show Provider;
 import 'package:open_hearts/net/store_buying.dart';

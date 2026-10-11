@@ -38,12 +38,12 @@ class Duty {
 
   /// The duty on [relays], started if need be; a new list replaces it.
   /// With [crypto] the juror can serve sealed tables, holding a piece
-  /// of every person's deal secret there.
-  static Duty on(List<Uri> relays, Signer signer, {bool log = false, DealCrypto? crypto, DealWorker? dealWorker}) {
+  /// of every person's deal secret there. [log], if given, hears what
+  /// the duty does, its mesh's channels among it.
+  static Duty on(List<Uri> relays, Signer signer, {void Function(String)? log, DealCrypto? crypto, DealWorker? dealWorker}) {
     final d = _current;
     if (d != null && listEquals(d.relays, relays)) return d;
     d?.close();
-    void Function(String)? logger = log ? (l) => debugPrint('duty: $l') : null;
     // Presence has a connection of its own; a table's events go on the
     // table's.
     final presence = RelayPresence(
@@ -54,7 +54,7 @@ class Duty {
       // as a juror where its account sits, and another device of the
       // account hears that it has been superseded (net/in_use.dart).
       activation: () => InUse.current.activation,
-      log: logger,
+      log: log,
     );
     // Another device of the account heard taking it up: this one steps
     // back, and the duty with it.
@@ -63,7 +63,7 @@ class Duty {
       relays: relays,
       signer: signer,
       presence: presence,
-      log: logger,
+      log: log,
       crypto: crypto,
       dealWorker: dealWorker,
       pinned: pinnedRelays(relays),
@@ -77,7 +77,7 @@ class Duty {
         relay: lane,
         peers: [for (final s in spec.seats) if (s is HumanSeat) s.key],
         iceServers: Duty.ice,
-        log: logger == null ? null : (l) => logger('mesh: $l'),
+        log: log == null ? null : (l) => log('mesh: $l'),
       ),
     )..start();
     final duty = _current = Duty._(relays, presence, juror);

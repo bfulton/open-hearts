@@ -38,8 +38,8 @@ import 'l10n/l10n.dart';
 import 'net/copy.dart';
 import 'pages.dart';
 import 'profile_page.dart';
-import 'live/options_sheet.dart';
-import 'live_controller.dart';
+import 'options_sheet.dart';
+import 'live/live_controller.dart';
 import 'net/account_profile.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
@@ -86,6 +86,7 @@ void _relayLog(String line) => debugPrint('relay: $line');
 /// In a build being driven (net/address.dart) the table's every
 /// transition and the mesh's every channel change go to the console too.
 final _debugging = driven(Uri.base);
+final _dutyLog = _debugging ? (String l) => debugPrint('duty: $l') : null;
 
 /// The deal a solo game starts from, for a browser test that needs a
 /// particular one (`?e2e&seed=156`); in a build not being driven, never.
@@ -462,7 +463,7 @@ class _HomePageState extends State<HomePage> {
     if (InUse.current.standing != Use.here) await InUse.current.open(signer);
     if (!mounted || InUse.current.elsewhere || Duty.current != null) return;
     unawaited(_comeBack(signer));
-    Duty.on(_relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
+    Duty.on(_relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
       if (mounted) setState(() => _listeningSinceMs = DateTime.now().millisecondsSinceEpoch);
     });
     _onlineClock?.cancel();
@@ -585,7 +586,7 @@ class _HomePageState extends State<HomePage> {
       }
       // A relay answered: from here on this device is online to
       // everyone, and a juror when drawn.
-      Duty.on(relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker);
+      Duty.on(relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker);
       _iceServers ??= const [];
       iceServersFor(signer).then((servers) {
         _iceServers = servers;
@@ -747,7 +748,7 @@ class _HomePageState extends State<HomePage> {
       // The players' reactions ride the table's own tag, beside its
       // events and outside them (packages/table, reactions.dart).
       reactions: relay,
-      presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence,
+      presence: Duty.on(relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker).presence,
       crypto: dealCrypto,
       dealWorker: dealWorker,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,

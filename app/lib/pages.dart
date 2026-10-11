@@ -26,8 +26,7 @@ enum AppPage {
 Future<T?> openPage<T>(BuildContext context, AppPage page, {Object? extra}) => context.push<T>(located(page.path), extra: extra);
 
 /// The query parameters that belong to the session rather than to a
-/// page — `lang`, and the suites' `e2e`, `seed`, `roomWait`, `relay`,
-/// `pace`, `target` and `updatecheck` — as the app was opened with them
+/// page (router.dart, `sessionParams`), as the app was opened with them
 /// (router.dart sets this).
 Map<String, String> session = const {};
 

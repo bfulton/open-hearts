@@ -9,12 +9,11 @@ library;
 
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Card;
 
 import 'avatar.dart';
 import 'entitlement.dart';
 import 'package:engine/engine.dart';
-import 'package:engine/engine.dart' as engine;
 import 'feedback_page.dart';
 import 'game_controller.dart';
 import 'identity.dart';
@@ -109,7 +108,7 @@ class _TablePageState extends State<TablePage> {
     super.dispose();
   }
 
-  void _tapCard(engine.Card card) {
+  void _tapCard(Card card) {
     final controller = _controller;
     if (controller.awaitingPass) {
       controller.toggleSelected(card);
@@ -443,7 +442,7 @@ Widget _cardsLine(
     {required int position,
     required String Function(String name) said,
     required String name,
-    required List<engine.Card> cards,
+    required List<Card> cards,
     required AppLocalizations l10n}) {
   return Row(
     mainAxisAlignment: MainAxisAlignment.center,

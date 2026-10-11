@@ -6,9 +6,9 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../game_options.dart';
-import '../l10n/l10n.dart';
-import '../theme.dart';
+import 'game_options.dart';
+import 'l10n/l10n.dart';
+import 'theme.dart';
 
 /// Opens the options over [context]; resolves to what was chosen, or
 /// null if the sheet was dismissed without a change.

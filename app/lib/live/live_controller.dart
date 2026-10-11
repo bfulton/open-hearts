@@ -27,11 +27,11 @@ import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
-import 'avatar.dart';
-import 'l10n/l10n.dart';
-import 'pictures.dart';
-import 'reaction_mute.dart';
-import 'table_model.dart';
+import '../avatar.dart';
+import '../l10n/l10n.dart';
+import '../pictures.dart';
+import '../reaction_mute.dart';
+import '../table_model.dart';
 
 class LiveController extends ChangeNotifier implements TableModel {
   LiveController({

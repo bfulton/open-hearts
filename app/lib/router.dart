@@ -16,10 +16,10 @@
 ///   /table/ID           a finished live game, kept and checked
 ///                       (review_page.dart)
 ///
-/// A few query parameters are the session's rather than the page's —
-/// `lang`, and the suites' `e2e`, `seed`, `roomWait`, `relay`, `pace`,
-/// `target` and `updatecheck` — and stay in the address wherever it
-/// goes (pages.dart, [located]), so a refresh is the same session.
+/// A few query parameters are the session's rather than the page's
+/// ([sessionParams]: `lang`, and the suites' own) and stay in the
+/// address wherever it goes (pages.dart, [located]), so a refresh is
+/// the same session.
 library;
 
 import 'package:flutter/material.dart';
@@ -30,7 +30,7 @@ import 'about_page.dart';
 import 'activate_page.dart';
 import 'feedback_page.dart';
 import 'home_page.dart';
-import 'live_controller.dart';
+import 'live/live_controller.dart';
 import 'live/live_page.dart';
 import 'net/buying.dart';
 import 'net/household.dart';

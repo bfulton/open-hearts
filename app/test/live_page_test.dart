@@ -16,7 +16,7 @@ import 'package:go_router/go_router.dart';
 import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/live/live_page.dart';
 import 'package:open_hearts/avatar.dart';
-import 'package:open_hearts/live_controller.dart';
+import 'package:open_hearts/live/live_controller.dart';
 import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/table_view.dart' show ClockText, TableView;

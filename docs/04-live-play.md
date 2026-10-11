@@ -12,7 +12,7 @@ table holds a licence and sits as an account, on one device at a time
 ([doc 06](06-service.md), and [Identity](#identity) below). The protocol
 is `packages/table` — chiefly `client.dart`, `jury.dart`,
 `juror_duty.dart`, `matching.dart` and `record.dart`, the verifier —
-driven by `app/lib/live_controller.dart` and `app/lib/net/`.
+driven by `app/lib/live/live_controller.dart` and `app/lib/net/`.
 
 ## Getting to a table
 
