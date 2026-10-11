@@ -9,7 +9,7 @@ import 'dart:js_interop_unsafe';
 external JSObject get _navigator;
 
 @JS('open')
-external JSAny? _open(JSString url, JSString target, JSString features);
+external JSObject? _open(JSString url, JSString target);
 
 extension type _Navigator._(JSObject _) implements JSObject {
   external JSPromise<JSAny?> share(JSObject data);
@@ -28,8 +28,15 @@ Future<bool> shareLink(String url) async {
 }
 
 /// A new tab, cut off from this one: the page opened cannot reach back
-/// into the app's window.
+/// into the app's window. False when no tab opened — a blocked pop-up,
+/// which Safari on a phone blocks by default — so the caller copies
+/// instead. Opened empty and cut off before it goes anywhere: with
+/// `noopener` asked for, the browser answers null whether it opened
+/// one or not, and a blocked tab would look like an opened one.
 bool openBeside(String url) {
-  _open(url.toJS, '_blank'.toJS, 'noopener'.toJS);
+  final tab = _open(''.toJS, '_blank'.toJS);
+  if (tab == null) return false;
+  tab['opener'] = null;
+  tab['location'] = url.toJS;
   return true;
 }
