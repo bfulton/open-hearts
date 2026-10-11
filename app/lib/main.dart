@@ -23,7 +23,6 @@ import 'net/report_error.dart';
 import 'net/store_buying.dart';
 import 'theme.dart';
 import 'ui/in_use_screen.dart';
-import 'ui/touch_probe.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -167,7 +166,7 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
         // No app-wide text selection: on a table played by touch it took
         // taps meant for the game, and what is worth copying (a code, a
         // link, a report) has its own Copy button.
-        builder: (context, child) => TouchProbe(child: InUseScreen(child: child ?? const SizedBox())),
+        builder: (context, child) => InUseScreen(child: child ?? const SizedBox()),
         routerConfig: _router,
       ),
     );
