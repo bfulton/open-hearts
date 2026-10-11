@@ -28,8 +28,10 @@ if [[ -z "$NDK" ]]; then
   # The SDK where Android Studio and the command-line tools put it.
   for sdk in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
     [[ -n "$sdk" && -d "$sdk/ndk" ]] || continue
-    NDK=$(ls -d "$sdk"/ndk/* 2>/dev/null | sort -V | tail -1 || true)
-    [[ -n "$NDK" ]] && break
+    # The newest revision (27.0.12077973 and the like), compared field
+    # by field as numbers: POSIX sort, since macOS's has no -V.
+    rev=$(cd "$sdk/ndk" && ls | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 || true)
+    [[ -n "$rev" ]] && { NDK="$sdk/ndk/$rev"; break; }
   done
 fi
 [[ -n "$NDK" ]] || { echo "build_android: no NDK found: set ANDROID_NDK_HOME, or ANDROID_HOME to an SDK with ndk/ in it" >&2; exit 1; }
