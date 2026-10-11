@@ -59,7 +59,8 @@
       "title": "Precisa de ajuda?",
       "text": "Veja a <a href=\"{{base}}/support\">página de suporte</a>, escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> ou use <i>Conte o que está quebrado</i> no menu do jogo.",
       "menuAlt": "O menu do jogo, aberto, com o ponteiro sobre Conte o que está quebrado"
-    }
+    },
+    "soon": "Os apps para celular chegam em breve."
   },
   "support": {
     "meta": {
@@ -84,7 +85,7 @@
       "p5": "Como eu assino?",
       "p6": "Toque no botão <i>Assinar</i>, em <i>Jogar ao vivo</i>. Na <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, o pagamento é feito na página da Stripe. Nos apps para celular, é pela App Store ou pelo Google Play, que cobram e renovam a assinatura. Assinar cria a sua conta: seu nome, sua imagem, seu rating e suas partidas vão com ela para qualquer aparelho que você adicionar (até 5), e uma mudança no seu perfil em um deles aparece em todos.",
       "p7": "Como eu cancelo?",
-      "p8": "Abra o menu, escolha <i>Assinatura</i> e depois <i>Gerenciar assinatura</i>. Outras formas, e os reembolsos, estão nos <a href=\"{{base}}/terms\">termos</a>.",
+      "p8": "Abra o menu, escolha <i>Assinatura</i> e depois <i>Gerenciar assinatura</i>. Isso abre a loja em que você assinou ou, na web, a página de cobrança da Stripe, onde você cancela.",
       "p9": "Como adiciono outro aparelho?",
       "p10": "Num aparelho da sua conta, abra o menu, escolha <i>Assinatura</i> e toque em <i>Adicionar um aparelho</i>; depois, escaneie o código com o outro aparelho, ou toque em <i>Enviar o link</i>. Um código vale uma vez só, por dez minutos.",
       "p11": "E se eu perder o celular, ou limpar os dados do navegador?",
@@ -113,10 +114,17 @@
       "wikipedia": "https://pt.wikipedia.org/wiki/Copas_(jogo_de_cartas)"
     },
     "cancelAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Gerenciar assinatura",
+    "cancel": {
+      "without": "Sem o app:",
+      "appStore": "<b>App Store:</b> no seu iPhone ou iPad, abra Ajustes, toque no seu nome, depois em Assinaturas, e escolha Open Hearts.",
+      "googlePlay": "<b>Google Play:</b> no app Play Store, toque na sua foto do perfil, depois em Pagamentos e assinaturas, depois em Assinaturas.",
+      "web": "<b>Web</b>, se você não tiver mais nenhum dos aparelhos da assinatura: mande um e-mail para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> do endereço com que pagou, e nós cancelamos e confirmamos.",
+      "refunds": "O que acontece ao cancelar, e os reembolsos, estão nos <a href=\"{{base}}/terms#cancelling\">termos</a>."
+    },
     "addAlt": "O menu do jogo com o ponteiro sobre Assinatura, e depois a página da assinatura com o ponteiro sobre Adicionar um aparelho",
     "fair": {
       "random": "<b>Aleatório.</b> Numa mesa ao vivo, cada aparelho embaralha o baralho por vez e prova que embaralhou com honestidade, então basta um aparelho honesto para uma distribuição justa. Cada mão só se abre para o seu jogador: nenhum outro jogador a vê, nem servidor algum. Jogando sozinho, cada distribuição vem do gerador aleatório seguro do seu aparelho.",
-      "witness": "<b>Com testemunhas.</b> Cada mão sorteia jurados: desconhecidos escolhidos ao acaso entre outros jogadores online, sem nada em jogo na mesa. Eles jogam os lugares dos bots e guardam pedaços das chaves de cada jogador, para que a mão possa terminar se alguém sair sem que ninguém, sozinho, consiga abrir as cartas de outro.",
+      "witness": "<b>Com testemunhas.</b> Cada mão sorteia jurados: desconhecidos escolhidos ao acaso entre outros jogadores online, sem nada em jogo na mesa. Eles jogam os lugares dos bots e guardam pedaços das chaves de cada jogador, para que a mão possa terminar se alguém sair sem que ninguém, sozinho, consiga abrir as cartas de outro. Quando não há mais ninguém online, o nosso serviço coloca jurados reserva. Como qualquer jurado, eles não conseguem ver as suas cartas sozinhos, só junto com outro jogador da sua mesa; então, nessas mãos, você confia que não vamos fazer conluio.",
       "audit": "<b>Auditado.</b> Depois de cada mão, cada aparelho publica o seu segredo, então a partida inteira pode ser refeita e cada embaralhada, carta e jogada conferida. Depois de uma partida ao vivo, <i>Ver a partida inteira</i> faz essa conferência por você; depois de uma partida sozinho, <i>Copiar registro</i> a guarda.",
       "more": "Como tudo funciona está <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">nesta explicação</a>."
     }
@@ -129,7 +137,7 @@
     "header": {
       "title": "Privacidade",
       "tagline": "O que o Open Hearts faz com o que você dá a ele, em palavras simples.",
-      "updated": "Última atualização: 7 de outubro de 2026"
+      "updated": "Última atualização: 11 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
@@ -138,7 +146,7 @@
       "p3": "O jogo ao vivo é público, de propósito",
       "p4": "Para jogar com pessoas, seu nome, sua imagem, o número da sua conta e seus resultados passam pelo nosso relay, onde qualquer um que pedir pode lê-los. Lá, salas e imagens são guardadas por um dia; os resultados são guardados para os ratings.",
       "p5": "Contas, mas sem e-mail nem senha",
-      "p6": "Nada é vendido, alugado ou usado para publicidade. Não há rastreadores no app nem neste site. Assinar cria uma conta: um número aleatório que o nosso serviço dá a você, com o qual os seus aparelhos jogam. Não há senha, e nós não guardamos nenhum endereço de e-mail.",
+      "p6": "Nada é vendido, alugado ou usado para publicidade, e nada segue você de site em site. O jogo na web informa seus erros e tempos de carregamento à New Relic, como descrito abaixo; este site e os apps para celular não informam nada. Assinar cria uma conta: um número aleatório que o nosso serviço dá a você, com o qual os seus aparelhos jogam. Não há senha, e nós não guardamos nenhum endereço de e-mail.",
       "p7": "O pagamento fica com a Stripe",
       "p8": "Na web, a assinatura é comprada pela Stripe, que fica com o seu endereço de e-mail e o seu cartão. Nós guardamos uma anotação de qual conta ela paga e de quais aparelhos estão nessa conta. Nunca vemos o número do seu cartão."
     },
@@ -153,7 +161,7 @@
       "p3": "<b>Seu nome e sua aparência</b>: um ícone e uma cor, ou uma imagem sua. A imagem é reduzida para 64 por 64 pixels no seu aparelho, e só essa cópia pequena é guardada. A foto de onde você a tirou não é guardada nem enviada. Se você assinar, o nosso serviço guarda uma cópia com a sua conta, como explicado abaixo.",
       "p4": "<b>Suas últimas trinta partidas contra os bots</b>, que o seu perfil contabiliza. Elas só saem do aparelho se você tocar em <i>Copiar registro</i>.",
       "p5": "<b>Com que rapidez você joga</b>, as opções da partida, o idioma que você escolheu, a sua licença e o número da sua conta se você assinar, e os jogadores cujas imagens você escolheu esconder.",
-      "p6": "<b>A partida ao vivo em que você está</b>, enquanto estiver nela: a mesa, cada jogada e voto que o seu aparelho assinou ali, e os segredos com que ele distribuiu as suas cartas, para que uma página recarregada no meio da partida possa voltar ao seu lugar. Isso é descartado quando a partida termina ou você sai dela, ou dois minutos depois da última vez que você esteve lá.",
+      "p6": "<b>A partida ao vivo em que você está</b>, enquanto estiver nela: a mesa, cada jogada e voto que o seu aparelho assinou ali, e os segredos com que ele distribuiu as suas cartas, para que uma página recarregada no meio da partida possa voltar ao seu lugar. Isso é apagado quando a partida termina ou você sai dela. Se o app fechar no meio da partida, é apagado na próxima vez que ele abrir, a menos que seja dentro de dois minutos: aí você volta ao seu lugar.",
       "p7": "Para remover tudo isso, apague os dados de play.openhearts.game no navegador (e os de openhearts.game, onde um navegador que jogou antes de o jogo mudar para play.openhearts.game guarda a sua cópia anterior), ou desinstale o app. Isso também remove a sua chave, então o aparelho volta como um jogador novo, até que um código de backup ou o seu login o traga de volta à sua conta."
     },
     "alone": {
@@ -167,7 +175,7 @@
       "p2": "<b>Os servidores de fontes do Google, às vezes.</b> O jogo traz a sua própria fonte, mas quando precisa desenhar um caractere que essa fonte não tem — um emoji, uma seta ou um nome escrito num sistema de escrita como o chinês ou o árabe — o kit de ferramentas com que ele foi feito busca a fonte extra em <code>fonts.gstatic.com</code>. Quando isso acontece, o Google recebe o seu endereço IP e a informação de que você está visitando este site.",
       "p3": "<b>Uma verificação de licença.</b> Toda vez que o jogo começa, ele envia a chave pública do seu aparelho ao nosso serviço para perguntar se ele tem uma assinatura. Se tiver, o serviço também anota que este é o aparelho que a sua conta está usando agora, quando, e em qual mesa ao vivo ele está, se estiver em alguma; essa anotação é substituída da próxima vez que qualquer aparelho seu abrir o jogo. Se não tiver, nada é guardado.",
       "p4": "<b>A sua página de perfil</b> pede ao nosso relay os resultados das partidas para poder mostrar o seu rating. Ela não publica nada sobre você.",
-      "p5": "<b>A New Relic</b> nos avisa quando o jogo quebra ou fica lento para você na web, em openhearts.game. A página do jogo envia a ela os erros que encontra, quanto tempo levou para carregar, os endereços das chamadas que faz ao nosso serviço (sem nada depois de um \"?\"), e o seu navegador, o tipo de aparelho e a sua localização aproximada. O seu endereço IP é usado para essa localização e descartado em até um dia. Ela não cria cookies, não grava a tela nem a sessão, e não lê nada do que você digita. Sob os <a href=\"https://newrelic.com/termsandconditions/services-notices\">avisos de privacidade da New Relic</a>."
+      "p5": "<b>A New Relic</b> nos avisa quando o jogo quebra ou fica lento para você em play.openhearts.game. A página do jogo envia a ela os erros que encontra, quanto tempo levou para carregar, os endereços das chamadas que faz ao nosso serviço (sem nada depois de um \"?\"), e o seu navegador, o tipo de aparelho e a sua localização aproximada. O seu endereço IP é usado para essa localização e descartado em até um dia. Ela não cria cookies, não grava a tela nem a sessão, e não lê nada do que você digita. Sob os <a href=\"https://newrelic.com/termsandconditions/services-notices\">avisos de privacidade da New Relic</a>."
     },
     "live": {
       "title": "Jogo ao vivo",
@@ -182,7 +190,7 @@
       "p9": "Só para o nosso relay, que roda na Cloudflare. Cada mensagem é assinada pelo aparelho que a enviou, então qualquer um que guarde uma cópia pode mostrar que ela é autêntica; não podemos apagar uma cópia feita por outra pessoa.",
       "p10": "O que só a sua mesa vê",
       "p11": "As cartas são distribuídas entre os aparelhos da mesa de forma que a mão de cada jogador só possa ser lida por ele, e nenhum servidor nosso jamais vê uma mão. As jogadas vão de aparelho para aparelho.",
-      "p12": "Todas essas conexões passam pelo serviço de relay da Cloudflare (TURN), então os outros aparelhos da sua mesa nunca ficam sabendo o seu endereço IP — nem os outros jogadores, nem os <b>jurados</b>: os apps de outros jogadores, sorteados, que ajudam a resolver uma mesa e jogam nos lugares dos bots. A Cloudflare vê o seu endereço IP, como qualquer servidor a que você se conecta, e repassa o tráfego criptografado, de modo que não consegue lê-lo."
+      "p12": "Todas essas conexões passam pelo serviço de relay da Cloudflare (TURN), então os outros aparelhos da sua mesa nunca ficam sabendo o seu endereço IP — nem os outros jogadores, nem os <b>jurados</b>: os apps de outros jogadores, sorteados, que ajudam a resolver uma mesa e jogam nos lugares dos bots (ou, quando não há mais ninguém online, os jurados reserva do nosso serviço). A Cloudflare vê o seu endereço IP, como qualquer servidor a que você se conecta, e repassa o tráfego criptografado, de modo que não consegue lê-lo."
     },
     "subscribing": {
       "title": "Assinar",
@@ -245,7 +253,7 @@
     "header": {
       "title": "Termos de uso",
       "tagline": "O acordo entre você e o Open Hearts, em palavras simples.",
-      "updated": "Última atualização: 6 de outubro de 2026"
+      "updated": "Última atualização: 11 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
@@ -260,7 +268,7 @@
     },
     "who": {
       "title": "Com quem é este acordo",
-      "p1": "Estes termos são um acordo entre você e o Open Hearts (\"nós\"), cujo endereço está em <a href=\"#contact\">Contato</a>. Eles cobrem este site, o jogo em <a href=\"{{play}}\">play.openhearts.game</a>, os apps do Open Hearts para celular e o serviço de jogo ao vivo. Ao usar qualquer um deles, você concorda com estes termos. Se não concordar, por favor não os use.",
+      "p1": "Estes termos são um acordo entre você e o Open Hearts (\"nós\"), mantido por Bright Fulton, cujo endereço está em <a href=\"#contact\">Contato</a>. Eles cobrem este site, o jogo em <a href=\"{{play}}\">play.openhearts.game</a>, os apps do Open Hearts para celular e o serviço de jogo ao vivo. Ao usar qualquer um deles, você concorda com estes termos. Se não concordar, por favor não os use.",
       "p2": "Como tratamos informações sobre você está na <a href=\"{{base}}/privacy\">política de privacidade</a>, que faz parte destes termos."
     },
     "appStore": {
@@ -290,9 +298,7 @@
       "p14": "<b>Web:</b> a compra é feita pela Stripe, e a Stripe cobra no cartão que você informou a ela, todo ano, na data em que você assinou pela primeira vez.",
       "p15": "Cancelamento",
       "p16": "Você pode cancelar a qualquer momento. Cancelar interrompe a próxima renovação; o jogo ao vivo continua funcionando até o fim do ano que você pagou.",
-      "p17": "<b>App Store:</b> no seu iPhone ou iPad, abra Ajustes, toque no seu nome, depois em Assinaturas, e escolha Open Hearts.",
-      "p18": "<b>Google Play:</b> no app Play Store, toque na sua foto do perfil, depois em Pagamentos e assinaturas, depois em Assinaturas.",
-      "p19": "<b>Web:</b> no jogo, abra o Jogo ao vivo e escolha <b>Gerenciar assinatura</b>, em qualquer um dos aparelhos da assinatura. Isso abre a página de cobrança da Stripe, onde você pode cancelar, trocar o cartão e ver os seus recibos. Se você não tiver mais nenhum desses aparelhos, mande um e-mail para a gente (dados abaixo) com o endereço de e-mail com que pagou, e nós cancelamos e confirmamos.",
+      "p17": "Como cancelar — no app, em cada loja e quando você não tem mais nenhum dos seus aparelhos — está na <a href=\"{{base}}/support#cancel\">página de suporte</a>.",
       "p20": "Reembolsos",
       "p21": "<b>App Store e Google Play:</b> os reembolsos são tratados pela Apple ou pelo Google, conforme as políticas deles. Para a App Store, peça em <a href=\"https://reportaproblem.apple.com/\">reportaproblem.apple.com</a>. Não podemos reembolsar nós mesmos uma compra feita na loja.",
       "p22": "<b>Web:</b> fale com a gente. Onde a lei do lugar em que você mora lhe der o direito de desistir da compra ou de receber um reembolso, você tem esse direito, e vamos analisar com justiça qualquer outro pedido.",

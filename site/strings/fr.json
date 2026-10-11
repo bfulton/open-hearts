@@ -59,7 +59,8 @@
       "title": "Besoin d'aide ?",
       "text": "Consultez la <a href=\"{{base}}/support\">page d'aide</a>, écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> ou utilisez <i>Signaler un problème</i> dans le menu du jeu.",
       "menuAlt": "Le menu du jeu, ouvert, avec le pointeur sur Signaler un problème"
-    }
+    },
+    "soon": "Les applications pour téléphone arrivent bientôt."
   },
   "support": {
     "meta": {
@@ -84,7 +85,7 @@
       "p5": "Comment s'abonner ?",
       "p6": "Touchez le bouton <i>S'abonner</i> sous <i>Jouer en direct</i>. Sur le <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, le paiement se fait sur la page de Stripe. Dans les applications mobiles, il passe par l'App Store ou Google Play, qui le facturent et le renouvellent. S'abonner crée votre compte : votre nom, votre image, votre classement et vos parties le suivent sur tout appareil que vous ajoutez (jusqu'à 5), et une modification de votre profil sur l'un d'eux s'affiche sur tous.",
       "p7": "Comment résilier ?",
-      "p8": "Ouvrez le menu, choisissez <i>Abonnement</i>, puis <i>Gérer l'abonnement</i>. Les autres moyens, et les remboursements, sont dans les <a href=\"{{base}}/terms\">conditions</a>.",
+      "p8": "Ouvrez le menu, choisissez <i>Abonnement</i>, puis <i>Gérer l'abonnement</i>. Cela ouvre la boutique où vous vous êtes abonné ou, pour le web, la page de facturation de Stripe, où vous résiliez.",
       "p9": "Comment ajouter un autre appareil ?",
       "p10": "Sur un appareil de votre compte, ouvrez le menu, choisissez <i>Abonnement</i> et touchez <i>Ajouter un appareil</i>, puis scannez le code avec l'autre appareil, ou touchez <i>Envoyer le lien à la place</i>. Un code ne sert qu'une fois, pendant dix minutes.",
       "p11": "Et si je perds mon téléphone, ou efface les données de mon navigateur ?",
@@ -113,10 +114,17 @@
       "wikipedia": "https://fr.wikipedia.org/wiki/Dame_de_pique_(jeu)"
     },
     "cancelAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Gérer l'abonnement",
+    "cancel": {
+      "without": "Sans l'application :",
+      "appStore": "<b>App Store :</b> sur votre iPhone ou iPad, ouvrez Réglages, touchez votre nom, puis Abonnements, et choisissez Open Hearts.",
+      "googlePlay": "<b>Google Play :</b> dans l'application Play Store, touchez votre photo de profil, puis Paiements et abonnements, puis Abonnements.",
+      "web": "<b>Web</b>, si vous n'avez plus aucun appareil de l'abonnement : écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> depuis l'adresse avec laquelle vous avez payé ; nous le résilierons et vous le confirmerons.",
+      "refunds": "Ce qu'implique la résiliation, et les remboursements, sont dans les <a href=\"{{base}}/terms#cancelling\">conditions</a>."
+    },
     "addAlt": "Le menu du jeu avec le pointeur sur Abonnement, puis la page de l'abonnement avec le pointeur sur Ajouter un appareil",
     "fair": {
       "random": "<b>Aléatoire.</b> À une table en direct, chaque appareil mélange le paquet à son tour et prouve qu'il l'a fait honnêtement : un seul appareil honnête suffit pour une donne équitable. Chaque main ne s'ouvre que pour son joueur : aucun autre joueur ne la voit, ni aucun serveur. En solo, chaque donne vient du générateur aléatoire sécurisé de votre appareil.",
-      "witness": "<b>Sous témoins.</b> Chaque main tire au sort des jurés : des inconnus choisis au hasard parmi les autres joueurs en ligne, sans enjeu à la table. Ils jouent les places des bots et gardent des morceaux des clés de chaque joueur, pour qu'une main puisse se terminer si quelqu'un part, sans que personne ne puisse seul ouvrir les cartes d'un autre.",
+      "witness": "<b>Sous témoins.</b> Chaque main tire au sort des jurés : des inconnus choisis au hasard parmi les autres joueurs en ligne, sans enjeu à la table. Ils jouent les places des bots et gardent des morceaux des clés de chaque joueur, pour qu'une main puisse se terminer si quelqu'un part, sans que personne ne puisse seul ouvrir les cartes d'un autre. Quand personne d'autre n'est en ligne, notre service fournit des jurés de réserve. Comme tout juré, ils ne peuvent pas voir vos cartes seuls, seulement avec un autre joueur de votre table : pour ces mains, vous nous faites confiance pour ne pas nous entendre avec lui.",
       "audit": "<b>Vérifié.</b> Après chaque main, chaque appareil publie son secret : la partie entière peut être rejouée et chaque mélange, carte et coup vérifiés. Après une partie en direct, <i>Voir toute la partie</i> fait cette vérification pour vous ; après une partie en solo, <i>Copier le relevé</i> la conserve.",
       "more": "Tout le fonctionnement est expliqué dans <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">la description</a>."
     }
@@ -129,7 +137,7 @@
     "header": {
       "title": "Confidentialité",
       "tagline": "Ce qu'Open Hearts fait de ce que vous lui confiez, en termes simples.",
-      "updated": "Dernière mise à jour : 7 octobre 2026"
+      "updated": "Dernière mise à jour : 11 octobre 2026"
     },
     "short": {
       "title": "En bref",
@@ -138,7 +146,7 @@
       "p3": "Le jeu en direct est public, et c'est voulu",
       "p4": "Pour jouer avec d'autres, votre nom, votre image, le numéro de votre compte et vos résultats passent par notre relais, où quiconque les demande peut les lire. Les salles et les images y sont conservées un jour ; les résultats sont conservés pour les classements.",
       "p5": "Un compte, mais ni e-mail ni mot de passe",
-      "p6": "Rien n'est vendu, loué ni utilisé pour la publicité. Il n'y a aucun traceur dans l'application ni sur ce site. S'abonner crée un compte : un nombre aléatoire que notre service vous donne, sous lequel jouent vos appareils. Il n'y a pas de mot de passe, et nous ne conservons aucune adresse e-mail.",
+      "p6": "Rien n'est vendu, loué ni utilisé pour la publicité, et rien ne vous suit d'un site à l'autre. Le jeu sur le web signale ses erreurs et ses temps de chargement à New Relic, comme décrit plus bas ; ce site et les applications pour téléphone ne signalent rien. S'abonner crée un compte : un nombre aléatoire que notre service vous donne, sous lequel jouent vos appareils. Il n'y a pas de mot de passe, et nous ne conservons aucune adresse e-mail.",
       "p7": "Le paiement, c'est l'affaire de Stripe",
       "p8": "Sur le web, un abonnement s'achète via Stripe, qui a votre adresse e-mail et votre carte. Nous gardons une note indiquant le compte qu'il paie et les appareils de ce compte. Nous ne voyons jamais votre numéro de carte."
     },
@@ -153,7 +161,7 @@
       "p3": "<b>Votre nom et votre apparence</b> : une icône et une couleur, ou une image à vous. L'image est réduite à 64 sur 64 pixels sur votre appareil, et seule cette petite copie est conservée. La photo d'origine n'est ni stockée ni envoyée. Si vous vous abonnez, notre service en conserve une copie avec votre compte, comme expliqué plus bas.",
       "p4": "<b>Vos trente dernières parties contre les bots</b>, que votre profil comptabilise. Elles ne quittent l'appareil que si vous touchez <i>Copier le relevé</i>.",
       "p5": "<b>Votre rythme de jeu</b>, vos options de partie, la langue que vous avez choisie, votre licence et le numéro de votre compte si vous êtes abonné, et les joueurs dont vous avez choisi de masquer l'image.",
-      "p6": "<b>La partie en direct en cours</b>, tant que vous y êtes : la table, chaque coup et chaque vote que votre appareil y a signés, et les secrets avec lesquels il a distribué vos cartes, pour qu'une page rechargée en cours de partie puisse reprendre sa place. Tout cela est effacé quand la partie se termine ou que vous la quittez, ou deux minutes après votre dernier passage.",
+      "p6": "<b>La partie en direct en cours</b>, tant que vous y êtes : la table, chaque coup et chaque vote que votre appareil y a signés, et les secrets avec lesquels il a distribué vos cartes, pour qu'une page rechargée en cours de partie puisse reprendre sa place. Tout cela est effacé quand la partie se termine ou que vous la quittez. Si l'application se ferme en cours de partie, c'est effacé à sa prochaine ouverture, sauf si elle a lieu dans les deux minutes : vous reprenez alors votre place.",
       "p7": "Pour tout supprimer, effacez les données de play.openhearts.game dans votre navigateur (et celles d'openhearts.game, où un navigateur qui jouait avant que le jeu ne passe à play.openhearts.game garde sa copie antérieure), ou supprimez l'application. Cela supprime aussi votre clé : l'appareil revient alors comme un nouveau joueur, jusqu'à ce qu'un code de secours ou votre connexion le ramène dans votre compte."
     },
     "alone": {
@@ -167,7 +175,7 @@
       "p2": "<b>Les serveurs de polices de Google, parfois.</b> Le jeu embarque sa propre police, mais quand il doit afficher un caractère qu'elle ne contient pas — un emoji, une flèche, ou un nom écrit dans une écriture comme le chinois ou l'arabe — la boîte à outils avec laquelle il est conçu télécharge la police manquante depuis <code>fonts.gstatic.com</code>. Dans ce cas, Google reçoit votre adresse IP et apprend que vous visitez ce site.",
       "p3": "<b>Une vérification de licence.</b> À chaque démarrage, le jeu envoie la clé publique de votre appareil à notre service pour demander si elle a un abonnement. Si c'est le cas, le service note aussi que cet appareil est celui que votre compte utilise maintenant, depuis quand, et à quelle table en direct il se trouve, s'il est à une table ; cette note est remplacée la prochaine fois que l'un de vos appareils ouvre le jeu. Si ce n'est pas le cas, rien n'est conservé.",
       "p4": "<b>Votre page de profil</b> demande les résultats des parties à notre relais pour afficher votre classement. Elle ne publie rien sur vous.",
-      "p5": "<b>New Relic</b> nous signale quand le jeu plante ou est lent pour vous sur le web, à openhearts.game. La page du jeu lui envoie les erreurs rencontrées, son temps de chargement, les adresses des appels qu'elle fait à notre service (sans ce qui suit un « ? »), ainsi que votre navigateur, votre type d'appareil et votre localisation approximative. Votre adresse IP sert à cette localisation et est effacée dans la journée. Il ne dépose aucun cookie, n'enregistre ni l'écran ni la session, et ne lit rien de ce que vous tapez. Selon les <a href=\"https://newrelic.com/termsandconditions/services-notices\">avis de confidentialité de New Relic</a>."
+      "p5": "<b>New Relic</b> nous signale quand le jeu plante ou est lent pour vous sur play.openhearts.game. La page du jeu lui envoie les erreurs rencontrées, son temps de chargement, les adresses des appels qu'elle fait à notre service (sans ce qui suit un « ? »), ainsi que votre navigateur, votre type d'appareil et votre localisation approximative. Votre adresse IP sert à cette localisation et est effacée dans la journée. Il ne dépose aucun cookie, n'enregistre ni l'écran ni la session, et ne lit rien de ce que vous tapez. Selon les <a href=\"https://newrelic.com/termsandconditions/services-notices\">avis de confidentialité de New Relic</a>."
     },
     "live": {
       "title": "Jeu en direct",
@@ -182,7 +190,7 @@
       "p9": "Uniquement à notre relais, qui tourne sur Cloudflare. Chaque message est signé par l'appareil qui l'a envoyé, si bien que quiconque en garde une copie peut prouver qu'il est authentique ; nous ne pouvons pas supprimer une copie faite par quelqu'un d'autre.",
       "p10": "Ce que seule votre table voit",
       "p11": "Les cartes sont distribuées entre les appareils de la table de sorte que la main de chaque joueur ne puisse être lue que par lui seul, et aucun de nos serveurs ne voit jamais une main. Les coups passent d'appareil à appareil.",
-      "p12": "Ces connexions passent toutes par le service de relais de Cloudflare (TURN), si bien que les autres appareils de votre table ne connaissent jamais votre adresse IP — ni les autres joueurs, ni les <b>jurés</b> : les applications d'autres joueurs, tirées au hasard, qui aident à arbitrer une table et jouent à la place des bots. Cloudflare voit votre adresse IP, comme tout serveur auquel vous vous connectez, et transmet le trafic chiffré, sans pouvoir le lire."
+      "p12": "Ces connexions passent toutes par le service de relais de Cloudflare (TURN), si bien que les autres appareils de votre table ne connaissent jamais votre adresse IP — ni les autres joueurs, ni les <b>jurés</b> : les applications d'autres joueurs, tirées au hasard, qui aident à arbitrer une table et jouent à la place des bots (ou, quand personne d'autre n'est en ligne, les jurés de réserve de notre service). Cloudflare voit votre adresse IP, comme tout serveur auquel vous vous connectez, et transmet le trafic chiffré, sans pouvoir le lire."
     },
     "subscribing": {
       "title": "S'abonner",
@@ -245,7 +253,7 @@
     "header": {
       "title": "Conditions d'utilisation",
       "tagline": "L'accord entre vous et Open Hearts, en termes simples.",
-      "updated": "Dernière mise à jour : 6 octobre 2026"
+      "updated": "Dernière mise à jour : 11 octobre 2026"
     },
     "short": {
       "title": "En bref",
@@ -260,7 +268,7 @@
     },
     "who": {
       "title": "Avec qui ces conditions sont conclues",
-      "p1": "Ces conditions sont un accord entre vous et Open Hearts (« nous »), dont l'adresse figure sous <a href=\"#contact\">Contact</a>. Elles couvrent ce site, le jeu à l'adresse <a href=\"{{play}}\">play.openhearts.game</a>, les applications Open Hearts pour téléphone et le service de jeu en direct. En utilisant l'un d'eux, vous acceptez ces conditions. Si vous ne les acceptez pas, merci de ne pas les utiliser.",
+      "p1": "Ces conditions sont un accord entre vous et Open Hearts (« nous »), exploité par Bright Fulton, dont l'adresse figure sous <a href=\"#contact\">Contact</a>. Elles couvrent ce site, le jeu à l'adresse <a href=\"{{play}}\">play.openhearts.game</a>, les applications Open Hearts pour téléphone et le service de jeu en direct. En utilisant l'un d'eux, vous acceptez ces conditions. Si vous ne les acceptez pas, merci de ne pas les utiliser.",
       "p2": "La façon dont nous traitons les informations vous concernant est décrite dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>, qui fait partie de ces conditions."
     },
     "appStore": {
@@ -290,9 +298,7 @@
       "p14": "<b>Web :</b> l'achat se fait via Stripe, et Stripe débite chaque année la carte que vous lui avez donnée, à la date de votre premier abonnement.",
       "p15": "Résiliation",
       "p16": "Vous pouvez résilier à tout moment. La résiliation arrête le prochain renouvellement ; le jeu en direct continue de fonctionner jusqu'à la fin de l'année que vous avez payée.",
-      "p17": "<b>App Store :</b> sur votre iPhone ou iPad, ouvrez Réglages, touchez votre nom, puis Abonnements, et choisissez Open Hearts.",
-      "p18": "<b>Google Play :</b> dans l'application Play Store, touchez votre photo de profil, puis Paiements et abonnements, puis Abonnements.",
-      "p19": "<b>Web :</b> dans le jeu, ouvrez Jeu en direct et choisissez <b>Gérer l'abonnement</b>, sur n'importe quel appareil de l'abonnement. Cela ouvre la page de facturation de Stripe, où vous pouvez résilier, changer de carte et consulter vos reçus. Si vous n'avez plus aucun de ces appareils, écrivez-nous (coordonnées ci-dessous) en indiquant l'adresse e-mail avec laquelle vous avez payé : nous le résilierons et vous le confirmerons.",
+      "p17": "Comment résilier — dans l'application, dans chaque boutique, et quand vous n'avez plus aucun de vos appareils — est expliqué sur la <a href=\"{{base}}/support#cancel\">page d'aide</a>.",
       "p20": "Remboursements",
       "p21": "<b>App Store et Google Play :</b> les remboursements sont gérés par Apple ou Google selon leurs propres politiques. Pour l'App Store, demandez-en un sur <a href=\"https://reportaproblem.apple.com/\">reportaproblem.apple.com</a>. Nous ne pouvons pas rembourser nous-mêmes un achat fait dans une boutique.",
       "p22": "<b>Web :</b> contactez-nous. Là où la loi de votre pays vous donne un droit de rétractation ou un droit au remboursement, vous en bénéficiez, et nous examinerons équitablement toute autre demande.",
