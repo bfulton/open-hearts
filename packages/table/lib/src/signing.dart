@@ -67,10 +67,11 @@ bool verify(PublicKey key, String digestHex, String signatureHex) {
 }
 
 /// How a real signature is checked. The pure-Dart `bip340` package by
-/// default — seventeen milliseconds in the VM — and on the web the app
-/// swaps in its wasm, the VM its cdylib (schnorr_native.dart), each two
-/// hundred times faster (measurements/sign). Set once, at startup,
-/// before any event is parsed.
+/// default, and on the web the app swaps in its wasm
+/// (crypto/schnorr_wasm), the VM its cdylib (schnorr_native.dart): the
+/// same k256 code compiled, which is what makes checking every event
+/// of a table, several times a turn, cheap enough not to notice. Set
+/// once, at startup, before any event is parsed.
 bool Function(PublicKey key, String digestHex, String signatureHex) schnorrVerifier = bip340.verify;
 
 /// How a real signature is made: secret, digest and thirty-two bytes of

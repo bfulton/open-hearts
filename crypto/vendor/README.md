@@ -58,7 +58,7 @@ wasm), as do two sealed games the 0.3 library kept
   a flag of its own (`ZeroFlag = bool`). The unused r1cs gadgets are left
   out.
 - Dropped as unused: proof-essentials' merlin transcript module and
-  criterion bench (measurements/shuffle is the benchmark), and the
+  criterion bench, and the
   dependencies only they or 0.3 needed (ark-marlin, ark-crypto-primitives,
   merlin, anyhow). Blake2 is 0.10 (the same BLAKE2b-512 and BLAKE2s-256).
 

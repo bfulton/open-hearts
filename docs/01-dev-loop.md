@@ -33,7 +33,6 @@ Pages project `open-hearts`:
 | `/` | `site/`, built in each language by `site/build.mjs` |
 | `/api/` | the service's handlers, `service/functions/` published as `_worker.js` ([doc 06](06-service.md)) |
 | `/play/` | the Flutter web build, `--base-href /` |
-| `/measure/shuffle/` | the deal benchmark, when its wasm has been built ([measurements](../measurements/README.md)) |
 
 The worker routes by host ([doc 06](06-service.md#where-the-app-is)).
 In production the site is `openhearts.game` and the app is the root of

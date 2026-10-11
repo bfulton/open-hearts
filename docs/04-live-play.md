@@ -681,8 +681,8 @@ picture on this device for good.
 
 A device's identity is a keypair made on the device when first needed
 (`app/lib/identity.dart`): an x-only secp256k1 key with BIP-340 Schnorr
-signatures (`signing.dart`; on the web through the wasm in
-[measurements](../measurements/README.md)). The key signs every move and
+signatures (`signing.dart`; on the web through the wasm built from
+`crypto/schnorr_wasm`). The key signs every move and
 never leaves the device. A person is an **account**, made when they
 subscribe ([doc 06](06-service.md)), with up to five devices. The
 service's licence names a device's key beside its account's id, and

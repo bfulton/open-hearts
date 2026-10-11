@@ -22,7 +22,6 @@ private to the person holding it.
 | [`site/`](site/) | The marketing site: page templates, their words in each language, and the build that joins them |
 | [`config/`](config/openhearts.json) | What is not secret about this deployment: the service's public key, store and sign-in identifiers, the Stripe price |
 | [`infra/`](infra/), [`observability/`](observability/) | Cloudflare, Stripe and New Relic configuration, checked and applied by script |
-| [`measurements/`](measurements/README.md) | Benchmarks behind the design's numbers |
 
 Solo play runs entirely on the device. Live play is four devices talking
 directly to each other over WebRTC, with our relay
