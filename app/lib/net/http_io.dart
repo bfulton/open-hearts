@@ -1,4 +1,5 @@
-/// One JSON POST on a native build: dart:io's client.
+/// The app's own requests on a native build: dart:io's client
+/// (http.dart).
 library;
 
 import 'dart:convert';
@@ -18,12 +19,6 @@ Future<({int status, String body})> post(Uri url, String body) async {
   } finally {
     client.close(force: true);
   }
-}
-
-/// The body of a POST that was taken, or null when it was not.
-Future<String?> postJson(Uri url, String body) async {
-  final answer = await post(url, body);
-  return answer.status == 200 ? answer.body : null;
 }
 
 /// The body of a GET that was answered 200, or null.

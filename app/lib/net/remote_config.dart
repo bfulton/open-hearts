@@ -23,7 +23,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart' show TableTiming;
 
 import 'licence.dart' show handlerAt;
-import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
+import 'http.dart' as http;
 
 /// A sentence the operator wrote, in the languages they wrote it in.
 /// English is always one of them.

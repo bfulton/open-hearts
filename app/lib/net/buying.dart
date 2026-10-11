@@ -23,7 +23,7 @@ import 'licence.dart';
 import 'remote_config.dart';
 import 'store_buying.dart';
 import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
-import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
+import 'http.dart' as http;
 
 /// What live play costs a year, as it is written on the front door
 /// (`pricePerYear`, l10n). The shape of the price is chosen by the fees

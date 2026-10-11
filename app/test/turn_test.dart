@@ -8,7 +8,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/net/licence.dart' show requestDigest;
 import 'package:open_hearts/net/turn.dart';
-import 'package:open_hearts/net/turn_fetch_io.dart';
+import 'package:open_hearts/net/http.dart';
 import 'package:table/table.dart';
 
 void main() {

@@ -23,7 +23,7 @@ import 'dart:convert';
 import 'package:table/table.dart';
 
 import 'address.dart' show appBase;
-import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
+import 'http.dart' as http;
 
 /// The service this build will take a licence from, and no other. A
 /// licence signed by anything else is not a licence, which is the whole
