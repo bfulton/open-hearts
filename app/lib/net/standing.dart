@@ -77,7 +77,7 @@ class Standing {
     }
   }
 
-  /// The bots to seat at a table of people rated about [rating]:
+  /// The bots to seat at a table of people rated about `rating`:
   /// personas at the levels nearest it, no name twice, ties broken by
   /// the draw.
   static List<Persona> Function(int rating, int count, Random random) botPicker(Ledger ledger) => (rating, count, random) {

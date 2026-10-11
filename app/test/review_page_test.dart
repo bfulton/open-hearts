@@ -5,13 +5,13 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:engine/engine.dart' show Card, Phase, twoOfClubs;
 import 'package:flutter/material.dart' hide Card;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
 import 'package:open_hearts/net/record_check.dart';
 import 'package:open_hearts/net/remote_config.dart' show waits;
 import 'package:open_hearts/net/watching.dart';
-import 'package:engine/engine.dart' show Card, Phase, twoOfClubs;
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:table/src/sim/sim.dart';

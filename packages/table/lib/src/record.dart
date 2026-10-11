@@ -489,7 +489,7 @@ Verification verifyRecord(
     }
     if (snapshot.any(humans.contains)) return fail('a jury drawn from the table itself');
     final expected = drawJury(spec.seed, e.hand, snapshot);
-    if (expected.length != drawn.length || Iterable.generate(drawn.length).any((i) => expected[i] != drawn[i])) {
+    if (expected.length != drawn.length || Iterable<int>.generate(drawn.length).any((i) => expected[i] != drawn[i])) {
       return fail('a jury for hand ${e.hand} that is not the draw its snapshot gives');
     }
     if (!carried(d.witnesses, d.turn, d.among)) {

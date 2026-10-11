@@ -29,14 +29,14 @@ cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 #
 # One function each, run from the root with its output to its log.
 
-suite_engine() { cd packages/engine && dart analyze && dart test -j "$cores"; }
-suite_deal() { cd packages/deal && dart analyze && dart test -j "$cores"; }
+suite_engine() { cd packages/engine && dart analyze --fatal-infos && dart test -j "$cores"; }
+suite_deal() { cd packages/deal && dart analyze --fatal-infos && dart test -j "$cores"; }
 # The table's fast tier, and the slow one: whole sealed games under
 # every departure, the chaos walks past the first eight
 # (packages/table/dart_test.yaml).
-suite_table() { cd packages/table && dart analyze && dart test -j "$cores" -x slow; }
+suite_table() { cd packages/table && dart analyze --fatal-infos && dart test -j "$cores" -x slow; }
 suite_table_slow() { cd packages/table && dart test -j "$cores" -t slow; }
-suite_service() { cd service && dart analyze && dart test -j "$cores"; }
+suite_service() { cd service && dart analyze --fatal-infos && dart test -j "$cores"; }
 # The same suite against the relay the Cloudflare object runs.
 suite_service_js() { cd service && OH_RELAY=js dart test -j "$cores"; }
 suite_service_object() { cd service && OH_RELAY=object dart test -j "$cores"; }

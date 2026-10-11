@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'package:table/table.dart' show Pace, Tally;
 
 import 'avatar.dart';
 import 'entitlement.dart';
@@ -38,8 +39,6 @@ import 'stats.dart';
 import 'theme.dart';
 import 'ui/photo_crop.dart';
 import 'ui/player_icon.dart';
-
-import 'package:table/table.dart' show Pace, Tally;
 
 /// How big a picture is, or null when the bytes are not one.
 Size? sizeOfPicture(Uint8List bytes) {

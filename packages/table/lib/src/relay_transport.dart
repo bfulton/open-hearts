@@ -11,11 +11,10 @@
 /// distinction the protocol's "heard from" depends on.
 ///
 /// A relay is a meeting point, not a friend: it says nothing when a peer
-/// goes, so [disconnected] never fires here. The protocol's heartbeats
+/// goes, so `disconnected` never fires here. The protocol's heartbeats
 /// carry that.
 library;
 
-import 'relay_policy.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -24,6 +23,7 @@ import 'nip44.dart';
 import 'nostr.dart';
 import 'presence_relay.dart' show relaysForTag;
 import 'reactions.dart';
+import 'relay_policy.dart';
 import 'relays.dart';
 import 'signing.dart';
 import 'transport.dart';

@@ -9,9 +9,8 @@ library;
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-
 import 'package:engine/engine.dart';
+import 'package:flutter/foundation.dart';
 
 import 'avatar.dart';
 import 'l10n/l10n.dart';

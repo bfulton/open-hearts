@@ -23,11 +23,11 @@
 /// gives the same milliseconds every time.
 library;
 
+import 'package:deal/deal.dart';
 // A measurement's output is its log.
 // ignore_for_file: avoid_print
 
 import 'package:engine/args.dart';
-import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';

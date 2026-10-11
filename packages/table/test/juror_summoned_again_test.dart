@@ -8,7 +8,7 @@
 /// a new client that took that as its own would draw fresh keys for a
 /// seat keyed hands ago, keep them over the ones on the record, and
 /// verify nothing shuffled from them. So it has no part in the hands
-/// before its first summons ([SimTable.sweepJurors] lets go of a
+/// before its first summons (`SimTable.sweepJurors` lets go of a
 /// juror's client as the duty does).
 @Tags(['slow'])
 library;

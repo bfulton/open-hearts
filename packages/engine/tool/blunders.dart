@@ -17,9 +17,8 @@ library;
 
 import 'dart:math';
 
-import 'package:engine/engine.dart';
-
 import 'package:engine/args.dart';
+import 'package:engine/engine.dart';
 
 void main(List<String> args) {
   final tables = intArg(args, 'tables', 300);

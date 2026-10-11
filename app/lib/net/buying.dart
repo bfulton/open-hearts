@@ -18,12 +18,12 @@ import 'dart:convert';
 import 'package:table/table.dart';
 
 import '../l10n/l10n.dart';
+import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
 import 'household.dart' show askService;
+import 'http.dart' as http;
 import 'licence.dart';
 import 'remote_config.dart';
 import 'store_buying.dart';
-import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
-import 'http.dart' as http;
 
 /// What live play costs a year, as it is written on the front door
 /// (`pricePerYear`, l10n). The shape of the price is chosen by the fees

@@ -3,11 +3,12 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:engine/engine.dart';
 import 'package:flutter/material.dart' hide Card;
 import 'package:flutter/semantics.dart';
 
-import 'package:engine/engine.dart';
 import '../avatar.dart';
+import '../l10n/l10n.dart';
 import '../table_model.dart';
 import '../theme.dart';
 import 'card_view.dart';
@@ -15,7 +16,6 @@ import 'pip.dart';
 import 'player_icon.dart';
 import 'reactions.dart';
 import 'scaled.dart';
-import '../l10n/l10n.dart';
 
 /// More height than a table is ever going to use, at which point where
 /// it sits in the felt stops being a rounding error and starts being a

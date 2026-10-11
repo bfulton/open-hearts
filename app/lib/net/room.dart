@@ -21,8 +21,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
+import 'package:flutter/foundation.dart';
 import 'package:table/table.dart';
 
 import '../avatar.dart';

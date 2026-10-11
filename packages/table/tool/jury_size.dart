@@ -16,7 +16,7 @@
 ///    people and the jury, so it wants one live juror of any.
 ///  - **A deadlocked turn** wants one live juror to rule.
 ///
-/// The one number this rests on is [f]: the chance that a juror drawn
+/// The one number this rests on is `f`: the chance that a juror drawn
 /// at the start of a hand cannot be reached when its piece is wanted,
 /// a minute or two later. There is no population to measure yet, so
 /// the answer is given across a range of it and the design assumption
@@ -90,7 +90,7 @@ int? least(double f, double target, {required int t}) {
   return null;
 }
 
-/// [f] from a lifetime, which is how the assumption actually comes:
+/// `f` from a lifetime, which is how the assumption actually comes:
 /// "expect the p50 juror to last about a minute".
 ///
 /// A juror's presence is taken as memoryless — a constant chance of

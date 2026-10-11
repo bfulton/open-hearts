@@ -1,9 +1,10 @@
 /// A pace, and who it seats you with.
 library;
 
+import 'dart:math';
+
 import 'package:table/table.dart';
 import 'package:test/test.dart';
-import 'dart:math';
 
 Waiter _waiter(String key, {int rating = 1500, int pace = 0, int since = 0}) =>
     Waiter(key: key, name: key, rating: rating, pace: pace, since: since);

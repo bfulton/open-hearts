@@ -17,8 +17,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../theme.dart';
 import '../l10n/l10n.dart';
+import '../theme.dart';
 
 /// What a square window of [side] is looking at, over a picture of
 /// [picture] pixels.

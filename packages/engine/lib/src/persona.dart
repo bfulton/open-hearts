@@ -7,7 +7,7 @@
 /// or patient, never bad; test/persona_test.dart plays them against each
 /// other and fails if any falls behind.
 ///
-/// Each character also comes at every strength on a ladder ([at]), so
+/// Each character also comes at every strength on a ladder (`at`), so
 /// a person is seated with bots near their own rating, and a bot's
 /// rating means what a person's does.
 ///

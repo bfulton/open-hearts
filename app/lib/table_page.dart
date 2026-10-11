@@ -9,11 +9,11 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:engine/engine.dart';
 import 'package:flutter/material.dart' hide Card;
 
 import 'avatar.dart';
 import 'entitlement.dart';
-import 'package:engine/engine.dart';
 import 'feedback_page.dart';
 import 'game_controller.dart';
 import 'identity.dart';
@@ -22,8 +22,8 @@ import 'net/copy.dart';
 import 'pages.dart';
 import 'table_model.dart';
 import 'theme.dart';
-import 'ui/hand_fan.dart';
 import 'ui/gone.dart';
+import 'ui/hand_fan.dart';
 import 'ui/header.dart';
 import 'ui/overlays.dart';
 import 'ui/pip.dart';

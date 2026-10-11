@@ -7,12 +7,12 @@
 /// ended on.
 library;
 
+import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/game_controller.dart';
-import 'package:open_hearts/record_store.dart';
 import 'package:open_hearts/net/standing.dart' as net;
+import 'package:open_hearts/record_store.dart';
 import 'package:open_hearts/stats.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';

@@ -7,9 +7,9 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
+import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/table_model.dart';
 import 'package:open_hearts/ui/table_view.dart' show TableView;
 import 'package:table/src/sim/sim.dart';

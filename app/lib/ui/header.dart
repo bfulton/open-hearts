@@ -6,12 +6,11 @@
 /// control for the things that are not the game, wherever the app is.
 library;
 
+import 'package:engine/engine.dart';
 import 'package:flutter/material.dart';
 
-import 'package:engine/engine.dart';
-
-import '../theme.dart';
 import '../l10n/l10n.dart';
+import '../theme.dart';
 
 /// One entry on the table's menu.
 class MenuAction {

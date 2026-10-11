@@ -50,7 +50,7 @@ class KeptGame {
   static KeptGame? read(String text) {
     try {
       final json = jsonDecode(text) as Map<String, Object?>;
-      final head = GameRecord.parse({...json, 'record': const [], 'juries': const [], 'releases': const []});
+      final head = GameRecord.parse({...json, 'record': const <Object?>[], 'juries': const <Object?>[], 'releases': const <Object?>[]});
       return head == null ? null : KeptGame(spec: head.spec, names: head.names, text: text);
     } catch (_) {
       return null;

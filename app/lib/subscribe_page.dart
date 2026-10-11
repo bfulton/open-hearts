@@ -13,16 +13,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart' show SignInWithAppleButton, SignInWithAppleButtonStyle;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:table/table.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'activate_page.dart';
 import 'entitlement.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
 import 'net/backoff.dart';
-import 'net/copy.dart';
 import 'net/buying.dart';
+import 'net/copy.dart';
 import 'net/household.dart';
 import 'net/provider_tokens.dart';
 import 'net/remote_config.dart';

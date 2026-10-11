@@ -204,7 +204,7 @@ class _ReviewPageState extends State<ReviewPage> {
         record = await _load();
       }
     } on GameNotShown {
-      _watching?.cancel();
+      unawaited(_watching?.cancel());
       _watching = null;
       return;
     }

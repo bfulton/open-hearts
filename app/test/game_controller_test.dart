@@ -8,8 +8,8 @@ import 'package:engine/engine.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/game_controller.dart';
-import 'package:open_hearts/record_store.dart';
 import 'package:open_hearts/pacing.dart';
+import 'package:open_hearts/record_store.dart';
 
 void main() {
   test('the last trick is held, swept, and then the sheet is due, a beat later', () {

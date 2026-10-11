@@ -96,7 +96,7 @@ class SimNetwork {
   }
 
   /// [key]'s link let go of, as a juror's duty lets go of a table it
-  /// has served ([SimJuror.sweeps]): nothing more reaches it. A later
+  /// has served (`SimJuror.sweeps`): nothing more reaches it. A later
   /// [attach] for the same key is a new link, and whatever was already
   /// on its way goes to that one or nowhere.
   void detach(PublicKey key, SimTransport t) {

@@ -2,8 +2,9 @@
 /// be replayed with a transition log.
 library;
 
-import 'package:deal/deal.dart';
 import 'dart:math';
+
+import 'package:deal/deal.dart';
 
 import '../signing.dart';
 import 'scripted_human.dart';

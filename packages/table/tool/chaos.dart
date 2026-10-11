@@ -30,8 +30,8 @@ library;
 
 import 'dart:io';
 
-import 'package:engine/args.dart';
 import 'package:deal/deal.dart';
+import 'package:engine/args.dart';
 import 'package:table/src/sim/sim.dart';
 
 Future<void> main(List<String> args) async {

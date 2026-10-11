@@ -76,9 +76,9 @@ String? _keepingDir() {
 }
 
 class MemoCrypto implements DealCrypto {
-  /// The library [_real], remembered in memory — and in [keep], a
+  /// The library [_real], remembered in memory — and in `keep`, a
   /// directory, when there is one.
-  MemoCrypto(this._real, {String? keep}) : _keep = keep;
+  MemoCrypto(this._real, {this._keep});
   final DealCrypto _real;
   final String? _keep;
   final Map<String, Object?> _memo = {};

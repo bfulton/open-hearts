@@ -1,12 +1,11 @@
 /// What the table's widgets need from whatever is driving the game —
 /// the solo controller, or a live table's client. The views draw the
 /// player at the bottom whichever seat they hold, so everything is
-/// asked relative to [mySeat].
+/// asked relative to `mySeat`.
 library;
 
-import 'package:flutter/foundation.dart';
-
 import 'package:engine/engine.dart';
+import 'package:flutter/foundation.dart';
 import 'package:table/table.dart' show Reaction;
 
 import 'avatar.dart';

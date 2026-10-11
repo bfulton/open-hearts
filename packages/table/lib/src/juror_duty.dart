@@ -42,7 +42,7 @@ class JurorDuty {
   final Clock clock;
 
   /// The silence a juror's clients count as absence: null for each
-  /// table's own ([TableTiming.silenceMs]), shorter in a test.
+  /// table's own (`TableTiming.silenceMs`), shorter in a test.
   final int? silenceAfterMs;
 
   /// The deal's primitives, to serve at sealed tables.
@@ -206,7 +206,7 @@ class LetGo {
 }
 
 /// The backup jurors: several of them. A table whose bot seats are the
-/// jury's to hold needs [juryToHoldBots] jurors before it can hold any
+/// jury's to hold needs `juryToHoldBots` jurors before it can hold any
 /// (jury.dart), and the call for backup jurors comes exactly when too
 /// few others are online to make that number up — so what answers is
 /// several jurors rather than one, and a quiet night keeps the bots'

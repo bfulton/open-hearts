@@ -4,7 +4,7 @@
 /// choices, so a game against bots is fully described by its seed, who
 /// sat where, and what the human passed and played. That is the record
 /// the app keeps on the device and what its Copy button hands over —
-/// a line of text that [replay] turns back into every trick, so a hand
+/// a line of text that `replay` turns back into every trick, so a hand
 /// where the moon got through can be studied and the defence tuned
 /// against it.
 ///

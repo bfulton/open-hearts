@@ -6,32 +6,32 @@ library;
 
 import 'dart:async';
 
+import 'package:engine/engine.dart';
 import 'package:flutter/material.dart' hide Card;
 import 'package:go_router/go_router.dart';
-import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 import '../avatar.dart';
 import '../feedback_page.dart';
 import '../l10n/l10n.dart';
-import 'live_controller.dart';
+import '../net/address.dart' show driven;
+import '../net/copy.dart';
+import '../net/in_use.dart';
+import '../net/share.dart';
 import '../pages.dart';
 import '../reaction_mute.dart';
 import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
-import '../ui/hand_fan.dart';
 import '../ui/gone.dart';
+import '../ui/hand_fan.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
 import '../ui/reactions.dart';
-import '../net/address.dart' show driven;
-import '../net/copy.dart';
-import '../net/in_use.dart';
-import '../net/share.dart';
 import '../ui/reading_time.dart';
 import '../ui/table_layout.dart';
 import '../ui/table_view.dart';
+import 'live_controller.dart';
 
 class LivePage extends StatefulWidget {
   const LivePage({super.key, required this.controller});

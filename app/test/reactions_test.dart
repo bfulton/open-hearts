@@ -12,10 +12,10 @@ library;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:engine/engine.dart' show Phase;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:engine/engine.dart' show Phase;
 import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/net/in_use.dart';
 import 'package:open_hearts/net/watching.dart';

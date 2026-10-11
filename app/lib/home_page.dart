@@ -35,29 +35,29 @@ import 'feedback_page.dart';
 import 'game_options.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
-import 'net/copy.dart';
-import 'pages.dart';
-import 'profile_page.dart';
-import 'options_sheet.dart';
 import 'live/live_controller.dart';
 import 'net/account_profile.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
+import 'net/copy.dart';
 import 'net/duty.dart';
 import 'net/game_records.dart';
 import 'net/household.dart';
 import 'net/in_use.dart';
 import 'net/mesh_transport.dart';
 import 'net/network.dart';
-import 'net/remote_config.dart';
 import 'net/relays.dart';
+import 'net/remote_config.dart';
 import 'net/room.dart';
 import 'net/seat_store.dart';
 import 'net/share.dart';
 import 'net/standing.dart';
-import 'pace_store.dart';
 import 'net/turn.dart';
+import 'options_sheet.dart';
+import 'pace_store.dart';
+import 'pages.dart';
 import 'pictures.dart';
+import 'profile_page.dart';
 import 'subscribe_page.dart';
 import 'table_page.dart';
 import 'theme.dart';
@@ -463,9 +463,9 @@ class _HomePageState extends State<HomePage> {
     if (InUse.current.standing != Use.here) await InUse.current.open(signer);
     if (!mounted || InUse.current.elsewhere || Duty.current != null) return;
     unawaited(_comeBack(signer));
-    Duty.on(_relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
+    unawaited(Duty.on(_relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
       if (mounted) setState(() => _listeningSinceMs = DateTime.now().millisecondsSinceEpoch);
-    });
+    }));
     _onlineClock?.cancel();
     _onlineClock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -573,7 +573,7 @@ class _HomePageState extends State<HomePage> {
         return null;
       }
       transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
-      _refusalSub?.cancel();
+      unawaited(_refusalSub?.cancel());
       _refusalSub = transport.refusals.listen((r) {
         if (mounted) setState(() => _relayNote = r == null ? null : context.l10n.noRelayTakesEvents(r));
       });
@@ -588,12 +588,12 @@ class _HomePageState extends State<HomePage> {
       // everyone, and a juror when drawn.
       Duty.on(relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker);
       _iceServers ??= const [];
-      iceServersFor(signer).then((servers) {
+      unawaited(iceServersFor(signer).then((servers) {
         _iceServers = servers;
         // The same credentials serve this device's juror duty, whose
         // channels are made when a table summons it (net/duty.dart).
         Duty.ice = servers;
-      });
+      }));
       if (_standing == null) await _loadStanding(relays, signer);
       setState(() {
         _transport = transport;

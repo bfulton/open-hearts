@@ -21,8 +21,8 @@ import 'package:table/table.dart';
 
 import '../l10n/l10n.dart';
 import 'address.dart';
-import 'licence.dart';
 import 'http.dart' as http;
+import 'licence.dart';
 import 'remote_config.dart' show waits;
 
 /// A device of the account, as the service lists them.

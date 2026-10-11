@@ -9,8 +9,8 @@ library;
 import 'package:flutter/material.dart';
 
 import '../build_info.dart';
-import '../theme.dart';
 import '../l10n/l10n.dart';
+import '../theme.dart';
 
 class UpdatePill extends StatefulWidget {
   const UpdatePill({super.key});

@@ -22,8 +22,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart' show TableTiming;
 
-import 'licence.dart' show handlerAt;
 import 'http.dart' as http;
+import 'licence.dart' show handlerAt;
 
 /// A sentence the operator wrote, in the languages they wrote it in.
 /// English is always one of them.

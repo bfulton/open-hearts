@@ -31,9 +31,9 @@ class SimJuror {
   final DealWorker? dealWorker;
 
   /// Whether this juror can serve: not while its deal worker has
-  /// failed for good. One that cannot is not online ([SimPresence]),
+  /// failed for good. One that cannot is not online (`SimPresence`),
   /// as a device's presence says nothing of it then
-  /// (presence_relay.dart, [RelayPresence.canServe]).
+  /// (presence_relay.dart, `RelayPresence.canServe`).
   bool get canServe => !(dealWorker?.dead ?? false);
 
   /// The client following the table, from the first summons on.

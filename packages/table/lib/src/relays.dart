@@ -14,13 +14,13 @@
 /// relays and one relay's bad hour is not every table's.
 library;
 
-import 'relay_policy.dart';
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'nostr.dart';
+import 'relay_policy.dart';
 import 'signing.dart';
 
 /// What a device shows a relay that asks who it is (NIP-42), as tags

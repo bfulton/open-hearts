@@ -17,10 +17,10 @@ import 'net/duty.dart';
 import 'net/in_use.dart';
 import 'net/licence.dart' show serviceKey;
 import 'net/remote_config.dart';
-import 'router.dart';
-import 'pacing.dart' show tableBeats;
 import 'net/report_error.dart';
 import 'net/store_buying.dart';
+import 'pacing.dart' show tableBeats;
+import 'router.dart';
 import 'theme.dart';
 import 'ui/in_use_screen.dart';
 

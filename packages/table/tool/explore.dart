@@ -48,8 +48,8 @@ library;
 
 import 'dart:io';
 
-import 'package:engine/args.dart';
 import 'package:deal/deal.dart';
+import 'package:engine/args.dart';
 import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
@@ -61,7 +61,7 @@ class Scenario {
       {this.script, this.faultAt = 0, this.windowMs = 20000, this.horizonMs = 5 * 60 * 1000, this.whole = false});
   final String about;
   final SimTable Function(DealCrypto crypto) build;
-  /// What the game does to itself, at [at] milliseconds.
+  /// What the game does to itself, at `at` milliseconds.
   final void Function(SimTable t, int at)? script;
 
   /// When the scripted fault comes, unless `--fault-at` says otherwise.
@@ -268,7 +268,7 @@ String? judgeWhole(SimTable t, Scenario s) {
   final first = survivors.first.record.map((d) => d.key).toList();
   for (final c in survivors.skip(1)) {
     final r = c.record.map((d) => d.key).toList();
-    if (r.length != first.length || Iterable.generate(r.length).any((i) => r[i] != first[i])) {
+    if (r.length != first.length || Iterable<int>.generate(r.length).any((i) => r[i] != first[i])) {
       return 'survivors hold different records';
     }
   }

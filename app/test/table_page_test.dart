@@ -5,14 +5,16 @@
 /// and that the screen says what just happened.
 library;
 
+import 'package:engine/engine.dart' as engine;
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/about_page.dart';
 import 'package:open_hearts/game_controller.dart';
+import 'package:open_hearts/pages.dart';
 import 'package:open_hearts/record_store.dart';
 import 'package:open_hearts/table_page.dart';
+import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
 import 'package:open_hearts/ui/header.dart';
@@ -20,12 +22,9 @@ import 'package:open_hearts/ui/player_icon.dart';
 import 'package:open_hearts/ui/scaled.dart';
 import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
-import 'package:open_hearts/theme.dart';
-import 'package:open_hearts/pages.dart';
-
-import 'routes.dart';
 
 import 'drawn.dart';
+import 'routes.dart';
 
 /// A phone-shaped surface: the fan layout is the part most likely to
 /// break, and it only breaks when width is scarce.

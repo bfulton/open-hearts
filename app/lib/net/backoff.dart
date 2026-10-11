@@ -1,5 +1,5 @@
-/// Asking again after an ask that went unanswered: [first] the first
-/// time, twice as long each time after that, up to [most]. The licence
+/// Asking again after an ask that went unanswered: `first` the first
+/// time, twice as long each time after that, up to `most`. The licence
 /// and an account's list of devices are both asked for this way
 /// (entitlement.dart, subscribe_page.dart).
 library;

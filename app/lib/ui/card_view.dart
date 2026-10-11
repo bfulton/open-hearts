@@ -5,9 +5,9 @@
 /// desktop, and text plus a pip scales to both for free.
 library;
 
+import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 
-import 'package:engine/engine.dart' as engine;
 import '../theme.dart';
 import 'pip.dart';
 

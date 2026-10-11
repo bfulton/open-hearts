@@ -1,7 +1,7 @@
 /// The rules of Hearts, as pure functions over hands and tricks.
 ///
 /// Nothing here holds state or knows about players-as-people: every
-/// function takes what it needs and returns a value. [HeartsGame] in
+/// function takes what it needs and returns a value. `HeartsGame` in
 /// game.dart is the only thing that sequences them, and the bot in
 /// bot.dart reads them to decide. Keeping the rules callable in
 /// isolation is what makes them testable without dealing a game.
@@ -156,7 +156,7 @@ List<int> scoreHand(List<int> takenPoints) {
 }
 
 /// The score a game runs to unless the table asked for another
-/// ([HeartsGame.target]). Play stops at the end of the hand in which
+/// (`HeartsGame.target`). Play stops at the end of the hand in which
 /// any player reaches it; lowest total wins. Fifty: a game of a few
 /// hands rather than an evening, the length a phone is picked up for.
 const gameOverScore = 50;

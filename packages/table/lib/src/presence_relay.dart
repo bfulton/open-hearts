@@ -55,7 +55,7 @@ class Summons {
 
   /// The draws the sender's table had carried for [hand], each with
   /// the witnesses that carried it, as signed events
-  /// ([TableClient.serveFor]).
+  /// (`TableClient.serveFor`).
   final List<Map<String, Object?>> draws;
 
   static Summons? parse(PublicKey from, Map<String, Object?> content) {
