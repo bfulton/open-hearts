@@ -36,6 +36,7 @@ import worker, {
   webhookSigned,
   whoSignedIn,
 } from './worker.mjs';
+import { eventIdOf } from './records.mjs';
 import { keys } from '../do/sign.mjs';
 
 const KEY = 'ab'.repeat(32);
@@ -1439,10 +1440,24 @@ test('a game\'s record: sent by a player signed for its table, kept, and shown o
   const { held, send } = serving(store);
   const env = { ...held, OH_RECORDS: bucket };
   const table = '0123456789abcdef0123456789abcdef';
-  const record = JSON.stringify({ v: 1, spec: { id: table, seats: [{ key: ADA.public }, { key: BAO.public }, { bot: 'Romeo' }, { bot: 'Juliet' }] }, record: [] });
+  // A play of Ada's, made as the table makes one (records.mjs).
+  const body = { hand: 0, turn: 4, seat: 0, card: '2C' };
+  const id = await eventIdOf(table, { author: ADA.public, kind: 'play', body });
+  const play = { id, author: ADA.public, kind: 'play', body, sig: signer.sign(ADA.secret, id) };
+  const record = JSON.stringify({
+    v: 1,
+    spec: { id: table, seats: [{ key: ADA.public }, { key: BAO.public }, { bot: 'Romeo' }, { bot: 'Juliet' }] },
+    record: [{ turn: [0, 4], event: play, witnesses: [] }],
+  });
   // Signed for another table: not this one's.
   const wrong = await worker.fetch(send('record', await asking(ADA, 'record', { what: 'f'.repeat(32), table, record })), env);
   assert.equal(wrong.status, 401);
+  // Sent by a device with no subscription, or not its account's in use.
+  assert.equal((await worker.fetch(send('record', await asking(CY, 'record', { what: table, table, record })), env)).status, 402);
+  assert.equal((await worker.fetch(send('record', await asking(ADA, 'record', { what: table, table, record })), env)).status, 409);
+  assert.equal((await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env)).status, 409, 'nor looked at');
+  assert.equal(kept.size, 0);
+  await worker.fetch(send('activate', await asking(ADA, 'activate', { what: 'open ', want: 'open' })), env);
   const sent = await worker.fetch(send('record', await asking(ADA, 'record', { what: table, table, record })), env);
   assert.equal(sent.status, 200);
   assert.deepEqual(await sent.json(), { kept: true });
@@ -1450,9 +1465,6 @@ test('a game\'s record: sent by a player signed for its table, kept, and shown o
   // Not by its address alone: looking at games is live play.
   assert.equal((await worker.fetch(new Request(`https://dev.open-hearts.pages.dev/api/record/${table}`), env)).status, 404);
   assert.equal((await worker.fetch(send('review', await asking(CY, 'review', { what: table, table })), env)).status, 402, 'no subscription');
-  // A device of an account, but not the one in use.
-  assert.equal((await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env)).status, 409);
-  await worker.fetch(send('activate', await asking(ADA, 'activate', { what: 'open ', want: 'open' })), env);
   const got = await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env);
   assert.equal(got.status, 200);
   assert.equal(got.headers.get('content-encoding'), 'gzip');

@@ -92,6 +92,10 @@ export const SERVICE_DEFAULTS = Object.freeze({
   // allowance of its own, so that it never spends the one a code or a
   // claim needs.
   profileWritesPerHour: 30,
+  // How many finished games one account may send to be kept in an
+  // hour: a game is ten minutes at the quickest, and a device that
+  // misses the answer sends again.
+  recordsPerHour: 12,
   stripePrice: null,
 });
 
@@ -112,6 +116,7 @@ export const SERVICE_BOUNDS = Object.freeze({
   householdReadsPerHour: [10, 2000],
   activationsPerHour: [60, 6000],
   profileWritesPerHour: [5, 300],
+  recordsPerHour: [2, 120],
 });
 
 /// The row, checked: every field that checks out, the default for the
@@ -1559,7 +1564,9 @@ export function sequencer({ now = Date.now } = {}) {
             ? S().activationsPerHour
             : kind === 'profile'
               ? S().profileWritesPerHour
-              : S().householdChangesPerHour;
+              : kind === 'record'
+                ? S().recordsPerHour
+                : S().householdChangesPerHour;
       if (recent.length >= most) return { status: 429, body: { error: 'too many at once: try again in a while' } };
       recent.push(t);
       return work();
@@ -1615,6 +1622,7 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
     case 'seen':
       return seenAt(op, active);
     case 'inUse':
+    case 'record':
       return inUse(op, active, { now });
     case 'profile':
       return op.profile ? profileWritten(op, store, active, { now }) : profileRead(op, store, { now });
@@ -1630,7 +1638,9 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
 const kindOf = (op) =>
   op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
     ? 'active'
-    : op.op === 'profile' && op.profile
+    : op.op === 'record'
+      ? 'record'
+      : op.op === 'profile' && op.profile
       ? 'profile'
       : op.op === 'unlink'
         ? 'unlink'
@@ -1941,7 +1951,9 @@ async function activateRoute(request, env) {
 }
 
 /// A finished game's record, sent by one of its players' devices to be
-/// kept (records.mjs): signed for the table it is the record of.
+/// kept (records.mjs): signed for the table it is the record of, by the
+/// device in use of an account with a subscription — live play is what
+/// leaves a record — and so many an hour, in the account's own turn.
 async function recordRoute(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -1952,7 +1964,14 @@ async function recordRoute(request, env) {
     most: recordMost + 4096,
   });
   if (asked instanceof Response) return asked;
-  const { status, body } = await keepRecord(env.OH_RECORDS, asked.key, asked.body.table, asked.body.record);
+  const { key, body: sent, signer } = asked;
+  const store = storeOf(env);
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
+  const account = await deviceAccount(env, store, key);
+  if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
+  const ok = await inHousehold(env, account, { op: 'record', key, account });
+  if (ok.status !== 200) return json(request, ok.status, ok.body);
+  const { status, body } = await keepRecord(env.OH_RECORDS, key, sent.table, sent.record, { verify: (k, d, s) => signer.verify(k, d, s) });
   return json(request, status, body);
 }
 
