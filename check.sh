@@ -286,7 +286,7 @@ full() {
   local crypto=""
   [ -d crypto/deal/target/release/.fingerprint ] && command -v cargo > /dev/null && crypto=crypto
   echo "logs in $logs/"
-  lanes "table table_slow" "app_analyze app" "engine,deal" "relay_js,functions,site,infra,workers,scripts $crypto" \
+  lanes "table table_slow" "app_analyze app" "engine,deal" "relay_js,functions,site,infra,workers,scripts,docs $crypto" \
     "e2e_build e2e_move,e2e_site service,service_js,service_object,e2e_escrow e2e_run,e2e_offline e2e_flows"
   verdict
 }
