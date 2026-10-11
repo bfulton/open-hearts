@@ -71,14 +71,10 @@ class RelayRoomChannel implements RoomChannel {
 }
 
 class _Present {
-  _Present(this.member, this.policy, this.seed, this.arrivedHere);
+  _Present(this.member, this.policy, this.seed);
   RoomMember member;
   int? policy;
   int seed;
-
-  /// When this device first heard them, by its own clock: the
-  /// countdown runs from the latest of these.
-  final int arrivedHere;
   int lastHeard = 0;
 }
 
@@ -369,7 +365,7 @@ class Room extends ChangeNotifier {
         if (p == null || now - p.lastHeard > staleMs) {
           // New, or back after going quiet: an arrival either way, and
           // the countdown starts over.
-          _others[e.pubkey] = _Present(member, c['policy'] as int?, c['seed'] as int? ?? 0, now)..lastHeard = now;
+          _others[e.pubkey] = _Present(member, c['policy'] as int?, c['seed'] as int? ?? 0)..lastHeard = now;
           _lastArrival = now;
         } else {
           p
