@@ -65,8 +65,8 @@ void main() {
       EventKind.absent: {'hand': 0, 'turn': 4, 'seat': 1},
       EventKind.witness: {'hand': 0, 'turn': 4, 'seat': 2, 'event': witnessed.id},
       EventKind.heartbeat: {'hand': 0, 'step': 7, 'reads': ['wss://a', 'wss://b']},
-      EventKind.jury: {'hand': 0, 'jurors': [other.publicKey], 'snapshot': [signer.publicKey, other.publicKey]},
-      EventKind.serve: {'hand': 0},
+      EventKind.jury: {'hand': 0, 'turn': -16, 'seat': 1, 'jurors': [other.publicKey], 'snapshot': [signer.publicKey, other.publicKey]},
+      EventKind.serve: {'hand': 0, 'step': 7, 'serving': [0], 'reads': ['wss://a']},
       EventKind.appeal: {'hand': 0, 'turn': 4, 'seat': 1},
       EventKind.verdict: {'hand': 0, 'turn': 4, 'seat': 1, 'side': 'action', 'event': witnessed.toJson()},
       EventKind.deal: {'hand': 0, 'turn': -16, 'seat': 1, 'round': 0, 'keys': 'AAECAwQFBgcICQoLDA0ODw=='},
@@ -80,7 +80,7 @@ void main() {
         'holder': other.publicKey,
         'part': 'AAECAwQFBgcICQoLDA0ODw==',
       },
-      EventKind.ended: {'hand': 0, 'turn': 59, 'seat': 3},
+      EventKind.ended: {'hand': 0, 'turn': 59, 'seat': 3, 'vote': true},
       EventKind.escrow: {'hand': 0, 'turn': 9, 'seat': 3},
     };
     expect(bodies.keys, containsAll(EventKind.values), reason: 'a new kind wants a line here');
@@ -123,7 +123,10 @@ void main() {
       {'hand': 4, 'b64': base64.encode(List<int>.generate(300, (i) => (i * 37) & 0xff))},
       {'hand': 5, 'unnamed key not in the dictionary': 'x', 'hex': '0123456789abcdef0123456789abcdef'},
     ];
-    for (final body in bodies) {
+    for (final odd in bodies) {
+      // A deal step's own fields, so that it parses as one, under the
+      // shapes being tried.
+      final body = {'turn': -16, 'seat': 3, 'round': 0, ...odd};
       final e = TableEvent.sign(signer, table: 't', kind: EventKind.deal, body: body);
       final frame = encodeFrame(e.toJson(), table: 't');
       expect(frame, isNotNull, reason: '$body');
