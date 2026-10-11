@@ -4,8 +4,8 @@
 # Assembles one directory and uploads it once:
 #
 #   /            the marketing site, in each of its languages (site/build.mjs)
-#   /api/        the service's handlers (service/functions/worker.mjs,
-#                published as _worker.js)
+#   /api/        the service's handlers (service/functions/, published
+#                as the _worker.js/ directory, entry.mjs its index.js)
 #   /play/       the Flutter web build, base-href / : served at the root
 #                of play.openhearts.game, and at /play/ on a preview
 #                (the worker routes by host, docs/06-service.md)

@@ -32,8 +32,8 @@ import 'ui/table_layout.dart';
 import 'ui/table_view.dart';
 import 'ui/update_pill.dart';
 
-/// A game alone, as `/table` is opened with it (router.dart): what the
-/// address cannot carry.
+/// A game alone, as `/solo` is opened with it (router.dart, soloPath):
+/// what the address cannot carry.
 class SoloGame {
   const SoloGame({this.target = gameOverScore, this.seed, this.paced = true});
 

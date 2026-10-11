@@ -925,7 +925,8 @@ class SeatBadge extends StatelessWidget {
 
   /// How tall the badge is, and how big its icon: the felt chooses
   /// both, since it is the one that gives up the height. A null height
-  /// is the badge's own, which is what [stackedHeight] predicts.
+  /// is the badge's own: a stacked one, which takes the height of the
+  /// row it is in (TableView).
   final double? height;
   final double iconSize;
 

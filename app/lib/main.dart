@@ -163,7 +163,9 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: language,
-        // No app-wide text selection: on a table played by touch it took
+        // Every page under the screen a device shows once another of its
+        // account's has taken over (ui/in_use_screen.dart) — and no
+        // selection area over them: on a table played by touch it took
         // taps meant for the game, and what is worth copying (a code, a
         // link, a report) has its own Copy button.
         builder: (context, child) => InUseScreen(child: child ?? const SizedBox()),

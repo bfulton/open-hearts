@@ -14,7 +14,7 @@
 /// So the client writes both here as it goes ([said], [keep]) and,
 /// built again from them, reads its own word back before it says
 /// anything new ([TableClient.start]). Kept on the device and nowhere
-/// else (app: net/rejoin.dart); a heartbeat is not kept, being only
+/// else (app: net/seat_store.dart); a heartbeat is not kept, being only
 /// "still here".
 library;
 

@@ -36,13 +36,15 @@ name = "TABLE"
 class_name = "TagRelay"
 
 # SQLite-backed objects are the ones the free plan carries, and the
-# only kind new classes may be. This one stores nothing either way.
+# only kind new classes may be. This one keeps its tag's lobby events
+# in its own storage (tag_store.mjs).
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TagRelay"]
 
-# A household's codes, claims and drops, one at a time per subscription
-# (docs/06-service.md). Bound to the Pages
+# An account's codes, claims, drops and the rest of what changes it,
+# one at a time per account, and a subscription's account found in the
+# subscription's own turn (docs/06-service.md). Bound to the Pages
 # project as HOUSEHOLD (script open-hearts-relay, class Household); it
 # reads and writes the project's own store, the same KV namespace as
 # the Pages project's OH_STORE (open-hearts-store). A HOUSEHOLD bound

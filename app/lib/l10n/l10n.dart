@@ -65,7 +65,7 @@ String flag(bool b) => b ? 'true' : 'false';
 Locale? languageInAddress([Uri? at]) => _spoken((at ?? Uri.base).queryParameters['lang']);
 
 /// Where a chosen language is kept. The site's language links keep
-/// theirs under the same name (site/lang.js), so a language picked
+/// theirs under the same name (site/public/lang.js), so a language picked
 /// there is the app's too.
 const chosenLanguageKey = 'language';
 

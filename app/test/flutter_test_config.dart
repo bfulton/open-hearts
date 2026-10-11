@@ -6,7 +6,7 @@ import 'package:open_hearts/ui/table_view.dart';
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   // The "your turn" pill breathes for as long as the turn is yours, so a
   // test that waits for the table to settle would wait for ever. It is
-  // still and glowing here; table_view_test.dart watches it breathe.
+  // still and glowing here; table_page_test.dart watches it breathe.
   turnPillBreathes = false;
   await testMain();
 }

@@ -194,7 +194,7 @@ void main() {
       expect(await chosenLanguage(Uri.parse('https://x/play/')), isNull);
       expect(await chosenLanguage(Uri.parse('https://x/play/?lang=fr')), const Locale('fr'));
       expect(await chosenLanguage(Uri.parse('https://x/play/')), const Locale('fr'));
-      // What site/lang.js keeps when a language link is followed.
+      // What site/public/lang.js keeps when a language link is followed.
       SharedPreferences.setMockInitialValues({chosenLanguageKey: 'es'});
       expect(await chosenLanguage(Uri.parse('https://x/play/')), const Locale('es'));
       SharedPreferences.setMockInitialValues({chosenLanguageKey: 'ja'});

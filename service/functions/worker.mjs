@@ -1,30 +1,37 @@
 // The service's handlers as one Cloudflare Pages worker
 // (docs/06-service.md): what runs on our side beside the static site
-// and the app. deploy.sh copies this file to _worker.js at the root of
-// the published directory, where Pages runs it for every request;
-// whatever is not a handler is handed to the static assets.
+// and the app. deploy.sh publishes this file and the modules it
+// imports as _worker.js/ at the root of the published directory, where
+// Pages runs it for every request (entry.mjs first); whatever is not a
+// handler is handed to the static assets.
 //
-// Every handler but Stripe's is asked with the caller's table key, and
-// signed by it: {"key", "at", "sig", ...} — see "who is asking" below.
-// A key is public, so a request that only names one is anybody's.
+// Every handler a device calls is asked with the caller's table key,
+// and signed by it: {"key", "at", "sig", ...} — see "who is asking"
+// below. A key is public, so a request that only names one is
+// anybody's. The rest are the config and health, which anybody may
+// read, and the notifications of Stripe, the stores and Sign in with
+// Apple, each checked as its sender signs it.
 //
 // turn-creds: POST /api/turn answers {"iceServers": [...], "ttl":
 // seconds} — Cloudflare Realtime TURN credentials good for a few hours,
-// minted from a TURN key that lives in the project's secrets
-// (OH_TURN_KEY_ID, OH_TURN_API_TOKEN) and never here, for a device
+// minted from a Realtime TURN key — its id in config/openhearts.json
+// (OH_TURN_KEY_ID), its token a project secret (OH_TURN_API_TOKEN) and
+// never here — for a device
 // whose subscription stands: TURN is what the subscription pays for.
 // Without the secrets the handler says so (503) and the app falls back
 // to STUN alone.
 //
 // licence: POST /api/licence answers {"licence": {key, account, until,
-// plan, sig}} — a month, signed by the service key (OH_SERVICE_SECRET,
+// plan, sig}} — for the service's licenceDays, signed by the service
+// key (OH_SERVICE_SECRET,
 // with OH_SERVICE_KEY beside it as the public half the app has baked
 // in), or 402 when no subscription stands behind the key. What is read
 // is one row, and the others only around a renewal.
 //
-// No imports, so nothing is bundled: the file is the worker. The curve
-// is the one the whole project signs on, so the signing is the app's
-// own wasm, fetched from the static assets this worker serves.
+// The curve is the one the whole project signs on, so the signing is
+// the app's own wasm: on Cloudflare the module entry.mjs imports, and
+// elsewhere (the tests, wrangler pages dev) fetched from the static
+// assets this worker serves.
 
 import { keepRecord, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { alertSubscribed, alertWaiting, sendAlert } from './alerts.mjs';
@@ -73,7 +80,9 @@ export const SERVICE_DEFAULTS = Object.freeze({
   ticketReuseMinutes: 2,
   turnTtlS: 4 * 60 * 60,
   // How far a request's second may be from ours: clocks drift, and a
-  // phone out by more than this is told so.
+  // phone out by more than this is told so — in words that say five
+  // minutes, which the app knows the refusal by (app/lib/net/
+  // household.dart): a change here is a change there.
   requestToleranceS: 300,
   // How old a webhook's own timestamp may be: a replay is not a payment.
   webhookToleranceS: 300,
@@ -1269,7 +1278,8 @@ export async function claimWith(key, code, store, { now = Date.now() } = {}) {
 
 // ---- backup codes ----------------------------------------------------------
 // A code on the screen of a device already on the account is good for
-// ten minutes; a backup code is good until it is used or replaced. It
+// minutes (ticketMinutes); a backup code is good until it is used or
+// replaced. It
 // is the account's recovery secret, for the day there is no such
 // screen: a phone lost, a new one in hand. Entered on any device, it
 // brings that device into the account — the same account, with its
@@ -1277,12 +1287,13 @@ export async function claimWith(key, code, store, { now = Date.now() } = {}) {
 // kept with the account and shown on any device of it; replaced all
 // five at once from any of them, which spends the old ones. The person
 // who paid on the web is sent them by email when the subscription is
-// made and again when they are replaced — to the address Stripe holds,
-// read from Stripe when it is needed and not kept here.
+// made and again whenever a device of the account asks — to the
+// address Stripe holds, read from Stripe when it is needed and not
+// kept here.
 //
 // Sixteen characters of Crockford's base32, eighty bits, read and typed
-// by a person: no I, L, O or U, case and dashes ignored, and an O, I or
-// L typed is taken as the 0 or 1 it looks like. A code's row is keyed
+// by a person: no I, L, O or U, case, spaces and dashes ignored, and
+// an O, I or L typed is taken as the 0 or 1 it looks like. A code's row is keyed
 // by its digest, so a listing of the store does not list the codes.
 
 export const BACKUP_CODES = 5;
