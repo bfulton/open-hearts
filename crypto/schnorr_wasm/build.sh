@@ -6,7 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 source ../wasm.sh
-cargo build --release --locked --target wasm32-unknown-unknown
+wasm_build
 cp target/wasm32-unknown-unknown/release/schnorr_wasm.wasm ../../app/web/schnorr.wasm
 node --test vectors.test.mjs
 ls -la ../../app/web/schnorr.wasm

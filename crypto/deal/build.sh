@@ -7,6 +7,6 @@ set -euo pipefail
 cd "$(dirname "$0")"
 source ../wasm.sh
 cargo build --release --locked
-cargo build --release --locked --target wasm32-unknown-unknown
+wasm_build
 cp target/wasm32-unknown-unknown/release/deal.wasm ../../app/web/deal.wasm
 ls -la target/release/libdeal.* ../../app/web/deal.wasm
