@@ -55,7 +55,7 @@ void main() {
     expect(game.phase, engine.Phase.gameOver);
 
     final kept = await PrefsRecordStore().load();
-    final tally = soloTally(kept);
+    final tally = soloGames(kept).tally;
     expect(tally.games, 1);
     expect(tally.points, game.totals[controller.mySeat], reason: 'the score the game actually ended on');
     expect(tally.best, game.totals[controller.mySeat]);
@@ -63,7 +63,7 @@ void main() {
     expect(tally.average, tally.points.toDouble());
 
     // The same game twice over is two games and the same average.
-    final twice = soloTally([...kept, ...kept]);
+    final twice = soloGames([...kept, ...kept]).tally;
     expect(twice.games, 2);
     expect(twice.average, tally.average);
 
@@ -152,11 +152,11 @@ void main() {
   });
 
   test('a record that stops short is not a game anyone finished', () {
-    expect(soloTally(const ['not a record at all']).games, 0);
+    expect(soloGames(const ['not a record at all']).tally.games, 0);
     // A real record with its plays cut off: the game was left, so
     // there is no score to claim for it.
     const whole = 'oh1:11:Cyrano,Juliet,Tristan:-:2C';
-    expect(soloTally(const [whole]).games, 0);
+    expect(soloGames(const [whole]).tally.games, 0);
   });
 
   test('a standing folds into the live half', () {

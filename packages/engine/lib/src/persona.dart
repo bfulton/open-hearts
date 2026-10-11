@@ -220,8 +220,6 @@ class Persona {
 
   bool get shoots => shootLoserShare > 0;
 
-  bool get flushesQueen => flushMinSmallSpades <= 13;
-
   // ---- what the pass style means in numbers ---------------------------
 
   /// Spades in hand before the queen counts as protected. Above 13 means

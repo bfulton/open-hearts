@@ -42,9 +42,6 @@ class GameController extends ChangeNotifier implements TableModel {
 
   String get recordText => _record.encode();
 
-  /// Every finished game kept on the device, newest first.
-  Future<List<String>> pastRecords() => _store.load();
-
   void _start() {
     // A player's game is dealt from 256 bits of the platform's secure
     // generator, drawn once when it starts, and its record names them

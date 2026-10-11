@@ -139,9 +139,6 @@ const runAtTheMoon = 10;
   );
 }
 
-/// The games on this device, played again for their scores.
-Tally soloTally(Iterable<String> records) => soloGames(records).tally;
-
 /// The games on this device, played again once for everything the
 /// profile says about them: the tally, and the history hand by hand.
 /// [records] newest first, as the store keeps them.

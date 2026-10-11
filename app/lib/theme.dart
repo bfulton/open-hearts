@@ -34,7 +34,6 @@ abstract final class Felt {
 /// them. **Red** is the game's own — a heart, a suit, a warning.
 abstract final class Palette {
   static const gold = Color(0xFFE4B363);
-  static const goldDim = Color(0x66E4B363);
   static const cardFace = Color(0xFFFAF7F0);
   static const cardEdge = Color(0xFF2A2E2B);
   static const red = Color(0xFFC1352B);

@@ -54,8 +54,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     ReactionLane? reactions,
     ValueListenable<bool>? reactionMute,
     int Function()? reactionClock,
-  })  : _crypto = crypto,
-        _lane = reactions,
+  })  : _lane = reactions,
         _mute = reactionMute ?? ReactionMute.current,
         _reactionRules = ReactionRules(now: reactionClock),
         client = TableClient(
@@ -90,9 +89,6 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// off from the relays looks alive until it is said.
   String? relayRefusal;
   StreamSubscription<String?>? _refusals;
-
-  /// The deal's primitives, at a sealed table; for the verifier.
-  final DealCrypto? _crypto;
 
   /// The humans' names by seat, from the lobby.
   final Map<int, String> seatNames;
@@ -822,10 +818,6 @@ class LiveController extends ChangeNotifier implements TableModel {
       _ => words.dealing,
     };
   }
-
-  /// The record so far, as the verifier sees it.
-  Verification verification() => verifyRecord(client.spec, client.record,
-      allowPartial: !client.done, juries: client.juries, crypto: _crypto, releases: client.releases);
 
   // ---- reactions ---------------------------------------------------------
   // A seated player's 👍, shown for a moment beside their badge here and
