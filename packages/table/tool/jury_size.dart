@@ -32,6 +32,8 @@ library;
 
 import 'dart:math';
 
+import 'package:engine/args.dart';
+
 const ln2 = 0.6931471805599453;
 
 /// A person leaves in about 8% of hands (docs/04-live-play.md).
@@ -199,8 +201,7 @@ void sizeByAssumption(double target) {
 }
 
 void main(List<String> args) {
-  final at = args.indexOf('--target');
-  final target = at >= 0 && at + 1 < args.length ? double.parse(args[at + 1]) : 0.00001;
+  final target = doubleArg(args, 'target', 0.00001);
   final fs = [0.01, 0.02, 0.05, 0.10, 0.20];
   print('a hand that cannot go on, per hand, at most $target — '
       '${(100 * (1 - target)).toStringAsFixed(3)}% of hands');
@@ -219,9 +220,8 @@ void main(List<String> args) {
     }
   }
 
-  final hl = args.indexOf('--juror-p50');
   sizeByAssumption(target);
-  lifetimes(target, hl >= 0 && hl + 1 < args.length ? double.parse(args[hl + 1]) : 60);
+  lifetimes(target, doubleArg(args, 'juror-p50', 60));
 
   print('\n--- what each size costs, for the trade (tool/wire_in_sim.dart) ---');
   print('a jury of  4: 1.21 MB handed over a hand');

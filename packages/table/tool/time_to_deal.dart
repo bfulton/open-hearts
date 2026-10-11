@@ -26,6 +26,7 @@ library;
 // A measurement's output is its log.
 // ignore_for_file: avoid_print
 
+import 'package:engine/args.dart';
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
@@ -33,13 +34,8 @@ import 'package:table/table.dart';
 
 Future<void> main(List<String> args) async {
   final crypto = await DealCrypto.load();
-  int argOf(String name, int fallback) {
-    final i = args.indexOf('--$name');
-    return i >= 0 && i + 1 < args.length ? int.parse(args[i + 1]) : fallback;
-  }
-
-  final seeds = argOf('seeds', 12);
-  final jurors = argOf('jury', jurySize + 4);
+  final seeds = intArg(args, 'seeds', 12);
+  final jurors = intArg(args, 'jury', jurySize + 4);
   final took = <int>[];
   final each = <({int seed, int ms})>[];
   var holding = 0;

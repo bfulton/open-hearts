@@ -2,7 +2,7 @@
 /// four at a time at random, and rated from the pairwise results the
 /// way a live table would score them (lower total wins the pair).
 ///
-///     cd packages/table && dart run --define=TABLES=20000 tool/ladder.dart
+///     cd packages/table && dart run tool/ladder.dart --tables 20000
 ///
 /// The fit is Bradley–Terry (the model Glicko's expected score is), by
 /// the minorisation–maximisation iteration, on the same 400-points-
@@ -19,13 +19,12 @@ library;
 
 import 'dart:math';
 
+import 'package:engine/args.dart';
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
-void main() {
-  final tables = int.parse(
-    const String.fromEnvironment('TABLES', defaultValue: '20000'),
-  );
+void main(List<String> args) {
+  final tables = intArg(args, 'tables', 20000);
   final all = Persona.all;
   final index = {for (var i = 0; i < all.length; i++) all[i].id: i};
   final n = all.length;

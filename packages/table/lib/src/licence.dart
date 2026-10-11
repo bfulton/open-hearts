@@ -201,12 +201,13 @@ class Activation {
     }
   }
 
-  /// Not run out at [nowS], seconds since the epoch.
-  bool goodAt(int nowS) => nowS < until;
+  /// Not run out at [at], as a [Licence] says it with [Licence.goodAt].
+  bool goodAt(DateTime at) => at.millisecondsSinceEpoch ~/ 1000 < until;
 
-  /// For this device, this service's, and not run out.
-  bool holdsFor(PublicKey device, {required String service, int? nowS}) =>
-      key == device && signedBy(service) && goodAt(nowS ?? DateTime.now().millisecondsSinceEpoch ~/ 1000);
+  /// For this device, this service's, and not run out at [at] (now
+  /// unless given).
+  bool holdsFor(PublicKey device, {required String service, DateTime? at}) =>
+      key == device && signedBy(service) && goodAt(at ?? DateTime.now());
 
   /// Later than [other], for the same account.
   bool supersedes(Activation other) => account == other.account && epoch > other.epoch;
@@ -241,8 +242,8 @@ class Activation {
 /// when there is none to be had, which is a key the relay admitted on
 /// the service's own word: the backup jurors, who belong to no account
 /// (docs/04-live-play.md).
-AccountId? accountFrom(Activation? activation, PublicKey key, {int? nowS}) {
+AccountId? accountFrom(Activation? activation, PublicKey key, {DateTime? at}) {
   if (activation == null || activation.key != key) return null;
   if (!licencesChecked) return activation.account;
-  return activation.holdsFor(key, service: licenceService, nowS: nowS) ? activation.account : null;
+  return activation.holdsFor(key, service: licenceService, at: at) ? activation.account : null;
 }

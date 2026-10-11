@@ -14,7 +14,7 @@ library;
 
 import 'package:engine/engine.dart';
 
-import 'args.dart';
+import 'package:engine/args.dart';
 
 void main(List<String> args) {
   final games = intArg(args, 'games', 1200);

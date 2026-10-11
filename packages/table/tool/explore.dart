@@ -48,6 +48,7 @@ library;
 
 import 'dart:io';
 
+import 'package:engine/args.dart';
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
@@ -278,13 +279,8 @@ String? judgeWhole(SimTable t, Scenario s) {
   return disagreed(t);
 }
 
-String? _arg(List<String> args, String name) {
-  final i = args.indexOf('--$name');
-  return i >= 0 && i + 1 < args.length ? args[i + 1] : null;
-}
-
 Future<void> main(List<String> args) async {
-  final name = _arg(args, 'scenario') ?? 'deal';
+  final name = strArg(args, 'scenario', 'deal');
   final s = scenarios[name];
   if (s == null) {
     print('scenarios: ${scenarios.keys.join(', ')}');
@@ -293,13 +289,13 @@ Future<void> main(List<String> args) async {
   // One hold or several: `--hold 2500,6000` tries each copy late by
   // each. A juror holds its keys back until the record names the draw,
   // so a jury that is to arrive after them has to be held back longer.
-  final holds = [for (final h in (_arg(args, 'hold') ?? '2500').split(',')) int.parse(h)];
+  final holds = intsArg(args, 'hold', const [2500]);
   final holdMs = holds.first;
-  final shard = (_arg(args, 'shard') ?? '0/1').split('/').map(int.parse).toList();
-  final limit = int.tryParse(_arg(args, 'limit') ?? '');
-  final whole = args.contains('--whole') || s.whole;
-  final stopAtFirst = args.contains('--first');
-  final changes = [for (final c in (_arg(args, 'changes') ?? 'lose,late').split(',')) Change.values.byName(c)];
+  final shard = strArg(args, 'shard', '0/1').split('/').map(int.parse).toList();
+  final limit = int.tryParse(strArg(args, 'limit', ''));
+  final whole = flagArg(args, 'whole') || s.whole;
+  final stopAtFirst = flagArg(args, 'first');
+  final changes = [for (final c in strArg(args, 'changes', 'lose,late').split(',')) Change.values.byName(c)];
   // What each run does to its copy: lost, or late by each hold.
   final tries = [
     for (final c in changes)
@@ -315,7 +311,7 @@ Future<void> main(List<String> args) async {
   // walks each. A fault is the one thing a single-message change
   // cannot move, and some faults matter only at a moment — a leave
   // that lands while the deal is being built, and not after its keys.
-  final faultTimes = [for (final x in (_arg(args, 'fault-at') ?? '${s.faultAt}').split(',')) int.parse(x)];
+  final faultTimes = intsArg(args, 'fault-at', [s.faultAt]);
   print('$name: ${s.about}');
 
   var runs = 0;
@@ -323,7 +319,7 @@ Future<void> main(List<String> args) async {
   // `--structure`: each run read every second against who can end each
   // wait. Counts runs with each kind of finding; prints the first run
   // of each kind. Measures; decides nothing.
-  final measure = args.contains('--structure');
+  final measure = flagArg(args, 'structure');
   final runsWith = <String, int>{};
   final runsEndedWith = <String, int>{};
   final runsEndedOnline = <String, int>{};
@@ -389,7 +385,7 @@ Future<void> main(List<String> args) async {
   for (final f in faultTimes) {
     // Kind by kind, then as said. A stable sort keeps the second.
     final order = List.of(baselines[f]!)..sort((a, b) => rank(a).compareTo(rank(b)));
-    if (args.contains('--census')) {
+    if (flagArg(args, 'census')) {
       final byKind = <String, int>{};
       for (final t in order) {
         byKind[t.kind] = (byKind[t.kind] ?? 0) + 1;
@@ -404,8 +400,8 @@ Future<void> main(List<String> args) async {
     // at 308ms'` the same one by what it was, which outlives a change
     // to the code — a fix that alters the traffic renumbers everything
     // after it.
-    final match = _arg(args, 'match');
-    final at = match != null ? order.indexWhere((t) => '$t'.contains(match)) : int.tryParse(_arg(args, 'at') ?? '');
+    final match = optionalArg(args, 'match');
+    final at = match != null ? order.indexWhere((t) => '$t'.contains(match)) : int.tryParse(optionalArg(args, 'at') ?? '');
     if (match != null && at == -1) {
       print('no event matches "$match"');
       exit(2);
@@ -442,7 +438,7 @@ Future<void> main(List<String> args) async {
       }
     }
   }
-  if (args.contains('--census')) exit(0);
+  if (flagArg(args, 'census')) exit(0);
   if (measure) {
     print('structure: ${runsWith.isEmpty ? 'nothing found' : runsWith.entries.map((e) => '${e.key} in ${e.value} run(s), '
         'still there at the end of ${runsEndedWith[e.key] ?? 0} (${runsEndedOnline[e.key] ?? 0} among sides online)').join('; ')}');

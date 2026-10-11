@@ -39,8 +39,8 @@ void main() {
     verifiesComplete(json);
     final bytes = utf8.encode(json).length;
     final packed = gzip.encode(utf8.encode(json)).length;
-    // What one costs to keep, said where a test run shows it.
-    print('a game\'s record: ${(bytes / 1024).toStringAsFixed(0)} KB, ${(packed / 1024).toStringAsFixed(0)} KB packed');
+    // What one costs to keep, said beside a failure.
+    printOnFailure('a game\'s record: ${(bytes / 1024).toStringAsFixed(0)} KB, ${(packed / 1024).toStringAsFixed(0)} KB packed');
   });
 
   test('the replay of a verified record: every hand dealt, passed and played, and the scores as the game kept them', () {

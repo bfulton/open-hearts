@@ -50,8 +50,8 @@ void main() {
           'f057c3fdfcb5ff1d195ce9cf4c3044a9f2141cf39d30672ae7ce3263fc6684309ed08cd852ca4e5d61acc00f8ac5ea3cc0159618cb8d9659e09ac99d5b81c82a',
     })!;
     expect(act.signedBy(_service), isTrue);
-    expect(act.holdsFor('ab' * 32, service: _service, nowS: 1790999999), isTrue);
-    expect(act.holdsFor('ab' * 32, service: _service, nowS: 1791000000), isFalse, reason: 'run out');
+    expect(act.holdsFor('ab' * 32, service: _service, at: DateTime.fromMillisecondsSinceEpoch(1790999999 * 1000)), isTrue);
+    expect(act.holdsFor('ab' * 32, service: _service, at: DateTime.fromMillisecondsSinceEpoch(1791000000 * 1000)), isFalse, reason: 'run out');
     final moved = Activation(account: _bao, key: act.key, epoch: act.epoch, until: act.until, signature: act.signature);
     expect(moved.signedBy(_service), isFalse, reason: 'another account is another statement');
   });

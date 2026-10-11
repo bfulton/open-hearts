@@ -19,6 +19,7 @@ library;
 // A measurement's output is its log.
 // ignore_for_file: avoid_print
 
+import 'package:engine/args.dart';
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import 'package:table/src/sim/sim.dart';
@@ -29,23 +30,22 @@ Future<void> main(List<String> args) async {
   // carried forward over everything it missed, which is the heaviest
   // thing anyone sends and the case worth measuring separately: with
   // `away`, seat 1 goes offline early in the hand and returns.
-  final away = args.contains('--away');
+  final away = flagArg(args, 'away');
   // And `--slow` gives the network a relay's latency rather than a
   // data channel's, which is what it takes for a peer to still be
   // behind when the jury's turn to answer comes round.
-  final slow = args.contains('--slow');
+  final slow = flagArg(args, 'slow');
   // And `--quiet` takes a bot seat's own juror offline once the play
   // has begun, which is the case sealing the escrow to the jury put a
   // price on: the seat is given up, every custodian says its piece
   // sealed to the others, and one of them plays the seat out. An
   // ordinary hand gives nothing up and pays none of it.
-  final quiet = args.contains('--quiet');
+  final quiet = flagArg(args, 'quiet');
   // Jury sizes to measure: the default sweep, or whatever is asked
   // for — `--jury 4,6,8,10` — since what a jury costs is half of
   // choosing how big it should be (tool/jury_size.dart is the other
   // half).
-  final asked = args.indexOf('--jury');
-  final sizes = asked >= 0 && asked + 1 < args.length ? [for (final n in args[asked + 1].split(',')) int.parse(n)] : const [4, 6];
+  final sizes = intsArg(args, 'jury', const [4, 6]);
   // And how many seeded hands to average over. One hand is exact —
   // the same seed gives the same bytes every time — but it is one
   // draw, and the draw decides things that move the total by half
@@ -54,8 +54,7 @@ Future<void> main(List<String> args) async {
   // measure a protocol change that doubles the traffic and not one
   // that moves it a tenth, so a change of that size is read off an
   // average of several.
-  final over = args.indexOf('--seeds');
-  final seeds = over >= 0 && over + 1 < args.length ? int.parse(args[over + 1]) : 1;
+  final seeds = intArg(args, 'seeds', 1);
   for (final jurors in sizes) {
     var said = 0;
     var handed = 0;
