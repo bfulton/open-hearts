@@ -104,10 +104,11 @@ fn fixed() -> &'static Fixed {
     })
 }
 
-fn rng_from(seed: &[u8]) -> ChaCha20Rng {
-    let mut s = [0u8; 32];
-    s.copy_from_slice(&seed[..32]);
-    ChaCha20Rng::from_seed(s)
+/// The generator a 32-byte seed drives, or None for a seed shorter
+/// than that: refused, as any other input of the wrong size is.
+fn rng_from(seed: &[u8]) -> Option<ChaCha20Rng> {
+    let s: [u8; 32] = seed.get(..32)?.try_into().ok()?;
+    Some(ChaCha20Rng::from_seed(s))
 }
 
 /// A seat's keys from its 32-byte secret: the reference crate's own
@@ -118,7 +119,7 @@ fn keys(secret: &[u8]) -> Option<(Affine, Scalar)> {
     if secret.len() < 32 {
         return None;
     }
-    Protocol::player_keygen(&mut rng_from(secret), &fixed().pp).ok()
+    Protocol::player_keygen(&mut rng_from(secret)?, &fixed().pp).ok()
 }
 
 /// The ElGamal generator the parameters were set up with. The
@@ -176,7 +177,7 @@ pub fn keygen(secret: &[u8], pk_out: &mut [u8]) -> Option<usize> {
 pub fn key_proof(secret: &[u8], name: &[u8], seed: &[u8], out: &mut [u8]) -> Option<usize> {
     let f = fixed();
     let (pk, sk) = keys(secret)?;
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     let name = to_bytes![name].ok()?;
     let proof = Protocol::prove_key_ownership(&mut rng, &f.pp, &pk, &sk, &name).ok()?;
     write(&proof, out)
@@ -207,7 +208,7 @@ pub fn aggregate(pks: &[u8], out: &mut [u8]) -> Option<usize> {
 pub fn initial_deck(joint: &[u8], out: &mut [u8]) -> Option<usize> {
     let f = fixed();
     let joint = read::<Affine>(joint)?;
-    let mut rng = rng_from(&[0u8; 32]);
+    let mut rng = rng_from(&[0u8; 32])?;
     let deck: Vec<Masked> = f
         .cards
         .iter()
@@ -224,7 +225,7 @@ pub fn shuffle(joint: &[u8], deck_in: &[u8], seed: &[u8], deck_out: &mut [u8], p
     let f = fixed();
     let joint = read::<Affine>(joint)?;
     let deck = read_deck(deck_in)?;
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     let permutation = Permutation::new(&mut rng, DECK);
     let factors: Vec<Scalar> = (0..DECK).map(|_| Scalar::rand(&mut rng)).collect();
     let (next, proof) = Protocol::shuffle_and_remask(&mut rng, &f.pp, &joint, &deck, &factors, &permutation).ok()?;
@@ -248,7 +249,7 @@ pub fn reveal_token(secret: &[u8], masked: &[u8], seed: &[u8], out: &mut [u8]) -
     let f = fixed();
     let (pk, sk) = keys(secret)?;
     let masked = read::<Masked>(masked)?;
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     let (token, proof) = Protocol::compute_reveal_token(&mut rng, &f.pp, &sk, &pk, &masked).ok()?;
     if out.len() < TOKEN {
         return None;
@@ -315,7 +316,7 @@ pub fn reveal_tokens(secret: &[u8], masked_many: &[u8], seed: &[u8], out: &mut [
     }
     let (h, b) = batch_points(&pk, &cards, &out[..n * POINT])?;
 
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     let a = Scalar::rand(&mut rng);
     let a1 = (g * a).into_affine();
     let a2 = (h * a).into_affine();
@@ -406,7 +407,7 @@ pub fn split(secret: &[u8], shares: usize, seed: &[u8], out: &mut [u8]) -> Optio
         return None;
     }
     let (_, sk) = keys(secret)?;
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     // Every share but the last is drawn; the last is what is left, so
     // they add to the key and no smaller set of them is anything.
     let mut rest = sk;
@@ -471,7 +472,7 @@ pub fn share_bytes(secret: &[u8], n: usize, t: usize, seed: &[u8], out: &mut [u8
     if len == 0 || t < 2 || n < t || n > 255 || out.len() < n * len {
         return None;
     }
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     // The coefficients above the constant term, one set per byte.
     let mut above = vec![0u8; len * (t - 1)];
     rand::RngCore::fill_bytes(&mut rng, &mut above);
@@ -563,7 +564,7 @@ pub fn split_threshold(secret: &[u8], n: usize, t: usize, seed: &[u8], out: &mut
         return None;
     }
     let (_, sk) = keys(secret)?;
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     // f(x) = sk + a1·x + … + a(t−1)·x^(t−1)
     let coefficients: Vec<Scalar> = (1..t).map(|_| Scalar::rand(&mut rng)).collect();
     for i in 1..=n {
@@ -661,7 +662,7 @@ pub fn share_token(share: &[u8], masked: &[u8], seed: &[u8], out: &mut [u8]) -> 
     let sk = read::<Scalar>(share)?;
     let pk = (generator() * sk).into_affine();
     let masked = read::<Masked>(masked)?;
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     let (token, proof) = Protocol::compute_reveal_token(&mut rng, &f.pp, &sk, &pk, &masked).ok()?;
     if out.len() < TOKEN {
         return None;
@@ -729,7 +730,7 @@ pub fn seal(secret: &[u8], pk_to: &[u8], masked: &[u8], seed: &[u8], out: &mut [
     if out.len() < SEALED + SEAL_PROOF {
         return None;
     }
-    let mut rng = rng_from(seed);
+    let mut rng = rng_from(seed)?;
     let r = Scalar::rand(&mut rng);
 
     let token = m.0 * sk;
@@ -1088,6 +1089,21 @@ mod tests {
         s
     }
 
+    /// A seed shorter than 32 bytes is input of the wrong size: refused
+    /// with None, as every other, and never a panic across the C or
+    /// wasm boundary.
+    #[test]
+    fn a_short_seed_is_refused() {
+        let secret = seed(1);
+        let mut out = vec![0u8; 4096];
+        for short in [&[][..], &[7u8; 16][..], &[7u8; 31][..]] {
+            assert_eq!(key_proof(&secret, b"seat", short, &mut out), None, "{} bytes", short.len());
+            assert_eq!(split(&secret, 3, short, &mut out), None, "{} bytes", short.len());
+            assert_eq!(share_bytes(&[1, 2, 3], 3, 2, short, &mut out), None, "{} bytes", short.len());
+        }
+        assert!(key_proof(&secret, b"seat", &seed(2), &mut out).is_some(), "and 32 bytes is a seed");
+    }
+
     #[test]
     fn a_whole_deal_round_trips_and_every_size_is_what_it_says() {
         let secrets: Vec<[u8; 32]> = (1..=4).map(seed).collect();
@@ -1395,7 +1411,7 @@ mod transcript_tests {
         let secret = [3u8; 32];
         let (pk, sk) = keys(&secret).unwrap();
         let name = to_bytes![b"seat".as_slice()].unwrap();
-        let mut rng = rng_from(&[9u8; 32]);
+        let mut rng = rng_from(&[9u8; 32]).unwrap();
         let proof = Protocol::prove_key_ownership(&mut rng, &f.pp, &pk, &sk, &name).unwrap();
         assert!(Protocol::verify_key_ownership(&f.pp, &pk, &name, &proof).is_ok(), "in memory");
         let mut pk_bytes = vec![0u8; POINT];
