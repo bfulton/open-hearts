@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The jurors of last resort as a container image (Dockerfile here,
+# The backup jurors as a container image (Dockerfile here,
 # service/do/bench.mjs runs it): the juror compiled ahead of time, and
 # the deal's and Schnorr's native libraries beside it where the juror
 # looks for them (crypto/*/target/release under its working directory).

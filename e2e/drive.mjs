@@ -187,7 +187,7 @@ export async function startRelay({ apart = false, port = null, tag = suite, say 
       out += d.toString();
       const m = out.match(/relay (ws:\/\/\S+)/);
       if (m) resolveUrl(m[1]);
-      // The jurors of last resort's own lines, once the relay is up.
+      // The backup jurors' own lines, once the relay is up.
       if (relayLog) relayLog.write(d);
       if (m && bench.length === 0) {
         if (apart) {
@@ -238,7 +238,7 @@ function startJuror([cmd, ...args], relay, secret, relayLog, size, say) {
     for (const line of d.toString().split('\n')) {
       if (line === '') continue;
       said.push(line);
-      const m = line.match(/^jurors of last resort (\w{8}) /);
+      const m = line.match(/^backup jurors (\w{8}) /);
       if (m) named(m[1]);
       if (/juror|summoned|called|verdict|done with/.test(line)) say(`juror: ${line.trim()}`);
     }

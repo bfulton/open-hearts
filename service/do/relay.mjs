@@ -299,7 +299,7 @@ export async function activationOf(raw, service, verify, nowS) {
   return verify(service, digest, sig) ? { account, key, epoch, until } : null;
 }
 
-/// The mark a juror of last resort shows instead of an activation: an
+/// The mark a backup juror shows instead of an activation: an
 /// HMAC of its key under the backup jurors' own secret
 /// (OH_JUROR_SECRET), which the relay holds too. They belong to no
 /// account; they are the service's (docs/explanation/live-play.md).

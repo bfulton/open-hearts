@@ -1,5 +1,5 @@
 /// Serving as a juror: the client any player's app runs in the
-/// background, and the one the service runs as juror of last resort.
+/// background, and the one the service runs as backup juror.
 ///
 /// A summons names a table and a hand. The duty opens a client on that
 /// table's tag — following, not seated — tells it which hand and which
@@ -269,7 +269,7 @@ class LastResortBench {
   }
 }
 
-/// The juror of last resort (docs/explanation/live-play.md): quiet until a
+/// The backup juror (docs/explanation/live-play.md): quiet until a
 /// table says it has nobody to draw from, then online — the same code
 /// every other juror runs — and quiet again once it has been idle for
 /// a while.

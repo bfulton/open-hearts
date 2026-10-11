@@ -4,7 +4,7 @@
 /// few seconds — an ephemeral event, forwarded and forgotten — and
 /// everyone listening keeps a map of who was heard when. A summons is
 /// an event on the same tag addressed to one key, carrying the table's
-/// spec and the hand; a juror of last resort listens for a table's
+/// spec and the hand; a backup juror listens for a table's
 /// call on the tag as well. Its own sockets, apart from any table's:
 /// one to every relay in the list, the announcements written to all
 /// of them, since who is online has to be seen by devices that can
@@ -235,7 +235,7 @@ class RelayPresence implements Presence {
   /// client's latest announcement; null once one takes it again.
   String? get refusal => _group.refusal;
 
-  /// Stops announcing, while still listening — a juror of last resort
+  /// Stops announcing, while still listening — a backup juror
   /// stays quiet until called.
   set silent(bool v) => _silent = v;
 

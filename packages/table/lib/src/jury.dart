@@ -112,7 +112,7 @@ abstract class Presence {
   /// spec and the hand.
   void summon(PublicKey juror, Map<String, Object?> summons);
 
-  /// Says that [table] found nobody to draw from, so that a juror of
-  /// last resort can come online.
+  /// Says that [table] found nobody to draw from, so that a backup
+  /// juror can come online.
   void callForJuror(String table);
 }

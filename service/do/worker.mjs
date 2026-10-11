@@ -49,7 +49,7 @@ import config from '../../config/openhearts.json';
 // define a Durable Object of its own, only bind one.
 export { Household } from '../functions/worker.mjs';
 
-// The jurors of last resort, a Cloudflare Container started when a table
+// The backup jurors, a Cloudflare Container started when a table
 // calls for a juror and nobody is there (bench.mjs).
 export class Bench extends BenchObject {
   constructor(state, env = {}) {

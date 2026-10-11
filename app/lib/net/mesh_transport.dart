@@ -196,7 +196,7 @@ class MeshTransport implements Transport {
     final link = _links[peer] = _Link()..tries = tries;
     // An offer that is never answered is not free: it holds a peer
     // connection open, and its candidates are sealed and published one
-    // by one. Some peers never answer — a juror of last resort runs in
+    // by one. Some peers never answer — a backup juror runs in
     // the service's VM with no WebRTC in it at all — so a dial that has
     // not come up in time (remote config, waits.meshAnswer) is let go
     // of, and the relay lane carries that peer, which is what the lane

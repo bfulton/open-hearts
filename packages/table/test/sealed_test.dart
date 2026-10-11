@@ -95,7 +95,7 @@ void main() {
     t.stop();
   }, timeout: const Timeout(Duration(minutes: 5)));
 
-  test('nobody online to draw from: the jurors of last resort come up and hold the bot seats', () {
+  test('nobody online to draw from: the backup jurors come up and hold the bot seats', () {
     // The quiet night, which is when a table has bot seats at all:
     // matchmaking gives you bots exactly when it cannot find four
     // people, and that is exactly when there is nobody to draw a jury

@@ -159,7 +159,7 @@ class SimTable {
   final List<ScriptedHuman> people = [];
 
   /// Strangers online who can be drawn as jurors; the last is the
-  /// juror of last resort when there is one.
+  /// backup juror when there is one.
   final List<SimJuror> jurors = [];
   SimPresence? presence;
 

@@ -162,7 +162,7 @@ void main() {
       t.stop();
     });
 
-    test('nobody online to draw from: the table says so, and a juror of last resort answers', () {
+    test('nobody online to draw from: the table says so, and a backup juror answers', () {
       final t = SimTable(humans: 2, seed: 67, lastResort: true);
       t.people[1]
         ..exit = Exit.idle
@@ -182,7 +182,7 @@ void main() {
     // can be found: once the other person has been silent as long as a
     // person is given, the game ends rather than wait for good
     // (docs/explanation/live-play.md).
-    test('nobody online and no last resort: the table pauses and says why, then the game ends', () {
+    test('nobody online and no backup jurors: the table pauses and says why, then the game ends', () {
       final t = SimTable(humans: 2, seed: 68, withPresence: true);
       t.people[1]
         ..exit = Exit.idle

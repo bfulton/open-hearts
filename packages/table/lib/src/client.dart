@@ -2689,8 +2689,8 @@ class TableClient {
   /// so a table that holds bots with the jury waits for the jury
   /// before building it. The jury is proposed as the hand opens and
   /// settles a moment later, and a table with bot seats waits past
-  /// that for a jury big enough to hold them — the call for a juror
-  /// of last resort is what answers on a quiet night
+  /// that for a jury big enough to hold them — the call for a backup
+  /// juror is what answers on a quiet night
   /// (docs/explanation/live-play.md).
   ///
   /// It waits for as long as that takes. A bot's hand dealt in the

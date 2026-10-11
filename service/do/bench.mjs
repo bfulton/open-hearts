@@ -1,4 +1,4 @@
-// The jurors of last resort, as a Cloudflare Container
+// The backup jurors, as a Cloudflare Container
 // (docs/explanation/live-play.md; service/bench builds the image).
 //
 // A table with bot seats is dealt only to a jury that can hold them, and

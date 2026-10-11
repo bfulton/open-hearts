@@ -1,4 +1,4 @@
-// The jurors of last resort as a Cloudflare Container (bench.mjs): a
+// The backup jurors as a Cloudflare Container (bench.mjs): a
 // call heard on the presence relay starts the backup jurors and is
 // passed to them; they are left alone while they serve or wait, and
 // stopped once they have gone quiet. The container here is a stand-in with the

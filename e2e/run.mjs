@@ -287,7 +287,7 @@ async function main() {
     // Cell 4: two people left, and Bao's browser goes off his turn. Ada
     // alone is no majority of two and claims nothing; her next play
     // waits on a vote that will never come, and the table asks the
-    // jury — the service's juror of last resort, called for when this
+    // jury — the service's backup juror, called for when this
     // table found nobody else online. It rules once Bao has been
     // silent half a minute (the rig's config): Ada's play stands, and at
     // Bao's own turn his seat goes to a bot. Ada finishes the hand with

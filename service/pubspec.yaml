@@ -1,5 +1,5 @@
 name: service
-description: The local NIP-01 relay the table clients meet on, the jurors of last resort, and the service's tools.
+description: The local NIP-01 relay the table clients meet on, the backup jurors, and the service's tools.
 version: 0.1.0
 publish_to: none
 

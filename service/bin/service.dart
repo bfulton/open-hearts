@@ -1,5 +1,5 @@
-/// Runs the local service: the relay, and with `--juror` the juror of
-/// last resort on it (docs/explanation/live-play.md) — in this process, which
+/// Runs the local service: the relay, and with `--juror` a backup juror
+/// on it (docs/explanation/live-play.md) — in this process, which
 /// is fine on a dev machine and wrong under load, since a relay
 /// verifies every event it carries and a juror's client verifies them
 /// again; `bin/juror.dart` runs one beside the relay instead, which is
@@ -66,6 +66,6 @@ Future<void> main(List<String> args) async {
       crypto: crypto,
     );
     bench.start();
-    print('jurors of last resort ${[for (final j in bench.jurors) j.presence.signer.publicKey.substring(0, 8)].join(' ')} listening');
+    print('backup jurors ${[for (final j in bench.jurors) j.presence.signer.publicKey.substring(0, 8)].join(' ')} listening');
   }
 }

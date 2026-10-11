@@ -1,5 +1,5 @@
 /// The backup jurors as they run in their container, against a real table: a
-/// relay here, two people here, and the jurors of last resort wherever
+/// relay here, two people here, and the backup jurors wherever
 /// they were started — in the image (service/bench), limited to the
 /// Cloudflare instance it will run on, say. Nobody else is online, so
 /// the table calls for jurors, they come online, hold the two
