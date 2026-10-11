@@ -196,6 +196,7 @@ const liveProduction = () => ({
   kv_namespaces: { OH_STORE: { namespace_id: '5b65' } },
   durable_object_namespaces: { HOUSEHOLD: { namespace_id: 'fcae' } },
   r2_buckets: { OH_RECORDS: { name: 'open-hearts-records' } },
+  analytics_engine_datasets: { OH_METRICS: { dataset: 'open_hearts_api' } },
   compatibility_date: '2026-09-09',
   compatibility_flags: [],
 });
@@ -210,6 +211,7 @@ test('Pages: preview has its own store and no household', () => {
   have.kv_namespaces.OH_STORE.namespace_id = 'ab41';
   have.r2_buckets.OH_RECORDS.name = 'open-hearts-records-preview';
   delete have.durable_object_namespaces;
+  delete have.analytics_engine_datasets;
   assert.deepEqual(pagesEnvPlan(pages.environments.preview, have, ids), { patch: {}, lines: [], owner: [] });
   // And production's store on preview is a rebinding.
   have.kv_namespaces.OH_STORE.namespace_id = '5b65';
@@ -259,13 +261,13 @@ test('Pages: bindings added, rebound and removed', () => {
   const have = liveProduction();
   delete have.durable_object_namespaces;
   have.r2_buckets.OH_RECORDS.name = 'elsewhere';
-  have.analytics_engine_datasets = { OH_METRICS: { dataset: 'open_hearts_api' } };
+  have.analytics_engine_datasets = { OH_METRICS: { dataset: 'elsewhere' } };
   have.services = { OTHER: { service: 'x' } };
   const plan = pagesEnvPlan(pages.environments.production, have, ids);
   assert.deepEqual(plan.patch, {
     durable_object_namespaces: { HOUSEHOLD: { namespace_id: 'fcae' } },
     r2_buckets: { OH_RECORDS: { name: 'open-hearts-records' } },
-    analytics_engine_datasets: { OH_METRICS: null },
+    analytics_engine_datasets: { OH_METRICS: { dataset: 'open_hearts_api' } },
     services: { OTHER: null },
   });
 });
@@ -379,7 +381,7 @@ test("toml: the relay's own wrangler.toml reads", () => {
   assert.deepEqual(wrangler.routes, [{ pattern: 'relay.openhearts.game', custom_domain: true }]);
   assert.deepEqual(
     wranglerBindings(wrangler).map((b) => `${b.type}:${b.name}`).sort(),
-    ['durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'send_email:EMAIL'],
+    ['analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'send_email:EMAIL'],
   );
 });
 
@@ -393,6 +395,7 @@ const liveRelay = () => ({
       { name: 'EMAIL', type: 'send_email' },
       { class_name: 'Household', name: 'HOUSEHOLD', namespace_id: 'a1c3', type: 'durable_object_namespace' },
       { name: 'OH_JUROR_SECRET', type: 'secret_text' },
+      { dataset: 'open_hearts_relay', name: 'OH_METRICS', type: 'analytics_engine' },
       { name: 'OH_MAIL_FROM', text: 'noreply@openhearts.game', type: 'plain_text' },
       { name: 'OH_STORE', namespace_id: '5b65151de63341dc9f7a9d417c9b6a4e', type: 'kv_namespace' },
       { class_name: 'TagRelay', name: 'TABLE', namespace_id: '744b', type: 'durable_object_namespace' },

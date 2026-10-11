@@ -100,9 +100,7 @@ OH_MAIL_FROM = "noreply@openhearts.game"
 
 # What the operator watches (docs/06-service.md): a
 # line of counts a minute from each object in use — connections,
-# events, deliveries, refusals — and nothing about who. Uncomment where
-# Workers Analytics Engine is on for the account; without the binding
-# the object counts nothing and writes nothing.
-# [[analytics_engine_datasets]]
-# binding = "OH_METRICS"
-# dataset = "open_hearts_relay"
+# events, deliveries, refusals — and nothing about who.
+[[analytics_engine_datasets]]
+binding = "OH_METRICS"
+dataset = "open_hearts_relay"
