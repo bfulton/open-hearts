@@ -207,7 +207,10 @@ hands a device's storage from where the app used to be to
 The worker lets exactly that origin frame it. The page has no buttons, and
 it answers only a message from its parent at exactly that origin,
 addressed back to exactly that origin. The app checks the answer's origin
-and source, and never writes over a key it already has. The app loads no third-party script. Cloudflare's
+and source, and never writes over a key it already has. The app loads one
+third-party script, on play.openhearts.game only: New Relic's browser
+agent, which its loader (`app/web/observability.js`) fetches from
+`js-agent.newrelic.com`. Cloudflare's
 Web Analytics and email obfuscation are off, since both inject scripts.
 Open: a fuller CSP (`script-src`) has not been set. The Flutter build
 needs `wasm-unsafe-eval`, and the policy has to be tested against it.
@@ -217,8 +220,8 @@ needs `wasm-unsafe-eval`, and the policy has to be tested against it.
 The service key, Stripe keys, the TURN token, the HMAC key and the
 bench's juror secret are Cloudflare secrets, set by hand and checked
 only by name (`infra/apply.mjs`). The service key is minted with a
-CSPRNG by `service/bin/service_key.dart` into `service.secret`, which is
-ignored by version control. `deploy.sh` reads only environment
+CSPRNG by `service/bin/service_key.dart`, which prints it once and
+writes it nowhere. `deploy.sh` reads only environment
 variables and pins `wrangler`. The Android release key's properties
 file is never checked in. Every key in the repository is a published
 test vector: BIP-340's test pair (used by the e2e rig and the relay's

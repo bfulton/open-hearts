@@ -18,10 +18,13 @@
 /// class, so every suite here — the relay's own, a hand played over
 /// real sockets, the jury, the waiting room — runs against whichever
 /// relay is asked for, and the app's side of the wire is only written
-/// once:
+/// once. `OH_RELAY=object` runs the JavaScript one under the deployed
+/// object's own rules: a tag an address, and only that tag's kinds
+/// ([JsRelay.object]).
 ///
-///     cd service && dart test                 # this relay
-///     cd service && OH_RELAY=js dart test     # the one the object runs
+///     cd service && dart test                     # this relay
+///     cd service && OH_RELAY=js dart test         # the one the object runs
+///     cd service && OH_RELAY=object dart test     # as the object runs it
 library;
 
 import 'dart:async';

@@ -76,3 +76,31 @@ test('the page that hands a device on to the app answers only the app, and only 
   assert.match(carry, /postMessage\(\{ type: 'oh-carry\/entries', entries \}, app\)/);
   assert.doesNotMatch(carry, /removeItem|clear\(\)/, 'nothing is deleted');
 });
+
+test('a badge with no store listing yet says so where it can be seen', () => {
+  const out = mkdtempSync(join(tmpdir(), 'site-'));
+  build(out);
+  for (const l of languages) {
+    const html = readFileSync(join(l.code === 'en' ? out : join(out, l.code), 'index.html'), 'utf8');
+    assert.match(html, /<a class="cta badge" aria-disabled="true"/, l.code);
+    assert.match(html, /<p class="soon">[^<]+<\/p>/, l.code);
+  }
+});
+
+test('every link to a part of a page finds that part', () => {
+  const out = mkdtempSync(join(tmpdir(), 'site-'));
+  build(out);
+  for (const l of languages) {
+    const dir = l.code === 'en' ? out : join(out, l.code);
+    const prefix = l.code === 'en' ? '' : `/${l.code}`;
+    const ids = Object.fromEntries(pages().map((p) => [p,
+      new Set([...readFileSync(join(dir, `${p}.html`), 'utf8').matchAll(/ id="([^"]+)"/g)].map((m) => m[1]))]));
+    for (const p of pages()) {
+      const html = readFileSync(join(dir, `${p}.html`), 'utf8');
+      for (const [, to, part] of html.matchAll(/href="([^"#:]*)#([^"]+)"/g)) {
+        const page = to === '' ? p : to === `${prefix}/` ? 'index' : to.slice(prefix.length + 1);
+        assert.ok(ids[page]?.has(part), `${l.code}/${p}: ${to}#${part}`);
+      }
+    }
+  }
+});

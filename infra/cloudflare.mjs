@@ -13,6 +13,10 @@
 // forwarded to come from the environment, as observability's do: this
 // repository is public.
 
+import { readFileSync } from 'node:fs';
+
+const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
+
 export const app = {
   key: 'open-hearts',
   name: 'Open Hearts',
@@ -49,9 +53,8 @@ export const pages = {
       r2: { OH_RECORDS: 'open-hearts-records' },
       /// The household object lives in the relay worker (wrangler.toml).
       durableObjects: { HOUSEHOLD: { script: 'open-hearts-relay', class: 'Household' } },
-      /// None: OH_METRICS, when bound, is open_hearts_api
-      /// (docs/06-service.md).
-      analyticsEngine: {},
+      /// Counts and nothing about anybody (docs/06-service.md).
+      analyticsEngine: { OH_METRICS: 'open_hearts_api' },
     },
     preview: {
       compatibilityDate: '2026-09-09',
@@ -92,9 +95,11 @@ export const r2 = [
   },
 ];
 
-/// The Realtime TURN key the worker mints credentials with. Made once;
-/// its secret is the project's OH_TURN_API_TOKEN, shown only at creation.
-export const turnKeys = [{ name: 'open-hearts-turn', uid: 'd681af4e315018c9dc90b898de5f24be' }];
+/// The Realtime TURN key the worker mints credentials with: the one the
+/// config names (turnKeyId), which the worker is deployed with too. Made
+/// once; its secret is the project's OH_TURN_API_TOKEN, shown only at
+/// creation.
+export const turnKeys = [{ name: 'open-hearts-turn', uid: config.turnKeyId }];
 
 // ---- the relay worker ---------------------------------------------------
 
@@ -114,17 +119,22 @@ export const relay = {
 
 // ---- the zones ------------------------------------------------------------
 
-/// Settings pinned to what they are. Only email_obfuscation differs from
-/// Cloudflare's default (off: it rewrites help@ on the site's pages and
-/// injects a script to put it back, docs/06-service.md); the rest are
-/// Cloudflare's defaults, pinned so a change to them shows here. SSL's
-/// mode is left to automatic mode (it chose Full), so `ssl` itself is
-/// not pinned.
+/// Settings pinned to what they are, so a change to them shows here.
+/// Where they differ from Cloudflare's defaults: plain HTTP is sent to
+/// HTTPS and nothing older than TLS 1.2 is spoken; a browser keeps a
+/// file only as long as the file's own Cache-Control says
+/// (browser_cache_ttl 0), so the app's unhashed files are checked on
+/// every load rather than kept for Cloudflare's four hours
+/// (site/public/_headers); and email_obfuscation is off (it rewrites
+/// help@ on the site's pages and injects a script to put it back,
+/// docs/06-service.md). SSL's mode is left to automatic mode (it chose
+/// Full), so `ssl` itself is not pinned.
 const tls = {
   ssl_automatic_mode: 'auto',
-  always_use_https: 'off',
-  min_tls_version: '1.0',
+  always_use_https: 'on',
+  min_tls_version: '1.2',
   tls_1_3: 'on',
+  browser_cache_ttl: 0,
 };
 
 /// Cloudflare-made records (Email Routing's, Email Sending's, a worker's

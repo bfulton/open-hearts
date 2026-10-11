@@ -17,7 +17,7 @@ private to the person holding it.
 | [`packages/deal/`](packages/deal/) | The verifiable deal as Dart sessions over the Rust primitives |
 | [`crypto/`](crypto/) | Rust: the deal (`crypto/deal`, built for the Dart VM and as wasm) and BIP-340 signatures for the VM (`crypto/schnorr`) |
 | [`app/`](app/) | The Flutter app, one codebase for web, Android and iOS |
-| [`service/`](service/) | The Cloudflare worker's handlers (licences, the shop, TURN), the relay, the jurors of last resort, and a local relay for tests |
+| [`service/`](service/) | The Cloudflare worker's handlers (licences, the shop, TURN), the relay, the backup jurors, and a local relay for tests |
 | [`e2e/`](e2e/) | Browser suites that drive the built app through its accessibility tree |
 | [`site/`](site/) | The marketing site: page templates, their words in each language, and the build that joins them |
 | [`config/`](config/openhearts.json) | What is not secret about this deployment: the service's public key, store and sign-in identifiers, the Stripe price |
@@ -27,9 +27,12 @@ Solo play runs entirely on the device. Live play is four devices talking
 directly to each other over WebRTC, with our relay
 (`relay.openhearts.game`, one Cloudflare Durable Object per tag) for
 introductions, as a fallback path, and for storing rooms and results.
-Bots at a live table are played by *jurors*: other online devices, or
-the service's own bench when nobody else is online. No juror or player
-can see a bot's cards. The deal is Barnett–Smart mental poker with a
+Bots at a live table are played by *jurors*: other players online,
+picked at random, with the service's backup jurors making up the
+number when too few are online. No player sees a bot's cards, and the juror playing a bot's seat
+sees only that hand, never enough to work out a person's; what that
+guarantees, and where it rests on trusting us, is in
+[doc 03](docs/03-fair-deal.md#what-is-guaranteed-and-what-is-not). The deal is Barnett–Smart mental poker with a
 Bayer–Groth shuffle argument. Every seat shuffles with a proof, and the
 whole hand is audited and can be replayed once it ends.
 
@@ -120,13 +123,13 @@ unsigned, once without the key to see it refused.
 ### Deploying
 
 `./deploy.sh` builds the site and the web app and publishes them to
-Cloudflare Pages. It needs `CLOUDFLARE_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
+Cloudflare Pages. It needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
 ([doc 01](docs/01-dev-loop.md)). A build accepts licences only from the
 service key it was compiled with. Mint the key pair once with
 `cd service && dart run bin/service_key.dart`, put the public half in
 `config/openhearts.json` as `serviceKey`, and set the secret half as the
 Pages secret `OH_SERVICE_SECRET`. A build without the key has live play shut.
-The relay deploys separately: `cd service/do && npx wrangler@4 deploy`.
+The relay deploys separately: `cd service/do && npx wrangler@4.130.0 deploy`.
 Everything that is not secret is in `config/openhearts.json`; [doc 06](docs/06-service.md) lists the secrets.
 
 ### Languages
@@ -153,3 +156,17 @@ cd packages/engine && dart run tool/bot_stats.dart --games 2000
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+## Third-party code
+
+Code from others that ships in this repository, each under its own
+licence beside it:
+
+- **The deal's proof crates** (`crypto/vendor/`): Geometry's
+  mental-poker and proof-toolbox, ported to arkworks 0.6. MIT or
+  Apache-2.0.
+- **ZXing** (`app/web/zxing/`): the QR scanner's decoder on the web,
+  `@zxing/library` 0.23.0. Apache-2.0.
+- **New Relic's browser agent** (`app/web/observability.js`): its loader,
+  as New Relic serves it, on play.openhearts.game only. Apache-2.0
+  (`app/web/nr-loader-full-1.323.0.min.js.LICENSE.txt`).

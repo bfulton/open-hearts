@@ -1,22 +1,125 @@
 // A certificate chain shaped like the App Store's — a P-384 root, an
 // intermediate carrying Apple's WWDR mark, a P-256 leaf carrying the
-// App Store's signing mark — made with openssl for these tests and
-// for nothing else. "Not Apple" is in every name. Beside it, Apple's
-// real WWDR G6 intermediate, which the pinned root must verify.
-// Generated once; see store.test.mjs for what each one is for.
+// App Store's signing mark — and the variants store.test.mjs holds the
+// chain check to, made fresh with new keys each time the tests load,
+// so no key is kept in the repository. "Not Apple" is in every name.
+// Beside them, Apple's real WWDR G6 intermediate, which the pinned
+// root must verify.
+//
+// Each certificate is base64 DER, as an x5c entry carries it; the
+// leaf's key is PKCS#8 PEM.
 
-export const root = 'MIIB0DCCAVagAwIBAgIBATAKBggqhkjOPQQDAzAwMRowGAYDVQQDDBFUZXN0IFJvb3QgQ0EgLSBHMzESMBAGA1UECgwJTm90IEFwcGxlMCAXDTI2MTAwMTIzMTczOVoYDzIwNTEwNTIzMjMxNzM5WjAwMRowGAYDVQQDDBFUZXN0IFJvb3QgQ0EgLSBHMzESMBAGA1UECgwJTm90IEFwcGxlMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAErjyNz6nn3ubCHECrpt4oXZUPhBcwKeBVR/FAugXA0fHMkQlJ9wXiOLew4g/xSYUsWN4KF1LOgIQJ9H0t3SP99qO72YC8oqriS64Z7b/ykSwhbQYZgEhygbqQxMgg87/oo0IwQDAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUUhsCF7KwNC0+06LGZsmXnOQVE2cwCgYIKoZIzj0EAwMDaAAwZQIxAIBJr9th01bHV4rl+h1HDaUSRtLetO7NlialO4dSTCvNV3uAZr83Nwn4vzOVOfpepgIwd9hRGKLYFeZMZuxjL6293LoZst/S2DbEheFUBmvrqeMy597M8RIARoSik42P/ZW4';
-export const mid = 'MIICCTCCAZCgAwIBAgICAegwCgYIKoZIzj0EAwMwMDEaMBgGA1UEAwwRVGVzdCBSb290IENBIC0gRzMxEjAQBgNVBAoMCU5vdCBBcHBsZTAeFw0yNjEwMDEyMzE3MzlaFw00ODA4MjYyMzE3MzlaMDUxEjAQBgNVBAMMCVRlc3QgV1dEUjELMAkGA1UECwwCRzYxEjAQBgNVBAoMCU5vdCBBcHBsZTB2MBAGByqGSM49AgEGBSuBBAAiA2IABKZJ6NRntY/a0H3Cb2jtJAEoa3eI38YT0XrarXTgSihDDBk9YwAAsNB50aJGcu4Ik9/5LWECrd6uJzjq2AB5nTcF7by7AxZTeRvdV5/Jawbt4OQLGRPgAL99NVScuOobAKN4MHYwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwEAYKKoZIhvdjZAYCAQQCBQAwHQYDVR0OBBYEFGCUWcgkPV22R7MThu30EtECA5whMB8GA1UdIwQYMBaAFFIbAheysDQtPtOixmbJl5zkFRNnMAoGCCqGSM49BAMDA2cAMGQCMHsATgU2TvgXTOy04q+fRQNo5u6Mg4mGgpDV7q5HiBNjq++4Xc9nlm1BZ636AK7bRgIwQKnrBwhBJqQjD56wBbCuLR/rACeBwG8yRR4f3rGU5E1mfofZ+xgEKEPvHhLEsdYo';
-export const midplain = 'MIIB+TCCAX6gAwIBAgICbUkwCgYIKoZIzj0EAwMwMDEaMBgGA1UEAwwRVGVzdCBSb290IENBIC0gRzMxEjAQBgNVBAoMCU5vdCBBcHBsZTAeFw0yNjEwMDEyMzE3MzlaFw00ODA4MjYyMzE3MzlaMDUxEjAQBgNVBAMMCVRlc3QgV1dEUjELMAkGA1UECwwCRzYxEjAQBgNVBAoMCU5vdCBBcHBsZTB2MBAGByqGSM49AgEGBSuBBAAiA2IABKZJ6NRntY/a0H3Cb2jtJAEoa3eI38YT0XrarXTgSihDDBk9YwAAsNB50aJGcu4Ik9/5LWECrd6uJzjq2AB5nTcF7by7AxZTeRvdV5/Jawbt4OQLGRPgAL99NVScuOobAKNmMGQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFGCUWcgkPV22R7MThu30EtECA5whMB8GA1UdIwQYMBaAFFIbAheysDQtPtOixmbJl5zkFRNnMAoGCCqGSM49BAMDA2kAMGYCMQC2LfBWpthCcfTG0Fj88iviBqZQTzytzjjZnV4rHP0LDB7UkUtB2Wmx2hC9hKLcZ8QCMQDN1zD9DvtpX/IQrr0yLWW6qJ/Dv7y9TyLLTT8yOR24Gqkuy9EcAKOCVTPL3Rzvmtc=';
-export const midother = 'MIICCjCCAZCgAwIBAgICJ7swCgYIKoZIzj0EAwMwMDEaMBgGA1UEAwwRVGVzdCBSb290IENBIC0gRzMxEjAQBgNVBAoMCU5vdCBBcHBsZTAeFw0yNjEwMDEyMzE3MzlaFw00ODA4MjYyMzE3MzlaMDUxEjAQBgNVBAMMCVRlc3QgV1dEUjELMAkGA1UECwwCRzYxEjAQBgNVBAoMCU5vdCBBcHBsZTB2MBAGByqGSM49AgEGBSuBBAAiA2IABKZJ6NRntY/a0H3Cb2jtJAEoa3eI38YT0XrarXTgSihDDBk9YwAAsNB50aJGcu4Ik9/5LWECrd6uJzjq2AB5nTcF7by7AxZTeRvdV5/Jawbt4OQLGRPgAL99NVScuOobAKN4MHYwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwEAYKKoZIhvdjZAYCAQQCBQAwHQYDVR0OBBYEFGCUWcgkPV22R7MThu30EtECA5whMB8GA1UdIwQYMBaAFJ5JsudwpVroRsVXnx33wEOI+593MAoGCCqGSM49BAMDA2gAMGUCMCydpIvcWfwCj7YEMLvqlMW+BMvMNfOu/5PpaFrDB9u89JySlXPq6+78aY+vI8AkogIxAN9yW1aZryvkydnuybS7Ore6LFt1EEVL0jd7gP/6LhjfKVZCNBfblwybppS3O4lpjw==';
-export const midnotca = 'MIICBTCCAYqgAwIBAgICRfowCgYIKoZIzj0EAwMwMDEaMBgGA1UEAwwRVGVzdCBSb290IENBIC0gRzMxEjAQBgNVBAoMCU5vdCBBcHBsZTAeFw0yNjEwMDEyMzIwMjlaFw00ODA4MjYyMzIwMjlaMDUxEjAQBgNVBAMMCVRlc3QgV1dEUjELMAkGA1UECwwCRzYxEjAQBgNVBAoMCU5vdCBBcHBsZTB2MBAGByqGSM49AgEGBSuBBAAiA2IABKZJ6NRntY/a0H3Cb2jtJAEoa3eI38YT0XrarXTgSihDDBk9YwAAsNB50aJGcu4Ik9/5LWECrd6uJzjq2AB5nTcF7by7AxZTeRvdV5/Jawbt4OQLGRPgAL99NVScuOobAKNyMHAwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwEAYKKoZIhvdjZAYCAQQCBQAwHQYDVR0OBBYEFGCUWcgkPV22R7MThu30EtECA5whMB8GA1UdIwQYMBaAFFIbAheysDQtPtOixmbJl5zkFRNnMAoGCCqGSM49BAMDA2kAMGYCMQC67VeSke2KEyszBcQ1nOIHtgXXoUQamGkd6aqWLUwwoImJypqqJUHfChDgcXIqIs8CMQCx/YapiFUI3dCUMSnGls8QTk9XN8PrN/DzjX80fEFPk2JUeez0C2NZMWhjaEWT8K4=';
-export const midrenamed = 'MIICDjCCAZOgAwIBAgICT4swCgYIKoZIzj0EAwMwMDEaMBgGA1UEAwwRVGVzdCBSb290IENBIC0gRzMxEjAQBgNVBAoMCU5vdCBBcHBsZTAeFw0yNjEwMDEyMzIwMjlaFw00ODA4MjYyMzIwMjlaMDgxFTATBgNVBAMMDEFub3RoZXIgV1dEUjELMAkGA1UECwwCRzYxEjAQBgNVBAoMCU5vdCBBcHBsZTB2MBAGByqGSM49AgEGBSuBBAAiA2IABKZJ6NRntY/a0H3Cb2jtJAEoa3eI38YT0XrarXTgSihDDBk9YwAAsNB50aJGcu4Ik9/5LWECrd6uJzjq2AB5nTcF7by7AxZTeRvdV5/Jawbt4OQLGRPgAL99NVScuOobAKN4MHYwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwEAYKKoZIhvdjZAYCAQQCBQAwHQYDVR0OBBYEFGCUWcgkPV22R7MThu30EtECA5whMB8GA1UdIwQYMBaAFFIbAheysDQtPtOixmbJl5zkFRNnMAoGCCqGSM49BAMDA2kAMGYCMQDSKEyofrrT0HJXdA9PDAVEA6S4G4S296zg2PlvrJUOq8/Z1+ipXqkoJsAVK0RCxcQCMQCwFxMdBWoMjnATMS6scnWha9TPtuyhNOwCi4KgBAkdW11MaUiVY9aP6WZnDwwwELU=';
-export const leaf = 'MIICEjCCAZigAwIBAgICel0wCgYIKoZIzj0EAwMwNTESMBAGA1UEAwwJVGVzdCBXV0RSMQswCQYDVQQLDAJHNjESMBAGA1UECgwJTm90IEFwcGxlMB4XDTI2MTAwMTIzMTczOVoXDTQ4MDgyNjIzMTczOVowWzFFMEMGA1UEAww8VGVzdCBQcm9kIEVDQyBNYWMgQXBwIFN0b3JlIGFuZCBpVHVuZXMgU3RvcmUgUmVjZWlwdCBTaWduaW5nMRIwEAYDVQQKDAlOb3QgQXBwbGUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQJBEEM6WrOZEqae99lVoeF5etHMF2qNwQFf09D164tWN45Ve0hXKrTcjKiq5Vzr6lFdCHBwxFTUEcWQwO7CGn6o3IwcDAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDAQBgoqhkiG92NkBgsBBAIFADAdBgNVHQ4EFgQUCjHMj08L1+2afToodD5UOolT1bkwHwYDVR0jBBgwFoAUYJRZyCQ9XbZHsxOG7fQS0QIDnCEwCgYIKoZIzj0EAwMDaAAwZQIxAJhaQi6usk57Ftn7vqWnh1mFcxpU+iZgqtDaep4YuDOth7ebGU8fLj/DO04+GSedsgIwPueuxRNaHnfTrJctQfIttHyDBwi+VyVaSK7UMZbhKeN5rI/LXwCGc30DIo3PsqoV';
-export const leafplain = 'MIIB/zCCAYagAwIBAgICZcgwCgYIKoZIzj0EAwMwNTESMBAGA1UEAwwJVGVzdCBXV0RSMQswCQYDVQQLDAJHNjESMBAGA1UECgwJTm90IEFwcGxlMB4XDTI2MTAwMTIzMTczOVoXDTQ4MDgyNjIzMTczOVowWzFFMEMGA1UEAww8VGVzdCBQcm9kIEVDQyBNYWMgQXBwIFN0b3JlIGFuZCBpVHVuZXMgU3RvcmUgUmVjZWlwdCBTaWduaW5nMRIwEAYDVQQKDAlOb3QgQXBwbGUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQJBEEM6WrOZEqae99lVoeF5etHMF2qNwQFf09D164tWN45Ve0hXKrTcjKiq5Vzr6lFdCHBwxFTUEcWQwO7CGn6o2AwXjAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDAdBgNVHQ4EFgQUCjHMj08L1+2afToodD5UOolT1bkwHwYDVR0jBBgwFoAUYJRZyCQ9XbZHsxOG7fQS0QIDnCEwCgYIKoZIzj0EAwMDZwAwZAIwKGXvpnTlCWJ68sqWJOsJklXrcAn9TCGFAA7cwBOiu3V/uvvf2kdesoN0tP1au8uCAjBGF99C69rDgbxVcnn0QrFyDm1daMAMt3pgvJuDjUGWDhos32u+f9iZBOr3ujzeIE8=';
-export const other = 'MIIB0DCCAVagAwIBAgIBCTAKBggqhkjOPQQDAzAwMRowGAYDVQQDDBFUZXN0IFJvb3QgQ0EgLSBHMzESMBAGA1UECgwJTm90IEFwcGxlMCAXDTI2MTAwMTIzMTczOVoYDzIwNTEwNTIzMjMxNzM5WjAwMRowGAYDVQQDDBFUZXN0IFJvb3QgQ0EgLSBHMzESMBAGA1UECgwJTm90IEFwcGxlMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEIzwo3d/fURLF5cWuXmGDFKpq5FU+JBe87VGti4ETFx5ue03WeR3ihDxc9oetQpybUPv/09GRIC1aYTvTtRr4foL4nftqhRcC2eIL84AZHrM7iyZwlPQmHrR3uK5GBB6Co0IwQDAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUnkmy53ClWuhGxVefHffAQ4j7n3cwCgYIKoZIzj0EAwMDaAAwZQIxAKZ7/bK9GVUFWF5WDvhAQJZwQrqcLpr0WRatZ26nwaqccQxpbmzwGTay+j2b61RKzAIwcl3AvOFK94MivZ+cg2Bo2+x2e6dK0tHNKV13hmUjarA2jKevqQTsVV3Bg3ncut1g';
-export const leafKey = `-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwxKDjejH69a5E0gA
-MjFxmqhBkfJNO3BLN8y1+hzCJH2hRANCAAQJBEEM6WrOZEqae99lVoeF5etHMF2q
-NwQFf09D164tWN45Ve0hXKrTcjKiq5Vzr6lFdCHBwxFTUEcWQwO7CGn6
------END PRIVATE KEY-----`;
+const enc = new TextEncoder();
+const concat = (parts) => {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
+};
+const lengthOf = (n) => {
+  if (n < 0x80) return [n];
+  const bytes = [];
+  for (; n; n = Math.floor(n / 256)) bytes.unshift(n & 0xff);
+  return [0x80 | bytes.length, ...bytes];
+};
+
+// ---- as much DER as a certificate needs ----------------------------------
+
+const tlv = (tag, ...parts) => {
+  const body = concat(parts);
+  return concat([Uint8Array.of(tag, ...lengthOf(body.length)), body]);
+};
+const seq = (...parts) => tlv(0x30, ...parts);
+const set = (...parts) => tlv(0x31, ...parts);
+const bool = (yes) => tlv(0x01, Uint8Array.of(yes ? 0xff : 0));
+const octets = (bytes) => tlv(0x04, bytes);
+const nothing = Uint8Array.of(0x05, 0x00);
+
+function oid(text) {
+  const [a, b, ...rest] = text.split('.').map(Number);
+  const bytes = [40 * a + b];
+  for (const v of rest) {
+    const part = [v & 0x7f];
+    for (let x = Math.floor(v / 128); x; x = Math.floor(x / 128)) part.unshift((x & 0x7f) | 0x80);
+    bytes.push(...part);
+  }
+  return tlv(0x06, Uint8Array.from(bytes));
+}
+
+/// A non-negative INTEGER from big-endian [bytes].
+function int(bytes) {
+  let b = Uint8Array.from(bytes);
+  let i = 0;
+  while (i < b.length - 1 && b[i] === 0 && !(b[i + 1] & 0x80)) i++;
+  b = b.subarray(i);
+  return tlv(0x02, b[0] & 0x80 ? concat([Uint8Array.of(0), b]) : b);
+}
+
+function time(ms) {
+  const d = new Date(ms);
+  const two = (n) => String(n).padStart(2, '0');
+  const rest = `${two(d.getUTCMonth() + 1)}${two(d.getUTCDate())}${two(d.getUTCHours())}${two(d.getUTCMinutes())}${two(d.getUTCSeconds())}Z`;
+  const y = d.getUTCFullYear();
+  return y < 2050 ? tlv(0x17, enc.encode(String(y).slice(2) + rest)) : tlv(0x18, enc.encode(String(y) + rest));
+}
+
+const named = (...parts) => seq(...parts.map(([type, value]) => set(seq(oid(type), tlv(0x0c, enc.encode(value))))));
+const CN = '2.5.4.3';
+const OU = '2.5.4.11';
+const O = '2.5.4.10';
+
+const HASH_OF = { 'P-256': 'SHA-256', 'P-384': 'SHA-384' };
+const ECDSA_WITH = { 'SHA-256': '1.2.840.10045.4.3.2', 'SHA-384': '1.2.840.10045.4.3.3' };
+
+const extension = (type, value, critical = false) => seq(oid(type), ...(critical ? [bool(true)] : []), octets(value));
+const ca = (yes) => extension('2.5.29.19', yes ? seq(bool(true)) : seq(), true);
+const WWDR_MARK = extension('1.2.840.113635.100.6.2.1', nothing);
+const STORE_MARK = extension('1.2.840.113635.100.6.11.1', nothing);
+
+const pair = (curve) => crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: curve }, true, ['sign', 'verify']);
+
+let serial = 1;
+
+/// A certificate for [key] under [subject], signed by [by] (a pair and
+/// its curve) as [issuer], good from [from] to [to].
+async function certificate({ subject, issuer, key, by, curve, from, to, extensions }) {
+  const hash = HASH_OF[curve];
+  const algorithm = seq(oid(ECDSA_WITH[hash]));
+  const spki = new Uint8Array(await crypto.subtle.exportKey('spki', key.publicKey));
+  const tbs = seq(tlv(0xa0, int([2])), int([0, serial++]), algorithm, issuer, seq(time(from), time(to)), subject, spki, tlv(0xa3, seq(...extensions)));
+  const raw = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash }, by.privateKey, tbs));
+  const half = raw.length / 2;
+  const signature = seq(int(raw.subarray(0, half)), int(raw.subarray(half)));
+  return Buffer.from(seq(tbs, algorithm, tlv(0x03, Uint8Array.of(0), signature))).toString('base64');
+}
+
+// ---- the chain, and what is wrong with each variant ---------------------
+
+const DAY = 86400000;
+const now = Date.now();
+const [rootKey, otherKey, midKey, leafPair] = await Promise.all([pair('P-384'), pair('P-384'), pair('P-384'), pair('P-256')]);
+
+const rootName = named([CN, 'Test Root CA - G3'], [O, 'Not Apple']);
+const midName = named([CN, 'Test WWDR'], [OU, 'G6'], [O, 'Not Apple']);
+const leafName = named([CN, 'Test App Store Signing'], [O, 'Not Apple']);
+
+const asRoot = (key) => ({ subject: rootName, issuer: rootName, key, by: key, curve: 'P-384', from: now - 30 * DAY, to: now + 7000 * DAY, extensions: [ca(true)] });
+const underRoot = (extra) => ({ subject: midName, issuer: rootName, key: midKey, by: rootKey, curve: 'P-384', from: now - 20 * DAY, to: now + 5000 * DAY, ...extra });
+const underMid = (extensions) => ({ subject: leafName, issuer: midName, key: leafPair, by: midKey, curve: 'P-384', from: now - 10 * DAY, to: now + 3000 * DAY, extensions });
+
+export const root = await certificate(asRoot(rootKey));
+/// A root of the same name and another key.
+export const other = await certificate(asRoot(otherKey));
+export const mid = await certificate(underRoot({ extensions: [ca(true), WWDR_MARK] }));
+export const midplain = await certificate(underRoot({ extensions: [ca(true)] }));
+export const midother = await certificate(underRoot({ by: otherKey, extensions: [ca(true), WWDR_MARK] }));
+export const midnotca = await certificate(underRoot({ extensions: [ca(false), WWDR_MARK] }));
+export const midrenamed = await certificate(underRoot({ subject: named([CN, 'Test WWDR Renamed'], [O, 'Not Apple']), extensions: [ca(true), WWDR_MARK] }));
+export const leaf = await certificate(underMid([ca(false), STORE_MARK]));
+export const leafplain = await certificate(underMid([ca(false)]));
+export const leafKey = `-----BEGIN PRIVATE KEY-----\n${Buffer.from(await crypto.subtle.exportKey('pkcs8', leafPair.privateKey)).toString('base64')}\n-----END PRIVATE KEY-----`;
+
 export const appleWwdrG6 = 'MIIDFjCCApygAwIBAgIUIsGhRwp0c2nvU4YSycafPTjzbNcwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMjEwMzE3MjAzNzEwWhcNMzYwMzE5MDAwMDAwWjB1MUQwQgYDVQQDDDtBcHBsZSBXb3JsZHdpZGUgRGV2ZWxvcGVyIFJlbGF0aW9ucyBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTELMAkGA1UECwwCRzYxEzARBgNVBAoMCkFwcGxlIEluYy4xCzAJBgNVBAYTAlVTMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEbsQKC94PrlWmZXnXgtxzdVJL8T0SGYngDRGpngn3N6PT8JMEb7FDi4bBmPhCnZ3/sq6PF/cGcKXWsL5vOteRhyJ45x3ASP7cOB+aao90fcpxSv/EZFbniAbNgZGhIhpIo4H6MIH3MBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgwFoAUu7DeoVgziJqkipnevr3rr9rLJKswRgYIKwYBBQUHAQEEOjA4MDYGCCsGAQUFBzABhipodHRwOi8vb2NzcC5hcHBsZS5jb20vb2NzcDAzLWFwcGxlcm9vdGNhZzMwNwYDVR0fBDAwLjAsoCqgKIYmaHR0cDovL2NybC5hcHBsZS5jb20vYXBwbGVyb290Y2FnMy5jcmwwHQYDVR0OBBYEFD8vlCNR01DJmig97bB85c+lkGKZMA4GA1UdDwEB/wQEAwIBBjAQBgoqhkiG92NkBgIBBAIFADAKBggqhkjOPQQDAwNoADBlAjBAXhSq5IyKogMCPtw490BaB677CaEGJXufQB/EqZGd6CSjiCtOnuMTbXVXmxxcxfkCMQDTSPxarZXvNrkxU3TkUMI33yzvFVVRT4wxWJC994OsdcZ4+RGNsYDyR5gmdr0nDGg=';
