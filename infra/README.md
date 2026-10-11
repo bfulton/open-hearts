@@ -59,7 +59,7 @@ are read.
 - **The relay worker's own definition.** `open-hearts-relay` — its
   code, bindings, Durable Object migrations, the bench's container, its
   vars and custom domain — is `service/do/wrangler.toml`, deployed with
-  `npx wrangler@4 deploy`. `apply.mjs` reads that file and checks the
+  `npx wrangler@4.130.0 deploy`. `apply.mjs` reads that file and checks the
   live worker against it (compatibility date, observability, every
   binding and var, the custom domain `relay.openhearts.game` and no
   other, workers.dev off, a namespace per migrated class, the

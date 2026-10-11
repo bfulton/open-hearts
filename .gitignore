@@ -4,7 +4,8 @@ app/.dart_tool/
 app/.flutter-plugins-dependencies
 build/
 .dart_tool/
-pubspec.lock
+# Libraries don't commit their lockfiles; the app and the service do.
+packages/*/pubspec.lock
 *.iml
 
 # Rust (measurements)
@@ -15,12 +16,10 @@ measurements/*/wasm/target/
 node_modules/
 .wrangler/
 
-# The service's signing secret, as bin/service_key.dart writes it for
-# one paste into the project's secrets. Never a commit.
+# The service's signing secret, as bin/service_key.dart wrote it before
+# it printed it instead: a copy left on a disk is never a commit.
 service.secret
 
 # OS
 .DS_Store
 
-# Python bytecode (e2e/ios_safari).
-__pycache__/

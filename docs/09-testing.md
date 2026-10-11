@@ -11,7 +11,7 @@ build the other suites test (`app/integration_test/native_libs_test.dart`).
 ## Running them
 
 ```bash
-./check.sh quick            # what you touched since origin/claude/launch-punch-list, fast tiers
+./check.sh quick            # what you touched since origin/main, fast tiers
 ./check.sh quick main       # … since another base
 ./check.sh full             # everything, the browser suites too, side by side
 ./check.sh table app        # the suites named
