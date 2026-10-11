@@ -20,6 +20,7 @@
 //   {{langName}}    the page's language, by its own name
 //   {{appStore}}, {{googlePlay}}  the store, linked to the listing once it is live
 //   {{appStoreBadge}}, {{googlePlayBadge}}  a badge's link, or inactive
+//   {{storesSoon}}  home.soon, said under the badges while either is inactive
 //   {{> name}}      pages/_name.html, filled in the same way
 import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -88,6 +89,7 @@ export function render(page, language, words) {
     googlePlay: storeLink('googlePlay', 'Google Play'),
     appStoreBadge: storeBadge(stores.appStore),
     googlePlayBadge: storeBadge(stores.googlePlay),
+    storesSoon: stores.appStore && stores.googlePlay ? '' : `<p class="soon">${lookup(words, 'home.soon')}</p>`,
   };
   const fill = (text, depth = 0) => {
     if (depth > 4) throw new Error(`${page}: placeholders nested too deep`);
@@ -105,8 +107,9 @@ export function render(page, language, words) {
     new RegExp(`(<nav[^>]*>[\\s\\S]*?<a href="${base(language.code)}${path}")`),
     '$1 aria-current="page"',
   );
-  // Stylesheets, scripts and pictures are cached for hours: each link
-  // carries its file's fingerprint, so a changed one is fetched at once.
+  // Each link to a stylesheet, script or picture carries its file's
+  // fingerprint, so a changed one is fetched at once by a browser that
+  // kept the last.
   html = html.replace(/(href|src|srcset)="\/([\w/-]+\.(?:css|js|png))/g, (_, attr, file) => {
     const hash = createHash('sha256').update(readFileSync(join(here, 'public', file))).digest('hex').slice(0, 10);
     return `${attr}="/${file}?v=${hash}`;

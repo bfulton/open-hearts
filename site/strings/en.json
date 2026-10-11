@@ -59,7 +59,8 @@
       "title": "Need help?",
       "text": "See the <a href=\"{{base}}/support\">support page</a>, email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, or use <i>Tell us what's broken</i> in the game's menu.",
       "menuAlt": "The game's menu, open, with the pointer on Tell us what's broken"
-    }
+    },
+    "soon": "The phone apps are coming soon."
   },
   "support": {
     "meta": {
@@ -84,7 +85,7 @@
       "p5": "How do I subscribe?",
       "p6": "Tap the <i>Subscribe</i> button under <i>Play live</i>. On the <a href=\"{{app}}/subscription?lang={{code}}\">web</a>, payment is on Stripe's page. In the phone apps, it is through the App Store or Google Play, which bill and renew it. Subscribing makes your account: your name, picture, rating and games go with it onto any device you add (up to 5), and a change to your profile on one of them shows on all of them.",
       "p7": "How do I cancel?",
-      "p8": "Open the menu, choose <i>Subscription</i>, then <i>Manage subscription</i>. Other ways, and refunds, are in the <a href=\"{{base}}/terms\">terms</a>.",
+      "p8": "Open the menu, choose <i>Subscription</i>, then <i>Manage subscription</i>. That opens the store you subscribed in, or for the web Stripe's billing page, where you cancel.",
       "p9": "How do I add another device?",
       "p10": "On a device in your account, open the menu, choose <i>Subscription</i> and tap <i>Add a device</i>, then scan the code with the other device, or tap <i>Send the link instead</i>. A code works once, for ten minutes.",
       "p11": "What if I lose my phone, or clear my browser?",
@@ -115,10 +116,17 @@
       "wikipedia": "https://en.wikipedia.org/wiki/Hearts_(card_game)"
     },
     "cancelAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Manage subscription",
+    "cancel": {
+      "without": "Without the app:",
+      "appStore": "<b>App Store:</b> on your iPhone or iPad open Settings, tap your name, then Subscriptions, and choose Open Hearts.",
+      "googlePlay": "<b>Google Play:</b> in the Play Store app, tap your profile picture, then Payments &amp; subscriptions, then Subscriptions.",
+      "web": "<b>Web</b>, with none of the subscription's devices left: email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> from the address you paid with, and we will cancel it and confirm.",
+      "refunds": "What cancelling leaves you with, and refunds, are in the <a href=\"{{base}}/terms#cancelling\">terms</a>."
+    },
     "addAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Add a device",
     "fair": {
       "random": "<b>Random.</b> At a live table every device shuffles the deck in turn and proves it shuffled honestly, so one honest device is enough for a fair deal. Each hand opens for its own player alone: no other player sees it, and no server does. Alone, every deal comes from your device's secure random generator.",
-      "witness": "<b>Witnessed.</b> Each hand draws jurors: strangers picked at random from other players online, with no stake in the table. They play any seat a bot holds, and keep pieces of each player's keys, so a hand can finish when someone leaves while nobody alone can open another's cards.",
+      "witness": "<b>Witnessed.</b> Each hand draws jurors: strangers picked at random from other players online, with no stake in the table. They play any seat a bot holds, and keep pieces of each player's keys, so a hand can finish when someone leaves while nobody alone can open another's cards. When too few other players are online to make a jury, our service's backup jurors make up the number. Like any juror, they cannot see your cards alone, only together with another player at your table, so for those hands you are trusting us not to collude.",
       "audit": "<b>Audited.</b> After each hand every device publishes its secret, so the whole game can be replayed and every shuffle, card and play checked. After a live game, <i>See the whole game</i> does that check for you; after a game alone, <i>Copy record</i> keeps it.",
       "more": "How it all works is in <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">the write-up</a>."
     }
@@ -140,7 +148,7 @@
       "p3": "Live play is public, on purpose",
       "p4": "To play people, your name, your picture, your account's number and your results go through our relay, where anyone who asks can read them. Rooms and pictures are kept there a day; results are kept for the ratings.",
       "p5": "Accounts, but no email or password",
-      "p6": "Nothing is sold, rented or used for advertising. There are no trackers in the app or on this site. Subscribing makes an account: a random number our service gives you, which your devices play under. There is no password, and we hold no email address.",
+      "p6": "Nothing is sold, rented or used for advertising, and nothing follows you from site to site. The game on the web reports its errors and load times to New Relic, as described below; this site and the phone apps report nothing. Subscribing makes an account: a random number our service gives you, which your devices play under. There is no password, and we hold no email address.",
       "p7": "Paying is Stripe's job",
       "p8": "On the web a subscription is bought through Stripe, which has your email address and card. We keep a note of which account it pays for and which devices are in that account. We never see your card number."
     },
@@ -155,7 +163,7 @@
       "p3": "<b>Your name and how you look</b>: an icon and a colour, or a picture of your own. The picture is cut down to 64 by 64 pixels on your device, and only that small copy is kept. The photo you picked it from is not stored or sent. If you subscribe, our service keeps a copy with your account, as below.",
       "p4": "<b>Your last thirty games against the bots</b>, which your profile counts up. They leave the device only if you tap <i>Copy record</i>.",
       "p5": "<b>How quickly you play</b>, your game options, the language you chose, your licence and your account's number if you subscribe, and the players whose pictures you chose to hide.",
-      "p6": "<b>The live game you are in</b>, while you are in it: the table, every move and vote your device signed there, and the secrets it dealt your cards with, so that a page reloaded mid-game can come back to its seat. Let go of when the game ends or you leave it, or two minutes after you were last there.",
+      "p6": "<b>The live game you are in</b>, while you are in it: the table, every move and vote your device signed there, and the secrets it dealt your cards with, so that a page reloaded mid-game can come back to its seat. It is deleted when the game ends or you leave it. If the app closes mid-game, it is deleted the next time the app opens, unless that is within two minutes, when you go back to your seat.",
       "p7": "To remove all of it, clear the data of play.openhearts.game in your browser (and of openhearts.game, where a browser that played before the game moved to play.openhearts.game keeps its earlier copy), or delete the app. That also removes your key, so the device comes back as a new player, until a backup code or your sign-in brings it into your account again."
     },
     "alone": {
@@ -169,7 +177,7 @@
       "p2": "<b>Google's font servers, sometimes.</b> The game carries its own font, but when it has to draw a character that font lacks — an emoji, an arrow, or a name written in a script such as Chinese or Arabic — the toolkit it is built with fetches the extra font from <code>fonts.gstatic.com</code>. When that happens, Google receives your IP address and the fact that you are visiting this site.",
       "p3": "<b>A licence check.</b> Each time the game starts it sends your device's public key to our service to ask whether it holds a subscription. If it does, the service also notes that this device is the one your account is using now, when, and which live table it is at, if any; that note is replaced the next time any of your devices opens the game. If it does not, nothing is kept.",
       "p4": "<b>Your profile page</b> asks our relay for game results so it can show your rating. Nothing about you is published by it.",
-      "p5": "<b>New Relic</b> tells us when the game breaks or is slow for you on the web at openhearts.game. The game's page sends it the errors it meets, how long it took to load, the addresses of the calls it makes to our service (without anything after a \"?\"), and your browser, device type and rough location. Your IP address is used for that location and dropped within a day. It sets no cookies, records no screen or session, and reads nothing you type. Under <a href=\"https://newrelic.com/termsandconditions/services-notices\">New Relic's privacy notices</a>."
+      "p5": "<b>New Relic</b> tells us when the game breaks or is slow for you at play.openhearts.game. The game's page sends it the errors it meets, how long it took to load, the addresses of the calls it makes to our service (without anything after a \"?\"), and your browser, device type and rough location. Your IP address is used for that location and dropped within a day. It sets no cookies, records no screen or session, and reads nothing you type. Under <a href=\"https://newrelic.com/termsandconditions/services-notices\">New Relic's privacy notices</a>."
     },
     "live": {
       "title": "Live play",
@@ -184,7 +192,7 @@
       "p9": "Only to our relay, which runs on Cloudflare. Every message is signed by the device that sent it, so anyone who keeps a copy can show it is genuine; we cannot delete a copy someone else made.",
       "p10": "What only your table sees",
       "p11": "The cards are dealt between the devices at the table so that each player's hand can be read by that player alone, and no server of ours ever sees a hand. Plays go from device to device.",
-      "p12": "Those connections all go through Cloudflare's relay service (TURN), so the other devices at your table never learn your IP address — not the other players, and not the <b>jurors</b>: the apps of other players, drawn at random, that help settle a table and play the bots' seats. Cloudflare sees your IP address, as any server you connect to does, and passes the traffic on encrypted, so that it cannot read it.",
+      "p12": "Those connections all go through Cloudflare's relay service (TURN), so the other devices at your table never learn your IP address — not the other players, and not the <b>jurors</b>: the apps of other players, drawn at random, that help settle a table and play the bots' seats (or, when too few are online, our service's backup jurors). Cloudflare sees your IP address, as any server you connect to does, and passes the traffic on encrypted, so that it cannot read it.",
       "p13": "If nobody else is waiting and you choose to wait for a person, our service emails us that someone is waiting: the pool, the time, and the first few characters of your device's key and of your subscription — never your name or email address. One of us may come and play."
     },
     "subscribing": {
@@ -249,7 +257,7 @@
     "header": {
       "title": "Terms of Use",
       "tagline": "The agreement between you and Open Hearts, in plain words.",
-      "updated": "Last updated 6 October 2026"
+      "updated": "Last updated 11 October 2026"
     },
     "short": {
       "title": "The short version",
@@ -264,7 +272,7 @@
     },
     "who": {
       "title": "Who these terms are with",
-      "p1": "These terms are an agreement between you and Open Hearts (\"we\", \"us\"), whose address is under <a href=\"#contact\">Contact</a>. They cover this site, the game at <a href=\"{{play}}\">play.openhearts.game</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
+      "p1": "These terms are an agreement between you and Open Hearts (\"we\", \"us\"), which is run by Bright Fulton and whose address is under <a href=\"#contact\">Contact</a>. They cover this site, the game at <a href=\"{{play}}\">play.openhearts.game</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
       "p2": "How we handle information about you is in the <a href=\"{{base}}/privacy\">privacy policy</a>, which is part of these terms."
     },
     "appStore": {
@@ -294,9 +302,7 @@
       "p14": "<b>Web:</b> the purchase is made through Stripe, and Stripe charges the card you gave it each year on the date you first subscribed.",
       "p15": "Cancelling",
       "p16": "You can cancel at any time. Cancelling stops the next renewal; live play keeps working until the end of the year you have paid for.",
-      "p17": "<b>App Store:</b> on your iPhone or iPad open Settings, tap your name, then Subscriptions, and choose Open Hearts.",
-      "p18": "<b>Google Play:</b> in the Play Store app, tap your profile picture, then Payments &amp; subscriptions, then Subscriptions.",
-      "p19": "<b>Web:</b> in the game, open Live play and choose <b>Manage subscription</b>, on any of the subscription's devices. That opens Stripe's billing page, where you can cancel, change the card, and see your receipts. If you no longer have any of those devices, email us (details below) with the email address you paid with, and we will cancel it and confirm.",
+      "p17": "How to cancel — in the app, in each store, and when you no longer have any of your devices — is on the <a href=\"{{base}}/support#cancel\">support page</a>.",
       "p20": "Refunds",
       "p21": "<b>App Store and Google Play:</b> refunds are handled by Apple or Google under their own policies. For the App Store, request one at <a href=\"https://reportaproblem.apple.com/\">reportaproblem.apple.com</a>. We cannot refund a store purchase ourselves.",
       "p22": "<b>Web:</b> contact us. Where the law where you live gives you a right to withdraw from the purchase or to a refund, you have it, and we will look fairly at any other request.",
