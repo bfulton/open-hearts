@@ -124,7 +124,7 @@
     "addAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Add a device",
     "fair": {
       "random": "<b>Random.</b> At a live table every device shuffles the deck in turn and proves it shuffled honestly, so one honest device is enough for a fair deal. Each hand opens for its own player alone: no other player sees it, and no server does. Alone, every deal comes from your device's secure random generator.",
-      "witness": "<b>Witnessed.</b> Each hand draws jurors: strangers picked at random from other players online, with no stake in the table. They play any seat a bot holds, and keep pieces of each player's keys, so a hand can finish when someone leaves while nobody alone can open another's cards. When no one else is online, our service runs backup jurors. Like any juror, they cannot see your cards alone, only together with another player at your table, so for those hands you are trusting us not to collude.",
+      "witness": "<b>Witnessed.</b> Each hand draws jurors: strangers picked at random from other players online, with no stake in the table. They play any seat a bot holds, and keep pieces of each player's keys, so a hand can finish when someone leaves while nobody alone can open another's cards. When too few other players are online to make a jury, our service's backup jurors make up the number. Like any juror, they cannot see your cards alone, only together with another player at your table, so for those hands you are trusting us not to collude.",
       "audit": "<b>Audited.</b> After each hand every device publishes its secret, so the whole game can be replayed and every shuffle, card and play checked. After a live game, <i>See the whole game</i> does that check for you; after a game alone, <i>Copy record</i> keeps it.",
       "more": "How it all works is in <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">the write-up</a>."
     }
@@ -190,7 +190,7 @@
       "p9": "Only to our relay, which runs on Cloudflare. Every message is signed by the device that sent it, so anyone who keeps a copy can show it is genuine; we cannot delete a copy someone else made.",
       "p10": "What only your table sees",
       "p11": "The cards are dealt between the devices at the table so that each player's hand can be read by that player alone, and no server of ours ever sees a hand. Plays go from device to device.",
-      "p12": "Those connections all go through Cloudflare's relay service (TURN), so the other devices at your table never learn your IP address — not the other players, and not the <b>jurors</b>: the apps of other players, drawn at random, that help settle a table and play the bots' seats (or, when no one else is online, our service's backup jurors). Cloudflare sees your IP address, as any server you connect to does, and passes the traffic on encrypted, so that it cannot read it."
+      "p12": "Those connections all go through Cloudflare's relay service (TURN), so the other devices at your table never learn your IP address — not the other players, and not the <b>jurors</b>: the apps of other players, drawn at random, that help settle a table and play the bots' seats (or, when too few are online, our service's backup jurors). Cloudflare sees your IP address, as any server you connect to does, and passes the traffic on encrypted, so that it cannot read it."
     },
     "subscribing": {
       "title": "Subscribing",

@@ -29,8 +29,8 @@ directly to each other over WebRTC, with our relay
 (`relay.openhearts.game`, one Cloudflare Durable Object per tag) for
 introductions, as a fallback path, and for storing rooms and results.
 Bots at a live table are played by *jurors*: other players online,
-picked at random, or the service's backup jurors when nobody else is
-online. No player sees a bot's cards, and the juror playing a bot's seat
+picked at random, with the service's backup jurors making up the
+number when too few are online. No player sees a bot's cards, and the juror playing a bot's seat
 sees only that hand, never enough to work out a person's; what that
 guarantees, and where it rests on trusting us, is in
 [doc 03](docs/03-fair-deal.md#what-is-guaranteed-and-what-is-not). The deal is Barnett–Smart mental poker with a

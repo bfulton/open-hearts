@@ -244,9 +244,9 @@ pure-Dart BIP-340 at 17 ms a signature.
   alone, and not whoever is left at the table after you go. Any
   coalition able to open your hand must include a person at the table
   and a juror of the hand. Jurors are other players online, drawn at
-  random; when nobody else is online the service runs backup jurors,
-  which are ours, so for those hands you trust us not to collude with a
-  player at your table. The other exception is that a departed seat's
+  random; when too few are online to make a jury, the service's backup
+  jurors make up the number, and they are ours, so for those hands you
+  trust us not to collude with a player at your table. The other exception is that a departed seat's
   hand is opened from escrow for the rest of that hand (above).
 - **Nobody can play a card they were not dealt**, because the masked
   card fixes its value.
