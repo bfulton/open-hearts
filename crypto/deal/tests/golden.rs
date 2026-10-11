@@ -44,7 +44,7 @@ fn hex(b: &[u8]) -> String {
 }
 
 fn unhex(s: &str) -> Vec<u8> {
-    assert!(s.len() % 2 == 0, "odd hex");
+    assert!(s.len().is_multiple_of(2), "odd hex");
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("hex")).collect()
 }
 
@@ -439,7 +439,8 @@ fn write_vectors() -> Value {
     r.check("verify_seal", &[s("pk2"), s("pk1"), s("card7"), s("sealed01")], false);
     r.check("verify_seal", &[s("pk0"), s("pk2"), s("card7"), s("sealed01")], false);
     r.check("verify_seal", &[s("pk0"), s("pk1"), s("card0"), s("sealed01")], false);
-    r.val("sealed01_c", &r.values["sealed01"][..SEALED].to_vec());
+    let sealed = r.values["sealed01"][..SEALED].to_vec();
+    r.val("sealed01_c", &sealed);
     r.must("open", &[s("secret1"), s("sealed01_c")], "opened01");
     r.must("open", &[s("secret2"), s("sealed01_c")], "opened01_wrong");
     r.must("shared_secret", &[s("secret0"), s("pk1")], "shared01");
