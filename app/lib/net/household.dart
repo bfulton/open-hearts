@@ -266,7 +266,7 @@ class Refused {
     'that sign-in is linked to another account': 'accountElsewhere',
     'that sign-in is not linked to an account': 'accountNowhere',
     'this account is linked to another sign-in': 'otherSignIn',
-    'sign-in is not configured': 'signInNotSetUp',
+    'service not configured: OH_ID_HMAC': 'signInNotSetUp',
     // A store's purchase brought to the service (store_buying.dart).
     'not a store': 'notAStore',
     'no proof': 'noProof',

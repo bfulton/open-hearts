@@ -219,11 +219,15 @@ export function serversOf(answer) {
 /// The user name and password of local mode's TURN server.
 export const LOCAL_TURN = 'rig';
 
+/// What the service says when it is missing [what] it needs — a
+/// binding or a secret, by name, so the one deploying it knows which.
+export const notConfigured = (what) => ({ error: `service not configured: ${what}` });
+
 /// Mints credentials: the status and body to answer with.
 export async function mint(env, fetchImpl = fetch) {
   const keyId = env.OH_TURN_KEY_ID;
   const token = env.OH_TURN_API_TOKEN;
-  if (!keyId || !token) return { status: 503, body: { error: 'turn not configured' } };
+  if (!keyId || !token) return { status: 503, body: notConfigured('OH_TURN_KEY_ID and OH_TURN_API_TOKEN') };
   const ttl = S().turnTtlS;
   const upstream = `${UPSTREAM}/${keyId}/credentials/generate-ice-servers`;
   let res;
@@ -457,9 +461,9 @@ function serviceKeys(env) {
 /// The licence handler's status and body.
 export async function licence(key, env, { signer, now = Date.now(), open = false } = {}) {
   const keys = serviceKeys(env);
-  if (!keys) return { status: 503, body: { error: 'licensing not configured' } };
+  if (!keys) return { status: 503, body: notConfigured('OH_SERVICE_KEY and OH_SERVICE_SECRET') };
   const store = storeOf(env);
-  if (!store) return { status: 503, body: { error: 'licensing not configured' } };
+  if (!store) return { status: 503, body: notConfigured('OH_STORE') };
   await deviceAccount(env, store, key, { now });
   const held = await entitlementOf(store, key, { now, openHouse: open });
   if (!held) return { status: 402, body: { error: 'no subscription' } };
@@ -941,13 +945,28 @@ export async function priceIdOf(named, secret, fetchImpl = fetch, { now = Date.n
   if (named.startsWith('price_')) return named;
   const kept = priceIds.get(named);
   if (kept && kept.until > now) return kept.id;
+  const id = await priceLookup(named, secret, fetchImpl);
+  if (id) priceIds.set(named, { id, until: now + PRICE_KEPT_MS });
+  return id;
+}
+
+/// Stripe refusing to say: its status.
+class StripeRefused extends Error {
+  constructor(status) {
+    super(`stripe prices ${status}`);
+    this.status = status;
+  }
+}
+
+/// The price Stripe has under the lookup key [named], asked now: its
+/// id, or null for none. Throws [StripeRefused] when Stripe says no,
+/// and whatever the fetch throws when it does not answer.
+async function priceLookup(named, secret, fetchImpl) {
   const url = `${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
   const res = await fetchImpl(url, { headers: { authorization: `Bearer ${secret}` } });
-  if (!res.ok) throw new Error(`stripe prices ${res.status}`);
+  if (!res.ok) throw new StripeRefused(res.status);
   const id = (await res.json())?.data?.[0]?.id;
-  if (typeof id !== 'string' || !id.startsWith('price_')) return null;
-  priceIds.set(named, { id, until: now + PRICE_KEPT_MS });
-  return id;
+  return typeof id === 'string' && id.startsWith('price_') ? id : null;
 }
 
 /// How Stripe's checkout page looks: the app's, not the account's — the
@@ -1725,7 +1744,7 @@ export class Household {
     if (op?.op === 'alert') return Response.json(await sendAlert(op, this.env));
     await settle(this.env);
     const store = storeOf(this.env);
-    if (!store) return Response.json({ status: 503, body: { error: 'licensing not configured' } });
+    if (!store) return Response.json({ status: 503, body: notConfigured('OH_STORE') });
     return Response.json(
       await this.next(kindOf(op), () => householdOp(op, store, { mail: mailerOf(this.env), active: this.active, revoke: revokerOf(this.env) })),
     );
@@ -1745,7 +1764,7 @@ export async function inHousehold(env, name, op) {
     return answer.json();
   }
   const store = storeOf(env);
-  if (!store) return { status: 503, body: { error: 'licensing not configured' } };
+  if (!store) return { status: 503, body: notConfigured('OH_STORE') };
   if (!households.has(name)) households.set(name, sequencer());
   return households.get(name)(kindOf(op), () => householdOp(op, store, { mail: mailerOf(env) }));
 }
@@ -1764,7 +1783,7 @@ async function ticketRoute(request, env) {
   const asked = await signedFor(request, env, 'ticket');
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const account = await deviceAccount(env, store, asked.key);
   if (!account) return json(request, 402, { error: 'no subscription' });
   const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key: asked.key });
@@ -1790,7 +1809,7 @@ async function claimRoute(request, env) {
   if (asked instanceof Response) return asked;
   const { key, body, signer } = asked;
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   // In the account the code is for, which the code's row says; a code
   // nobody made is said so here, without queueing anybody.
   // A backup code, typed by a person, or a code off another device's
@@ -1855,7 +1874,7 @@ async function backupsRoute(request, env) {
   if (asked instanceof Response) return asked;
   const { key, body } = asked;
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const account = await deviceAccount(env, store, key);
   if (!account) return json(request, 402, { error: 'no subscription' });
   const rotate = body.rotate === true;
@@ -1879,7 +1898,7 @@ async function reviewRoute(request, env) {
   const { key, body } = asked;
   if (typeof body.table !== 'string' || !tableIdShape.test(body.table)) return json(request, 400, { error: 'a table id, 32 hex' });
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const account = await deviceAccount(env, store, key);
   if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
   const ok = await inHousehold(env, account, { op: 'inUse', key, account, table: body.table });
@@ -1901,7 +1920,7 @@ async function activateRoute(request, env) {
   if (!['open', 'take', 'renew'].includes(body.want)) return json(request, 400, { error: 'want: open, take or renew' });
   const keys = serviceKeys(env);
   const store = storeOf(env);
-  if (!keys || !store) return json(request, 503, { error: 'licensing not configured' });
+  if (!keys || !store) return json(request, 503, notConfigured(keys ? 'OH_STORE' : 'OH_SERVICE_KEY and OH_SERVICE_SECRET'));
   const open = openHouse(env, request);
   const now = Date.now();
   // In local mode a device nobody has heard of is licensed, and so has
@@ -1945,7 +1964,7 @@ async function devicesRoute(request, env) {
   if (asked instanceof Response) return asked;
   const { key, body } = asked;
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const drop = body.drop;
   if (typeof drop === 'string' && !/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
   const account = await deviceAccount(env, store, key);
@@ -1974,7 +1993,7 @@ async function profileRoute(request, env) {
   const { key, body } = asked;
   if (body.profile !== undefined && typeof body.profile !== 'string') return json(request, 400, { error: 'not a profile' });
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const account = await deviceAccount(env, store, key);
   if (!account) return json(request, 402, { error: 'no subscription' });
   const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, ...(body.profile !== undefined ? { profile: body.profile } : {}) });
@@ -2135,7 +2154,7 @@ async function linkedAccount(store, login) {
 /// an account linked to another sign-in, is a refusal rather than a
 /// second link: one person, one account, one sign-in.
 export async function attest(who, key, store, login, { now = Date.now() } = {}) {
-  if (!login) return { status: 503, body: { error: 'sign-in is not configured' } };
+  if (!login) return { status: 503, body: notConfigured('OH_ID_HMAC') };
   const today = dayOf(now);
   const account = await accountOfKey(store, key);
   if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) return { status: 402, body: { error: 'no subscription' } };
@@ -2155,7 +2174,7 @@ export async function attest(who, key, store, login, { now = Date.now() } = {}) 
 /// linked to, as a backup code would bring it — by the same rules, in
 /// the account's turn. {status, body}, with the account.
 export async function supersede(who, key, store, env, login, { now = Date.now() } = {}) {
-  if (!login) return { status: 503, body: { error: 'sign-in is not configured' } };
+  if (!login) return { status: 503, body: notConfigured('OH_ID_HMAC') };
   const account = await linkedAccount(store, login);
   if (!account) return { status: 404, body: { error: 'that sign-in is not linked to an account' } };
   const joined = await inHousehold(env, account, { op: 'join', key, account, now });
@@ -2178,7 +2197,7 @@ async function signInRoute(request, env, move) {
   if (asked instanceof Response) return asked;
   const { key, body, signer } = asked;
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const who = await whoSignedIn(body.provider, body.token, key, env, fetch, { open: openHouse(env, request) });
   if (!who) return json(request, 401, { error: 'that sign-in does not check out' });
   const login = await loginRow(who, env);
@@ -2307,7 +2326,7 @@ async function appleIdRoute(request, env) {
   if (raw === null) return json(request, 413, { error: 'too big' });
   if (!env[PROVIDERS.apple.audience]) return json(request, 503, { error: 'sign-in is not set up yet' });
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   let payload;
   try {
     ({ payload } = JSON.parse(raw));
@@ -2318,7 +2337,7 @@ async function appleIdRoute(request, env) {
   if (!notice) return json(request, 400, { error: 'not signed' });
   if (!APPLE_ID_GONE.has(notice.type)) return json(request, 200, { unlinked: null });
   const login = await loginRow({ provider: 'apple', sub: notice.sub }, env);
-  if (!login) return json(request, 503, { error: 'sign-in is not configured' });
+  if (!login) return json(request, 503, notConfigured('OH_ID_HMAC'));
   const done = await unlinkFromAccount(env, store, login);
   if (done.status !== 200) return json(request, 503, { error: 'not unlinked yet' });
   return json(request, 200, done.body);
@@ -2349,7 +2368,7 @@ async function manageRoute(request, env) {
   const back = sameSite(asked.body.back, request.url);
   if (!back) return json(request, 400, { error: 'somewhere on this site to come back to' });
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const { status, body } = await manage(asked.key, back, store, env);
   return json(request, status, body);
 }
@@ -2363,7 +2382,7 @@ async function stripeRoute(request, env, ctx) {
     return json(request, 400, { error: 'not signed' });
   }
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   let event;
   try {
     event = JSON.parse(raw);
@@ -2481,7 +2500,7 @@ async function turn(request, env) {
   const asked = await signedFor(request, env, 'turn');
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   if (!(await entitlementOf(store, asked.key, { openHouse: openHouse(env, request) }))) return json(request, 402, { error: 'no subscription' });
   // Local mode's own TURN server (the browser rig's, e2e/drive.mjs), so
   // the rig's channels take the path production's do.
@@ -2690,14 +2709,12 @@ export async function healthOf(env, fetchImpl = fetch, { now = Date.now() } = {}
   if (!secret || typeof named !== 'string') {
     said.stripe = 'not configured';
   } else {
+    // Asked now, not the checkout's kept answer (priceIdOf): this is
+    // whether Stripe answers at all.
     try {
-      const res = await fetchImpl(`${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`, {
-        headers: { authorization: `Bearer ${secret}` },
-      });
-      if (!res.ok) said.stripe = `stripe said ${res.status}`;
-      else if (!(await res.json())?.data?.length) said.stripe = 'no such price';
-    } catch {
-      said.stripe = 'not answering';
+      if (!(await priceLookup(named, secret, fetchImpl))) said.stripe = 'no such price';
+    } catch (e) {
+      said.stripe = e instanceof StripeRefused ? `stripe said ${e.status}` : 'not answering';
     }
   }
   said.ok = said.store === 'ok' && said.stripe === 'ok';
@@ -3123,7 +3140,7 @@ async function storeRoute(request, env, ctx) {
   if (asked instanceof Response) return asked;
   const { key, body, signer } = asked;
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   if (body.store !== 'apple' && body.store !== 'google') return json(request, 400, { error: 'not a store' });
   if (typeof body.proof !== 'string' || !body.proof) return json(request, 400, { error: 'no proof' });
   const now = Date.now();
@@ -3163,7 +3180,7 @@ async function appleRoute(request, env) {
   if (raw === null) return json(request, 413, { error: 'too big' });
   if (!env.OH_APPLE_BUNDLE_ID || !env.OH_APPLE_PRODUCT) return json(request, 503, { error: 'the store is not set up yet' });
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   let signedPayload;
   try {
     ({ signedPayload } = JSON.parse(raw));
@@ -3203,7 +3220,7 @@ async function playRoute(request, env) {
   const bearer = /^Bearer (.+)$/.exec(request.headers.get('authorization') ?? '')?.[1];
   if (!(await pushedByPlay(bearer, env))) return json(request, 401, { error: 'not Play' });
   const store = storeOf(env);
-  if (!store) return json(request, 503, { error: 'licensing not configured' });
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
   let note;
   try {
     const pushed = JSON.parse((await textOf(request, MOST_BODY)) ?? '');

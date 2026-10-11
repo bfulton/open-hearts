@@ -147,7 +147,7 @@ void main() {
       ('attest', 409, 'that sign-in is linked to another account', 'That sign-in is linked to another account.'),
       ('attest', 409, 'this account is linked to another sign-in', 'This account is already linked to another sign-in.'),
       ('supersede', 404, 'that sign-in is not linked to an account', 'No account is linked to that sign-in yet.'),
-      ('attest', 503, 'sign-in is not configured', 'Signing in is not open yet.'),
+      ('attest', 503, 'service not configured: OH_ID_HMAC', 'Signing in is not open yet.'),
       ('attest', 401, "this device's clock is out by more than five minutes", "This device's clock is out. Set it right and try again."),
     ]) {
       stand.says(handler, {'error': said}, status: status);

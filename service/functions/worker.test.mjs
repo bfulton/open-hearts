@@ -132,8 +132,8 @@ test('servers: a list or the older single object, urls always a list', () => {
 });
 
 test('mint: not configured is said, not guessed', async () => {
-  assert.deepEqual(await mint({}, okUpstream), { status: 503, body: { error: 'turn not configured' } });
-  assert.deepEqual(await mint({ OH_TURN_KEY_ID: 'kid' }, okUpstream), { status: 503, body: { error: 'turn not configured' } });
+  assert.deepEqual(await mint({}, okUpstream), { status: 503, body: { error: 'service not configured: OH_TURN_KEY_ID and OH_TURN_API_TOKEN' } });
+  assert.deepEqual(await mint({ OH_TURN_KEY_ID: 'kid' }, okUpstream), { status: 503, body: { error: 'service not configured: OH_TURN_KEY_ID and OH_TURN_API_TOKEN' } });
 });
 
 test('mint: credentials from the upstream, with the key and a ttl of four hours', async () => {
@@ -152,7 +152,7 @@ test('mint: credentials from the upstream, with the key and a ttl of four hours'
 test('mint: only the OH_-prefixed secret names are read', async () => {
   assert.deepEqual(await mint({ TURN_KEY_ID: 'kid', TURN_API_TOKEN: 'tok' }, okUpstream), {
     status: 503,
-    body: { error: 'turn not configured' },
+    body: { error: 'service not configured: OH_TURN_KEY_ID and OH_TURN_API_TOKEN' },
   });
 });
 
