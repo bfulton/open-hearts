@@ -151,3 +151,17 @@ cd packages/engine && dart run tool/bot_stats.dart --games 2000
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+## Third-party code
+
+Code from others that ships in this repository, each under its own
+licence beside it:
+
+- **The deal's proof crates** (`crypto/vendor/`): Geometry's
+  mental-poker and proof-toolbox, ported to arkworks 0.6. MIT or
+  Apache-2.0.
+- **ZXing** (`app/web/zxing/`): the QR scanner's decoder on the web,
+  `@zxing/library` 0.23.0. Apache-2.0.
+- **New Relic's browser agent** (`app/web/observability.js`): its loader,
+  as New Relic serves it, on play.openhearts.game only. Apache-2.0
+  (`app/web/nr-loader-full-1.323.0.min.js.LICENSE.txt`).

@@ -378,9 +378,30 @@ async function applyBrowser() {
   ].join('\n');
   const out = new URL(`../${browser.out}`, import.meta.url);
   const was = await readFile(out, 'utf8').catch(() => null);
-  if (was === file) return;
-  say(`write ${browser.out} with the browser app's loader`);
-  if (write) await writeFile(out, file);
+  if (was !== file) {
+    say(`write ${browser.out} with the browser app's loader`);
+    if (write) await writeFile(out, file);
+  }
+  // The licence notices the loader's banner names, beside it, and the
+  // licence itself: the agent is New Relic's, under the Apache License
+  // 2.0, which goes with the code wherever the code goes.
+  const named = script.match(/For license information please see (\S+\.LICENSE\.txt)/)?.[1];
+  if (!named) throw new Error('browser: the loader names no licence file; look at it');
+  const fetched = async (url) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`browser: ${url} said ${res.status}`);
+    return res.text();
+  };
+  const notices = [
+    await fetched(`https://js-agent.newrelic.com/${named}`),
+    '',
+    '',
+    await fetched('https://www.apache.org/licenses/LICENSE-2.0.txt'),
+  ].join('\n');
+  const beside = new URL(named, out);
+  if ((await readFile(beside, 'utf8').catch(() => null)) === notices) return;
+  say(`write ${named} beside it`);
+  if (write) await writeFile(beside, notices);
 }
 
 // ---- the workload ------------------------------------------------------
