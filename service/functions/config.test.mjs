@@ -150,6 +150,15 @@ test('the waits are served field by field, each within its bounds, the relay pai
   assert.equal(configOf({ waits: [1, 2] }).waits, undefined);
 });
 
+test('the table clocks\' bounds are the table\'s own', () => {
+  // Every seat parses the start event by TableTiming.bounds, so a clock
+  // the worker serves outside them makes the standard table everywhere.
+  const dart = readFileSync(new URL('../../packages/table/lib/src/timing.dart', import.meta.url), 'utf8');
+  const bounds = dart.slice(dart.indexOf('static const bounds = {'), dart.indexOf('};', dart.indexOf('static const bounds = {')));
+  const table = Object.fromEntries([...bounds.matchAll(/'(\w+)': \((\d+), (\d+)\)/g)].map((m) => [m[1], [Number(m[2]), Number(m[3])]]));
+  assert.deepEqual(table, { ...TABLE_TIMING_BOUNDS });
+});
+
 test('the waits\' bounds are the app\'s own', () => {
   const dart = readFileSync(new URL('../../app/lib/net/remote_config.dart', import.meta.url), 'utf8');
   const app = Object.fromEntries([...dart.matchAll(/'(\w+)': \((\d+), (\d+)\)/g)].map((m) => [m[1], [Number(m[2]), Number(m[3])]]));
