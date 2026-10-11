@@ -83,6 +83,13 @@ const flow = (name, run) => flows.push({ name, run });
 /// looks at it.
 const stillFlow = (name, run) => flows.push({ name, run, still: true });
 
+stillFlow('a browser whose language Intl cannot read still opens the app', async ({ open }) => {
+  // Chromium on Linux with no language set says en-US@posix.
+  const page = await open({ languages: ['en-US@posix'] });
+  await waitFor(page, /^Open Hearts$/, { what: 'the home screen' });
+  if (!(await has(page, /^Play solo$/))) throw new Error('the home screen without Play solo');
+});
+
 stillFlow('the front door', async ({ open }) => {
   const page = await open();
   await waitFor(page, /^Open Hearts$/, { what: 'the home screen' });
@@ -848,7 +855,7 @@ async function main() {
       // holding sockets — and the next flow runs against a relay with a
       // crowd on it and a machine with nothing left to give.
       const contexts = [];
-      const open = async ({ viewport = portrait, pointer = false, url = null, ready = /^Open Hearts$|^Play solo$/ } = {}) => {
+      const open = async ({ viewport = portrait, pointer = false, url = null, ready = /^Open Hearts$|^Play solo$/, languages = null } = {}) => {
         const ctx = await browser.newContext({
           viewport,
           locale: 'en-US',
@@ -862,6 +869,15 @@ async function main() {
           permissions: ['clipboard-read', 'clipboard-write'],
         });
         contexts.push(ctx);
+        // The browser's languages as it says them, before anything of the
+        // page's runs, for a flow about a language a context's locale
+        // cannot be set to.
+        if (languages) {
+          await ctx.addInitScript((list) => {
+            Object.defineProperty(navigator, 'languages', { get: () => list, configurable: true });
+            Object.defineProperty(navigator, 'language', { get: () => list[0], configurable: true });
+          }, languages);
+        }
         const page = await ctx.newPage();
         page.on('pageerror', AsyncResource.bind((e) => log(`page error: ${e.message}\n${(e.stack || '').slice(0, 900)}`)));
         await page.goto(app.at(url ?? '/?e2e=1'));

@@ -240,12 +240,14 @@ pure-Dart BIP-340 at 17 ms a signature.
 ## What is guaranteed, and what is not
 
 - **The deal cannot be rigged.** One honest shuffler is enough.
-- **Nobody can see your cards**: not another player, not the operator,
-  and not whoever is left at the table after you go. Any coalition able
-  to open your hand must include a person at the table and a juror of
-  the hand, and the juror is drawn at random. The exception is that a
-  departed seat's hand is opened from escrow for the rest of that hand
-  (above).
+- **Nobody can see your cards**: not another player, not the operator
+  alone, and not whoever is left at the table after you go. Any
+  coalition able to open your hand must include a person at the table
+  and a juror of the hand. Jurors are other players online, drawn at
+  random; when too few are online to make a jury, the service's backup
+  jurors make up the number, and they are ours, so for those hands you
+  trust us not to collude with a player at your table. The other exception is that a departed seat's
+  hand is opened from escrow for the rest of that hand (above).
 - **Nobody can play a card they were not dealt**, because the masked
   card fixes its value.
 - **Every game verifies end to end**, by anyone, after the fact.

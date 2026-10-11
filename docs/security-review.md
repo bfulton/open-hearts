@@ -207,7 +207,10 @@ hands a device's storage from where the app used to be to
 The worker lets exactly that origin frame it. The page has no buttons, and
 it answers only a message from its parent at exactly that origin,
 addressed back to exactly that origin. The app checks the answer's origin
-and source, and never writes over a key it already has. The app loads no third-party script. Cloudflare's
+and source, and never writes over a key it already has. The app loads one
+third-party script, on play.openhearts.game only: New Relic's browser
+agent, which its loader (`app/web/observability.js`) fetches from
+`js-agent.newrelic.com`. Cloudflare's
 Web Analytics and email obfuscation are off, since both inject scripts.
 Open: a fuller CSP (`script-src`) has not been set. The Flutter build
 needs `wasm-unsafe-eval`, and the policy has to be tested against it.

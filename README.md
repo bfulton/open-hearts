@@ -17,7 +17,7 @@ private to the person holding it.
 | [`packages/deal/`](packages/deal/) | The verifiable deal as Dart sessions over the Rust primitives |
 | [`crypto/`](crypto/) | Rust: the deal (`crypto/deal`, built for the Dart VM and as wasm) and BIP-340 signatures for the VM (`crypto/schnorr`) |
 | [`app/`](app/) | The Flutter app, one codebase for web, Android and iOS |
-| [`service/`](service/) | The Cloudflare worker's handlers (licences, the shop, TURN), the relay, the jurors of last resort, and a local relay for tests |
+| [`service/`](service/) | The Cloudflare worker's handlers (licences, the shop, TURN), the relay, the backup jurors, and a local relay for tests |
 | [`e2e/`](e2e/) | Browser suites that drive the built app through its accessibility tree |
 | [`site/`](site/) | The marketing site: page templates, their words in each language, and the build that joins them |
 | [`config/`](config/openhearts.json) | What is not secret about this deployment: the service's public key, store and sign-in identifiers, the Stripe price |
@@ -28,9 +28,12 @@ Solo play runs entirely on the device. Live play is four devices talking
 directly to each other over WebRTC, with our relay
 (`relay.openhearts.game`, one Cloudflare Durable Object per tag) for
 introductions, as a fallback path, and for storing rooms and results.
-Bots at a live table are played by *jurors*: other online devices, or
-the service's own bench when nobody else is online. No juror or player
-can see a bot's cards. The deal is Barnett–Smart mental poker with a
+Bots at a live table are played by *jurors*: other players online,
+picked at random, with the service's backup jurors making up the
+number when too few are online. No player sees a bot's cards, and the juror playing a bot's seat
+sees only that hand, never enough to work out a person's; what that
+guarantees, and where it rests on trusting us, is in
+[doc 03](docs/03-fair-deal.md#what-is-guaranteed-and-what-is-not). The deal is Barnett–Smart mental poker with a
 Bayer–Groth shuffle argument. Every seat shuffles with a proof, and the
 whole hand is audited and can be replayed once it ends.
 

@@ -1,6 +1,28 @@
 {{flutter_js}}
 {{flutter_build_config}}
 
+// The browser's languages as Intl can read them. Flutter's engine makes
+// an Intl.Locale of each as it starts, and one it cannot read stops the
+// app before it draws anything: Chromium on Linux with no language set
+// (LANG=C) says en-US@posix, which Intl refuses. The part from @ on is
+// a POSIX locale's modifier, which a browser's language never needs.
+(() => {
+  const readable = (tag) => {
+    try {
+      new Intl.Locale(tag);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+  const languages = [...(navigator.languages ?? [navigator.language])];
+  if (languages.every(readable)) return;
+  const fixed = languages.map((tag) => (readable(tag) ? tag : tag.split('@')[0])).filter(readable);
+  if (fixed.length === 0) fixed.push('en');
+  Object.defineProperty(navigator, 'languages', { get: () => Object.freeze([...fixed]) });
+  Object.defineProperty(navigator, 'language', { get: () => fixed[0] });
+})();
+
 // Flutter's own loader, without Flutter's service worker: that one is
 // a stub, which unregisters whatever is registered where it is —
 // ours included. Once the device has been brought along from where the

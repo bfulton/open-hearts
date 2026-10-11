@@ -1,11 +1,3 @@
-# The suites that only count — the Dart and Flutter tests on the
-# simulator's clock and the test clock — run at the lowest priority,
-# beside those that keep time: the browser suites and the service's
-# sockets, whose tables have deadlines a starved process misses, and
-# whose checks hold the app to seconds. The counting suites take what
-# the clocks leave, and all four cores stay busy.
-patient="engine deal table table_slow app app_analyze crypto relay_js functions site infra workers scripts"
-
 #!/usr/bin/env bash
 # Every check the repository has, as much of it as a change needs
 # (docs/09-testing.md).
