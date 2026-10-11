@@ -73,7 +73,11 @@ void main() {
     });
     tearDown(() => relay.close());
 
-    Future<(RelayTransport, WaitingRoom)> join(String name,
+    // A waiter, and the table it is seated at, listened for as the room
+    // is made: `seated` keeps nothing for a late listener, and a room
+    // can be seated while the test is still joining the next. One never
+    // seated ends with an error nobody need wait for.
+    Future<(RelayTransport, WaitingRoom, Future<TableSpec>)> join(String name,
         {int rating = 1500,
         int target = gameOverScore,
         TableTiming timing = TableTiming.standard,
@@ -95,7 +99,8 @@ void main() {
           heartbeatMs: 500,
           staleMs: 2000,
           log: log);
-      return (t, room);
+      final seated = room.seated.first..ignore();
+      return (t, room, seated);
     }
 
     test('two waiting for a person are left waiting, whoever hosts, until one of them takes bots', () async {
@@ -105,10 +110,10 @@ void main() {
       b.$2.waitForPerson();
       // Past the pool's wait for bots (three seconds here), and nobody is
       // seated: whoever hosts has heard the other wants a person.
-      final early = Future.any([a.$2.seated.first, b.$2.seated.first]);
+      final early = Future.any([a.$3, b.$3]);
       expect(await early.then((_) => true).timeout(const Duration(seconds: 7), onTimeout: () => false), isFalse);
       b.$2.playWithBots();
-      final specs = await Future.wait([a.$2.seated.first, b.$2.seated.first].map((f) => f.timeout(const Duration(seconds: 15))));
+      final specs = await Future.wait([a.$3, b.$3].map((f) => f.timeout(const Duration(seconds: 15))));
       expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table, the two of them and two bots');
       expect(specs.first.seats.whereType<HumanSeat>().length, 2);
       for (final r in [a, b]) {
@@ -136,9 +141,9 @@ void main() {
       while (host.$2.present.length < 2) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
-      final otherSeated = other.$2.seated.first.then((spec) => (spec, DateTime.now().millisecondsSinceEpoch));
+      final otherSeated = other.$3.then((spec) => (spec, DateTime.now().millisecondsSinceEpoch));
       host.$2.playWithBots();
-      final hosted = await host.$2.seated.first.timeout(const Duration(seconds: 10));
+      final hosted = await host.$3.timeout(const Duration(seconds: 10));
       expect(hosted.seats.whereType<HumanSeat>().single.key, signers[0].publicKey, reason: 'the host alone, with bots');
       final (seated, at) = await otherSeated.timeout(const Duration(seconds: 20));
       expect(at - other.$2.since, greaterThanOrEqualTo(pool), reason: 'not before the pool\'s wait');
@@ -164,7 +169,7 @@ void main() {
             if (line.contains(': hosting,')) hostings++;
           }),
       ];
-      final specs = await Future.wait(rooms.map((r) => r.$2.seated.first.timeout(const Duration(seconds: 15))));
+      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
       expect(hostings, greaterThan(0), reason: 'somebody hosted the round');
       for (var i = 0; i < rooms.length; i++) {
         expect(specs[i].seats.whereType<HumanSeat>().map((h) => h.key), contains(rooms[i].$2.me),
@@ -221,14 +226,9 @@ void main() {
     }
 
     // Waiters nobody else seats: nobody is due bots for a minute, so no
-    // room hosts a table of its own. Each with its seating listened for
-    // as it is made: one handed its seatings with the relay's stored
-    // history takes one a tenth of a round later, maybe while the next
-    // is still joining, and `seated` keeps nothing for a late listener.
-    Future<List<(RelayTransport, WaitingRoom, Future<TableSpec>)>> waiters(List<SchnorrSigner> signers) async => [
-          for (final s in signers)
-            await join('W', signer: s, botsAfterMs: 60000).then((r) => (r.$1, r.$2, r.$2.seated.first)),
-        ];
+    // room hosts a table of its own.
+    Future<List<(RelayTransport, WaitingRoom, Future<TableSpec>)>> waiters(List<SchnorrSigner> signers) async =>
+        [for (final s in signers) await join('W', signer: s, botsAfterMs: 60000)];
 
     test('a device takes the lowest table id among the seatings it has in time, whichever came first', () async {
       final signers = [for (var i = 0; i < 3; i++) SchnorrSigner.generate()];
@@ -297,7 +297,7 @@ void main() {
             if (line.contains(': hosting,')) hosted.add(i);
           }),
       ];
-      final specs = await Future.wait(rooms.map((r) => r.$2.seated.first.timeout(const Duration(seconds: 15))));
+      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
       expect(hosted, isNotEmpty, reason: 'somebody hosted the round');
       for (final spec in specs) {
         expect(spec.timing, anyOf([for (final h in hosted) timings[h]]),
@@ -311,7 +311,7 @@ void main() {
 
     test('a game to another score waits in a pool of its own, and the table it gets says so', () async {
       final rooms = [await join('Short'), await join('Long', target: longGameScore)];
-      final specs = await Future.wait(rooms.map((r) => r.$2.seated.first.timeout(const Duration(seconds: 15))));
+      final specs = await Future.wait(rooms.map((r) => r.$3.timeout(const Duration(seconds: 15))));
       expect(specs[0].target, gameOverScore);
       expect(specs[1].target, longGameScore);
       expect(specs[0].id, isNot(specs[1].id), reason: 'two games nobody can play at once are two tables');
@@ -334,7 +334,7 @@ void main() {
       // included.
       final mine = SchnorrSigner.generate();
       final first = [await join('A', signer: mine), await join('B'), await join('C')];
-      final was = await first.first.$2.seated.first.timeout(const Duration(seconds: 15));
+      final was = await first.first.$3.timeout(const Duration(seconds: 15));
       expect(was.seats.whereType<HumanSeat>().length, 3, reason: 'three were seated together');
       // That table is played and left; the others close their apps.
       for (final r in first) {
@@ -346,7 +346,7 @@ void main() {
       // for a game again.
       await Future<void>.delayed(const Duration(seconds: 8));
       final again = await join('A', signer: mine);
-      final now = await again.$2.seated.first.timeout(const Duration(seconds: 15));
+      final now = await again.$3.timeout(const Duration(seconds: 15));
       expect(now.id, isNot(was.id), reason: 'a new table, not the one it left');
       expect(now.seats.whereType<HumanSeat>().map((h) => h.key), [again.$2.me],
           reason: 'alone at the pool, so alone at the table: B and C are gone, and a seat that never moves is worse '
@@ -406,7 +406,7 @@ void main() {
       // The would-be host leaves without a word.
       rooms.first.$2.close();
       rooms.first.$1.close();
-      final spec = await rooms.last.$2.seated.first.timeout(const Duration(seconds: 15));
+      final spec = await rooms.last.$3.timeout(const Duration(seconds: 15));
       expect(spec.seats.whereType<HumanSeat>().map((h) => h.key), [rooms.last.$2.me]);
       expect(spec.seats.whereType<BotSeat>().length, 3);
       rooms.last.$2.close();
