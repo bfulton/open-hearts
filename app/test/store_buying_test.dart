@@ -310,6 +310,27 @@ void main() {
     expect(find.text('Subscribe'), findsOneWidget, reason: 'and the way to try again is there');
   });
 
+  testWidgets('a purchase that falls over here is said, and the store keeps it for next time', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    Entitlement.current = _AdoptFails(service: _service);
+    await Entitlement.current.load(me.publicKey);
+    final store = FakeStore();
+    await shopWith(store);
+    await _pumpPage(tester);
+
+    await tester.tap(find.text('Subscribe'));
+    await tester.pump();
+    stand.says('store', {'licence': signedFor(me.publicKey)});
+    store.says([paid('header.payload.sig')]);
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing, reason: 'the spinner stops');
+    expect(find.text('The store did not finish the purchase. Try again in a moment.'), findsOneWidget);
+    expect(find.text('Subscribe'), findsOneWidget, reason: 'and the way to try again is there');
+    expect(store.finished, isEmpty, reason: 'the store keeps the purchase, to be shown again');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a sheet that does not open, or is closed, leaves the page as it was', (tester) async {
     standUp();
     final store = FakeStore()..sheetOpens = false;
@@ -433,4 +454,13 @@ _Held _holdAnswers(Future<void> until) {
 
 class _Held {
   bool asked = false;
+}
+
+/// An entitlement whose licence cannot be kept: the device's storage
+/// refusing the write, say.
+class _AdoptFails extends Entitlement {
+  _AdoptFails({super.service});
+
+  @override
+  Future<bool> adopt(Licence licence) async => throw StateError('storage refused the licence');
 }

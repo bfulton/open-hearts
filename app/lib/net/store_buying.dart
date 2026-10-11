@@ -29,6 +29,7 @@ import '../entitlement.dart';
 import 'household.dart';
 import 'licence.dart';
 import 'remote_config.dart' show waits;
+import 'report_error.dart';
 import 'store_buying_io.dart' if (dart.library.js_interop) 'store_buying_web.dart' as platform;
 
 /// Which store, as the service is told it.
@@ -238,7 +239,9 @@ class StoreShop extends ChangeNotifier {
     // One at a time, in the order the store said them; and one that
     // fell over does not stop the next being heard.
     _listening = store.purchases.listen((purchases) {
-      _queue = _queue.then((_) => _handle(purchases)).catchError((Object _) {});
+      _queue = _queue.then((_) => _handle(purchases)).catchError((Object error, StackTrace stack) {
+        reportError(error, stack, where: 'store purchases');
+      });
     });
     try {
       if (await store.available()) _product = await store.product(store.kind.product);
@@ -289,36 +292,48 @@ class StoreShop extends ChangeNotifier {
   }
 
   Future<void> _handle(List<StorePurchase> purchases) async {
+    for (final purchase in purchases) {
+      // One that falls over is said on the page, as a store that did not
+      // finish, and reported: the spinner does not turn for ever, and
+      // the purchase stays with the store, unfinished, for next time.
+      try {
+        await _take(purchase);
+      } catch (error, stack) {
+        reportError(error, stack, where: 'store purchase');
+        _set(busy: false, pending: false, refusal: const Refused('storeFailed'));
+      }
+    }
+  }
+
+  Future<void> _take(StorePurchase purchase) async {
     final store = this.store!;
     final signer = _signer!;
-    for (final purchase in purchases) {
-      if (purchase.product != store.kind.product) continue;
-      switch (purchase.status) {
-        case StoreStatus.pending:
-          _set(busy: false, pending: true);
-        case StoreStatus.cancelled:
-          _set(busy: false, pending: false);
-        case StoreStatus.error:
-          _set(busy: false, pending: false, refusal: const Refused('storeFailed'));
-        case StoreStatus.purchased || StoreStatus.restored:
-          if (purchase.proof.isEmpty) continue;
-          if (purchase.status == StoreStatus.restored) _restored++;
-          _set(busy: true, pending: false);
-          final said = await presentProof(signer, store.kind, purchase.proof, service: Entitlement.current.service);
-          final licence = said.answer;
-          if (licence != null) {
-            await Entitlement.current.adopt(licence);
-            _bought = true;
-            try {
-              await (await SharedPreferences.getInstance()).setBool(_boughtHere, true);
-            } catch (_) {}
-            await _finish(purchase);
-            _set(busy: false, clear: true);
-          } else {
-            if (_settled.contains(said.refusal!.reason)) await _finish(purchase);
-            _set(busy: false, refusal: said.refusal);
-          }
-      }
+    if (purchase.product != store.kind.product) return;
+    switch (purchase.status) {
+      case StoreStatus.pending:
+        _set(busy: false, pending: true);
+      case StoreStatus.cancelled:
+        _set(busy: false, pending: false);
+      case StoreStatus.error:
+        _set(busy: false, pending: false, refusal: const Refused('storeFailed'));
+      case StoreStatus.purchased || StoreStatus.restored:
+        if (purchase.proof.isEmpty) return;
+        if (purchase.status == StoreStatus.restored) _restored++;
+        _set(busy: true, pending: false);
+        final said = await presentProof(signer, store.kind, purchase.proof, service: Entitlement.current.service);
+        final licence = said.answer;
+        if (licence != null) {
+          await Entitlement.current.adopt(licence);
+          _bought = true;
+          try {
+            await (await SharedPreferences.getInstance()).setBool(_boughtHere, true);
+          } catch (_) {}
+          await _finish(purchase);
+          _set(busy: false, clear: true);
+        } else {
+          if (_settled.contains(said.refusal!.reason)) await _finish(purchase);
+          _set(busy: false, refusal: said.refusal);
+        }
     }
   }
 
