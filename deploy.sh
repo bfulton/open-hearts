@@ -9,8 +9,6 @@
 #   /play/       the Flutter web build, base-href / : served at the root
 #                of play.openhearts.game, and at /play/ on a preview
 #                (the worker routes by host, docs/06-service.md)
-#   /measure/    benchmarks meant to be run on a phone (only the ones
-#                that have been built; see measurements/README.md)
 #
 # Publishing is for looking at, not for keeping: every upload is a
 # deployment Cloudflare keeps for ever, and a few dozen of them make
@@ -239,16 +237,6 @@ cp -r app/build/web/. "$STAGE/play"/
 printf '{"build": "%s", "date": "%s"}\n' "$BUILD_TAG" "$BUILD_DATE" \
   > "$STAGE/play/build-info.json"
 
-# The deal benchmark rides along when its wasm has been built here; the
-# phone is the device the number is wanted from.
-SHUFFLE_WASM=measurements/shuffle/target/wasm32-unknown-unknown/release/shuffle_bench.wasm
-if [ -f "$SHUFFLE_WASM" ]; then
-  mkdir -p "$STAGE/measure/shuffle"
-  cp "$SHUFFLE_WASM" "$STAGE/measure/shuffle/"
-  cp measurements/shuffle/bench.html "$STAGE/measure/shuffle/index.html"
-  echo "==> including /measure/shuffle/"
-fi
-
 echo "==> publishing to $PROJECT ($LABEL)"
 npx --yes "wrangler@$WRANGLER_VERSION" pages deploy "$STAGE" \
     --project-name "$PROJECT" \
@@ -261,7 +249,4 @@ echo "site  https://$LABEL.$PROJECT.pages.dev/"
 echo "app   https://$LABEL.$PROJECT.pages.dev/play/"
 if [ "$LABEL" = main ]; then
   echo "      https://play.openhearts.game/ (production, and its /api/)"
-fi
-if [ -f "$SHUFFLE_WASM" ]; then
-  echo "bench https://$LABEL.$PROJECT.pages.dev/measure/shuffle/"
 fi

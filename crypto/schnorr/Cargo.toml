@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 license = "MIT"
-description = "BIP-340 Schnorr over secp256k1 for the Dart VM: the same k256 the browser's wasm uses (measurements/sign), as a cdylib over FFI, since a pure-Dart signature costs seventeen milliseconds and a relay checks every event it carries"
+description = "BIP-340 Schnorr over secp256k1 for the Dart VM: the same k256 the browser's wasm uses (crypto/schnorr_wasm), as a cdylib over FFI, since pure-Dart signatures are too slow for a relay that checks every event it carries"
 
 [lib]
 crate-type = ["cdylib"]

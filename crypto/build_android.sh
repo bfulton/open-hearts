@@ -7,8 +7,8 @@
 # `flutter build appbundle`, which refuses to build a release without
 # them (app/android/app/build.gradle.kts).
 #
-# Needs the NDK Flutter builds with (ANDROID_NDK_HOME, or the version
-# under ANDROID_HOME/ndk) and the Rust targets:
+# Needs the NDK Flutter builds with (ANDROID_NDK_HOME, or the newest
+# under the SDK's ndk/) and the Rust targets:
 #   rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -16,12 +16,27 @@ cd "$(dirname "$0")"
 # The API level the app's minSdk is (Flutter's default, 24): the
 # linker's sysroot for it is what the library may call.
 API=24
+# The NDK's prebuilt toolchain is named for the host; on Apple Silicon
+# too it is darwin-x86_64 (it ships as a universal build).
+case "$(uname -s)" in
+  Linux) HOST=linux-x86_64 ;;
+  Darwin) HOST=darwin-x86_64 ;;
+  *) echo "build_android: no NDK toolchain for $(uname -s)" >&2; exit 1 ;;
+esac
 NDK="${ANDROID_NDK_HOME:-}"
 if [[ -z "$NDK" ]]; then
-  NDK=$(ls -d "${ANDROID_HOME:-$HOME/android-sdk}"/ndk/* 2>/dev/null | sort -V | tail -1)
+  # The SDK where Android Studio and the command-line tools put it.
+  for sdk in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
+    [[ -n "$sdk" && -d "$sdk/ndk" ]] || continue
+    # The newest revision (27.0.12077973 and the like), compared field
+    # by field as numbers: POSIX sort, since macOS's has no -V.
+    rev=$(cd "$sdk/ndk" && ls | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 || true)
+    [[ -n "$rev" ]] && { NDK="$sdk/ndk/$rev"; break; }
+  done
 fi
-BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
-[[ -x "$BIN/clang" ]] || { echo "no NDK at '$NDK' (set ANDROID_NDK_HOME)" >&2; exit 1; }
+[[ -n "$NDK" ]] || { echo "build_android: no NDK found: set ANDROID_NDK_HOME, or ANDROID_HOME to an SDK with ndk/ in it" >&2; exit 1; }
+BIN="$NDK/toolchains/llvm/prebuilt/$HOST/bin"
+[[ -x "$BIN/clang" ]] || { echo "build_android: no clang at $BIN (is $NDK an NDK?)" >&2; exit 1; }
 
 OUT=../app/android/app/src/main/jniLibs
 # Rust target, Android ABI, the NDK's clang prefix for it.
@@ -38,7 +53,7 @@ for t in "${TARGETS[@]}"; do
   export "AR_${target//-/_}=$BIN/llvm-ar"
   mkdir -p "$OUT/$abi"
   for crate in deal schnorr; do
-    (cd "$crate" && cargo build --release --offline --target "$target")
+    (cd "$crate" && cargo build --release --locked --target "$target")
     "$BIN/llvm-strip" --strip-unneeded -o "$OUT/$abi/lib$crate.so" "$crate/target/$target/release/lib$crate.so"
   done
 done

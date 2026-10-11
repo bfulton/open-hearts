@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Builds the Schnorr cdylib for the Dart VM (the service's relay and
-# juror, the tests). Offline: k256 is in the cargo cache.
+# juror, the tests). --locked: the versions Cargo.lock names, and no
+# others.
 set -euo pipefail
 cd "$(dirname "$0")"
-cargo build --release --offline
+cargo build --release --locked
 ls -la target/release/libschnorr.*

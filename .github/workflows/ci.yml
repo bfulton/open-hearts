@@ -54,15 +54,15 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: crypto/deal/target/memo
-          key: deal-memo-app-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
+          key: deal-memo-app-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.toml', 'crypto/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
       # The deal's cryptography (docs/03-fair-deal.md): the cdylib the VM
       # tests load.
       # The browser's wasm is committed (app/web/deal.wasm).
       - name: Deal and Schnorr (Rust — the cdylibs for the VM; the golden vectors; the vendored proof crates)
         run: |
-          cd crypto/deal && cargo build --release && cargo test --release
-          cd ../vendor && cargo test --release
-          cd ../schnorr && cargo build --release && cargo test --release
+          cd crypto/deal && cargo build --release --locked && cargo test --release --locked
+          cd ../vendor && cargo test --release --locked
+          cd ../schnorr && cargo build --release --locked && cargo test --release --locked
       - name: Engine (pure Dart — rules, bots, 200 seeded games)
         run: cd packages/engine && dart pub get && dart analyze && dart test -j 4
       - name: Deal (the primitives over FFI, and a hand's deal among four sessions)
@@ -121,9 +121,9 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: crypto/deal/target/memo
-          key: deal-memo-table-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
+          key: deal-memo-table-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.toml', 'crypto/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
-        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
+        run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
       - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
         run: cd packages/table && dart pub get && dart analyze && dart test -x slow
       - name: Table, the slow tier (whole sealed games under every departure, the chaos walks)
@@ -153,7 +153,7 @@ jobs:
             crypto/deal
             crypto/schnorr
       - name: Deal and Schnorr (Rust — the cdylibs the relay and the juror load)
-        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
+        run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
       - name: Service (the local relay, and a hand played over it with real signatures)
         run: cd service && dart pub get && dart analyze && dart test
       - name: Service, against the object's relay (the same suite, the other implementation)
@@ -162,6 +162,40 @@ jobs:
         run: cd service && OH_RELAY=object dart test
       - name: The object's relay (its own tests, in node's test runner)
         run: node --test service/do/*.test.mjs
+
+  # The wasm the app serves is committed (app/web/deal.wasm,
+  # app/web/schnorr.wasm). Built here from its sources with the pinned
+  # toolchain it is the same bytes (crypto/wasm.sh), or the commit
+  # carries a wasm its sources do not make. Clippy holds our crates to
+  # no warnings; the vendored ones are kept as their authors wrote them.
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: 1.97.0
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            crypto/deal
+            crypto/schnorr
+            crypto/schnorr_wasm
+      - name: Clippy (the deal, Schnorr, Schnorr for the browser)
+        run: |
+          (cd crypto/deal && cargo clippy --release --locked --all-targets -- -D warnings)
+          (cd crypto/schnorr && cargo clippy --release --locked --all-targets -- -D warnings)
+          (cd crypto/schnorr_wasm && cargo clippy --release --locked --target wasm32-unknown-unknown -- -D warnings)
+      - name: The wasm, from its sources (and BIP-340's vectors against it)
+        run: crypto/deal/build.sh && crypto/schnorr_wasm/build.sh
+      - name: The same bytes as committed
+        run: git diff --exit-code --stat -- app/web/deal.wasm app/web/schnorr.wasm
 
   # What runs in node alone: no Flutter, no Rust, no browser.
   node:
@@ -217,7 +251,7 @@ jobs:
             crypto/deal
             crypto/schnorr
       - name: Deal and Schnorr (Rust — the cdylibs the relay and the juror load)
-        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
+        run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
       - name: coturn (the rig's TURN server)
         run: sudo apt-get update && sudo apt-get install -y coturn
       - name: Playwright

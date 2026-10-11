@@ -8,10 +8,6 @@ build/
 packages/*/pubspec.lock
 *.iml
 
-# Rust (measurements)
-measurements/*/target/
-measurements/*/wasm/target/
-
 # Tooling
 node_modules/
 .wrangler/

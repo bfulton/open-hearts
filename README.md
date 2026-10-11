@@ -22,7 +22,6 @@ private to the person holding it.
 | [`site/`](site/) | The marketing site: page templates, their words in each language, and the build that joins them |
 | [`config/`](config/openhearts.json) | What is not secret about this deployment: the service's public key, store and sign-in identifiers, the Stripe price |
 | [`infra/`](infra/), [`observability/`](observability/) | Cloudflare, Stripe and New Relic configuration, checked and applied by script |
-| [`measurements/`](measurements/README.md) | Benchmarks behind the design's numbers |
 
 Solo play runs entirely on the device. Live play is four devices talking
 directly to each other over WebRTC, with our relay
@@ -51,14 +50,15 @@ Design docs: [01 dev loop](docs/01-dev-loop.md) ·
 ## Building and testing
 
 You need Flutter (stable), which brings Dart. The deal and native
-signatures also need stable Rust with the `wasm32-unknown-unknown`
-target. The browser suites need Node and a global Playwright with
-Chromium. Run `dart pub get` (`flutter pub get` in `app/`) in a package
-before testing it.
+signatures also need Rust (1.97.0, which CI pins) with the
+`wasm32-unknown-unknown` target. The browser suites need Node and a
+global Playwright with Chromium. Run `dart pub get` (`flutter pub get`
+in `app/`) in a package before testing it.
 
 ```bash
 crypto/deal/build.sh                 # the deal: a cdylib for the VM, and app/web/deal.wasm
 crypto/schnorr/build.sh              # signatures for the VM (optional: pure Dart is the fallback)
+crypto/schnorr_wasm/build.sh         # signatures for the browser and the relay: app/web/schnorr.wasm
 
 ./check.sh quick                     # what you changed, at each package's fast tier
 ./check.sh full                      # everything below, side by side, with a table of times
@@ -71,13 +71,15 @@ cd service && OH_RELAY=js dart test  # the same suite against the relay the Dura
 cd app && flutter test               # widgets
 
 node --test service/do/*.test.mjs service/functions/*.test.mjs infra/*.test.mjs
-node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
+node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs crypto/schnorr_wasm/vectors.test.mjs
 
 cd app && flutter run -d chrome      # run the app locally
 ```
 
-The deal's wasm is committed at `app/web/deal.wasm`, so the web build
-needs no Rust. VM tests that deal a sealed hand load the cdylib from
+The wasm is committed (`app/web/deal.wasm`, `app/web/schnorr.wasm`), so
+the web build needs no Rust. Built with Rust 1.97.0 it is the same bytes
+from any checkout, and CI checks that what is committed is what its
+sources build. VM tests that deal a sealed hand load the cdylib from
 `crypto/deal/target/release/`, and keep its answers beside it in
 `crypto/deal/target/memo/` ([doc 09](docs/09-testing.md)). The browser
 suites run from the repository root, each start a local relay on a port

@@ -199,16 +199,15 @@ A record that continues past the end of the game is rejected.
 
 ## Cost, and keeping it off the page
 
-Measured natively on arkworks 0.6: a shuffle with its argument takes
-106 ms, checking one 72 ms, a token 0.7 ms to make and 1.2 ms to check,
-and a sealed token 1.3 ms to make and 2.1 ms to check. A four-person
-hand costs each seat well under a second of its own work. In V8, a
-shuffle takes 380 ms, checking one 240 ms, and a seat's 39 tokens
-103 ms to make and 92 ms to check. (On the same machine the library on
-arkworks 0.3 took 124 and 108 ms natively, and 548, 455, 177 and
-184 ms in V8, close to what was measured for it on a 2.8 GHz core:
-566, 468, 199 and 190.) A phone is two or three times slower. Playing a
-card stays in the noise: one token and its proof.
+A shuffle with its argument is the costly step: about a tenth of a
+second natively, and three or four times that in a browser's wasm, with
+checking one a little less. A token, sealed or not, takes a millisecond
+or two to make or check natively, and a few in a browser. A four-person
+hand costs each seat well under a second of its own work, a phone two
+or three times that, and playing a card stays in the noise: one token
+and its proof. What a person notices is the wait for the deal's rounds
+to pass between the seats, which `packages/table/tool/time_to_deal.dart`
+measures.
 
 Slow calls never run on the page's thread. The page runs the wasm in a
 Web Worker, `app/web/deal_worker.js` (an isolate on the VM;
@@ -235,7 +234,7 @@ builds embed it as a framework (`crypto/build_ios.sh`).
 
 A juror summoned mid-hand replays the whole hand's events, so the VM
 signs with `crypto/schnorr` (k256, as the browser's wasm) instead of
-pure-Dart BIP-340 at 17 ms a signature.
+pure-Dart BIP-340, which is too slow to replay a hand in good time.
 
 ## What is guaranteed, and what is not
 

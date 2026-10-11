@@ -303,7 +303,7 @@ pub fn reveal_tokens(secret: &[u8], masked_many: &[u8], seed: &[u8], out: &mut [
     let g = generator();
     let (pk, sk) = keys(secret)?;
     let n = masked_many.len() / MASKED;
-    if n == 0 || masked_many.len() % MASKED != 0 || out.len() < tokens_len(n) {
+    if n == 0 || !masked_many.len().is_multiple_of(MASKED) || out.len() < tokens_len(n) {
         return None;
     }
     let mut cards = Vec::with_capacity(n);
@@ -335,7 +335,7 @@ pub fn reveal_tokens(secret: &[u8], masked_many: &[u8], seed: &[u8], out: &mut [
 pub fn verify_tokens(pk: &[u8], masked_many: &[u8], tokens: &[u8]) -> bool {
     let g = generator();
     let n = masked_many.len() / MASKED;
-    if n == 0 || masked_many.len() % MASKED != 0 || tokens.len() < tokens_len(n) {
+    if n == 0 || !masked_many.len().is_multiple_of(MASKED) || tokens.len() < tokens_len(n) {
         return false;
     }
     let Some(pk) = read::<Affine>(pk) else { return false };
@@ -530,7 +530,7 @@ pub fn bytes_scale(share: &[u8], by: u8, out: &mut [u8]) -> Option<usize> {
 /// secret, or into the share of whatever index they were scaled
 /// towards.
 pub fn bytes_sum(parts: &[u8], len: usize, out: &mut [u8]) -> Option<usize> {
-    if len == 0 || parts.is_empty() || parts.len() % len != 0 || out.len() < len {
+    if len == 0 || parts.is_empty() || !parts.len().is_multiple_of(len) || out.len() < len {
         return None;
     }
     out[..len].fill(0);
@@ -624,7 +624,7 @@ pub fn scalar_mul(a: &[u8], b: &[u8], out: &mut [u8]) -> Option<usize> {
 /// Scalars added: the parts a newcomer is sent, summed into the share
 /// it now holds.
 pub fn scalar_sum(parts: &[u8], out: &mut [u8]) -> Option<usize> {
-    if parts.is_empty() || parts.len() % SCALAR != 0 {
+    if parts.is_empty() || !parts.len().is_multiple_of(SCALAR) {
         return None;
     }
     let mut sum = Scalar::zero();
@@ -870,6 +870,12 @@ pub fn open_shared(sealed: &[u8], parts: &[u8], out: &mut [u8]) -> Option<usize>
 // Every function takes pointers and lengths into memory the caller
 // owns (from `deal_alloc`), returns the bytes written or -1, and never
 // keeps a reference. The same symbols serve wasm and the VM's FFI.
+//
+// Safety, for every unsafe function here: each pointer is null or
+// valid for as many bytes as the function reads or writes through it
+// (the fixed sizes above, or the length or count passed beside it), and
+// no output overlaps an input. A null pointer reads as empty, which
+// fails the call.
 
 use std::slice;
 
@@ -906,51 +912,81 @@ fn done(r: Option<usize>) -> i32 {
     r.map(|n| n as i32).unwrap_or(-1)
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_keygen(secret: *const u8, out: *mut u8) -> i32 {
     done(keygen(input(secret, SCALAR), output(out, POINT)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_key_proof(secret: *const u8, name: *const u8, name_len: usize, seed: *const u8, out: *mut u8) -> i32 {
     done(key_proof(input(secret, SCALAR), input(name, name_len), input(seed, 32), output(out, KEY_PROOF)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_verify_key(pk: *const u8, name: *const u8, name_len: usize, proof: *const u8) -> i32 {
     verify_key(input(pk, POINT), input(name, name_len), input(proof, KEY_PROOF)) as i32
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_aggregate(pks: *const u8, count: usize, out: *mut u8) -> i32 {
     done(aggregate(input(pks, count * POINT), output(out, POINT)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_initial_deck(joint: *const u8, out: *mut u8) -> i32 {
     done(initial_deck(input(joint, POINT), output(out, DECK_BYTES)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_shuffle(joint: *const u8, deck_in: *const u8, seed: *const u8, deck_out: *mut u8, proof_out: *mut u8, proof_cap: usize) -> i32 {
     done(shuffle(input(joint, POINT), input(deck_in, DECK_BYTES), input(seed, 32), output(deck_out, DECK_BYTES), output(proof_out, proof_cap)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_verify_shuffle(joint: *const u8, deck_in: *const u8, deck_out: *const u8, proof: *const u8, proof_len: usize) -> i32 {
     verify_shuffle(input(joint, POINT), input(deck_in, DECK_BYTES), input(deck_out, DECK_BYTES), input(proof, proof_len)) as i32
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_reveal_token(secret: *const u8, masked: *const u8, seed: *const u8, out: *mut u8) -> i32 {
     done(reveal_token(input(secret, SCALAR), input(masked, MASKED), input(seed, 32), output(out, TOKEN)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_split(secret: *const u8, shares: usize, seed: *const u8, out: *mut u8) -> i32 {
     done(split(input(secret, SCALAR), shares, input(seed, 32), output(out, shares * SCALAR)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_share_bytes(secret: *const u8, len: usize, n: usize, t: usize, seed: *const u8, out: *mut u8) -> i32 {
     done(share_bytes(input(secret, len), n, t, input(seed, 32), output(out, n * len)))
@@ -958,6 +994,10 @@ pub unsafe extern "C" fn deal_share_bytes(secret: *const u8, len: usize, n: usiz
 
 /// The coefficient itself, since it is one byte: negative for a set
 /// that is not one.
+///
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_bytes_lagrange(have: *const u8, count: usize, index: u8, at: u8) -> i32 {
     match bytes_lagrange(input(have, count), index, at) {
@@ -966,66 +1006,105 @@ pub unsafe extern "C" fn deal_bytes_lagrange(have: *const u8, count: usize, inde
     }
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_bytes_scale(share: *const u8, len: usize, by: u8, out: *mut u8) -> i32 {
     done(bytes_scale(input(share, len), by, output(out, len)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_bytes_sum(parts: *const u8, count: usize, len: usize, out: *mut u8) -> i32 {
     done(bytes_sum(input(parts, count * len), len, output(out, len)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_split_threshold(secret: *const u8, n: usize, t: usize, seed: *const u8, out: *mut u8) -> i32 {
     done(split_threshold(input(secret, SCALAR), n, t, input(seed, 32), output(out, n * SCALAR)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_lagrange(have: *const u8, count: usize, index: u8, at: u8, out: *mut u8) -> i32 {
     done(lagrange(input(have, count), index, at, output(out, SCALAR)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_scalar_mul(a: *const u8, b: *const u8, out: *mut u8) -> i32 {
     done(scalar_mul(input(a, SCALAR), input(b, SCALAR), output(out, SCALAR)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_scalar_sum(parts: *const u8, count: usize, out: *mut u8) -> i32 {
     done(scalar_sum(input(parts, count * SCALAR), output(out, SCALAR)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_point_scale(point: *const u8, scalar: *const u8, out: *mut u8) -> i32 {
     done(point_scale(input(point, POINT), input(scalar, SCALAR), output(out, POINT)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_share_key(share: *const u8, out: *mut u8) -> i32 {
     done(share_key(input(share, SCALAR), output(out, POINT)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_share_token(share: *const u8, masked: *const u8, seed: *const u8, out: *mut u8) -> i32 {
     done(share_token(input(share, SCALAR), input(masked, MASKED), input(seed, 32), output(out, TOKEN)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_open_shared(sealed: *const u8, parts: *const u8, count: usize, out: *mut u8) -> i32 {
     done(open_shared(input(sealed, SEALED), input(parts, count * POINT), output(out, POINT)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_verify_token(pk: *const u8, masked: *const u8, token: *const u8) -> i32 {
     verify_token(input(pk, POINT), input(masked, MASKED), input(token, TOKEN)) as i32
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_unmask(pks: *const u8, tokens: *const u8, count: usize, masked: *const u8) -> i32 {
     done(unmask(input(pks, count * POINT), input(tokens, count * POINT), input(masked, MASKED)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_reveal_tokens(secret: *const u8, masked: *const u8, count: usize, seed: *const u8, out: *mut u8) -> i32 {
     done(reveal_tokens(
@@ -1036,11 +1115,17 @@ pub unsafe extern "C" fn deal_reveal_tokens(secret: *const u8, masked: *const u8
     ))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_verify_tokens(pk: *const u8, masked: *const u8, count: usize, tokens: *const u8) -> i32 {
     verify_tokens(input(pk, POINT), input(masked, count * MASKED), input(tokens, tokens_len(count))) as i32
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_seal(
     secret: *const u8,
@@ -1058,6 +1143,9 @@ pub unsafe extern "C" fn deal_seal(
     ))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_verify_seal(pk_owner: *const u8, pk_to: *const u8, masked: *const u8, sealed: *const u8) -> i32 {
     i32::from(verify_seal(
@@ -1068,11 +1156,17 @@ pub unsafe extern "C" fn deal_verify_seal(pk_owner: *const u8, pk_to: *const u8,
     ))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_shared_secret(secret: *const u8, pk: *const u8, out: *mut u8) -> i32 {
     done(shared_secret(input(secret, SCALAR), input(pk, POINT), output(out, 32)))
 }
 
+/// # Safety
+///
+/// The flat interface's contract (above).
 #[no_mangle]
 pub unsafe extern "C" fn deal_open(secret: *const u8, sealed: *const u8, out: *mut u8) -> i32 {
     done(open(input(secret, SCALAR), input(sealed, SEALED), output(out, POINT)))
@@ -1101,7 +1195,7 @@ mod tests {
             assert_eq!(split(&secret, 3, short, &mut out), None, "{} bytes", short.len());
             assert_eq!(share_bytes(&[1, 2, 3], 3, 2, short, &mut out), None, "{} bytes", short.len());
         }
-        assert!(key_proof(&secret, b"seat", &seed(2), &mut out).is_some(), "and 32 bytes is a seed");
+        assert_eq!(key_proof(&secret, b"seat", &seed(2), &mut out), Some(KEY_PROOF), "and 32 bytes is a seed");
     }
 
     #[test]
@@ -1145,7 +1239,7 @@ mod tests {
             assert!(verify_tokens(&pks[i * POINT..(i + 1) * POINT], &deck, &out), "the batch checks");
             batched.push(out);
         }
-        let mut seen = vec![false; DECK];
+        let mut seen = [false; DECK];
         for c in 0..DECK {
             let masked = &deck[c * MASKED..(c + 1) * MASKED];
             let mut tokens = vec![0u8; 4 * POINT];
@@ -1302,7 +1396,7 @@ mod tests {
             aggregate(&pks[..(shares - 1) * POINT], &mut short).unwrap();
             assert_ne!(short, pk, "{} of {shares} is not the key", shares - 1);
         }
-        assert_eq!(split(&secret, 1, &seed(90), &mut vec![0u8; SCALAR]), None, "a split is into two or more");
+        assert_eq!(split(&secret, 1, &seed(90), &mut [0u8; SCALAR]), None, "a split is into two or more");
     }
 
     /// A departed seat's card, opened by the holders of its key's two
@@ -1340,9 +1434,9 @@ mod tests {
         let mut tokens = vec![0u8; 5 * TOKEN];
         assert_eq!(share_token(a, masked, &seed(61), &mut tokens[..TOKEN]), Some(TOKEN));
         assert_eq!(share_token(b, masked, &seed(62), &mut tokens[TOKEN..2 * TOKEN]), Some(TOKEN));
-        for i in 1..4 {
+        for (i, secret) in secrets.iter().enumerate().take(4).skip(1) {
             let at = (i + 1) * TOKEN;
-            reveal_token(&secrets[i], masked, &seed(63 + i as u8), &mut tokens[at..at + TOKEN]).unwrap();
+            reveal_token(secret, masked, &seed(63 + i as u8), &mut tokens[at..at + TOKEN]).unwrap();
         }
         // A share's token is proved against that share's key, and
         // against nothing else — so a share-holder cannot pass off

@@ -1,4 +1,4 @@
-/// Web: BIP-340 in wasm (web/schnorr.wasm, built from measurements/sign)
+/// Web: BIP-340 in wasm (web/schnorr.wasm, built from crypto/schnorr_wasm)
 /// behind the table package's verifier hook, and a [Signer] that signs
 /// through it. Falls back to the Dart implementation if the wasm
 /// cannot be fetched, so a table still works, slowly.

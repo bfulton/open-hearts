@@ -7,7 +7,7 @@
 //
 // Nothing is imported: no node, no Cloudflare. Signatures are checked
 // by the wasm the app already carries (app/web/schnorr.wasm, built
-// from measurements/sign), handed in already compiled, because a
+// from crypto/schnorr_wasm), handed in already compiled, because a
 // Worker may not compile wasm at runtime and because BIP-340 is not
 // worth a second implementation in a third language.
 
