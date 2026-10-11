@@ -220,8 +220,8 @@ needs `wasm-unsafe-eval`, and the policy has to be tested against it.
 The service key, Stripe keys, the TURN token, the HMAC key and the
 bench's juror secret are Cloudflare secrets, set by hand and checked
 only by name (`infra/apply.mjs`). The service key is minted with a
-CSPRNG by `service/bin/service_key.dart` into `service.secret`, which is
-ignored by version control. `deploy.sh` reads only environment
+CSPRNG by `service/bin/service_key.dart`, which prints it once and
+writes it nowhere. `deploy.sh` reads only environment
 variables and pins `wrangler`. The Android release key's properties
 file is never checked in. Every key in the repository is a published
 test vector: BIP-340's test pair (used by the e2e rig and the relay's

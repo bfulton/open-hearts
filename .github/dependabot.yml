@@ -1,0 +1,8 @@
+# The actions the workflows use are pinned to commits (ci.yml); this
+# proposes the next release of each, as a pull request a week.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

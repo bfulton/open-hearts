@@ -13,6 +13,10 @@
 // forwarded to come from the environment, as observability's do: this
 // repository is public.
 
+import { readFileSync } from 'node:fs';
+
+const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
+
 export const app = {
   key: 'open-hearts',
   name: 'Open Hearts',
@@ -49,9 +53,8 @@ export const pages = {
       r2: { OH_RECORDS: 'open-hearts-records' },
       /// The household object lives in the relay worker (wrangler.toml).
       durableObjects: { HOUSEHOLD: { script: 'open-hearts-relay', class: 'Household' } },
-      /// None: OH_METRICS, when bound, is open_hearts_api
-      /// (docs/06-service.md).
-      analyticsEngine: {},
+      /// Counts and nothing about anybody (docs/06-service.md).
+      analyticsEngine: { OH_METRICS: 'open_hearts_api' },
     },
     preview: {
       compatibilityDate: '2026-09-09',
@@ -92,9 +95,11 @@ export const r2 = [
   },
 ];
 
-/// The Realtime TURN key the worker mints credentials with. Made once;
-/// its secret is the project's OH_TURN_API_TOKEN, shown only at creation.
-export const turnKeys = [{ name: 'open-hearts-turn', uid: 'd681af4e315018c9dc90b898de5f24be' }];
+/// The Realtime TURN key the worker mints credentials with: the one the
+/// config names (turnKeyId), which the worker is deployed with too. Made
+/// once; its secret is the project's OH_TURN_API_TOKEN, shown only at
+/// creation.
+export const turnKeys = [{ name: 'open-hearts-turn', uid: config.turnKeyId }];
 
 // ---- the relay worker ---------------------------------------------------
 

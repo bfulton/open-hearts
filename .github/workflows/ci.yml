@@ -1,16 +1,21 @@
 # Analyze, test, and prove the web build still builds: everything
 # ./check.sh full runs (docs/09-testing.md), in jobs side by side.
 #
-# On pull requests, main, and every push to a claude/** working branch,
-# where the work is done between pull requests. The repository is
-# public, so the minutes cost nothing; a push that supersedes another on
-# the same branch cancels it, except on main, where every push is kept.
+# On pull requests and on main. A push that supersedes another on the
+# same pull request cancels it; on main every push is kept.
+#
+# Every action is pinned to a commit, with its version beside it, and
+# Dependabot proposes the next (.github/dependabot.yml). Rust is pinned
+# to the version the committed wasm was built with.
 name: ci
 
 on:
   pull_request:
   push:
-    branches: [main, 'claude/**']
+    branches: [main]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -31,20 +36,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.2
           cache: true
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: |
             crypto/deal
             crypto/vendor
             crypto/schnorr
-      - uses: actions/cache@v4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: crypto/deal/target/memo
           key: deal-memo-app-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
@@ -73,8 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.2
@@ -85,8 +92,10 @@ jobs:
       - name: Build web
         run: |
           cd app && flutter pub get
-          flutter build web --release --no-web-resources-cdn \
+          flutter build web --release --source-maps --no-web-resources-cdn \
             --base-href /
+      - name: The review's worker, beside the app (app/worker/build.sh)
+        run: app/worker/build.sh app/build/web
 
   # Every tier: the fast one, then the whole sealed games and long
   # sweeps tagged slow (packages/table/dart_test.yaml), four files at a
@@ -95,19 +104,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v5
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.2
           cache: true
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: |
             crypto/deal
             crypto/schnorr
-      - uses: actions/cache@v4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: crypto/deal/target/memo
           key: deal-memo-table-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
@@ -122,19 +133,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.2
           cache: true
       # The object's relay's socket tests talk through node's own
       # WebSocket, which is there from node 22.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: |
             crypto/deal
@@ -145,6 +158,8 @@ jobs:
         run: cd service && dart pub get && dart analyze && dart test
       - name: Service, against the object's relay (the same suite, the other implementation)
         run: cd service && OH_RELAY=js dart test
+      - name: Service, against the object's relay as deployed (one tag an address, its own kinds)
+        run: cd service && OH_RELAY=object dart test
       - name: The object's relay (its own tests, in node's test runner)
         run: node --test service/do/*.test.mjs
 
@@ -153,8 +168,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: Handlers (the Pages worker, in node's test runner)
@@ -165,6 +180,8 @@ jobs:
         run: node --test infra/*.test.mjs
       - name: The page's workers (in node's test runner, against the committed wasm)
         run: node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
+      - name: The scripts no suite runs, each still parsing (./check.sh scripts)
+        run: ./check.sh scripts
 
   # The browser suites (e2e/README.md), three runners at once: the flows
   # one device can drive; four browsers at one table; and the rest — the
@@ -182,17 +199,19 @@ jobs:
         suites: ['flows', 'run', 'escrow offline move site']
     name: e2e (${{ matrix.suites }})
     steps:
-      - uses: actions/checkout@v5
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.2
           cache: true
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: |
             crypto/deal
@@ -203,7 +222,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y coturn
       - name: Playwright
         run: npm i -g playwright@1.56.1 && npx playwright install --with-deps chromium
-      - uses: actions/cache@v4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: app/build/e2e
           key: e2e-build-${{ hashFiles('app/lib/**', 'app/web/**', 'app/worker/**', 'app/pubspec.*', 'app/l10n.yaml', 'packages/*/lib/**', 'packages/*/pubspec.yaml', 'e2e/build.sh') }}

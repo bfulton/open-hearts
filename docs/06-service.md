@@ -633,8 +633,11 @@ stay in code.
 
 ## Watching it run
 
-Monitoring records counts and nothing about anybody. When a Workers
-Analytics Engine dataset is bound as `OH_METRICS`:
+Monitoring records counts and nothing about anybody, in Workers
+Analytics Engine datasets bound as `OH_METRICS`: `open_hearts_api` on
+the Pages project's production environment (`infra/cloudflare.mjs`) and
+`open_hearts_relay` on the relay (`service/do/wrangler.toml`). Previews
+bind none.
 
 - **The worker** (`measure`) writes one line per request: the handler,
   the status, the milliseconds, and a weight. `config` and `health` are
@@ -644,9 +647,8 @@ Analytics Engine dataset is bound as `OH_METRICS`:
   refusal. The columns are in the order `tallied` lists them in
   `service/do/relay.mjs`.
 
-No key, address, tag or location is written. To enable it, bind a
-dataset named `open_hearts_api` on the Pages project and uncomment the
-dataset in `service/do/wrangler.toml`. External ping monitors watch the
+No key, address, tag or location is written. Read the counts with the
+Analytics Engine SQL API. External ping monitors watch the
 site, the app, `/api/health` and the relay
 ([observability/](../observability/README.md)).
 
@@ -703,7 +705,7 @@ container. The image is built from the repository on every relay deploy
 | What | How |
 |---|---|
 | Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)) |
-| Relay, Household, Bench | `cd service/do && npx wrangler@4 deploy` (`wrangler.toml`: the `TABLE`, `HOUSEHOLD` and `BENCH` objects, the container, `OH_STORE`, `EMAIL`, `OH_SERVICE_KEY`, the domain `relay.openhearts.game`) |
+| Relay, Household, Bench | `cd service/do && npx wrangler@4.130.0 deploy` (`wrangler.toml`: the `TABLE`, `HOUSEHOLD` and `BENCH` objects, the container, `OH_STORE`, `EMAIL`, `OH_SERVICE_KEY`, the domain `relay.openhearts.game`) |
 | Accounts from before | `node service/tool/accounts.mjs`, a dry run unless given `--apply`; once, before the deploy that brings accounts in |
 | An account's data, deleted on request | `node service/tool/forget.mjs <account>`, a dry run unless given `--apply` ([above](#deleting-an-accounts-data)) |
 | Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../infra/README.md)) |
@@ -728,13 +730,13 @@ to the worker, which reads it beneath the project's settings
 (`service/functions/deployment.mjs`): a variable of the same name set on
 the project wins, as one set by a test does. A field left null is a
 feature left off. Bindings: `OH_STORE` (KV), `OH_RECORDS` (R2),
-`HOUSEHOLD` (production only) and optionally `OH_METRICS`. Previews have
+`HOUSEHOLD` and `OH_METRICS` (both production only). Previews have
 their own KV and bucket, and no Stripe. The relay's secret is
 `OH_JUROR_SECRET`; its `OH_SERVICE_KEY` is a var in `wrangler.toml`,
 held equal to `config/openhearts.json` by a test, and without it the
 relay carries nobody. `cd service && dart run bin/service_key.dart`
-mints the service key pair and writes the secret half to
-`service.secret`, which is ignored by version control.
+mints the service key pair and prints both halves once; the secret is
+kept nowhere but the project's secrets.
 
 A deployment with no keys degrades safely: no service key means live
 play is shut, no Stripe means the shop says it is not open, and no TURN

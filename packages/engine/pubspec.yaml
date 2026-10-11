@@ -1,5 +1,6 @@
 name: engine
 description: The rules of Hearts and the bots that play them. Pure Dart — no Flutter, no I/O, no clock.
+version: 0.1.0
 publish_to: none
 
 environment:

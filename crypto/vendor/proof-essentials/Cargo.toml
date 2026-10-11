@@ -2,6 +2,7 @@
 name = "proof-essentials"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
 
 # Open Hearts: ported from arkworks 0.3 to 0.6 (see ../README.md). What
 # 0.3 and ark-marlin provided and 0.6 no longer does — the byte form a

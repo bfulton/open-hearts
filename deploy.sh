@@ -29,9 +29,13 @@
 # "main" (which is production, so the custom domains: the site at
 # openhearts.game, the app at play.openhearts.game) on main.
 #
-# Needs CLOUDFLARE_TOKEN and CLOUDFLARE_ACCOUNT_ID in the environment.
+# Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in the environment,
+# checked before anything is built.
 set -euo pipefail
 cd "$(dirname "$0")"
+for need in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+  [ -n "${!need:-}" ] || { echo "deploy: $need is not set" >&2; exit 1; }
+done
 
 PROJECT=open-hearts
 FLUTTER=${FLUTTER:-flutter}
@@ -53,7 +57,7 @@ prune() {
   # A page at a time, newest first, until a page comes back empty: the
   # newest [keep] are left alone and everything after them goes.
   while :; do
-    ids=$(curl -sS "$api?per_page=25&page=$page" -H "Authorization: Bearer $CLOUDFLARE_TOKEN" |
+    ids=$(curl -sS "$api?per_page=25&page=$page" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" |
       python3 -c "
 import json, sys
 page = json.load(sys.stdin)
@@ -80,14 +84,26 @@ $(echo "$ids" | tail -n +2)"
     echo "nothing to sweep: $keep or fewer previews, 3 or fewer production"
     return
   fi
-  echo "$all" | while read -r id made branch; do
+  # Every one is tried; the sweep fails if any of them was not deleted.
+  local failed=0 said
+  while read -r id made branch; do
     if [ -n "$dry" ]; then
       echo "would delete $id  $made  $branch"
     else
-      curl -sS -X DELETE "$api/$id" -H "Authorization: Bearer $CLOUDFLARE_TOKEN" > /dev/null &&
+      # Said deleted only when Cloudflare says so.
+      said=$(curl -sS -X DELETE "$api/$id" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" || true)
+      if echo "$said" | python3 -c 'import json, sys; sys.exit(0 if json.load(sys.stdin).get("success") else 1)' 2> /dev/null; then
         echo "deleted $id  $made  $branch"
+      else
+        echo "not deleted $id  $made  $branch: ${said:-no answer}" >&2
+        failed=$((failed + 1))
+      fi
     fi
-  done
+  done <<<"$all"
+  if [ "$failed" -gt 0 ]; then
+    echo "$failed not deleted" >&2
+    return 1
+  fi
 }
 
 if [ "${1:-}" = --prune ]; then
@@ -101,7 +117,7 @@ if [ "${1:-}" = --prune ]; then
     esac
   done
   prune "$KEEP" "$DRY"
-  exit 0
+  exit
 fi
 
 LABEL=${1:-}
@@ -129,7 +145,8 @@ fi
 # "+" marks a dirty tree: the deploy holds work newer than the sha it
 # claims. Committing first is the habit; the suffix catches the misses.
 SHA=$(git rev-parse --short HEAD)
-BUILD_TAG="$SHA$([ -n "$(git status --porcelain)" ] && echo '+' || true)"
+DIRTY=$([ -n "$(git status --porcelain)" ] && echo true || echo false)
+BUILD_TAG="$SHA$([ "$DIRTY" = true ] && echo '+' || true)"
 BUILD_DATE=$(date -u +%Y-%m-%d)
 
 # The running build's identity is compiled in — a build cannot fetch
@@ -233,13 +250,11 @@ if [ -f "$SHUFFLE_WASM" ]; then
 fi
 
 echo "==> publishing to $PROJECT ($LABEL)"
-CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-$CLOUDFLARE_TOKEN}" \
-CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
-  npx --yes "wrangler@$WRANGLER_VERSION" pages deploy "$STAGE" \
+npx --yes "wrangler@$WRANGLER_VERSION" pages deploy "$STAGE" \
     --project-name "$PROJECT" \
     --branch "$LABEL" \
     --commit-hash "$SHA" \
-    --commit-dirty=true
+    --commit-dirty="$DIRTY"
 
 echo
 echo "site  https://$LABEL.$PROJECT.pages.dev/"
