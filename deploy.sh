@@ -84,20 +84,26 @@ $(echo "$ids" | tail -n +2)"
     echo "nothing to sweep: $keep or fewer previews, 3 or fewer production"
     return
   fi
-  echo "$all" | while read -r id made branch; do
+  # Every one is tried; the sweep fails if any of them was not deleted.
+  local failed=0 said
+  while read -r id made branch; do
     if [ -n "$dry" ]; then
       echo "would delete $id  $made  $branch"
     else
       # Said deleted only when Cloudflare says so.
-      local said
       said=$(curl -sS -X DELETE "$api/$id" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" || true)
       if echo "$said" | python3 -c 'import json, sys; sys.exit(0 if json.load(sys.stdin).get("success") else 1)' 2> /dev/null; then
         echo "deleted $id  $made  $branch"
       else
         echo "not deleted $id  $made  $branch: ${said:-no answer}" >&2
+        failed=$((failed + 1))
       fi
     fi
-  done
+  done <<<"$all"
+  if [ "$failed" -gt 0 ]; then
+    echo "$failed not deleted" >&2
+    return 1
+  fi
 }
 
 if [ "${1:-}" = --prune ]; then
@@ -111,7 +117,7 @@ if [ "${1:-}" = --prune ]; then
     esac
   done
   prune "$KEEP" "$DRY"
-  exit 0
+  exit
 fi
 
 LABEL=${1:-}
