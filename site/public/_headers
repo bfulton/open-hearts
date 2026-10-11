@@ -1,7 +1,11 @@
 # Cloudflare Pages header rules.
 #
-# The build is content-hashed by Flutter EXCEPT for the entry points, so
-# the entry points must never be cached and everything else can be.
+# Flutter names its files the same in every build (main.dart.js,
+# canvaskit/, assets/), so none of the app's may be kept unasked: every
+# file not listed below is Pages' default, max-age=0, must-revalidate,
+# which a browser asks about on each load and is answered "not
+# modified" by its etag while it is. That holds only while the zone's
+# browser cache TTL leaves Cache-Control alone (infra/cloudflare.mjs).
 
 # Nobody else's page frames these. Subscribe and Drop are a tap each,
 # and under another site's frame the taps are that site's to steer:
@@ -31,9 +35,6 @@
   Cache-Control: no-store
 /play/build-info.json
   Cache-Control: no-store
-
-/play/canvaskit/*
-  Cache-Control: public, max-age=31536000, immutable
 
 # Benchmarks: the wasm is rebuilt with the deploy, so never let a phone
 # time a stale one.

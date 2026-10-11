@@ -114,17 +114,22 @@ export const relay = {
 
 // ---- the zones ------------------------------------------------------------
 
-/// Settings pinned to what they are. Only email_obfuscation differs from
-/// Cloudflare's default (off: it rewrites help@ on the site's pages and
-/// injects a script to put it back, docs/06-service.md); the rest are
-/// Cloudflare's defaults, pinned so a change to them shows here. SSL's
-/// mode is left to automatic mode (it chose Full), so `ssl` itself is
-/// not pinned.
+/// Settings pinned to what they are, so a change to them shows here.
+/// Where they differ from Cloudflare's defaults: plain HTTP is sent to
+/// HTTPS and nothing older than TLS 1.2 is spoken; a browser keeps a
+/// file only as long as the file's own Cache-Control says
+/// (browser_cache_ttl 0), so the app's unhashed files are checked on
+/// every load rather than kept for Cloudflare's four hours
+/// (site/public/_headers); and email_obfuscation is off (it rewrites
+/// help@ on the site's pages and injects a script to put it back,
+/// docs/06-service.md). SSL's mode is left to automatic mode (it chose
+/// Full), so `ssl` itself is not pinned.
 const tls = {
   ssl_automatic_mode: 'auto',
-  always_use_https: 'off',
-  min_tls_version: '1.0',
+  always_use_https: 'on',
+  min_tls_version: '1.2',
   tls_1_3: 'on',
+  browser_cache_ttl: 0,
 };
 
 /// Cloudflare-made records (Email Routing's, Email Sending's, a worker's
