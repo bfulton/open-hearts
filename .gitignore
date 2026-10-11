@@ -4,7 +4,8 @@ app/.dart_tool/
 app/.flutter-plugins-dependencies
 build/
 .dart_tool/
-pubspec.lock
+# Libraries don't commit their lockfiles; the app and the service do.
+packages/*/pubspec.lock
 *.iml
 
 # Rust (measurements)
