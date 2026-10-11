@@ -118,13 +118,13 @@ unsigned, once without the key to see it refused.
 ### Deploying
 
 `./deploy.sh` builds the site and the web app and publishes them to
-Cloudflare Pages. It needs `CLOUDFLARE_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
+Cloudflare Pages. It needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
 ([doc 01](docs/01-dev-loop.md)). A build accepts licences only from the
 service key it was compiled with. Mint the key pair once with
 `cd service && dart run bin/service_key.dart`, put the public half in
 `config/openhearts.json` as `serviceKey`, and set the secret half as the
 Pages secret `OH_SERVICE_SECRET`. A build without the key has live play shut.
-The relay deploys separately: `cd service/do && npx wrangler@4 deploy`.
+The relay deploys separately: `cd service/do && npx wrangler@4.130.0 deploy`.
 Everything that is not secret is in `config/openhearts.json`; [doc 06](docs/06-service.md) lists the secrets.
 
 ### Languages

@@ -1,6 +1,6 @@
 # The per-tag relay (worker.mjs, docs/06-service.md).
 #
-#   cd service/do && npx wrangler@4 deploy
+#   cd service/do && npx wrangler@4.130.0 deploy
 #
 # The signature wasm is the app's own copy, imported from where it
 # already lives rather than duplicated here, so there is one file to

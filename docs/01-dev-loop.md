@@ -21,7 +21,7 @@ suite costs and why.
 ## Publishing
 
 ```bash
-./deploy.sh [label]          # needs CLOUDFLARE_TOKEN and CLOUDFLARE_ACCOUNT_ID
+./deploy.sh [label]          # needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
 ./deploy.sh --prune [keep]   # delete older preview deployments (-n: dry run)
 ```
 
