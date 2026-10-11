@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The felt at its darkest, as the app's own background is
+         (lib/theme.dart, Palette.dark; web/index.html). -->
+    <color name="felt">#06231A</color>
+</resources>

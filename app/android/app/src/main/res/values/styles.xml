@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Dark themes in light mode too: the app is the felt either way. -->
 <resources>
     <!-- While the app starts: launch_background until Flutter's first
-         frame. -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+         frame. From Android 12 the system draws its own launch screen
+         first (values-v31). -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>
     <!-- Once Flutter is drawing: the window behind it. -->
-    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@color/felt</item>
     </style>
 </resources>

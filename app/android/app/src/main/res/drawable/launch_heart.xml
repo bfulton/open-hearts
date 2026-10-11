@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The icon's heart on a 288 dp canvas, for the launch screens: made by
+     tool/icons.mjs from tool/icon.svg, so changed there, not here. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path
+        android:fillColor="#E8EFEA"
+        android:pathData="M 512.0 774.0 C 248.0 594.0 224.0 426.0 332.0 318.0 C 422.0 234.0 488.0 294.0 512.0 378.0 C 536.0 294.0 602.0 234.0 692.0 318.0 C 800.0 426.0 776.0 594.0 512.0 774.0 Z" />
+</vector>
