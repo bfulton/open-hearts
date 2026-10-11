@@ -18,7 +18,7 @@ same one, wherever they are:
 | a table's id | its events (kind 24242), WebRTC signalling (24243), the watch lane (24247), the players' reactions (24248) |
 | `queue:…` | a pool's waiting room (24245) |
 | a room code | the room's lobby events |
-| `results` | game results, which ratings are folded from |
+| `standings` | game results, which ratings are folded from |
 | `online` | presence, summons, calls for a juror (24246) |
 
 Every event's id and BIP-340 signature are checked before anything else

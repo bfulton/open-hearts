@@ -768,7 +768,8 @@ export const lobbyKind = 4244;
 /// The tag game results are written under (packages/table, results.dart,
 /// GameResult.tag): kept, since the ratings are folded from all of them.
 /// Everything else stored is kept a day (worker.mjs, the sweep).
-export const resultsTag = 'results';
+/// tag_store.test.mjs holds it to the table package's.
+export const resultsTag = 'standings';
 
 /// How many stored events a tag's object holds in memory. A room or a
 /// pool's lobby is a handful; the results are every game's, folded by
