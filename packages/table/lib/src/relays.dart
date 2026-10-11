@@ -136,7 +136,11 @@ class RelayConnection {
     try {
       ch.sink.add(jsonEncode(['EVENT', e.toJson()]));
       _lastPublishMs = _nowMs;
-    } catch (_) {}
+    } on StateError catch (err) {
+      // The socket closed under it; the drop reconnects, and what was
+      // not sent is said again by whoever is waiting on it.
+      log?.call('$url: not sent, the socket is closing: $err');
+    }
   }
 
   /// Drops the socket and connects afresh: a relay that turned on this
@@ -190,12 +194,16 @@ class RelayConnection {
   void _onMessage(WebSocketChannel ch, Object? raw) {
     if (ch != _channel) return;
     _lastMessageMs = _nowMs;
-    List<Object?> m;
+    if (raw is! String) return;
+    final Object? decoded;
     try {
-      m = jsonDecode(raw as String) as List<Object?>;
-    } catch (_) {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      log?.call('$url: a message that is not JSON');
       return;
     }
+    if (decoded is! List<Object?>) return;
+    final m = decoded;
     if (m.isEmpty) return;
     if (m[0] == 'EOSE' && !_ready.isCompleted) _ready.complete();
     if (m[0] == 'AUTH' && m.length > 1 && m[1] is String) {
@@ -204,7 +212,9 @@ class RelayConnection {
         _authId = answer.id;
         try {
           ch.sink.add(jsonEncode(['AUTH', answer.toJson()]));
-        } catch (_) {}
+        } on StateError catch (err) {
+          log?.call('$url: no answer to its challenge, the socket is closing: $err');
+        }
       }
       return;
     }

@@ -83,7 +83,9 @@ export class TagRelay {
     this.wokeAt = now;
     const bench = this.env.BENCH.get(this.env.BENCH.idFromName('bench'));
     this.state.waitUntil(
-      bench.fetch(`https://bench/wake?table=${encodeURIComponent(table)}`, { method: 'POST' }).catch(() => {}),
+      // A wake that does not get through is said again by the table's
+      // next call, ten seconds on.
+      bench.fetch(`https://bench/wake?table=${encodeURIComponent(table)}`, { method: 'POST' }).catch((e) => console.log(`backup jurors not woken: ${e}`)),
     );
   }
 

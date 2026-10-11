@@ -161,9 +161,7 @@ Verification verifyRecord(
   // pieces from the start of the replay ([feedSecrets]).
   final allEscrows = <int, Set<int>>{};
   for (final d in record) {
-    try {
-      if (d.removal && d.event.kind == EventKind.escrow) allEscrows.putIfAbsent(d.turn.hand, () => {}).add(d.event.seat);
-    } catch (_) {}
+    if (d.removal && d.event.kind == EventKind.escrow) allEscrows.putIfAbsent(d.turn.hand, () => {}).add(d.event.seat);
   }
   Set<PublicKey> floorAt(TurnId turn) => {
     for (final k in humans)
@@ -348,11 +346,9 @@ Verification verifyRecord(
   /// then on, as the table reads it (_asKeyed in client.dart).
   final keyedBy = <int, Map<int, PublicKey>>{};
   for (final d in record) {
-    try {
-      final e = d.event;
-      if (d.removal || e.kind != EventKind.deal || e.round != 0 || humans.contains(e.author)) continue;
-      keyedBy.putIfAbsent(d.turn.hand, () => {})[e.seat] = e.author;
-    } catch (_) {}
+    final e = d.event;
+    if (d.removal || e.kind != EventKind.deal || e.round != 0 || humans.contains(e.author)) continue;
+    keyedBy.putIfAbsent(d.turn.hand, () => {})[e.seat] = e.author;
   }
 
   /// The held seats the record has given to the escrow, by hand, as
@@ -408,15 +404,25 @@ Verification verifyRecord(
     for (var i = index; i < record.length && record[i].turn.hand == hand; i++) {
       final e = record[i].event;
       if (e.kind != EventKind.deal || record[i].removal || e.round != 4) continue;
+      // An audit's secrets are the deal's fields, not ones every side
+      // reads (TableEvent.wellFormed): one that is not base64 opens
+      // nothing, and the check of the hand says what it lacks.
+      // Read as far as it reads, as before: no secret, nothing; a bad
+      // entry among the known, none after it.
+      final secret = e.body['secret'];
+      if (secret is! String) continue;
+      final known = e.body['known'];
       try {
-        pending[e.seat] = Uint8List.fromList(base64.decode(e.body['secret'] as String));
-        final known = e.body['known'];
+        pending[e.seat] = Uint8List.fromList(base64.decode(secret));
         if (known is Map) {
-          for (final k in known.entries) {
-            pending[int.parse(k.key as String)] = Uint8List.fromList(base64.decode(k.value as String));
+          for (final MapEntry(:key, :value) in known.entries) {
+            if (key is! String || value is! String) break;
+            pending[int.parse(key)] = Uint8List.fromList(base64.decode(value));
           }
         }
-      } catch (_) {}
+      } on FormatException {
+        continue;
+      }
     }
   }
 
@@ -433,28 +439,29 @@ Verification verifyRecord(
       }
     }
     for (final r in releases) {
-      try {
-        if (r.kind != EventKind.release || r.hand != game.handNumber) continue;
-        final about = r.about;
-        if (all && !d.gone.contains(about) && !d.knowsSecret(about)) {
-          final h = holders[about];
-          if (h is HumanSeat && allRemovals[h.key]?.hand == game.handNumber) d.seatLeft(about);
-          // A bot seat a juror held that the record gives to the
-          // escrow this hand — its holder quiet, or slow to play. Its
-          // audit is settled with nothing said, the pieces having
-          // opened it in the clear, so its pieces are its whole
-          // account. As with a person's: taken only from the
-          // custodians the seat's own deal steps named, and what they
-          // rebuild opens nothing unless it is the secret behind the
-          // key the seat dealt with — the one its own audit would have
-          // said. A held seat the record did not give up owes its own
-          // audit, as at the table (_botActs in client.dart), and
-          // pieces are no substitute.
-          if (h is BotSeat && (allEscrows[game.handNumber]?.contains(about) ?? false)) d.seatLeft(about);
-        }
-        if (!d.awaitsSecret(about)) continue;
-        d.acceptRelease({'about': about, 'holder': r.author, 'share': r.body['share']});
-      } catch (_) {}
+      if (r.kind != EventKind.release || r.hand != game.handNumber) continue;
+      // A release names its seat by number, and a number past the
+      // table's is none of its seats.
+      final about = r.about;
+      if (about < 0 || about >= seatCount) continue;
+      if (all && !d.gone.contains(about) && !d.knowsSecret(about)) {
+        final h = holders[about];
+        if (h is HumanSeat && allRemovals[h.key]?.hand == game.handNumber) d.seatLeft(about);
+        // A bot seat a juror held that the record gives to the
+        // escrow this hand — its holder quiet, or slow to play. Its
+        // audit is settled with nothing said, the pieces having
+        // opened it in the clear, so its pieces are its whole
+        // account. As with a person's: taken only from the
+        // custodians the seat's own deal steps named, and what they
+        // rebuild opens nothing unless it is the secret behind the
+        // key the seat dealt with — the one its own audit would have
+        // said. A held seat the record did not give up owes its own
+        // audit, as at the table (_botActs in client.dart), and
+        // pieces are no substitute.
+        if (h is BotSeat && (allEscrows[game.handNumber]?.contains(about) ?? false)) d.seatLeft(about);
+      }
+      if (!d.awaitsSecret(about)) continue;
+      d.acceptRelease({'about': about, 'holder': r.author, 'share': r.body['share']});
     }
   }
 

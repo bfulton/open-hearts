@@ -330,7 +330,9 @@ Refused refusalOf(({int status, String body})? answer) {
       final said = json['error'] as String;
       return said.isEmpty ? _unreachable : Refused.from(said);
     }
-  } catch (_) {}
+  } on FormatException {
+    // A body that is not JSON says nothing in its own words.
+  }
   return _unreachable;
 }
 

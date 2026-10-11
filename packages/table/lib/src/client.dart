@@ -1912,11 +1912,8 @@ class TableClient {
     final order = _orderFor(game.handNumber);
     final carrier = order.where((j) => j == signer.publicKey || _jurorRecent(j)).firstOrNull;
     if (carrier != signer.publicKey) return;
-    try {
-      final turn = event.turn;
-      if (_races[turn]?.settled == true) return;
-      transport.broadcast(event.toJson());
-    } catch (_) {}
+    if (_races[event.turn]?.settled == true) return;
+    transport.broadcast(event.toJson());
   }
 
   /// The hand in which this juror last heard an appeal.
@@ -2040,7 +2037,12 @@ class TableClient {
         return d.verifyPlay(seat, Map<String, Object?>.from(event.body)) == card.index && game.allows(seat, card);
       }
       return game.legalPlaysFor(seat).contains(card);
-    } catch (_) {
+    } catch (e) {
+      // A signed action whose body is not what its kind's check reads —
+      // a card that is no card, a deal part of the wrong shape — is
+      // not one this side backs (TableEvent.wellFormed checks only the
+      // fields every side reads).
+      _trace('not backed: ${event.kind.name} by seat $seat: $e');
       return false;
     }
   }
@@ -2777,7 +2779,7 @@ class TableClient {
       myKey: signer.publicKey,
       wrap: signer.sharedSecretWith,
       random: _random,
-    );
+    )..log = (l) => _trace('deal: $l');
     _dealsByHand[game.handNumber] = _deal!;
     final kept = _deal!.mySecret;
     if (amSeated && me == mySeat && kept != null) journal?.keep(game.handNumber, kept);
@@ -4328,13 +4330,11 @@ class TableClient {
         _ => false,
       };
 
+  /// Only for the kinds [_votes] takes, every one of which names its
+  /// turn (TableEvent.wellFormed).
   static bool _pastTurn(TableEvent e, TurnId turn) {
-    try {
-      final t = e.turn;
-      return t.hand > turn.hand || (t.hand == turn.hand && t.position > turn.position);
-    } catch (_) {
-      return false;
-    }
+    final t = e.turn;
+    return t.hand > turn.hand || (t.hand == turn.hand && t.position > turn.position);
   }
 
   /// Whether this side is holding [turn] for the game's end: it backed

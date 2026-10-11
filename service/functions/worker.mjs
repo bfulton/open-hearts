@@ -1531,6 +1531,8 @@ export function sequencer({ now = Date.now } = {}) {
       recent.push(t);
       return work();
     });
+    // The next in line waits for this one whatever it came to; how it
+    // came out is the caller's, through run.
     queue = run.catch(() => {});
     return run;
   };
@@ -2529,11 +2531,9 @@ export function configOf(raw) {
   if (Array.isArray(raw.relays) && raw.relays.length > 0 && raw.relays.length <= MOST_RELAYS) {
     const relays = [];
     for (const r of raw.relays) {
-      try {
-        const u = new URL(r);
-        const ours = u.hostname === 'openhearts.game' || u.hostname.endsWith('.openhearts.game');
-        if (u.protocol === 'wss:' && ours && !u.username && !u.password) relays.push(u.toString().replaceAll('%7Btag%7D', '{tag}'));
-      } catch {}
+      const u = urlOf(r);
+      const ours = u && (u.hostname === 'openhearts.game' || u.hostname.endsWith('.openhearts.game'));
+      if (ours && u.protocol === 'wss:' && !u.username && !u.password) relays.push(u.toString().replaceAll('%7Btag%7D', '{tag}'));
     }
     if (relays.length === raw.relays.length) c.relays = relays;
   }
@@ -2548,24 +2548,19 @@ export function configOf(raw) {
     c.update = { before: raw.update.before, text: sayingOf(raw.update.text) };
   }
   // Where a player's "tell us what's broken" goes: a page, or mail.
-  if (typeof raw.feedback === 'string') {
-    try {
-      const u = new URL(raw.feedback);
-      const page = u.protocol === 'https:' && !u.username && !u.password;
-      const mail = u.protocol === 'mailto:' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.pathname);
-      if (page || mail) c.feedback = u.toString();
-    } catch {}
+  const feedback = urlOf(raw.feedback);
+  if (feedback) {
+    const page = feedback.protocol === 'https:' && !feedback.username && !feedback.password;
+    const mail = feedback.protocol === 'mailto:' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(feedback.pathname);
+    if (page || mail) c.feedback = feedback.toString();
   }
   // What a year costs, as the web shows it beside Subscribe: changed
   // with the Stripe price (`config|service`, stripePrice) it describes.
   if (typeof raw.price === 'string' && /^[^\s<>{}]{1,12}$/.test(raw.price) && /\d/.test(raw.price)) c.price = raw.price;
   // Where the privacy policy and the terms are, when not on this site.
   for (const name of ['privacy', 'terms']) {
-    if (typeof raw[name] !== 'string') continue;
-    try {
-      const u = new URL(raw[name]);
-      if (u.protocol === 'https:' && !u.username && !u.password) c[name] = u.toString();
-    } catch {}
+    const u = urlOf(raw[name]);
+    if (u && u.protocol === 'https:' && !u.username && !u.password) c[name] = u.toString();
   }
   // The clocks of the tables a device starts: served only where the
   // whole of it checks out, and left out otherwise, which the app
@@ -2575,6 +2570,19 @@ export function configOf(raw) {
   const waits = waitsOf(raw.waits);
   if (waits) c.waits = waits;
   return c;
+}
+
+/// [text] as a URL, or null where it is not text or not a URL: what an
+/// operator's row says is checked, and a URL that does not parse is one
+/// that is left out.
+function urlOf(text) {
+  if (typeof text !== 'string') return null;
+  try {
+    return new URL(text);
+  } catch (e) {
+    if (e instanceof TypeError) return null;
+    throw e;
+  }
 }
 
 /// How long a device waits on the network, each field least and most:

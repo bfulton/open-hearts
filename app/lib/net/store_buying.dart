@@ -163,8 +163,11 @@ Future<Said<Licence>> presentProof(Signer signer, StoreKind store, String proof,
   if (answer?.status != 200) return (answer: null, refusal: refusalOf(answer));
   Licence? licence;
   try {
-    licence = Licence.parse((jsonDecode(answer!.body) as Map)['licence']);
-  } catch (_) {}
+    final json = jsonDecode(answer!.body);
+    if (json is Map) licence = Licence.parse(json['licence']);
+  } on FormatException {
+    debugPrint('store: the service\'s answer is not JSON');
+  }
   if (licence == null || !licence.holdsFor(signer.publicKey, service: service)) {
     return (answer: null, refusal: const Refused('licenceNotForThisDevice'));
   }
@@ -235,7 +238,9 @@ class StoreShop extends ChangeNotifier {
     _signer = signer;
     try {
       _bought = (await SharedPreferences.getInstance()).getBool(_boughtHere) ?? false;
-    } catch (_) {}
+    } on Exception catch (e) {
+      debugPrint('store: whether this device bought cannot be read: $e');
+    }
     // One at a time, in the order the store said them; and one that
     // fell over does not stop the next being heard.
     _listening = store.purchases.listen((purchases) {
@@ -262,7 +267,10 @@ class StoreShop extends ChangeNotifier {
     var opened = false;
     try {
       opened = await store.buy(product, account: store.kind == StoreKind.apple ? account.apple : account.play);
-    } catch (_) {}
+    } on Exception catch (e) {
+      // Said as storeFailed, below; what the store said is for a trace.
+      debugPrint('store: the purchase did not open: $e');
+    }
     if (!opened) _set(busy: false, refusal: const Refused('storeFailed'));
   }
 
@@ -327,7 +335,9 @@ class StoreShop extends ChangeNotifier {
           _bought = true;
           try {
             await (await SharedPreferences.getInstance()).setBool(_boughtHere, true);
-          } catch (_) {}
+          } on Exception catch (e) {
+            debugPrint('store: that this device bought is not kept: $e');
+          }
           await _finish(purchase);
           _set(busy: false, clear: true);
         } else {
@@ -341,7 +351,11 @@ class StoreShop extends ChangeNotifier {
     if (!purchase.needsFinishing) return;
     try {
       await store!.finish(purchase);
-    } catch (_) {}
+    } on Exception catch (e) {
+      // Unfinished, the store offers it again at the next start, and it
+      // is taken again then.
+      debugPrint('store: a purchase not finished: $e');
+    }
   }
 
   /// [clear] takes away what the last attempt was refused for.
