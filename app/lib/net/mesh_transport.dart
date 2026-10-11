@@ -5,7 +5,7 @@
 ///
 /// Who that is grows: the seats are known when the table starts, and
 /// the jurors as each jury carries, so the client says again who to
-/// reach and the mesh dials whatever is new ([reach]). It only ever
+/// reach and the mesh dials whatever is new (`reach`). It only ever
 /// adds. A client's view of the table lags — a juror that has not yet
 /// seen a seat sit down leaves it out — and dropping a channel on that
 /// would report a disconnect for somebody who never went anywhere.

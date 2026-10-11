@@ -21,8 +21,8 @@ import 'package:table/table.dart';
 
 import '../l10n/l10n.dart';
 import 'address.dart';
+import 'http.dart' as http;
 import 'licence.dart';
-import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 import 'remote_config.dart' show waits;
 
 /// A device of the account, as the service lists them.
@@ -330,7 +330,9 @@ Refused refusalOf(({int status, String body})? answer) {
       final said = json['error'] as String;
       return said.isEmpty ? _unreachable : Refused.from(said);
     }
-  } catch (_) {}
+  } on FormatException {
+    // A body that is not JSON says nothing in its own words.
+  }
   return _unreachable;
 }
 

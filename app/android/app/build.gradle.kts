@@ -4,7 +4,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // After the Android plugin, which Flutter's configures.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -33,10 +33,7 @@ android {
         applicationId = "game.openhearts"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
-        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
-        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
-        // flag during build.
+        // pubspec.yaml's version: the name before the +, the code after.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

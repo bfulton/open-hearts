@@ -16,9 +16,9 @@ import 'dart:math' as math;
 import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../theme.dart';
 import 'pip.dart';
-import '../l10n/l10n.dart';
 
 class Gone extends StatelessWidget {
   const Gone({super.key, required this.played, this.width = 300});

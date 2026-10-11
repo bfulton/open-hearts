@@ -4,6 +4,8 @@
 /// parameters stay in the address wherever it goes.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -59,7 +61,7 @@ void main() {
 
   testWidgets('the session\'s parameters stay in the address wherever it goes', (tester) async {
     final router = await pumpAt(tester, '/?lang=fr&e2e=1', boot: 'https://play.openhearts.game/?lang=fr&e2e=1');
-    router.push(located('/about'));
+    unawaited(router.push(located('/about')));
     await tester.pumpAndSettle();
     final at = Uri.parse(where(router));
     expect(at.path, '/about');
@@ -71,7 +73,7 @@ void main() {
 
   testWidgets('a game opened with the session\'s parameters in the address is the game, not the front door', (tester) async {
     final router = await pumpAt(tester, '/?e2e=1', boot: 'https://play.openhearts.game/?e2e=1');
-    router.push(located(soloPath), extra: const SoloGame(seed: 4, paced: false));
+    unawaited(router.push(located(soloPath), extra: const SoloGame(seed: 4, paced: false)));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget, reason: where(router));
     expect(Uri.parse(where(router)).path, soloPath);

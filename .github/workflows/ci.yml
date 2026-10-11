@@ -64,9 +64,9 @@ jobs:
           cd ../vendor && cargo test --release --locked
           cd ../schnorr && cargo build --release --locked && cargo test --release --locked
       - name: Engine (pure Dart — rules, bots, 200 seeded games)
-        run: cd packages/engine && dart pub get && dart analyze && dart test -j 4
+        run: cd packages/engine && dart pub get && dart analyze --fatal-infos && dart test -j 4
       - name: Deal (the primitives over FFI, and a hand's deal among four sessions)
-        run: cd packages/deal && dart pub get && dart analyze && dart test -j 4
+        run: cd packages/deal && dart pub get && dart analyze --fatal-infos && dart test -j 4
       - name: Analyze
         run: cd app && flutter pub get && flutter analyze
       - name: Test (widgets)
@@ -125,7 +125,7 @@ jobs:
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
         run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
       - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
-        run: cd packages/table && dart pub get && dart analyze && dart test -x slow
+        run: cd packages/table && dart pub get && dart analyze --fatal-infos && dart test -x slow
       - name: Table, the slow tier (whole sealed games under every departure, the chaos walks)
         run: cd packages/table && dart test -t slow
 
@@ -155,7 +155,7 @@ jobs:
       - name: Deal and Schnorr (Rust — the cdylibs the relay and the juror load)
         run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
       - name: Service (the local relay, and a hand played over it with real signatures)
-        run: cd service && dart pub get && dart analyze && dart test
+        run: cd service && dart pub get && dart analyze --fatal-infos && dart test
       - name: Service, against the object's relay (the same suite, the other implementation)
         run: cd service && OH_RELAY=js dart test
       - name: Service, against the object's relay as deployed (one tag an address, its own kinds)

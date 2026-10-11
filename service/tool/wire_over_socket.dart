@@ -6,8 +6,8 @@
 ///
 ///     cd service && dart run tool/wire_over_socket.dart
 ///
-/// Two people and two bots at a sealed table, the bot seats held by a
-/// bench of jurors of last resort, everything through a proxy that
+/// Two people and two bots at a sealed table, the bot seats held by
+/// backup jurors, everything through a proxy that
 /// counts. Run twice, and the difference is what the extension is
 /// worth.
 library;
@@ -82,8 +82,8 @@ Future<
     BotSeat(Persona.roster[3]),
     BotSeat(Persona.roster[4]),
   ]);
-  // The bench, which is what holds the two bot seats when nobody else
-  // is online — which nobody is, here.
+  // The backup jurors, which are what hold the two bot seats when
+  // nobody else is online — which nobody is, here.
   final bench = LastResortBench(
     signers: [for (var i = 0; i < juryToHoldBots; i++) FakeSigner('bench$i')],
     relays: [proxy.url],

@@ -1,7 +1,7 @@
 // The jurors of last resort as a Cloudflare Container (bench.mjs): a
-// call heard on the presence relay starts the bench and is passed to
-// it; the bench is left alone while it serves or waits, and stopped
-// once it has gone quiet. The container here is a stand-in with the
+// call heard on the presence relay starts the backup jurors and is
+// passed to them; they are left alone while they serve or wait, and
+// stopped once they have gone quiet. The container here is a stand-in with the
 // runtime's shape (ctx.container); the image itself is checked against
 // a real table by service/tool/bench_check.dart. node --test service/do
 import assert from 'node:assert/strict';
@@ -13,8 +13,8 @@ import { objectRelay, schnorrVerifier } from './relay.mjs';
 import { wasmPath } from './host.mjs';
 import { keys, signing } from './sign.mjs';
 
-/// A container with the runtime's shape, and a bench inside it that
-/// answers as service/bin/juror.dart does once [startsAfter] pings
+/// A container with the runtime's shape, and backup jurors inside it
+/// that answer as service/bin/juror.dart does once [startsAfter] pings
 /// have gone unanswered.
 function container({ startsAfter = 2 } = {}) {
   const c = {
@@ -83,7 +83,7 @@ function state(c) {
 
 const wake = (bench, table = 'tbl1') => bench.fetch(new Request(`https://bench/wake?table=${table}`, { method: 'POST' }));
 
-test('a call starts the bench, waits for it, and passes the call on', async () => {
+test('a call starts the backup jurors, waits for them, and passes the call on', async () => {
   const c = container();
   const s = state(c);
   const bench = new Bench(s, { OH_JUROR_SECRET: 'ab'.repeat(32), OH_BENCH_RELAYS: 'wss://r1' });
@@ -101,7 +101,7 @@ test('a call starts the bench, waits for it, and passes the call on', async () =
   assert.equal((await bench.fetch(new Request('https://bench/wake', { method: 'POST' }))).status, 400, 'a call names its table');
 });
 
-test('left alone while it serves or waits, stopped once it is quiet', async () => {
+test('left alone while they serve or wait, stopped once they are quiet', async () => {
   const c = container({ startsAfter: 0 });
   const s = state(c);
   const bench = new Bench(s, {});
@@ -120,7 +120,7 @@ test('left alone while it serves or waits, stopped once it is quiet', async () =
   assert.deepEqual(await bench.status(), { running: false, online: false, serving: 0 });
 });
 
-test('a bench that does not answer is given one more look, then stopped', async () => {
+test('backup jurors that do not answer is given one more look, then stopped', async () => {
   const c = container({ startsAfter: 0 });
   const s = state(c);
   const bench = new Bench(s, {});
@@ -132,7 +132,7 @@ test('a bench that does not answer is given one more look, then stopped', async 
   assert.deepEqual(c.signals, [15]);
 });
 
-test('a bench that never comes up is not passed the call', async () => {
+test('backup jurors that never come up is not passed the call', async () => {
   const c = container({ startsAfter: 1e9 });
   const bench = new Bench(state(c), {});
   const res = await wake(bench);

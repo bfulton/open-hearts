@@ -64,7 +64,7 @@ class FoldingHeart extends StatefulWidget {
   static Rect packetAfter(int n, Size size) => _FoldedHeart.packetIn(size, folds: n);
 
   /// The point of the turn at which fold [n] is just made, and the one
-  /// at which the packet is [howFar] shut. Named rather than counted,
+  /// at which the packet is `howFar` shut. Named rather than counted,
   /// so what looks at one step of the turn does not carry a copy of
   /// the timings around with it.
   static double afterFold(int n) => _FoldedHeart._at(_FoldedHeart._still + n * _FoldedHeart._foldFor);

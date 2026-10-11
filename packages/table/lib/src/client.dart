@@ -68,13 +68,13 @@ import 'package:engine/engine.dart';
 import 'clock.dart';
 import 'events.dart';
 import 'journal.dart';
+import 'jury.dart';
 import 'model.dart';
 import 'sealed_pass.dart';
 import 'signing.dart';
 import 'spec.dart';
 import 'time_bank.dart';
 import 'timing.dart';
-import 'jury.dart';
 import 'transport.dart';
 
 /// How a modified client lies (docs/03-fair-deal.md), for the
@@ -244,16 +244,14 @@ class TableClient {
     required this.signer,
     required this.transport,
     required this.clock,
-    int? silenceAfterMs,
+    this._silenceAfterMs,
     this.heartbeatMs = 5000,
     this.presence,
     this.crypto,
     this.dealWorker,
     this.journal,
-    Random? random,
-  })  : _random = random,
-        _silenceAfterMs = silenceAfterMs,
-        game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target),
+    this._random,
+  })  : game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target),
         holders = List.of(spec.seats),
         _humans = {for (final h in spec.seats) if (h is HumanSeat) h.key} {
     if (spec.sealed && crypto == null) throw ArgumentError('a sealed table needs the deal\'s cryptography');
@@ -321,7 +319,7 @@ class TableClient {
   /// table; the seat it holds goes to the escrow at its deadline, as a
   /// quiet juror's does. Either way the device stops saying it is
   /// online, and no table draws it after (presence_relay.dart,
-  /// [RelayPresence.canServe]).
+  /// `RelayPresence.canServe`).
   String? get cannotDeal => _cannotDeal;
   String? _cannotDeal;
 
@@ -1912,11 +1910,8 @@ class TableClient {
     final order = _orderFor(game.handNumber);
     final carrier = order.where((j) => j == signer.publicKey || _jurorRecent(j)).firstOrNull;
     if (carrier != signer.publicKey) return;
-    try {
-      final turn = event.turn;
-      if (_races[turn]?.settled == true) return;
-      transport.broadcast(event.toJson());
-    } catch (_) {}
+    if (_races[event.turn]?.settled == true) return;
+    transport.broadcast(event.toJson());
   }
 
   /// The hand in which this juror last heard an appeal.
@@ -2040,7 +2035,12 @@ class TableClient {
         return d.verifyPlay(seat, Map<String, Object?>.from(event.body)) == card.index && game.allows(seat, card);
       }
       return game.legalPlaysFor(seat).contains(card);
-    } catch (_) {
+    } catch (e) {
+      // A signed action whose body is not what its kind's check reads —
+      // a card that is no card, a deal part of the wrong shape — is
+      // not one this side backs (TableEvent.wellFormed checks only the
+      // fields every side reads).
+      _trace('not backed: ${event.kind.name} by seat $seat: $e');
       return false;
     }
   }
@@ -2777,7 +2777,7 @@ class TableClient {
       myKey: signer.publicKey,
       wrap: signer.sharedSecretWith,
       random: _random,
-    );
+    )..log = (l) => _trace('deal: $l');
     _dealsByHand[game.handNumber] = _deal!;
     final kept = _deal!.mySecret;
     if (amSeated && me == mySeat && kept != null) journal?.keep(game.handNumber, kept);
@@ -2875,7 +2875,7 @@ class TableClient {
   final Map<int, String?> _sealedTo = {};
 
 
-  /// Who keyed each seat at [hand], by the event that settled its
+  /// Who keyed each seat at `hand`, by the event that settled its
   /// first deal round.
   final Map<int, Map<int, PublicKey>> _keyedBy = {};
 
@@ -3848,7 +3848,7 @@ class TableClient {
   // and a bot seat's move settles with nothing said where the seat is
   // everyone's to work out.
 
-  /// The draws named in [hand]'s people's plays so far, in the order
+  /// The draws named in `hand`'s people's plays so far, in the order
   /// the record names them.
   final Map<int, List<String>> _grown = {};
 
@@ -4328,13 +4328,11 @@ class TableClient {
         _ => false,
       };
 
+  /// Only for the kinds [_votes] takes, every one of which names its
+  /// turn (TableEvent.wellFormed).
   static bool _pastTurn(TableEvent e, TurnId turn) {
-    try {
-      final t = e.turn;
-      return t.hand > turn.hand || (t.hand == turn.hand && t.position > turn.position);
-    } catch (_) {
-      return false;
-    }
+    final t = e.turn;
+    return t.hand > turn.hand || (t.hand == turn.hand && t.position > turn.position);
   }
 
   /// Whether this side is holding [turn] for the game's end: it backed
@@ -5357,7 +5355,7 @@ class TableClient {
     final jurors = e.jurors;
     if (jurors.isEmpty || snapshot.any(_ofThisTable)) return false;
     final drawn = drawJury(spec.seed, e.hand, snapshot);
-    if (drawn.length != jurors.length || !Iterable.generate(jurors.length).every((i) => drawn[i] == jurors[i])) return false;
+    if (drawn.length != jurors.length || !Iterable<int>.generate(jurors.length).every((i) => drawn[i] == jurors[i])) return false;
     final p = presence;
     if (p != null) {
       final seen = p.online(withinMs: 300000);

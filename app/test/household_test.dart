@@ -27,9 +27,8 @@ import 'package:open_hearts/ui/qr_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
-import 'routes.dart';
-
 import 'home_page_test.dart' show licenceThisDevice;
+import 'routes.dart';
 
 const _serviceSecret = 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef';
 const _service = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';

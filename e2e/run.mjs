@@ -62,8 +62,8 @@ const handOver = (n) => {
   return async (p) => (await texts(p)).some((t) => t === 'On with it' || next.test(t));
 };
 
-/// How long a whole hand may take. Four browsers, a relay and a bench
-/// of jurors on a hosted runner's two cores take some 173 s over the
+/// How long a whole hand may take. Four browsers, a relay and the backup
+/// jurors on a hosted runner's two cores take some 173 s over the
 /// first cell's, and runners differ: one runs the table's suite 1.7
 /// times slower than another (ci.yml), which makes that hand nearly
 /// five minutes.

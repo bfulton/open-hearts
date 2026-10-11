@@ -35,29 +35,29 @@ import 'feedback_page.dart';
 import 'game_options.dart';
 import 'identity.dart';
 import 'l10n/l10n.dart';
-import 'net/copy.dart';
-import 'pages.dart';
-import 'profile_page.dart';
-import 'live/options_sheet.dart';
-import 'live_controller.dart';
+import 'live/live_controller.dart';
 import 'net/account_profile.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
+import 'net/copy.dart';
 import 'net/duty.dart';
 import 'net/game_records.dart';
 import 'net/household.dart';
 import 'net/in_use.dart';
 import 'net/mesh_transport.dart';
 import 'net/network.dart';
-import 'net/remote_config.dart';
 import 'net/relays.dart';
+import 'net/remote_config.dart';
 import 'net/room.dart';
 import 'net/seat_store.dart';
 import 'net/share.dart';
 import 'net/standing.dart';
-import 'pace_store.dart';
 import 'net/turn.dart';
+import 'options_sheet.dart';
+import 'pace_store.dart';
+import 'pages.dart';
 import 'pictures.dart';
+import 'profile_page.dart';
 import 'subscribe_page.dart';
 import 'table_page.dart';
 import 'theme.dart';
@@ -86,6 +86,7 @@ void _relayLog(String line) => debugPrint('relay: $line');
 /// In a build being driven (net/address.dart) the table's every
 /// transition and the mesh's every channel change go to the console too.
 final _debugging = driven(Uri.base);
+final _dutyLog = _debugging ? (String l) => debugPrint('duty: $l') : null;
 
 /// The deal a solo game starts from, for a browser test that needs a
 /// particular one (`?e2e&seed=156`); in a build not being driven, never.
@@ -95,6 +96,12 @@ final _dealtFrom = _debugging ? int.tryParse(Uri.base.queryParameters['seed'] ??
 /// for another (`?e2e&target=1`, net/address.dart); otherwise never —
 /// the device's own choice, which the door still shows.
 final _playsTo = targetIn(Uri.base);
+
+/// How often a seated device notes that it is still at its table
+/// (net/seat_store.dart, here): often enough that the note is never far
+/// behind against SeatStore.comeBackWithin, rarely enough that a busy
+/// table is not a write to the device's storage at every event.
+const _seatSavedEvery = Duration(seconds: 10);
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true});
@@ -456,9 +463,9 @@ class _HomePageState extends State<HomePage> {
     if (InUse.current.standing != Use.here) await InUse.current.open(signer);
     if (!mounted || InUse.current.elsewhere || Duty.current != null) return;
     unawaited(_comeBack(signer));
-    Duty.on(_relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
+    unawaited(Duty.on(_relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
       if (mounted) setState(() => _listeningSinceMs = DateTime.now().millisecondsSinceEpoch);
-    });
+    }));
     _onlineClock?.cancel();
     _onlineClock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -566,7 +573,7 @@ class _HomePageState extends State<HomePage> {
         return null;
       }
       transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
-      _refusalSub?.cancel();
+      unawaited(_refusalSub?.cancel());
       _refusalSub = transport.refusals.listen((r) {
         if (mounted) setState(() => _relayNote = r == null ? null : context.l10n.noRelayTakesEvents(r));
       });
@@ -579,14 +586,14 @@ class _HomePageState extends State<HomePage> {
       }
       // A relay answered: from here on this device is online to
       // everyone, and a juror when drawn.
-      Duty.on(relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker);
+      Duty.on(relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker);
       _iceServers ??= const [];
-      iceServersFor(signer).then((servers) {
+      unawaited(iceServersFor(signer).then((servers) {
         _iceServers = servers;
         // The same credentials serve this device's juror duty, whose
         // channels are made when a table summons it (net/duty.dart).
         Duty.ice = servers;
-      });
+      }));
       if (_standing == null) await _loadStanding(relays, signer);
       setState(() {
         _transport = transport;
@@ -741,7 +748,7 @@ class _HomePageState extends State<HomePage> {
       // The players' reactions ride the table's own tag, beside its
       // events and outside them (packages/table, reactions.dart).
       reactions: relay,
-      presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence,
+      presence: Duty.on(relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker).presence,
       crypto: dealCrypto,
       dealWorker: dealWorker,
       ratingOf: spec.rated ? (id) => ledger.of(id) : null,
@@ -777,7 +784,7 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       final now = DateTime.now().millisecondsSinceEpoch;
-      if (now - hereAt < 10000) return;
+      if (now - hereAt < _seatSavedEvery.inMilliseconds) return;
       hereAt = now;
       seats.here();
     });

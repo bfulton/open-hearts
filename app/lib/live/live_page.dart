@@ -6,33 +6,32 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:engine/engine.dart' as engine;
 import 'package:engine/engine.dart';
+import 'package:flutter/material.dart' hide Card;
+import 'package:go_router/go_router.dart';
 import 'package:table/table.dart';
 
 import '../avatar.dart';
 import '../feedback_page.dart';
 import '../l10n/l10n.dart';
-import '../live_controller.dart';
+import '../net/address.dart' show driven;
+import '../net/copy.dart';
+import '../net/in_use.dart';
+import '../net/share.dart';
 import '../pages.dart';
 import '../reaction_mute.dart';
 import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
-import '../ui/hand_fan.dart';
 import '../ui/gone.dart';
+import '../ui/hand_fan.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
 import '../ui/reactions.dart';
-import '../net/address.dart' show driven;
-import '../net/copy.dart';
-import '../net/in_use.dart';
-import '../net/share.dart';
 import '../ui/reading_time.dart';
 import '../ui/table_layout.dart';
 import '../ui/table_view.dart';
+import 'live_controller.dart';
 
 class LivePage extends StatefulWidget {
   const LivePage({super.key, required this.controller});
@@ -88,7 +87,7 @@ class _LivePageState extends State<LivePage> {
     super.dispose();
   }
 
-  void _tapCard(engine.Card card) {
+  void _tapCard(Card card) {
     if (_c.awaitingPass) return _c.toggleSelected(card);
     if (!_c.awaitingPlay) return;
     final refusal = _c.playCard(card);
@@ -328,7 +327,7 @@ class _LivePageState extends State<LivePage> {
     final game = _c.game;
     // What the player has committed is already off the hand.
     // Nothing yet while a sealed table deals.
-    final hand = game.knowsHand(_c.mySeat) ? _c.handShown : <engine.Card>[];
+    final hand = game.knowsHand(_c.mySeat) ? _c.handShown : <Card>[];
     final legal = _c.legalNow;
     final passing = _c.awaitingPass;
     final ended = _c.handJustEnded;

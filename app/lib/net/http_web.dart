@@ -1,4 +1,5 @@
-/// One JSON POST on the web: a bare `fetch`, as the update check does.
+/// The app's own requests on the web: a bare `fetch`, as the update
+/// check does (http.dart).
 library;
 
 import 'dart:js_interop';
@@ -24,12 +25,6 @@ Future<({int status, String body})> post(Uri url, String body) async {
   }.jsify() as JSObject;
   final response = await _fetch(url.toString().toJS, init).toDart;
   return (status: response.status, body: (await response.text().toDart).toDart);
-}
-
-/// The body of a POST that was taken, or null when it was not.
-Future<String?> postJson(Uri url, String body) async {
-  final answer = await post(url, body);
-  return answer.status == 200 ? answer.body : null;
 }
 
 /// The body of a GET that was answered 200, or null. The browser's own

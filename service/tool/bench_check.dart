@@ -1,15 +1,15 @@
-/// The bench as it runs in its container, against a real table: a
+/// The backup jurors as they run in their container, against a real table: a
 /// relay here, two people here, and the jurors of last resort wherever
 /// they were started — in the image (service/bench), limited to the
 /// Cloudflare instance it will run on, say. Nobody else is online, so
-/// the table calls for jurors, the bench comes online, holds the two
+/// the table calls for jurors, they come online, hold the two
 /// bot seats and plays them, and this says how long each step took.
 ///
 ///     cd service && dart run tool/bench_check.dart --port 7449 [--hands 2]
 ///     docker run --rm --network host --cpus 0.25 --memory 1g \
 ///       -e OH_RELAYS=ws://127.0.0.1:7449 -e OH_PRESENCE_RELAYS=ws://127.0.0.1:7449 oh-bench:local
 ///
-/// It waits for the bench to come up on the relay, so the two can be
+/// It waits for the backup jurors to come up on the relay, so the two can be
 /// started in either order. `--relay <url>` uses a relay already
 /// running instead of starting one: the deployed object's, say, as
 /// `node do/host.mjs --object` runs it, at `ws://127.0.0.1:7448/{tag}`.
@@ -77,7 +77,7 @@ Future<void> main(List<String> args) async {
     });
   }
   final ok = await done.future.timeout(Duration(minutes: 10 * hands), onTimeout: () => false);
-  print(ok ? '${at()}: $hands hand(s) played with the bench holding the bots' : 'FAIL: ${clients.first.describe()}');
+  print(ok ? '${at()}: $hands hand(s) played with the backup jurors holding the bots' : 'FAIL: ${clients.first.describe()}');
   for (final p in players) {
     p.stop();
   }

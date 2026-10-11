@@ -3,17 +3,17 @@
 ///     cd packages/engine && dart run tool/arena.dart --games 3000
 ///     dart run tool/arena.dart --roster "Westley,Romeo,Don Juan,Roxane"
 ///
-/// Fair share of wins is 25%. The test holds every persona to at least
-/// 20% and within ten points of the best mean score; this is for seeing
-/// where each actually lands when tuning one.
+/// Fair share of wins is 25%. The test holds every persona to a floor a
+/// little under it and to a mean score near the best (its bounds, and
+/// why, are in test/persona_test.dart); this is for seeing where each
+/// actually lands when tuning one.
 library;
 
+import 'package:engine/args.dart';
 // A benchmark's entire output is its printing.
 // ignore_for_file: avoid_print
 
 import 'package:engine/engine.dart';
-
-import 'args.dart';
 
 void main(List<String> args) {
   final games = intArg(args, 'games', 1200);

@@ -227,8 +227,8 @@ async function applyStores() {
   const keys = await get(`${acct}/calls/turn_keys`);
   for (const t of turnKeys) {
     const k = keys.find((x) => x.name === t.name);
-    if (!k) owner(`no Realtime TURN key ${t.name}: make one (its secret, shown once, is OH_TURN_API_TOKEN) and set OH_TURN_KEY_ID to its id`);
-    else if (k.uid !== t.uid) owner(`TURN key ${t.name} is ${k.uid}, defined as ${t.uid}: set OH_TURN_KEY_ID in cloudflare.mjs and the project`);
+    if (!k) owner(`no Realtime TURN key ${t.name}: make one (its secret, shown once, is OH_TURN_API_TOKEN) and put its id in config/openhearts.json as turnKeyId`);
+    else if (k.uid !== t.uid) owner(`TURN key ${t.name} is ${k.uid}, defined as ${t.uid}: set turnKeyId in config/openhearts.json to the key in use`);
     else ok(`Realtime TURN key ${t.name}`);
   }
 }

@@ -55,7 +55,7 @@ class Summons {
 
   /// The draws the sender's table had carried for [hand], each with
   /// the witnesses that carried it, as signed events
-  /// ([TableClient.serveFor]).
+  /// (`TableClient.serveFor`).
   final List<Map<String, Object?>> draws;
 
   static Summons? parse(PublicKey from, Map<String, Object?> content) {
@@ -160,7 +160,7 @@ class RelayPresence implements Presence {
   /// device this is — a table draws no juror from an account it seats —
   /// and another device of the same account hears that it has been
   /// superseded. Read at every beat; null says no account, which only
-  /// the bench of jurors of last resort may do on our relay.
+  /// the backup jurors may do on our relay.
   final Activation? Function()? activation;
 
   static const topic = 'online';

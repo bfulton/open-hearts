@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
+import 'package:open_hearts/net/backoff.dart';
 import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -112,7 +113,7 @@ void main() {
       clock.elapse(const Duration(minutes: 20));
       final gaps = [for (var i = 1; i < service.at.length; i++) service.at[i] - service.at[i - 1]];
       expect(gaps.take(7).map((g) => g.inSeconds), [2, 4, 8, 16, 32, 64, 120]);
-      expect(gaps.skip(6), everyElement(Entitlement.mostAgain), reason: 'no shorter, and no longer');
+      expect(gaps.skip(6), everyElement(Backoff.most), reason: 'no shorter, and no longer');
       expect(e.live, isFalse);
     });
   });

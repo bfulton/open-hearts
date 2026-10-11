@@ -3,6 +3,10 @@
 /// glue library; the module imports nothing.
 library;
 
+// The wasm's exports keep the names the Rust gives them (deal_setup and
+// the rest): they are the properties' names on the JavaScript side.
+// ignore_for_file: non_constant_identifier_names
+
 import 'dart:js_interop';
 import 'dart:typed_data';
 
@@ -29,69 +33,37 @@ extension type _Instance._(JSObject _) implements JSObject {
 
 extension type _Exports._(JSObject _) implements JSObject {
   external _Memory get memory;
-  // ignore: non_constant_identifier_names
   external void deal_setup();
-  // ignore: non_constant_identifier_names
   external JSNumber deal_alloc(JSNumber n);
-  // ignore: non_constant_identifier_names
   external void deal_free(JSNumber p, JSNumber n);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_keygen(JSNumber secret, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_key_proof(JSNumber secret, JSNumber name, JSNumber nameLen, JSNumber seed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_verify_key(JSNumber pk, JSNumber name, JSNumber nameLen, JSNumber proof);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_aggregate(JSNumber pks, JSNumber count, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_initial_deck(JSNumber joint, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_shuffle(JSNumber joint, JSNumber deckIn, JSNumber seed, JSNumber deckOut, JSNumber proofOut, JSNumber proofCap);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_verify_shuffle(JSNumber joint, JSNumber deckIn, JSNumber deckOut, JSNumber proof, JSNumber proofLen);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_reveal_token(JSNumber secret, JSNumber masked, JSNumber seed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_verify_token(JSNumber pk, JSNumber masked, JSNumber token);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_split(JSNumber secret, JSNumber shares, JSNumber seed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_share_key(JSNumber share, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_share_bytes(JSNumber secret, JSNumber len, JSNumber n, JSNumber t, JSNumber seed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_bytes_lagrange(JSNumber have, JSNumber count, JSNumber index, JSNumber at);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_bytes_scale(JSNumber share, JSNumber len, JSNumber by, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_bytes_sum(JSNumber parts, JSNumber count, JSNumber len, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_split_threshold(JSNumber secret, JSNumber n, JSNumber t, JSNumber seed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_lagrange(JSNumber have, JSNumber count, JSNumber index, JSNumber at, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_scalar_mul(JSNumber a, JSNumber b, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_scalar_sum(JSNumber parts, JSNumber count, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_point_scale(JSNumber point, JSNumber scalar, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_open_shared(JSNumber sealed, JSNumber parts, JSNumber count, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_share_token(JSNumber share, JSNumber masked, JSNumber seed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_unmask(JSNumber pks, JSNumber tokens, JSNumber count, JSNumber masked);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_reveal_tokens(JSNumber secret, JSNumber masked, JSNumber count, JSNumber seed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_verify_tokens(JSNumber pk, JSNumber masked, JSNumber count, JSNumber tokens);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_seal(JSNumber secret, JSNumber pkTo, JSNumber masked, JSNumber seed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_verify_seal(JSNumber pkOwner, JSNumber pkTo, JSNumber masked, JSNumber sealed);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_open(JSNumber secret, JSNumber sealed, JSNumber out);
-  // ignore: non_constant_identifier_names
   external JSNumber deal_shared_secret(JSNumber secret, JSNumber pk, JSNumber out);
 }
 

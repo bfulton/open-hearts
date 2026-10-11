@@ -22,11 +22,11 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 
-import 'package:engine/engine.dart' as engine;
-import 'card_view.dart';
 import '../l10n/l10n.dart';
+import 'card_view.dart';
 
 /// Extra space between two suits in the fan. Grouping is most of what
 /// makes a 13-card row scannable.

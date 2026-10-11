@@ -9,12 +9,11 @@ library;
 
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:engine/engine.dart';
+import 'package:flutter/material.dart' hide Card;
 
 import 'avatar.dart';
 import 'entitlement.dart';
-import 'package:engine/engine.dart';
-import 'package:engine/engine.dart' as engine;
 import 'feedback_page.dart';
 import 'game_controller.dart';
 import 'identity.dart';
@@ -23,8 +22,8 @@ import 'net/copy.dart';
 import 'pages.dart';
 import 'table_model.dart';
 import 'theme.dart';
-import 'ui/hand_fan.dart';
 import 'ui/gone.dart';
+import 'ui/hand_fan.dart';
 import 'ui/header.dart';
 import 'ui/overlays.dart';
 import 'ui/pip.dart';
@@ -33,8 +32,8 @@ import 'ui/table_layout.dart';
 import 'ui/table_view.dart';
 import 'ui/update_pill.dart';
 
-/// A game alone, as `/table` is opened with it (router.dart): what the
-/// address cannot carry.
+/// A game alone, as `/solo` is opened with it (router.dart, soloPath):
+/// what the address cannot carry.
 class SoloGame {
   const SoloGame({this.target = gameOverScore, this.seed, this.paced = true});
 
@@ -109,7 +108,7 @@ class _TablePageState extends State<TablePage> {
     super.dispose();
   }
 
-  void _tapCard(engine.Card card) {
+  void _tapCard(Card card) {
     final controller = _controller;
     if (controller.awaitingPass) {
       controller.toggleSelected(card);
@@ -443,7 +442,7 @@ Widget _cardsLine(
     {required int position,
     required String Function(String name) said,
     required String name,
-    required List<engine.Card> cards,
+    required List<Card> cards,
     required AppLocalizations l10n}) {
   return Row(
     mainAxisAlignment: MainAxisAlignment.center,

@@ -31,22 +31,12 @@ library;
 import 'dart:io';
 
 import 'package:deal/deal.dart';
+import 'package:engine/args.dart';
 import 'package:table/src/sim/sim.dart';
 
-int _intArg(List<String> args, String name, int fallback) {
-  final flag = '--$name';
-  for (var i = 0; i < args.length; i++) {
-    if (args[i] == flag && i + 1 < args.length) return int.tryParse(args[i + 1]) ?? fallback;
-    if (args[i].startsWith('$flag=')) return int.tryParse(args[i].substring(flag.length + 1)) ?? fallback;
-  }
-  return fallback;
-}
-
 Future<void> main(List<String> args) async {
-  final seeds = _intArg(args, 'seeds', 250);
-  var sealedSeeds = List.generate(_intArg(args, 'sealed', 0), (i) => i);
-  final only = args.indexOf('--sealed-only');
-  if (only >= 0 && only + 1 < args.length) sealedSeeds = [for (final s in args[only + 1].split(',')) int.parse(s)];
+  final seeds = intArg(args, 'seeds', 250);
+  final sealedSeeds = intsArg(args, 'sealed-only', List.generate(intArg(args, 'sealed', 0), (i) => i));
   final sealed = sealedSeeds.length;
   final crypto = sealed > 0 ? await DealCrypto.load() : null;
   final started = DateTime.now();
@@ -54,15 +44,15 @@ Future<void> main(List<String> args) async {
   // `--structure`: every five seconds of each walk, what every side
   // waits for, read against who can end it (lib/src/sim/structure.dart).
   // Measures; decides nothing.
-  final measure = args.contains('--structure');
+  final measure = flagArg(args, 'structure');
   // `--jurors N --sweep`: more strangers than a jury, each letting go
   // of the table once it has served and summoned again later, as the
   // duty does — and what any of them would have said about a hand
   // from before its summons, by kind.
-  final jurors = _intArg(args, 'jurors', 4);
-  final sweep = args.contains('--sweep');
-  final workers = args.contains('--workers');
-  final twins = args.contains('--twins');
+  final jurors = intArg(args, 'jurors', 4);
+  final sweep = flagArg(args, 'sweep');
+  final workers = flagArg(args, 'workers');
+  final twins = flagArg(args, 'twins');
   final saidBefore = <String, int>{};
   void jurorLog(String line) {
     final at = line.indexOf('over before this side was summoned: ');

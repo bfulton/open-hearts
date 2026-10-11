@@ -672,15 +672,12 @@ pub fn share_token(share: &[u8], masked: &[u8], seed: &[u8], out: &mut [u8]) -> 
     Some(n + m)
 }
 
-/// The card behind [masked] given every seat's token. With [check],
-/// each token's proof is verified against its key first; without, the
-/// tokens are combined as given — for a caller that verified each on
-/// arrival, since a proof checked twice is most of the cost of a card.
-/// [tokens] are the bare 32-byte tokens, one per key in [pks], with no
-/// proofs among them: a token is checked when it arrives — against its
-/// key, singly or in a batch ([verify_tokens]) — and what is kept
-/// afterwards is the token alone. Opening is addition, and addition
-/// has nothing to check.
+/// The card behind [masked] given every seat's token. [tokens] are the
+/// bare 32-byte tokens, one per key in [pks], with no proofs among
+/// them: a token is checked when it arrives — against its key, singly
+/// or in a batch ([verify_tokens]) — and what is kept afterwards is the
+/// token alone, since a proof checked twice is most of the cost of a
+/// card. Opening is addition, and addition has nothing to check.
 pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8]) -> Option<usize> {
     let f = fixed();
     let masked = read::<Masked>(masked)?;

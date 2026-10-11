@@ -17,13 +17,12 @@ import 'net/duty.dart';
 import 'net/in_use.dart';
 import 'net/licence.dart' show serviceKey;
 import 'net/remote_config.dart';
-import 'router.dart';
-import 'table_model.dart' show tableBeats;
 import 'net/report_error.dart';
 import 'net/store_buying.dart';
+import 'pacing.dart' show tableBeats;
+import 'router.dart';
 import 'theme.dart';
 import 'ui/in_use_screen.dart';
-import 'ui/touch_probe.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -164,10 +163,12 @@ class _OpenHeartsAppState extends State<OpenHeartsApp> {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: language,
-        // No app-wide text selection: on a table played by touch it took
+        // Every page under the screen a device shows once another of its
+        // account's has taken over (ui/in_use_screen.dart) — and no
+        // selection area over them: on a table played by touch it took
         // taps meant for the game, and what is worth copying (a code, a
         // link, a report) has its own Copy button.
-        builder: (context, child) => TouchProbe(child: InUseScreen(child: child ?? const SizedBox())),
+        builder: (context, child) => InUseScreen(child: child ?? const SizedBox()),
         routerConfig: _router,
       ),
     );

@@ -1,12 +1,11 @@
 /// What the table's widgets need from whatever is driving the game —
 /// the solo controller, or a live table's client. The views draw the
 /// player at the bottom whichever seat they hold, so everything is
-/// asked relative to [mySeat].
+/// asked relative to `mySeat`.
 library;
 
-import 'package:flutter/foundation.dart';
-
 import 'package:engine/engine.dart';
+import 'package:flutter/foundation.dart';
 import 'package:table/table.dart' show Reaction;
 
 import 'avatar.dart';
@@ -15,12 +14,6 @@ import 'l10n/l10n.dart';
 /// A reaction showing at a seat, and which of this screen's it is: a
 /// second 👍 from the same seat is a new bubble, said aloud again.
 typedef SeatReaction = ({Reaction reaction, int n});
-
-/// The share of its beats a table takes — a bot's thinking, a trick
-/// held on the felt, the score sheet's stay: all of them, but for a
-/// build the browser suites drive and ask for less (net/address.dart,
-/// [paceIn]). Set once, at startup (main.dart).
-double tableBeats = 1;
 
 abstract class TableModel implements Listenable {
   HeartsGame get game;

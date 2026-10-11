@@ -16,8 +16,8 @@ import 'dart:math';
 
 import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/about_page.dart';
 import 'package:open_hearts/avatar.dart';
@@ -27,10 +27,10 @@ import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/l10n/l10n.dart';
-import 'package:open_hearts/live/options_sheet.dart';
 import 'package:open_hearts/net/remote_config.dart';
 import 'package:open_hearts/net/sign_in.dart' show Provider;
 import 'package:open_hearts/net/store_buying.dart';
+import 'package:open_hearts/options_sheet.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/stats.dart';
 import 'package:open_hearts/subscribe_page.dart';
@@ -194,7 +194,7 @@ void main() {
       expect(await chosenLanguage(Uri.parse('https://x/play/')), isNull);
       expect(await chosenLanguage(Uri.parse('https://x/play/?lang=fr')), const Locale('fr'));
       expect(await chosenLanguage(Uri.parse('https://x/play/')), const Locale('fr'));
-      // What site/lang.js keeps when a language link is followed.
+      // What site/public/lang.js keeps when a language link is followed.
       SharedPreferences.setMockInitialValues({chosenLanguageKey: 'es'});
       expect(await chosenLanguage(Uri.parse('https://x/play/')), const Locale('es'));
       SharedPreferences.setMockInitialValues({chosenLanguageKey: 'ja'});

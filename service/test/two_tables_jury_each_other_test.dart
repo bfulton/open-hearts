@@ -61,7 +61,7 @@ void main() {
       for (var i = 0; i < 4; i++)
         JurorDuty(relays: [relay.url], signer: signers[i], presence: presences[i], silenceAfterMs: silence, crypto: crypto)..start(),
     ];
-    // A bench behind them, as the browser suite has: four people are
+    // Backup jurors behind them, as the browser suite has: four people are
     // not enough to hold seven bot seats between two tables.
     final bench = [
       for (var i = 0; i < juryToHoldBots; i++)

@@ -23,7 +23,7 @@ import 'dart:convert';
 import 'package:table/table.dart';
 
 import 'address.dart' show appBase;
-import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
+import 'http.dart' as http;
 
 /// The service this build will take a licence from, and no other. A
 /// licence signed by anything else is not a licence, which is the whole
@@ -84,9 +84,9 @@ String requestDigest(String handler, PublicKey key, int at, [String what = '']) 
     sha256Hex(utf8.encode('oh-request/1\n$handler\n$key\n$at\n$what'));
 
 /// What the service said when it was asked for this device's licence.
-/// [answered] when it said anything at all — a licence, or that there
+/// `answered` when it said anything at all — a licence, or that there
 /// is none behind the key — and false when it could not be reached or
-/// could not answer just then; [licence] the licence, when it gave one
+/// could not answer just then; `licence` the licence, when it gave one
 /// signed for this device.
 typedef LicenceAnswer = ({bool answered, Licence? licence});
 

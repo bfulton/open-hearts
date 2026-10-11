@@ -9,12 +9,11 @@
 /// its own has no business in a character, however apt.
 library;
 
+import 'package:engine/args.dart';
 // A benchmark's entire output is its printing.
 // ignore_for_file: avoid_print
 
 import 'package:engine/engine.dart';
-
-import 'args.dart';
 
 void main(List<String> args) {
   final games = intArg(args, 'games', 1000);

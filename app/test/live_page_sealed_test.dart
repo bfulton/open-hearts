@@ -7,9 +7,9 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
+import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:engine/engine.dart' as engine;
 import 'package:open_hearts/table_model.dart';
 import 'package:open_hearts/ui/table_view.dart' show TableView;
 import 'package:table/src/sim/sim.dart';
@@ -182,7 +182,8 @@ void main() {
     expect(left, isTrue);
     expect(live.controller.personaAt(0), isNotNull, reason: 'a bot holds seat 0');
     expect(live.controller.game.handNumber, 1, reason: 'the first hand finished');
-    final v = live.controller.verification();
+    final c = live.controller.client;
+    final v = verifyRecord(c.spec, c.record, allowPartial: !c.done, juries: c.juries, crypto: crypto, releases: c.releases);
     expect(v.ok, isTrue, reason: v.reason);
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 5)));

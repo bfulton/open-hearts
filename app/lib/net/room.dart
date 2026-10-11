@@ -21,13 +21,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
+import 'package:flutter/foundation.dart';
 import 'package:table/table.dart';
 
 import '../avatar.dart';
 import '../crypto/deal.dart';
 import '../l10n/l10n.dart';
+import 'remote_config.dart' show waits;
 
 class RoomMember {
   const RoomMember(this.key, this.name, {this.since = 0, this.avatar = Avatar.none, this.licence});
@@ -71,14 +72,10 @@ class RelayRoomChannel implements RoomChannel {
 }
 
 class _Present {
-  _Present(this.member, this.policy, this.seed, this.arrivedHere);
+  _Present(this.member, this.policy, this.seed);
   RoomMember member;
   int? policy;
   int seed;
-
-  /// When this device first heard them, by its own clock: the
-  /// countdown runs from the latest of these.
-  final int arrivedHere;
   int lastHeard = 0;
 }
 
@@ -106,12 +103,13 @@ class Room extends ChangeNotifier {
     this.timing = TableTiming.standard,
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
-    this.startAfterMs = 10000,
+    int? startAfterMs,
     this.licence,
     int Function()? nowMs,
     Random? random,
     bool? canDeal,
-  })  : _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch),
+  })  : startAfterMs = startAfterMs ?? waits.roomStart.inMilliseconds,
+        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch),
         seed = (random ?? Random.secure()).nextInt(1 << 31),
         canDeal = canDeal ?? dealReady {
     since = _nowMs();
@@ -143,7 +141,7 @@ class Room extends ChangeNotifier {
     Avatar avatar = Avatar.none,
     int target = gameOverScore,
     TableTiming timing = TableTiming.standard,
-    Duration startAfter = Room.startAfter,
+    Duration? startAfter,
     Licence? licence,
   }) =>
       Room(
@@ -153,11 +151,9 @@ class Room extends ChangeNotifier {
         myAvatar: avatar,
         target: target,
         timing: timing,
-        startAfterMs: startAfter.inMilliseconds,
+        startAfterMs: startAfter?.inMilliseconds,
         licence: licence,
       );
-
-  static const startAfter = Duration(seconds: 10);
 
   /// How far apart two devices' clocks are allowed to be before a
   /// start made since this device arrived stops looking like one. Wider
@@ -211,7 +207,7 @@ class Room extends ChangeNotifier {
   final int staleMs;
 
   /// How long after the last arrival the leader starts, with two or
-  /// more in.
+  /// more in: the operator's (waits.roomStart) unless given.
   final int startAfterMs;
   final int Function() _nowMs;
 
@@ -369,7 +365,7 @@ class Room extends ChangeNotifier {
         if (p == null || now - p.lastHeard > staleMs) {
           // New, or back after going quiet: an arrival either way, and
           // the countdown starts over.
-          _others[e.pubkey] = _Present(member, c['policy'] as int?, c['seed'] as int? ?? 0, now)..lastHeard = now;
+          _others[e.pubkey] = _Present(member, c['policy'] as int?, c['seed'] as int? ?? 0)..lastHeard = now;
           _lastArrival = now;
         } else {
           p

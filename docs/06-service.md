@@ -10,8 +10,8 @@ on our side:
   shop, TURN credentials, remote config and game records.
 - **The relay worker** (`service/do/`): a Durable Object per tag
   ([doc 08](08-own-relays.md)), which carries only an account's device
-  in use; the `Household` object, one per account; and the bench of
-  jurors of last resort (`service/bin/juror.dart` in a container).
+  in use; the `Household` object, one per account; and the backup
+  jurors (`service/bin/juror.dart` in a container).
 
 None of it is in a game's latency path.
 
@@ -313,18 +313,6 @@ previews, an in-memory queue in the isolate does the same. An account
 is limited to 20 changes, 60 reads, 600 activations and 30 profile
 writes an hour, and Apple's unlinks to 20 of their own.
 
-**Before accounts.** A subscription from before accounts is made an
-account the first time any of its devices, its store or Stripe is heard
-from, in the subscription's own turn: its devices, their rows and its
-backup codes move under a new account, and every licence after that
-names it. `node service/tool/accounts.mjs --apply` (Cloudflare API
-token and account id in the environment) does all of them at the deploy
-that brings accounts in; it is run before the new worker goes live, and
-the worker moves anything the old one added in between. Nobody's
-subscription is lost. A sign-in linked before accounts named a device;
-it is read as that device's account. Codes made before are for ten
-minutes, and are gone.
-
 ### When Apple says a sign-in is gone
 
 Sign in with Apple tells `apple-id` when a person stops using it with the
@@ -417,10 +405,10 @@ duty, the pool and anything it was watching, and shows "Open Hearts is
 now open on another device" with *Use it here*. The service is the
 authority because it is the one party every device of an account
 already trusts and already asks; an activation is the account's turn's
-word, so two devices can never both hold the current one. The bench of
-jurors of last resort answers the challenge with an HMAC of its key
-under `OH_JUROR_SECRET`, which the relay holds too; it belongs to no
-account.
+word, so two devices can never both hold the current one. A backup
+juror answers the challenge with an HMAC of its key under
+`OH_JUROR_SECRET`, which the relay holds too; backup jurors belong to
+no account.
 
 ### The account's profile
 
@@ -585,7 +573,8 @@ next start, and asks again every fifteen minutes while open.
 `waits` sets how long the app waits on the network — the licence, a
 household, a checkout, TURN, this config and how often it is asked
 again, the relays, the standings, a friends' room's start, a direct
-connection — each in milliseconds (`configEveryMin` in minutes). Each
+connection, a game's record and how long one just over is asked for —
+each in milliseconds (`configEveryMin` in minutes). Each
 field is taken on its own if it is a whole number within its bounds
 (`WAITS_BOUNDS` in the worker, `AppWaits.bounds` in the app, kept equal
 by a test), and the relay's slow and give-up pair only in that order.
@@ -673,7 +662,7 @@ binding, through a Household object named `operator-alerts`, which
 mails only `@openhearts.game`. A failed alert never fails the request.
 Set either flag to `false` and deploy to stop it.
 
-## The relay and the bench
+## The relay and the backup jurors
 
 The relay's core ([doc 08](08-own-relays.md)), `service/do/relay.mjs`,
 is plain functions with no Cloudflare or Node imports. It checks
@@ -689,14 +678,14 @@ relays also accept the simulator's fake signatures; the deployed object
 accepts only BIP-340. WebRTC signalling on the relay is sealed to its
 one recipient with NIP-44 v2, since an ICE candidate carries an address.
 
-**The jurors of last resort.** A table with bot seats needs enough
+**The backup jurors.** A table with bot seats needs enough
 jurors online to hold them. On a quiet night it calls for jurors on the
 presence tag. The presence object passes the call to the `Bench` object
 (`service/do/bench.mjs`), at most once every twenty seconds. The `Bench`
 object starts a Cloudflare Container running `service/bin/juror.dart`:
 four jurors in one process, with keys derived from `OH_JUROR_SECRET` so
-they are the same across restarts. The bench goes quiet ten minutes
-after its last call with nothing to serve, and the object stops the
+they are the same across restarts. The jurors go quiet ten minutes
+after their last call with nothing to serve, and the object stops the
 container. The image is built from the repository on every relay deploy
 (`service/bench/build.sh`).
 
@@ -706,7 +695,6 @@ container. The image is built from the repository on every relay deploy
 |---|---|
 | Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)) |
 | Relay, Household, Bench | `cd service/do && npx wrangler@4.130.0 deploy` (`wrangler.toml`: the `TABLE`, `HOUSEHOLD` and `BENCH` objects, the container, `OH_STORE`, `EMAIL`, `OH_SERVICE_KEY`, the domain `relay.openhearts.game`) |
-| Accounts from before | `node service/tool/accounts.mjs`, a dry run unless given `--apply`; once, before the deploy that brings accounts in |
 | An account's data, deleted on request | `node service/tool/forget.mjs <account>`, a dry run unless given `--apply` ([above](#deleting-an-accounts-data)) |
 | Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../infra/README.md)) |
 | Monitoring | `node observability/apply.mjs` |

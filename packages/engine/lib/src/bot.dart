@@ -3,7 +3,7 @@
 /// A heuristic player, not a search: every decision is a named rule you
 /// can read, argue with, and unit-test — a bot whose mistakes are
 /// legible is worth more than a stronger one whose mistakes are not.
-/// The interface is deliberately narrow ([choosePass] and [chooseCard]
+/// The interface is deliberately narrow (`choosePass` and `chooseCard`
 /// over a [BotView]), so the body can change without touching the game
 /// or the UI.
 ///

@@ -84,8 +84,8 @@ app at `/play/`.
   leaves.
 - **`escrow.mjs`**: one person and three bot seats held by the jury.
   A juror can only be drawn from whoever is online, and a seated player
-  cannot be a juror at her own table, so the jury is exactly the bench of
-  jurors of last resort. The suite runs each juror as its own process.
+  cannot be a juror at her own table, so the jury is exactly the backup
+  jurors. The suite runs each juror as its own process.
   It silences the juror holding a seat and checks that the remaining
   jurors open the seat from the escrow and finish the hand.
 - **`offline.mjs`**: takes away the whole network (mid-session, and

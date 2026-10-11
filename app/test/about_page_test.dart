@@ -4,10 +4,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:open_hearts/about_page.dart';
 import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// The page in an app drawn in [appLanguage], as main.dart draws it.
 Widget _app({bool languages = true}) => ValueListenableBuilder<Locale?>(

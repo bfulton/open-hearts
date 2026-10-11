@@ -4,9 +4,8 @@ library;
 
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-
 import 'package:engine/engine.dart';
+import 'package:flutter/material.dart';
 import 'package:table/table.dart' show Rating;
 
 import '../avatar.dart';

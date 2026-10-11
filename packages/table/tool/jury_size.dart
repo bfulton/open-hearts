@@ -16,7 +16,7 @@
 ///    people and the jury, so it wants one live juror of any.
 ///  - **A deadlocked turn** wants one live juror to rule.
 ///
-/// The one number this rests on is [f]: the chance that a juror drawn
+/// The one number this rests on is `f`: the chance that a juror drawn
 /// at the start of a hand cannot be reached when its piece is wanted,
 /// a minute or two later. There is no population to measure yet, so
 /// the answer is given across a range of it and the design assumption
@@ -31,6 +31,8 @@ library;
 // ignore_for_file: avoid_print
 
 import 'dart:math';
+
+import 'package:engine/args.dart';
 
 const ln2 = 0.6931471805599453;
 
@@ -88,7 +90,7 @@ int? least(double f, double target, {required int t}) {
   return null;
 }
 
-/// [f] from a lifetime, which is how the assumption actually comes:
+/// `f` from a lifetime, which is how the assumption actually comes:
 /// "expect the p50 juror to last about a minute".
 ///
 /// A juror's presence is taken as memoryless — a constant chance of
@@ -199,8 +201,7 @@ void sizeByAssumption(double target) {
 }
 
 void main(List<String> args) {
-  final at = args.indexOf('--target');
-  final target = at >= 0 && at + 1 < args.length ? double.parse(args[at + 1]) : 0.00001;
+  final target = doubleArg(args, 'target', 0.00001);
   final fs = [0.01, 0.02, 0.05, 0.10, 0.20];
   print('a hand that cannot go on, per hand, at most $target — '
       '${(100 * (1 - target)).toStringAsFixed(3)}% of hands');
@@ -219,9 +220,8 @@ void main(List<String> args) {
     }
   }
 
-  final hl = args.indexOf('--juror-p50');
   sizeByAssumption(target);
-  lifetimes(target, hl >= 0 && hl + 1 < args.length ? double.parse(args[hl + 1]) : 60);
+  lifetimes(target, doubleArg(args, 'juror-p50', 60));
 
   print('\n--- what each size costs, for the trade (tool/wire_in_sim.dart) ---');
   print('a jury of  4: 1.21 MB handed over a hand');

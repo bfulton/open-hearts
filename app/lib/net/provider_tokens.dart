@@ -19,8 +19,8 @@ library;
 
 import 'package:flutter/widgets.dart';
 
-import 'sign_in.dart';
 import 'provider_tokens_io.dart' if (dart.library.js_interop) 'provider_tokens_web.dart' as platform;
+import 'sign_in.dart';
 
 /// Google's OAuth client for the web, which is also what an Android
 /// build asks Credential Manager for a token addressed to: the one
@@ -56,7 +56,7 @@ List<Provider> providersFor({
     ];
 
 /// What asking a provider came to: a token, or the person backing out
-/// (neither), or the provider failing ([failed]).
+/// (neither), or the provider failing (`failed`).
 typedef Asked = ({String? token, bool failed});
 
 const backedOut = (token: null, failed: false);
@@ -83,5 +83,5 @@ abstract class ProviderTokens {
 }
 
 /// This platform's. Settable, as the service is (household.dart,
-/// [askService]): a test stands its own provider here.
+/// `askService`): a test stands its own provider here.
 ProviderTokens providerTokens = platform.providerTokens();

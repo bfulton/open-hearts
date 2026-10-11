@@ -146,7 +146,7 @@ class GameResult {
 
   /// Builds a result from a finished game: the spec says who sat down,
   /// the holders who finished, and the totals settle it.
-  factory GameResult.of(TableSpec spec, List<SeatHolder> finalHolders, List<int> totals, {Set<PublicKey> gone = const {}}) {
+  factory GameResult.of(TableSpec spec, List<SeatHolder> finalHolders, List<int> totals) {
     final seats = <SeatResult>[];
     for (var s = 0; s < seatCount; s++) {
       final start = spec.seats[s];

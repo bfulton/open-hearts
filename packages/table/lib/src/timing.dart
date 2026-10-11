@@ -9,7 +9,7 @@
 /// a table's timing is chosen once, by whoever starts it, from that
 /// device's remote config (docs/06-service.md), and
 /// rides in the start event everyone signs, as the target does
-/// ([TableSpec.timing]).
+/// (`TableSpec.timing`).
 ///
 /// What is left out is pacing — how often something is said again, a
 /// heartbeat, a carry, a top-up, how often a jury is proposed — and the

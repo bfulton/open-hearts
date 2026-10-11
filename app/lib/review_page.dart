@@ -32,6 +32,7 @@ import 'l10n/l10n.dart';
 import 'net/game_records.dart';
 import 'net/in_use.dart';
 import 'net/record_check.dart';
+import 'net/remote_config.dart' show waits;
 import 'net/watching.dart';
 import 'reaction_mute.dart';
 import 'subscribe_page.dart';
@@ -58,11 +59,6 @@ class ReviewPage extends StatefulWidget {
   /// How a game still being played is watched: [watchTable] unless a
   /// test says otherwise.
   final Stream<Watched> Function(String table)? watch;
-
-  /// How often a game just over is asked for again, and how many times,
-  /// while its players' devices send it to be kept.
-  static const recordAgain = Duration(seconds: 3);
-  static const recordTries = 20;
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
@@ -194,8 +190,8 @@ class _ReviewPageState extends State<ReviewPage> {
 
   Future<void> _check() async {
     // Opened as the game ends, the copy may still be on its way from a
-    // player's device (home_page.dart): asked again a few times before
-    // there is said to be none.
+    // player's device (home_page.dart): asked again for a little while
+    // (waits.recordSoon) before there is said to be none.
     KeptGame? record;
     try {
       record = await _load();
@@ -203,12 +199,12 @@ class _ReviewPageState extends State<ReviewPage> {
       // the record is asked for a few more times, in case it is one just
       // over.
       if (record == null) _watch();
-      for (var i = 0; record == null && i < 4 && mounted; i++) {
-        await Future<void>.delayed(const Duration(seconds: 2));
+      for (var i = 0; record == null && i < _triesIn(waits.recordSoon) && mounted; i++) {
+        await Future<void>.delayed(waits.recordAgain);
         record = await _load();
       }
     } on GameNotShown {
-      _watching?.cancel();
+      unawaited(_watching?.cancel());
       _watching = null;
       return;
     }
@@ -238,10 +234,13 @@ class _ReviewPageState extends State<ReviewPage> {
     });
   }
 
+  /// How many times a record is asked for again over [span].
+  static int _triesIn(Duration span) => max(1, span.inMilliseconds ~/ waits.recordAgain.inMilliseconds);
+
   /// The game is over: its record, once a player's device has sent it.
   Future<void> _awaitRecord() async {
-    for (var i = 0; i < ReviewPage.recordTries && mounted && _checking == null; i++) {
-      await Future<void>.delayed(ReviewPage.recordAgain);
+    for (var i = 0; i < _triesIn(waits.recordFor) && mounted && _checking == null; i++) {
+      await Future<void>.delayed(waits.recordAgain);
       if (!mounted || _checking != null) return;
       final KeptGame? record;
       try {

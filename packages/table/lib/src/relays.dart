@@ -14,19 +14,19 @@
 /// relays and one relay's bad hour is not every table's.
 library;
 
-import 'relay_policy.dart';
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'nostr.dart';
+import 'relay_policy.dart';
 import 'signing.dart';
 
 /// What a device shows a relay that asks who it is (NIP-42), as tags
 /// beside the relay's challenge in an event its key signs: the
-/// activation the service gave it (licence.dart), or for the bench of
-/// jurors of last resort the mark the relay knows it by. Set once at
+/// activation the service gave it (licence.dart), or for the backup
+/// jurors the mark the relay knows them by. Set once at
 /// startup by whatever holds them; null, or null for a key, and a
 /// challenge goes unanswered — a relay that asks will not carry that
 /// device, which is right for one the service has not vouched for.
@@ -136,7 +136,11 @@ class RelayConnection {
     try {
       ch.sink.add(jsonEncode(['EVENT', e.toJson()]));
       _lastPublishMs = _nowMs;
-    } catch (_) {}
+    } on StateError catch (err) {
+      // The socket closed under it; the drop reconnects, and what was
+      // not sent is said again by whoever is waiting on it.
+      log?.call('$url: not sent, the socket is closing: $err');
+    }
   }
 
   /// Drops the socket and connects afresh: a relay that turned on this
@@ -190,12 +194,16 @@ class RelayConnection {
   void _onMessage(WebSocketChannel ch, Object? raw) {
     if (ch != _channel) return;
     _lastMessageMs = _nowMs;
-    List<Object?> m;
+    if (raw is! String) return;
+    final Object? decoded;
     try {
-      m = jsonDecode(raw as String) as List<Object?>;
-    } catch (_) {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      log?.call('$url: a message that is not JSON');
       return;
     }
+    if (decoded is! List<Object?>) return;
+    final m = decoded;
     if (m.isEmpty) return;
     if (m[0] == 'EOSE' && !_ready.isCompleted) _ready.complete();
     if (m[0] == 'AUTH' && m.length > 1 && m[1] is String) {
@@ -204,7 +212,9 @@ class RelayConnection {
         _authId = answer.id;
         try {
           ch.sink.add(jsonEncode(['AUTH', answer.toJson()]));
-        } catch (_) {}
+        } on StateError catch (err) {
+          log?.call('$url: no answer to its challenge, the socket is closing: $err');
+        }
       }
       return;
     }

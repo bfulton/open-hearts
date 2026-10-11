@@ -185,8 +185,8 @@ List<Element> _under(Element root, bool Function(Widget) test) {
   return found;
 }
 
-/// The lines of text under [root], or on the whole screen: not an
-/// icon's glyph, which is drawn as text and is a picture.
+/// The lines of text among [elements]: not an icon's glyph, which is
+/// drawn as text and is a picture.
 Iterable<_Thing> _texts(Iterable<Element> elements) =>
     _each(elements.where((e) => !_within(e, (w) => w is Icon)), (e) => '"${_textOf(e)}"');
 

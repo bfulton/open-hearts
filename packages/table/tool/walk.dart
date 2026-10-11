@@ -1,7 +1,7 @@
 /// One chaos seed, walked with every client's trace kept.
 ///
-///     dart run tool/walk.dart 5            # sealed, which is the slow kind
-///     dart run tool/walk.dart 5 --seeded
+///     dart run tool/walk.dart --seed 5            # sealed, which is the slow kind
+///     dart run tool/walk.dart --seed 5 --seeded
 ///
 /// `tool/chaos.dart` walks many seeds and says which broke an
 /// invariant; this walks one and says what everybody did, which is
@@ -9,16 +9,17 @@
 /// walk is deterministic, so the seed that broke there breaks here.
 library;
 
+import 'package:deal/deal.dart';
 // A probe's whole output is its printing.
 // ignore_for_file: avoid_print
 
-import 'package:deal/deal.dart';
+import 'package:engine/args.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 
 Future<void> main(List<String> args) async {
-  final seed = args.isEmpty ? 0 : int.parse(args.first);
-  final crypto = args.contains('--seeded') ? null : await DealCrypto.load();
+  final seed = intArg(args, 'seed', 0);
+  final crypto = flagArg(args, 'seeded') ? null : await DealCrypto.load();
   final sc = ChaosScenario(seed, crypto: crypto);
   final t = sc.table;
   t.start();

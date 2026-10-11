@@ -23,12 +23,12 @@ import 'sim_presence.dart';
 import 'virtual_clock.dart';
 
 /// A simulated table: [humans] scripted people in the first seats,
-/// bots in the rest — or the bots first, with [botsFirst]. With
+/// bots in the rest — or the bots first, with `botsFirst`. With
 /// [crypto] the table is sealed: the cards come from the verifiable
-/// deal, run for real on the virtual clock; with [workers] as well,
+/// deal, run for real on the virtual clock; with `workers` as well,
 /// each device makes the deal's slow calls in a worker of its own
 /// that takes a browser's time over them ([SimDealWorker]), where
-/// otherwise they take none. With [sweepJurors] a
+/// otherwise they take none. With `sweepJurors` a
 /// juror lets go of the table once it has served, as the duty does,
 /// and a later summons starts it again from the first hand.
 class SimTable {
@@ -71,9 +71,9 @@ class SimTable {
         this.jurors.add(juror);
         p.register(juror);
       }
-      // A bench, not one: a table that needs its bot seats held needs
-      // [juryToHoldBots] of them, and when it calls there is nobody
-      // else to make that up (docs/04-live-play.md).
+      // Several backup jurors, not one: a table that needs its bot
+      // seats held needs [juryToHoldBots] of them, and when it calls too
+      // few others are online to make that up (docs/04-live-play.md).
       final bench = lastResorts ?? (lastResort ? juryToHoldBots : 0);
       for (var b = 0; b < bench; b++) {
         final signer = FakeSigner('last-resort$b-$seed');

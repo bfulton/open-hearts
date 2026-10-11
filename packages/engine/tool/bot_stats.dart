@@ -16,12 +16,11 @@
 /// tournament in test/persona_test.dart is where they meet each other.
 library;
 
+import 'package:engine/args.dart';
 // A benchmark's entire output is its printing.
 // ignore_for_file: avoid_print
 
 import 'package:engine/engine.dart';
-
-import 'args.dart';
 
 void main(List<String> args) {
   final games = intArg(args, 'games', 500);

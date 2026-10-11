@@ -86,7 +86,7 @@ void main() {
     expect(a.sharedSecretWith(b.publicKey), isNot(a.sharedSecretWith(FakeSigner('c').publicKey)));
   });
 
-  test('the native library signs and checks what the Dart implementation does, and is two hundred times faster', () async {
+  test('the native library signs and checks what the Dart implementation does, and checks at least twenty times faster', () async {
     final before = (schnorrVerifier, schnorrSigning);
     try {
       expect(await installNativeSchnorr(), isTrue, reason: 'crypto/schnorr/build.sh has been run');
@@ -101,11 +101,25 @@ void main() {
       expect(await installNativeSchnorr(), isTrue);
       expect(verify(s.publicKey, digest, dart), isTrue, reason: 'a Dart signature checks natively');
       expect(verify(s.publicKey, sha256Hex([1]), dart), isFalse);
-      final sw = Stopwatch()..start();
+      // Timed against Dart in the same run, so a machine under load
+      // slows both alike: what is held is the ratio, which is a hundred
+      // or more where the library is the one in use and about one where
+      // it is not.
+      final fast = Stopwatch()..start();
       for (var i = 0; i < 200; i++) {
         verify(s.publicKey, digest, native);
       }
-      expect(sw.elapsedMilliseconds, lessThan(200), reason: '200 checks in under a fifth of a second');
+      fast.stop();
+      final nativeVerifier = schnorrVerifier;
+      schnorrVerifier = before.$1;
+      final slow = Stopwatch()..start();
+      for (var i = 0; i < 20; i++) {
+        verify(s.publicKey, digest, native);
+      }
+      slow.stop();
+      schnorrVerifier = nativeVerifier;
+      final ratio = (slow.elapsedMicroseconds / 20) / (fast.elapsedMicroseconds / 200);
+      expect(ratio, greaterThanOrEqualTo(20), reason: 'a check natively, against one in Dart: ${ratio.toStringAsFixed(0)} times as fast');
     } finally {
       schnorrVerifier = before.$1;
       schnorrSigning = before.$2;

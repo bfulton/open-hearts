@@ -1189,19 +1189,6 @@ test('a sign-in does not take a device off an account somebody paid for; once th
   assert.deepEqual((await devicesOn(store, mine)).map((d) => d.key), [], 'not counted against both');
 });
 
-test('a sign-in linked before accounts, to a device, is that device\'s account', async () => {
-  const now = Date.UTC(2026, 8, 16);
-  const store = await household(now);
-  const account = await accountOfSub(store, 'sub_9');
-  const who = { provider: 'apple', sub: '001234.abcd' };
-  const login = await loginRow(who, signedInAs);
-  await store.put(login, 'IDENTITY', { key: KEY, created_at: '2026-01-01' });
-  assert.equal((await supersede(who, OTHER, store, { OH_STORE: kvOf(store) }, login, { now })).body.account, account);
-  // And linking it again names the account from here.
-  assert.equal((await attest(who, KEY, store, login, { now })).status, 200);
-  assert.equal((await store.get(login, 'IDENTITY')).account, account);
-});
-
 test('an audience may be several: Apple names the bundle on an iPhone and the Services ID on the web', async () => {
   forgetProviderKeys();
   const apple = { OH_APPLE_AUDIENCE: 'game.openhearts.web, game.openhearts.app', OH_ID_HMAC: 'pepper' };

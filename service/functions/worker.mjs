@@ -1,30 +1,37 @@
 // The service's handlers as one Cloudflare Pages worker
 // (docs/06-service.md): what runs on our side beside the static site
-// and the app. deploy.sh copies this file to _worker.js at the root of
-// the published directory, where Pages runs it for every request;
-// whatever is not a handler is handed to the static assets.
+// and the app. deploy.sh publishes this file and the modules it
+// imports as _worker.js/ at the root of the published directory, where
+// Pages runs it for every request (entry.mjs first); whatever is not a
+// handler is handed to the static assets.
 //
-// Every handler but Stripe's is asked with the caller's table key, and
-// signed by it: {"key", "at", "sig", ...} — see "who is asking" below.
-// A key is public, so a request that only names one is anybody's.
+// Every handler a device calls is asked with the caller's table key,
+// and signed by it: {"key", "at", "sig", ...} — see "who is asking"
+// below. A key is public, so a request that only names one is
+// anybody's. The rest are the config and health, which anybody may
+// read, and the notifications of Stripe, the stores and Sign in with
+// Apple, each checked as its sender signs it.
 //
 // turn-creds: POST /api/turn answers {"iceServers": [...], "ttl":
 // seconds} — Cloudflare Realtime TURN credentials good for a few hours,
-// minted from a TURN key that lives in the project's secrets
-// (OH_TURN_KEY_ID, OH_TURN_API_TOKEN) and never here, for a device
+// minted from a Realtime TURN key — its id in config/openhearts.json
+// (OH_TURN_KEY_ID), its token a project secret (OH_TURN_API_TOKEN) and
+// never here — for a device
 // whose subscription stands: TURN is what the subscription pays for.
 // Without the secrets the handler says so (503) and the app falls back
 // to STUN alone.
 //
 // licence: POST /api/licence answers {"licence": {key, account, until,
-// plan, sig}} — a month, signed by the service key (OH_SERVICE_SECRET,
+// plan, sig}} — for the service's licenceDays, signed by the service
+// key (OH_SERVICE_SECRET,
 // with OH_SERVICE_KEY beside it as the public half the app has baked
 // in), or 402 when no subscription stands behind the key. What is read
 // is one row, and the others only around a renewal.
 //
-// No imports, so nothing is bundled: the file is the worker. The curve
-// is the one the whole project signs on, so the signing is the app's
-// own wasm, fetched from the static assets this worker serves.
+// The curve is the one the whole project signs on, so the signing is
+// the app's own wasm: on Cloudflare the module entry.mjs imports, and
+// elsewhere (the tests, wrangler pages dev) fetched from the static
+// assets this worker serves.
 
 import { keepRecord, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { alertSubscribed, alertWaiting, sendAlert } from './alerts.mjs';
@@ -73,7 +80,9 @@ export const SERVICE_DEFAULTS = Object.freeze({
   ticketReuseMinutes: 2,
   turnTtlS: 4 * 60 * 60,
   // How far a request's second may be from ours: clocks drift, and a
-  // phone out by more than this is told so.
+  // phone out by more than this is told so — in words that say five
+  // minutes, which the app knows the refusal by (app/lib/net/
+  // household.dart): a change here is a change there.
   requestToleranceS: 300,
   // How old a webhook's own timestamp may be: a replay is not a payment.
   webhookToleranceS: 300,
@@ -424,8 +433,7 @@ export async function licenceFor(key, account, until, keys) {
 /// How far this key is paid up to, and the account it is a device of.
 /// One read of the device's own row; the account's and its
 /// subscription's only when that row says the device has run out,
-/// which is once a renewal. A device whose row is from before accounts
-/// has its account found first ([deviceAccount]).
+/// which is once a renewal.
 ///
 /// In local mode a key nobody has heard of is entitled on the spot for
 /// a month (docs/06-service.md), on an account of its own — one branch,
@@ -469,7 +477,6 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
   if (!keys) return { status: 503, body: notConfigured('OH_SERVICE_KEY and OH_SERVICE_SECRET') };
   const store = storeOf(env);
   if (!store) return { status: 503, body: notConfigured('OH_STORE') };
-  await deviceAccount(env, store, key, { now });
   const held = await entitlementOf(store, key, { now, openHouse: open });
   if (!held) return { status: 402, body: { error: 'no subscription' } };
   const until = earlier(dayAfter(now, S().licenceDays), held.licensed_until);
@@ -484,30 +491,19 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
 // every device brought in — the one that paid, one shown a code, one
 // given a backup code, one signed in — is one of its devices. A device
 // keeps its own key; the licence says whose device it is.
-//
-// A subscription from before accounts is given one the first time it is
-// touched — by any of its devices, its store or Stripe — in the
-// subscription's own turn, so it is given exactly one: its devices and
-// its backup codes move under it, and nobody's subscription is lost.
-// `node service/tool/accounts.mjs` walks them all at a deploy instead.
 
-/// [subscription]'s account: the one it has; for a subscription from
-/// before accounts, one made now with everything moved under it; and
-/// otherwise, when [make], the account of [buyer] — the device paying —
-/// when it has one with nothing else paid up under it, or a new one.
-/// Null for a subscription with none and nothing to make one for. Run
-/// in the subscription's own turn ([inSubscription]).
+/// [subscription]'s account: the one it has; otherwise, when [make],
+/// the account of [buyer] — the device paying — when it has one with
+/// nothing else paid up under it, or a new one. Null for a subscription
+/// with none and nothing to make one for. Run in the subscription's own
+/// turn ([inSubscription]).
 export async function accountFor(store, subscription, { buyer = null, make = false, now = Date.now() } = {}) {
   const today = dayOf(now);
   const known = (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account;
-  if (isAccount(known)) {
-    await adoptLegacy(store, subscription, known);
-    return known;
-  }
-  const legacy = (await store.under(`SUB#${subscription}`, 'DEVICE#')).length > 0 || !!(await store.get(`SUB#${subscription}`, 'BACKUP'));
-  if (!legacy && !make) return null;
+  if (isAccount(known)) return known;
+  if (!make) return null;
   let account = null;
-  if (!legacy && buyer) {
+  if (buyer) {
     const theirs = (await store.get(`KEY#${buyer}`, 'ENTITLEMENT'))?.account;
     const was = isAccount(theirs) ? await store.get(`ACCOUNT#${theirs}`, 'META') : null;
     // The buyer's own account takes the new subscription where it has
@@ -519,43 +515,7 @@ export async function accountFor(store, subscription, { buyer = null, make = fal
   const meta = await store.get(`ACCOUNT#${account}`, 'META');
   await store.put(`ACCOUNT#${account}`, 'META', { subscription, created_at: meta?.created_at ?? today });
   await store.put(`SUB#${subscription}`, 'ACCOUNT', { account });
-  await adoptLegacy(store, subscription, account);
   return account;
-}
-
-/// Whatever a subscription from before accounts still holds, moved
-/// under [account]: its devices, each device's row naming the account,
-/// and its backup codes. Every step can be taken twice, so a move that
-/// stopped half way finishes the next time.
-async function adoptLegacy(store, subscription, account) {
-  for (const sk of await store.under(`SUB#${subscription}`, 'DEVICE#')) {
-    const key = sk.slice('DEVICE#'.length);
-    const bound = await store.get(`SUB#${subscription}`, sk);
-    if (!(await store.get(`ACCOUNT#${account}`, sk))) await store.put(`ACCOUNT#${account}`, sk, { bound_at: bound?.bound_at ?? null });
-    const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-    if (row && !row.account && row.subscription === subscription) {
-      await store.put(`KEY#${key}`, 'ENTITLEMENT', { account, licensed_until: row.licensed_until ?? null, at: row.at ?? null });
-    }
-    await store.del(`SUB#${subscription}`, sk);
-  }
-  const backups = await store.get(`SUB#${subscription}`, 'BACKUP');
-  if (backups) {
-    if (!(await store.get(`ACCOUNT#${account}`, 'BACKUP'))) await store.put(`ACCOUNT#${account}`, 'BACKUP', backups);
-    for (const c of backups.codes ?? []) await store.put(await backupRow(c.code), 'META', { account });
-    await store.del(`SUB#${subscription}`, 'BACKUP');
-  }
-  await store.del(`SUB#${subscription}`, 'TICKET');
-}
-
-/// The account [key] is a device of, found for a device from before
-/// accounts in its subscription's turn; null for none.
-export async function deviceAccount(env, store, key, { now = Date.now() } = {}) {
-  const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-  if (!row) return null;
-  if (isAccount(row.account)) return row.account;
-  if (typeof row.subscription !== 'string') return null;
-  const made = await inSubscription(env, row.subscription, { op: 'account', subscription: row.subscription, now });
-  return isAccount(made.body?.account) ? made.body.account : null;
 }
 
 /// A subscription just paid for by [key]: its account — the buyer's,
@@ -1153,15 +1113,13 @@ export async function dateSubscription(store, subscription, { source, txn_ref = 
   // may not: a copy that outlived its subscription would go on
   // licensing a refunded device for as long as a year. Five rows, once:
   // the devices of its account, if this is still the account's
-  // subscription, or of the subscription itself, from before accounts.
-  if (gone) {
-    const account = (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account;
-    const current = isAccount(account) && (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription === subscription;
-    const under = current ? `ACCOUNT#${account}` : `SUB#${subscription}`;
-    for (const sk of await store.under(under, 'DEVICE#')) {
+  // subscription.
+  const account = gone ? (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account : null;
+  if (isAccount(account) && (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription === subscription) {
+    for (const sk of await store.under(`ACCOUNT#${account}`, 'DEVICE#')) {
       const key = sk.slice('DEVICE#'.length);
       const row = await store.get(`KEY#${key}`, 'ENTITLEMENT');
-      if (current ? row?.account !== account : row?.subscription !== subscription) continue;
+      if (row?.account !== account) continue;
       await store.put(`KEY#${key}`, 'ENTITLEMENT', { ...row, licensed_until: today, at: today });
     }
   }
@@ -1320,7 +1278,8 @@ export async function claimWith(key, code, store, { now = Date.now() } = {}) {
 
 // ---- backup codes ----------------------------------------------------------
 // A code on the screen of a device already on the account is good for
-// ten minutes; a backup code is good until it is used or replaced. It
+// minutes (ticketMinutes); a backup code is good until it is used or
+// replaced. It
 // is the account's recovery secret, for the day there is no such
 // screen: a phone lost, a new one in hand. Entered on any device, it
 // brings that device into the account — the same account, with its
@@ -1328,12 +1287,13 @@ export async function claimWith(key, code, store, { now = Date.now() } = {}) {
 // kept with the account and shown on any device of it; replaced all
 // five at once from any of them, which spends the old ones. The person
 // who paid on the web is sent them by email when the subscription is
-// made and again when they are replaced — to the address Stripe holds,
-// read from Stripe when it is needed and not kept here.
+// made and again whenever a device of the account asks — to the
+// address Stripe holds, read from Stripe when it is needed and not
+// kept here.
 //
 // Sixteen characters of Crockford's base32, eighty bits, read and typed
-// by a person: no I, L, O or U, case and dashes ignored, and an O, I or
-// L typed is taken as the 0 or 1 it looks like. A code's row is keyed
+// by a person: no I, L, O or U, case, spaces and dashes ignored, and
+// an O, I or L typed is taken as the 0 or 1 it looks like. A code's row is keyed
 // by its digest, so a listing of the store does not list the codes.
 
 export const BACKUP_CODES = 5;
@@ -1571,6 +1531,8 @@ export function sequencer({ now = Date.now } = {}) {
       recent.push(t);
       return work();
     });
+    // The next in line waits for this one whatever it came to; how it
+    // came out is the caller's, through run.
     queue = run.catch(() => {});
     return run;
   };
@@ -1596,10 +1558,6 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       return backupsMade(op.account, op.email ?? null, store, mail, { now });
     case 'bind':
       return bindPurchase(op, store, { now });
-    case 'account': {
-      const account = await accountFor(store, op.subscription, { now });
-      return account ? { status: 200, body: { account } } : { status: 404, body: { error: 'no such subscription' } };
-    }
     case 'drop':
       return dropDevice(op.key, op.device, store, { now, active, revoke });
     case 'list': {
@@ -1794,19 +1752,10 @@ async function ticketRoute(request, env) {
   if (asked instanceof Response) return asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await deviceAccount(env, store, asked.key);
+  const account = await accountOfKey(store, asked.key);
   if (!account) return json(request, 402, { error: 'no subscription' });
   const { status, body: out } = await inHousehold(env, account, { op: 'ticket', key: asked.key });
   return json(request, status, out);
-}
-
-/// The account a code's row is for: its own, or — a row from before
-/// accounts — its subscription's.
-async function accountOfRow(env, row) {
-  if (isAccount(row?.account)) return row.account;
-  if (typeof row?.subscription !== 'string') return null;
-  const made = await inSubscription(env, row.subscription, { op: 'account', subscription: row.subscription });
-  return isAccount(made.body?.account) ? made.body.account : null;
 }
 
 async function claimRoute(request, env) {
@@ -1824,19 +1773,15 @@ async function claimRoute(request, env) {
   // nobody made is said so here, without queueing anybody.
   // A backup code, typed by a person, or a code off another device's
   // screen: sixteen characters of one alphabet, or thirty-two hex.
-  // The device's own account first, if it is from before accounts: a
-  // code never takes a device off an account still paid up.
-  await deviceAccount(env, store, key);
   const backup = backupCodeOf(body.ticket);
   let claimed;
   if (backup) {
-    const account = await accountOfRow(env, await store.get(await backupRow(backup), 'META'));
-    if (!account) return json(request, 404, { error: 'no such code' });
+    const account = (await store.get(await backupRow(backup), 'META'))?.account;
+    if (!isAccount(account)) return json(request, 404, { error: 'no such code' });
     claimed = await inHousehold(env, account, { op: 'redeem', key, code: backup });
   } else {
     if (typeof body.ticket !== 'string' || !/^[0-9a-f]{2,64}$/.test(body.ticket)) return json(request, 400, { error: 'not a code' });
     const ticket = await store.get(`TICKET#${body.ticket}`, 'META');
-    // A code made before accounts was for ten minutes: long gone.
     if (!isAccount(ticket?.account)) return json(request, 404, { error: 'no such code' });
     claimed = await inHousehold(env, ticket.account, { op: 'claim', key, code: body.ticket });
   }
@@ -1885,7 +1830,7 @@ async function backupsRoute(request, env) {
   const { key, body } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await deviceAccount(env, store, key);
+  const account = await accountOfKey(store, key);
   if (!account) return json(request, 402, { error: 'no subscription' });
   const rotate = body.rotate === true;
   const send = !rotate && body.send === true;
@@ -1909,7 +1854,7 @@ async function reviewRoute(request, env) {
   if (typeof body.table !== 'string' || !tableIdShape.test(body.table)) return json(request, 400, { error: 'a table id, 32 hex' });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await deviceAccount(env, store, key);
+  const account = await accountOfKey(store, key);
   if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
   const ok = await inHousehold(env, account, { op: 'inUse', key, account, table: body.table });
   if (ok.status !== 200) return json(request, ok.status, ok.body);
@@ -1936,7 +1881,7 @@ async function activateRoute(request, env) {
   // In local mode a device nobody has heard of is licensed, and so has
   // an account, as it asks.
   if (open) await entitlementOf(store, key, { now, openHouse: true });
-  const account = await deviceAccount(env, store, key, { now });
+  const account = await accountOfKey(store, key);
   if (!account) return json(request, 402, { error: 'no subscription' });
   const seated = body.seated === undefined ? undefined : body.seated;
   const took = await inHousehold(env, account, { op: 'activate', key, account, want: body.want, ...(seated !== undefined ? { seated } : {}) });
@@ -1967,7 +1912,7 @@ async function recordRoute(request, env) {
   const { key, body: sent, signer } = asked;
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await deviceAccount(env, store, key);
+  const account = await accountOfKey(store, key);
   if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
   const ok = await inHousehold(env, account, { op: 'record', key, account });
   if (ok.status !== 200) return json(request, ok.status, ok.body);
@@ -1986,7 +1931,7 @@ async function devicesRoute(request, env) {
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
   const drop = body.drop;
   if (typeof drop === 'string' && !/^[0-9a-f]{64}$/.test(drop)) return json(request, 400, { error: 'a table key, 64 hex' });
-  const account = await deviceAccount(env, store, key);
+  const account = await accountOfKey(store, key);
   if (!account) return json(request, 402, { error: 'no subscription' });
   if (typeof drop === 'string') {
     const { status, body: out } = await inHousehold(env, account, { op: 'drop', key, device: drop });
@@ -2013,7 +1958,7 @@ async function profileRoute(request, env) {
   if (body.profile !== undefined && typeof body.profile !== 'string') return json(request, 400, { error: 'not a profile' });
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await deviceAccount(env, store, key);
+  const account = await accountOfKey(store, key);
   if (!account) return json(request, 402, { error: 'no subscription' });
   const { status, body: out } = await inHousehold(env, account, { op: 'profile', key, ...(body.profile !== undefined ? { profile: body.profile } : {}) });
   return json(request, status, out);
@@ -2159,13 +2104,10 @@ export async function loginRow(who, env) {
   return `LOGIN#${who.provider}#${mac}`;
 }
 
-/// The account a sign-in is linked to, or null: its own row, or — a row
-/// from before accounts, which named a device — that device's account.
+/// The account a sign-in is linked to, or null.
 async function linkedAccount(store, login) {
-  const held = await store.get(login, 'IDENTITY');
-  if (!held) return null;
-  if (isAccount(held.account)) return held.account;
-  return typeof held.key === 'string' ? accountOfKey(store, held.key) : null;
+  const account = (await store.get(login, 'IDENTITY'))?.account;
+  return isAccount(account) ? account : null;
 }
 
 /// Links the sign-in at [login] to the account [key] is a device of,
@@ -2223,7 +2165,7 @@ async function signInRoute(request, env, move) {
   // In local mode a device nobody has heard of has an account, as it
   // asks for anything.
   if (openHouse(env, request)) await entitlementOf(store, key, { openHouse: true });
-  const mine = await deviceAccount(env, store, key);
+  const mine = await accountOfKey(store, key);
   const { status, body: out } = move
     ? await supersede(who, key, store, env, login)
     : mine
@@ -2320,14 +2262,8 @@ export async function unlinkSignIn(account, login, store) {
 /// [login] unlinked from the account it is linked to: in that account's
 /// turn, since linking it is done in that turn too.
 async function unlinkFromAccount(env, store, login) {
-  if (!(await store.get(login, 'IDENTITY'))) return { status: 200, body: { unlinked: false } };
   const account = await linkedAccount(store, login);
-  // A link from before accounts, to a device that is now in none, has
-  // no turn to run in and nothing on an account's side to take away.
-  if (!account) {
-    await store.del(login, 'IDENTITY');
-    return { status: 200, body: { unlinked: true } };
-  }
+  if (!account) return { status: 200, body: { unlinked: false } };
   return inHousehold(env, account, { op: 'unlink', account, login });
 }
 
@@ -2521,7 +2457,7 @@ async function waitingRoute(request, env, ctx) {
   }
   const store = storeOf(env);
   if (!store) return json(request, 503, notConfigured('OH_STORE'));
-  const account = await deviceAccount(env, store, key);
+  const account = await accountOfKey(store, key);
   if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
   if (!openHouse(env, request)) await after(ctx, alertWaiting(env, store, { key, account, pool: body.pool, target: body.target }));
   return json(request, 200, { ok: true });
@@ -2595,11 +2531,9 @@ export function configOf(raw) {
   if (Array.isArray(raw.relays) && raw.relays.length > 0 && raw.relays.length <= MOST_RELAYS) {
     const relays = [];
     for (const r of raw.relays) {
-      try {
-        const u = new URL(r);
-        const ours = u.hostname === 'openhearts.game' || u.hostname.endsWith('.openhearts.game');
-        if (u.protocol === 'wss:' && ours && !u.username && !u.password) relays.push(u.toString().replaceAll('%7Btag%7D', '{tag}'));
-      } catch {}
+      const u = urlOf(r);
+      const ours = u && (u.hostname === 'openhearts.game' || u.hostname.endsWith('.openhearts.game'));
+      if (ours && u.protocol === 'wss:' && !u.username && !u.password) relays.push(u.toString().replaceAll('%7Btag%7D', '{tag}'));
     }
     if (relays.length === raw.relays.length) c.relays = relays;
   }
@@ -2614,24 +2548,19 @@ export function configOf(raw) {
     c.update = { before: raw.update.before, text: sayingOf(raw.update.text) };
   }
   // Where a player's "tell us what's broken" goes: a page, or mail.
-  if (typeof raw.feedback === 'string') {
-    try {
-      const u = new URL(raw.feedback);
-      const page = u.protocol === 'https:' && !u.username && !u.password;
-      const mail = u.protocol === 'mailto:' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.pathname);
-      if (page || mail) c.feedback = u.toString();
-    } catch {}
+  const feedback = urlOf(raw.feedback);
+  if (feedback) {
+    const page = feedback.protocol === 'https:' && !feedback.username && !feedback.password;
+    const mail = feedback.protocol === 'mailto:' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(feedback.pathname);
+    if (page || mail) c.feedback = feedback.toString();
   }
   // What a year costs, as the web shows it beside Subscribe: changed
   // with the Stripe price (`config|service`, stripePrice) it describes.
   if (typeof raw.price === 'string' && /^[^\s<>{}]{1,12}$/.test(raw.price) && /\d/.test(raw.price)) c.price = raw.price;
   // Where the privacy policy and the terms are, when not on this site.
   for (const name of ['privacy', 'terms']) {
-    if (typeof raw[name] !== 'string') continue;
-    try {
-      const u = new URL(raw[name]);
-      if (u.protocol === 'https:' && !u.username && !u.password) c[name] = u.toString();
-    } catch {}
+    const u = urlOf(raw[name]);
+    if (u && u.protocol === 'https:' && !u.username && !u.password) c[name] = u.toString();
   }
   // The clocks of the tables a device starts: served only where the
   // whole of it checks out, and left out otherwise, which the app
@@ -2641,6 +2570,19 @@ export function configOf(raw) {
   const waits = waitsOf(raw.waits);
   if (waits) c.waits = waits;
   return c;
+}
+
+/// [text] as a URL, or null where it is not text or not a URL: what an
+/// operator's row says is checked, and a URL that does not parse is one
+/// that is left out.
+function urlOf(text) {
+  if (typeof text !== 'string') return null;
+  try {
+    return new URL(text);
+  } catch (e) {
+    if (e instanceof TypeError) return null;
+    throw e;
+  }
 }
 
 /// How long a device waits on the network, each field least and most:
@@ -2659,6 +2601,10 @@ export const WAITS_BOUNDS = Object.freeze({
   standingAllMs: [1000, 20000],
   roomStartMs: [3000, 60000],
   meshAnswerMs: [5000, 60000],
+  recordMs: [5000, 120000],
+  recordAgainMs: [1000, 30000],
+  recordForMs: [10000, 600000],
+  recordSoonMs: [2000, 60000],
 });
 
 /// The waits the row sets, each field taken on its own when it is a
@@ -3194,7 +3140,6 @@ async function storeRoute(request, env, ctx) {
   }
   const { account: _, ...op } = bought;
   const known = await store.get(`SUB#${bought.subscription}`, 'META');
-  await deviceAccount(env, store, key, { now });
   const bound = await inSubscription(env, bought.subscription, { op: 'bind', key, ...op });
   if (bound.status !== 200) return json(request, bound.status, bound.body);
   if (!known) await after(ctx, alertSubscribed(env, store, { subscription: bought.subscription, source: bought.source, key, now }));

@@ -6,9 +6,9 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../game_options.dart';
-import '../l10n/l10n.dart';
-import '../theme.dart';
+import 'game_options.dart';
+import 'l10n/l10n.dart';
+import 'theme.dart';
 
 /// Opens the options over [context]; resolves to what was chosen, or
 /// null if the sheet was dismissed without a change.
@@ -56,7 +56,7 @@ class _OptionsSheetState extends State<_OptionsSheet> {
               ],
             ),
             const SizedBox(height: 10),
-            _Heading(l10n.gameEndsAt),
+            SectionHeading(l10n.gameEndsAt),
             const SizedBox(height: 8),
             Wrap(
               spacing: 10,
@@ -71,7 +71,7 @@ class _OptionsSheetState extends State<_OptionsSheet> {
               ],
             ),
             const SizedBox(height: 18),
-            _Heading(l10n.ratedMovesRatings),
+            SectionHeading(l10n.ratedMovesRatings),
             const SizedBox(height: 8),
             Wrap(
               spacing: 10,
@@ -86,16 +86,6 @@ class _OptionsSheetState extends State<_OptionsSheet> {
       ),
     );
   }
-}
-
-class _Heading extends StatelessWidget {
-  const _Heading(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) =>
-      Text(text, style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim, letterSpacing: 0.3));
 }
 
 /// One of a pair: a pill, filled in gold when it is the choice.

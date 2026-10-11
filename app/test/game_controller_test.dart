@@ -8,8 +8,8 @@ import 'package:engine/engine.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/game_controller.dart';
+import 'package:open_hearts/pacing.dart';
 import 'package:open_hearts/record_store.dart';
-import 'package:open_hearts/table_model.dart' show tableBeats;
 
 void main() {
   test('the last trick is held, swept, and then the sheet is due, a beat later', () {
@@ -45,7 +45,7 @@ void main() {
       // The trick is gone and the sheet is not yet due.
       expect(c.game.pendingTrick, isNull);
       expect(c.sheetDue, isFalse, reason: 'a beat of felt first');
-      async.elapse(GameController.sweepBeat - const Duration(milliseconds: 60));
+      async.elapse(Pacing.sweepBeat - const Duration(milliseconds: 60));
       expect(c.sheetDue, isFalse);
       async.elapse(const Duration(milliseconds: 120));
       expect(c.sheetDue, isTrue, reason: 'due after the beat');
@@ -80,7 +80,7 @@ void main() {
       expect(c.game.phase, Phase.handOver, reason: 'a hand ends on the fake clock');
       expect(lastTrickHeldFor, inInclusiveRange(220, 260), reason: 'the trick held a quarter of 950 ms');
       expect(c.sheetDue, isFalse, reason: 'still a beat of felt first');
-      async.elapse(GameController.sweepBeat * 0.25 - const Duration(milliseconds: 20));
+      async.elapse(Pacing.sweepBeat * 0.25 - const Duration(milliseconds: 20));
       expect(c.sheetDue, isFalse);
       async.elapse(const Duration(milliseconds: 40));
       expect(c.sheetDue, isTrue, reason: 'due after a quarter of the beat');

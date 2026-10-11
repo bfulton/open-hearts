@@ -17,7 +17,7 @@ routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 # The jurors of last resort's image is built from the repo on every
 # deploy (service/bench/build.sh): the juror compiled from the table
 # code as it is now, never a stage left over from an earlier deploy, so
-# the bench always speaks the app's protocol. Needs cargo and dart
+# the backup jurors always speak the app's protocol. Needs cargo and dart
 # (flutter's bin) on the PATH.
 [build]
 command = "../bench/build.sh"
@@ -36,13 +36,15 @@ name = "TABLE"
 class_name = "TagRelay"
 
 # SQLite-backed objects are the ones the free plan carries, and the
-# only kind new classes may be. This one stores nothing either way.
+# only kind new classes may be. This one keeps its tag's lobby events
+# in its own storage (tag_store.mjs).
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TagRelay"]
 
-# A household's codes, claims and drops, one at a time per subscription
-# (docs/06-service.md). Bound to the Pages
+# An account's codes, claims, drops and the rest of what changes it,
+# one at a time per account, and a subscription's account found in the
+# subscription's own turn (docs/06-service.md). Bound to the Pages
 # project as HOUSEHOLD (script open-hearts-relay, class Household); it
 # reads and writes the project's own store, the same KV namespace as
 # the Pages project's OH_STORE (open-hearts-store). A HOUSEHOLD bound
@@ -62,12 +64,12 @@ class_name = "Household"
 # The jurors of last resort, as a Cloudflare Container (bench.mjs; the
 # image is service/bench, built by its build.sh). The presence relay
 # above passes a table's call for a juror to it, and it runs only while
-# the bench is serving or waiting to be drawn. Built by [build] above on
-# every deploy; the bench's identity is the secret OH_JUROR_SECRET
-# (64 hex, kept, so the bench has the same four keys after every start).
+# they are serving or waiting to be drawn. Built by [build] above on
+# every deploy; their identity is the secret OH_JUROR_SECRET (64 hex,
+# kept, so they have the same four keys after every start).
 # standard-1 is half a vCPU and 4 GiB: a deal took 9 s at a whole vCPU
-# and 21 s at a quarter (service/tool/bench_check.dart), and the bench
-# itself uses about 22 MiB.
+# and 21 s at a quarter (service/tool/bench_check.dart), and the jurors
+# themselves use about 22 MiB.
 [[containers]]
 class_name = "Bench"
 image = "../bench/Dockerfile"

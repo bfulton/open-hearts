@@ -6,7 +6,7 @@
 /// reaction on the wire is a short code from [Reaction], never words,
 /// and each screen says it in its own language. It is not a table
 /// event. It travels on the table's own tag as an ephemeral kind of its
-/// own ([TableKinds.react]), signed by the seat's device like
+/// own (`TableKinds.react`), signed by the seat's device like
 /// everything the seat says, and a relay forwards it and keeps nothing
 /// (service/do/relay.mjs). It is not in the record, the results or the
 /// game record, and nothing the protocol decides — a turn, a clock, a
@@ -120,7 +120,7 @@ abstract interface class ReactionLane {
 class ReactionRules {
   ReactionRules({int Function()? now}) : _now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
 
-  /// What [now] is: milliseconds since the epoch, as a reaction's event
+  /// What `now` is: milliseconds since the epoch, as a reaction's event
   /// is stamped in seconds since it.
   final int Function() _now;
 

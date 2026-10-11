@@ -277,7 +277,7 @@ class WaitingRoom {
   final int since;
   final void Function(String line)? log;
 
-  /// The bots for a table of people rated about [rating], [count] of
+  /// The bots for a table of people rated about [rating], `count` of
   /// them, no persona twice. Null seats the roster at the top.
   final List<Persona> Function(int rating, int count, Random random)? botRating;
 

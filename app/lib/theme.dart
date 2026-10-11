@@ -34,7 +34,6 @@ abstract final class Felt {
 /// them. **Red** is the game's own — a heart, a suit, a warning.
 abstract final class Palette {
   static const gold = Color(0xFFE4B363);
-  static const goldDim = Color(0x66E4B363);
   static const cardFace = Color(0xFFFAF7F0);
   static const cardEdge = Color(0xFF2A2E2B);
   static const red = Color(0xFFC1352B);
@@ -50,6 +49,22 @@ abstract final class Palette {
   /// The mark: the heart the app wears and the name beside it. White,
   /// because gold is what a button is.
   static const mark = chrome;
+}
+
+/// A section's heading, the same on every page: dim, bold and spaced.
+/// Written as it is read: a heading put through toUpperCase is read out
+/// as shouting by anything that reads the screen aloud, and the weight
+/// and the spacing set it apart well enough without it.
+class SectionHeading extends StatelessWidget {
+  const SectionHeading(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Palette.chromeDim, letterSpacing: 0.6),
+      );
 }
 
 ThemeData buildTheme() {

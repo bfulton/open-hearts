@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 on draws the launch screen itself, from these: the felt
+     and the icon's heart, as before Android 12 (values/styles.xml). -->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@color/felt</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/launch_heart</item>
+    </style>
+</resources>

@@ -15,8 +15,8 @@
 //
 // One browser, because the jury has to be known: a jury is drawn from
 // whoever is online, and one seated person is not eligible for her own
-// table, so the jury is exactly the bench of jurors of last resort
-// (drive.mjs starts them one to a process). Which of them holds which
+// table, so the jury is exactly the backup jurors (drive.mjs starts
+// them one to a process). Which of them holds which
 // seat is drawn, and the deal says so.
 
 import { chromium } from './browser.mjs';
@@ -95,7 +95,7 @@ async function main() {
     await traced(said, /dealt hand \d+/, { what: 'the hand dealt', page, timeout: 180000 });
     const bench = await Promise.all(relay.bench.map(async (j) => ({ ...j, key: await j.key })));
     const gone = seats.find((s) => bench.some((j) => j.key === s.key));
-    if (!gone) throw new Error(`no juror of the bench holds a seat: ${held} against ${bench.map((j) => j.key)}`);
+    if (!gone) throw new Error(`no backup juror holds a seat: ${held} against ${bench.map((j) => j.key)}`);
     bench.find((j) => j.key === gone.key).kill();
     log(`the juror holding seat ${gone.seat} (${gone.key}) was taken off the air`);
 

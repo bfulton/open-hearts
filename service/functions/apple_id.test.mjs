@@ -414,19 +414,6 @@ test('a turn that cannot do it says so, so that a notice sent again finds it don
   assert.deepEqual(await tell(env, await notice('account-deleted')), { status: 200, body: { unlinked: true } });
 });
 
-test('a link from before accounts, to a device, is unlinked too', async () => {
-  const { store, env } = await linked();
-  const old = await loginRow({ provider: 'apple', sub: '001234.before.0001' }, env);
-  await store.put(old, 'IDENTITY', { key: BAO.public, created_at: '2026-01-01' });
-  assert.deepEqual(await tell(env, await notice('consent-revoked', { sub: '001234.before.0001' })), { status: 200, body: { unlinked: true } });
-  assert.equal(await store.get(old, 'IDENTITY'), null);
-  // And one whose device is in no account any more: there is no turn to
-  // run it in, and the row goes all the same.
-  await store.put(old, 'IDENTITY', { key: CY.public, created_at: '2026-01-01' });
-  assert.deepEqual(await tell(env, await notice('consent-revoked', { sub: '001234.before.0001' })), { status: 200, body: { unlinked: true } });
-  assert.equal(await store.get(old, 'IDENTITY'), null);
-});
-
 test('unlinkSignIn: the identity\'s row and the account\'s note of it, and only a sign-in\'s rows', async () => {
   const store = memoryStore();
   const account = 'a1'.repeat(16);

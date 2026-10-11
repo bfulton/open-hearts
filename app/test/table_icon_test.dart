@@ -5,10 +5,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets("a solo table: You, wearing your profile's initials", (tester) async {

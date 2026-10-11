@@ -84,11 +84,11 @@ export function withRelay(url, port, pace = null) {
   return u.toString();
 }
 
-/// The bench of jurors of last resort, and how it is run.
+/// The backup jurors, and how they are run.
 ///
 /// A table whose bot seats the jury holds needs juryToHoldBots of
 /// them, and here there is nobody else online to make that number up,
-/// so the whole bench is the service's. Normally it is one process
+/// so every one of them is the service's. Normally it is one process
 /// serving all four, which is what the service itself runs.
 ///
 /// `apart` gives each juror a process of its own, for a run that has
@@ -115,7 +115,7 @@ const benchSecrets = [
 ];
 
 /// The relay and the juror as programs compiled ahead of time, as the
-/// bench's container runs the juror (service/bench/build.sh): made once
+/// backup jurors' container runs the juror (service/bench/build.sh): made once
 /// for whatever service/ and the packages it takes are at, under
 /// service/.dart_tool/e2e/<their hash>, and shared by every suite and
 /// worker after. A suite starts four or five of them, and each `dart
@@ -165,10 +165,10 @@ async function compileProgram(name) {
 /// [tag] (the suite, and the worker for a suite run side by side), and
 /// the jurors' lines said through [say].
 export async function startRelay({ apart = false, port = null, tag = suite, say = log } = {}) {
-  // The relay; and beside it, the bench of jurors of last resort: the
-  // four browsers are all at one table, so a jury can only come from
-  // the service. Beside rather than inside, because a relay verifies
-  // every event it carries and must never wait on a juror's work.
+  // The relay; and beside it, the backup jurors: the four browsers
+  // are all at one table, so a jury can only come from the service.
+  // Beside rather than inside, because a relay verifies every event it
+  // carries and must never wait on a juror's work.
   // The relay's whole log, always, at a known path for a debugging run.
   // A relay started again under the same tag — a worker's, flow after
   // flow — adds to the log this run began rather than starting it over.
@@ -222,7 +222,7 @@ const relayLogs = new Set();
 /// prints of the first one, which is how a run finds the juror that a
 /// deal named; `said` is every line it has written, for a run that
 /// has to check what a juror did rather than what a browser could see
-/// it do. Both are only meaningful when the bench is `apart` and this
+/// it do. Both are only meaningful when the jurors are `apart` and this
 /// process is one juror.
 function startJuror([cmd, ...args], relay, secret, relayLog, size, say) {
   const juror = spawn(cmd, [...args, '--relay', relay, '--jurors', `${size}`],

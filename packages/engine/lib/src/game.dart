@@ -6,7 +6,7 @@
 /// a whole game can be played out in a test in microseconds.
 ///
 /// Two transitions deliberately do NOT happen on their own:
-/// [collectTrick] and [nextHand]. A completed trick sits on the table
+/// `collectTrick` and `nextHand`. A completed trick sits on the table
 /// until the caller sweeps it, which is what gives the UI a beat to show
 /// the fourth card without the engine knowing about time.
 ///

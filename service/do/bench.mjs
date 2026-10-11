@@ -5,28 +5,29 @@
 // on a quiet night there is nobody online to make one. The table then
 // calls for a juror on the presence relay, every ten seconds while it is
 // short — and the presence relay is ours (worker.mjs, TagRelay), which
-// passes the call here. This object starts the bench if it is not
-// running, waits for it to answer, and hands it the call, so it comes
-// online for that table at once rather than at the table's next call.
+// passes the call here. This object starts the backup jurors if they
+// are not running, waits for them to answer, and hands them the call,
+// so they come online for that table at once rather than at the
+// table's next call.
 //
-// Then it looks in on the bench once a minute. While the bench is
-// serving a table, or online and waiting to be drawn, it is left alone;
-// once it has gone quiet — the bench does that itself, ten minutes
-// after the last call with nothing to serve (packages/table,
-// juror_duty.dart) — it is stopped, and stops costing anything. One
-// bench for everyone, named `bench`: four jurors in one process, which
+// Then it looks in on them once a minute. While they are serving a
+// table, or online and waiting to be drawn, they are left alone; once
+// they have gone quiet — they do that themselves, ten minutes after
+// the last call with nothing to serve (packages/table,
+// juror_duty.dart) — they are stopped, and stop costing anything. One
+// set for everyone, named `bench`: four jurors in one process, which
 // is what one quiet night needs, and one container to pay for.
 
-/// The bench's port (service/bin/juror.dart, `--port`).
+/// The backup jurors' port (service/bin/juror.dart, `--port`).
 export const BENCH_PORT = 8080;
 
-/// How often the running bench is looked in on, and how long the
-/// runtime may keep it without a word from here before stopping it: the
+/// How often the running backup jurors are looked in on, and how long
+/// the runtime may keep them without a word from here before stopping it: the
 /// second well past the first, so it is this object that decides.
 export const LOOK_EVERY_MS = 60 * 1000;
 const INACTIVITY_MS = 15 * 60 * 1000;
 
-/// How long a starting bench is waited for before the call is given up
+/// How long starting backup jurors are waited for before the call is given up
 /// on: the table calls again in ten seconds anyway.
 const READY_TRIES = 100;
 const READY_WAIT_MS = 200;
@@ -85,7 +86,7 @@ export class Bench {
     return true;
   }
 
-  /// Whether the bench answers on its port, waiting for it to start.
+  /// Whether the backup jurors answer on their port, waiting for it to start.
   async ready() {
     for (let i = 0; i < READY_TRIES; i++) {
       try {
@@ -98,7 +99,7 @@ export class Bench {
     return false;
   }
 
-  /// What the bench says of itself: {running, online, serving}.
+  /// What the backup jurors say of themselves: {running, online, serving}.
   async status() {
     const c = this.container;
     if (!c?.running) return { running: false, online: false, serving: 0 };
@@ -111,8 +112,8 @@ export class Bench {
   }
 
   /// Once a minute while it runs: left alone while it serves or waits
-  /// to be drawn, stopped once it has gone quiet. A bench that does not
-  /// answer is given the benefit of a minute more, once — it may be
+  /// to be drawn, stopped once it has gone quiet. A container that does
+  /// not answer is given the benefit of a minute more, once — it may be
   /// busy — and stopped if it still does not.
   async alarm() {
     const c = this.container;

@@ -21,7 +21,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 import { dayOf, forgetAccount, isAccount } from '../functions/worker.mjs';
-import { restStore } from './accounts.mjs';
+import { restStore } from './kv.mjs';
 
 async function main(argv) {
   const apply = argv.includes('--apply');

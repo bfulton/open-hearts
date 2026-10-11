@@ -1,7 +1,7 @@
 /// A game's whole record, as it is kept for anyone to look at after the
 /// fact: the table, every decision with the signed events behind it,
 /// the juries that carried, and the escrow pieces released for seats
-/// that left (record.dart, [verifyRecord] takes exactly these).
+/// that left (record.dart, `verifyRecord` takes exactly these).
 ///
 /// Nothing in it is taken on trust: every event carries its author's
 /// signature, and a record read back is verified as one played was —

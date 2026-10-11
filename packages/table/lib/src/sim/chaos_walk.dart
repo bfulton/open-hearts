@@ -44,6 +44,8 @@ Map<T, Set<T>> closure<T>(Map<T, Set<T>> direct) {
 final turnClosure = closure(turnTransitions);
 final seatClosure = closure(seatTransitions);
 final tableClosure = closure(tableTransitions);
+final heldSeatClosure = closure({for (final e in heldSeatTransitions.entries) e.key: e.value.keys.toSet()});
+final handClosure = closure({for (final e in handTransitions.entries) e.key: e.value.keys.toSet()});
 
 /// Two records conflict when they settle the same turn differently: two
 /// different actions, or an action by a seat that the other record
@@ -81,6 +83,11 @@ class _Observed {
   final Map<TurnId, TurnState> turns = {};
   final Map<int, SeatState> seats = {};
   TableState? table;
+
+  /// The hand last seen, where it stood, and its held bot seats.
+  int? hand;
+  HandState? handState;
+  final Map<int, HeldSeatState> held = {};
 }
 
 bool _sameList(List<Object?> a, List<Object?> b) {
@@ -318,6 +325,34 @@ String? walkChaos(int seed,
         return '$when: table went $before → $now';
       }
       o.table = now;
+      // A hand moves as handTransitions allows; one this side has moved
+      // on from ended where its last state could reach, and for good.
+      final hand = c.game.handNumber;
+      final handNow = c.handState;
+      if (o.hand == hand) {
+        final was = o.handState!;
+        if (was != handNow && !handClosure[was]!.contains(handNow)) return '$when: hand $hand went $was → $handNow';
+      } else if (o.hand != null) {
+        final was = o.handState!;
+        final ended = c.handOutcome(o.hand!);
+        if (ended == null) return '$when: hand ${o.hand} left behind at $was with no ending';
+        if (ended != was && !handClosure[was]!.contains(ended)) return '$when: hand ${o.hand} went $was → $ended';
+        if (handTransitions[ended]!.isNotEmpty) return '$when: hand ${o.hand} left behind at $ended, which is not an end';
+        o.held.clear();
+      }
+      o.hand = hand;
+      o.handState = handNow;
+      // A held bot seat goes to the escrow for the rest of its hand and
+      // never comes back from it.
+      for (var s = 0; s < seatCount; s++) {
+        final heldNow = c.heldSeatState(s);
+        if (heldNow == null) continue;
+        final was = o.held[s];
+        if (was != null && was != heldNow && !heldSeatClosure[was]!.contains(heldNow)) {
+          return '$when: hand $hand held seat $s went $was → $heldNow';
+        }
+        o.held[s] = heldNow;
+      }
     }
     return null;
   }
@@ -373,13 +408,16 @@ String? walkChaos(int seed,
       for (final j in t.jurors)
         if (j.client != null) j.client!,
     ];
+    // Which ways out must read alike everywhere is what seatExits says
+    // of each (model.dart): every one decided on the record.
+    const doors = {EventKind.leave: SeatState.left, EventKind.boot: SeatState.booted, EventKind.absent: SeatState.absent};
     for (var seat = 0; seat < seatCount; seat++) {
       final exits = <String, List<String>>{};
       for (final c in records) {
         for (final d in c.record) {
-          final kind = d.event.kind;
-          if (!d.removal || d.event.seat != seat || !(kind == EventKind.leave || kind == EventKind.boot || kind == EventKind.absent)) continue;
-          exits.putIfAbsent('${kind.name} at ${d.turn}', () => []).add(c.signer.publicKey.substring(0, 4));
+          final door = doors[d.event.kind];
+          if (!d.removal || d.event.seat != seat || door == null || seatExits[door] != Decided.onRecord) continue;
+          exits.putIfAbsent('${d.event.kind.name} at ${d.turn}', () => []).add(c.signer.publicKey.substring(0, 4));
         }
       }
       if (exits.length > 1) {

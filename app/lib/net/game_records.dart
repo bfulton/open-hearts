@@ -20,6 +20,7 @@ import '../identity.dart';
 import 'household.dart' show askHandler;
 import 'in_use.dart';
 import 'record_check.dart' show KeptGame;
+import 'remote_config.dart' show waits;
 import 'seat_store.dart';
 
 /// Sends [record] to be kept, signed by [signer] for its table. True
@@ -27,7 +28,7 @@ import 'seat_store.dart';
 Future<bool> keepGame(Signer signer, GameRecord record, {Uri? endpoint}) async {
   final table = record.spec.id;
   final answer = await askHandler('record', signer, {'table': table, 'record': jsonEncode(record.toJson())}, endpoint,
-      what: table, timeout: const Duration(seconds: 30));
+      what: table, timeout: waits.record);
   return answer?.status == 200;
 }
 
@@ -58,7 +59,7 @@ class GameNotShown implements Exception {
 /// record. Throws [GameNotShown] when the service will not show it here.
 Future<KeptGame?> gameOf(String table, {Signer? signer, Uri? endpoint}) async {
   final asking = signer ?? await Identity.signer();
-  final answer = await askHandler('review', asking, {'table': table}, endpoint, what: table, timeout: const Duration(seconds: 30));
+  final answer = await askHandler('review', asking, {'table': table}, endpoint, what: table, timeout: waits.record);
   switch (answer?.status) {
     case 200:
       break;

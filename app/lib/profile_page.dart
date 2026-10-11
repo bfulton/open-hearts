@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'package:table/table.dart' show Pace, Tally;
 
 import 'avatar.dart';
 import 'entitlement.dart';
@@ -38,8 +39,6 @@ import 'stats.dart';
 import 'theme.dart';
 import 'ui/photo_crop.dart';
 import 'ui/player_icon.dart';
-
-import 'package:table/table.dart' show Pace, Tally;
 
 /// How big a picture is, or null when the bytes are not one.
 Size? sizeOfPicture(Uint8List bytes) {
@@ -308,7 +307,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 20),
                 _Record(stats: _stats),
                 const SizedBox(height: 22),
-                _Heading(context.l10n.howYouLook),
+                SectionHeading(context.l10n.howYouLook),
                 const SizedBox(height: 12),
                 // The icons: a grid, the chosen one ringed.
                 Wrap(
@@ -421,21 +420,6 @@ class _ProfilePageState extends State<ProfilePage> {
 }
 
 /// A quiet label over a section.
-class _Heading extends StatelessWidget {
-  const _Heading(this.text);
-
-  final String text;
-
-  // Written as it is read: a heading put through toUpperCase is read
-  // out as shouting by anything that reads the screen aloud, and the
-  // weight and the spacing set it apart well enough without it.
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: const TextStyle(fontSize: 11.5, letterSpacing: 0.9, fontWeight: FontWeight.w700, color: Palette.chromeDim),
-  );
-}
-
 /// How long you take over a card, and what it does.
 ///
 /// Measured by this device from its own turns and kept on it: it is the
@@ -488,7 +472,7 @@ class _Record extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Heading(l10n.rating),
+        SectionHeading(l10n.rating),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -524,12 +508,12 @@ class _Record extends StatelessWidget {
         const SizedBox(height: 10),
         _PaceLine(pace: stats?.pace ?? Pace.fresh),
         const SizedBox(height: 18),
-        _Heading(l10n.yourGames),
+        SectionHeading(l10n.yourGames),
         const SizedBox(height: 10),
         _Games(live: stats?.live, alone: stats?.alone, liveMissing: stats != null && !stats.reached),
         if (stats != null && stats.history.recent.isNotEmpty) ...[
           const SizedBox(height: 22),
-          _Heading(l10n.statsRecent(stats.history.recent.length)),
+          SectionHeading(l10n.statsRecent(stats.history.recent.length)),
           const SizedBox(height: 10),
           _Lately(history: stats.history),
         ],

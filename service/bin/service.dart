@@ -44,7 +44,7 @@ Future<void> main(List<String> args) async {
   print('relay ${relay.url}');
   if (juror) {
     // Its few lines are worth having even when the relay is quiet.
-    // Every live table is sealed, so a bench without the deal could
+    // Every live table is sealed, so backup jurors without the deal could
     // serve none of them, and drawn it would hold bot seats and pieces
     // of escrow it never answers for (bin/juror.dart).
     final DealCrypto crypto;
@@ -55,9 +55,9 @@ Future<void> main(List<String> args) async {
       await relay.close();
       exit(1);
     }
-    // A bench of them, because a table with bot seats needs
+    // Several of them, because a table with bot seats needs
     // juryToHoldBots online before a juror can hold one at all, and
-    // this is what answers when there is nobody else
+    // these are what answer when too few others are online
     // (docs/04-live-play.md).
     final bench = LastResortBench(
       signers: [for (var i = 0; i < juryToHoldBots; i++) SchnorrSigner.generate()],

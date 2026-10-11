@@ -5,16 +5,16 @@ library;
 
 import 'dart:async';
 
+import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:engine/engine.dart' as engine;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:open_hearts/record_store.dart';
 import 'package:open_hearts/game_controller.dart';
+import 'package:open_hearts/record_store.dart';
 import 'package:open_hearts/table_page.dart';
-import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/ui/table_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'table_page_test.dart' show fanCards, tapCard;
 

@@ -14,8 +14,8 @@ import 'dart:convert';
 import 'package:table/table.dart';
 
 import 'address.dart' show appBase, isLocalHost;
+import 'http.dart' as http;
 import 'licence.dart' show signedAsk;
-import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
 import 'remote_config.dart' show waits;
 
 /// Where credentials come from: the app's own origin — the site the

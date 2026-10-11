@@ -3,12 +3,12 @@ library;
 
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:engine/engine.dart';
+import 'package:flutter/material.dart' hide Card;
 import 'package:flutter/semantics.dart';
 
-import 'package:engine/engine.dart';
-import 'package:engine/engine.dart' as engine;
 import '../avatar.dart';
+import '../l10n/l10n.dart';
 import '../table_model.dart';
 import '../theme.dart';
 import 'card_view.dart';
@@ -16,7 +16,6 @@ import 'pip.dart';
 import 'player_icon.dart';
 import 'reactions.dart';
 import 'scaled.dart';
-import '../l10n/l10n.dart';
 
 /// More height than a table is ever going to use, at which point where
 /// it sits in the felt stops being a rounding error and starts being a
@@ -546,7 +545,7 @@ class TableView extends StatelessWidget {
     );
   }
 
-  engine.Card? _cardFrom(HeartsGame game, int seat) {
+  Card? _cardFrom(HeartsGame game, int seat) {
     for (final p in game.trick) {
       if (p.seat == seat) return p.card;
     }
@@ -662,7 +661,7 @@ class _Trick extends StatefulWidget {
 
   /// By position, the near seat first: what is on the table, where in
   /// the trick it was played, and whose it is.
-  final List<engine.Card?> cards;
+  final List<Card?> cards;
   final List<int?> orders;
   final List<String> names;
 
@@ -684,7 +683,7 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
 
   /// The finished trick on its way to whoever took it: each card and
   /// the slot it is leaving from.
-  List<(engine.Card, int)> _taken = const [];
+  List<(Card, int)> _taken = const [];
   Offset _towards = Offset.zero;
 
   /// The position of the card that took the trick: the others are
@@ -794,7 +793,7 @@ class _TrickSlot extends StatelessWidget {
     required this.from,
   });
 
-  final engine.Card? card;
+  final Card? card;
   final String name;
   final int? order;
   final double width;
@@ -926,7 +925,8 @@ class SeatBadge extends StatelessWidget {
 
   /// How tall the badge is, and how big its icon: the felt chooses
   /// both, since it is the one that gives up the height. A null height
-  /// is the badge's own, which is what [stackedHeight] predicts.
+  /// is the badge's own: a stacked one, which takes the height of the
+  /// row it is in (TableView).
   final double? height;
   final double iconSize;
 
@@ -1092,7 +1092,7 @@ class SeatBadge extends StatelessWidget {
           if (taken > 0) ...[
             const SizedBox(width: 7),
             Pip(
-                suit: engine.Suit.hearts,
+                suit: Suit.hearts,
                 size: 10,
                 color: Palette.danger.withValues(alpha: 0.9)),
             const SizedBox(width: 3),

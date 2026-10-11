@@ -72,6 +72,10 @@ String _b64(Uint8List b) => base64.encode(b);
 Uint8List _unb64(Object? s) => Uint8List.fromList(base64.decode(s as String));
 
 class DealSession {
+  /// Hears what this session turned down and why, for a trace: a step
+  /// it could not read, a seal that opened nothing. Off by default.
+  void Function(String line)? log;
+
   DealSession(
     this.crypto, {
     required this.tableId,
@@ -640,7 +644,6 @@ class DealSession {
       final custody = [for (final c in m['custody'] as List) _unb64(c)];
       final pieces = Map<String, Object?>.from(m['pieces'] as Map);
       _pks[seat] = pk;
-      _keysIn++;
       _keyProofs[seat] = proof;
       _custodiansOf[seat] = custodianKeys;
       final shareKeys = [for (final k in (m['shareKeys'] as List? ?? const [])) _unb64(k)];
@@ -841,7 +844,11 @@ class DealSession {
           if (batch.length != tokensBytes(owed.length)) return const [];
           return [VerifyTokensJob(pk, _cardsAt(owed), batch)];
       }
-    } catch (_) {}
+    } catch (e) {
+      // A step whose message is not the shape its round reads is no
+      // step: nothing to check, and nothing taken.
+      log?.call('round $round: a step this side cannot read: $e');
+    }
     return const [];
   }
 
@@ -1062,7 +1069,9 @@ class DealSession {
             _tokens.putIfAbsent(owner, () => {})[p] = DealCrypto.tokenOf(token);
             _passed.putIfAbsent(owner, () => {})[p] = token;
           }
-        } catch (_) {}
+        } catch (e) {
+          log?.call('position $p: a seal that opens nothing: $e');
+        }
       }
       // A seal whose parts have not arrived is kept: the release that
       // carries them may go out before a peer has heard the pass. A
@@ -1569,12 +1578,6 @@ class DealSession {
   /// Parts of a new share, by the seat and the set they were weighed
   /// against.
   final Map<int, Map<String, Map<int, Uint8List>>> _topUp = {};
-
-  /// How many seats' keys have been read here. Zero says the deal is
-  /// as it was built and nothing has been sealed to it yet, which is
-  /// what makes it safe to throw away and build again.
-  int get keysIn => _keysIn;
-  int _keysIn = 0;
 
   /// How many custodians this side knows [seat] escrowed to: zero
   /// until its keys have been read here, and more as juries are drawn

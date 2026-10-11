@@ -10,18 +10,18 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
+import 'package:engine/engine.dart' as engine;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:engine/engine.dart' as engine;
-import 'package:open_hearts/live/live_page.dart';
 import 'package:open_hearts/avatar.dart';
-import 'package:open_hearts/live_controller.dart';
+import 'package:open_hearts/live/live_controller.dart';
+import 'package:open_hearts/live/live_page.dart';
 import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/table_view.dart' show ClockText, TableView;
-import 'package:table/src/sim/sim.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 
 import 'drawn.dart';
