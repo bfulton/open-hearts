@@ -60,9 +60,9 @@ jobs:
       # The browser's wasm is committed (app/web/deal.wasm).
       - name: Deal and Schnorr (Rust — the cdylibs for the VM; the golden vectors; the vendored proof crates)
         run: |
-          cd crypto/deal && cargo build --release && cargo test --release
-          cd ../vendor && cargo test --release
-          cd ../schnorr && cargo build --release && cargo test --release
+          cd crypto/deal && cargo build --release --locked && cargo test --release --locked
+          cd ../vendor && cargo test --release --locked
+          cd ../schnorr && cargo build --release --locked && cargo test --release --locked
       - name: Engine (pure Dart — rules, bots, 200 seeded games)
         run: cd packages/engine && dart pub get && dart analyze && dart test -j 4
       - name: Deal (the primitives over FFI, and a hand's deal among four sessions)
@@ -123,7 +123,7 @@ jobs:
           path: crypto/deal/target/memo
           key: deal-memo-table-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.toml', 'crypto/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
-        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
+        run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
       - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
         run: cd packages/table && dart pub get && dart analyze && dart test -x slow
       - name: Table, the slow tier (whole sealed games under every departure, the chaos walks)
@@ -153,7 +153,7 @@ jobs:
             crypto/deal
             crypto/schnorr
       - name: Deal and Schnorr (Rust — the cdylibs the relay and the juror load)
-        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
+        run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
       - name: Service (the local relay, and a hand played over it with real signatures)
         run: cd service && dart pub get && dart analyze && dart test
       - name: Service, against the object's relay (the same suite, the other implementation)
@@ -163,7 +163,6 @@ jobs:
       - name: The object's relay (its own tests, in node's test runner)
         run: node --test service/do/*.test.mjs
 
-  # What runs in node alone: no Flutter, no Rust, no browser.
   # The wasm the app serves is committed (app/web/deal.wasm,
   # app/web/schnorr.wasm). Built here from its sources with the pinned
   # toolchain it is the same bytes (crypto/wasm.sh), or the commit
@@ -198,6 +197,7 @@ jobs:
       - name: The same bytes as committed
         run: git diff --exit-code --stat -- app/web/deal.wasm app/web/schnorr.wasm
 
+  # What runs in node alone: no Flutter, no Rust, no browser.
   node:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -251,7 +251,7 @@ jobs:
             crypto/deal
             crypto/schnorr
       - name: Deal and Schnorr (Rust — the cdylibs the relay and the juror load)
-        run: cd crypto/deal && cargo build --release && cd ../schnorr && cargo build --release
+        run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
       - name: coturn (the rig's TURN server)
         run: sudo apt-get update && sudo apt-get install -y coturn
       - name: Playwright
