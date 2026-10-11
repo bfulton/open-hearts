@@ -47,9 +47,7 @@ Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `node infra/a
 | `OH_STRIPE_SECRET` | Yes | No | `checkout`, `manage`, `payerLookup`, `healthOf` | `checkout` and `manage` answer 503. `health` reports Stripe as not configured. Backup codes are not emailed. |
 | `OH_STRIPE_WEBHOOK_SECRET` | Yes | No | `webhookSigned` | The `stripe` webhook answers 400 to every delivery. |
 | `OH_TURN_API_TOKEN` | Yes | Yes | `mint` | `turn` answers 503, and the app plays over the relay. |
-| `OH_PLAY_SERVICE_ACCOUNT` | Not listed | Not listed | `playToken`: the Google service account's JSON key for the Play Developer API | `store` answers 503 for a Play purchase. `play` answers a subscription notification with 200 and records nothing. |
-
-`OH_PLAY_SERVICE_ACCOUNT` is not in `infra/cloudflare.mjs`, so `infra/apply.mjs` does not check it.
+| `OH_PLAY_SERVICE_ACCOUNT` | When the config names Play (`playSecrets`) | No | `playToken`: the Google service account's JSON key for the Play Developer API | `store` answers 503 for a Play purchase. `play` answers a subscription notification with 200 and records nothing. |
 
 The worker calls these Stripe endpoints, so `OH_STRIPE_SECRET` needs access to each: `GET /v1/prices`, `POST /v1/checkout/sessions`, `GET /v1/subscriptions/{id}`, `POST /v1/billing_portal/sessions` and `GET /v1/customers/{id}`.
 

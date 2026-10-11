@@ -17,6 +17,11 @@ import { readFileSync } from 'node:fs';
 
 const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
 
+/// Google Play's purchases are checked with a service account's key
+/// (playToken in service/functions/worker.mjs), which the worker wants
+/// once the config names Play's package and product, as here.
+export const playSecrets = config.google?.package && config.google?.product ? ['OH_PLAY_SERVICE_ACCOUNT'] : [];
+
 export const app = {
   key: 'open-hearts',
   name: 'Open Hearts',
@@ -48,7 +53,7 @@ export const pages = {
       /// Encrypted: names only. apply.mjs checks each is set, and cannot
       /// set one (it has no value to set), so a missing one is set by
       /// hand: `npx wrangler pages secret put NAME --project-name open-hearts`.
-      secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN'],
+      secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN', ...playSecrets],
       kv: { OH_STORE: 'open-hearts-store' },
       r2: { OH_RECORDS: 'open-hearts-records' },
       /// The household object lives in the relay worker (wrangler.toml).
