@@ -123,6 +123,18 @@ class CardView extends StatelessWidget {
                 children: [
                   Text(
                     card.rank.label,
+                    // The rank is the card's picture, not a line to
+                    // read: drawn at a fraction of the card, as the pip
+                    // under it is, and in a fan only the corner the next
+                    // card leaves shows it — about a quarter of a card on
+                    // a phone, which a 10 already fills. Grown with the
+                    // reader's text it would grow under that card and
+                    // off this one, so it keeps the card's size, which
+                    // is already larger than the type round the table at
+                    // twice its size; the card is what the table grows
+                    // (ui/scaled.dart), and a screen reader hears its
+                    // name in full.
+                    textScaler: TextScaler.noScaling,
                     style: TextStyle(
                       fontSize: rankSize,
                       height: 1.0,
@@ -183,10 +195,8 @@ class CardBack extends StatelessWidget {
 }
 
 /// The place a card will land: the room it takes, and nothing drawn.
-/// The room is what keeps the trick from jumping as cards arrive; the
-/// outline each empty place used to draw was four rules on the felt
-/// before anything had been played, and a trick reads as a trick
-/// without them.
+/// The room is what keeps the trick from jumping as cards arrive, and a
+/// trick reads as a trick without outlines on the felt.
 class CardGhost extends StatelessWidget {
   const CardGhost({super.key, required this.width});
 

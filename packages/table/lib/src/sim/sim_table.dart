@@ -2,15 +2,19 @@
 /// the trace tool share.
 library;
 
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 import '../client.dart';
+import '../journal.dart';
 import '../jury.dart';
+import '../licence.dart';
 import '../signing.dart';
 import '../spec.dart';
 import '../time_bank.dart';
+import '../timing.dart';
 import 'scripted_human.dart';
 import 'sim_deal_worker.dart';
 import 'sim_juror.dart';
@@ -38,12 +42,20 @@ class SimTable {
     bool withPresence = false,
     int target = gameOverScore,
     this.crypto,
-    TimeBank timeBank = TimeBank.standard,
+    TableTiming timing = TableTiming.standard,
+    TimeBank? timeBank,
     bool botsFirst = false,
     bool sweepJurors = false,
     bool workers = false,
-  })  : clock = VirtualClock(),
-        signers = [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
+    String? id,
+    List<Signer>? keys,
+    Map<int, TableJournal>? journals,
+    Licence? Function(PublicKey key)? licenceOf,
+  })  : journals = journals ?? {},
+        clock = VirtualClock(),
+        // Fake keys unless told otherwise: a table played for a record
+        // a real device will check needs real signatures.
+        signers = keys ?? [for (var i = 0; i < humans; i++) FakeSigner('p$i-$seed')] {
     net = SimNetwork(clock, seed: netSeed);
     SimDealWorker? workerFor(PublicKey key) {
       final c = crypto;
@@ -72,14 +84,16 @@ class SimTable {
       }
     }
     spec = TableSpec(
-      id: 'table-$seed',
+      id: id ?? 'table-$seed',
       seed: seed,
       sealed: crypto != null,
       target: target,
+      timing: timeBank == null ? timing : timing.withBank(timeBank),
       seats: [
         for (var s = 0; s < seatCount; s++)
           if (botsFirst ? s >= seatCount - humans : s < humans)
-            HumanSeat(signers[botsFirst ? s - (seatCount - humans) : s].publicKey)
+            HumanSeat(signers[botsFirst ? s - (seatCount - humans) : s].publicKey,
+                licence: licenceOf?.call(signers[botsFirst ? s - (seatCount - humans) : s].publicKey))
           else
             BotSeat(Persona.roster[(s + seed) % Persona.roster.length]),
       ],
@@ -93,7 +107,7 @@ class SimTable {
           presence: presence,
           crypto: crypto,
           dealWorker: workerFor(signers[i].publicKey),
-          timeBank: timeBank,
+          journal: this.journals[i],
           random: Random(seed * 1000 + i));
       people.add(ScriptedHuman(client, net, clock, persona: Persona.roster[(i * 3 + seed) % Persona.roster.length]));
     }
@@ -101,13 +115,45 @@ class SimTable {
 
   final int humans;
 
+  /// Journals for the people who keep one, by their place in [people]:
+  /// what a person's device needs to come back after a reload
+  /// ([TableJournal], [reload]).
+  final Map<int, TableJournal> journals;
+
+  /// Person [i]'s page reloaded: the process gone at once, as a tab
+  /// closing is, and after [awayMs] a new client built from the journal
+  /// alone, on a new link, with nothing else of the old one.
+  void reload(int i, {int awayMs = 5000, Random? random}) {
+    final old = people[i];
+    final key = old.client.signer.publicKey;
+    net.crash(key);
+    old.stop();
+    old.client.close();
+    old.gone = true;
+    clock.advance(awayMs);
+    net.revive(key);
+    final journal = TableJournal.parse(jsonDecode(jsonEncode(journals[i]!.toJson())))!;
+    journals[i] = journal;
+    final client = TableClient(
+        spec: spec,
+        signer: old.client.signer,
+        transport: net.attach(key),
+        clock: clock,
+        presence: presence,
+        crypto: crypto,
+        dealWorker: dealWorkers[key],
+        journal: journal,
+        random: random ?? Random(i + 7919));
+    people[i] = ScriptedHuman(client, net, clock, persona: old.persona)..start();
+  }
+
   /// The deal's primitives, at a sealed table.
   final DealCrypto? crypto;
 
   /// Each device's deal worker, by its key, when the table has them.
   final Map<PublicKey, SimDealWorker> dealWorkers = {};
   final VirtualClock clock;
-  final List<FakeSigner> signers;
+  final List<Signer> signers;
   late final SimNetwork net;
   late final TableSpec spec;
   final List<ScriptedHuman> people = [];

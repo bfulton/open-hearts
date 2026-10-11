@@ -18,11 +18,22 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import 'avatar.dart';
+import 'entitlement.dart';
+import 'identity.dart';
+import 'l10n/l10n.dart';
+import 'net/account_profile.dart';
+import 'net/network.dart';
+import 'net/relays.dart';
+import 'net/standing.dart';
+import 'pages.dart';
+import 'record_store.dart';
 import 'stats.dart';
 import 'theme.dart';
 import 'ui/photo_crop.dart';
@@ -59,6 +70,10 @@ Uint8List? shrinkPicture(Uint8List bytes, {Rect? from}) {
   final square = from == null
       ? img.copyResizeCropSquare(decoded, size: Avatar.side, interpolation: img.Interpolation.average)
       : _cut(decoded, from);
+  // Nothing the camera wrote goes with it: a crop and a resize carry a
+  // photograph's EXIF across, where it was taken included, and the
+  // picture is published to the relays for anyone to read.
+  square.exif = img.ExifData();
   // Quality down until it fits a relay, which it does at the first
   // step for any photograph this size.
   for (final quality in const [82, 70, 55, 40]) {
@@ -82,39 +97,49 @@ img.Image _cut(img.Image decoded, Rect from) {
 /// Who this device is to everyone else.
 typedef Profile = ({String name, Avatar avatar});
 
-/// Opens the profile over [context]; resolves to what it was left
-/// with, or null if there is nothing to keep.
-Future<Profile?> showProfile(
-  BuildContext context, {
-  required Profile current,
-  required String seed,
-  Stream<PlayerStats> stats = const Stream<PlayerStats>.empty(),
-}) {
-  return Navigator.of(context).push<Profile>(
-    MaterialPageRoute<Profile>(
-      builder: (_) => ProfilePage(current: current, seed: seed, stats: stats),
-    ),
+/// Opens the profile over [context] (router.dart, `/profile`); resolves
+/// to what it was left with. The page keeps it on the device itself, so
+/// one opened by its address alone loses nothing.
+Future<Profile?> showProfile(BuildContext context, {Stream<PlayerStats>? stats}) =>
+    openPage<Profile>(context, AppPage.profile, extra: stats);
+
+/// What the games say on this device: its own games, and the relays'
+/// results when it is online — [standing] when the caller already holds
+/// it, so they are not asked twice.
+Stream<PlayerStats> statsOnThisDevice({Standing? standing, bool online = true}) async* {
+  final signer = await Identity.signer();
+  yield* playerStats(
+    store: PrefsRecordStore(),
+    signer: signer,
+    standing: standing,
+    relays: online && !deviceOffline() ? appRelays() : null,
   );
 }
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key, required this.current, required this.seed, required this.stats});
+  const ProfilePage({super.key, this.current, this.seed, this.stats});
 
-  final Profile current;
-  final String seed;
+  /// Who this device is, and the key its colour comes from: the
+  /// device's own, read off it, when null.
+  final Profile? current;
+  final String? seed;
 
-  /// What the games say, as it comes. The page asks nobody anything
-  /// itself: whoever opens it knows which relays this build is on and
-  /// whether it should be talking to them (stats.dart).
-  final Stream<PlayerStats> stats;
+  /// What the games say, as it comes: [statsOnThisDevice] when null.
+  final Stream<PlayerStats>? stats;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  late Avatar _avatar = widget.current.avatar;
-  late final _name = TextEditingController(text: widget.current.name);
+  late Avatar _avatar = widget.current?.avatar ?? Avatar.none;
+  late final _name = TextEditingController(text: widget.current?.name ?? '');
+  late String _seed = widget.seed ?? '';
+
+  /// What the page opened with: left unchanged, nothing is kept, so a
+  /// page that sat open while another device of the account changed the
+  /// profile does not put the old one back.
+  late Profile _opened;
   String? _note;
   bool _busy = false;
 
@@ -126,7 +151,31 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    _opened = (name: Identity.nameOf(_name.text), avatar: _avatar);
     _watch();
+    if (widget.current == null) unawaited(_readDevice());
+    AccountProfile.current.addListener(_reprofiled);
+  }
+
+  /// Another device of the account changed the profile while this page
+  /// was open: shown here too, unless something has been changed here.
+  void _reprofiled() {
+    if ((name: Identity.nameOf(_name.text), avatar: _avatar) == _opened) unawaited(_readDevice());
+  }
+
+  /// Who this device is, when nobody said: opened by its address.
+  Future<void> _readDevice() async {
+    final name = await Identity.name();
+    final avatar = await Identity.avatar();
+    final signer = await Identity.signer();
+    if (!mounted) return;
+    setState(() {
+      _name.text = name ?? '';
+      _avatar = avatar;
+      _opened = (name: Identity.nameOf(_name.text), avatar: avatar);
+      // The account's colour, the one every table shows it in.
+      _seed = widget.seed ?? Entitlement.current.licence?.account ?? signer.publicKey;
+    });
   }
 
   @override
@@ -137,7 +186,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _watch() {
     _watching?.cancel();
-    _watching = widget.stats.listen(
+    _watching = (widget.stats ?? statsOnThisDevice()).listen(
       (s) {
         if (mounted) setState(() => _stats = s);
       },
@@ -153,6 +202,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void dispose() {
     _watching?.cancel();
+    AccountProfile.current.removeListener(_reprofiled);
     _name.dispose();
     super.dispose();
   }
@@ -171,7 +221,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final bytes = await picked.readAsBytes();
       final size = sizeOfPicture(bytes);
       if (size == null) {
-        setState(() => _note = 'That did not read as a picture.');
+        if (mounted) setState(() => _note = context.l10n.notAPicture);
         return;
       }
       if (!mounted) return;
@@ -183,12 +233,12 @@ class _ProfilePageState extends State<ProfilePage> {
       if (area == null || !mounted) return;
       final small = shrinkPicture(bytes, from: area);
       if (small == null) {
-        setState(() => _note = 'That did not read as a picture.');
+        setState(() => _note = context.l10n.notAPicture);
         return;
       }
       setState(() => _avatar = _avatar.copyWith(picture: small));
     } catch (e) {
-      setState(() => _note = 'Could not open that: $e');
+      if (mounted) setState(() => _note = context.l10n.couldNotOpen('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -209,12 +259,12 @@ class _ProfilePageState extends State<ProfilePage> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           foregroundColor: Palette.chromeDim,
-          title: const Text('Your profile', style: TextStyle(fontSize: 16, color: Palette.chromeDim)),
+          title: Text(context.l10n.yourProfile, style: const TextStyle(fontSize: 16, color: Palette.chromeDim)),
           actions: [
             TextButton(
               onPressed: _done,
               style: TextButton.styleFrom(foregroundColor: Palette.gold),
-              child: const Text('Done', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              child: Text(context.l10n.done, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
             const SizedBox(width: 6),
           ],
@@ -239,24 +289,26 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 // Who you are: the face, and the name under it.
                 Center(
-                  child: PlayerIcon(name: _shownName, seed: widget.seed, avatar: _avatar, size: 92),
+                  child: PlayerIcon(name: _shownName, seed: _seed, avatar: _avatar, size: 92),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _name,
                   textAlign: TextAlign.center,
                   textCapitalization: TextCapitalization.words,
-                  decoration: _field('Your name'),
+                  decoration: _field(context.l10n.yourName),
                   // The badge above it wears the initials of what is
                   // being typed, so a name with no avatar behind it
                   // is still a picture of something.
                   onChanged: (_) => setState(() {}),
+                  // No longer than a table carries, or the account keeps.
+                  inputFormatters: [LengthLimitingTextInputFormatter(Identity.longestName)],
                   style: const TextStyle(color: Palette.chrome, fontSize: 16),
                 ),
                 const SizedBox(height: 20),
                 _Record(stats: _stats),
                 const SizedBox(height: 22),
-                const _Heading('How you look'),
+                _Heading(context.l10n.howYouLook),
                 const SizedBox(height: 12),
                 // The icons: a grid, the chosen one ringed.
                 Wrap(
@@ -265,7 +317,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     for (final key in icons)
                       _Choice(
-                        label: AvatarIcons.names[key]!,
+                        label: context.l10n.avatarIcon(key),
                         selected: _avatar.icon == key && _avatar.picture == null,
                         onTap: () => setState(() => _avatar = _avatar.copyWith(icon: key, clearPicture: true)),
                         color: PlayerIcon.palette[_avatar.color ?? _derivedIndex()],
@@ -281,7 +333,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     for (var i = 0; i < PlayerIcon.palette.length; i++)
                       _Choice(
-                        label: 'Colour ${i + 1}',
+                        label: context.l10n.colourNumber(i + 1),
                         selected: (_avatar.color ?? _derivedIndex()) == i,
                         onTap: () => setState(() => _avatar = _avatar.copyWith(color: i)),
                         color: PlayerIcon.palette[i],
@@ -296,7 +348,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: OutlinedButton.icon(
                         onPressed: _busy ? null : _pickPhoto,
                         icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                        label: const Text('Use a photo'),
+                        label: Text(context.l10n.useAPhoto),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Palette.chrome,
                           side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
@@ -313,7 +365,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('My initials'),
+                        child: Text(context.l10n.myInitials),
                       ),
                     ),
                   ],
@@ -334,12 +386,24 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _done() => Navigator.of(context).pop((name: _name.text.trim(), avatar: _avatar));
+  /// Kept on the device, then closed with it: whoever opened the page
+  /// reads it back from there (home_page.dart), so it is the same
+  /// whether the menu opened it or an address did. A change goes on to
+  /// the account's other devices too, behind the page
+  /// (net/account_profile.dart).
+  Future<void> _done() async {
+    final chosen = (name: Identity.nameOf(_name.text), avatar: _avatar);
+    if (chosen != _opened) {
+      await AccountProfile.current.keep(chosen.name, chosen.avatar);
+      unawaited(AccountProfile.current.sync());
+    }
+    if (mounted) Navigator.of(context).pop(chosen);
+  }
 
   /// What the badge in the sheet wears while there is nothing to go on.
   String get _shownName => _name.text.trim().isEmpty ? '?' : _name.text.trim();
 
-  int _derivedIndex() => PlayerIcon.palette.indexOf(PlayerIcon.colorOf(widget.seed));
+  int _derivedIndex() => PlayerIcon.palette.indexOf(PlayerIcon.colorOf(_seed));
 
   static InputDecoration _field(String label) => InputDecoration(
     labelText: label,
@@ -394,10 +458,7 @@ class _PaceLine extends StatelessWidget {
         const SizedBox(width: 8),
         Flexible(
           child: Text(
-            pace.known
-                ? 'You play at a ${pace.word} pace, about ${pace.stated} second${pace.stated == 1 ? '' : 's'} a card, '
-                    'and are seated with players at a similar pace'
-                : 'Your pace is not known yet. After a live game or two you will be seated with players at a similar pace',
+            context.l10n.paceLine(pace),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 12, height: 1.4, color: Palette.chromeDim),
           ),
@@ -420,13 +481,14 @@ class _Record extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final stats = this.stats;
     final rating = stats?.rating;
     final rated = (stats?.ratedGames ?? 0) > 0 && rating != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _Heading('Rating'),
+        _Heading(l10n.rating),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -444,15 +506,15 @@ class _Record extends StatelessWidget {
               ),
               const SizedBox(height: 7),
               Text(
-                stats == null
-                    ? 'Counting up your games…'
+                stats == null || stats.asking
+                    ? l10n.countingGames
                     : !stats.reached
-                    ? 'The relays did not answer, so it cannot be shown just now'
+                    ? l10n.relaysSilent
                     : !rated
-                    ? 'Play a rated live game and you will have one'
+                    ? l10n.playRatedForRating
                     : rating.provisional
-                    ? 'Provisional, from ${_games(stats.ratedGames)}'
-                    : 'From ${_games(stats.ratedGames)}',
+                    ? l10n.ratingProvisionalFrom(stats.ratedGames)
+                    : l10n.ratingFrom(stats.ratedGames),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
               ),
@@ -462,14 +524,139 @@ class _Record extends StatelessWidget {
         const SizedBox(height: 10),
         _PaceLine(pace: stats?.pace ?? Pace.fresh),
         const SizedBox(height: 18),
-        const _Heading('Your games'),
+        _Heading(l10n.yourGames),
         const SizedBox(height: 10),
         _Games(live: stats?.live, alone: stats?.alone, liveMissing: stats != null && !stats.reached),
+        if (stats != null && stats.history.recent.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          _Heading(l10n.statsRecent(stats.history.recent.length)),
+          const SizedBox(height: 10),
+          _Lately(history: stats.history),
+        ],
       ],
     );
   }
+}
 
-  static String _games(int n) => n == 1 ? 'one game' : '$n games';
+/// The games alone, lately: each one's final score as a column, oldest
+/// on the left, with their average across them — and under it what the
+/// queen and the moon did over every hand kept. One series, so no
+/// legend; the numbers are said aloud in one line, which is the chart's
+/// table for a screen reader.
+class _Lately extends StatelessWidget {
+  const _Lately({required this.history});
+
+  final SoloHistory history;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final average = history.average!.round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          label: l10n.statsRecentSpoken(history.recent.length, history.recent.join(', '), average),
+          child: ExcludeSemantics(
+            child: SizedBox(height: 92, child: CustomPaint(painter: _ScoresPainter(history.recent, average: average, label: l10n.statsAverage(average)))),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(l10n.statsLowerIsBetter, style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            _Tile(value: history.queens, label: l10n.statsQueens),
+            const SizedBox(width: 8),
+            _Tile(value: history.moonsShot, label: l10n.statsMoonsShot),
+            const SizedBox(width: 8),
+            _Tile(value: history.moonsBlocked, label: l10n.statsMoonsBlocked),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(l10n.statsOverHands(history.hands), textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim)),
+      ],
+    );
+  }
+}
+
+/// One number and what it counts.
+class _Tile extends StatelessWidget {
+  const _Tile({required this.value, required this.label});
+
+  final int value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.13),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            children: [
+              Text('$value',
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w700, color: Palette.chrome, fontFeatures: [FontFeature.tabularFigures()])),
+              const SizedBox(height: 2),
+              Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, height: 1.25, color: Palette.chromeDim)),
+            ],
+          ),
+        ),
+      );
+}
+
+/// The columns: thin, a gap of the ground between them, rounded at the
+/// end away from the baseline; a hairline for the baseline; the average
+/// a gold rule across them with its number above it, in the text's own
+/// colour.
+class _ScoresPainter extends CustomPainter {
+  _ScoresPainter(this.scores, {required this.average, required this.label});
+
+  final List<int> scores;
+  final int average;
+  final String label;
+
+  static const _gap = 2.0;
+  static const _labelRoom = 16.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final top = scores.fold<int>(average, max).clamp(26, 1 << 20).toDouble();
+    final plot = size.height - _labelRoom;
+    double y(num v) => size.height - v / top * plot;
+    // Never wider than a column in a full chart, so a short history does
+    // not draw a few slabs.
+    final step = size.width / SoloHistory.shown;
+    final width = step - _gap;
+    final bar = Paint()..color = Palette.chromeDim.withValues(alpha: 0.55);
+    for (var i = 0; i < scores.length; i++) {
+      final left = i * step + _gap / 2;
+      final rect = Rect.fromLTRB(left, y(scores[i]), left + width, size.height);
+      final r = Radius.circular(min(4, width / 2));
+      canvas.drawRRect(RRect.fromRectAndCorners(rect, topLeft: r, topRight: r), bar);
+    }
+    canvas.drawLine(Offset(0, size.height - 0.5), Offset(size.width, size.height - 0.5),
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.18)
+          ..strokeWidth = 1);
+    final at = y(average);
+    canvas.drawLine(Offset(0, at), Offset(size.width, at),
+        Paint()
+          ..color = Palette.gold
+          ..strokeWidth = 2);
+    final text = TextPainter(
+      text: TextSpan(text: label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Palette.chrome)),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: size.width);
+    text.paint(canvas, Offset(size.width - text.width, max(0, at - text.height - 2)));
+  }
+
+  @override
+  bool shouldRepaint(_ScoresPainter old) => old.average != average || old.label != label || !listEquals(old.scores, scores);
 }
 
 /// The two halves of the game side by side: what each line is, once,
@@ -499,6 +686,7 @@ class _Games extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     String value(Tally? t, String Function(Tally t) of, {bool missing = false}) => t == null || missing ? '—' : of(t);
     TableRow line(String label, String Function(Tally t) of) => TableRow(children: [
           Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text(label, style: _label)),
@@ -510,17 +698,17 @@ class _Games extends StatelessWidget {
       defaultVerticalAlignment: TableCellVerticalAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        const TableRow(children: [
-          SizedBox.shrink(),
-          Padding(padding: EdgeInsets.only(bottom: 6), child: Text('Live', textAlign: TextAlign.right, style: _title)),
-          Padding(padding: EdgeInsets.only(bottom: 6), child: Text('Alone', textAlign: TextAlign.right, style: _title)),
+        TableRow(children: [
+          const SizedBox.shrink(),
+          Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(l10n.gamesLive, textAlign: TextAlign.right, style: _title)),
+          Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(l10n.gamesAlone, textAlign: TextAlign.right, style: _title)),
         ]),
-        line('played', (t) => '${t.games}'),
-        line('won', (t) => '${t.won}'),
-        line('average', (t) => t.average?.round().toString() ?? '—'),
+        line(l10n.gamesPlayed, (t) => '${t.games}'),
+        line(l10n.gamesWon, (t) => '${t.won}'),
+        line(l10n.gamesAverage, (t) => t.average?.round().toString() ?? '—'),
         // Low is good: the best game is the one you came out of with
         // the fewest.
-        line('best', (t) => t.best?.toString() ?? '—'),
+        line(l10n.gamesBest, (t) => t.best?.toString() ?? '—'),
       ],
     );
   }
@@ -530,9 +718,7 @@ class _Games extends StatelessWidget {
 ///
 /// The ring is white, since which one you chose is what a thing is,
 /// not something to do (docs/05-form-factors.md); and it stands off the
-/// disc by a gap of felt, so it shows on every colour. It was gold and
-/// drawn on the disc's own edge, which on the amber disc was no ring at
-/// all.
+/// disc by a gap of felt, so it shows on every colour, amber included.
 class _Choice extends StatelessWidget {
   const _Choice({required this.label, required this.selected, required this.onTap, required this.color, this.child, this.size = 50});
 

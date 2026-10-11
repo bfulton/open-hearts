@@ -11,8 +11,7 @@
 /// out, loss for a while. What it rarely finds is the other kind —
 /// one peer hearing two things in the other order from everybody
 /// else, or the one copy of something that mattered not arriving at
-/// one peer. Five fixes of that kind were each undone, one at a time,
-/// and the walk caught one of them.
+/// one peer.
 ///
 /// This takes a small sealed game, runs it once to list every event
 /// said in its first seconds and every peer it went to (heartbeats
@@ -31,9 +30,9 @@
 /// The simulator is deterministic and the change draws no randomness
 /// of its own (SimNetwork.steer), so each run is the baseline with
 /// exactly one thing different. The events are tried kind by kind —
-/// the jury and the deal first, since that is where these bugs have
-/// been, and the plays and witnesses last — and in the order they
-/// were said within a kind.
+/// the jury and the deal first, where ordering matters most, and the
+/// plays and witnesses last — and in the order they were said within
+/// a kind.
 ///
 /// Each run is held, by default, to what a table owes by the end of
 /// its first trick: every survivor dealt in and a trick played within
@@ -292,8 +291,8 @@ Future<void> main(List<String> args) async {
     exit(2);
   }
   // One hold or several: `--hold 2500,6000` tries each copy late by
-  // each. A juror holds its keys back two seconds on purpose, so a
-  // jury that is to arrive after them has to be held back longer.
+  // each. A juror holds its keys back until the record names the draw,
+  // so a jury that is to arrive after them has to be held back longer.
   final holds = [for (final h in (_arg(args, 'hold') ?? '2500').split(',')) int.parse(h)];
   final holdMs = holds.first;
   final shard = (_arg(args, 'shard') ?? '0/1').split('/').map(int.parse).toList();

@@ -10,10 +10,11 @@
 //! `now` and `report` from the host, so the same code runs in a browser
 //! with no glue library — bench.html and bench.mjs are the hosts.
 
-use ark_ff::{to_bytes, UniformRand};
+use ark_ff::UniformRand;
 use ark_std::One;
 use barnett_smart_card_protocol::discrete_log_cards;
 use barnett_smart_card_protocol::BarnettSmartProtocol;
+use proof_essentials::to_bytes;
 use proof_essentials::utils::permutation::Permutation;
 use proof_essentials::utils::rand::sample_vector;
 use rand::SeedableRng;
@@ -148,7 +149,19 @@ pub fn run(seed: u64, mut now: impl FnMut() -> f64) -> Timings {
 }
 
 #[cfg(target_arch = "wasm32")]
+mod no_entropy {
+    use getrandom::{register_custom_getrandom, Error};
+    fn none(_: &mut [u8]) -> Result<(), Error> {
+        Err(Error::UNSUPPORTED)
+    }
+    register_custom_getrandom!(none);
+}
+
+#[cfg(target_arch = "wasm32")]
 mod host {
+    // Imported from the host by name: newer linkers no longer leave an
+    // undefined symbol to be an import of its own accord.
+    #[link(wasm_import_module = "env")]
     extern "C" {
         pub fn now() -> f64;
         pub fn report(id: u32, ms: f64);

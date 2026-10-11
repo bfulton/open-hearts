@@ -2,8 +2,8 @@
 ///
 /// `service/do/relay.mjs` is the relay the Cloudflare object runs, and
 /// the whole point of it is that a client meets the same NIP-01 subset
-/// there as here. The way to know that is to run the tests that have
-/// always run against the Dart relay against the JS one instead, so
+/// there as here. The way to know that is to run the tests written
+/// against the Dart relay against the JS one instead, so
 /// this is that relay wearing the same class: a node process hosting
 /// the core (`service/do/host.mjs`), the same constructor the tests
 /// call, the same `url` to connect to.
@@ -30,12 +30,29 @@ import 'package:table/table.dart';
 import 'relay.dart';
 
 class JsRelay implements Relay {
-  JsRelay({this.keep = 10000, this.log, String? Function(NostrEvent event)? refuse}) {
+  JsRelay({this.keep = 10000, this.log, String? Function(NostrEvent event)? refuse, this.object = false, this.gate}) {
     _refuse = refuse;
   }
 
+  /// The service's key, to ask every socket who it is by, as the
+  /// deployed relay does (service/do/relay.mjs, serviceGate); null asks
+  /// nobody.
+  final String? gate;
+
+  /// Tells the relay that [account]'s device in use is now the one of
+  /// [epoch], as the account's own object tells the deployed one.
+  void revoke(String account, int epoch) => _tell({
+        'revoke': {'account': account, 'epoch': epoch},
+      });
+
   /// How many stored events the host holds before the oldest go.
   final int keep;
+
+  /// The deployed object's rules (`OH_RELAY=object`): one object per
+  /// tag, the tag in the address ([url] carries [tagMark]), the
+  /// ephemeral kinds and the tag's own lobby taken and nothing else,
+  /// and a table's limits.
+  final bool object;
 
   /// Receives the host's own log lines, connections and subscriptions
   /// and refusals, or null to start it quiet.
@@ -59,7 +76,7 @@ class JsRelay implements Relay {
   int get port => _port ?? (throw StateError('the relay is not serving'));
 
   @override
-  Uri get url => Uri(scheme: 'ws', host: '127.0.0.1', port: port);
+  Uri get url => Uri(scheme: 'ws', host: '127.0.0.1', port: port, pathSegments: object ? const [tagMark] : null);
 
   @override
   int get connections => _count('connections');
@@ -88,6 +105,8 @@ class JsRelay implements Relay {
       '--keep', '$keep',
       '--stats', _counts!.path,
       '--control',
+      if (object) '--object',
+      if (gate != null) ...['--gate', gate!],
       if (log == null) '--quiet',
     ]);
     _host = host;

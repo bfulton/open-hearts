@@ -96,7 +96,7 @@ void main() {
     // An eavesdropper on the relay sees every signal at the table, and
     // reads none of it: each is sealed to its addressee (NIP-44).
     final overheard = <String>[];
-    final ear = WebSocketChannel.connect(relay.url);
+    final ear = WebSocketChannel.connect(relaysForTag([relay.url], 'sig').single);
     await ear.ready;
     ear.stream.listen((raw) {
       final m = jsonDecode(raw as String) as List;

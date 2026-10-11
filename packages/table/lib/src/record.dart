@@ -5,10 +5,12 @@
 /// that held the seat and legal under the engine at that point, every
 /// removal must carry the majority the participants of the moment
 /// required, and every bot move is recomputed rather than read. The
-/// ratings fall out of the replay by doc 04's two rules.
+/// ratings fall out of the replay by the two rules of
+/// docs/04-live-play.md.
 library;
 
 import 'dart:convert';
+import 'dart:math' show min;
 import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
@@ -69,8 +71,10 @@ class Verification {
 /// verdict instead ([juries]: the jury proposals that carried at this
 /// peer). Each jury must itself be carried by a majority of the
 /// participants of its moment and be the draw its snapshot gives; a
-/// verdict must be by a juror of the hand, about this turn and this
-/// seat, ruling for the very event recorded.
+/// verdict must be by a juror of a jury in force at its turn — the
+/// hand's own, or the one before up to the turn the hand's own carried
+/// at — about this turn and this seat, ruling for the very event
+/// recorded.
 ///
 /// A sealed record (docs/03-fair-deal.md) is replayed through the deal
 /// as well, with [crypto]: every key's proof, every shuffle's
@@ -85,6 +89,9 @@ class Verification {
 /// departed seats: a seat's secret the audits do not vouch for — one
 /// removed at its own audit turn, after the others audited — is
 /// rebuilt from them, a person's piece and a juror's.
+///
+/// Where accounts are checked (licence.dart), every person's seat must
+/// carry a licence the service signed for its key, naming its account.
 Verification verifyRecord(
   TableSpec spec,
   List<Decision> record, {
@@ -92,6 +99,7 @@ Verification verifyRecord(
   List<Decision> juries = const [],
   DealCrypto? crypto,
   List<TableEvent> releases = const [],
+  TableReplay? replay,
 }) {
   // A record that ends the game where nobody could move the table ends
   // mid-hand, before the audit that opens every seat's cards: what it
@@ -111,6 +119,12 @@ Verification verifyRecord(
   Verification fail(String why) => Verification(ok: false, reason: why, winners: const [], ratings: const {}, finalHolders: holders);
 
   if (spec.sealed && crypto == null) return fail('a sealed record needs the deal\'s cryptography to check');
+  // Every seat an account's, by the service's word that its key is one
+  // of the account's devices (licence.dart): what makes the names, the
+  // ratings and the result the accounts'. No clock to hold a licence's
+  // date to: a record is read long after it ran out.
+  final unlicensed = spec.licenceProblem();
+  if (unlicensed != null) return fail(unlicensed);
 
   Verification partial() =>
       Verification(ok: true, reason: 'verified so far', winners: const [], ratings: const {}, finalHolders: holders, complete: false);
@@ -180,6 +194,39 @@ Verification verifyRecord(
       if (h <= hand && h > latest) latest = h;
     }
     return latest < 0 ? const {} : jurors[latest]!;
+  }
+
+  /// Where each hand's own jury carried: the earliest turn of its
+  /// draws. A draw names the turn its proposer stood at, and is carried
+  /// by a majority of the participants of that turn.
+  final ownJuryAt = <int, TurnId>{};
+
+  /// Whether [who] may rule at [turn]: a juror of a jury in force there.
+  /// The hand's own, across redraws; and, at turns up to the one the
+  /// hand's own carried at — or the whole hand, if it never carried —
+  /// the latest earlier hand's, since a jury serves until a later one
+  /// carries. A table of two with one gone quiet carries no draw, so
+  /// the old jury rules the seat out; then the one person left is the
+  /// table's majority and carries the hand's own draw, which the juror
+  /// who ruled need not be in (docs/04-live-play.md, "Appeals and
+  /// verdicts"; `test/verdict_before_the_draw_test.dart`).
+  ///
+  /// At the turn the hand's own carried, the old jury still rules: the
+  /// removal it rules there is what lets the one person left carry the
+  /// draw at all, so at that position the verdict comes first at the
+  /// table. Past it, a client that has carried the hand's own takes no
+  /// verdict from a juror outside it ([TableClient]'s _onVerdict), and
+  /// a record holding one is not a table's.
+  bool mayRule(PublicKey who, TurnId turn) {
+    final hand = turn.hand;
+    if (jurors[hand]?.contains(who) ?? false) return true;
+    final own = ownJuryAt[hand];
+    if (own != null && !atOrBefore(turn, own)) return false;
+    var before = -1;
+    for (final h in jurors.keys) {
+      if (h < hand && h > before) before = h;
+    }
+    return before >= 0 && jurors[before]!.contains(who);
   }
 
   /// The bot seats a jury holds at [hand], if it holds any: the ones
@@ -442,14 +489,17 @@ Verification verifyRecord(
       return fail('a jury for hand ${e.hand} without a majority behind it (${d.witnesses.length} of ${d.among.length})');
     }
     jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
+    final at = ownJuryAt[e.hand];
+    if (at == null || e.turn.position < at.position) ownJuryAt[e.hand] = e.turn;
   }
 
-  /// Whether [d] is carried by a verdict: a juror of the hand ruled
-  /// for exactly this event at exactly this turn.
+  /// Whether [d] is carried by a verdict: a juror of a jury in force at
+  /// its turn ([mayRule]) ruled for exactly this event at exactly this
+  /// turn.
   bool byVerdict(Decision d) {
     final v = d.verdict;
     if (v == null || v.kind != EventKind.verdict) return false;
-    if (!jurorsAt(d.turn.hand).contains(v.author)) return false;
+    if (!mayRule(v.author, d.turn)) return false;
     try {
       if (v.turn != d.turn || v.seat != d.event.seat) return false;
       if ((v.side == 'removal') != d.removal) return false;
@@ -496,6 +546,7 @@ Verification verifyRecord(
       );
       final card = bot.chooseCard(view, game.legalPlaysFor(seat));
       if (d != null) d.playOpen(seat, d.positionOf(seat, card.index)!);
+      replay?._played(game.handNumber, seat, card);
       game.play(seat, card);
       played.add(card);
     }
@@ -506,7 +557,10 @@ Verification verifyRecord(
     if (game.pendingTrick != null) game.collectTrick();
     if (game.phase == Phase.handOver) {
       played.clear();
-      if (!spec.sealed) game.nextHand();
+      if (!spec.sealed) {
+        replay?._ended(game);
+        game.nextHand();
+      }
     }
   }
 
@@ -665,7 +719,7 @@ Verification verifyRecord(
           // it cannot be opened to show anything. So the record goes
           // on to a later hand with this one's deal short, and that
           // is a hand over, not a deal left unfinished
-          // (docs/04-live-play.md, "When quorum is lost anyway").
+          // (docs/04-live-play.md).
           //
           // Only where the record gives a held seat to the escrow with
           // a step of the deal still owed. Every other step has
@@ -691,11 +745,10 @@ Verification verifyRecord(
         // is the hand played on with every card in the open, and it
         // cannot: the audits are where the hand ends.
         final givenUp = nextIsAudit();
-        // A newcomer's piece is released like any other, and one this
-        // side could not place was taken for nobody's: a seat given to
-        // the escrow, opened at the table from a topped-up juror's
-        // piece and another, was never opened here (sealed chaos seed
-        // 10, nine strangers).
+        // A newcomer's piece is released like any other, and has to be
+        // placed here as the table placed it, or a seat given to the
+        // escrow and opened at the table from a topped-up juror's piece
+        // would never open here.
         growCustodians(d, game.handNumber, index);
         feedSecrets(d, all: true);
         if (givenUp) {
@@ -821,6 +874,9 @@ Verification verifyRecord(
       // seated; then the next deal.
       final v = takeAudits();
       if (v != null) return v;
+      // Every card open now: what each seat was dealt, and held after
+      // the pass, for whoever is looking at the game afterwards.
+      replay?._ended(game, deal);
       game.nextHand();
       deal = null;
       continue;
@@ -882,6 +938,7 @@ Verification verifyRecord(
       );
       if (want != card) return fail('a play at $turn by seat $seat that the policy does not play: $card, not $want');
     }
+    replay?._played(game.handNumber, seat, card);
     game.play(seat, card);
     played.add(card);
     sweep();
@@ -890,13 +947,14 @@ Verification verifyRecord(
     // The last hand is audited too — after whatever the record removes
     // at its audits, which comes first at their position as at every
     // hand's. Taken straight to the audits, a claim for the escrow at
-    // one of them stopped the replay before any audit, and the hand's
-    // audits and that claim went unchecked.
+    // one of them would stop the replay before any audit, and leave the
+    // hand's audits and that claim unchecked.
     final why = takeRemovals();
     if (why != null) return fail(why);
     if (endedBy != null) return endedHere();
     final v = takeAudits();
     if (v != null) return v;
+    replay?._ended(game, deal);
   }
   // And nothing after: a decision the replay never reached is one it
   // never checked.
@@ -915,4 +973,101 @@ Verification verifyRecord(
     ratings[original.key] = botWon ? 0 : (winners.contains(s) ? 1 : -1);
   }
   return Verification(ok: true, reason: 'verified', winners: winners, ratings: ratings, finalHolders: holders);
+}
+
+
+/// A game as the verifier replayed it, for looking at afterwards: hand
+/// by hand, what each seat was dealt and held after the pass, every
+/// card in the order played, and the scores. Filled only as far as the
+/// record checks out — a record that fails has no replay worth showing.
+class TableReplay {
+  TableReplay({this.onHand});
+
+  final List<TableReplayHand> hands = [];
+
+  /// Called as each hand's check is done — and again for the last hand
+  /// once the game's closing audit opens its cards — so a game can be
+  /// shown a hand at a time while the rest is still being checked.
+  final void Function(TableReplayHand hand)? onHand;
+
+  TableReplayHand _hand(int number) {
+    while (hands.length <= number) {
+      hands.add(TableReplayHand._(hands.length));
+    }
+    return hands[number];
+  }
+
+  void _played(int hand, int seat, Card card) => _hand(hand).plays.add((seat: seat, card: card));
+
+  void _ended(HeartsGame game, [DealSession? deal]) {
+    final h = _hand(game.handNumber)
+      ..scores = List.of(game.handScores)
+      ..totals = List.of(game.totals);
+    if (deal != null) {
+      List<Card>? cards(List<int>? indices) => indices == null ? null : ([for (final i in indices) Card.deck[i]]..sort());
+      final dealt = [for (var s = 0; s < seatCount; s++) cards(deal.dealtHandOf(s))];
+      if (dealt.every((c) => c != null)) h.dealt = [for (final c in dealt) c!];
+    }
+    onHand?.call(h);
+  }
+}
+
+class TableReplayHand {
+  TableReplayHand._(this.number);
+
+  /// As [toJson] wrote it: cards by their index in the deck.
+  factory TableReplayHand.fromJson(Map<String, Object?> json) {
+    List<Card> cards(Object? l) => [for (final i in l as List) Card.deck[i as int]];
+    final h = TableReplayHand._(json['number'] as int)
+      ..scores = [for (final x in json['scores'] as List) x as int]
+      ..totals = [for (final x in json['totals'] as List) x as int];
+    final dealt = json['dealt'];
+    if (dealt != null) h.dealt = [for (final d in dealt as List) cards(d)];
+    for (final p in json['plays'] as List) {
+      final pair = p as List;
+      h.plays.add((seat: pair[0] as int, card: Card.deck[pair[1] as int]));
+    }
+    return h;
+  }
+
+  Map<String, Object?> toJson() => {
+        'number': number,
+        'dealt': dealt == null ? null : [for (final d in dealt!) [for (final c in d) c.index]],
+        'plays': [for (final p in plays) [p.seat, p.card.index]],
+        'scores': scores,
+        'totals': totals,
+      };
+
+  final int number;
+
+  /// Each seat's thirteen as dealt; null where the deal never opened
+  /// them (a game that ended mid-hand).
+  List<List<Card>>? dealt;
+
+  /// Each seat's thirteen once the pass was made: what it played, since
+  /// a hand is played out to the last card. Null for a hand cut short.
+  List<List<Card>>? get held => plays.length < seatCount * 13
+      ? null
+      : [
+          for (var s = 0; s < seatCount; s++) [for (final p in plays) if (p.seat == s) p.card]..sort(),
+        ];
+
+  /// Every card in the order it was played.
+  final List<({int seat, Card card})> plays = [];
+
+  /// The hand's points per seat, and the running totals after it; empty
+  /// for a hand the game ended in the middle of.
+  List<int> scores = const [];
+  List<int> totals = const [];
+
+  /// The plays, four to a trick.
+  List<List<({int seat, Card card})>> get tricks => [
+        for (var i = 0; i < plays.length; i += seatCount) plays.sublist(i, min(i + seatCount, plays.length)),
+      ];
+
+  /// What [seat] passed: dealt and not held.
+  List<Card> passedBy(int seat) {
+    final held = this.held;
+    return dealt == null || held == null ? const [] : [for (final c in dealt![seat]) if (!held[seat].contains(c)) c];
+  }
 }

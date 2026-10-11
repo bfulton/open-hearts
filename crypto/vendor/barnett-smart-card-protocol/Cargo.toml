@@ -1,0 +1,20 @@
+[package]
+name = "barnett-smart-card-protocol"
+version = "0.1.0"
+edition = "2021"
+
+# Open Hearts: vendored from geometryxyz/mental-poker at b1313f3 and
+# ported from arkworks 0.3 to 0.6 (see ../README.md). Its sibling crates
+# are the vendored ones beside it, not the ssh URLs upstream names; its
+# examples are left out.
+
+[dependencies]
+ark-ec = { version = "0.6.0", features = ["std"] }
+ark-ff = { version = "0.6.0", features = ["std"] }
+ark-serialize = { version = "0.6.0", features = ["std", "derive"] }
+ark-std = { version = "0.6.0", features = ["std"] }
+blake2 = "0.10"
+proof-essentials = { path = "../proof-essentials" }
+rand = "0.8.4"
+starknet-curve = { path = "../starknet-curve" }
+thiserror = "1.0.30"

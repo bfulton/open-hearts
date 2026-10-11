@@ -1,9 +1,9 @@
 // A WebSocket server in the twenty or so rules of RFC 6455 that a
 // relay needs, because node has a WebSocket client and no server and
 // this repo has no dependency to add one. It is here so the JS relay
-// core (relay.mjs) can be driven by the suites that have always driven
-// the Dart relay: the same sockets, the same clients, a different
-// relay underneath.
+// core (relay.mjs) can be driven by the suites that drive the Dart
+// relay: the same sockets, the same clients, a different relay
+// underneath.
 //
 // What it does: the upgrade handshake, masked frames from the client,
 // unmasked frames back, fragmentation, ping and close. What it does
@@ -101,6 +101,14 @@ class Connection {
       length = Number(big);
       at = 10;
     }
+    // A client masks every frame (RFC 6455 5.1), and a control frame is
+    // whole and at most 125 bytes (5.5). Anything else is not a client
+    // speaking the protocol, and the connection goes.
+    if (!masked || (opcode >= 0x8 && (!fin || length > 125))) {
+      this.close(1002);
+      this._gone();
+      return false;
+    }
     const data = at + (masked ? 4 : 0);
     if (b.length < data + length) return false;
     const payload = Buffer.from(b.subarray(data, data + length));
@@ -115,6 +123,7 @@ class Connection {
 
   _tooBig() {
     this.close(1009);
+    this._gone();
     return false;
   }
 
@@ -141,7 +150,7 @@ class Connection {
     this._fragmentBytes += payload.length;
     if (this._fragmentBytes > maxMessageBytes) {
       this._tooBig();
-      return this._gone();
+      return;
     }
     this._fragments.push(payload);
     if (!fin) return;
@@ -174,6 +183,13 @@ export async function listen({ port = 0, host = '127.0.0.1', onConnection }) {
     socket.setNoDelay(true);
     const connection = new Connection(socket, new URL(request.url, 'http://host').pathname);
     socket.on('data', (chunk) => connection.feed(chunk));
+    // An http server's sockets are half-open: a client that hangs up
+    // leaves ours open, and the server waiting on it forever, unless
+    // hanging up is answered in kind.
+    socket.on('end', () => {
+      socket.end();
+      connection._gone();
+    });
     socket.on('error', () => connection._gone());
     socket.on('close', () => connection._gone());
     // Handed over before a byte of it is read, since the first message

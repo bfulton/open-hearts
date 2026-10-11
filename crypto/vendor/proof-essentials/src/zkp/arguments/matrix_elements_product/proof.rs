@@ -4,10 +4,10 @@ use crate::error::CryptoError;
 use crate::vector_commitment::HomomorphicCommitmentScheme;
 use crate::zkp::arguments::{hadamard_product, single_value_product};
 
-use ark_ff::{to_bytes, Field};
-use ark_marlin::rng::FiatShamirRng;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use ark_std::io::{Read, Write};
+use ark_ff::{Field};
+use crate::to_bytes;
+use crate::zkp::FiatShamirRng;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use digest::Digest;
 
 #[derive(CanonicalDeserialize, CanonicalSerialize)]

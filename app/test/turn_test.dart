@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/net/licence.dart' show requestDigest;
 import 'package:open_hearts/net/turn.dart';
 import 'package:open_hearts/net/turn_fetch_io.dart';
 import 'package:table/table.dart';
@@ -41,25 +42,48 @@ void main() {
       expect(servers[1]['urls'], hasLength(2));
       expect(servers[1]['username'], 'u');
       expect(servers[1]['credential'], 'c');
-      expect(h.seen.single, 'POST /api/turn {"key":"${signer.publicKey}"}');
+      final [method, path, body] = h.seen.single.split(' ');
+      expect('$method $path', 'POST /api/turn');
+      // The key, and its signature over asking for TURN now: a key
+      // alone is anybody's (licence.dart, signedAsk).
+      final asked = jsonDecode(body) as Map<String, Object?>;
+      expect(asked['key'], signer.publicKey);
+      expect(asked['sig'], signer.sign(requestDigest('turn', signer.publicKey, asked['at'] as int)));
     } finally {
       await h.stop();
     }
   });
 
-  test('a handler with none to give, or unreachable, leaves STUN alone', () async {
+  test('a handler with none to give, or unreachable, leaves no servers, and so no channels', () async {
     final h = await handler(503, jsonEncode({'error': 'turn not configured'}));
     try {
-      expect(await iceServersFor(signer, endpoint: h.url), stunOnly);
+      expect(await iceServersFor(signer, endpoint: h.url), isEmpty);
     } finally {
       await h.stop();
     }
-    expect(await iceServersFor(signer, endpoint: Uri.parse('http://127.0.0.1:1/api/turn')), stunOnly);
+    expect(await iceServersFor(signer, endpoint: Uri.parse('http://127.0.0.1:1/api/turn')), isEmpty);
     final nonsense = await handler(200, '<html>');
     try {
-      expect(await iceServersFor(signer, endpoint: nonsense.url), stunOnly);
+      expect(await iceServersFor(signer, endpoint: nonsense.url), isEmpty);
     } finally {
       await nonsense.stop();
+    }
+  });
+
+  test('a handler that never answers is given its few seconds, and no servers after', () async {
+    // It takes the request and says nothing: a worker that has hung. The
+    // credentials are fetched beside the relays rather than in front of
+    // them (home_page.dart), so nothing on the screen waits on this.
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((_) {});
+    try {
+      final began = DateTime.now();
+      final servers = await iceServersFor(signer,
+          endpoint: Uri.parse('http://127.0.0.1:${server.port}/api/turn'), timeout: const Duration(milliseconds: 300));
+      expect(servers, isEmpty);
+      expect(DateTime.now().difference(began), lessThan(const Duration(seconds: 3)));
+    } finally {
+      await server.close(force: true);
     }
   });
 

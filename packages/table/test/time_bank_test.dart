@@ -1,4 +1,4 @@
-/// The time bank (docs/04-live-play.md, "Boot"), on the simulator: a
+/// The time bank (docs/04-live-play.md), on the simulator: a
 /// grace per decision, a bank per hand, and Boot the moment both are
 /// spent — by the others' own accounting of what they saw.
 library;

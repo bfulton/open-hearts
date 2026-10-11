@@ -20,29 +20,38 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:table/table.dart';
 
-import 'about_page.dart';
+import 'activate_page.dart';
 import 'avatar.dart';
+import 'build_info.dart' show buildDate, reloadPage;
 import 'crypto/deal.dart';
 import 'entitlement.dart';
+import 'feedback_page.dart';
 import 'game_options.dart';
 import 'identity.dart';
+import 'l10n/l10n.dart';
+import 'net/copy.dart';
+import 'pages.dart';
 import 'profile_page.dart';
-import 'record_store.dart';
-import 'stats.dart';
-import 'live/live_page.dart';
 import 'live/options_sheet.dart';
 import 'live_controller.dart';
+import 'net/account_profile.dart';
 import 'net/address.dart';
 import 'net/buying.dart';
 import 'net/duty.dart';
+import 'net/game_records.dart';
 import 'net/household.dart';
+import 'net/in_use.dart';
 import 'net/mesh_transport.dart';
+import 'net/network.dart';
+import 'net/remote_config.dart';
 import 'net/relays.dart';
 import 'net/room.dart';
+import 'net/seat_store.dart';
 import 'net/share.dart';
 import 'net/standing.dart';
 import 'pace_store.dart';
@@ -59,8 +68,14 @@ import 'ui/update_pill.dart';
 
 /// Whether live play is open on this device: whether it holds a
 /// licence the service signed and the date on it has not passed
-/// (entitlement.dart, docs/06-service.md). Solo play never asks.
-bool get liveOpen => Entitlement.current.live;
+/// (entitlement.dart, docs/06-service.md) — and it has not stepped back
+/// for another device of its account (net/in_use.dart). Solo play
+/// never asks.
+bool get liveOpen => Entitlement.current.live && !InUse.current.elsewhere;
+
+/// Whether the operator has shut live play's doors for everyone, for
+/// now: the remote config's kill switch (net/remote_config.dart).
+bool get livePaused => !RemoteSettings.current.config.live;
 
 /// What the relays say back — a refusal, a notice, a drop — goes to
 /// the console, where a person debugging a table can read it. Which
@@ -70,6 +85,15 @@ void _relayLog(String line) => debugPrint('relay: $line');
 /// With `?e2e` in the address the table's every transition and the
 /// mesh's every channel change go to the console too.
 final _debugging = Uri.base.queryParameters.containsKey('e2e');
+
+/// The deal a solo game starts from, for a browser test that needs a
+/// particular one (`?e2e&seed=156`); with no `e2e`, never.
+final _dealtFrom = _debugging ? int.tryParse(Uri.base.queryParameters['seed'] ?? '') : null;
+
+/// The score the games started here play to, when a browser test asks
+/// for another (`?e2e&target=1`, net/address.dart); with no `e2e`,
+/// never — the device's own choice, which the door still shows.
+final _playsTo = targetIn(Uri.base);
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.openRoom, this.openClaim, this.justBought = false, this.online = true});
@@ -127,6 +151,13 @@ class _HomePageState extends State<HomePage> {
   /// error — there is nothing to do about it but wait — so it is said
   /// quietly and it goes as soon as one answers.
   bool _slow = false;
+
+  /// Back from a checkout and waiting for the licence it bought: said
+  /// so, where the way to buy would otherwise sit looking as if nothing
+  /// had happened. [_paidWaiting] is the wait run out with no licence
+  /// yet — the payment went through, the webhook has not.
+  late bool _finishing = widget.justBought;
+  bool _paidWaiting = false;
   Room? _room;
   WaitingRoom? _queue;
   RelayTransport? _transport;
@@ -139,6 +170,14 @@ class _HomePageState extends State<HomePage> {
   /// takes them.
   String? _relayNote;
   StreamSubscription<String?>? _refusalSub;
+
+  /// Why a wait or a room has gone quiet, when that is known: every
+  /// relay refused this device, or the device says it has no network.
+  /// Unsaid, a room reads as though the others had left it — they drop
+  /// off the list once they have not been heard for a few seconds — and
+  /// a wait as one with nobody else in it. Gone again once the network
+  /// is back.
+  String? get _cutOff => _relayNote ?? (deviceOffline() ? context.l10n.noRelayAnswered : null);
 
   /// The ICE servers for this device's next table, fetched once the
   /// relays answer (turn.dart); none until then, and none at all on
@@ -171,9 +210,15 @@ class _HomePageState extends State<HomePage> {
     // the way back from a checkout, a licence the service was slow to
     // answer for — and when it does the door opens with it.
     Entitlement.current.addListener(_licensed);
+    RemoteSettings.current.addListener(_configured);
+    InUse.current.addListener(_inUse);
+    // Who this device is can change under this screen: another device
+    // of the account changed the profile (net/account_profile.dart).
+    AccountProfile.current.addListener(_reprofiled);
     // A device that cannot play live has no business in the count of
-    // who is here, or in a jury.
-    if (widget.online && liveOpen) _goOnline();
+    // who is here, or in a jury — nor one whose live play the operator
+    // has paused.
+    if (widget.online && liveOpen && !livePaused) _goOnline();
     // Neither of these is the relays, which is what `online` is about:
     // they are one call to the service each, and a test stands its own
     // behind that (net/household.dart).
@@ -181,11 +226,102 @@ class _HomePageState extends State<HomePage> {
     if (widget.openClaim != null) unawaited(_arriving());
   }
 
+  /// The router, listened to for the moment this screen is on top again
+  /// (router.dart): a page closed over it, or a game ended.
+  GoRouter? _router;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final router = GoRouter.maybeOf(context);
+    if (identical(router, _router)) return;
+    _router?.routerDelegate.removeListener(_moved);
+    _router = router?..routerDelegate.addListener(_moved);
+  }
+
+  bool get _onTop => _isHome(_router?.state.uri.path);
+
+  static bool _isHome(String? path) => path == '/' || (path?.startsWith('/room/') ?? false);
+
+  bool _wasOnTop = true;
+
+  void _moved() {
+    final onTop = _onTop;
+    if (onTop && !_wasOnTop) unawaited(_back());
+    _wasOnTop = onTop;
+  }
+
+  /// On top again. Who this device is may have changed on a page over
+  /// this one — the profile keeps itself — and the address is this
+  /// screen's again: in the room this device is in, or none.
+  Future<void> _back() async {
+    final name = await Identity.name();
+    final avatar = await Identity.avatar();
+    if (!mounted) return;
+    setState(() {
+      _name = name ?? '';
+      _avatar = avatar;
+    });
+    _showAddress();
+  }
+
+  /// The account's profile taken over this device's: shown at once, and
+  /// what the next room or table is told.
+  Future<void> _reprofiled() async {
+    final name = await Identity.name();
+    final avatar = await Identity.avatar();
+    if (!mounted) return;
+    setState(() {
+      _name = name ?? '';
+      _avatar = avatar;
+    });
+  }
+
+  /// The address, as this screen says it: its room, or none, and [drop]
+  /// taken out — a mark a round trip put there (the code a claim came
+  /// with, the `bought` a checkout came back with), which a refresh
+  /// should not act on twice. Not a place in the history: entering and
+  /// leaving a room is not something to go back to. Only while this
+  /// screen is the one showing; a page over it says where it is.
+  void _showAddress({Set<String> drop = const {}}) {
+    final router = _router;
+    if (!mounted || router == null || !_onTop) return;
+    final at = router.state.uri;
+    final room = _room;
+    final query = Map<String, String>.of(at.queryParameters)..removeWhere((k, _) => drop.contains(k));
+    final to = Uri(path: room == null ? '/' : roomPath(room.code), queryParameters: query.isEmpty ? null : query).toString();
+    if (to == at.toString()) return;
+    Router.neglect(context, () => router.go(to));
+  }
+
+  Future<void> _goAbout() => openPage<void>(context, AppPage.about);
+
   /// Arrived by a code another device showed (docs/06-service.md): this
   /// device joins that subscription and is given a licence of its own.
   Future<void> _arriving() async {
     final code = widget.openClaim;
     if (code == null) return;
+    // Asked first. A link is anybody's to send, and a code spent on
+    // opening it would put this device in whatever household sent it,
+    // without a word to its owner (docs/security-review.md).
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final join = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(dialog.l10n.joinHouseholdTitle),
+        content: Text(dialog.l10n.joinHouseholdBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: Text(dialog.l10n.notNow)),
+          FilledButton(onPressed: () => Navigator.of(dialog).pop(true), child: Text(dialog.l10n.join)),
+        ],
+      ),
+    );
+    if (join != true) {
+      _forget('claim');
+      return;
+    }
+    if (!mounted) return;
     // Checked against the service this app is standing behind, which
     // is the entitlement's to name and not a constant's: a test stands
     // its own there, and so does the browser suite's rig.
@@ -194,7 +330,7 @@ class _HomePageState extends State<HomePage> {
     if (said.answer != null) {
       await Entitlement.current.adopt(said.answer!);
     } else {
-      setState(() => _error = said.refusal);
+      setState(() => _error = said.refusal!.say(context.l10n));
     }
     // The code is spent, so the address lets it go. Afterwards, not
     // before: a refresh while it was still in the air should try again,
@@ -207,14 +343,45 @@ class _HomePageState extends State<HomePage> {
   /// least once.
   void _forget(String name) {
     if (!mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) => forgetInAddress(name));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showAddress(drop: {name}));
   }
 
   /// Live play opened, or shut, under this screen.
   void _licensed() {
     if (!mounted) return;
     setState(() {});
-    if (widget.online && liveOpen && Duty.current == null) _goOnline();
+    if (widget.online && liveOpen && !livePaused && Duty.current == null) _goOnline();
+  }
+
+  /// Another device of the account took it up, or this one took it back
+  /// (net/in_use.dart). Stepped back, nothing live is left open here: the
+  /// pool or the room goes, and the duty and any table go with their own
+  /// listeners (net/duty.dart, live/live_page.dart). Taken back, this
+  /// device comes online again.
+  void _inUse() {
+    if (!mounted) return;
+    if (InUse.current.elsewhere) {
+      setState(() {
+        _closeLobby();
+        _listeningSinceMs = null;
+        _onlineClock?.cancel();
+        _onlineClock = null;
+      });
+      return;
+    }
+    setState(() {});
+    if (widget.online && liveOpen && !livePaused && Duty.current == null && InUse.current.standing == Use.here) _goOnline();
+  }
+
+  /// The operator said something new. A pause shuts the doors from here
+  /// on and leaves whatever is already under way alone: a device that is
+  /// online stays a juror to the tables that drew it until the app is
+  /// next started, since a game it holds a bot's hand in would end
+  /// without it. A pause lifted opens them again.
+  void _configured() {
+    if (!mounted) return;
+    setState(() {});
+    if (widget.online && liveOpen && !livePaused && Duty.current == null) _goOnline();
   }
 
   /// Back from a checkout. The licence is behind a webhook Stripe sends
@@ -229,6 +396,11 @@ class _HomePageState extends State<HomePage> {
       await Future<void>.delayed(const Duration(seconds: 2));
     }
     _forget('bought');
+    if (!mounted) return;
+    setState(() {
+      _finishing = false;
+      _paidWaiting = !liveOpen;
+    });
   }
 
   /// Who this device is and what game it asks for, off the device. In
@@ -249,19 +421,44 @@ class _HomePageState extends State<HomePage> {
     // Here by a link: straight into the room — unless live play is
     // locked, which a link does not open. A device with no name yet is
     // asked for one on the way in.
-    if (liveOpen && widget.openRoom != null) await _enter();
+    if (liveOpen && !livePaused && widget.openRoom != null) await _enter();
+  }
+
+  /// The seat this device is playing in (net/seat_store.dart): kept as
+  /// the game goes, so that a reload comes back to it.
+  SeatStore? _seats;
+
+  /// Back from a reload in the middle of a game: straight back into the
+  /// seat, if it can still be this device's. The table may have given it
+  /// to a bot meanwhile, and then the table says so once it has caught
+  /// this device up (live/live_page.dart).
+  Future<void> _comeBack(Signer signer) async {
+    final seats = _seats = await SeatStore.open();
+    final kept = seats.load();
+    if (kept == null || !mounted) return;
+    if (kept.spec.seatOf(signer.publicKey) == null || (kept.spec.sealed && !dealReady)) return seats.clear();
+    _toTable(kept.spec, kept.names, kept.avatars, journal: kept.journal);
   }
 
   /// Online from the front door, not only from a table: this device is
   /// a juror to draw on as soon as the app is open, and it sees who
   /// else is about.
+  ///
+  /// First, this device takes its account up (net/in_use.dart): the
+  /// relay carries only the account's device in use, and one at a time.
+  /// Asked to wait — the account is in a game on another device — it
+  /// waits for the person's word, on the screen that asks for it.
   Future<void> _goOnline() async {
     final signer = await Identity.signer();
     if (!mounted) return;
     setState(() => _signer = signer);
+    if (InUse.current.standing != Use.here) await InUse.current.open(signer);
+    if (!mounted || InUse.current.elsewhere || Duty.current != null) return;
+    unawaited(_comeBack(signer));
     Duty.on(_relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence.ready.then((_) {
       if (mounted) setState(() => _listeningSinceMs = DateTime.now().millisecondsSinceEpoch);
     });
+    _onlineClock?.cancel();
     _onlineClock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -272,10 +469,13 @@ class _HomePageState extends State<HomePage> {
   /// This one is counted whether or not it says it is here: one that
   /// cannot deal says nothing of itself (net/duty.dart), and the
   /// others around it are still the others.
+  ///
+  /// And null while the device says it has no network: the beats it
+  /// heard before are not who is here now, and it hears nobody new.
   int? get _online {
     final since = _listeningSinceMs;
     final duty = Duty.current;
-    if (since == null || duty == null) return null;
+    if (since == null || duty == null || deviceOffline()) return null;
     if (DateTime.now().millisecondsSinceEpoch - since < duty.presence.everyMs + 1500) return null;
     final others = duty.presence.online(withinMs: 15000).difference({duty.presence.signer.publicKey});
     return others.length + 1;
@@ -285,7 +485,7 @@ class _HomePageState extends State<HomePage> {
   /// address nobody has confirmed.
   Future<void> _loadStanding(List<Uri> relays, Signer signer) async {
     try {
-      final standing = await Standing.load(relays, signer);
+      final standing = await Standing.load(relays, signer, account: Entitlement.current.licence?.account ?? signer.publicKey);
       if (mounted) setState(() => _standing = standing);
     } catch (_) {
       // The rating shows next time.
@@ -294,8 +494,12 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _router?.routerDelegate.removeListener(_moved);
     Entitlement.current.removeListener(_licensed);
-    _closeLobby();
+    RemoteSettings.current.removeListener(_configured);
+    InUse.current.removeListener(_inUse);
+    AccountProfile.current.removeListener(_reprofiled);
+    _closeLobby(address: false);
     _onlineClock?.cancel();
     _refusalSub?.cancel();
     super.dispose();
@@ -304,13 +508,13 @@ class _HomePageState extends State<HomePage> {
   /// Everything a waiting room or a room needs while it is open, shut:
   /// the pool, the room, and the transport they share — a matched or
   /// started table opens its own.
-  void _closeLobby() {
+  void _closeLobby({bool address = true}) {
     _queueSub?.cancel();
     _queueSub = null;
     _queue?.close();
     _queue = null;
     _waitClock?.cancel();
-    _dropRoom();
+    _dropRoom(address: address);
     _transport?.close();
     _transport = null;
   }
@@ -319,22 +523,29 @@ class _HomePageState extends State<HomePage> {
   /// left — is an answer to the room's own notification, and a
   /// [ChangeNotifier] may not be disposed inside one, so the disposal
   /// waits for the notification to finish.
-  void _dropRoom() {
+  void _dropRoom({bool address = true}) {
     final room = _room;
     if (room == null) return;
     room.removeListener(_onRoom);
     scheduleMicrotask(room.dispose);
     _room = null;
     // Out of the room, so out of the address: a refresh from here is
-    // the front door, not a table that has started or emptied.
-    showRoom(null);
+    // the front door, not a table that has started or emptied. Not when
+    // a table is opening over this screen, which says where it is; the
+    // address is this screen's again when it is back on top ([_back]).
+    if (address) _showAddress();
   }
-
-  Future<void> _go(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
   /// Connects to the relays on [tag], or explains why not. Nothing
   /// goes near a relay without a name on it.
   Future<RelayTransport?> _connect(String tag, _Opening opening) async {
+    // A device that says it has no network will not find a relay by
+    // waiting forty seconds for one (net/network.dart): it is told now,
+    // before a name is asked for or anything is opened.
+    if (deviceOffline()) {
+      setState(() => _error = context.l10n.noRelayAnswered);
+      return null;
+    }
     if (await _named() == null || !mounted) return null;
     final relays = _relays;
     setState(() {
@@ -345,10 +556,18 @@ class _HomePageState extends State<HomePage> {
     RelayTransport? transport;
     try {
       final signer = _signer ??= await Identity.signer();
+      // The relay carries the account's device in use and no other: this
+      // one, before anything is opened — unless the service has just
+      // not answered, and then the relay says what it will.
+      if (InUse.current.standing != Use.here && InUse.current.worthAsking) await InUse.current.open(signer);
+      if (!mounted || InUse.current.elsewhere) {
+        setState(() => _opening = null);
+        return null;
+      }
       transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
       _refusalSub?.cancel();
       _refusalSub = transport.refusals.listen((r) {
-        if (mounted) setState(() => _relayNote = r == null ? null : 'No relay will take this device\'s events: $r');
+        if (mounted) setState(() => _relayNote = r == null ? null : context.l10n.noRelayTakesEvents(r));
       });
       await waitForRelay(transport.ready, slow: () {
         if (mounted) setState(() => _slow = true);
@@ -375,16 +594,18 @@ class _HomePageState extends State<HomePage> {
       });
       return transport;
     } on TimeoutException {
-      _fell(transport, _noRelay);
+      // Nothing the player can change but the connection: the relays
+      // are the build's.
+      _fell(transport, (l10n) => l10n.noRelayAnswered);
     } catch (e) {
-      _fell(transport, 'Could not connect: $e');
+      _fell(transport, (l10n) => l10n.couldNotConnect('$e'));
     }
     return null;
   }
 
   /// The connection did not come off: the sockets go, and the screen
   /// says why rather than sitting on a spinner.
-  void _fell(RelayTransport? transport, String why) {
+  void _fell(RelayTransport? transport, String Function(AppLocalizations l10n) why) {
     _refusalSub?.cancel();
     _refusalSub = null;
     transport?.close();
@@ -392,23 +613,17 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _opening = null;
       _slow = false;
-      _error = why;
+      _error = why(context.l10n);
     });
   }
 
-  /// Nothing the player can change but the connection: the relays are
-  /// the build's.
-  static const _noRelay = 'No relay answered. Check the connection and try again.';
-
-
-
   /// Every live table is sealed, and a device that cannot run the deal
-  /// does not sit down (docs/03-fair-deal.md, "As built"). It says so
+  /// does not sit down (docs/03-fair-deal.md). It says so
   /// here, at the door, rather than connecting to find out; true when
   /// it has.
   bool _withoutDeal() {
     if (dealReady) return false;
-    setState(() => _error = Room.noDeal);
+    setState(() => _error = Room.noDeal(context.l10n));
     return true;
   }
 
@@ -417,8 +632,8 @@ class _HomePageState extends State<HomePage> {
   /// included. Everyone in a pool wants the same game, so the score it
   /// plays to is part of the pool's own name.
   Future<void> _play() async {
-    if (_withoutDeal()) return;
-    final options = _options;
+    if (livePaused || _withoutDeal()) return;
+    final options = _options.copyWith(target: _playsTo);
     final transport = await _connect(poolTag(options.pool, target: options.target), _Opening.live);
     if (transport == null) return;
     final ledger = _standing?.ledger ?? Ledger();
@@ -432,7 +647,12 @@ class _HomePageState extends State<HomePage> {
       // with people who play at about its speed (pace_store.dart).
       pace: _pace.stated,
       botRating: Standing.botPicker(ledger),
+      // Whose device this is, by the service's word: a seating names
+      // every seat's account with it, and every seat checks them all.
+      licence: Entitlement.current.licence,
       sealed: true,
+      // The tables this device hosts keep its remote config's clocks.
+      timing: RemoteSettings.current.config.table,
       avatar: _avatar.isDefault ? null : _avatar.toJson(withPicture: false),
       picture: _avatar.picture == null ? null : base64Encode(_avatar.picture!),
     );
@@ -452,16 +672,34 @@ class _HomePageState extends State<HomePage> {
         final picture = queue.pictures[h.key];
         avatars[s] = picture == null ? chosen : chosen.copyWith(picture: Avatar.fromJson({'picture': picture}).picture);
       }
-      _toTable(spec, queue.seatNames, avatars);
+      _toTable(spec, queue.seatNames, avatars, again: _play);
     });
-    _waitClock = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _waitClock = Timer.periodic(const Duration(seconds: 1), (_) {
+      // Bots take every seat still empty at ten seconds, so a device
+      // the relays can hear is seated a round or two after that. One
+      // still waiting at the far deadline is one nobody hears — it
+      // went offline, or its relays did — and even the seating it
+      // hosts itself has to come back to it off a relay: the spinner
+      // would turn for ever. So back to the door, saying why.
+      if (DateTime.now().millisecondsSinceEpoch - queue.since >= stopWaiting.inMilliseconds) {
+        setState(() {
+          _closeLobby();
+          _error = context.l10n.noRelayAnswered;
+        });
+        return;
+      }
+      setState(() {});
+    });
     setState(() => _queue = queue);
   }
 
   /// The seated table has its own tag on the relays: a fresh transport
   /// there, WebRTC over it, and the live page over the front door — so
   /// leaving the table comes back here.
-  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars) {
+  ///
+  /// [again] begins another game the way this one began, for the end
+  /// of game's Play again.
+  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars, {TableJournal? journal, VoidCallback? again}) {
     final signer = _signer!;
     final relays = _relays;
     final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays));
@@ -479,6 +717,9 @@ class _HomePageState extends State<HomePage> {
         log: _debugging ? (l) => debugPrint('mesh: $l') : null,
       ),
       relay: relay,
+      // The players' reactions ride the table's own tag, beside its
+      // events and outside them (packages/table, reactions.dart).
+      reactions: relay,
       presence: Duty.on(relays, signer, log: _debugging, crypto: dealCrypto, dealWorker: dealWorker).presence,
       crypto: dealCrypto,
       dealWorker: dealWorker,
@@ -495,8 +736,49 @@ class _HomePageState extends State<HomePage> {
         }));
       },
       pictures: _pictures,
+      canPlayAgain: again != null,
+      journal: _seats?.keep(spec, seatNames, seatAvatars, journal: journal),
     );
     if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
+    // Kept for coming back to while the seat is this device's; let go
+    // once the game is over or the seat is not (net/seat_store.dart).
+    var hereAt = 0;
+    controller.addListener(() {
+      final seats = _seats;
+      if (seats == null) return;
+      if (controller.client.done || (controller.client.mySeat != null && !controller.client.amSeated)) {
+        seats.clear();
+        // Over, or out of it: the account no longer sits at this table,
+        // and the service is told now rather than once the page is left,
+        // so the game — kept now — can be looked at from its end
+        // (net/game_records.dart) while the page still shows it.
+        if (InUse.current.seatedTable == spec.id && !InUse.current.elsewhere) InUse.current.seatedAt(null);
+        return;
+      }
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - hereAt < 10000) return;
+      hereAt = now;
+      seats.here();
+    });
+    // Anyone with the table's address can watch it being played: one
+    // seated player's device answers them with what everyone at the
+    // table sees (packages/table, watch.dart).
+    final words = context.l10n;
+    final watch = WatchBroadcast(
+      heard: relay.watch,
+      say: relay.sayWatch,
+      view: () => WatchedTable.of(controller.client, [
+        for (final (s, holder) in controller.client.holders.indexed)
+          switch (holder) {
+            BotSeat(:final persona) => persona.name,
+            HumanSeat() => seatNames[s] ?? words.seatNumber(s + 1),
+          },
+      ]),
+      answering: () => WatchBroadcast.answers(controller.client, signer.publicKey),
+      // Nobody of an account seated here watches it: their own game.
+      seated: spec.accounts,
+    );
+    controller.addListener(watch.changed);
     // What this device measured of its own play goes on the device and
     // nowhere else (pace_store.dart). Folded when the table is done
     // with, since a game left early is still cards this player took
@@ -504,27 +786,45 @@ class _HomePageState extends State<HomePage> {
     controller.addListener(() {
       if (!controller.client.done || _paced) return;
       _paced = true;
+      // The game, kept for anyone to look at afterwards by its address
+      // (net/game_records.dart): every player's device sends it, and the
+      // first is kept.
+      unawaited(keepGame(signer, GameRecord.of(controller.client, names: seatNames)).then((kept) {
+        if (!kept) debugPrint('record: not kept');
+      }));
       unawaited(PaceStore.fold(controller.client.myCardMs).then((pace) {
         if (mounted) setState(() => _pace = pace);
       }));
     });
     _paced = false;
-    setState(_closeLobby);
+    setState(() => _closeLobby(address: false));
     // Online *and* at a table, which another table's draw prefers:
     // somebody mid-game has a reason to still be here in a minute
-    // (docs/04-live-play.md, "The sizing"). Cleared on the way back
-    // to the front door, however the table ended.
+    // (docs/04-live-play.md). Cleared on the way back
+    // to the front door, however the table ended. And said to the
+    // service: another device of the account asks before taking the
+    // account from a game (net/in_use.dart).
     Duty.seated = true;
-    unawaited(_go(LivePage(controller: controller)).whenComplete(() => Duty.seated = false));
+    InUse.current.seatedAt(spec.id);
+    unawaited(context.push<bool>(located(livePath), extra: controller).whenComplete(() {
+      Duty.seated = false;
+      if (!InUse.current.elsewhere) InUse.current.seatedAt(null);
+      watch.close();
+      // Off the table by choice: nothing to come back to.
+      _seats?.clear();
+    }).then((playAgain) {
+      if (playAgain == true && mounted) again?.call();
+    }));
   }
 
   /// Into the room this device arrived at by a link, or a new one of
   /// its own: nobody types a code, so a room is either started here or
   /// opened from a link someone sent. Whoever is there is the table,
-  /// and the first to arrive is nobody special.
-  Future<void> _enter() async {
-    if (_withoutDeal()) return;
-    final code = widget.openRoom ?? Room.newCode();
+  /// and the first to arrive is nobody special. [same] is the room a
+  /// game just ended in, entered again for another.
+  Future<void> _enter({String? same}) async {
+    if (livePaused || _withoutDeal()) return;
+    final code = same ?? widget.openRoom ?? Room.newCode();
     final transport = await _connect(code, _Opening.friends);
     if (transport == null) return;
     try {
@@ -533,25 +833,29 @@ class _HomePageState extends State<HomePage> {
         code: code,
         name: _name,
         avatar: _avatar,
-        target: _options.target,
+        target: _playsTo ?? _options.target,
+        timing: RemoteSettings.current.config.table,
+        licence: Entitlement.current.licence,
         // Ten seconds, unless the address asks for longer and is
         // allowed to (net/address.dart).
-        startAfter: roomWait(Uri.base, standard: Room.startAfter),
+        startAfter: roomWait(Uri.base, standard: waits.roomStart),
       );
       room.addListener(_onRoom);
       setState(() => _room = room);
       // The room is its link, and the link is in the address bar while
       // this device is in it (net/address.dart).
-      showRoom(code);
+      _showAddress();
     } on TimeoutException {
+      if (!mounted) return;
       setState(() {
         _opening = null;
-        _error = _noRelay;
+        _error = context.l10n.noRelayAnswered;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _opening = null;
-        _error = 'Could not connect: $e';
+        _error = context.l10n.couldNotConnect('$e');
       });
     }
   }
@@ -560,35 +864,12 @@ class _HomePageState extends State<HomePage> {
   /// the face they see it on, and what the games say. The first two are
   /// kept on the device as soon as the page is left.
   Future<void> _editProfile() async {
-    final chosen = await showProfile(
-      context,
-      current: (name: _name, avatar: _avatar),
-      seed: _signer?.publicKey ?? '',
-      stats: _statsOnThisDevice(),
-    );
-    if (chosen == null || !mounted) return;
-    setState(() {
-      _name = chosen.name;
-      _avatar = chosen.avatar;
-    });
-    await Identity.setName(chosen.name);
-    await Identity.setAvatar(chosen.avatar);
-  }
-
-  /// What the profile page shows about the games. The games played
-  /// alone are the device's own to count; the rating is the relays' to
-  /// say, and the standing this door already loaded when it connected
-  /// is the same answer, so it is handed over rather than asked for
-  /// again. A door told to stay off the relays asks them nothing here
-  /// either.
-  Stream<PlayerStats> _statsOnThisDevice() async* {
-    final signer = _signer ??= await Identity.signer();
-    yield* playerStats(
-      store: PrefsRecordStore(),
-      signer: signer,
-      standing: _standing,
-      relays: widget.online ? _relays : null,
-    );
+    // The profile keeps what it is left with on the device itself; this
+    // screen reads it back when it is on top again ([_back]), however
+    // the page was opened. Waited for here as well, for [_named], which
+    // goes on only once there is a name.
+    await showProfile(context, stats: statsOnThisDevice(standing: _standing, online: widget.online));
+    if (mounted) await _back();
   }
 
   /// The name the others will see, asked for if this device has none:
@@ -613,11 +894,11 @@ class _HomePageState extends State<HomePage> {
   Future<void> _share(String code) async {
     final link = roomLink(code);
     if (await shareLink(link)) return;
-    await Clipboard.setData(ClipboardData(text: link.toString()));
+    await copyText(link.toString());
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Link copied', textAlign: TextAlign.center), duration: Duration(milliseconds: 1600), width: 200));
+      ..showSnackBar(SnackBar(content: Text(context.l10n.linkCopied, textAlign: TextAlign.center), duration: const Duration(milliseconds: 1600), width: 200));
   }
 
   void _onRoom() {
@@ -627,7 +908,7 @@ class _HomePageState extends State<HomePage> {
     if (room.refusal != null) {
       setState(() {
         _dropRoom();
-        _error = room.refusal;
+        _error = Room.said(room.refusal!, context.l10n);
       });
       return;
     }
@@ -637,12 +918,13 @@ class _HomePageState extends State<HomePage> {
         // device: back to the front door, where the line can be read.
         setState(() {
           _dropRoom();
-          _error = 'That table filled up without you';
+          _error = context.l10n.tableFilledWithoutYou;
         });
         return;
       }
       room.removeListener(_onRoom);
-      _toTable(spec, room.seatNames, room.seatAvatars);
+      final code = room.code;
+      _toTable(spec, room.seatNames, room.seatAvatars, again: () => _enter(same: code));
       return;
     }
     setState(() {});
@@ -661,12 +943,14 @@ class _HomePageState extends State<HomePage> {
               Column(
                 children: [
                   _chrome(),
+                  const OperatorNotes(),
                   Expanded(
                     child: Doorway(
                       heart: FoldingHeart(key: _heart, size: 46, color: Palette.mark),
                       // The app's name is the door's own: a screen with
                       // one thing to say says that instead.
                       title: queue == null && room == null,
+                      tagline: context.l10n.tagline,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -681,9 +965,9 @@ class _HomePageState extends State<HomePage> {
                                       onLeave: () => setState(_closeLobby),
                                       onShare: () => _share(room.code),
                                     ),
-                          if (_relayNote != null && (queue != null || room != null)) ...[
+                          if (_cutOff != null && (queue != null || room != null)) ...[
                             const SizedBox(height: 14),
-                            Text(_relayNote!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
+                            Text(_cutOff!, textAlign: TextAlign.center, style: const TextStyle(color: Palette.danger, fontSize: 13)),
                           ],
                         ],
                       ),
@@ -704,6 +988,7 @@ class _HomePageState extends State<HomePage> {
   /// game; and on the right how you look to the others, which is the
   /// way into your profile.
   Widget _chrome() {
+    final l10n = context.l10n;
     return Row(
       children: [
         MenuButton(
@@ -711,27 +996,40 @@ class _HomePageState extends State<HomePage> {
           menu: [
             // Once live play is open here, this is where the date on the
             // licence is. Shut, the door itself says what it costs and has
-            // the way to it, and the menu saying it again was a second way
-            // to the one page.
+            // the way to it, and the menu saying it again would be a
+            // second way to the one page.
             if (liveOpen)
-              MenuAction('Live play', icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
-            MenuAction('About', icon: Icons.info_outline, onSelected: () => _go(const AboutPage())),
+              MenuAction(l10n.subscription, icon: Icons.card_membership_outlined, onSelected: () => showSubscribe(context)),
+            // Not subscribed here: a subscription bought on another
+            // device, or a backup code from the email, brings it in.
+            if (!liveOpen)
+              MenuAction(l10n.activateSubscription, icon: Icons.key_outlined, onSelected: () => showActivate(context)),
+            MenuAction(l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
+            MenuAction(l10n.about, icon: Icons.info_outline, onSelected: _goAbout),
           ],
         ),
         const Spacer(),
         Semantics(
           button: true,
-          label: 'Your profile',
+          label: l10n.yourProfile,
           onTap: _editProfile,
-          child: InkWell(
-            onTap: _editProfile,
-            customBorder: const CircleBorder(),
-            child: ExcludeSemantics(
+          // The ink is the tap a finger makes; the Semantics above is the
+          // one a screen reader does, so the ink says nothing of its own:
+          // otherwise it is a second, nameless button inside the first.
+          child: ExcludeSemantics(
+            child: InkWell(
+              onTap: _editProfile,
+              customBorder: const CircleBorder(),
               child: SizedBox(
                 width: 48,
                 height: _chromeHeight,
                 child: Center(
-                  child: PlayerIcon(name: _name.isEmpty ? '?' : _name, seed: _signer?.publicKey ?? '', avatar: _avatar, size: 32),
+                  child: PlayerIcon(
+                      name: _name.isEmpty ? '?' : _name,
+                      // The account's colour, the one the table shows.
+                      seed: Entitlement.current.licence?.account ?? _signer?.publicKey ?? '',
+                      avatar: _avatar,
+                      size: 32),
                 ),
               ),
             ),
@@ -744,23 +1042,39 @@ class _HomePageState extends State<HomePage> {
   static const _chromeHeight = 44.0;
 
   Widget _entry() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Open source, no ads. Play alone or live.',
-            textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: Palette.chromeDim)),
-        const SizedBox(height: 22),
         FilledButton(
-          onPressed: () => _go(TablePage(target: _options.target)),
+          onPressed: () => context.push<void>(located(soloPath), extra: SoloGame(target: _playsTo ?? _options.target, seed: _dealtFrom)),
           style: _primary(),
-          child: const Text('Play solo', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+          child: Text(l10n.playSolo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
         ),
-        const SizedBox(height: 16),
-        liveOpen ? _live() : _LiveLocked(onTap: () => showSubscribe(context)),
+        // Live play, as the operator has it now: paused for everyone, open
+        // here, or offered — unless the paid tier is not being offered,
+        // and then a device without it is not shown it.
+        if (livePaused) ...[
+          const SizedBox(height: 16),
+          const _LivePaused(),
+        ] else if (liveOpen) ...[
+          const SizedBox(height: 16),
+          _live(),
+        ] else if (Entitlement.current.live && InUse.current.elsewhere) ...[
+          // Live play is this account's, and open on another device:
+          // the way to take it back.
+          const SizedBox(height: 16),
+          _LiveElsewhere(onTap: () async => InUse.current.open(await Identity.signer())),
+        ] else if (_finishing || _paidWaiting) ...[
+          const SizedBox(height: 16),
+          _Finishing(waiting: _finishing),
+        ] else if (RemoteSettings.current.config.offer) ...[
+          const SizedBox(height: 16),
+          _LiveLocked(onTap: () => showSubscribe(context)),
+        ],
         if (_slow) ...[
           const SizedBox(height: 14),
-          const Text('Still looking for a relay…',
-              textAlign: TextAlign.center, style: TextStyle(color: Palette.chromeDim, fontSize: 13)),
+          Text(l10n.stillLookingForRelay, textAlign: TextAlign.center, style: const TextStyle(color: Palette.chromeDim, fontSize: 13)),
         ],
         if (_error != null) ...[
           const SizedBox(height: 14),
@@ -773,6 +1087,8 @@ class _HomePageState extends State<HomePage> {
   /// Live play: the game being asked for, and the two ways into one —
   /// whoever is waiting, or the people you send the link to.
   Widget _live() {
+    final l10n = context.l10n;
+    final standing = _standing;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       decoration: BoxDecoration(
@@ -786,18 +1102,20 @@ class _HomePageState extends State<HomePage> {
           Row(
             children: [
               Expanded(
-                child: Text(_options.line,
+                child: Text(l10n.gameLine(_options.target, _options.pool),
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2)),
               ),
               Semantics(
                 button: true,
-                label: 'Game options',
+                label: l10n.gameOptions,
                 onTap: _changeOptions,
-                child: InkWell(
-                  onTap: _changeOptions,
-                  customBorder: const CircleBorder(),
-                  child: const ExcludeSemantics(
-                    child: SizedBox(
+                // As the profile's: the Semantics is the button, the ink
+                // only the finger's.
+                child: ExcludeSemantics(
+                  child: InkWell(
+                    onTap: _changeOptions,
+                    customBorder: const CircleBorder(),
+                    child: const SizedBox(
                       width: 38,
                       height: 38,
                       child: Icon(Icons.tune, size: 19, color: Palette.gold),
@@ -807,13 +1125,21 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          Text(
-            _standing == null
-                ? 'Four seats, filled with whoever is waiting.'
-                : 'You are rated ${_standing!.mine.shown}${_standing!.mine.provisional ? ', provisionally' : ''}, '
-                    'from ${_standing!.ledger.gamesOf(_standing!.me)} rated game${_standing!.ledger.gamesOf(_standing!.me) == 1 ? '' : 's'}.',
-            style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
-          ),
+          // Your rating, once the standings are in, and how many are online
+          // — said to be on its way until the relays answer. The button
+          // says the count to a screen reader, so it is not said twice.
+          Builder(builder: (context) {
+            final rated = standing == null
+                ? null
+                : l10n.youAreRated(standing.mine.shown, flag(standing.mine.provisional), standing.ledger.gamesOf(standing.me));
+            final n = _online;
+            final online = n == null ? l10n.checkingOnline : l10n.onlineCount(n);
+            return Text(
+              rated == null ? online : '$rated · $online',
+              semanticsLabel: rated ?? '',
+              style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
+            );
+          }),
           const SizedBox(height: 12),
           _PlayLive(online: _online, busy: _opening == _Opening.live, disabled: _busy, onTap: _play),
           const SizedBox(height: 10),
@@ -822,13 +1148,7 @@ class _HomePageState extends State<HomePage> {
           FilledButton(
             onPressed: _busy ? null : _enter,
             style: _primary(),
-            child: _Trying(busy: _opening == _Opening.friends, label: 'Play friends', weight: FontWeight.w700, size: 15.5),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'A new table, and a link to send. A link from a friend opens theirs.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11.5, color: Palette.chromeDim),
+            child: _Trying(busy: _opening == _Opening.friends, label: l10n.playFriends, weight: FontWeight.w700, size: 15.5),
           ),
         ],
       ),
@@ -859,8 +1179,9 @@ enum _Opening { live, friends }
 
 /// When a slow relay is worth a word, and when there is nothing left
 /// to wait for.
-const sayItIsSlow = Duration(seconds: 8);
-const stopWaiting = Duration(seconds: 40);
+/// (Remote config, `waits`: the build's are eight seconds and forty.)
+Duration get sayItIsSlow => waits.relaySlow;
+Duration get stopWaiting => waits.relayGiveUp;
 
 /// Waits for a relay to answer, and calls [slow] once if it is taking
 /// its time.
@@ -875,12 +1196,15 @@ const stopWaiting = Duration(seconds: 40);
 Future<void> waitForRelay(
   Future<void> ready, {
   required void Function() slow,
-  Duration sayIt = sayItIsSlow,
-  Duration stopAt = stopWaiting,
+  Duration? sayIt,
+  Duration? stopAt,
 }) {
+  sayIt ??= sayItIsSlow;
+  stopAt ??= stopWaiting;
+  final then = stopAt - sayIt;
   return ready.timeout(sayIt, onTimeout: () {
     slow();
-    return ready.timeout(stopAt - sayIt);
+    return ready.timeout(then);
   });
 }
 
@@ -903,11 +1227,11 @@ class _PlayLive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final n = online;
-    final count = n == null ? null : (n <= 1 ? 'Nobody else online' : '$n online');
     // One spoken line, so a screen reader and the suite read the same
     // thing the button says.
-    final spoken = count == null ? 'Play live' : 'Play live, ${n! <= 1 ? 'nobody else online' : '$n online'}';
+    final spoken = n == null ? l10n.playLive : l10n.playLiveSpoken(n);
     return FilledButton(
       onPressed: disabled ? null : onTap,
       style: _HomePageState._primary(),
@@ -917,16 +1241,7 @@ class _PlayLive extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _Trying(busy: busy, label: 'Play live', weight: FontWeight.w700, size: 15.5),
-              // Holds its line while there is nothing to say, so the
-              // button does not grow when the count arrives.
-              SizedBox(
-                height: 16,
-                child: count == null
-                    ? null
-                    : Text(count,
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Felt.dark.withValues(alpha: 0.75))),
-              ),
+              _Trying(busy: busy, label: l10n.playLive, weight: FontWeight.w700, size: 15.5),
             ],
           ),
         ),
@@ -935,11 +1250,47 @@ class _PlayLive extends StatelessWidget {
   }
 }
 
+/// Back from paying, before the licence is here: a spinner while it is
+/// asked for, and once the asking has run out, word that the payment
+/// went through and live play opens when it reaches us.
+class _Finishing extends StatelessWidget {
+  const _Finishing({required this.waiting});
+
+  final bool waiting;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          if (waiting) ...[
+            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Palette.gold)),
+            const SizedBox(width: 14),
+          ],
+          Expanded(
+            child: Text(
+              waiting ? l10n.finishingPurchase : l10n.paidLiveSoon,
+              style: const TextStyle(fontSize: 14, height: 1.4, color: Palette.chrome),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Live play, not open here. The padlock is not the point: what live
 /// play is and what it costs is, and the way to it — gold, like every
 /// way on, but drawn rather than filled: Play solo is what the door is
-/// for, and two filled buttons of one gold on one screen asked the eye
-/// to choose before it had read either.
+/// for, and two filled buttons of one gold on one screen ask the eye
+/// to choose before it has read either.
 class _LiveLocked extends StatelessWidget {
   const _LiveLocked({required this.onTap});
 
@@ -947,6 +1298,7 @@ class _LiveLocked extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
@@ -959,34 +1311,142 @@ class _LiveLocked extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text('Live play',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+              Expanded(
+                child: Text(l10n.livePlay,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
               ),
-              const Text(price, style: TextStyle(fontSize: 13, color: Palette.chrome, fontWeight: FontWeight.w600)),
+              Text(l10n.pricePerYear(priceShown),
+                  style: const TextStyle(fontSize: 13, color: Palette.chrome, fontWeight: FontWeight.w600)),
             ],
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Four seats, filled with whoever is waiting — or a link you send to three friends.',
-            style: TextStyle(fontSize: 12, color: Palette.chromeDim),
           ),
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: onTap,
             style: _HomePageState._secondary(),
-            child: const Text('Subscribe', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+            child: Text(l10n.subscribe, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Playing alone is free, and always will be.',
+          Text(
+            l10n.aloneIsFree,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11.5, color: Palette.chromeDim),
+            style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
           ),
         ],
       ),
     );
   }
+}
+
+/// Live play, open on another device of the account (net/in_use.dart):
+/// said where the buttons were, with the way to take it back here.
+class _LiveElsewhere extends StatelessWidget {
+  const _LiveElsewhere({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l10n.livePlay,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+          const SizedBox(height: 4),
+          Text(l10n.liveOpenElsewhere, style: const TextStyle(fontSize: 12, height: 1.4, color: Palette.chromeDim)),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: onTap,
+            style: _HomePageState._secondary(),
+            child: Text(l10n.useItHere, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Live play, paused by the operator for everyone (the remote config's
+/// kill switch): said where the buttons were, with what is still open.
+class _LivePaused extends StatelessWidget {
+  const _LivePaused();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l10n.livePlay,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Palette.chrome, letterSpacing: 0.2)),
+          const SizedBox(height: 4),
+          Text(l10n.livePaused, style: const TextStyle(fontSize: 12, color: Palette.chromeDim)),
+        ],
+      ),
+    );
+  }
+}
+
+/// What the operator has to say across the top of the front door
+/// (net/remote_config.dart): a notice — an outage, a maintenance
+/// window — and, to a build older than the one asked for, that it is.
+/// Nothing at all when there is nothing to say.
+class OperatorNotes extends StatelessWidget {
+  const OperatorNotes({super.key, this.published = buildDate});
+
+  /// The day this build was published: the build's own, unless a test
+  /// says.
+  final String published;
+
+  // Listening for itself: it is a const widget in the door's tree, which
+  // a rebuild of the door passes over as unchanged.
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(listenable: RemoteSettings.current, builder: (context, _) => _notes(context));
+
+  Widget _notes(BuildContext context) {
+    final l10n = context.l10n;
+    final config = RemoteSettings.current.config;
+    final notice = config.banner;
+    final lines = <Widget>[
+      if (notice != null) _line(notice.text.inLanguage(l10n.localeName), notice.warning ? Palette.danger : Palette.gold),
+      if (config.updateDue(published))
+        _line(config.updateText?.inLanguage(l10n.localeName) ?? (kIsWeb ? l10n.updateDueWeb : l10n.updateDueApp), Palette.gold,
+            action: kIsWeb ? TextButton(onPressed: reloadPage, child: Text(l10n.reload)) : null),
+    ];
+    if (lines.isEmpty) return const SizedBox.shrink();
+    return Column(children: lines);
+  }
+
+  static Widget _line(String text, Color tone, {Widget? action}) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: tone.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: tone.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5, color: Palette.chrome))),
+            ?action,
+          ],
+        ),
+      );
 }
 
 /// Waiting to be seated. Nothing to do but wait, and it is not long:
@@ -999,25 +1459,26 @@ class _WaitingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final waited = (DateTime.now().millisecondsSinceEpoch - queue.since) ~/ 1000;
     final others = queue.present.length - 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('${queue.target} points · ${queue.pool}',
+        Text(l10n.gameLine(queue.target, queue.pool),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 14, color: Palette.chromeDim, letterSpacing: 0.4)),
         const SizedBox(height: 26),
         const Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Palette.gold, strokeWidth: 2.5))),
         const SizedBox(height: 22),
-        const Text('Finding players',
+        Text(l10n.findingPlayers,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.chrome)),
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.chrome)),
         const SizedBox(height: 6),
-        Text('$waited s${others > 0 ? ', $others other${others == 1 ? '' : 's'} waiting' : ''} — bots fill any seat still empty at ten',
+        Text(l10n.waitedLine(waited, others < 0 ? 0 : others),
             textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
         const SizedBox(height: 26),
-        TextButton(onPressed: onCancel, child: const Text('Cancel', style: TextStyle(color: Palette.chromeDim))),
+        TextButton(onPressed: onCancel, child: Text(l10n.cancel, style: const TextStyle(color: Palette.chromeDim))),
       ],
     );
   }
@@ -1042,15 +1503,14 @@ class RoomView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final seconds = room.secondsToStart;
     final members = room.members;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          seconds == null
-              ? 'Send the link. The table starts ten seconds after someone joins.'
-              : 'Starting in $seconds s — empty seats go to bots',
+          seconds == null ? l10n.roomSendLink : l10n.roomStartingIn(seconds),
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
         ),
@@ -1058,7 +1518,7 @@ class RoomView extends StatelessWidget {
         TextButton.icon(
           onPressed: onShare,
           icon: const Icon(Icons.ios_share, size: 17),
-          label: const Text('Share the link', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          label: Text(l10n.shareTheLink, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           style: TextButton.styleFrom(foregroundColor: Palette.gold),
         ),
         const SizedBox(height: 10),
@@ -1068,14 +1528,14 @@ class RoomView extends StatelessWidget {
             child: Row(
               children: [
                 i < members.length
-                    ? PlayerIcon(name: members[i].name, seed: members[i].key, avatar: members[i].avatar, size: 30)
+                    ? PlayerIcon(name: members[i].name, seed: members[i].licence?.account ?? members[i].key, avatar: members[i].avatar, size: 30)
                     : const SizedBox(width: 30, height: 30, child: Icon(Icons.smart_toy_outlined, size: 20, color: Palette.chromeDim)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     i < members.length
-                        ? (members[i].key == room.me ? '${members[i].name} (you)' : members[i].name)
-                        : 'a bot, unless someone joins',
+                        ? (members[i].key == room.me ? l10n.nameIsYou(members[i].name) : members[i].name)
+                        : l10n.emptySeat,
                     style: TextStyle(
                       fontSize: 15,
                       color: i < members.length ? Palette.chrome : Palette.chromeDim,
@@ -1086,7 +1546,8 @@ class RoomView extends StatelessWidget {
                 // What they are rated, from the results everyone at
                 // their tables signed. A rating nobody has played
                 // enough games to settle carries its question mark.
-                if (i < members.length && ledger != null) _Rated(rating: ledger!.of(members[i].key)),
+                // A rating is the account's, whichever device it is in.
+                if (i < members.length && ledger != null) _Rated(rating: ledger!.of(members[i].licence?.account ?? members[i].key)),
               ],
             ),
           ),
@@ -1095,10 +1556,10 @@ class RoomView extends StatelessWidget {
           FilledButton(
             onPressed: members.length >= 2 ? room.start : null,
             style: _HomePageState._primary(),
-            child: const Text('Start now', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            child: Text(l10n.startNow, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
         const SizedBox(height: 8),
-        TextButton(onPressed: onLeave, child: const Text('Leave', style: TextStyle(color: Palette.chromeDim))),
+        TextButton(onPressed: onLeave, child: Text(l10n.leave, style: const TextStyle(color: Palette.chromeDim))),
       ],
     );
   }
@@ -1145,7 +1606,7 @@ class _Rated extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'rated ${rating.shown}${rating.provisional ? ', provisionally' : ''}',
+      label: context.l10n.ratedSpoken(rating.shown, flag(rating.provisional)),
       child: ExcludeSemantics(
         child: Text(
           '${rating.shown}${rating.provisional ? '?' : ''}',

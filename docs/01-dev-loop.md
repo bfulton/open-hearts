@@ -1,68 +1,97 @@
 # 01 — The development loop
 
-The constraint this repo is shaped around: **development is driven from a
-phone.** Not "works on a phone" — driven from one. That rules out
-anything whose feedback arrives in a terminal.
+Any commit can be published and opened on a phone within a minute, and
+the running build always says which commit it is.
 
-## What happens on every commit
+## Checking a change
 
+```bash
+./check.sh quick             # what changed since origin/claude/launch-punch-list, at its fast tier
+./check.sh full              # everything, the browser suites too, before a deploy
 ```
-./deploy.sh
+
+`quick` runs the suites a change is in — the app tests whose imports
+reach a changed file, a package's fast tier — and takes under a minute
+for a change to one package. `full` runs every suite side by side and
+ends with a table of verdicts and times. CI runs the same on every push
+to a `claude/**` branch, to `main` and on pull requests, a newer push
+cancelling the run it supersedes. [Doc 09](09-testing.md) has what each
+suite costs and why.
+
+## Publishing
+
+```bash
+./deploy.sh [label]          # needs CLOUDFLARE_TOKEN and CLOUDFLARE_ACCOUNT_ID
+./deploy.sh --prune [keep]   # delete older preview deployments (-n: dry run)
 ```
 
-1. Copies `site/` into `build/publish/`.
-2. Generates `app/lib/build_info.g.dart` with the short commit sha,
-   the date and the update check on, builds the Flutter web app with
-   `--base-href /play/` into `build/publish/play/`, and restores the
-   committed placeholder — the one whose sha is "dev" — whatever
-   happens.
-3. Writes `build/publish/play/build-info.json` stamped with the same
-   sha.
-4. Copies the deal benchmark to `build/publish/measure/shuffle/` when
-   its wasm has been built ([measurements](../measurements/README.md)),
-   so the number that matters comes from a phone.
-5. Uploads the lot to Cloudflare Pages as a **branch deployment**.
+`deploy.sh` assembles one directory and uploads it to the Cloudflare
+Pages project `open-hearts`:
 
-Cloudflare gives every branch a stable alias host, so the URL does not
-change between commits:
-
-| | |
+| Path | What |
 |---|---|
-| Working branches | `https://dev.open-hearts.pages.dev/play` |
-| `main` (production) | `https://open-hearts.pages.dev/play` — and the custom domain |
+| `/` | `site/`, built in each language by `site/build.mjs` |
+| `/api/` | the service's handlers, `service/functions/` published as `_worker.js` ([doc 06](06-service.md)) |
+| `/play/` | the Flutter web build, `--base-href /` |
+| `/measure/shuffle/` | the deal benchmark, when its wasm has been built ([measurements](../measurements/README.md)) |
 
-The label defaults to `dev` on any branch other than `main`. One short
-host, bookmarkable, always the last push. Pass a label to override:
-`./deploy.sh my-experiment` publishes to
-`https://my-experiment.open-hearts.pages.dev`.
+The worker routes by host ([doc 06](06-service.md#where-the-app-is)).
+In production the site is `openhearts.game` and the app is the root of
+`play.openhearts.game`, served from the build's `/play/` directory, with
+the handlers at its `/api/`; `openhearts.game` is the site alone. A preview
+has no play host, so it serves the same build at `/play/`, its worker
+moving the page's base there.
 
-About 45 seconds end to end, most of it the Flutter build. Uploads are
-content-addressed, so a redeploy typically re-uploads under ten files.
+The label names the Pages branch, and every branch gets a stable alias.
+It defaults to `dev` on any working branch, so the latest push is always
+at `https://dev.open-hearts.pages.dev/play/`, and to `main` (production,
+`openhearts.game` and `play.openhearts.game`) on `main`. A production deploy refuses to run without
+the service's public key (`serviceKey` in `config/openhearts.json`),
+since a build without it has live play shut for everyone. Before uploading, the script loads the staged worker, so a
+missing module fails locally instead of at Cloudflare.
 
-## Knowing which build you are looking at
+## Knowing which build is running
 
-A phone keeps a page alive for days. Without help, "did my change land?"
-is a hard refresh and a guess. So:
+The build's identity is compiled in. `deploy.sh` generates
+`app/lib/build_info.g.dart` with the short sha, the date and the update
+check turned on, and restores the committed placeholder afterwards. It
+also writes `play/build-info.json` with the same sha.
 
-- the running build's sha and date are on the About page, off the menu;
-- the generated `build_info.g.dart` turns the check on, and only a
-  deployed build has it. The app then fetches `build-info.json` at
-  launch and on every return to the foreground, and shows a
-  tap-to-reload pill when the published sha differs from its own;
-- `_headers` marks the entry points `no-store` so a cached bootstrap
-  cannot lie about this.
+- The About page shows the sha and date.
+- A deployed build fetches `build-info.json` at launch and whenever it
+  returns to the foreground. If the published sha differs from its own,
+  it shows a tap-to-reload pill. Local runs, tests and CI keep the
+  placeholder, so the pill never appears there.
+- `site/public/_headers` marks the entry points `no-store`, so a cached
+  bootstrap cannot load an old build.
+- A sha ending in `+` was deployed from a dirty tree.
 
-The build's identity has to be compiled in — a build cannot fetch its
-own sha — so it is generated into a source file rather than passed as
-a flag; and the check is a generated value rather than inferred from a
-real-looking tag, since inferring it turns the pill on in CI, where it
-floats over the widget tests and eats their taps.
+## Offline
 
-A build stamped `abc1234+` was deployed from a dirty tree: it contains
-work newer than the commit it names.
+Solo play needs only the device. The page registers its own service
+worker, `app/web/offline_worker.js`, from `app/web/flutter_bootstrap.js`.
+The worker fetches from the network first and keeps a copy of each file.
+It falls back to the copy only when the network fails, so online
+behaviour is unchanged and offline the last loaded build opens.
+`build-info.json` and the service's handlers are never cached.
+`node e2e/offline.mjs` checks this in a browser. At
+`play.openhearts.game` the worker's scope is the whole host; at a
+preview it is `/play/`.
+
+## The move to play.openhearts.game
+
+The app used to be at `openhearts.game/play/`, and a browser that played
+there keeps its device — key, licence, name, records, settings — in that
+origin's storage. On its first load at `play.openhearts.game` with no key,
+`app/web/carry.js` asks a hidden frame of `openhearts.game/carry` for
+those entries and writes them before the app starts, waiting 10 s at
+most for that page and 2 s for its answer ([doc 06](06-service.md#the-device-carried-over)). The old origin
+keeps its copy, so rolling back to serving the app at `/play/` loses
+nobody. `node e2e/move.mjs` drives the old address's 404s, the carry and a preview
+in a browser, on the rig's stand-ins for the two hosts
+(`openhearts.localhost` and `play.openhearts.localhost`).
 
 ## Credentials
 
-`deploy.sh` needs `CLOUDFLARE_TOKEN` (Pages: Edit) and
-`CLOUDFLARE_ACCOUNT_ID`. Nothing else, and no `wrangler.toml` — the
-project name is in the script.
+The Cloudflare token needs Pages: Edit. The relay worker deploys
+separately, from `service/do/wrangler.toml`.

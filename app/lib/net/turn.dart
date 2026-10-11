@@ -1,53 +1,48 @@
 /// ICE servers for a table.
 ///
-/// Most pairs of players connect directly; the ten to twenty percent
-/// behind a symmetric NAT or a strict firewall need a TURN relay
-/// (docs/02-multiplayer.md), and without one they play over the relay
-/// lane, which a public relay turned on once. TURN is Cloudflare's,
-/// and its credentials come from the service's turn-creds handler
-/// (docs/06-service.md; service/functions/worker.mjs), short-lived,
+/// Every data channel goes through TURN (net/mesh_transport.dart). The
+/// credentials come from the service's turn-creds handler
+/// (docs/06-service.md; service/functions/worker.mjs) — Cloudflare's
+/// TURN in production, the rig's own on this machine — short-lived, and
 /// fetched when a device connects so they are in hand when its table
-/// starts. When the handler has none to give — no TURN key configured
-/// yet, or the handler unreachable — a STUN server that needs no
-/// credentials still gives every peer its public address. On
-/// localhost there is nothing: peers connect directly (doc 06, local
-/// mode), and the browser suite stays off the network.
+/// starts. With none to give, a device makes no channels and its table
+/// plays over the relay.
 library;
 
 import 'dart:convert';
 
 import 'package:table/table.dart';
 
+import 'address.dart' show appBase, isLocalHost;
+import 'licence.dart' show signedAsk;
 import 'turn_fetch_io.dart' if (dart.library.js_interop) 'turn_fetch_web.dart' as http;
+import 'remote_config.dart' show waits;
 
-/// Where credentials come from: the app's origin over https — the site
-/// the worker runs beside — else nowhere.
-Uri? turnEndpoint() {
-  final base = Uri.base;
-  if (base.scheme != 'https' || base.host.isEmpty) return null;
-  return Uri(scheme: 'https', host: base.host, port: base.hasPort ? base.port : null, path: '/api/turn');
+/// Where credentials come from: the app's own origin — the site the
+/// worker runs beside, over https, or the browser rig on this machine
+/// (e2e/drive.mjs), or on a phone the address its build names — else
+/// nowhere.
+Uri? turnEndpoint([Uri? at]) {
+  final base = at ?? appBase();
+  final local = base.scheme == 'http' && isLocalHost(base.host);
+  if ((base.scheme != 'https' && !local) || base.host.isEmpty) return null;
+  return Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null, path: '/api/turn');
 }
 
-/// Cloudflare's STUN, free and without credentials.
-const stunOnly = <Map<String, Object?>>[
-  {
-    'urls': ['stun:stun.cloudflare.com:3478']
-  },
-];
-
 /// The ICE servers for this device's next table: from the handler at
-/// [endpoint] (by default [turnEndpoint]), [stunOnly] when it has none
-/// or cannot be reached, none when there is no endpoint.
+/// [endpoint] (by default [turnEndpoint]); none when it has none, cannot
+/// be reached, or there is no endpoint.
 Future<List<Map<String, Object?>>> iceServersFor(Signer signer,
-    {Uri? endpoint, Duration timeout = const Duration(seconds: 5)}) async {
+    {Uri? endpoint, Duration? timeout}) async {
+  timeout ??= waits.turn;
   final url = endpoint ?? turnEndpoint();
   if (url == null) return const [];
   try {
-    final body = await http.postJson(url, jsonEncode({'key': signer.publicKey})).timeout(timeout);
-    if (body == null) return stunOnly;
-    return parseIceServers(body) ?? stunOnly;
+    final body = await http.postJson(url, jsonEncode(signedAsk(signer, 'turn'))).timeout(timeout);
+    if (body == null) return const [];
+    return parseIceServers(body) ?? const [];
   } catch (_) {
-    return stunOnly;
+    return const [];
   }
 }
 

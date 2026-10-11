@@ -1,7 +1,10 @@
 /// The felt: opponents around the edge, the trick in the middle.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import 'package:engine/engine.dart';
 import 'package:engine/engine.dart' as engine;
@@ -11,12 +14,14 @@ import '../theme.dart';
 import 'card_view.dart';
 import 'pip.dart';
 import 'player_icon.dart';
+import 'reactions.dart';
 import 'scaled.dart';
+import '../l10n/l10n.dart';
 
 /// More height than a table is ever going to use, at which point where
 /// it sits in the felt stops being a rounding error and starts being a
 /// composition. Above a phone's own breathing room, so a phone's table
-/// is centred in its felt exactly as it was.
+/// is centred in its felt.
 const _roomToSpare = 240.0;
 
 /// The badges' inset from the felt's edge, and the gap every badge
@@ -30,6 +35,9 @@ const _badgeGap = 8.0;
 /// player's badge; on a wide felt there is no height for that and it
 /// sits beside the badge, where there is width to spare.
 const _pillRow = 30.0;
+
+/// How much bigger the "your turn" pill is at the top of its breath.
+const _breathing = 0.06;
 
 /// Play runs 0-1-2-3, which reads clockwise once the seats are laid
 /// out around the felt: the player at the near edge, then west, north
@@ -64,12 +72,33 @@ Offset? passesFrom(TableModel controller) {
   return seatDirection[controller.positionOf(controller.game.passerTo(controller.mySeat))];
 }
 
+/// The trick upright, as a pinwheel: north stepped to the west and
+/// south to the east, so that west and east can come in beside them.
+/// A phone upright is narrow before it is short, and the side badges
+/// need their room beside the trick: a cross, north and south in the
+/// middle, kept its cards smaller than the hand's (68 points to 76 on a
+/// 390-point phone). This way they are the hand's size.
+///
+/// No card covers another's corner, where its rank and suit are, in
+/// whichever order they are played. Taking a corner as the top left
+/// 0.36 of a card's width and 0.45 of its height, centres in card
+/// widths across and heights down: west at 0.72 is clear of north's
+/// right edge with north 0.30 aside (0.72 ≥ 1 − 0.30), its own corner
+/// clear of north's left edge (0.30 ≤ 0.72 − 0.36), and the far side
+/// of the corner it would cover on south (0.72 ≥ 0.30 + 0.36); north
+/// and south 0.6 out are clear of the middle row's tops and of each
+/// other (0.6 ≥ 0.45, ≥ 0.5). The offsets are in steps of 1.15 card
+/// widths and 1.02 heights (_Trick).
 const _trickOffset = <int, Offset>{
-  0: Offset(0, 0.78),
-  1: Offset(-0.86, 0),
-  2: Offset(0, -0.78),
-  3: Offset(0.86, 0),
+  0: Offset(0.30 / 1.15, 0.6 / 1.02),
+  1: Offset(-0.72 / 1.15, 0),
+  2: Offset(-0.30 / 1.15, -0.6 / 1.02),
+  3: Offset(0.72 / 1.15, 0),
 };
+
+/// How tall the upright trick's block is, in card heights: its cards'
+/// reach, 0.6 out each way and a card, and the margin the cross kept.
+const _trickTall = 2 * 0.6 + 1 + 0.11;
 const _wideTrickOffset = <int, Offset>{
   0: Offset(0, 0.62),
   1: Offset(-1.12, 0),
@@ -77,8 +106,16 @@ const _wideTrickOffset = <int, Offset>{
   3: Offset(1.12, 0),
 };
 
+/// Whether the "your turn" pill breathes. A test that waits for the
+/// table to come to rest turns it off, since a breath is a frame every
+/// sixteen milliseconds for as long as the turn is yours
+/// (test/flutter_test_config.dart); one test turns it back on to watch
+/// it breathe.
+@visibleForTesting
+bool turnPillBreathes = true;
+
 class TableView extends StatelessWidget {
-  const TableView({super.key, required this.controller, this.onHold});
+  const TableView({super.key, required this.controller, this.onHold, this.corner, this.react});
 
   final TableModel controller;
 
@@ -86,6 +123,16 @@ class TableView extends StatelessWidget {
   /// about that player — at a live table, what to do about their
   /// picture. Null leaves the badge alone.
   final void Function(int seat)? onHold;
+
+  /// A line in the felt's top corner, where the page has one — at a
+  /// live table, who is here — and the colour it is said in.
+  final ({String text, Color tone})? corner;
+
+  /// The player's way to react, beside their own badge, where the page
+  /// has one: at a live table they sit at, the button that opens the
+  /// reactions (ui/reactions.dart). Their own reaction takes its place
+  /// while it shows, and the button is back when it goes.
+  final Widget? react;
 
   @override
   Widget build(BuildContext context) {
@@ -100,11 +147,43 @@ class TableView extends StatelessWidget {
         final scale = TableScale.maybeOf(context) ?? TableScale.forFelt(box);
         final edge = _badgeInset * scale;
         final badgeGap = _badgeGap * scale;
-        final pillRow = _pillRow * scale;
+        // The row for the line the table says grows with the line, at the
+        // reader's text size: what the felt says is read, and the trick
+        // is what gives way to it. In portrait it floats in the room
+        // under the near seat, which is its row and a phone's row of air.
+        final pillRow = (_pillRow + _Pill.growth(context)) * scale;
+        final pillRoom = pillRow + _pillRow * scale;
         // A wide felt — a landscape phone — lays the trick out flatter
         // and its badges on one line, since height is what it lacks.
         final wide = box.width > box.height * 1.3;
         final offsets = wide ? _wideTrickOffset : _trickOffset;
+        // The line in the corner sits beside the seat across the felt
+        // where there is room for it: clear of the widest that seat's
+        // badge can be (the trick's own width), and above where the side
+        // seats' badges can start — the trick's top for a stacked one,
+        // which can be as tall as the trick, and on a wide felt the
+        // middle of the smallest trick, where a badge of one line sits.
+        // Where there is not — a phone upright, or large type — it has a
+        // strip of its own at the top, and the table comes down under
+        // it. Drawn at the table's scale.
+        final note = corner;
+        final noteSize = note == null ? Size.zero : FeltCorner.sizeOf(context, note.text, (box.width - 2 * edge) / scale) * scale;
+        // The side badges' room: from the felt's edge to the trick's
+        // outer card, less a gap. A name has to fit it, wrapped if it
+        // must; and on a felt too narrow for both, the trick gives way
+        // rather than running under the badges. Upright, that is what
+        // holds a card's width: as wide as leaves the side badges their
+        // least, which is the hand's size from a 360-point phone up. On
+        // a wide felt the trick lies flat and a share of the width does.
+        final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
+        double sideRoomFor(double cw) => box.width / 2 - cw * reach - edge - badgeGap;
+        final leastRoom = SeatBadge.leastWidth * scale;
+        final across = wide ? box.width * 0.16 : (box.width / 2 - edge - badgeGap - leastRoom) / reach;
+        final widest = (wide ? 3.6 : 2.9) * math.min(across, TableScale.phoneCard * scale);
+        final tight = SeatBadge.tightLine * scale;
+        final sidesFrom = tight + (wide ? math.max(0.0, (cardHeightFor(34) * 2.3 - tight) / 2) : 0.0);
+        final beside = edge + noteSize.width + badgeGap <= (box.width - widest) / 2 && edge + noteSize.height + badgeGap <= sidesFrom;
+        final noteRow = note == null || beside ? 0.0 : edge + noteSize.height + badgeGap;
         // The badges hold to their cards, so it is the trick that gives
         // way, never the layout that overflows: the two facing badges
         // and their gaps — and in portrait the row kept for the line
@@ -112,12 +191,12 @@ class TableView extends StatelessWidget {
         // sized, and it takes what is left of whichever dimension runs
         // out first.
         // Portrait keeps room under the near badge for the line the
-        // table says, and as much again, so the line sits in the middle
+        // table says, and a row of air, so the line sits in the middle
         // of it rather than against the badge. And a badge is as tall
         // as a face wants unless that would leave the cards under what
         // a card can be read at, where it takes the smaller size back.
         double cardsUnder(double line) =>
-            (box.height - 2 * (line + badgeGap) - (wide ? 0.0 : 2 * pillRow)) / ((wide ? 2.3 : 2.7) / cardAspect);
+            (box.height - noteRow - 2 * (line + badgeGap) - (wide ? 0.0 : pillRoom)) / ((wide ? 2.3 : _trickTall) / cardAspect);
         final line = (cardsUnder(SeatBadge.line * scale) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine) * scale;
         // The biggest a card is allowed to be, from the felt's own
         // size. A phone is held at arm's length and its felt is small,
@@ -128,37 +207,36 @@ class TableView extends StatelessWidget {
         // one its type is drawn at too.
         final most = TableScale.phoneCard * scale;
         var cardWidth = [
-          box.width * (wide ? 0.16 : 0.21),
+          across,
           cardsUnder(line),
           most,
         ].reduce((a, b) => a < b ? a : b).clamp(34.0, most);
-        // The side badges' room: from the felt's edge to the trick's
-        // outer card, less a gap. A name has to fit it, wrapped if it
-        // must; and on a felt too narrow for both, the trick gives way
-        // rather than running under the badges.
-        final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
-        double sideRoomFor(double cw) => box.width / 2 - cw * reach - edge - badgeGap;
-        final leastRoom = SeatBadge.minWidth * scale;
         if (sideRoomFor(cardWidth) < leastRoom) {
           cardWidth = ((box.width / 2 - edge - badgeGap - leastRoom) / reach).clamp(34.0, cardWidth);
         }
         final sideRoom = sideRoomFor(cardWidth).clamp(leastRoom, box.width);
         final cardHeight = cardHeightFor(cardWidth);
-        final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * 2.7);
+        final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * _trickTall);
 
         // A badge hugs what it says, up to the room it has: the width
         // of the trick's own column for the seat across the felt and
         // your own, and the strip between a card and the felt's edge
-        // for the two at the sides. They used to fill that room, so a
-        // short name sat in a wide bar and a side seat in a tall box.
+        // for the two at the sides.
         final facing = trickBox.width;
+        // The side strips start nearer the middle than the far and near
+        // badges may reach, the pinwheel having brought the side cards
+        // in: a side seat's reaction, which can run up or down into those
+        // badges' rows, keeps this far in from its strip's inner edge.
+        final clearOfFacing = math.max(0.0, facing / 2 - cardWidth * reach);
 
         // A badge is laid out at a phone's scale and drawn at the
         // table's, so the room it is given here is in a phone's points.
         Widget badge(int position) => SeatBadge(
               onHold: onHold == null ? null : () => onHold!(controller.seatAt(position)),
               seat: controller.seatAt(position),
+              position: position,
               name: controller.names[controller.seatAt(position)],
+              iconName: controller.iconNameOf(controller.seatAt(position)),
               game: game,
               onTurn: game.currentSeat == controller.seatAt(position),
               won: pending?.winner == controller.seatAt(position),
@@ -242,10 +320,15 @@ class TableView extends StatelessWidget {
           );
           // A side badge is anchored by its inner edge, a gap out from
           // its card (below), and runs out towards the felt's edge as
-          // far as its name takes it.
+          // far as its name takes it. It is as tall as its name and
+          // numbers make it, up to the trick's own height, between the
+          // badges above and below it: past that, at the largest type
+          // on the smallest felt, it scales what it holds into that.
           return Scaled(
             scale: scale,
-            child: wide || position.isEven ? SizedBox(height: line / scale, child: pair) : pair,
+            child: wide || position.isEven
+                ? SizedBox(height: line / scale, child: pair)
+                : ConstrainedBox(constraints: BoxConstraints(maxHeight: trickBox.height / scale), child: pair),
           );
         }
 
@@ -256,16 +339,78 @@ class TableView extends StatelessWidget {
         // beyond the far seat reads as the far end of the table, while
         // the room under your own badge is the gap between you and your
         // own cards, and wants to be small.
-        final cluster = 2 * line + 2 * gap + trickBox.height + (wide ? 0.0 : 2 * pillRow);
+        final cluster = noteRow + 2 * line + 2 * gap + trickBox.height + (wide ? 0.0 : pillRoom);
         final slack = (box.height - cluster).clamp(0.0, double.infinity);
-        final above = slack > _roomToSpare ? slack * 0.7 : slack / 2;
+        final above = noteRow + (slack > _roomToSpare ? slack * 0.7 : slack / 2);
 
-        return Padding(
+        // A seat's reaction while it shows (ui/reactions.dart), beside
+        // its badge in room nothing else is drawn in, and never over a
+        // card: across the felt, to the left of the far badge; at the
+        // sides, over the right-hand badge and under the left-hand one,
+        // each in the strip its badge stands in, so the two run off into
+        // opposite corners and neither meets the seats across; and at
+        // the near edge the player's own, in the place of the button
+        // that sent it, on the far side of the badge from the left-hand
+        // seat's. Drawn at the table's scale, as big as the room lets it
+        // be. The tail points at the badge.
+        final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+        Widget shows(Widget? child) => AnimatedSwitcher(
+              duration: still ? Duration.zero : const Duration(milliseconds: 180),
+              child: child ?? const SizedBox.shrink(),
+            );
+        Widget? bubble(int position, AxisDirection tail) {
+          final seat = controller.seatAt(position);
+          final shown = controller.reactionAt(seat);
+          if (shown == null) return null;
+          return Scaled(
+            key: ValueKey(shown.n),
+            scale: scale,
+            child: ReactionBubble(reaction: shown.reaction, name: controller.nameAlone(seat), tail: tail),
+          );
+        }
+
+        // The line in the corner, where it shares a row with the far
+        // seat — beside it, on a wide felt — is room the far seat's
+        // reaction keeps clear of; and where it runs across the top of
+        // the felt, the right-hand seat's keeps under it.
+        final noteBottom = edge + noteSize.height;
+        final northReserve = note != null && beside && noteBottom > above && edge < above + line ? noteSize.width + badgeGap : 0.0;
+        final eastTop = note != null && noteSize.width > sideOut ? noteBottom + badgeGap : edge;
+        // How far the side seats' reactions may run: over the right-hand
+        // badge up to the top of the felt, and under the left-hand one
+        // down past the near seat's row — the player's own reaction and
+        // the button are on the other side of it. On a wide felt the far
+        // and near badges may run as wide as the side strips, and the two
+        // keep to the trick's own rows.
+        final trickTop = above + line + gap;
+        final eastUp = wide ? gap : math.max(0.0, trickTop - eastTop);
+        final westDown = wide ? gap : gap + line;
+
+        // The player's own corner: the button, or their reaction.
+        final mine = bubble(0, wide ? AxisDirection.right : AxisDirection.left) ?? (react == null ? null : Scaled(scale: scale, child: react!));
+
+        final table = Padding(
           padding: EdgeInsets.symmetric(horizontal: edge),
           child: Column(
             children: [
               SizedBox(height: above),
-              seat(2),
+              // The far badge holds the middle, as it always has, and its
+              // reaction comes in on the left of it.
+              SizedBox(
+                height: line,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(left: northReserve, right: badgeGap),
+                        child: Align(alignment: Alignment.centerRight, child: shows(bubble(2, AxisDirection.right))),
+                      ),
+                    ),
+                    seat(2),
+                    const Expanded(child: SizedBox.shrink()),
+                  ],
+                ),
+              ),
               SizedBox(height: gap),
               SizedBox(
                 height: trickBox.height,
@@ -273,8 +418,36 @@ class TableView extends StatelessWidget {
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    Positioned(right: sideOut, top: 0, bottom: 0, child: Center(child: seat(1))),
-                    Positioned(left: sideOut, top: 0, bottom: 0, child: Center(child: seat(3))),
+                    Positioned(
+                      right: sideOut,
+                      width: sideRoom,
+                      top: 0,
+                      bottom: -westDown,
+                      child: _SideSeat(
+                        badge: seat(1),
+                        bubble: shows(bubble(1, AxisDirection.up)),
+                        home: Rect.fromLTWH(0, 0, sideRoom, trickBox.height),
+                        anchoredRight: true,
+                        up: false,
+                        gap: badgeGap,
+                        clear: clearOfFacing,
+                      ),
+                    ),
+                    Positioned(
+                      left: sideOut,
+                      width: sideRoom,
+                      top: -eastUp,
+                      bottom: 0,
+                      child: _SideSeat(
+                        badge: seat(3),
+                        bubble: shows(bubble(3, AxisDirection.down)),
+                        home: Rect.fromLTWH(0, eastUp, sideRoom, trickBox.height),
+                        anchoredRight: false,
+                        up: true,
+                        gap: badgeGap,
+                        clear: clearOfFacing,
+                      ),
+                    ),
                     Align(alignment: Alignment.center, child: trick),
                   ],
                 ),
@@ -283,20 +456,28 @@ class TableView extends StatelessWidget {
               if (wide)
                 // The line beside the badge, with the same room kept on
                 // the other side of it, so the badge holds the middle
-                // whether or not there is anything to say.
+                // whether or not there is anything to say. In the
+                // badge's row: a wide felt has no height to give it a
+                // row of its own. The room on the other side is the
+                // player's own corner.
                 SizedBox(
                   height: line,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Expanded(child: SizedBox.shrink()),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(right: badgeGap),
+                          child: Align(alignment: Alignment.centerRight, child: shows(mine)),
+                        ),
+                      ),
                       seat(0),
                       Expanded(
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Scaled(
                             scale: scale,
-                            child: Padding(padding: const EdgeInsets.only(left: 12), child: pill),
+                            child: Padding(padding: const EdgeInsets.only(left: 12), child: _Said(child: pill)),
                           ),
                         ),
                       ),
@@ -304,14 +485,61 @@ class TableView extends StatelessWidget {
                   ),
                 )
               else ...[
-                seat(0),
+                // The near badge holds the middle too, and the player's
+                // own corner is beside it.
+                SizedBox(
+                  height: line,
+                  child: Row(
+                    children: [
+                      const Expanded(child: SizedBox.shrink()),
+                      seat(0),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(left: badgeGap),
+                          child: Align(alignment: Alignment.centerLeft, child: shows(mine)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 // The room under the near seat, with the line the table
                 // says in the middle of it: the action line has the row
                 // against the hand (table_layout.dart).
-                Expanded(child: Center(child: Scaled(scale: scale, child: pill))),
+                Expanded(child: Center(child: Scaled(scale: scale, child: _Said(child: pill)))),
               ],
               if (wide) const Spacer(),
             ],
+          ),
+        );
+        final felt = note == null
+            ? table
+            : Stack(
+                children: [
+                  table,
+                  Positioned(
+                    left: edge,
+                    top: edge,
+                    child: Scaled(
+                      scale: scale,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: (box.width - 2 * edge) / scale),
+                        child: FeltCorner(text: note.text, tone: note.tone),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+        if (cluster <= box.height) return felt;
+        // Shorter than the least of a table: the smallest trick, its
+        // badges and the line, which only the largest type on a phone
+        // on its side comes to. The table is drawn smaller to fit
+        // rather than run off the felt, every part of it together, so
+        // nothing is cut and nothing lands on anything else.
+        return SizedBox.fromSize(
+          size: box,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: SizedBox(width: box.width, height: cluster, child: felt),
           ),
         );
       },
@@ -332,6 +560,83 @@ class TableView extends StatelessWidget {
     }
     return null;
   }
+}
+
+/// A side badge where it has always been — held against its card by
+/// its inner edge, in the middle of the trick's height ([home]) — and
+/// its reaction beside it, over or under it in the strip the badge
+/// stands in, as far as this box runs: the felt gives the box the room
+/// past the trick that the reaction may have (TableView).
+class _SideSeat extends StatelessWidget {
+  const _SideSeat({
+    required this.badge,
+    required this.bubble,
+    required this.home,
+    required this.anchoredRight,
+    required this.up,
+    required this.gap,
+    this.clear = 0,
+  });
+
+  final Widget badge;
+  final Widget bubble;
+  final Rect home;
+
+  /// Which side of the strip the badge holds to: the one against the
+  /// trick.
+  final bool anchoredRight;
+
+  /// Whether the reaction goes over the badge, rather than under it.
+  final bool up;
+  final double gap;
+
+  /// How far in from the strip's inner edge the reaction keeps: clear of
+  /// the far and near badges' column, which it can run alongside.
+  final double clear;
+
+  @override
+  Widget build(BuildContext context) => CustomMultiChildLayout(
+        delegate: _SideSeatLayout(home: home, anchoredRight: anchoredRight, up: up, gap: gap, clear: clear),
+        children: [
+          LayoutId(id: _SideSeatLayout.badge, child: badge),
+          LayoutId(id: _SideSeatLayout.bubble, child: bubble),
+        ],
+      );
+}
+
+class _SideSeatLayout extends MultiChildLayoutDelegate {
+  _SideSeatLayout({required this.home, required this.anchoredRight, required this.up, required this.gap, required this.clear});
+
+  static const badge = 'badge';
+  static const bubble = 'bubble';
+
+  final Rect home;
+  final bool anchoredRight;
+  final bool up;
+  final double gap;
+  final double clear;
+
+  @override
+  void performLayout(Size size) {
+    final b = layoutChild(badge, BoxConstraints.loose(home.size));
+    final at = Offset(anchoredRight ? home.right - b.width : home.left, home.top + (home.height - b.height) / 2);
+    positionChild(badge, at);
+    // From a gap off the badge to the end of the box, the strip's width.
+    final top = up ? 0.0 : at.dy + b.height + gap;
+    final bottom = up ? at.dy - gap : size.height;
+    // The strip less what it keeps clear of on its inner side: the left
+    // of the right-hand strip, the right of the left-hand one.
+    final from = anchoredRight ? 0.0 : clear;
+    final to = anchoredRight ? size.width - clear : size.width;
+    final r = layoutChild(bubble, BoxConstraints.loose(Size(math.max(0.0, to - from), math.max(0.0, bottom - top))));
+    // Over or under the middle of the badge, inside the strip.
+    final x = (at.dx + b.width / 2 - r.width / 2).clamp(from, math.max(from, to - r.width)).toDouble();
+    positionChild(bubble, Offset(x, up ? bottom - r.height : top));
+  }
+
+  @override
+  bool shouldRelayout(_SideSeatLayout old) =>
+      old.home != home || old.anchoredRight != anchoredRight || old.up != up || old.gap != gap || old.clear != clear;
 }
 
 /// The middle of the felt: four slots that hold their place, whatever
@@ -455,10 +760,8 @@ class _TrickState extends State<_Trick> with SingleTickerProviderStateMixin {
                 // the card that took the trick, which is the one
                 // furthest towards its taker, so every card only ever
                 // moves the one way; and the pile is pulled off towards
-                // the taker, getting up to speed as it goes. It used to
-                // leave as a picture of four cards sliding off in
-                // formation. Solid while it is plainly on the felt, and
-                // gone by the end.
+                // the taker, getting up to speed as it goes. Solid
+                // while it is plainly on the felt, and gone by the end.
                 final go = Easing.standardAccelerate.transform(v);
                 final together = Curves.easeInOutCubic.transform((v / 0.7).clamp(0.0, 1.0));
                 final fade = Curves.easeIn.transform(((v - 0.4) / 0.6).clamp(0.0, 1.0));
@@ -506,11 +809,12 @@ class _TrickSlot extends StatelessWidget {
     // Spoken as "Cyrano led the ace of clubs" / "Juliet played the 5 of
     // clubs": a screen reader hears the trick, and so does anything
     // else that reads the table through the accessibility tree.
+    final l10n = context.l10n;
     final label = card == null
         ? null
         : order == 0
-            ? '$name led the ${card!.spoken}'
-            : '$name played the ${card!.spoken}';
+            ? l10n.seatLed(name, l10n.cardInSentence(card!))
+            : l10n.seatPlayed(name, l10n.cardInSentence(card!));
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 240),
       // What leaves a slot is carried off by the sweep above, so there
@@ -573,18 +877,28 @@ class SeatBadge extends StatelessWidget {
     required this.won,
     required this.maxWidth,
     required this.iconSeed,
+    String? iconName,
     required this.avatar,
     this.clockMs,
     this.oneLine = false,
     this.height,
     this.onHold,
     required this.iconSize,
-  });
+    this.position = 0,
+  }) : iconName = iconName ?? name;
+
+  /// What the icon's initials come from (table_model.dart, iconNameOf).
+  final String iconName;
 
   /// What a long press on the badge offers, if anything.
   final VoidCallback? onHold;
 
   final int seat;
+
+  /// Where the seat is drawn from the player's: 0 their own, 1 on their
+  /// left — the seat that plays after them — 2 across, 3 on their right.
+  /// A sighted player reads it off the felt; a screen reader says it.
+  final int position;
   final String name;
 
   /// What the seat's icon is coloured from.
@@ -620,6 +934,16 @@ class SeatBadge extends StatelessWidget {
   /// the roster's one-word names on a line, at 58 points of text.
   static const minWidth = 80.0;
 
+  /// A stacked badge's padding at either side, and the least it gives
+  /// way to where its strip is narrower than [minWidth] — a 360-point
+  /// phone, upright — so that what is inside keeps the room it has at
+  /// [minWidth], and the cards keep the hand's size.
+  static const _side = 11.0;
+  static const _sideLeast = 7.0;
+
+  /// The narrowest a side badge's strip is let be.
+  static const leastWidth = minWidth - 2 * (_side - _sideLeast);
+
   /// What a badge on one line is, exactly: the felt sizes the trick
   /// from the height the seats leave it, so a badge that grew with its
   /// name or the reader's text size would push the cards off the
@@ -640,7 +964,6 @@ class SeatBadge extends StatelessWidget {
   static const nameSize = 13.0;
   static const _numberSize = 12.5;
 
-  static const _stacked = EdgeInsets.symmetric(horizontal: 11, vertical: 7);
 
   @override
   Widget build(BuildContext context) {
@@ -651,8 +974,9 @@ class SeatBadge extends StatelessWidget {
     // this hand, whether it is their turn, and their clock once it runs.
     final clock = clockMs;
     return Semantics(
-      label: '$name: $total in the game, $taken this hand'
-          '${onTurn ? ', on turn' : ''}${clock == null ? '' : ', ${clockSeconds(clock)} s on the clock'}',
+      label: '${context.l10n.seatScores(name, total, taken)}'
+          '${onTurn ? context.l10n.seatOnTurn : ''}${clock == null ? '' : context.l10n.seatClock(clockSeconds(clock))}'
+          '${position == 0 ? '' : context.l10n.seatWhere(switch (position) { 1 => 'left', 2 => 'across', _ => 'right' })}',
       onLongPress: onHold,
       child: ExcludeSemantics(
         child: height == null ? _held(context, total, taken) : SizedBox(height: height, child: _held(context, total, taken)),
@@ -667,7 +991,13 @@ class SeatBadge extends StatelessWidget {
     return GestureDetector(behavior: HitTestBehavior.opaque, onLongPress: onHold, child: badge);
   }
 
-  EdgeInsets get _padding => oneLine ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4) : _stacked;
+  EdgeInsets get _padding => oneLine
+      ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4)
+      : EdgeInsets.symmetric(horizontal: ((maxWidth - (minWidth - 2 * _side)) / 2).clamp(_sideLeast, _side), vertical: 7);
+
+  /// The border's width on the seat whose turn it is, or that just took
+  /// the trick; a point otherwise.
+  static const _borderMost = 1.6;
 
   /// The name, in the room it has, at one size wherever it is: every
   /// player's name is the same size as every other's, so a long one is
@@ -675,6 +1005,13 @@ class SeatBadge extends StatelessWidget {
   /// spaces where the badge is stacked and the name has any — Mumtaz
   /// Mahal in the east seat of a phone; and cut with an ellipsis when
   /// even that will not go in.
+  ///
+  /// At the reader's own text size the name is laid out as it is at
+  /// ordinary type, only bigger — the room grows with the type — and
+  /// the badge draws it as large as its box allows (below): never cut
+  /// shorter than at ordinary type, and never drawn smaller than it.
+  /// Cyrano is Cyrano at twice the type on the smallest phone, not
+  /// "Cy…".
   Widget _name(BuildContext context, double room) {
     final style = TextStyle(
       fontSize: nameSize,
@@ -682,6 +1019,7 @@ class SeatBadge extends StatelessWidget {
       color: onTurn ? Palette.gold : Palette.chrome,
     );
     final scaler = MediaQuery.textScalerOf(context);
+    room *= math.max(1.0, scaler.scale(nameSize) / nameSize);
     double widthOf(String text) => (TextPainter(
           text: TextSpan(text: text, style: style),
           textDirection: TextDirection.ltr,
@@ -730,8 +1068,11 @@ class SeatBadge extends StatelessWidget {
     // The icon sits beside the name where the badge has the width for
     // it and above it where it does not, so a side badge keeps its room
     // for the name either way.
-    final icon = PlayerIcon(name: name, seed: iconSeed, avatar: avatar, size: iconSize);
-    final nameText = _name(context, maxWidth - _padding.horizontal - (oneLine ? iconSize + 6 : 0));
+    final icon = PlayerIcon(name: iconName, seed: iconSeed, avatar: avatar, size: iconSize);
+    // Inside the padding and the border, at its widest: the gold one on
+    // the seat whose turn it is. A name given the room the border takes
+    // comes out wider than the badge, and the badge scales it to fit.
+    final nameText = _name(context, maxWidth - _padding.horizontal - 2 * _borderMost - (oneLine ? iconSize + 6 : 0));
     // A three-digit total beside a two-digit hand is the widest this
     // gets, and it is a hair inside a side badge's room: scaled down
     // rather than clipped should a font run wider.
@@ -781,13 +1122,15 @@ class SeatBadge extends StatelessWidget {
             // that just took the trick, which is the same news the pill
             // carries and had better not disagree with it.
             color: onTurn ? Palette.gold : (won ? Palette.chrome : Colors.white.withValues(alpha: 0.10)),
-            width: onTurn || won ? 1.6 : 1,
+            width: onTurn || won ? _borderMost : 1,
           ),
         ),
         // Scaled into the box rather than overflowing it: a badge is
         // given its size by the felt — the height of the card beside
-        // it, or one line — and a name that wraps to two, or a reader
-        // who has turned the text up, is a hair more than that.
+        // it, or one line — and a name that wraps to two is a hair more
+        // than that, and a reader who has turned the text up can be a
+        // good deal more. A badge is a label on the felt, and grows
+        // with the reader's type as far as the felt has room for it.
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: oneLine
@@ -805,6 +1148,129 @@ class SeatBadge extends StatelessWidget {
   }
 }
 
+/// Says [message] aloud to a screen reader when it appears and when it
+/// changes, and draws [child]: what the felt shows for a moment — who
+/// took the trick, that it is your turn — is gone before anyone could
+/// find it by moving through the screen, so it is said as it happens.
+class Announced extends StatefulWidget {
+  const Announced({super.key, required this.message, required this.child});
+
+  final String message;
+  final Widget child;
+
+  @override
+  State<Announced> createState() => _AnnouncedState();
+}
+
+class _AnnouncedState extends State<Announced> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _say());
+  }
+
+  @override
+  void didUpdateWidget(Announced old) {
+    super.didUpdateWidget(old);
+    if (old.message != widget.message) _say();
+  }
+
+  void _say() {
+    if (!mounted) return;
+    SemanticsService.sendAnnouncement(View.of(context), widget.message, Directionality.of(context));
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// The line in the felt's top corner (TableView.corner): small, quiet,
+/// and at the reader's text size, wrapped where it must be.
+class FeltCorner extends StatelessWidget {
+  const FeltCorner({super.key, required this.text, required this.tone});
+
+  final String text;
+  final Color tone;
+
+  static const _padding = EdgeInsets.symmetric(horizontal: 9, vertical: 4);
+  static const _type = TextStyle(fontSize: 10.5);
+
+  /// How big the line is in [room], at the reader's text size.
+  static Size sizeOf(BuildContext context, String text, double room) {
+    final laid = TextPainter(
+      text: TextSpan(text: text, style: DefaultTextStyle.of(context).style.merge(_type)),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: room - _padding.horizontal);
+    return Size(laid.width + _padding.horizontal, laid.height + _padding.vertical);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: _padding,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(text, style: _type.copyWith(color: tone)),
+    );
+  }
+}
+
+/// What [said] says of [name], in [lines] lines [width] wide at the
+/// reader's text size: all of it where it fits, and otherwise with the
+/// name cut short, a letter at a time, until it does. The name gives
+/// way before the sentence round it, as a long name does everywhere on
+/// the table, and the sentence is said whole to a screen reader.
+String nameGivesWay(BuildContext context,
+    {required String Function(String name) said, required String name, required TextStyle style, required double width, int lines = 1}) {
+  final type = DefaultTextStyle.of(context).style.merge(style);
+  bool fits(String text) => !(TextPainter(
+        text: TextSpan(text: text, style: type),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        maxLines: lines,
+      )..layout(maxWidth: width))
+          .didExceedMaxLines;
+  var line = said(name);
+  if (!width.isFinite || fits(line)) return line;
+  final letters = name.characters.toList();
+  for (var n = letters.length - 1; n > 0; n--) {
+    line = said('${letters.take(n).join().trimRight()}…');
+    if (fits(line)) return line;
+  }
+  return line;
+}
+
+/// The line the table says, in the slot the felt keeps for it: on one
+/// line at the reader's text size, a long name in it giving way first
+/// (see [_TrickResult]). Only where the slot is shorter than that type
+/// — a felt with no height to spare — is the line drawn smaller to fit
+/// it, as a badge draws its own name into its row; and small enough
+/// that the turn's pill is still in it at the top of its breath.
+class _Said extends StatelessWidget {
+  const _Said({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, room) => ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: room.maxWidth / (1 + _breathing), maxHeight: room.maxHeight / (1 + _breathing)),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: room.maxWidth / (1 + _breathing)),
+            child: DefaultTextStyle.merge(maxLines: 1, softWrap: false, child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrickResult extends StatelessWidget {
   const _TrickResult({required this.you, required this.name, required this.points});
 
@@ -814,12 +1280,21 @@ class _TrickResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final who = you ? 'You take it' : '$name takes it';
-    return _Pill(
-      text: points == 0 ? who : '$who  ·  $points',
-      // A trick that has been taken is news, not a turn to take: gold
-      // is kept for the seat it is the turn of (theme.dart).
-      tone: points == 0 ? Palette.chrome : Palette.danger,
+    final l10n = context.l10n;
+    String who(String name) => you ? l10n.youTakeIt : l10n.takesIt(name);
+    String said(String name) => points == 0 ? who(name) : '${who(name)}  ·  $points';
+    return Announced(
+      message: points == 0 ? who(name) : l10n.takesPoints(who(name), points),
+      // Said whole to a screen reader; on the felt, a name too long for
+      // the line is cut short, and the sentence and the points kept.
+      child: LayoutBuilder(
+        builder: (context, room) => _Pill(
+          text: _Pill.fit(context, room.maxWidth, said, name),
+          // A trick that has been taken is news, not a turn to take:
+          // gold is kept for the seat it is the turn of (theme.dart).
+          tone: points == 0 ? Palette.chrome : Palette.danger,
+        ),
+      ),
     );
   }
 }
@@ -836,33 +1311,112 @@ class _TurnHint extends StatelessWidget {
     if (seat == null) return const SizedBox.shrink();
     // "Your turn" whether leading or following: "your lead" reads as
     // a standing in the game, and in Hearts leading is no prize.
-    if (seat == mySeat) return const _Pill(text: 'Your turn', tone: Palette.gold);
+    if (seat == mySeat) return Announced(message: context.l10n.yourTurn, child: _YourTurn(text: context.l10n.yourTurn));
     return const SizedBox.shrink();
   }
 }
 
+/// The pill that says it is your turn, glowing and breathing gold so it
+/// is seen from across the room — a turn waited on is a table waiting.
+/// Held still, glow and all, for a reader who has asked for less
+/// movement.
+class _YourTurn extends StatefulWidget {
+  const _YourTurn({required this.text});
+
+  final String text;
+
+  @override
+  State<_YourTurn> createState() => _YourTurnState();
+}
+
+class _YourTurnState extends State<_YourTurn> with SingleTickerProviderStateMixin {
+  late final AnimationController _breath = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!turnPillBreathes || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
+      _breath
+        ..stop()
+        ..value = 0.6;
+    } else if (!_breath.isAnimating) {
+      _breath.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _breath.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _breath,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_breath.value);
+        return Transform.scale(
+          scale: 1 + _breathing * t,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: Palette.gold.withValues(alpha: 0.25 + 0.45 * t), blurRadius: 10 + 14 * t, spreadRadius: 1 + 3 * t),
+              ],
+            ),
+            child: child,
+          ),
+        );
+      },
+      child: _Pill(text: widget.text, tone: Palette.gold, strong: true),
+    );
+  }
+}
+
 class _Pill extends StatelessWidget {
-  const _Pill({required this.text, required this.tone});
+  const _Pill({required this.text, required this.tone, this.strong = false});
 
   final String text;
   final Color tone;
 
+  /// Filled with its tone rather than outlined: the one pill that asks
+  /// for something.
+  final bool strong;
+
+  static const _padding = EdgeInsets.symmetric(horizontal: 13, vertical: 6);
+  static const _type = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.2);
+
+  static TextPainter _laid(BuildContext context, String text, TextScaler scaler) => TextPainter(
+        text: TextSpan(text: text, style: DefaultTextStyle.of(context).style.merge(_type)),
+        textDirection: Directionality.of(context),
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+
+  /// How much taller the reader's text size makes a pill than ordinary
+  /// type does: the felt's row for it grows by as much.
+  static double growth(BuildContext context) =>
+      _laid(context, 'M', MediaQuery.textScalerOf(context)).height - _laid(context, 'M', TextScaler.noScaling).height;
+
+  /// What [said] says of [name] on one line of a pill in [room].
+  static String fit(BuildContext context, double room, String Function(String name) said, String name) =>
+      nameGivesWay(context, said: said, name: name, style: _type, width: room - _padding.horizontal - 2);
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+      padding: _padding,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
+        color: strong ? tone : Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tone.withValues(alpha: 0.5)),
+        border: Border.all(color: tone.withValues(alpha: strong ? 1 : 0.5)),
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.2,
-          color: tone,
+        style: _type.copyWith(
+          fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
+          color: strong ? Felt.dark : tone,
         ),
       ),
     );

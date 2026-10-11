@@ -26,7 +26,7 @@ class JurorDuty {
       required this.presence,
       this.log,
       Clock? clock,
-      this.silenceAfterMs = 120000,
+      this.silenceAfterMs,
       this.pinned = 0,
       this.dial,
       this.crypto,
@@ -41,9 +41,9 @@ class JurorDuty {
   final void Function(String line)? log;
   final Clock clock;
 
-  /// The silence a juror's clients count as absence; the protocol's
-  /// two minutes, shorter in a test.
-  final int silenceAfterMs;
+  /// The silence a juror's clients count as absence: null for each
+  /// table's own ([TableTiming.silenceMs]), shorter in a test.
+  final int? silenceAfterMs;
 
   /// The deal's primitives, to serve at sealed tables.
   final DealCrypto? crypto;
@@ -52,19 +52,17 @@ class JurorDuty {
   /// ([TableClient.dealWorker]); one for all of them, as a device has.
   final DealWorker? dealWorker;
 
-  /// Relays at the front of [relays] kept primary — ours to run.
+  /// Relays at the front of [relays] kept primary.
   final int pinned;
 
   /// How a juror talks to the table it is summoned to. The default is
-  /// the relay it was summoned over, which is all a juror had for a
-  /// long time — and the reason the table copied every event there
-  /// (docs/02-multiplayer.md gives the relay signalling and a fallback
-  /// lane, not the play). An app hands over a mesh instead: the relay
-  /// under it for signalling, and a data channel to each seat, so a
-  /// juror is dialled like anybody else at the table.
+  /// the relay it was summoned over (docs/02-multiplayer.md). An app
+  /// hands over a mesh instead: the relay under it for signalling, and
+  /// a data channel to each seat, so a juror is dialled like anybody
+  /// else at the table.
   ///
   /// The service's own jurors keep the relay, having no WebRTC in the
-  /// VM to dial with — which is what the fallback lane is for.
+  /// VM to dial with.
   final Transport Function(TableSpec spec, RelayTransport relay)? dial;
 
   final Map<String, ({TableClient client, Transport transport})> _tables = {};
@@ -90,6 +88,7 @@ class JurorDuty {
 
   void _onSummons(Summons s) {
     var t = _tables[s.spec.id];
+    if (t == null && !_mayServe(s.spec)) return;
     if (t == null && letGo.stale(s.spec.id, s.hand)) {
       log?.call('summoned to ${s.spec.id} for hand ${s.hand}, which it had followed past: stale');
       return;
@@ -118,15 +117,51 @@ class JurorDuty {
     t.client.serveFor(s.hand, s.jurors, juryId: s.juryId, first: s.first, draws: s.draws);
   }
 
+  /// Whether this device may follow [spec] as a juror at all: never a
+  /// table its own account sits at — by whichever of its devices, since
+  /// a juror there would be the player judging their own game — and
+  /// never one whose seats are not the accounts they say they are
+  /// (spec.dart, licence.dart).
+  bool _mayServe(TableSpec spec) {
+    final mine = presence.accountOf(signer.publicKey);
+    if (spec.accounts.contains(mine)) {
+      log?.call('summoned to ${spec.id}, where this device\'s own account sits: not served');
+      return false;
+    }
+    final wrong = spec.licenceProblem(at: DateTime.now());
+    if (wrong != null) {
+      log?.call('summoned to ${spec.id}, whose seats do not check out ($wrong): not served');
+      return false;
+    }
+    return true;
+  }
+
+  /// Where each table followed last moved, and when the juror last
+  /// said why it has not since.
+  final Map<String, ({int hand, int step, int movedAt, int toldAt})> _progress = {};
+
   void _sweepTables() {
+    final now = DateTime.now().millisecondsSinceEpoch;
     for (final e in List.of(_tables.entries)) {
       final c = e.value.client;
       // A line every ten seconds per table followed: where the juror
       // stands, for a log read after the fact.
       log?.call('following ${e.key}: hand ${c.game.handNumber} ${c.game.phase.name} step ${c.step} pause ${c.pause?.name} '
           'heartbeats ${c.heartbeatsSent} deferred ${c.deferred} serving ${c.serving}');
+      // And a table that has not moved for a minute, once a minute: the
+      // whole of what this side sees of it — whose turn, what is open,
+      // what it holds back — so a stall can be read off the log rather
+      // than guessed at.
+      final was = _progress[e.key];
+      if (was == null || was.hand != c.game.handNumber || was.step != c.step) {
+        _progress[e.key] = (hand: c.game.handNumber, step: c.step, movedAt: now, toldAt: now);
+      } else if (now - was.movedAt >= 60000 && now - was.toldAt >= 60000) {
+        _progress[e.key] = (hand: was.hand, step: was.step, movedAt: was.movedAt, toldAt: now);
+        log?.call('stalled ${e.key} for ${(now - was.movedAt) ~/ 1000}s:\n${c.describe()}');
+      }
       if (c.serving) continue;
       log?.call('done with ${e.key}');
+      _progress.remove(e.key);
       letGo.record(e.key, c.game.handNumber);
       c.close();
       e.value.transport.close();
@@ -180,25 +215,46 @@ class LetGo {
 /// Each seat on the bench is its own identity, its own presence and
 /// its own duty, so the draw takes them as it takes anyone: one bot
 /// seat each, and none of them holding enough of the deck to subtract
-/// the rest. They are all ours, which is the bend doc 04 names — ours
-/// rather than another player's, and only when the room is empty.
+/// the rest. They are all the service's, which docs/04-live-play.md
+/// allows: the service's rather than another player's, and only when
+/// the room is empty.
 class LastResortBench {
   LastResortBench({
     required List<Signer> signers,
     required List<Uri> relays,
+    List<Uri>? presenceRelays,
     void Function(String line)? log,
     int idleMs = 10 * 60 * 1000,
-    int silenceAfterMs = 120000,
+    int? silenceAfterMs,
     DealCrypto? crypto,
   }) : jurors = [
           for (final s in signers)
-            LastResortJuror(relays: relays, signer: s, log: log, idleMs: idleMs, silenceAfterMs: silenceAfterMs, crypto: crypto),
+            LastResortJuror(
+                relays: relays,
+                presenceRelays: presenceRelays,
+                signer: s,
+                log: log,
+                idleMs: idleMs,
+                silenceAfterMs: silenceAfterMs,
+                crypto: crypto),
         ];
 
   final List<LastResortJuror> jurors;
 
   /// Whether any of the bench is up.
   bool get online => jurors.any((j) => j.online);
+
+  /// How many tables the bench is serving, counted once a juror.
+  int get serving => jurors.fold(0, (n, j) => n + j.duty.serving);
+
+  /// Called for by [table] some other way than on the relay — the
+  /// service that woke this bench, passing the call on — so the bench
+  /// is online for it now rather than at the table's next call.
+  void wake(String table) {
+    for (final j in jurors) {
+      j.wake(table);
+    }
+  }
 
   void start() {
     for (final j in jurors) {
@@ -218,9 +274,19 @@ class LastResortBench {
 /// every other juror runs — and quiet again once it has been idle for
 /// a while.
 class LastResortJuror {
+  /// [presenceRelays] are where it says it is here and hears the calls,
+  /// as a device's presence is carried (app/lib/net/relays.dart,
+  /// presenceRelays); [relays] where it follows the tables. The same
+  /// list for both unless said.
   LastResortJuror(
-      {required this.relays, required this.signer, this.log, this.idleMs = 10 * 60 * 1000, int silenceAfterMs = 120000, DealCrypto? crypto}) {
-    presence = RelayPresence(relays: relays, signer: signer, status: 'last-resort', log: log)..silent = true;
+      {required this.relays,
+      List<Uri>? presenceRelays,
+      required this.signer,
+      this.log,
+      this.idleMs = 10 * 60 * 1000,
+      int? silenceAfterMs,
+      DealCrypto? crypto}) {
+    presence = RelayPresence(relays: presenceRelays ?? relays, signer: signer, status: 'last-resort', log: log)..silent = true;
     duty = JurorDuty(relays: relays, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs, crypto: crypto);
   }
 
@@ -243,6 +309,9 @@ class LastResortJuror {
     _calls = presence.calls.listen(_onCall);
     _idle = Timer.periodic(const Duration(seconds: 30), (_) => _checkIdle());
   }
+
+  /// As a call heard on the relay.
+  void wake(String table) => _onCall(table);
 
   void _onCall(String table) {
     _calledAt = DateTime.now().millisecondsSinceEpoch;

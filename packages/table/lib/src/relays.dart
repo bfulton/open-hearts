@@ -1,11 +1,9 @@
 /// Several relays, one client: listening on all of them, writing to one.
 ///
-/// A public relay is volunteer infrastructure with rate limits and no
-/// uptime promise (docs/02-multiplayer.md), and one turned on a live
-/// table: six minutes into a game it began answering every event from
-/// the table with a proof-of-work demand, a play that was on its way
-/// reached nobody, and the seat was booted for silence. So a client
-/// holds a short list. It keeps a subscription open on every relay in
+/// Any relay can go down or start refusing a client's events, and a
+/// play that reaches nobody gets its seat booted for silence. So a
+/// client holds a short list (docs/08-own-relays.md). It keeps a
+/// subscription open on every relay in
 /// the list and writes each event to the first that has not refused it
 /// lately; a refusal moves the same event on to the next, and when
 /// every relay has refused, the client is told, so a table that is cut
@@ -23,6 +21,39 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'nostr.dart';
+import 'signing.dart';
+
+/// What a device shows a relay that asks who it is (NIP-42), as tags
+/// beside the relay's challenge in an event its key signs: the
+/// activation the service gave it (licence.dart), or for the bench of
+/// jurors of last resort the mark the relay knows it by. Set once at
+/// startup by whatever holds them; null, or null for a key, and a
+/// challenge goes unanswered — a relay that asks will not carry that
+/// device, which is right for one the service has not vouched for.
+List<List<String>>? Function(PublicKey key)? relayCredentials;
+
+/// Told when a relay turns this device away for good, with the
+/// relay's reason: `superseded:` — another device of the account is the
+/// one in use now — or `restricted:` — not admitted at all. The relay
+/// has closed or will close the socket, and retrying will not change
+/// its mind (docs/06-service.md, "One device at a time").
+void Function(String reason)? relayTurnedAway;
+
+/// How [signer] answers a relay's challenge: the AUTH event, or null
+/// when this process has nothing to show for it.
+NostrEvent? Function(Uri relay, String challenge) relayAuthFor(Signer signer) => (relay, challenge) {
+      final shown = relayCredentials?.call(signer.publicKey);
+      if (shown == null) return null;
+      return NostrEvent.sign(signer, kind: TableKinds.auth, content: '', tags: [
+        ['relay', '$relay'],
+        ['challenge', challenge],
+        ...shown,
+      ]);
+    };
+
+/// Whether a relay's reason is one it will not change its mind about
+/// for this device: a superseded device, or one not admitted.
+bool turnedAway(String reason) => reason.startsWith('superseded:') || reason.startsWith('restricted:');
 
 /// The list itself: parsed from text, turned by a key.
 abstract final class Relays {
@@ -37,9 +68,8 @@ abstract final class Relays {
   /// The relays past the first [pinned] begun at the entry a hash of
   /// [key] picks, the rest following in order: where a client writes
   /// first among the interchangeable relays is a function of the table,
-  /// so tables spread over them. The [pinned] at the front stay first —
-  /// a relay we run, primary while up, not spun out of place with the
-  /// volunteer ones.
+  /// so tables spread over them. The [pinned] at the front stay first:
+  /// a primary relay, not spun out of place with the rest.
   static List<Uri> turnedBy(List<Uri> relays, String key, {int pinned = 0}) {
     if (relays.length - pinned < 2) return relays;
     final tail = relays.sublist(pinned);
@@ -60,11 +90,19 @@ abstract final class Relays {
 /// nothing at all for [quietMs] after publishing, when this client's
 /// own events should be coming back on it.
 class RelayConnection {
-  RelayConnection({required this.url, required this.subscriptions, required this.onMessage, this.log}) {
+  RelayConnection({required this.url, required this.subscriptions, required this.onMessage, this.log, this.auth}) {
     _connect();
   }
 
   final Uri url;
+
+  /// How this connection answers the relay's challenge, if it asks
+  /// ([relayAuthFor]). A relay that asks holds whatever was said before
+  /// the answer until it has checked it, so nothing here waits.
+  final NostrEvent? Function(Uri relay, String challenge)? auth;
+
+  /// Turned away for good ([turnedAway]): not connected again.
+  bool _refused = false;
 
   /// Subscription id to filters, as JSON; sent on every connection.
   final Map<String, List<Map<String, Object?>>> subscriptions;
@@ -120,7 +158,7 @@ class RelayConnection {
   }
 
   void _connect() {
-    if (_closed) return;
+    if (_closed || _refused) return;
     final ch = WebSocketChannel.connect(url);
     _channel = ch;
     ch.stream.listen((m) => _onMessage(ch, m), onDone: () => _onDropped(ch), onError: (_) => _onDropped(ch));
@@ -160,7 +198,40 @@ class RelayConnection {
     }
     if (m.isEmpty) return;
     if (m[0] == 'EOSE' && !_ready.isCompleted) _ready.complete();
+    if (m[0] == 'AUTH' && m.length > 1 && m[1] is String) {
+      final answer = auth?.call(url, m[1] as String);
+      if (answer != null) {
+        _authId = answer.id;
+        try {
+          ch.sink.add(jsonEncode(['AUTH', answer.toJson()]));
+        } catch (_) {}
+      }
+      return;
+    }
+    // The answer to this connection's own AUTH is the relay's to give,
+    // and its refusal for good is the device's to hear.
+    if (m[0] == 'OK' && m.length > 3 && m[1] == _authId) {
+      if (m[2] == true) return;
+      final reason = '${m[3]}';
+      if (turnedAway(reason)) return _turnedAway(reason);
+      // Not now — an activation run out, say, while the device slept:
+      // a fresh socket in a few seconds answers with whatever it holds
+      // by then.
+      log?.call('$url: not carried yet: $reason');
+      Future<void>.delayed(const Duration(seconds: 5), remake);
+      return;
+    }
+    if ((m[0] == 'NOTICE' || m[0] == 'CLOSED') && m.length > 1 && turnedAway('${m.last}')) _turnedAway('${m.last}');
     onMessage(this, m);
+  }
+
+  String? _authId;
+
+  void _turnedAway(String reason) {
+    if (!turnedAway(reason)) return;
+    log?.call('$url: turned away: $reason');
+    _refused = true;
+    relayTurnedAway?.call(reason);
   }
 
   void close() {
@@ -175,10 +246,11 @@ class RelayConnection {
 /// A client's relays: its subscriptions on all of them, each of its
 /// events written to one.
 class RelayGroup {
-  RelayGroup({required List<Uri> urls, required this.subscriptions, required this.onEvent, this.log, this.refusalMs = defaultRefusalMs}) {
+  RelayGroup(
+      {required List<Uri> urls, required this.subscriptions, required this.onEvent, this.log, this.refusalMs = defaultRefusalMs, this.auth}) {
     if (urls.isEmpty) throw ArgumentError('a relay group needs a relay');
     for (final u in urls) {
-      connections.add(RelayConnection(url: u, subscriptions: subscriptions, onMessage: _onMessage, log: log));
+      connections.add(RelayConnection(url: u, subscriptions: subscriptions, onMessage: _onMessage, log: log, auth: auth));
     }
     ready = Future.any([for (final c in connections) c.ready]);
     allReady = Future.wait([for (final c in connections) c.ready]);
@@ -193,6 +265,9 @@ class RelayGroup {
   /// not remembered, so the real one under that id still gets in.
   final bool Function(Map<String, Object?> raw) onEvent;
   final void Function(String line)? log;
+
+  /// How each connection answers a relay that asks who it is.
+  final NostrEvent? Function(Uri relay, String challenge)? auth;
 
   final List<RelayConnection> connections = [];
 
@@ -222,6 +297,10 @@ class RelayGroup {
 
   /// Waiting to hear whether an event was taken: see [taken].
   final Map<String, Completer<bool>> _taking = {};
+
+  /// Events published [publish] `aside`, whose refusal is nobody's
+  /// business but theirs: the newest few hundred, oldest first.
+  final _aside = <String>{};
   final _refusals = StreamController<String?>.broadcast();
   String? _refusal;
   Timer? _sweeper;
@@ -263,8 +342,22 @@ class RelayGroup {
   /// written to is the first in order among those, and when none of
   /// them is up and taking events the event goes to every relay that
   /// is, since a relay nobody can read is no place for it.
-  void publish(NostrEvent e, {bool everywhere = false, Set<Uri>? readBy}) {
+  ///
+  /// [aside]: what becomes of [e] is its own business. A relay that
+  /// turns it away is not taken to be refusing this client — not kept
+  /// out of the running for [refusalMs], not said under the felt — since
+  /// the table waits on nothing like it: a player's reaction
+  /// (reactions.dart). Gone is gone; it is not tried anywhere else.
+  void publish(NostrEvent e, {bool everywhere = false, Set<Uri>? readBy, bool aside = false}) {
     if (_closed) return;
+    if (aside) {
+      _aside.add(e.id);
+      if (_aside.length > 200) _aside.remove(_aside.first);
+      for (final c in connections) {
+        if (c.connected && (_refusedUntil[c.url] ?? 0) <= _nowMs) c.publish(e);
+      }
+      return;
+    }
     final now = _nowMs;
     final upUrls = [for (final c in connections) if (c.connected && (_refusedUntil[c.url] ?? 0) <= now) c.url];
     if (floodWrite(upUrls, readBy, everywhere: everywhere)) {
@@ -328,6 +421,12 @@ class RelayGroup {
         final id = m[1] as String;
         final reason = m.length > 3 ? '${m[3]}' : '';
         final taken = m[2] == true || reason.startsWith('duplicate:');
+        // Every relay it went to answers for itself, so it stays marked
+        // until the newest few hundred have pushed it out.
+        if (_aside.contains(id)) {
+          if (!taken) log?.call('${from.url} refused ${id.substring(0, 8)}, said aside: $reason');
+          return;
+        }
         final p = _pending.remove(id);
         final flood = _flooded[id];
         if (taken) {

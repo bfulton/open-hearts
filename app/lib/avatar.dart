@@ -1,8 +1,10 @@
 /// What a player looks like: one of a set of icons on a colour of
 /// their choosing, a small picture of their own, or — with nothing
 /// chosen — their initials on a colour that is theirs. Chosen once in
-/// the lobby, kept on the device with the name, and carried to the
-/// others over the relay with the name (docs/04-live-play.md).
+/// the lobby, kept on the device with the name — and with the account,
+/// for a subscriber's devices to share (net/account_profile.dart) — and
+/// carried to the others over the relay with the name
+/// (docs/04-live-play.md).
 library;
 
 import 'dart:convert';
@@ -30,8 +32,8 @@ class Avatar {
   /// enough to ride a relay.
   static const side = 64;
 
-  /// The most a picture may be, in bytes: what a public relay carries
-  /// without complaint.
+  /// The most a picture may be, in bytes: what a relay carries without
+  /// complaint.
   static const maxPictureBytes = 12000;
 
   bool get isDefault => icon == null && color == null && picture == null;
@@ -137,34 +139,6 @@ abstract final class AvatarIcons {
     'piano': Icons.piano,
     'palette': Icons.palette,
     'snow': Icons.ac_unit,
-  };
-
-  /// What each is called, for a screen reader and a test.
-  static const names = <String, String>{
-    'pets': 'Paw',
-    'rabbit': 'Rabbit',
-    'bug': 'Bug',
-    'sailing': 'Sailing boat',
-    'rocket': 'Rocket',
-    'anchor': 'Anchor',
-    'castle': 'Castle',
-    'diamond': 'Diamond',
-    'spa': 'Leaf',
-    'park': 'Tree',
-    'star': 'Star',
-    'bolt': 'Bolt',
-    'sun': 'Sun',
-    'moon': 'Moon',
-    'flower': 'Flower',
-    'cake': 'Cake',
-    'coffee': 'Coffee',
-    'music': 'Music note',
-    'game': 'Game controller',
-    'umbrella': 'Umbrella',
-    'bike': 'Bicycle',
-    'piano': 'Piano',
-    'palette': 'Palette',
-    'snow': 'Snowflake',
   };
 
   /// How many colours the palette has (ui/player_icon.dart).

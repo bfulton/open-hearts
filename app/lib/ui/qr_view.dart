@@ -12,6 +12,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:qr/qr.dart';
 
+import '../l10n/l10n.dart';
+
 class QrView extends StatelessWidget {
   const QrView({super.key, required this.data, this.size = 220});
 
@@ -27,7 +29,7 @@ class QrView extends StatelessWidget {
     final code = QrCode(payload: QrPayload.fromString(data), errorCorrectLevel: QrErrorCorrectLevel.low);
     final image = QrImage(code);
     return Semantics(
-      label: 'A code to scan',
+      label: context.l10n.codeToScan,
       child: Container(
         width: size,
         height: size,

@@ -2,23 +2,30 @@
 ///
 /// At the end of a rated game every human at the table publishes the
 /// same result — the table, the seats, the final totals, who was there
-/// from the deal and who left — signed with their key. A table's
-/// result stands when a majority of the humans who sat down published
-/// the same one. From every result that stands, in order, ratings fall
-/// out (rating.dart), for people and for the bots that started the
-/// game; a bot that took over a leaver's seat has no stake, and a
-/// leaver finishes last.
+/// from the deal and who left — signed with their device's key. A
+/// person in a result is an account, not a device: each line names the
+/// account, with the licence that says the seat's key is one of its
+/// devices (licence.dart), so anyone folding results can check whose
+/// it is. A table's result stands when a majority of the accounts who
+/// sat down published the same one, each by the device it sat with.
+/// From every result that stands, in order, ratings fall out
+/// (rating.dart), for accounts and for the bots that started the game;
+/// a bot that took over a leaver's seat has no stake, and a leaver
+/// finishes last.
 ///
-/// Until the verifiable deal and the juror exist (docs 03, 04) the deal
-/// is a seed everyone can read and a table of one human is attested by
-/// that one human, so these ratings are provisional: fine for a reward,
-/// not yet for a claim.
+/// A result is attested by the humans at the table alone, so a table
+/// of one human is attested by that one human.
+///
+/// Ratings began again with accounts: results go under their own tag
+/// ([GameResult.tag]), and a result that names no account — one from
+/// before, keyed by device — is not folded.
 library;
 
 import 'dart:convert';
 
 import 'package:engine/engine.dart';
 
+import 'licence.dart';
 import 'nostr.dart';
 import 'rating.dart';
 import 'signing.dart';
@@ -26,12 +33,22 @@ import 'spec.dart';
 
 /// One seat's line in a result.
 class SeatResult {
-  const SeatResult({required this.human, this.key, this.bot, required this.total, required this.fromStart, this.left = false});
+  const SeatResult(
+      {required this.human, this.key, this.account, this.licence, this.bot, required this.total, required this.fromStart, this.left = false});
 
   final bool human;
 
-  /// The human's key, or null for a bot.
+  /// The key of the device the human sat with, or null for a bot.
   final PublicKey? key;
+
+  /// The human's account, or null for a bot: whose result this is.
+  final AccountId? account;
+
+  /// The service's word that [key] is a device of [account].
+  final Licence? licence;
+
+  /// Who a line is about: the account, or the bot's identity.
+  String get id => account ?? bot!;
 
   /// The bot's identity — its persona at its level, `Persona.id` — or
   /// null for a human.
@@ -48,6 +65,8 @@ class SeatResult {
 
   Map<String, Object?> toJson() => {
         if (key != null) 'key': key,
+        if (account != null) 'account': account,
+        if (licence != null) 'licence': licence!.toJson(),
         if (bot != null) 'bot': bot,
         'total': total,
         'fromStart': fromStart,
@@ -57,9 +76,17 @@ class SeatResult {
   static SeatResult? parse(Object? json) {
     try {
       final m = json as Map;
+      final human = m['key'] is String;
+      // A person is an account here: a line keyed by a device alone is
+      // from before accounts, and not a line at all.
+      if (human && m['account'] is! String) return null;
+      if (!human && m['bot'] is! String) return null;
+      final licence = m['licence'] == null ? null : Licence.parse(m['licence']) ?? (throw const FormatException('licence'));
       return SeatResult(
-        human: m['key'] is String,
+        human: human,
         key: m['key'] as String?,
+        account: m['account'] as String?,
+        licence: licence,
         bot: m['bot'] as String?,
         total: m['total'] as int,
         fromStart: m['fromStart'] as bool,
@@ -87,11 +114,17 @@ class GameResult {
   final int at;
 
   /// The relay's tag every result carries, so one subscription finds
-  /// them all.
-  static const tag = 'results';
+  /// them all. Not the tag device-keyed results went under before
+  /// accounts: ratings started again with them.
+  static const tag = 'standings';
+
+  /// What a result says it is, so that one of another shape is never
+  /// read as one of these.
+  static const version = 2;
 
   Map<String, Object?> toJson() => {
         'kind': 'result',
+        'v': version,
         'table': table,
         'rated': rated,
         'seats': [for (final s in seats) s.toJson()],
@@ -103,7 +136,7 @@ class GameResult {
   static GameResult? parse(NostrEvent e) {
     try {
       final m = Map<String, Object?>.from(jsonDecode(e.content) as Map);
-      if (m['kind'] != 'result') return null;
+      if (m['kind'] != 'result' || m['v'] != version) return null;
       final seats = [for (final s in m['seats'] as List) SeatResult.parse(s)!];
       return GameResult(table: m['table'] as String, rated: m['rated'] == true, seats: seats, at: e.createdAt);
     } catch (_) {
@@ -120,10 +153,10 @@ class GameResult {
       final end = finalHolders[s];
       if (start is HumanSeat && end is BotSeat) {
         // Left: the human finishes last, the bot has no stake.
-        seats.add(SeatResult(human: true, key: start.key, total: totals[s], fromStart: true, left: true));
+        seats.add(SeatResult(human: true, key: start.key, account: start.account, licence: start.licence, total: totals[s], fromStart: true, left: true));
         seats.add(SeatResult(human: false, bot: end.persona.id, total: totals[s], fromStart: false));
       } else if (start is HumanSeat) {
-        seats.add(SeatResult(human: true, key: start.key, total: totals[s], fromStart: true));
+        seats.add(SeatResult(human: true, key: start.key, account: start.account, licence: start.licence, total: totals[s], fromStart: true));
       } else {
         seats.add(SeatResult(human: false, bot: (start as BotSeat).persona.id, total: totals[s], fromStart: true));
       }
@@ -131,8 +164,32 @@ class GameResult {
     return GameResult(table: spec.id, rated: spec.rated, seats: seats, at: 0);
   }
 
-  /// The humans who sat down, whose majority makes the result stand.
-  Set<PublicKey> get humans => {for (final s in seats) if (s.key != null) s.key!};
+  /// The accounts who sat down, whose majority makes the result stand.
+  Set<AccountId> get humans => {for (final s in seats) if (s.account != null) s.account!};
+
+  /// The account whose device [key] sat here, or null for a key that
+  /// sat nowhere at this table.
+  AccountId? accountAt(PublicKey key) {
+    for (final s in seats) {
+      if (s.key == key) return s.account;
+    }
+    return null;
+  }
+
+  /// Whether every person's line names its account by a licence for
+  /// the key it sat with, where accounts are checked ([licenceFits]),
+  /// and no account sits twice. Without a clock: a result is folded
+  /// long after the licences in it ran out.
+  bool get licensed {
+    final seen = <AccountId>{};
+    for (final s in seats) {
+      if (!s.human) continue;
+      if (s.licence != null && s.licence!.account != s.account) return false;
+      if (!licenceFits(s.licence, s.key!)) return false;
+      if (!seen.add(s.account!)) return false;
+    }
+    return true;
+  }
 }
 
 /// What one player's finished games come to: enough to put on a
@@ -157,13 +214,13 @@ class Tally {
 
   double? get average => games == 0 ? null : points / games;
 
-  /// One player's line through [results].
+  /// One player's line through [results]: an account, or a bot.
   static Tally of(String id, Iterable<GameResult> results, {bool? rated}) {
     var games = 0, won = 0, points = 0;
     int? best;
     for (final r in results) {
       if (rated != null && r.rated != rated) continue;
-      final mine = r.seats.where((s) => (s.key ?? s.bot) == id).toList();
+      final mine = r.seats.where((s) => s.id == id).toList();
       if (mine.isEmpty) continue;
       // A seat with two lines — a human who left and the bot that
       // finished it — is one game for the human, at the total they
@@ -198,7 +255,7 @@ class Ledger {
   /// here too, and nothing else on the device has them.
   final List<GameResult> standing = [];
 
-  /// A person's key or a bot's `Persona.id`.
+  /// A person's account or a bot's `Persona.id`.
   Rating of(String id) => _ratings[id] ?? prior?.call(id) ?? Rating.fresh;
   int gamesOf(String id) => _games[id] ?? 0;
 
@@ -209,7 +266,7 @@ class Ledger {
     standing.add(r);
     if (!r.rated) return;
     final staked = r.seats.where((s) => s.human || s.fromStart).toList();
-    String idOf(SeatResult s) => s.key ?? s.bot!;
+    String idOf(SeatResult s) => s.id;
     int totalOf(SeatResult s) => s.left ? 1 << 20 : s.total;
     final before = {for (final s in staked) idOf(s): of(idOf(s))};
     for (final s in staked) {
@@ -231,16 +288,20 @@ class Ledger {
   }
 
   /// Folds every result on the relay that stands: grouped by table,
-  /// the version a majority of the table's humans published, oldest
-  /// first.
+  /// the version a majority of the table's accounts published, each by
+  /// the device it sat with, oldest first.
   static Ledger from(Iterable<NostrEvent> events, {Rating? Function(String id)? prior}) {
-    final byTable = <String, Map<String, ({GameResult result, Set<PublicKey> signers})>>{};
+    final byTable = <String, Map<String, ({GameResult result, Set<AccountId> signers})>>{};
     for (final e in events) {
       final r = GameResult.parse(e);
-      if (r == null || !r.humans.contains(e.pubkey)) continue; // only a seat may vouch for its table
+      if (r == null || !r.licensed) continue;
+      // Only a seat may vouch for its table: the device that sat there
+      // for its account, and nobody else of the account or not.
+      final account = r.accountAt(e.pubkey);
+      if (account == null) continue;
       final versions = byTable.putIfAbsent(r.table, () => {});
       final v = versions.putIfAbsent(r.digest, () => (result: r, signers: {}));
-      v.signers.add(e.pubkey);
+      v.signers.add(account);
     }
     final standing = <GameResult>[];
     for (final versions in byTable.values) {

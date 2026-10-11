@@ -5,6 +5,10 @@ publish_to: none
 environment:
   sdk: ^3.13.2
 
+dependencies:
+  # SHA-256 and HMAC for a solo game's deal (lib/src/deal_seed.dart).
+  crypto: ^3.0.6
+
 dev_dependencies:
   lints: ^5.1.1
   test: ^1.25.0

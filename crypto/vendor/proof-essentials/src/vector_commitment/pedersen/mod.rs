@@ -1,35 +1,32 @@
 use crate::error::CryptoError;
+use crate::to_bytes::{ToBytes, TranscriptCurve};
 use crate::vector_commitment::HomomorphicCommitmentScheme;
 
-use ark_ec::{msm::VariableBaseMSM, ProjectiveCurve};
-use ark_ff::{PrimeField, ToBytes};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use ark_std::{
-    io::{Read, Write},
-    marker::PhantomData,
-};
+use ark_ec::VariableBaseMSM;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::{io::Write, marker::PhantomData};
 use rand::Rng;
 
 pub mod arithmetic_definitions;
 mod tests;
 
-pub struct PedersenCommitment<C: ProjectiveCurve> {
+pub struct PedersenCommitment<C: TranscriptCurve> {
     _curve: PhantomData<C>,
 }
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize, Debug)]
-pub struct CommitKey<C: ProjectiveCurve> {
+pub struct CommitKey<C: TranscriptCurve> {
     g: Vec<C::Affine>,
     h: C::Affine,
 }
 
-impl<C: ProjectiveCurve> CommitKey<C> {
+impl<C: TranscriptCurve> CommitKey<C> {
     pub fn new(g: Vec<C::Affine>, h: C::Affine) -> Self {
         Self { g, h }
     }
 }
 
-impl<C: ProjectiveCurve> ToBytes for CommitKey<C> {
+impl<C: TranscriptCurve> ToBytes for CommitKey<C> {
     fn write<W: Write>(&self, mut w: W) -> ark_std::io::Result<()> {
         self.g.write(&mut w)?;
         self.h.write(&mut w)?;
@@ -39,9 +36,9 @@ impl<C: ProjectiveCurve> ToBytes for CommitKey<C> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct Commitment<C: ProjectiveCurve>(pub C::Affine);
+pub struct Commitment<C: TranscriptCurve>(pub C::Affine);
 
-impl<C: ProjectiveCurve> ToBytes for Commitment<C> {
+impl<C: TranscriptCurve> ToBytes for Commitment<C> {
     fn write<W: Write>(&self, mut w: W) -> ark_std::io::Result<()> {
         self.0.write(&mut w)?;
 
@@ -49,7 +46,7 @@ impl<C: ProjectiveCurve> ToBytes for Commitment<C> {
     }
 }
 
-impl<C: ProjectiveCurve> HomomorphicCommitmentScheme<C::ScalarField> for PedersenCommitment<C> {
+impl<C: TranscriptCurve> HomomorphicCommitmentScheme<C::ScalarField> for PedersenCommitment<C> {
     type CommitKey = CommitKey<C>;
     type Commitment = Commitment<C>;
 
@@ -75,16 +72,14 @@ impl<C: ProjectiveCurve> HomomorphicCommitmentScheme<C::ScalarField> for Pederse
             ));
         }
 
-        let scalars = [&[r], x.as_slice()]
-            .concat()
-            .iter()
-            .map(|x| x.into_repr())
-            .collect::<Vec<_>>();
+        let scalars = [&[r], x.as_slice()].concat();
 
-        let bases = [&[commit_key.h], &commit_key.g[..]].concat();
+        let bases = [&[commit_key.h], &commit_key.g[..x.len()]].concat();
 
         Ok(Commitment(
-            VariableBaseMSM::multi_scalar_mul(&bases, &scalars[..]).into_affine(),
+            <C as VariableBaseMSM>::msm(&bases, &scalars)
+                .expect("as many bases as scalars")
+                .into_affine(),
         ))
     }
 }

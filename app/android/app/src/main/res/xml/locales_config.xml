@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The languages the app speaks (lib/l10n/), so Android 13 and later
+     offer them in the system's per-app language setting. -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en"/>
+    <locale android:name="es"/>
+    <locale android:name="pt"/>
+    <locale android:name="de"/>
+    <locale android:name="fr"/>
+</locale-config>

@@ -3,16 +3,22 @@ name = "starknet-curve"
 version = "0.1.0"
 edition = "2021"
 
+# Open Hearts: ported from arkworks 0.3 to 0.6 (see ../README.md): the
+# same curve, fields and constants. The r1cs gadgets, which nothing here
+# used, are left out.
+
 [dependencies]
-ark-std = { version = "^0.3.0", default-features = false }
-ark-ff = "0.3.0"
-ark-ec = "0.3.0"
-ark-serialize = "0.3.0"
-ark-r1cs-std = { version = "^0.3.0", default-features = false, optional = true }
+ark-std = { version = "0.6.0", default-features = false }
+ark-ff = { version = "0.6.0", default-features = false }
+ark-ec = { version = "0.6.0", default-features = false }
+ark-serialize = { version = "0.6.0", default-features = false }
+
+# The field derive looks for an `asm` feature of the crate it is used in.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("asm"))'] }
 
 [dev-dependencies]
-ark-algebra-test-templates = { version = "^0.3.0", default-features = false }
-
+ark-algebra-test-templates = { version = "0.6.0", default-features = false }
 
 [features]
 default = [ "curve" ]
@@ -21,4 +27,3 @@ std = [ "ark-std/std", "ark-ff/std", "ark-ec/std" ]
 curve = [ "scalar_field", "base_field" ]
 scalar_field = []
 base_field = []
-r1cs = [ "base_field", "ark-r1cs-std" ]

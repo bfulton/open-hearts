@@ -1,19 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
+  <!-- Replaced by the `--base-href` given to `flutter build`. -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -27,7 +15,7 @@
        fails the people who need it to be (WCAG 1.4.4). This one says
        what that one will, so nothing changes when it is swapped. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <meta name="description" content="Open source, no ads. Play alone or live.">
+  <meta name="description" content="Open source card game, no ads">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -35,8 +23,11 @@
   <meta name="apple-mobile-web-app-title" content="Open Hearts">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <!-- Favicon. The query is the icon's own: a browser keeps a site's
+       icon for a long time, and one from before the heart was the icon
+       is let go only for an address it has not seen. -->
+  <link rel="icon" href="favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/png" href="favicon.png?v=heart"/>
 
   <!-- The felt, so the address bar and the boot screen do not flash
        white before the app paints — and the page itself, so what a
@@ -54,20 +45,51 @@
       height: 100%;
       touch-action: manipulation;
       overscroll-behavior: none;
+      /* Safari on a phone otherwise selects the page itself on some taps
+         and long presses, which washes the whole table grey until the
+         page is laid out again. What can be copied has a Copy button of
+         its own (net/copy.dart). */
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Except where typing goes: Flutter's text fields are fields of the
+       page underneath, and Safari will not type into one it cannot
+       select in. */
+    input, textarea, [contenteditable] {
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+    }
+    /* Safari on a phone zooms the page into any text field whose type is
+       smaller than 16px as it takes focus, and in an app added to the
+       home screen there is nothing to zoom it back out with: the table
+       is left cut off at the edges. The fields the browser focuses are
+       Flutter's own, invisible — the app draws what is seen — so their
+       size changes nothing on the screen. The reader can still zoom. */
+    flt-semantics input, flt-semantics textarea,
+    flt-text-editing-host input, flt-text-editing-host textarea,
+    input.flt-text-editing, textarea.flt-text-editing {
+      font-size: 16px !important;
     }
   </style>
   <title>Open Hearts</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <!-- New Relic Browser: errors and load times from production only
+       (observability/monitoring.mjs); it does nothing on any other host. -->
+  <script src="observability.js"></script>
+  <!-- Copying that Safari allows (copy.js, net/copy_web.dart). -->
+  <script src="copy.js"></script>
+  <!-- Keeps the page at its top, where taps land where they are drawn. -->
+  <script src="hold_still.js"></script>
+  <!-- A touch probe, off until switched on in About (ui/touch_probe.dart). -->
+  <script src="touch_probe.js"></script>
+  <!-- The device brought along from openhearts.game/play, where the app
+       used to be, before the app reads its storage (carry.js). -->
+  <script src="carry.js"></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

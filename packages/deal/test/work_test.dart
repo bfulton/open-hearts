@@ -10,6 +10,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:deal/deal.dart';
+import 'package:deal/memo.dart';
 import 'package:test/test.dart';
 
 Uint8List Function(String) wrapFor(String me) => (other) {
@@ -19,7 +20,7 @@ Uint8List Function(String) wrapFor(String me) => (other) {
 
 void main() {
   late DealCrypto d;
-  setUpAll(() async => d = await DealCrypto.load());
+  setUpAll(() async => d = await rememberedCrypto());
 
   Uint8List bytes(Random r, int n) => Uint8List.fromList(List.generate(n, (_) => r.nextInt(256)));
   Uint8List flipped(Uint8List b, int at) => Uint8List.fromList(b)..[at] ^= 1;

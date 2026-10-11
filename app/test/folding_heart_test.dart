@@ -70,8 +70,8 @@ void main() {
     await tester.pump(FoldingHeart.turn ~/ 2);
     expect(turnAt(tester), 1, reason: 'and whole again, the turn over');
 
-    // Resting. This is the part that is new: the heart is not folding,
-    // and nothing is being drawn for it either. One more frame is what
+    // Resting: the heart is not folding, and nothing is being drawn
+    // for it either. One more frame is what
     // tells the turn it is over — a run is done on the tick past its
     // end, not on the tick that reaches it.
     await tester.pump(frame);

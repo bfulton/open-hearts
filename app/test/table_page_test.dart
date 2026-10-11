@@ -17,9 +17,13 @@ import 'package:open_hearts/ui/card_view.dart';
 import 'package:open_hearts/ui/hand_fan.dart';
 import 'package:open_hearts/ui/header.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+import 'package:open_hearts/ui/scaled.dart';
 import 'package:open_hearts/ui/table_layout.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:open_hearts/pages.dart';
+
+import 'routes.dart';
 
 import 'drawn.dart';
 
@@ -577,22 +581,13 @@ void main() {
   });
 
   testWidgets('the menu leaves the table, and names the build on the About page', (tester) async {
-    // Pushed from a front door, as the app does it, so leaving has
-    // somewhere to go.
+    // At its own address, over the front door, as the app opens it, so
+    // leaving has somewhere to go.
     tester.view
       ..physicalSize = _phone
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(),
-      home: Builder(
-        builder: (context) => TextButton(
-          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TablePage(seed: 4, paced: false))),
-          child: const Text('Play solo'),
-        ),
-      ),
-    ));
-    await tester.tap(find.text('Play solo'));
+    await tester.pumpWidget(routed(soloPath, extra: const SoloGame(seed: 4, paced: false)));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget);
 
@@ -603,6 +598,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AboutPage), findsOneWidget);
     expect(find.text('dev'), findsWidgets, reason: 'the build tag, and its date');
+    expect(find.text('Open source card game, no ads'), findsOneWidget, reason: 'the home page\'s tagline');
+    for (final link in ['Code', 'License', 'Privacy', 'Terms']) {
+      expect(find.widgetWithText(TextButton, link), findsOneWidget, reason: link);
+    }
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsOneWidget);
@@ -612,14 +611,17 @@ void main() {
     await tester.tap(find.text('Leave the table'));
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsNothing);
-    expect(find.text('Play solo'), findsOneWidget);
+    expect(find.text('home'), findsOneWidget, reason: 'back at the front door');
   });
 
   testWidgets('everyone\'s standing: on their badges, yours among them, no card counts', (tester) async {
     await pumpTable(tester);
     final model = tester.widget<TableView>(find.byType(TableView)).controller;
+    // And where each sits, which a sighted player reads off the felt:
+    // seat 1 plays after you and is drawn on your left.
+    const where = ['', 'on your left', 'across from you', 'on your right'];
     for (var seat = 1; seat < engine.seatCount; seat++) {
-      expect(find.bySemanticsLabel('${model.names[seat]}: 0 in the game, 0 this hand'), findsOneWidget);
+      expect(find.bySemanticsLabel('${model.names[seat]}: 0 in the game, 0 this hand, ${where[model.positionOf(seat)]}'), findsOneWidget);
     }
     expect(find.bySemanticsLabel(RegExp(r'\d+ cards')), findsNothing);
     expect(find.bySemanticsLabel('You: 0 in the game, 0 this hand'), findsOneWidget);
@@ -694,9 +696,10 @@ void main() {
         expect(badge.overlaps(slot), isFalse, reason: '${names[seat]}\'s badge stays clear of the trick');
       }
     }
-    // Shrunk from what the width alone would allow: 340 × 0.21 = 71.
+    // Shrunk from the hand's size, which a 360-point felt has room for:
+    // 340 leaves the side badges their least only at a card of 69.
     final slotWidth = slots.map((r) => r.width).reduce((a, b) => a > b ? a : b);
-    expect(slotWidth, lessThan(60));
+    expect(slotWidth, lessThan(TableScale.phoneCard - 1));
   });
 
   for (final shape in [_phone, _sideways, const Size(1280, 800), const Size(340, 720)]) {
@@ -744,6 +747,41 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('your turn is told with a pill that glows and breathes, and holds still for reduced motion', (tester) async {
+    turnPillBreathes = true;
+    addTearDown(() => turnPillBreathes = false);
+    await pumpTable(tester);
+    final hand = fanCards(tester);
+    for (var i = 0; i < 3; i++) {
+      await tapCard(tester, hand[i].card);
+    }
+    await tester.tap(find.widgetWithText(FilledButton, 'Pass'));
+    // Not pumpAndSettle: a breathing pill never settles, which is the point.
+    for (var i = 0; i < 60 && find.text('Your turn').evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Your turn'), findsOneWidget);
+    double glow() {
+      final glowing = tester
+          .widgetList<DecoratedBox>(find.ancestor(of: find.text('Your turn'), matching: find.byType(DecoratedBox)))
+          .map((b) => b.decoration)
+          .whereType<BoxDecoration>()
+          .where((d) => d.boxShadow?.isNotEmpty ?? false);
+      return glowing.single.boxShadow!.single.color.a;
+    }
+
+    final seen = <double>[];
+    for (var i = 0; i < 6; i++) {
+      seen.add(glow());
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    expect(seen.reduce((a, b) => a > b ? a : b) - seen.reduce((a, b) => a < b ? a : b), greaterThan(0.2),
+        reason: 'the glow rises and falls: $seen');
+    expect(seen.every((a) => a >= 0.25), isTrue, reason: 'and never goes out');
+    // Gone from the table, the breathing stops with it.
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('the action line sits against the hand, and what the table says floats in the room under your badge', (tester) async {
     await pumpTable(tester);

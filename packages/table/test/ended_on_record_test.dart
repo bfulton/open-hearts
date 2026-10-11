@@ -2,16 +2,13 @@
 ///
 /// A table stopped where nobody left can move it — a held seat whose
 /// jury has gone, a departed seat nobody left can open — ends the game
-/// after twenty seconds. Each side used to end it for itself, up to five
-/// seconds apart, and the record said nothing: a verifier could not
-/// tell a game that ended from one cut short. Now the twenty seconds
-/// only propose it. A person stopped there claims the end at that turn,
-/// the others stopped there back it, and a majority of the people
-/// carries it as a boot is carried: one voice each at the turn, which
-/// goes to the move, to a removal or to the end. Every record then ends
-/// at that turn, and the verifier reads it as a game ended rather than
-/// one unfinished (docs/07-states.md, "The lost-quorum ending on the
-/// record").
+/// after twenty seconds. The twenty seconds only propose it: a person
+/// stopped there claims the end at that turn, the others stopped there
+/// back it, and a majority of the people carries it as a boot is
+/// carried: one voice each at the turn, which goes to the move, to a
+/// removal or to the end. Every record then ends at that turn, and the
+/// verifier reads it as a game ended rather than one unfinished
+/// (docs/07-states.md).
 ///
 /// Where no majority can be had — a turn split between a move and a
 /// boot with the jury gone, every voice spent; the last person, who
@@ -27,7 +24,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   /// Two people with a jury of their own and strangers to spare, the
   /// whole jury gone once the hand is being played: the table stops at
@@ -239,8 +236,8 @@ void main() {
   // holds while b and c are still at the turn, and they play the
   // leaver's seat on and wait on a, whose card is next. a lets go when
   // their heartbeats say they have gone past, and plays on with them.
-  // Holding on, it waited at the leaver's seat until they put it out
-  // at its own turn — and a side holding a hand it has open must not
+  // Holding on, it would wait at the leaver's seat until they put it
+  // out at its own turn — and a side holding a hand it has open must not
   // take the seat for one nobody can open either, and end the game
   // alone over it.
   test('a side that said the game ends lets go once the rest stand past the turn', () {
@@ -326,10 +323,10 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 10)));
 
   test('a side that ended the game for itself is not a vote still coming for the end', () {
-    // Sealed chaos seed 1: at a table of two with the jury gone, one
-    // person, hearing too little of the table, said its word and ended
-    // the game for itself. The other backed that word as a claim, and
-    // waited for good on a vote from somebody who had already gone.
+    // At a table of two with the jury gone, one person, hearing too
+    // little of the table, says its word and ends the game for itself.
+    // The other must not take that word as a claim and wait for good
+    // on a vote from somebody who has already gone.
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4);
     t.start();
     final x = t.clients.first, y = t.clients.last;
@@ -347,11 +344,11 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 10)));
 
   test('an end at a held seat\'s audit comes after the audits said beside it, on the record and to the verifier', () {
-    // Sealed chaos seed 12, nine strangers: the table stopped at a held
-    // seat's audit, given to the escrow with nobody left to open it, and
-    // ended the game there. The people's own audits, the same position
-    // and said before it, sorted after the end — removals come first in
-    // a position — and the verifier read the record as going on past it.
+    // The table stops at a held seat's audit, given to the escrow with
+    // nobody left to open it, and ends the game there. The people's own
+    // audits, at the same position and said before it, sort ahead of
+    // the end, or the verifier would read the record as going on past
+    // it.
     final t = SimTable(humans: 2, seed: 3, crypto: crypto, jurors: jurySize + 4, target: 1);
     final jurors = {for (final j in t.jurors) j.signer.publicKey};
     // No held seat's audit is ever said.

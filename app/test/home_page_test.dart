@@ -10,6 +10,7 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
+import 'package:deal/memo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
@@ -17,9 +18,10 @@ import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
-import 'package:open_hearts/net/licence.dart';
+import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/table_page.dart';
+import 'package:open_hearts/router.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/folding_heart.dart';
 import 'package:open_hearts/ui/header.dart';
@@ -41,10 +43,11 @@ Future<void> licenceThisDevice({int days = 30}) async {
   final device = (await Identity.signer()).publicKey;
   final day = DateTime.now().toUtc().add(Duration(days: days));
   final until = DateTime.utc(day.year, day.month, day.day);
-  final unsigned = Licence(key: device, until: until, plan: 'year', signature: '');
+  final unsigned = Licence(key: device, account: '0a' * 16, until: until, plan: 'year', signature: '');
   await Entitlement.current.load(device);
   await Entitlement.current.adopt(Licence(
     key: device,
+    account: '0a' * 16,
     until: until,
     plan: 'year',
     signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest),
@@ -68,9 +71,15 @@ Future<void> pumpHome(WidgetTester tester, {String? openRoom, String? openClaim,
 /// opens for as long as the app is open (ui/folding_heart.dart), so a
 /// test that waits for the screen to come to rest has to ask for the
 /// same stillness a reader can ask for.
-Widget still(Widget home) => MaterialApp(
+/// [home] as the home screen, on the app's own routes (router.dart): the
+/// pages and games it opens are the real ones.
+Widget still(Widget home) => MaterialApp.router(
       theme: buildTheme(),
-      home: MediaQuery(data: const MediaQueryData(disableAnimations: true), child: home),
+      routerConfig: appRouter(
+        boot: Uri.parse('https://play.openhearts.game/'),
+        initialLocation: '/',
+        home: (_, _) => MediaQuery(data: const MediaQueryData(disableAnimations: true), child: home),
+      ),
     );
 
 void main() {
@@ -78,7 +87,7 @@ void main() {
   // is — the primitives and the worker that makes the slow ones: the
   // one that cannot is a test of its own (below).
   setUpAll(() async {
-    dealCrypto = await DealCrypto.load();
+    dealCrypto = await rememberedCrypto();
     dealWorker = await DealWorker.start();
   });
   tearDownAll(() => dealWorker?.close());
@@ -157,6 +166,25 @@ void main() {
     // Let the wait run out, so the relay it opened is closed behind it.
     await tester.pump(stopWaiting + const Duration(seconds: 2));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('a device that says it has no network is told so at once, and plays alone all the same', (tester) async {
+    final was = deviceOffline;
+    deviceOffline = () => true;
+    addTearDown(() => deviceOffline = was);
+    // No name on purpose: a game that cannot be had does not ask for one.
+    await pumpHome(tester);
+    for (final way in ['Play live', 'Play friends']) {
+      await tester.tap(find.text(way));
+      await tester.pump();
+      expect(find.text('No relay answered. Check the connection and try again.'), findsOneWidget,
+          reason: '$way: said now, not forty seconds from now');
+      expect(find.byType(CircularProgressIndicator), findsNothing, reason: '$way: and nothing is being opened');
+      expect(find.text('My initials'), findsNothing, reason: '$way: nor a name asked for');
+    }
+    await tester.tap(find.text('Play solo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TablePage), findsOneWidget, reason: 'the bots need no network');
   });
 
   testWidgets('one screen: the three ways in, and who you are in the corner', (tester) async {
@@ -257,7 +285,7 @@ void main() {
     expect(find.text('Play live'), findsNothing);
     expect(find.text('Play friends'), findsNothing);
     expect(find.text('Share the link'), findsNothing, reason: 'the link did not open a room either');
-    expect(find.text(r'$2.99 a year'), findsOneWidget, reason: 'what it costs, said on the door');
+    expect(find.text(r'$5.99 a year'), findsOneWidget, reason: 'what it costs, said on the door');
     expect(find.text('Subscribe'), findsOneWidget);
   });
 
@@ -271,7 +299,7 @@ void main() {
       await tester.tap(find.text(way));
       await tester.pump();
       await tester.pump();
-      expect(find.text(Room.noDeal), findsOneWidget, reason: '$way: every live table is sealed');
+      expect(find.text(Room.noDeal()), findsOneWidget, reason: '$way: every live table is sealed');
       expect(find.byType(CircularProgressIndicator), findsNothing, reason: '$way: and nothing is being opened');
       expect(find.text('Share the link'), findsNothing, reason: '$way: no room either');
     }
@@ -301,9 +329,9 @@ void main() {
     final other = SchnorrSigner.generate().publicKey;
     final until = DateTime.now().toUtc().add(const Duration(days: 30));
     final day = DateTime.utc(until.year, until.month, until.day);
-    final unsigned = Licence(key: other, until: day, plan: 'year', signature: '');
+    final unsigned = Licence(key: other, account: '0b' * 16, until: day, plan: 'year', signature: '');
     final signed = Licence(
-        key: other, until: day, plan: 'year', signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest));
+        key: other, account: '0b' * 16, until: day, plan: 'year', signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest));
     expect(await Entitlement.current.adopt(signed), isFalse);
     expect(Entitlement.current.live, isFalse);
 
@@ -325,11 +353,25 @@ void main() {
     final me = await Identity.signer();
     stand.says('claim', {'licence': signedFor(me.publicKey)});
     await pumpHome(tester, openClaim: 'ab12cd34', live: false);
+    // Asked first: a link is anybody's to send.
+    expect(find.text('Join this subscription?'), findsOneWidget);
+    expect(stand.seen, isEmpty, reason: 'nothing spent before the answer');
+    await tester.tap(find.text('Join'));
     await tester.pumpAndSettle();
     expect(stand.seen.single, contains('"ticket":"ab12cd34"'));
     expect(Entitlement.current.licence?.key, (await Identity.signer()).publicKey, reason: 'what came back');
     expect(Entitlement.current.live, isTrue);
     expect(find.text('Play live'), findsOneWidget, reason: 'the door is open on the device that scanned it');
+  });
+
+  testWidgets('a link not joined spends nothing', (tester) async {
+    final stand = standUp();
+    await pumpHome(tester, openClaim: 'ab12cd34', live: false);
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(stand.seen, isEmpty);
+    expect(Entitlement.current.live, isFalse);
+    expect(find.text('Subscribe'), findsOneWidget);
   });
 
   testWidgets('a code already spent says so, and leaves the door where it was', (tester) async {
@@ -338,6 +380,7 @@ void main() {
     final stand = standUp();
     stand.says('claim', {'error': 'that code has been used'}, status: 409);
     await pumpHome(tester, openClaim: 'ab12cd34', live: false);
+    await tester.tap(find.text('Join'));
     await tester.pumpAndSettle();
     expect(Entitlement.current.live, isFalse);
     expect(find.text('That code has been used.'), findsOneWidget);
@@ -354,16 +397,76 @@ void main() {
     expect(find.text('Live play'), findsOneWidget, reason: 'the card on the door, and not a second one in the menu');
   });
 
+  testWidgets('the live card: no filler, and the online count said to be on its way until it is known', (tester) async {
+    await pumpHome(tester);
+    expect(find.text('Checking online players…'), findsOneWidget);
+    expect(find.textContaining('Four seats, filled'), findsNothing);
+    expect(find.textContaining('A new table, and a link to send'), findsNothing);
+    expect(find.text('Open source card game, no ads'), findsOneWidget);
+  });
+
+  testWidgets('back from paying: said so at once, and live play opens when the licence comes', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final slow = _LicenceOnAsk(2);
+    Entitlement.current = slow;
+    await Entitlement.current.load((await Identity.signer()).publicKey);
+    await tester.pumpWidget(still(const HomePage(justBought: true, online: false)));
+    await tester.pump();
+    expect(find.text('Finishing your purchase…'), findsOneWidget, reason: 'from the first frame, not after a pause');
+    expect(find.text('Play live'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    // The webhook's licence arrives on the second ask, two seconds on.
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
+    expect(slow.asks, 2);
+    expect(find.text('Finishing your purchase…'), findsNothing);
+    expect(find.text('Play live'), findsOneWidget);
+  });
+
+  testWidgets('back from paying with no licence yet: the payment is said to have gone through', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    Entitlement.current = _LicenceOnAsk(null);
+    await Entitlement.current.load((await Identity.signer()).publicKey);
+    await tester.pumpWidget(still(const HomePage(justBought: true, online: false)));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(seconds: 2));
+    }
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Your payment went through.'), findsOneWidget);
+    expect(find.text('Finishing your purchase…'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
   testWidgets('with live play open the menu is where the date on the licence is', (tester) async {
     await pumpHome(tester);
     expect(find.text('Play live'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Live play'));
+    expect(find.text('Activate subscription'), findsNothing, reason: 'already active');
+    await tester.tap(find.text('Subscription'));
     await tester.pumpAndSettle();
+    expect(find.text('Subscription'), findsWidgets, reason: 'the page is named for what it holds');
     final until = Licence.dayOf(Entitlement.current.until!);
     expect(find.text('Open on this device, to $until'), findsOneWidget);
     expect(find.text('Subscribe'), findsNothing, reason: 'nothing to buy twice');
+  });
+
+  testWidgets('without live play the menu has the way in with a code, and with it does not', (tester) async {
+    await pumpHome(tester, live: false);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(find.text('Subscription'), findsNothing);
+    await tester.tap(find.text('Activate subscription'));
+    await tester.pumpAndSettle();
+    expect(find.text('Scan a code'), findsOneWidget);
+    expect(find.text('Activate'), findsOneWidget);
   });
 
   testWidgets('the page behind the price says what the money is for, and it is not the game', (tester) async {
@@ -372,7 +475,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Playing alone is free'), findsOneWidget);
     expect(find.textContaining('No server sees a hand'), findsOneWidget);
-    expect(find.text(r'$2.99 a year'), findsOneWidget);
+    expect(find.text(r'$5.99 a year'), findsOneWidget);
   });
 }
 
@@ -384,4 +487,20 @@ class _DeadWorker implements DealWorker {
   void run(DealJob job, {required void Function(Object answer) done, required void Function(Object error) failed}) => failed('dead');
   @override
   void close() {}
+}
+
+/// The service, standing in for the webhook's lag: no licence until the
+/// [on]th time it is asked, and none at all when [on] is null.
+class _LicenceOnAsk extends Entitlement {
+  _LicenceOnAsk(this.on) : super(service: _service);
+
+  final int? on;
+  int asks = 0;
+
+  @override
+  Future<bool> refresh(Signer signer, {Uri? endpoint}) async {
+    asks++;
+    if (on != null && asks >= on!) await licenceThisDevice();
+    return true;
+  }
 }

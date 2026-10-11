@@ -2,12 +2,10 @@
 /// table is drawn, and the widget that draws a piece of it that much
 /// bigger (docs/05-form-factors.md).
 ///
-/// The cards on a tablet's felt grow to be read from across a desk. The
-/// type round them — the names on the badges, the line the table says,
-/// the action line and its Pass button, the rail — was a phone's, so a
-/// tablet had a big game with small words on it. Now all of it is drawn
-/// at the one scale the cards grew by. A phone's table is at exactly
-/// one, and is drawn exactly as it was.
+/// The cards on a tablet's felt grow to be read from across a desk, and
+/// the type round them — the names on the badges, the line the table
+/// says, the action line and its Pass button, the rail — is drawn at the
+/// one scale the cards grew by. A phone's table is at exactly one.
 library;
 
 import 'package:flutter/rendering.dart';

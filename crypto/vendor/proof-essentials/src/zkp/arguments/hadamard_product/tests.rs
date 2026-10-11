@@ -9,9 +9,9 @@ mod test {
     use crate::zkp::{arguments::hadamard_product, ArgumentOfKnowledge};
 
     use ark_ff::One;
-    use ark_marlin::rng::FiatShamirRng;
+    use crate::zkp::FiatShamirRng;
     use ark_std::{rand::thread_rng, UniformRand};
-    use blake2::Blake2s;
+    use blake2::Blake2s256 as Blake2s;
     use starknet_curve;
     use std::iter::Iterator;
 

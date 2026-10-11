@@ -1,5 +1,7 @@
 /// Ratings, as this device knows them: every result on the relays,
-/// folded into a ledger, and this device's own line in it.
+/// folded into a ledger, and this device's account's line in it. A
+/// rating is an account's, whichever of its devices played
+/// (packages/table, results.dart).
 library;
 
 import 'dart:async';
@@ -9,12 +11,15 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 import 'relays.dart';
+import 'remote_config.dart' show waits;
 
 class Standing {
   Standing(this.ledger, this.me);
 
   final Ledger ledger;
-  final PublicKey me;
+
+  /// This device's account.
+  final String me;
 
   Rating get mine => ledger.of(me);
 
@@ -22,12 +27,12 @@ class Standing {
   /// a busy relay; instant on an empty one. Each relay holds the
   /// results written to it, so the fold waits for all of them, within
   /// reason.
-  static Future<Standing> load(List<Uri> relays, Signer signer) async {
+  static Future<Standing> load(List<Uri> relays, Signer signer, {required String account}) async {
     final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
     try {
-      await t.ready.timeout(const Duration(seconds: 8));
-      await t.allReady.timeout(const Duration(seconds: 4)).catchError((_) {});
-      return Standing(Ledger.from(t.lobbySoFar, prior: prior), signer.publicKey);
+      await t.ready.timeout(waits.standing);
+      await t.allReady.timeout(waits.standingAll).catchError((_) {});
+      return Standing(Ledger.from(t.lobbySoFar, prior: prior), account);
     } finally {
       t.close();
     }
@@ -37,9 +42,8 @@ class Standing {
   /// waits for a relay to say it has it. A result stands only when a
   /// majority of the table's people published it — at a table of two,
   /// both (packages/table, results.dart) — so one that went nowhere
-  /// costs the game its rating, and nobody would know. It used to be
-  /// sent and the connection closed a moment later, whatever the relays
-  /// said. Tried again on a fresh connection after each of [retries]
+  /// costs the game its rating, and nobody would know. Tried again on a
+  /// fresh connection after each of [retries]
   /// while no relay has taken it; true once one has.
   static Future<bool> publish(
     List<Uri> relays,
@@ -50,7 +54,7 @@ class Standing {
     for (var attempt = 0;; attempt++) {
       final t = RelayTransport(relays: relays, signer: signer, table: GameResult.tag, pinned: pinnedRelays(relays));
       try {
-        await t.ready.timeout(const Duration(seconds: 8));
+        await t.ready.timeout(waits.standing);
         if (await t.announceTaken(result.toJson())) return true;
       } on TimeoutException {
         // No relay answered at all: the same as none taking it.
@@ -65,7 +69,7 @@ class Standing {
   /// Where a bot with no results yet starts: its level's calibrated
   /// rating. A person starts fresh.
   static Rating? prior(String id) {
-    if (id.length == 64) return null; // a key
+    if (validAccount(id) || id.length == 64) return null; // an account, or a key
     try {
       return Rating(mu: Persona.named(id).level.let(Persona.priorRating).toDouble(), phi: 120);
     } catch (_) {

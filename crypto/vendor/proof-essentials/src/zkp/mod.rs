@@ -1,11 +1,12 @@
 use crate::error::CryptoError;
-use ark_marlin::rng::FiatShamirRng;
 use ark_std::rand::Rng;
 use digest::Digest;
 
 pub mod arguments;
+pub mod fiat_shamir;
 pub mod proofs;
-pub mod transcript;
+
+pub use fiat_shamir::FiatShamirRng;
 
 pub trait ArgumentOfKnowledge {
     type CommonReferenceString;

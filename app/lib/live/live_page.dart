@@ -4,14 +4,20 @@
 /// why — and what leaving means: a bot takes the seat.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:engine/engine.dart' as engine;
 import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
-import '../about_page.dart';
 import '../avatar.dart';
+import '../feedback_page.dart';
+import '../l10n/l10n.dart';
 import '../live_controller.dart';
+import '../pages.dart';
+import '../reaction_mute.dart';
 import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
@@ -19,6 +25,11 @@ import '../ui/hand_fan.dart';
 import '../ui/gone.dart';
 import '../ui/header.dart';
 import '../ui/overlays.dart';
+import '../ui/reactions.dart';
+import '../net/copy.dart';
+import '../net/in_use.dart';
+import '../net/share.dart';
+import '../ui/reading_time.dart';
 import '../ui/table_layout.dart';
 import '../ui/table_view.dart';
 
@@ -38,15 +49,39 @@ class _LivePageState extends State<LivePage> {
   void initState() {
     super.initState();
     _c.addListener(_changed);
+    InUse.current.addListener(_steppedBack);
+    // Whether this device hides the others' reactions, as it was left.
+    unawaited(ReactionMute.current.load());
+  }
+
+  /// Another device of the account took it up, at this table's expense
+  /// (net/in_use.dart): this device leaves the seat — its own word, by
+  /// whatever path is still open to it; the relay has already cut it
+  /// off — and the table gives the seat to a bot, as for anyone who
+  /// leaves. The screen saying why is over everything.
+  void _steppedBack() {
+    if (!InUse.current.elsewhere || !mounted) return;
+    InUse.current.removeListener(_steppedBack);
+    _leave();
+  }
+
+  /// The controller names the player and says what the deal is doing
+  /// in the app's language, which is known once the page is in the tree.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _c.words = context.l10n;
   }
 
   void _changed() => setState(() {});
 
   List<String> get _seeds => [for (var s = 0; s < seatCount; s++) _c.iconSeedOf(s)];
+  List<String> get _iconNames => [for (var s = 0; s < seatCount; s++) _c.iconNameOf(s)];
   List<Avatar> get _avatars => [for (var s = 0; s < seatCount; s++) _c.avatarOf(s)];
 
   @override
   void dispose() {
+    InUse.current.removeListener(_steppedBack);
     _c.removeListener(_changed);
     _c.dispose();
     super.dispose();
@@ -59,12 +94,29 @@ class _LivePageState extends State<LivePage> {
     if (refusal != null) _say(refusal);
   }
 
+  /// The table's own address, for somebody to watch it from: the game
+  /// as it is played, and the whole of it once it is over.
+  Future<void> _shareToWatch() async {
+    final link = tableLink(_c.client.spec.id);
+    if (await shareLink(link)) return;
+    await copyText(link.toString());
+    if (mounted) _say(context.l10n.linkCopied);
+  }
+
+  /// The reactions to send (ui/reactions.dart), and the one picked said
+  /// for this player — by this device, the account's device in use: one
+  /// the account has been taken up from has already left its seat.
+  Future<void> _pickReaction() async {
+    final picked = await pickReaction(context);
+    if (picked != null && mounted && !InUse.current.elsewhere) _c.react(picked);
+  }
+
   void _say(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
         content: Text(message, textAlign: TextAlign.center),
-        duration: const Duration(milliseconds: 1600),
+        duration: readingTime(message),
         width: 260,
       ));
   }
@@ -89,26 +141,25 @@ class _LivePageState extends State<LivePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (about.flagged)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    'This device thought this picture was one you would not want at the table. '
-                    'It is a guess, made here, and it can be wrong.',
-                    style: TextStyle(fontSize: 13, color: Palette.chromeDim),
+                    sheet.l10n.pictureFlagged,
+                    style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
                   ),
                 ),
               TextButton(
                 onPressed: () => Navigator.of(sheet).pop(showIt),
                 style: TextButton.styleFrom(foregroundColor: showIt ? Palette.gold : Palette.danger),
                 child: Text(
-                  showIt ? "Show ${about.name}'s picture" : "Hide ${about.name}'s picture",
+                  showIt ? sheet.l10n.showPicture(about.name) : sheet.l10n.hidePicture(about.name),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
-              const Text(
-                'On this device only, and only their picture: their name and their score stay.',
+              Text(
+                sheet.l10n.pictureChoiceNote,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Palette.chromeDim),
+                style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
               ),
             ],
           ),
@@ -153,21 +204,33 @@ class _LivePageState extends State<LivePage> {
         'my turn ${_c.client.awaitingMyPlay}; offered ${_c.awaitingPlay}; pass ${_c.awaitingPass}; ${_c.behind}\n';
   }
 
+  /// Who is still here: people at the table, out of those who sat down,
+  /// red while anybody is missing.
+  ({String text, Color tone}) _presence(BuildContext context) {
+    final humans = [for (var s = 0; s < seatCount; s++) if (_c.client.spec.seats[s] is HumanSeat) s];
+    final here = _c.here;
+    return (
+      text: context.l10n.hereCount(here, humans.length, _c.client.spec.rated ? 'rated' : 'unrated'),
+      tone: here == humans.length ? Palette.chromeDim : Palette.danger,
+    );
+  }
+
   /// The line under the felt: a pause and why, or a boot clock on the
   /// seat holding everyone up, or nothing special.
   Widget? _liveNote() {
+    final l10n = context.l10n;
     // Cut off from every relay comes first: it is the cause of most of
     // what follows, and the one thing the player can act on.
     final refused = _c.relayRefusal;
-    if (refused != null) return _note('No relay will take this device\'s events: ${_short(refused)}');
-    if (_c.pause == Pause.waitingForPeers) return _note('Waiting for the others to reconnect');
+    if (refused != null) return _note(l10n.noRelayTakesEvents(_short(refused)));
+    if (_c.pause == Pause.waitingForPeers) return _note(l10n.waitingToReconnect);
     if (_c.pause == Pause.waitingForJury) {
-      if (_c.jury.live > 0) return _note('Asking the jury');
-      if (_c.needsJuror) return _note('Nobody online to draw a jury from — waiting for one');
-      return _note('Waiting for the jury');
+      if (_c.jury.live > 0) return _note(l10n.askingTheJury);
+      if (_c.needsJuror) return _note(l10n.noJurorOnline);
+      return _note(l10n.waitingForTheJury);
     }
-    if (_c.pause == Pause.openingHand) return _note("Opening a departed player's hand");
-    if (_c.pause == Pause.waitingForLead) return _note('Nobody claims the 2♣ — the deal is stuck');
+    if (_c.pause == Pause.openingHand) return _note(l10n.openingDepartedHand);
+    if (_c.pause == Pause.waitingForLead) return _note(l10n.nobodyClaimsTwo);
     // The seat everyone is waiting on, if it is a person other than me
     // and its clock has run out — during the deal as much as the play:
     // a seat that never sends its keys is the one thing that stalls a
@@ -177,11 +240,11 @@ class _LivePageState extends State<LivePage> {
       if (_c.bootCountdownMs(seat) == null) continue;
       if (_c.canBoot(seat)) {
         // Sized to the line, which is thirty pixels: a button at its
-        // default height was clipped top and bottom.
+        // default height is clipped top and bottom.
         return TextButton.icon(
           onPressed: () => _c.boot(seat),
           icon: const Icon(Icons.timer_off_outlined, size: 15),
-          label: Text('Boot ${_c.names[seat]}', style: const TextStyle(fontSize: 12)),
+          label: Text(l10n.bootPlayer(_c.names[seat]), style: const TextStyle(fontSize: 12)),
           style: TextButton.styleFrom(
             foregroundColor: Palette.danger,
             visualDensity: VisualDensity.compact,
@@ -219,10 +282,9 @@ class _LivePageState extends State<LivePage> {
           decoration: const BoxDecoration(gradient: Felt.gradient),
           child: SafeArea(
             child: _Failed(
-              title: 'This device can\'t deal',
-              label: 'The deal stopped working here',
-              why: 'So you have left the table, and the others play on with a bot in your seat. '
-                  'Reloading the page starts the deal afresh. ($cannotDeal)',
+              title: context.l10n.cannotDealTitle,
+              label: context.l10n.cannotDealLabel,
+              why: context.l10n.cannotDealWhy(cannotDeal),
               onHome: () => Navigator.of(context).pop(),
             ),
           ),
@@ -249,11 +311,12 @@ class _LivePageState extends State<LivePage> {
           decoration: const BoxDecoration(gradient: Felt.gradient),
           child: SafeArea(
             child: _Failed(
-              title: 'Connection failure',
-              label: failure.label[0].toUpperCase() + failure.label.substring(1),
+              title: context.l10n.connectionFailure,
+              label: switch (failure) {
+                Failure.jurorQuorumLost => context.l10n.jurorQuorumLost,
+              },
               why: switch (failure) {
-                Failure.jurorQuorumLost => 'Too few of the jurors keeping the bot seats are still online, '
-                    'so the hand cannot go on. The game ends here, unscored.',
+                Failure.jurorQuorumLost => context.l10n.jurorQuorumLostWhy,
               },
               onHome: () => Navigator.of(context).pop(),
             ),
@@ -282,21 +345,22 @@ class _LivePageState extends State<LivePage> {
                 header: TableHeader(
                   game: game,
                   menu: [
-                    MenuAction('Leave the table', icon: Icons.logout, onSelected: _leave),
-                    MenuAction('About', icon: Icons.info_outline, onSelected: () {
-                      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage()));
+                    MenuAction(context.l10n.shareToWatch, icon: Icons.visibility_outlined, onSelected: _shareToWatch),
+                    MenuAction(context.l10n.leaveTheTable, icon: Icons.logout, onSelected: _leave, danger: true),
+                    MenuAction(context.l10n.tellUsWhatsBroken, icon: Icons.feedback_outlined, onSelected: () => showFeedback(context)),
+                    MenuAction(context.l10n.about, icon: Icons.info_outline, onSelected: () {
+                      openPage<void>(context, AppPage.about);
                     }),
                   ],
                 ),
-                felt: Stack(
-                  children: [
-                    TableView(controller: _c, onHold: _aboutPicture),
-                    Positioned(
-                      left: 6,
-                      top: 4,
-                      child: _Presence(controller: _c),
-                    ),
-                  ],
+                // Who is here, in the felt's corner: the felt keeps it
+                // clear of the seat across the table.
+                felt: TableView(
+                  controller: _c,
+                  onHold: _aboutPicture,
+                  corner: _presence(context),
+                  // Beside the player's own badge, while they sit here.
+                  react: _c.canReact && !InUse.current.elsewhere ? ReactionButton(onPressed: _pickReaction) : null,
                 ),
                 below: _debugState(),
                 action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),
@@ -326,9 +390,10 @@ class _LivePageState extends State<LivePage> {
                   moonShooter: ended.moonShooter,
                   names: _c.names,
                   seeds: _seeds,
+                  iconNames: _iconNames,
                   avatars: _avatars,
                   mySeat: _c.mySeat,
-                  action: 'On with it',
+                  action: context.l10n.onWithIt,
                   onNext: _c.dismissHandSheet,
                 ),
               if (_c.done && _c.gameOverDue)
@@ -336,39 +401,23 @@ class _LivePageState extends State<LivePage> {
                   game: game,
                   names: _c.names,
                   seeds: _seeds,
+                  iconNames: _iconNames,
                   avatars: _avatars,
                   mySeat: _c.mySeat,
                   rating: _c.ratingChange,
-                  action: 'Home',
-                  onNewGame: () => Navigator.of(context).pop(),
+                  // Another game the way this one began, where the front
+                  // door knows how (home_page.dart); home beside it.
+                  action: _c.canPlayAgain ? context.l10n.playAgain : context.l10n.home,
+                  onNewGame: () => Navigator.of(context).pop(_c.canPlayAgain),
+                  onHome: _c.canPlayAgain ? () => Navigator.of(context).pop(false) : null,
+                  // The game is kept as it ends (home_page.dart), and its
+                  // address is the table's: in place of this one, so back
+                  // is home either way.
+                  onSeeGame: () => context.pushReplacement(located(tablePath(_c.client.spec.id))),
                 ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Who is still here: people at the table, out of those who sat down.
-class _Presence extends StatelessWidget {
-  const _Presence({required this.controller});
-
-  final LiveController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final humans = [for (var s = 0; s < seatCount; s++) if (controller.client.spec.seats[s] is HumanSeat) s];
-    final here = controller.here;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        '$here of ${humans.length} here  ·  ${controller.client.spec.rated ? 'rated' : 'unrated'}',
-        style: TextStyle(fontSize: 10.5, color: here == humans.length ? Palette.chromeDim : Palette.danger),
       ),
     );
   }
@@ -409,7 +458,7 @@ class _Failed extends StatelessWidget {
             FilledButton(
               onPressed: onHome,
               style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
-              child: const Text('Home'),
+              child: Text(context.l10n.home),
             ),
           ],
         ),
@@ -438,16 +487,16 @@ class _Replaced extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('A bot took your seat',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
+            Text(context.l10n.botTookYourSeat,
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.danger)),
             const SizedBox(height: 6),
-            const Text('The table could not hear from you, and went on without you.',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Palette.chromeDim)),
+            Text(context.l10n.tableCouldNotHear,
+                textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: onBack,
               style: FilledButton.styleFrom(backgroundColor: Palette.gold, foregroundColor: Felt.dark),
-              child: const Text('Back'),
+              child: Text(context.l10n.back),
             ),
           ],
         ),

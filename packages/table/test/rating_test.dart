@@ -81,8 +81,8 @@ void main() {
           rated: rated,
           at: 0,
           seats: [
-            SeatResult(human: true, key: me, total: totals[0], fromStart: true, left: iLeft),
-            SeatResult(human: true, key: you, total: totals[1], fromStart: true),
+            SeatResult(human: true, key: me, account: me, total: totals[0], fromStart: true, left: iLeft),
+            SeatResult(human: true, key: you, account: you, total: totals[1], fromStart: true),
             SeatResult(human: false, bot: 'Romeo', total: totals[2], fromStart: true),
             SeatResult(human: false, bot: 'Juliet', total: totals[3], fromStart: true),
           ],

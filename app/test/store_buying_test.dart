@@ -1,0 +1,436 @@
+/// Live play bought in a phone's store (net/store_buying.dart).
+///
+/// Neither the store nor the service is real here: the store is this
+/// file's own [FakeStore], standing where the plugin would, and the
+/// service is household_test's stand-in. What these prove is the app's
+/// half — what a purchase is recorded against, what the service is
+/// shown and how it is signed, what each answer comes to on the
+/// screen, and that a purchase is finished with the store only once
+/// the service has taken it or has said the proof is no good.
+library;
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:open_hearts/entitlement.dart';
+import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/net/buying.dart';
+import 'package:open_hearts/net/household.dart' show askService;
+import 'package:open_hearts/net/licence.dart';
+import 'package:open_hearts/net/store_buying.dart';
+import 'package:open_hearts/subscribe_page.dart';
+import 'package:open_hearts/theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table/table.dart';
+
+import 'household_test.dart' show Stand, signedFor, standUp;
+
+const _service = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
+
+/// A store of a test's own: says what it is told to, and keeps what it
+/// was asked to do.
+class FakeStore implements PhoneStore {
+  FakeStore({this.kind = StoreKind.apple, this.open = true, this.price = '£4.99'});
+
+  @override
+  final StoreKind kind;
+
+  /// Whether it takes payments here.
+  final bool open;
+
+  /// The product's price, or null for a store with no such product.
+  final String? price;
+
+  final _purchases = StreamController<List<StorePurchase>>.broadcast();
+
+  /// The account each sheet was opened for.
+  final bought = <String>[];
+  final finished = <StorePurchase>[];
+
+  /// Whether a sheet opens when asked.
+  bool sheetOpens = true;
+
+  /// What a restore finds.
+  List<StorePurchase> restoring = [];
+
+  /// The store telling the app about purchases.
+  void says(List<StorePurchase> purchases) => _purchases.add(purchases);
+
+  @override
+  Future<bool> available() async => open;
+
+  @override
+  Future<StoreProduct?> product(String id) async =>
+      price == null || id != kind.product ? null : StoreProduct(id: id, price: price!);
+
+  @override
+  Stream<List<StorePurchase>> get purchases => _purchases.stream;
+
+  @override
+  Future<bool> buy(StoreProduct product, {required String account}) async {
+    bought.add(account);
+    return sheetOpens;
+  }
+
+  @override
+  Future<void> restore() async => _purchases.add(restoring);
+
+  @override
+  Future<void> finish(StorePurchase purchase) async => finished.add(purchase);
+}
+
+/// A purchase the store reports, for the build's product.
+StorePurchase paid(String proof, {StoreStatus status = StoreStatus.purchased, bool? needsFinishing}) => StorePurchase(
+      product: StoreKind.apple.product,
+      status: status,
+      proof: proof,
+      needsFinishing: needsFinishing ?? status == StoreStatus.purchased,
+    );
+
+/// [store] as the app's shop, open for this device.
+Future<StoreShop> shopWith(FakeStore store) async {
+  final shop = StoreShop(store);
+  StoreShop.current = shop;
+  addTearDown(() => StoreShop.current = StoreShop(null));
+  await shop.open(await Identity.signer());
+  return shop;
+}
+
+/// The Live play page, on a phone tall enough to show all of it.
+Future<void> _pumpPage(WidgetTester tester) async {
+  tester.view
+    ..physicalSize = const Size(390, 1400)
+    ..devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const SubscribePage()));
+  await tester.pumpAndSettle();
+}
+
+/// The request the stand-in service last had at [handler], as sent.
+Map<String, Object?> lastAt(Stand stand, String handler) => jsonDecode(
+    stand.seen.lastWhere((s) => s.startsWith('/api/$handler ')).substring('/api/$handler '.length)) as Map<String, Object?>;
+
+void main() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    Entitlement.current = Entitlement(service: _service);
+    await Entitlement.current.load((await Identity.signer()).publicKey);
+  });
+  tearDown(() => Entitlement.current = Entitlement());
+
+  test('what a purchase is recorded against is made from the key, the same way the service makes it', () {
+    // Pinned on both sides: service/ makes the same two from this key.
+    final account = storeAccountFor('dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659');
+    expect(account.play, 'a0d2e1ee61d4911692a59bbda8ac7b994078d916759c7eaaf166d43072748199');
+    expect(account.apple, 'a0d2e1ee-61d4-4116-92a5-9bbda8ac7b99');
+    // A UUID StoreKit takes: version 4, the RFC's variant.
+    expect(account.apple, matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')));
+    expect(storeAccountFor(SchnorrSigner.generate().publicKey).play, isNot(account.play));
+  });
+
+  test('the store\'s own subscription page is where a store subscriber is sent to manage it', () {
+    expect(StoreKind.apple.manage.toString(), 'https://apps.apple.com/account/subscriptions');
+    expect(StoreKind.google.manage.toString(),
+        'https://play.google.com/store/account/subscriptions?sku=openhearts_annual&package=game.openhearts');
+  });
+
+  test('the products a build names by default are the ones the config names', () {
+    final config = jsonDecode(File('../config/openhearts.json').readAsStringSync()) as Map<String, dynamic>;
+    expect(StoreKind.apple.product, (config['apple'] as Map)['product']);
+    expect(StoreKind.google.product, (config['google'] as Map)['product']);
+  });
+
+  test('the proof is shown to the service signed over, and comes back a licence for this device', () async {
+    final stand = standUp();
+    final me = SchnorrSigner.generate();
+    stand.says('store', {'licence': signedFor(me.publicKey)});
+    final said = await presentProof(me, StoreKind.google, 'token-123', service: _service);
+    expect(said.answer?.key, me.publicKey);
+    final asked = lastAt(stand, 'store');
+    expect(asked['store'], 'google');
+    expect(asked['proof'], 'token-123');
+    expect(asked['key'], me.publicKey);
+    // The proof is what is signed for, so it cannot be carried to
+    // another key.
+    expect(schnorrVerifier(me.publicKey, requestDigest('store', me.publicKey, asked['at'] as int, 'token-123'), asked['sig'] as String),
+        isTrue);
+
+    // Somebody else's licence, correctly signed, is nothing here.
+    stand.says('store', {'licence': signedFor(SchnorrSigner.generate().publicKey)});
+    final theirs = await presentProof(me, StoreKind.google, 'token-123', service: _service);
+    expect(theirs.answer, isNull);
+    expect(theirs.refusal?.reason, 'licenceNotForThisDevice');
+    expect(theirs.refusal?.say(), 'The service\'s answer was not a licence for this device.');
+  });
+
+  test('each of the service\'s refusals is said in the app\'s words', () async {
+    final stand = standUp();
+    final me = SchnorrSigner.generate();
+    for (final (status, body, reason, shown) in [
+      (400, {'error': 'not a store'}, 'notAStore', 'That is not a store the service knows.'),
+      (400, {'error': 'no proof'}, 'noProof', 'The store gave nothing to show for the purchase.'),
+      (401, {'error': 'not from the store'}, 'notFromStore', 'That purchase did not come from the store.'),
+      (402, {'error': 'not paid'}, 'notPaid', 'The store says that purchase is not paid for.'),
+      (409, {'error': 'this device is on another subscription: drop it there first'}, 'onAnotherSubscription',
+          'This device is on another subscription. Drop it there first.'),
+      (409, {'error': 'five devices already', 'devices': 5, 'most': 5}, 'fiveDevices',
+          'This subscription has all the devices it can take.'),
+      (502, {'error': 'the store is not answering'}, 'storeNotAnswering', 'The store is not answering. Try again in a moment.'),
+      (503, {'error': 'the store is not set up yet'}, 'storeNotSetUp', 'Buying in the store is not open yet.'),
+    ]) {
+      stand.says('store', body, status: status);
+      final said = await presentProof(me, StoreKind.apple, 'a.b.c', service: _service);
+      expect(said.answer, isNull);
+      expect(said.refusal?.reason, reason, reason: '$status $body');
+      expect(said.refusal?.say(), shown);
+    }
+    stand.reachable = false;
+    expect((await presentProof(me, StoreKind.apple, 'a.b.c', service: _service)).refusal?.say(),
+        'Could not reach the service. Try again in a moment.');
+  });
+
+  test('a purchase is finished only once the service has taken it, or has said the proof is no good', () async {
+    final stand = standUp();
+    final store = FakeStore();
+    final shop = await shopWith(store);
+
+    // The store is not answering the service: left for next time.
+    stand.says('store', {'error': 'the store is not answering'}, status: 502);
+    store.says([paid('jws-1')]);
+    await pumpEventQueue();
+    expect(stand.seen, hasLength(1));
+    expect(store.finished, isEmpty);
+    expect(Entitlement.current.live, isFalse);
+    expect(shop.refusal?.reason, 'storeNotAnswering');
+
+    // On another subscription: may go differently once it is dropped.
+    stand.says('store', {'error': 'this device is on another subscription: drop it there first'}, status: 409);
+    store.says([paid('jws-1')]);
+    await pumpEventQueue();
+    expect(store.finished, isEmpty);
+
+    // Not from the store, or not paid for: never going to be taken.
+    stand.says('store', {'error': 'not from the store'}, status: 401);
+    store.says([paid('jws-forged')]);
+    await pumpEventQueue();
+    expect(store.finished.map((p) => p.proof), ['jws-forged']);
+    stand.says('store', {'error': 'not paid'}, status: 402);
+    store.says([paid('jws-refunded')]);
+    await pumpEventQueue();
+    expect(store.finished.map((p) => p.proof), ['jws-forged', 'jws-refunded']);
+
+    // Taken: the licence kept, and the purchase finished.
+    final me = await Identity.signer();
+    stand.says('store', {'licence': signedFor(me.publicKey)});
+    store.says([paid('jws-1')]);
+    await pumpEventQueue();
+    expect(Entitlement.current.live, isTrue);
+    expect(store.finished.map((p) => p.proof), ['jws-forged', 'jws-refunded', 'jws-1']);
+    expect(shop.refusal, isNull);
+    expect(shop.boughtHere, isTrue);
+
+    // Another product's purchase is not this app's to show anybody.
+    store.says([StorePurchase(product: 'something_else', status: StoreStatus.purchased, proof: 'x', needsFinishing: true)]);
+    await pumpEventQueue();
+    expect(stand.seen.where((s) => s.contains('"proof":"x"')), isEmpty);
+  });
+
+  testWidgets('bought in the store: the sheet opens for this device, and the page becomes a subscriber\'s', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    final store = FakeStore();
+    await shopWith(store);
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-10-01'},
+      ],
+      'most': 5,
+    });
+    await _pumpPage(tester);
+
+    // The store's price, and what the stores require said beside it.
+    expect(canBuyHere, isTrue);
+    expect(find.text('£4.99 a year'), findsOneWidget);
+    expect(find.textContaining('£4.99 a year, charged to your Apple Account'), findsOneWidget);
+    expect(find.textContaining('renews by itself every year until you cancel'), findsOneWidget);
+    expect(find.text('Restore purchases'), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
+
+    await tester.tap(find.text('Subscribe'));
+    await tester.pump();
+    expect(store.bought, [storeAccountFor(me.publicKey).apple]);
+
+    // The service takes its time over it: nothing is finished meanwhile.
+    final answer = Completer<void>();
+    final held = _holdAnswers(answer.future);
+    stand.says('store', {'licence': signedFor(me.publicKey)});
+    store.says([paid('header.payload.sig')]);
+    await tester.pump();
+    await tester.pump();
+    expect(held.asked, isTrue);
+    expect(store.finished, isEmpty);
+    expect(Entitlement.current.live, isFalse);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget, reason: 'still being bought');
+
+    answer.complete();
+    await tester.pumpAndSettle();
+    final asked = lastAt(stand, 'store');
+    expect(asked['proof'], 'header.payload.sig');
+    expect(asked['store'], 'apple');
+    expect(Entitlement.current.live, isTrue);
+    expect(store.finished.single.proof, 'header.payload.sig');
+
+    // A subscriber's page, with the store's settings to manage it in.
+    expect(find.text('This device'), findsOneWidget);
+    expect(find.text('Subscribe'), findsNothing);
+    expect(find.text('Cancel or change it in the App Store.'), findsOneWidget);
+    expect(find.text('Manage subscription'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a purchase the service could not take is said, and the store keeps it', (tester) async {
+    final stand = standUp();
+    final store = FakeStore(kind: StoreKind.google);
+    await shopWith(store);
+    await _pumpPage(tester);
+    expect(find.textContaining('charged to your Google account'), findsOneWidget);
+
+    await tester.tap(find.text('Subscribe'));
+    await tester.pump();
+    expect(store.bought, [storeAccountFor((await Identity.signer()).publicKey).play]);
+    stand.says('store', {'error': 'the store is not answering'}, status: 502);
+    store.says([StorePurchase(product: StoreKind.google.product, status: StoreStatus.purchased, proof: 'token', needsFinishing: true)]);
+    await tester.pumpAndSettle();
+    expect(find.text('The store is not answering. Try again in a moment.'), findsOneWidget);
+    expect(store.finished, isEmpty);
+    expect(Entitlement.current.live, isFalse);
+    expect(find.text('Subscribe'), findsOneWidget, reason: 'and the way to try again is there');
+  });
+
+  testWidgets('a sheet that does not open, or is closed, leaves the page as it was', (tester) async {
+    standUp();
+    final store = FakeStore()..sheetOpens = false;
+    await shopWith(store);
+    await _pumpPage(tester);
+    await tester.tap(find.text('Subscribe'));
+    await tester.pumpAndSettle();
+    expect(find.text('The store did not finish the purchase. Try again in a moment.'), findsOneWidget);
+
+    store.sheetOpens = true;
+    await tester.tap(find.text('Subscribe'));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('The store did not finish the purchase. Try again in a moment.'), findsNothing);
+    store.says([paid('', status: StoreStatus.cancelled)]);
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Subscribe'), findsOneWidget);
+  });
+
+  testWidgets('a purchase waiting for approval is said to be, and only shown to the service once it is paid',
+      (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    final store = FakeStore();
+    await shopWith(store);
+    await _pumpPage(tester);
+    await tester.tap(find.text('Subscribe'));
+    await tester.pump();
+
+    store.says([paid('', status: StoreStatus.pending)]);
+    await tester.pumpAndSettle();
+    expect(find.text('The store is waiting to approve the payment. Live play opens here as soon as it does.'), findsOneWidget);
+    expect(stand.seen, isEmpty);
+    expect(store.finished, isEmpty);
+    expect(Entitlement.current.live, isFalse);
+
+    // Approved, perhaps long after: it comes in as any purchase does.
+    stand.says('store', {'licence': signedFor(me.publicKey)});
+    stand.says('devices', {'devices': <Object>[], 'most': 5});
+    store.says([paid('approved.jws.sig')]);
+    await tester.pumpAndSettle();
+    expect(Entitlement.current.live, isTrue);
+    expect(store.finished.single.proof, 'approved.jws.sig');
+    expect(find.textContaining('waiting to approve'), findsNothing);
+  });
+
+  testWidgets('restore brings back what this store account has, and says when it has nothing', (tester) async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    final store = FakeStore();
+    await shopWith(store);
+    await _pumpPage(tester);
+
+    await tester.tap(find.text('Restore purchases'));
+    await tester.pumpAndSettle();
+    expect(find.text('No subscription to restore was found in this store account.'), findsOneWidget);
+    expect(stand.seen, isEmpty);
+
+    // Already finished with on the phone it was bought on, so nothing
+    // to finish here: it is shown to the service, and bound to this one.
+    store.restoring = [paid('restored.jws.sig', status: StoreStatus.restored)];
+    stand.says('store', {'licence': signedFor(me.publicKey)});
+    stand.says('devices', {
+      'devices': [
+        {'key': me.publicKey, 'bound_at': '2026-10-01'},
+      ],
+      'most': 5,
+    });
+    await tester.tap(find.text('Restore purchases'));
+    await tester.pumpAndSettle();
+    expect(lastAt(stand, 'store')['proof'], 'restored.jws.sig');
+    expect(Entitlement.current.live, isTrue);
+    expect(store.finished, isEmpty);
+    expect(find.text('This device'), findsOneWidget);
+    expect(find.textContaining('No subscription to restore'), findsNothing);
+  });
+
+  testWidgets('with no store, or a store without the product, the page is the web\'s', (tester) async {
+    standUp();
+    await shopWith(FakeStore(open: false));
+    expect(canBuyHere, isFalse);
+    expect(priceShown, r'$5.99');
+    await _pumpPage(tester);
+    expect(find.text('Restore purchases'), findsNothing);
+    expect(find.textContaining('renews by itself'), findsNothing);
+    expect(find.textContaining('Until the app is in the stores'), findsOneWidget);
+
+    final productless = FakeStore(price: null);
+    await shopWith(productless);
+    expect(canBuyHere, isFalse);
+
+    // And the web goes to Stripe, not to a store: here, to a
+    // checkout handler the test binding answers 400 for.
+    final wasCan = canLeaveForStripe;
+    canLeaveForStripe = true;
+    addTearDown(() => canLeaveForStripe = wasCan);
+    await tester.pumpWidget(const SizedBox());
+    await _pumpPage(tester);
+    expect(find.text('Cancel whenever you like; the year you paid for runs out on its own.'), findsOneWidget);
+    expect(find.text('Restore purchases'), findsNothing);
+    await tester.tap(find.text('Subscribe'));
+    await tester.pumpAndSettle();
+    expect(productless.bought, isEmpty);
+    expect(find.text('The shop is not open yet.'), findsOneWidget);
+  });
+}
+
+/// Holds the stand-in service's answers until [until], and says
+/// whether it was asked meanwhile.
+_Held _holdAnswers(Future<void> until) {
+  final held = _Held();
+  final through = askService;
+  askService = (url, body) async {
+    held.asked = true;
+    await until;
+    return through(url, body);
+  };
+  return held;
+}
+
+class _Held {
+  bool asked = false;
+}

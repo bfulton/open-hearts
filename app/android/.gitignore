@@ -13,3 +13,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Built by crypto/build_android.sh from the crates, not checked in.
+/app/src/main/jniLibs/

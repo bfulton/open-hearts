@@ -11,14 +11,19 @@
 /// device on a train must be able to answer at all.
 library;
 
+import 'dart:async';
+import 'dart:math' show min;
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
 import 'net/licence.dart';
+import 'net/network.dart';
+import 'net/remote_config.dart' show waits;
 
 class Entitlement extends ChangeNotifier {
-  Entitlement({this.service = serviceKey});
+  Entitlement({this.service = serviceKey, this.ask = askLicence});
 
   /// The one this app asks. A global, like the device's identity, for
   /// the same reason: there is one device and it has one standing.
@@ -29,6 +34,14 @@ class Entitlement extends ChangeNotifier {
 
   /// The service whose word counts, which is the build's to name.
   final String service;
+
+  /// How the service is asked: [askLicence], unless a test stands in.
+  final Future<LicenceAnswer> Function(Signer signer, {Uri? endpoint, String service}) ask;
+
+  /// How long after an ask that went unanswered the next one goes, the
+  /// first time; twice as long each time after that, up to [mostAgain].
+  static const firstAgain = Duration(seconds: 2);
+  static const mostAgain = Duration(minutes: 2);
 
   Licence? _licence;
   PublicKey? _device;
@@ -60,9 +73,79 @@ class Entitlement extends ChangeNotifier {
   /// that has stopped being renewed is one whose last licence runs
   /// out. A service that cannot be reached says nothing, and the
   /// device keeps what it has until its date.
-  Future<void> refresh(Signer signer, {Uri? endpoint}) async {
-    final fresh = await fetchLicence(signer, endpoint: endpoint, service: service);
-    if (fresh != null) await adopt(fresh);
+  ///
+  /// Answers whether the service answered within its few seconds
+  /// (`waits.licence`). One that answers after that is still taken when
+  /// it does: a slow network is not a refusal, and a subscriber whose
+  /// licence came back in the seventh second is a subscriber.
+  Future<bool> refresh(Signer signer, {Uri? endpoint}) {
+    final asked = ask(signer, endpoint: endpoint, service: service).then((said) async {
+      if (said.licence != null) await adopt(said.licence!);
+      if (said.answered) _heard();
+      return said.answered;
+    });
+    return asked.timeout(waits.licence, onTimeout: () => false);
+  }
+
+  Signer? _signer;
+  bool _answered = false;
+  bool _asking = false;
+  bool _listening = false;
+  Duration _gap = firstAgain;
+  Timer? _again;
+
+  /// Asks the service for this device's licence until it answers, as
+  /// the app starts: at once, and while nothing has come back, again
+  /// after [firstAgain], then twice as long each time up to [mostAgain]
+  /// — one ask at a time, and none while the device says it has no
+  /// network. Back on a network, or back in the foreground ([askAgain]),
+  /// it asks at once and the waits start short again. Once the service
+  /// has answered, licence or none, it is not asked again this start.
+  ///
+  /// Resolves when the first ask is answered or given up on, as
+  /// [refresh] does.
+  Future<bool> keepAsking(Signer signer) {
+    _signer = signer;
+    if (!_listening) {
+      _listening = true;
+      whenOnline(askAgain);
+    }
+    return _askNow();
+  }
+
+  /// Ask now, if the service has not answered yet: the device is back
+  /// in the foreground, or on a network again.
+  void askAgain() {
+    if (_signer == null || _answered) return;
+    _gap = firstAgain;
+    unawaited(_askNow());
+  }
+
+  Future<bool> _askNow() async {
+    final signer = _signer;
+    if (signer == null || _answered || _asking) return _answered;
+    _again?.cancel();
+    // Nobody to ask with no network: the next ask is when one is back.
+    if (deviceOffline()) return false;
+    _asking = true;
+    final bool answered;
+    try {
+      answered = await refresh(signer);
+    } finally {
+      _asking = false;
+    }
+    if (!answered && !_answered) {
+      _again = Timer(_gap, () => unawaited(_askNow()));
+      _gap = Duration(milliseconds: min(_gap.inMilliseconds * 2, mostAgain.inMilliseconds));
+    }
+    return answered;
+  }
+
+  /// The service has answered: nothing more to ask it this start.
+  void _heard() {
+    _answered = true;
+    _again?.cancel();
+    _again = null;
   }
 
   /// A licence from anywhere — the service, a purchase just made, a

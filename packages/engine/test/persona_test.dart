@@ -18,12 +18,10 @@ void main() {
     // Fair share is a quarter. The floor is three and a third standard
     // errors under it, from each character's own number of seats (about
     // 1.5 points at eight hundred): with forty characters, one straying
-    // that far by chance is a one-in-fifty run. (A fixed floor three
-    // points under tripped on a different innocent character every
-    // other run.) The arena is seeded, so a persona that trips it is
-    // weaker, not unlucky, and tool/knobs.dart says which setting to
-    // blame; the mean score, far less noisy, is held within six of the
-    // best.
+    // that far by chance is a one-in-fifty run. The arena is seeded,
+    // so a persona that trips it is weaker, not unlucky, and
+    // tool/knobs.dart says which setting to blame; the mean score, far
+    // less noisy, is held within six of the best.
     final standings = Arena.play(8000);
     final best = standings.map((s) => s.meanScore).reduce(min);
     for (final s in standings) {
@@ -35,5 +33,11 @@ void main() {
           reason: '${s.persona} averages ${s.meanScore.toStringAsFixed(1)} '
               'against a best of ${best.toStringAsFixed(1)}');
     }
+  });
+
+  test('a record kept under a persona\'s earlier name reads as that persona', () {
+    expect(Persona.named('Sid'), same(Persona.tristan));
+    expect(Persona.named('Nancy'), same(Persona.isolde));
+    expect(Persona.named('Sid/3').name, 'Tristan');
   });
 }

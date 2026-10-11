@@ -8,18 +8,21 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-barnett-smart-card-protocol = { git = "https://github.com/geometryxyz/mental-poker.git" }
-proof-essentials = { git = "https://github.com/geometryresearch/proof-toolbox.git" }
-starknet-curve = { git = "https://github.com/geometryresearch/proof-toolbox.git" }
-ark-ff = "0.3.0"
-ark-std = { version = "0.3.0", features = ["std"] }
+# The reference crates as the deal builds them: vendored, and ported to
+# arkworks 0.6 (crypto/vendor/README.md).
+barnett-smart-card-protocol = { path = "../../crypto/vendor/barnett-smart-card-protocol" }
+proof-essentials = { path = "../../crypto/vendor/proof-essentials" }
+starknet-curve = { path = "../../crypto/vendor/starknet-curve" }
+ark-ff = "0.6.0"
+ark-std = { version = "0.6.0", features = ["std"] }
 rand = "0.8"
 rand_chacha = "0.3"
 
-# The reference crate pins its sibling crates by ssh URL; take them by https.
-[patch."ssh://git@github.com/geometryresearch/proof-toolbox.git"]
-proof-essentials = { git = "https://github.com/geometryresearch/proof-toolbox.git" }
-starknet-curve = { git = "https://github.com/geometryresearch/proof-toolbox.git" }
+# On wasm, rand wants an entropy source and none is wanted: every random
+# value comes from a seeded generator. One that refuses keeps the module
+# free of imports beyond the host's two.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
 
 [profile.release]
 opt-level = 3

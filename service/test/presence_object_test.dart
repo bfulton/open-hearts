@@ -1,14 +1,11 @@
 /// Presence on the object that carries it, and presence when that
 /// object is not there.
 ///
-/// The relay a deployed build prefers for presence keeps one object
-/// per tag and wants the tag in the URL (docs/06-service.md,
-/// `service/do/`), which is the only thing about it a client has to
-/// know. Everything else is the arrangement presence already had: the
-/// beats go to every relay the device can write to, so the public
-/// relays carry them too, and a device that cannot reach the object —
-/// or is running before it was ever deployed — is online exactly as it
-/// was before.
+/// The deployed relay keeps one object per tag and wants the tag in the
+/// URL (docs/06-service.md, `service/do/`), which is the only thing
+/// about it a client has to know. Otherwise presence is as on any
+/// relay: the beats go to every relay in the device's list, so a device
+/// that cannot reach the object is still online through the others.
 library;
 
 import 'dart:io';
@@ -65,8 +62,7 @@ void main() {
   });
 
   test('the object not answering is not the end of presence: the relays carry it', () async {
-    // Nothing has ever been deployed at this address — which is the
-    // state of the world the day a build ships with it in the list.
+    // Nothing is listening at this address.
     final absent = Uri.parse('ws://127.0.0.1:${await closedPort()}/$tagMark');
     final relay = Relay();
     await relay.serve();
@@ -91,8 +87,8 @@ void main() {
     await relay.serve();
     final both = [Uri.parse('${object.url}/$tagMark'), relay.url];
     final ours = RelayPresence(relays: both, signer: SchnorrSigner.generate(), everyMs: 300);
-    // An older build, a filtered network, a device that simply cannot
-    // reach the object: it reads the public relays and nothing else.
+    // A filtered network, a device that simply cannot reach the
+    // object: it reads the other relay and nothing else.
     final theirs = RelayPresence(relays: [relay.url], signer: SchnorrSigner.generate(), everyMs: 300);
     await Future.wait([ours.ready, theirs.ready]).timeout(const Duration(seconds: 10));
     await until('the two did not see each other across the object and the relay',

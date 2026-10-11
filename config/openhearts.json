@@ -1,0 +1,19 @@
+{
+  "appOrigin": "https://play.openhearts.game",
+  "serviceKey": "8031cb2192987148c1af19ebe8338a15ffec1745e3974508932e1e403323a46b",
+  "turnKeyId": "d681af4e315018c9dc90b898de5f24be",
+  "stripePrice": "openhearts_annual",
+  "apple": {
+    "bundleId": "game.openhearts",
+    "product": "openhearts_annual",
+    "servicesId": "game.openhearts.play"
+  },
+  "google": {
+    "package": "game.openhearts",
+    "product": "openhearts_annual",
+    "webClientId": null,
+    "playPushAudience": null,
+    "playPushEmail": null
+  },
+  "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "online": true, "onlineQuietMinutes": 60, "notOnline": ["ab6ce76c87d37564"] }
+}

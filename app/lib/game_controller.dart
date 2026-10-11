@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import 'package:engine/engine.dart';
 
 import 'avatar.dart';
+import 'l10n/l10n.dart';
 import 'record_store.dart';
 import 'table_model.dart';
 
@@ -24,7 +25,8 @@ class GameController extends ChangeNotifier implements TableModel {
   }
 
   /// Fixes the shuffle, so [newGame] reshuffles the same way a test
-  /// expects. Null in the app, where every game is a fresh draw.
+  /// expects: dealt by [Random] from it. Null in the app, where every
+  /// game is a fresh draw of a [DealSeed].
   final int? seed;
 
   /// The score this game runs to, and every game after it on this
@@ -32,10 +34,6 @@ class GameController extends ChangeNotifier implements TableModel {
   final int target;
 
   final RecordStore _store;
-
-  /// The seed this game was actually dealt from — drawn once when the
-  /// game starts, so every game has one and the record can name it.
-  late int _dealSeed;
 
   /// This game as a line of text: the deal, the bots, and the player's
   /// own passes and plays. Everything the bots did follows from those.
@@ -48,16 +46,21 @@ class GameController extends ChangeNotifier implements TableModel {
   Future<List<String>> pastRecords() => _store.load();
 
   void _start() {
-    _dealSeed = seed ?? Random().nextInt(1 << 31);
-    _game = HeartsGame(seed: _dealSeed, target: target);
-    _bots = _seatBots(_dealSeed);
+    // A player's game is dealt from 256 bits of the platform's secure
+    // generator, drawn once when it starts, and its record names them
+    // (engine, deal_seed.dart); a test's from its seed, by Random.
+    final dealSeed = seed == null ? DealSeed.draw() : null;
+    _game = HeartsGame(seed: seed, dealSeed: dealSeed, target: target);
+    _bots = _seatBots(seed == null ? Random.secure() : Random(seed));
     _record = SoloRecord(
-      seed: _dealSeed,
+      seed: seed,
+      dealSeed: dealSeed,
       personas: [for (var s = 0; s < seatCount; s++) s == humanSeat ? '' : _bots[s]!.persona.name],
       target: target,
     );
     _saved = false;
     _sheetDue = false;
+    _auto.reset();
     _played.clear();
     _selected.clear();
     _pump();
@@ -69,8 +72,10 @@ class GameController extends ChangeNotifier implements TableModel {
 
   late HeartsGame _game;
 
-  /// Who holds each seat; null at the player's. Three from the roster,
-  /// drawn by the game's seed so a seeded table is the same table.
+  /// Who holds each seat; null at the player's. Three from the roster:
+  /// drawn by a test's seed, so a seeded table is the same table, and
+  /// otherwise by the secure generator. The record names them, so
+  /// nothing has to draw them again.
   late List<Bot?> _bots;
 
   final Random _rhythm = Random();
@@ -87,17 +92,21 @@ class GameController extends ChangeNotifier implements TableModel {
   @override
   int seatAt(int position) => (position + mySeat) % seatCount;
 
+  /// The words the table speaks in: the page sets them from the app's
+  /// language (l10n/l10n.dart), and they are English until it does.
+  AppLocalizations words = english;
+
   /// The names around the table, seat order (0 is the player).
   @override
   List<String> get names =>
-      [for (var s = 0; s < seatCount; s++) s == humanSeat ? 'You' : _bots[s]!.persona.name];
+      [for (var s = 0; s < seatCount; s++) s == humanSeat ? words.you : _bots[s]!.persona.name];
 
   /// The persona at [seat], or null at the player's.
   @override
   Persona? personaAt(int seat) => _bots[seat]?.persona;
 
-  static List<Bot?> _seatBots(int seed) {
-    final draw = List.of(Persona.roster)..shuffle(Random(seed));
+  static List<Bot?> _seatBots(Random random) {
+    final draw = List.of(Persona.roster)..shuffle(random);
     return [
       for (var s = 0; s < seatCount; s++)
         s == humanSeat ? null : Bot(persona: draw[s]),
@@ -195,7 +204,16 @@ class GameController extends ChangeNotifier implements TableModel {
   Set<Card> get inFlight => const {};
 
   @override
-  String iconSeedOf(int seat) => seat == humanSeat ? 'you' : _bots[seat]!.persona.name;
+  String iconSeedOf(int seat) => seat == humanSeat ? (mySeed.isEmpty ? 'you' : mySeed) : _bots[seat]!.persona.name;
+
+  @override
+  String iconNameOf(int seat) => seat == humanSeat && myName.isNotEmpty ? myName : names[seat];
+
+  /// The player's name and colour as their profile has them (home_page.dart):
+  /// their icon here is the one they chose, or else their initials on
+  /// their account's colour, as on every other screen.
+  String myName = '';
+  String mySeed = '';
 
   /// The player's own avatar, once the page has read it off the
   /// device; the bots' are their own.
@@ -208,6 +226,14 @@ class GameController extends ChangeNotifier implements TableModel {
   @override
   int? clockMs(int seat) => null;
 
+  /// No reactions at a solo table: bots do not react, and there is
+  /// nobody else to react to.
+  @override
+  SeatReaction? reactionAt(int seat) => null;
+
+  @override
+  String nameAlone(int seat) => names[seat];
+
   @override
   Set<Card> get passed =>
       _game.phase == Phase.passing ? (_game.passOf(humanSeat) ?? const []).toSet() : const {};
@@ -216,13 +242,44 @@ class GameController extends ChangeNotifier implements TableModel {
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
     final legal = _game.legalPlaysFor(humanSeat);
-    if (!legal.contains(card)) return refusalFor(_game, humanSeat, card);
+    if (!legal.contains(card)) return refusalFor(_game, humanSeat, card, words);
+    _playMine(card);
+    _pump();
+    return null;
+  }
+
+  /// The player's card, played: by their hand, or by the Auto switch.
+  void _playMine(Card card) {
     _record.plays.add(card);
     _game.play(humanSeat, card);
     _played.add(card);
     notifyListeners();
-    _pump();
-    return null;
+  }
+
+  // ---- the Auto switch -------------------------------------------------
+
+  final AutoPilot _auto = AutoPilot();
+
+  @override
+  bool get autoOffered => _auto.offered(this);
+
+  @override
+  bool get autoPlay => _auto.on;
+
+  /// On, and the player's turn — if it is theirs now — is played at
+  /// once; the pump plays every one after it as it comes round.
+  @override
+  void setAutoPlay(bool on) {
+    _auto.set(this, on);
+    notifyListeners();
+    if (on) _pump();
+  }
+
+  /// Every change the table shows is one the switch may be offered on.
+  @override
+  void notifyListeners() {
+    _auto.watch(this);
+    super.notifyListeners();
   }
 
   void nextHand() {
@@ -290,7 +347,16 @@ class GameController extends ChangeNotifier implements TableModel {
         }
 
         final seat = _game.currentSeat!;
-        if (seat == humanSeat) break; // the player's turn
+        if (seat == humanSeat) {
+          // The player's turn: theirs to take, unless the Auto switch is
+          // on, in which case it is played at once — no thinking beat,
+          // since nobody is thinking.
+          _auto.watch(this);
+          final card = _auto.cardFor(this);
+          if (card == null) break;
+          _playMine(card);
+          continue;
+        }
 
         if (!await _wait(_botThink(seat))) return;
         final legal = _game.legalPlaysFor(seat);
@@ -310,16 +376,13 @@ class GameController extends ChangeNotifier implements TableModel {
   /// every await point is a place the widget can be torn down.
   ///
   /// A timer the controller can cancel, rather than a delayed future,
-  /// which nothing can: a beat this table is in the middle of is a beat
-  /// still running after the page has gone. Nothing came of it, since
-  /// every step checks whether it is still alive; but a timer outliving
-  /// its widget is the sort of thing that is true until one day it is
-  /// expensive, and the live table already does it the other way.
+  /// which nothing can: a beat should not outlive the page it is
+  /// pacing. The live table cancels its own the same way.
   Future<bool> _wait(Duration d) async {
     if (d > Duration.zero) {
       final done = Completer<void>();
       _waitTimer?.cancel();
-      _waitTimer = Timer(d, done.complete);
+      _waitTimer = Timer(d * tableBeats, done.complete);
       await done.future;
     }
     return !_disposed;

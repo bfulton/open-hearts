@@ -1,675 +1,790 @@
 # 06 — The service
 
-What runs on our side, which is deliberately little. The game is peer to
-peer ([doc 02](02-multiplayer.md)), the deal is verifiable
-([doc 03](03-fair-deal.md)), presence rides relays and bot seats are
-played by the players and the jury ([doc 04](04-live-play.md)). What is
-left is identity, entitlement, and jurors when the room is empty.
+The service is deliberately small. The game is peer to peer
+([doc 02](02-multiplayer.md)), the deal is verifiable
+([doc 03](03-fair-deal.md)), and matchmaking, results and ratings are the
+players' own business on the relay ([doc 04](04-live-play.md)). What runs
+on our side:
+
+- **The Pages worker** (`service/functions/`): accounts, licences, the
+  shop, TURN credentials, remote config and game records.
+- **The relay worker** (`service/do/`): a Durable Object per tag
+  ([doc 08](08-own-relays.md)), which carries only an account's device
+  in use; the `Household` object, one per account; and the bench of
+  jurors of last resort (`service/bin/juror.dart` in a container).
+
+None of it is in a game's latency path.
 
 ## Handlers
 
-| | In | Out |
+`service/functions/worker.mjs`, published as `_worker.js`, answers
+`/api/<name>` and hands every other path to the static assets.
+
+| Handler | Method | What it does |
 |---|---|---|
-| **attest** | Apple/Google sign-in token, device public key | signed attestation, or refusal because the account is already bound |
-| **supersede** | sign-in token, old and new public keys | signed supersession link |
-| **checkout** | key, where to come back to | a Stripe Checkout to send the buyer to |
-| **entitle** | purchase webhook | entitlement recorded; signed licence available to the key |
-| **licence** | key | the licence that key is owed, or 402 |
-| **ticket** | key | a one-use code another device can arrive with |
-| **claim** | key, code | the code spent, the device bound, and its licence |
-| **devices** | key, a device to drop | the devices on this subscription |
-| **turn-creds** | attested key | short-lived TURN credentials |
-| **last-resort** | table id, hand | the bench comes online for that hand |
+| `licence` | POST, signed | the device's current licence, naming its account, or 402 if no subscription stands behind it |
+| `activate` | POST, signed | makes the device its account's device in use, or says it still is: an activation, or 409 |
+| `checkout` | POST, signed | opens a Stripe Checkout session (subscription mode) for this device |
+| `stripe` | POST, Stripe-signed | Stripe's webhook: makes the account, binds the paying device and dates the subscription |
+| `manage` | POST, signed | opens Stripe's billing portal for a web subscription (409 for a store one) |
+| `store` | POST, signed | takes an App Store signed transaction or a Play purchase token and returns a licence |
+| `apple` | POST | App Store Server Notifications V2 |
+| `play` | POST | Play real-time developer notifications (Pub/Sub push) |
+| `ticket` | POST, signed | a one-use code another device can join the account with |
+| `claim` | POST, signed | spends a code (a household code or a backup code), brings the device into the account, returns its licence |
+| `devices` | POST, signed | lists the account's devices, which one is in use, and which sign-in (if any) the account is linked to; can drop one |
+| `backups` | POST, signed | shows, replaces or emails the account's backup codes |
+| `profile` | POST, signed | reads the account's profile, or writes it from the account's device in use ([below](#the-accounts-profile)) |
+| `attest`, `supersede` | POST, signed | links an Apple/Google sign-in to the device's account, or brings the device into the account a sign-in is linked to |
+| `apple-id` | POST, Apple-signed | Sign in with Apple's server-to-server notifications: unlinks a sign-in its person stopped using with the app, or whose Apple Account is deleted ([below](#when-apple-says-a-sign-in-is-gone)) |
+| `turn` | POST, signed | Cloudflare Realtime TURN credentials for a subscribed device |
+| `record` | POST, signed | keeps a finished game's record |
+| `review` | POST, signed | a finished game's record, for an account's device in use that is not at that table |
+| `config` | GET | the remote config ([below](#remote-config)) |
+| `health` | GET | whether the store is readable and Stripe answers for the price, for the monitors |
 
-Each is a point lookup and a signature. None is in a game's latency path
-and none is needed by a table already playing.
+Bodies are capped at 16 KB (a profile at 36 KB, a record at 2 MiB,
+the Stripe webhook at 512 KB). CORS answers the site's own origins (openhearts.game, www,
+play.openhearts.game and the project's `*.open-hearts.pages.dev`). A
+local origin is answered only by a worker that is itself running locally.
 
-**As built.** The handlers run as the Cloudflare Pages worker beside the
-site and the app: `service/functions/worker.mjs`, published by
-`deploy.sh` as `_worker.js`, answers `/api/…` and hands everything else
-to the static assets; `node --test service/functions/worker.test.mjs`
-runs it against a stand-in upstream. Built so far: **turn-creds**,
-**checkout**, **entitle**, **licence**, **ticket**, **claim**,
-**devices**, **attest** and **supersede**; **last-resort** is not, and
-the last two are built on this side only — see below.
+### Where the app is
 
-**licence**, `POST /api/licence` with the caller's key, answers the
-signed statement below or 402 when no subscription stands behind it.
-The signing is the app's own BIP-340 wasm — one curve in this project
-and one implementation of it — which the worker fetches from the static
-assets it is already serving and keeps for the life of its isolate. It
-signs with `OH_SERVICE_SECRET` and then checks its own signature
-against `OH_SERVICE_KEY`, the public half every build is compiled to
-expect: a pair that does not match is a 503 saying so, rather than
-licences no device will take. `dart run bin/service_key.dart` in
-`service/` mints a pair; `deploy.sh` passes the public half into the
-build.
+One Pages project and one deployment serve the site, the app and the
+handlers. The worker routes by host (`serveStatic` in `worker.mjs`):
 
-**checkout**, `POST /api/checkout`, opens a Stripe Checkout session in
-subscription mode with the device's key in three places — the session's
-metadata, its client reference, and the subscription's metadata, which
-is what a renewal a year from now will carry. Where the buyer is sent
-back to comes in from the app and is checked against this site's own
-origin first: a payment does not land wherever the caller says.
+| Host | `/api/…` | Everything else |
+|---|---|---|
+| `play.openhearts.game` | the handlers | the app at the root: a file from the build's `/play/` directory (`/main.dart.js` is `/play/main.dart.js`), and any address with no extension (`/`, `/room/ABCD`, `/subscription`, `/table/<id>`) the app's page |
+| `openhearts.game` | **404** | the site, and nothing of the app: `/play` and `/play/…` are **404**, since serving the build from there would be the app at another origin, with no device in it. `/carry` is the one page the app may frame (below) |
+| a preview, `*.open-hearts.pages.dev` | the handlers | the site at the root and the app at `/play/`, as before the move: the worker moves the page's `<base href="/">` to `/play/` and points the site's links to `https://play.openhearts.game/` at the preview's own `/play/`. A preview never sends anyone to production |
 
-**entitle**, `POST /api/stripe`, is Stripe's webhook. Nothing is read
-out of a body until the `Stripe-Signature` header checks out against
-`OH_STRIPE_WEBHOOK_SECRET` — HMAC-SHA256 over the timestamp and the
-body, and a signature from last week is refused whatever it says, since
-a replay is not a payment. `checkout.session.completed` binds the
-device; the subscription's own events carry the date. The two arrive in
-either order, so a device bound before its date is known is dated on
-its first ask after.
+The app is built once, with base `/` (`deploy.sh`). Links from before
+the move (`openhearts.game/play/…`) are not sent on: there were none in
+anyone else's hands. The offline worker an old visit installed at
+`openhearts.game/play/` is network-first, so online it passes the 404
+through; offline, it opens the last build at the old address, with that
+address's own data.
 
-**attest** and **supersede**, `POST /api/attest` and
-`/api/supersede`, are one proof with two endings. The proof is the
-provider's own sign-in token, checked against that provider's published
-keys — issuer, audience, expiry, and a nonce that has to be the hash of
-the device's key, so a token lifted from somewhere else cannot bind
-somebody's account to the lifter. What is stored of the account is an
-HMAC of the provider's subject identifier (`OH_ID_HMAC`), never the
-identifier; nothing on the `KEY#` side leads back to the provider.
-attest binds an account to one device and refuses a second; supersede
-is the move, and carries the subscription across — dropping the device
-it replaced, and nobody else's, where the household is already five.
+**The app calls the handlers on its own origin.** Every address the app
+makes for the service is its page's origin plus `/api/<name>`
+(`handlerFor` in `licence.dart`, `turn.dart`), so at
+`play.openhearts.game` it calls `play.openhearts.game/api/…`. That keeps
+the three things that care about origins as simple as they were:
 
-**Not built: the app's half of it.** Getting a token out of Google or
-Apple in a browser is a handshake with a client id in it, and there is
-no id to test against yet, so the flow the app would use — a redirect,
-or their button on the page — is a choice made better against a real
-one than guessed at. Local mode has a token of its own in the meantime
-(`local:<subject>`, taken only where the open house is), so the
-handler's own path runs end to end. What is needed to finish it: a
-Google OAuth client id and an Apple service id, as
-`OH_GOOGLE_AUDIENCE` and `OH_APPLE_AUDIENCE`.
+- No CORS. The calls are same-origin, as they were at `/play/`; there
+  is no preflight to get right and no second origin whose `Origin` header
+  a handler has to trust. (`play.openhearts.game` is in the allowed list
+  anyway, for anything else of ours that asks.)
+- Stripe's return addresses must be on the origin the checkout was
+  asked of (`sameSite`). Asked of the app's own origin, the app's own
+  page (`https://play.openhearts.game/subscription?bought=1`) is one,
+  with no list of other origins to accept. The billing portal's return
+  is the same.
+- Signed requests carry no cookie and no session, so nothing depends
+  on which host a device calls.
 
-**turn-creds**, `POST /api/turn`
-with the caller's table key, answering Cloudflare Realtime TURN
-credentials good for four hours, minted from a TURN key that lives in
-the project's secrets (`OH_TURN_KEY_ID`, `OH_TURN_API_TOKEN`) and never in
-the repo. Without them it says so, and the app falls back to STUN
-alone; on localhost the app asks nothing and peers connect directly.
-The key is taken as given for now — attesting it is the sign-in
-handler's, not built — so the credentials' short life is the only
-limit on their use. The app fetches them when a device connects to the
-relays (`app/lib/net/turn.dart`) and hands them to every peer
-connection at its next table.
+Everything else that calls the service calls it there too: Stripe's
+webhook (`infra/stripe.mjs`), the App Store's and Google Play's
+notifications, Sign in with Apple's, and the health monitor
+(`observability/`). The site's
+host answers no handler, so there is one address for the service, and
+the rate limit on `/api/` is on that host (`infra/cloudflare.mjs`).
+Sign in with Apple's return address is the document's base, so it is
+`https://play.openhearts.game/`, and the Services ID names only that
+host and that address. The
+relay checks no `Origin` header, so it needs nothing for the new host.
+
+### The device, carried over
+
+What makes a device itself — its secret key, licence, name and picture
+(its copy of its account's, for a subscriber), records and settings — is in the browser's `localStorage` under
+`flutter.*`, and storage is per origin. A device that played at
+`openhearts.game/play/` would be a new player at `play.openhearts.game`,
+and a subscriber's device no device of any account. So it is carried
+over, once, in the browser:
+
+1. On a load at `play.openhearts.game` with no `flutter.identity_secret`
+   and no `oh.carried` mark, `app/web/carry.js` — a script before the
+   bootstrap, so before Dart reads storage — puts a hidden iframe of
+   `https://openhearts.game/carry` (`site/public/carry.html`) on the page
+   and, once it loads, asks it with `postMessage` addressed to exactly
+   `https://openhearts.game`.
+2. The carry page answers only a message from its parent at exactly
+   `https://play.openhearts.game`, and only when asked: it posts its
+   `flutter.*` entries back, addressed to exactly that origin. The worker
+   lets that origin, and no other, frame it (`frame-ancestors
+   https://play.openhearts.game`, no `X-Frame-Options`), where every
+   other page is framed by nobody.
+3. The app takes an answer only from that frame at that origin. It
+   writes the entries if there is still no key (another tab may have made
+   one), never over an entry already there, marks the carry done
+   (`oh.carried`), and starts the app. `flutter_bootstrap.js` waits on
+   this, and on nothing else.
+4. It waits up to 10 s for the old origin's page to load, then up to
+   2 s for its answer. A carry that does not answer in time is not
+   marked done and the app boots: it makes a key of its own, and with a
+   key there the carry is never tried again — so the wait for the
+   network is long, and costs only a slow first load; a page with
+   nothing to carry answers in milliseconds.
+
+The two hosts are one site (same scheme, same registrable domain), so
+the frame reads `openhearts.game`'s own storage, not a copy partitioned
+under the top-level site, in Chromium, Firefox and Safari alike;
+`e2e/move.mjs` checks this in Chromium with the rig's stand-ins, which
+are one site in the same way. Nothing is deleted at the old origin: a
+rollback to `/play/` finds the device where it left it. What is carried
+never leaves the browser.
+
+### Signed requests
+
+A device's key is public. It signs everything the device says at a
+table, and the relay hands those events to anybody. So every handler
+that acts for a device takes `{key, at, sig}`: a BIP-340
+signature by that key over `oh-request/1`, the handler name, the key, the
+second the request was made, and anything else the request asks for
+(the code being spent, the device being dropped), one per line
+(`signedAsk` in `app/lib/net/licence.dart`; `askedBy` and `signedFor` in
+`worker.mjs`). Because the handler name is signed, a request for one
+handler cannot be replayed against another. A request more than five
+minutes from the service's clock is refused with a reason. Nothing is
+stored to stop replays within that window, which is why the window is
+short. The statement's hash is pinned in tests on both sides.
+
+### Licence
+
+A device holds a **licence**, not a receipt. It is a five-line
+statement (a tag `oh-licence/2`, the device's key, its account's id, the
+last day it is good for, and the plan), hashed and signed with BIP-340
+by the service key (`OH_SERVICE_SECRET`). The app checks it against
+`OH_SERVICE_KEY`, the public half compiled into the build
+(`packages/table/lib/src/licence.dart`, `app/lib/entitlement.dart`). A
+licence for another key, past its day, or signed by anything else is not
+a licence. A build compiled without a service key treats every device as
+unlicensed, never as licensed by whoever answers.
+
+The licence is also how every peer knows whose a device is. A device's
+key never leaves it and none is held for it; the licence vouches that
+the key is one of an account's devices. It rides in every seat of a
+start event, in a waiter's and a room member's beats, in a watcher's
+request and in each line of a result, and every peer checks it against
+the same compiled key ([doc 04](04-live-play.md)).
+
+A licence lasts a month (`licenceDays`), never past what was paid for,
+and is renewed while the subscription lives, so an ended subscription
+needs no revocation list. The app reads its stored licence before the
+first frame and asks the service afterwards, so it plays offline until
+the licence's date. The worker checks its own signature against
+`OH_SERVICE_KEY` and answers 503 for a mismatched pair.
+
+### Payment
+
+Live play is **$5.99 a year, paid up front**. The rest is free: solo
+play, the records, the verifiable deal and the engine. The price is
+yearly because a card fee's fixed 30¢ would be most of a monthly price.
+
+**Web: Stripe.** `checkout` writes the device's key into the session's
+metadata and the subscription's metadata, so renewals carry it too. The
+return address must be on the origin the checkout was asked of — the
+app's own, `play.openhearts.game` ([where the app is](#where-the-app-is))
+— and the app only leaves for Stripe's own hosts. The webhook reads nothing until `Stripe-Signature` verifies
+(HMAC-SHA-256, constant-time, at most five minutes old).
+`checkout.session.completed` and `checkout.session.async_payment_succeeded`
+bind the device, but only for a session this service created (the key
+is read from `metadata`, never from `client_reference_id`) and only once
+`payment_status` is `paid` or `no_payment_required`. The
+`customer.subscription.*` events carry the date. Stripe does not promise
+event order, so each subscription row keeps the time of the event that
+wrote it and ignores older ones. Nothing changes a subscription after a
+deletion or a final status. `OH_STRIPE_PRICE` (or `stripePrice`) is a
+price id or a lookup key. The active price for a lookup key is cached
+for five minutes.
+
+**Phones: the store.** The phone buys in its own store and sends the
+proof to `store`:
+
+- **App Store**: a StoreKit 2 signed transaction. Its `x5c` chain must
+  end at Apple Root CA – G3 (pinned in the worker) through Apple's WWDR
+  intermediate to an App Store leaf, with each certificate valid when the
+  payload was signed. It must also be this bundle and product, and an
+  auto-renewable subscription. Apple is not contacted.
+- **Google Play**: a purchase token. The service asks the Play Developer
+  API (`subscriptionsv2`) what the token is, checks the product, and
+  acknowledges the purchase if it has not been acknowledged.
+
+The subscription id is `apple:<original transaction id>` or
+`google:<hash of token>`. The app tags each purchase with a name derived
+from its key, `sha256("oh-store/1\n" + key)`: Play's obfuscated account
+id is that hash in hex, and Apple's `appAccountToken` is a v4 UUID made
+from its first 16 bytes. The paying device moves onto what it paid for,
+with its account where nothing else is paid up there. Another device
+presenting the same proof (a restore on a new phone) joins that account
+within its limit. Renewals, lapses and refunds arrive
+at `apple` and `play`, where each notification is verified (for Play,
+the Pub/Sub push's Google ID token), and for Play the purchase is
+fetched again. Neither store is ever final, since a lapsed subscription
+can come back.
+
+Without its identifiers (`apple`, `google` in the configuration) each store answers 503.
+
+### Accounts
+
+A subscription buys an **account**: an id of 32 random hex characters,
+made when the subscription is first paid for (a Stripe checkout, an App
+Store or Play purchase), with the paying device on it. The account is
+the person: a seat, a name, a rating and a result are the account's,
+whichever of its devices played. Solo play needs none. A subscriber
+whose subscription lapses and who buys again, with nothing else paid up
+on the account, gets the same account back.
+
+An account carries up to five devices (`mostDevices`), and any of them
+can drop another or open the billing portal.
+
+- **A household code.** `ticket` makes a one-use code of sixteen
+  random bytes, good for ten minutes. It is shown as a QR of a link into
+  the app and as text. The other device opens the link, scans it in the
+  app (the platform's scanner, or BarcodeDetector or the bundled ZXing
+  port on the web), or types it. Asking again while a code has two
+  minutes left returns the same code. The household's size is checked
+  when the code is spent. The row expires from KV after an hour.
+- **Backup codes.** Five per account, each good for one join, in
+  the form `XXXX-XXXX-XXXX-XXXX` (Crockford base32, 80 bits; case and
+  dashes are ignored, and O, I and L read as 0 and 1). They are the
+  account's recovery secret: one entered on any device brings it into
+  the same account. They are made when the account is paid for and
+  emailed to the checkout's address, which is read from Stripe and not
+  kept. Any device of the account can show them, replace all five, or
+  email them again. Email goes through Cloudflare Email Sending
+  (`EMAIL`, from `OH_MAIL_FROM`, no reply-to). A store subscription has
+  no address, so its codes are only shown. Rows are keyed by a digest
+  of the code.
+- **Sign-in.** A sign-in with Apple or Google is linked to one account,
+  and an account to one sign-in; it is a backup code that is never used
+  up. Both handlers check an Apple or Google ID token against the
+  provider's published keys: issuer, audience, expiry, allow-listed
+  algorithm, and a nonce equal to the hash of the device's key
+  (`sha256("oh-signin/1\n" + key)`, pinned in tests on both sides). The
+  request is also signed by the key. `attest` links the sign-in to the
+  account the device is in (409 if it is linked to another account, or
+  the account to another sign-in). `supersede` brings the device into
+  the account the sign-in is linked to, by a backup code's rules (404
+  if it is linked to none). No key moves. Only an HMAC of the provider's
+  subject (`OH_ID_HMAC`) is stored. Google's audience is
+  `google.webClientId`; Apple's are `apple.bundleId` and
+  `apple.servicesId`, since Apple's token names the bundle id on an
+  iPhone and the Services ID on the web. When Apple says a person has
+  stopped using it with the app, the sign-in is unlinked
+  ([below](#when-apple-says-a-sign-in-is-gone)).
+
+  The app (`app/lib/net/sign_in.dart`, `provider_tokens.dart`) offers
+  Apple on iOS and the web and Google on Android and the web, each only
+  in a build compiled with its identifier (`apple.servicesId`,
+  `google.webClientId`, compiled in by `deploy.sh`); without them
+  there is no sign-in on the screen. On iOS it uses Sign in with Apple,
+  on Android Credential Manager (through `google_sign_in_android`, not
+  `google_sign_in`, whose web half loads Google's script into every
+  page), and on the web Apple's JS popup and Google's own button, whose
+  scripts are fetched only when a sign-in is on the screen. On the
+  Subscription page a subscriber is offered a sign-in, which links it to
+  the account; a sign-in linked to another account brings this device
+  into that one only when the subscriber says so. A device with no
+  subscription signs in to come into its account. The device keeps only
+  which provider it signed in with.
+
+A code or a sign-in never takes a device out of another account whose
+subscription is still paid up. The app asks "Join this subscription?"
+before spending a code. To move, a device drops itself first. A device
+whose subscription has ended is free to join. Dropping a device deletes
+its binding and its entitlement row, and cuts it off at the relay if it
+was the device in use. The licence it already holds runs out on its own
+within the month. When a subscription ends, its account's devices'
+entitlement rows are written down too, so a refund takes effect at each
+device's next ask.
+
+**One account at a time.** KV has no compare-and-set, so every change
+to an account — a code, a claim, a drop, its device list, its device in
+use — goes through one **Household** Durable Object per account, which
+handles them one at a time. A subscription has a turn of its own, the
+object named `sub:` and its id, where its account is found or made
+exactly once. The class is exported from the relay worker and bound to
+the Pages project as `HOUSEHOLD` (production only) and to the relay
+worker under the same name. Without the binding, as in the tests and
+previews, an in-memory queue in the isolate does the same. An account
+is limited to 20 changes, 60 reads, 600 activations and 30 profile
+writes an hour, and Apple's unlinks to 20 of their own.
+
+**Before accounts.** A subscription from before accounts is made an
+account the first time any of its devices, its store or Stripe is heard
+from, in the subscription's own turn: its devices, their rows and its
+backup codes move under a new account, and every licence after that
+names it. `node service/tool/accounts.mjs --apply` (Cloudflare API
+token and account id in the environment) does all of them at the deploy
+that brings accounts in; it is run before the new worker goes live, and
+the worker moves anything the old one added in between. Nobody's
+subscription is lost. A sign-in linked before accounts named a device;
+it is read as that device's account. Codes made before are for ten
+minutes, and are gone.
+
+### When Apple says a sign-in is gone
+
+Sign in with Apple tells `apple-id` when a person stops using it with the
+app (in their Apple Account's settings, Sign in with Apple, Stop Using)
+or deletes their Apple Account, and when they turn forwarding to a
+hidden address on or off. Apple posts `{"payload": <JWT>}`. The token is
+checked as an ID token is, against the same key set
+(`appleid.apple.com/auth/keys`): issuer `https://appleid.apple.com`, one
+of our Apple audiences (Apple names the primary App ID,
+`game.openhearts`), and its date — past its `exp`, or, with none, more
+than a day after its `iat`, it is refused. Its `events` claim, a JSON
+string as it arrives or the object Apple's page shows, must give a
+`type` and the person's `sub`, so a sign-in's ID token, which is signed
+the same way for the same audience, does nothing here. Anything that
+does not check out is a 400.
+
+- **`consent-revoked`, `account-deleted`** (Apple's page once said
+  `account-delete`; both are taken): the sign-in found by the HMAC of
+  `sub` is unlinked, in its account's turn, where it was linked: its
+  `LOGIN#apple#…` row and the account's `LOGIN` row are deleted. It
+  brings no device in after that (`supersede` answers 404), and the
+  account can be linked again, to it or to another sign-in. Nothing
+  else changes: the account stays, with its devices and backup codes,
+  which still bring devices in, and its subscription, which is the
+  store's or Stripe's to end.
+- **`email-disabled`, `email-enabled`**: we hold no email from Apple, so
+  nothing changes.
+
+Anything authentic is answered 200, whatever its type, so Apple does not
+send it again; an unlink that could not be done is a 503, to be done when
+it comes again. Nothing is kept to spot a notice seen before (`jti`): one
+sent again only unlinks what is already unlinked. It is quiet: the
+operator is not mailed, and `measure` counts it as `apple-id`. Without
+the Apple identifiers or `OH_ID_HMAC` it answers 503.
+
+The address is registered by hand on Apple's developer site:
+Certificates, Identifiers & Profiles → Identifiers → the App ID
+`game.openhearts` → Sign In with Apple → Edit → Server-to-Server
+Notification Endpoint, `https://play.openhearts.game/api/apple-id`. Like
+the other webhooks it is left out of the rate limit on `/api/`
+(`infra/cloudflare.mjs`).
+
+### One device at a time
+
+An account plays on one device at a time, and the newest device to take
+it up wins at once. The app takes the account up when it opens, and
+again on the person's *Use it here*; each is `activate` with `want:
+open` (or `take`), and a renewal every twenty minutes is `want: renew`.
+In the account's turn, the device asking is made the one in use and the
+account's **epoch**, the count of times it has been taken up, goes up by
+one; a renewal by any device but the one in use is a 409. Taking the
+account from a device that said it is at a table (its renewals carry
+the table, `seated`) is asked about first: `open` answers 409
+`seated`, the app asks "You're in a game on another device. Continue
+here? That game will be lost.", and only `take` goes through.
+
+The device in use is given an **activation**: `oh-active/1`, the
+account, the device's key, the epoch and when it runs out (an hour, and
+never past the day the subscription is paid to), signed by the service
+key (`activationFor`; `Activation` in
+`packages/table/lib/src/licence.dart`).
+
+**The relay enforces it, rather than asking.** A device told to stop
+could be a modified one that does not. So the relay asks every socket
+who it is (NIP-42: a challenge, answered by a kind-22242 event the
+device's key signs, carrying its activation), holds whatever the socket
+sends until the answer is in, and carries nothing for a socket without a
+current one (`serviceGate` in `service/do/relay.mjs`). Three things keep
+a superseded device off it:
+
+- each relay object keeps the newest epoch it has seen of each account,
+  so showing a later activation closes every socket of that account's
+  earlier one there, and an earlier one is refused;
+- as a socket answers, the object asks the account's own object whether
+  that activation is still the one in use, and the account's object
+  remembers which relay objects the device was seen at; when the account
+  is taken up it tells each of them (`/revoke`) to close the old
+  device's sockets — at once, wherever the old device is: presence, a
+  pool, a table, a watch;
+- an activation runs out within the hour, and an answer that has run
+  out is asked for again.
+
+The device itself hears it sooner where it can: the relay's
+`superseded:` notice, a 409 at its renewal, or the other device's
+presence, which carries the later activation. It then leaves the relays,
+any table it sits at (its signed leave goes by whatever channel is
+still open; the table's ordinary handling — a bot in the seat, scored
+as a leave in a rated game — takes the seat however it goes), juror
+duty, the pool and anything it was watching, and shows "Open Hearts is
+now open on another device" with *Use it here*. The service is the
+authority because it is the one party every device of an account
+already trusts and already asks; an activation is the account's turn's
+word, so two devices can never both hold the current one. The bench of
+jurors of last resort answers the challenge with an HMAC of its key
+under `OH_JUROR_SECRET`, which the relay holds too; it belongs to no
+account.
+
+### The account's profile
+
+The name the others see, and the icon and colour or the picture they see
+it on, are the account's, as its seat and rating are: every device of the
+account shows the same, and a change on one reaches the others. The
+service keeps it as `ACCOUNT#<account>|PROFILE`: `name`, `icon`, `color`
+and `picture` (null for what is not chosen), a `version` that goes up by
+one at each write, and `updated_at`.
+
+`profile` is one signed handler. Asked with nothing, it is a read, for
+any device of the account while the subscription stands, in the account's
+turn among its reads: `{profile, version, updated_at}`, or `{profile:
+null, version: 0}` for an account with none yet. Asked with `profile` —
+the profile as the device's own JSON text, which is also the request's
+signed *what*, so nobody else's request writes it — it is a write, only
+from the account's device in use (409 from another device of it, 402 from
+a device of none), with an allowance of its own (`profileWritesPerHour`)
+so that a person changing their mind never spends what a code or a claim
+needs. The text is taken only in the shape the app makes (`profileOf`):
+a name of at most 60 characters, trimmed, with no control characters (a
+watched table carries no longer, and `Identity.longestName` in the app
+cuts to the same); an icon from the app's set and a colour from its
+palette of ten; a picture that is base64 of a JPEG of at most 12,000
+bytes (`Avatar.maxPictureBytes`, which the app's picture is made to fit);
+and nothing else. A test reads `app/lib/avatar.dart` and `identity.dart`
+and holds the two sides equal.
+
+**The last write wins.** Each write is the next version, whatever version
+the writing device had last seen. There is nothing to merge in a name,
+writes come only from the device in use, which is the one in the
+person's hand, and a compare-and-set would only turn a change made
+offline into a refusal the person has to make again.
+
+**The app** (`app/lib/net/account_profile.dart`) keeps the profile on the
+device as before, so the front door draws it with no network, and keeps
+beside it which account and version it last matched:
+
+- A change on the profile page is kept on the device at once, marked
+  unsent for the account, and sent. Unanswered, refused as not the device
+  in use, or over the allowance, it stays marked and is sent at the next
+  chance: the next start, this device becoming the one in use again, the
+  app coming back to the foreground, or the quarter-hourly config ask. A
+  profile the service refuses as malformed is not sent again.
+- At start, behind the licence, and whenever the device becomes the one
+  in use, a licensed device sends its unsent change if it has one, and
+  otherwise reads the account's and takes it if its version is newer than
+  the one it last matched — or if it last matched another account, or
+  none. A change made while a read was on its way wins: it is sent next.
+- **Joining** — a household code, a backup code, a sign-in, a store
+  restore — ends in a licence for another account, which the app watches
+  for: the account's profile replaces the device's, and an unsent change
+  for the account it left is let go.
+- **Before profiles were kept** an account has none. The first of its
+  devices to read finds none and sends its own, if it has a name or a
+  look; the others take it from there. Two at once both write, and the
+  later is the profile.
+- A device with no subscription keeps its profile to itself. One that
+  leaves an account, or is dropped, keeps the last profile it had.
+
+What is published at tables is unchanged: it is read from the device's
+copy, as before ([doc 04](04-live-play.md)).
+
+### Deleting an account's data
+
+On request (the privacy policy's choices), `node service/tool/forget.mjs
+<account>` (a dry run unless given `--apply`; Cloudflare API token and
+account id in the environment) deletes every row kept for the account
+(`forgetAccount`): those under `ACCOUNT#` — its devices, code, backup
+codes, sign-in, device in use and profile — each device's `ENTITLEMENT`,
+the rows its codes and sign-in are found by, and its subscription's
+`SUB#` rows. It refuses a subscription still paid up, which is cancelled
+first. Where the `Household` object runs, its note of the device in use
+(a key, a count and times) is in the object's own storage and is not
+reached from outside: it is written over the next time the account is
+taken up, which after deletion is never, and holds no name or picture.
+The account's finished games are deleted from R2, and its results from
+the relay, by hand ([doc 08](08-own-relays.md)).
+
+### TURN
+
+`turn` mints Cloudflare Realtime TURN credentials (`OH_TURN_KEY_ID`,
+`OH_TURN_API_TOKEN`) valid for four hours, only for a device whose
+subscription stands, since TURN is billed by the gigabyte. Without the
+secrets it answers 503, and the app makes no data channels and plays
+over the relay: channels go through TURN or not at all, so no peer
+learns another's address ([doc 02](02-multiplayer.md)).
+
+### Game records
+
+A player at a finished table can `POST` its record. The worker checks
+that the sender's key holds a seat in the record, that the table id is
+32 hex characters, and that the record is at most 2 MiB. The first copy
+is kept, gzipped, in R2 (`OH_RECORDS`). Looking at one is live play:
+`review` serves it only to a device with a subscription that is its
+account's device in use, and not while the account sits at that table.
+The worker vouches for nothing else. Every viewer replays the record
+through the verifier before showing a card, seats' licences included.
 
 ## Storage
 
-Everything the service keeps fits one key-value table. Every access is
-a lookup by key — no scans, no ranges, no joins.
+Everything the worker keeps is in one KV namespace, `OH_STORE`, one key
+per row as `PK|SK`, behind `get`, `put`, `del` and `under` (the rows under
+one partition key, at most an account's devices). Tests and local mode
+use a `Map` behind the same calls (`memoryStore`).
 
 ```
-PK                         SK             attributes
-LOGIN#apple#<hmac(sub)>    IDENTITY       key, created_at
-LOGIN#google#<hmac(sub)>   IDENTITY       key, created_at
-KEY#<key>                  META           provider, attested_at, attestation
-KEY#<key>                  SUPERSEDES     predecessor, link, at
-SUB#<subscription>         META           source, txn_ref, renews_at, cancelled_at
-SUB#<subscription>         DEVICE#<key>   bound_at
-KEY#<key>                  ENTITLEMENT    subscription, licensed_until, at
-TICKET#<code>              META           subscription, expires_at, used_at
-COUNTER#<metric>#<day>     -              n
+PK                         SK              holds
+KEY#<key>                  ENTITLEMENT     account, licensed_until, at
+ACCOUNT#<account>          META            subscription, created_at
+ACCOUNT#<account>          DEVICE#<key>    bound_at
+ACCOUNT#<account>          TICKET          the outstanding code (expires)
+ACCOUNT#<account>          BACKUP          the five backup codes, used or not
+ACCOUNT#<account>          LOGIN           provider, the linked sign-in's row, at
+ACCOUNT#<account>          ACTIVE          device in use, epoch, at, seated, relay tags (without HOUSEHOLD)
+ACCOUNT#<account>          PROFILE         name, icon, color, picture, version, updated_at
+SUB#<subscription>         META            source, txn_ref, renews_at, cancelled_at, event time
+SUB#<subscription>         ACCOUNT         account
+SUB#<subscription>         CUSTOMER        Stripe customer, for the portal
+TICKET#<code>              META            account, expires_at, used_at (expires)
+BACKUP#<digest>            META            account
+LOGIN#<provider>#<hmac>    IDENTITY        account, created_at
+config|app, config|service                 the operator's rows (below)
 ```
 
-Three rules baked in:
+Where the `Household` object runs, the account's device in use is kept
+in that object's own storage instead of `ACTIVE`. A provider's
+identifier is stored only as an HMAC, and nothing on the `KEY#` side
+leads back to a provider. Entitlement is copied to each device so a
+licence is one read. Cards, plays, game state, ratings and email
+addresses are not stored.
 
-- **The provider identifier is stored keyed, never raw.** It is opaque
-  but stable, and it joins to a real account. HMAC'd with a server-side
-  secret, a leaked table joins to nothing.
-- **Nothing on the `KEY#` side leads back to the provider.** The key is
-  what public records carry.
-- **Entitlement is copied forward on supersession**, so a licence is a
-  single read. Supersessions are rare; licences are every session.
-- **A subscription is one row and its devices are rows under it**, so
-  binding a device by QR, dropping one, and counting the five are all
-  point operations, and a renewal touches the subscription rather than
-  every device on it.
+## Remote config
 
-Not stored: cards, plays, game state, ratings, emails, device sessions.
-Ratings are computed from public records by anyone. TURN credentials are
-minted from a secret, not kept. The last-resort jurors keep nothing.
-
-Counters are the instrumentation the design asks for — how often tables
-drain to one human, how often a jury cannot be drawn — as atomic
-increments, no identities attached.
-
-Secrets — the service signing key, the TURN secret, the purchase webhook
-secret, the HMAC key — live in the platform's secret store, never in
-the table.
-
-**As built.** The shape above, flattened to one key per row —
-`PK|SK` — behind four calls: `get`, `put`, `under` (the sort keys under
-one partition key, for the devices on a subscription) and nothing else.
-Cloudflare KV bound as `OH_STORE` on the site; a `Map` behind the same
-four in the browser suite and in the tests, which is all local mode
-needs (`memoryStore`). `under` is the only call that is not a point
-lookup, and what it ranges over is five devices.
-
-One thing the shape does not survive on its own: the copy of the date a
-device keeps so that a licence is one read. Stale is harmless when a
-renewal has moved the date *out* — the device catches up on its first
-ask after its copy runs out. It is not harmless when a subscription
-*ends*: a refund would otherwise leave every device on it licensed for
-up to a year. So an ending — deleted, unpaid, expired — writes the
-devices down as well as the subscription. Five rows, once, and never on
-the renewal path.
-
-The design is written against DynamoDB's single-table shape and ports to
-any key-value store almost literally; the platform choice is deferred to
-deployment. A bucket is reserved for archiving public game records,
-since relays do not promise retention; whether the service subscribes
-to relays or clients post copies is undecided, and nothing depends on
-it yet.
-
-## What is paid for, and how
-
-Live play is a subscription: **$2.99 a year**. Everything else is free
-and stays free — the bots, the records, the verifiable deal, the engine
-itself. What the money is for is the part that costs us money to run:
-relaying people to each other, TURN when a direct path will not form,
-and jurors when a table is left alone.
-
-A year rather than a month, for an unglamorous reason. At three dollars
-a month the fixed part of a card fee — thirty cents on Stripe — is ten
-per cent of the price, and a store's cut is taken on top; at three
-dollars a year the same fee is paid once. $2.99 nets about $2.60 through
-Stripe after 2.9% + 30¢, and about $2.54 on a store at the small
-business rate. The shape of the price is chosen by the fees, not the
-other way round.
-
-### The licence
-
-What a device holds is not a receipt and not an account: it is a
-**licence**, a short statement signed by the service's key —
-
-    { key: <device public key>, until: <date>, plan: 'year' }
-
-— which the app verifies against a public key baked into the build, the
-same way it verifies everything else it is told. Three things follow
-from that. A device that cannot reach us keeps playing until the date on
-its licence, which is the only sane behaviour for a game people take on
-a train. Nothing about the purchase is on the device except the
-statement, so there is nothing on it worth stealing. And the service is
-not in a game's latency path: a licence is read at the front door, not
-at a trick.
-
-The date is **short — a month — and renewed while the subscription
-lives**. That is what makes cancellation and refunds work without a
-revocation list to distribute and check: a cancelled subscription simply
-stops being renewed, and the last licence runs out. A year's
-subscription is twelve or thirteen renewals, each a single point read.
-
-**As built** (`app/lib/net/licence.dart`, `app/lib/entitlement.dart`).
-The statement is four lines — a tag, the key, the day, the plan — hashed
-and signed BIP-340, and the date is the last day it is good for, running
-to the end of it in UTC. A licence signed by anything but the key this
-build names is not a licence; neither is one for another device, and
-neither is a licence whose day has passed. It is read off the device
-before the first frame and asked of the service behind it, in that
-order and never the other way: the front door has to be able to answer
-before it is drawn, and a device on a train has to be able to answer at
-all.
-
-Two things it does *not* do. It does not go through the general
-signature check the rest of the protocol uses, which also takes a
-simulated table's fake signature — a hash of the signer's **public**
-key, and the service's is printed in every build. And a build that
-names no service does not fall open: every device is unlicensed, rather
-than every device licensed by whoever answers first.
-
-### Where the money comes in
-
-| | Buying | Renewing | Telling us |
-|---|---|---|---|
-| iOS, Android | the store's own subscription | the store | App Store server notifications, Play real-time developer notifications |
-| Web | Stripe Checkout, subscription mode | Stripe | the Stripe webhook |
-
-Both land at **entitle**, keyed by the public key the buyer had when
-they bought — the key rides in the checkout session's metadata, or in
-the purchase's application username. A renewal is the same handler with
-a later date. Neither path asks the player to make an account.
-
-**As built.** The web half: Checkout, the webhook, and the app's side of
-both (`app/lib/net/buying.dart`). Pressing Subscribe asks the service
-for a session and leaves for it — and only for Stripe's own host,
-checked here, since what a device is sent to is not a place a bad
-answer gets to choose. Coming back, the address carries a mark the app
-reads once and then takes out: the webhook is usually there before the
-browser is, and when it is not the app asks again for a few seconds
-rather than telling the buyer nothing happened.
-
-The store half is not built, and cannot be until the app is in a store
-(README, roadmap 8). Until then `canBuyHere` is false off the web and
-says so rather than opening a checkout a phone should not be using.
-
-Three things have to be set on the project for any of it to work:
-`OH_STRIPE_SECRET`, `OH_STRIPE_PRICE` (a yearly recurring price) and
-`OH_STRIPE_WEBHOOK_SECRET`, with the webhook pointed at `/api/stripe`
-for `checkout.session.completed` and `customer.subscription.*`. Without
-them the shop says it is not open yet, which is what a deployment with
-no keys should say.
-
-### A subscription is a person's, not a device's
-
-So a second device has to be able to hold the same licence, and there
-are three ways for one to get it, in the order they cost the player
-anything:
-
-- **A QR code**, which is the fast one and needs nothing typed. A
-  subscribed device shows a code carrying a one-time claim ticket: the
-  subscription's id, an expiry a few minutes out, and a signature over
-  both. The other device scans it and calls **claim**; the service
-  checks the ticket has not been used and is not stale, binds the new
-  key to the subscription, and issues it a licence. Tickets are
-  one-use, so a photograph of someone's screen an hour later is worth
-  nothing.
-- **A provider account**, which is the durable one. **attest** already
-  binds an Apple or Google sign-in to a key and entitlement already
-  follows that identity, so signing in on a new phone is enough, and a
-  lost phone is recovered the same way.
-- **An email address**, for buyers who have neither. The rule that this
-  service does not keep email addresses stands: what is stored is an
-  HMAC of the address, exactly as a provider's subject identifier is,
-  so the table joins to nothing if it leaks. Where an address is needed
-  to send a link — a web buyer recovering a lost device — Stripe
-  already holds the one they paid with, and it is asked rather than
-  kept.
-
-A subscription carries **up to five devices**, and any of them can drop
-another. Unbounded sharing by QR is a subscription shared with the
-internet; five is a household.
-
-**As built**, the QR one, and with one change to it. The subscribed
-device asks for a code, shows it as a QR of a link back into the app,
-and the other device opens that link with its own camera — so there is
-no camera in this app and no permission to ask for, which is most of
-why this is the cheap way in. A device with no camera pointed at the
-screen gets the same link through the share sheet, as a room's link
-goes.
-
-The change: the code is sixteen random bytes and nothing else. The
-design has it carry the subscription and an expiry under a signature;
-what is built keeps both at the service instead, for two reasons that
-only showed up against a camera. A code that has to be spent needs a
-row whatever it carries, so a signature saves no lookup — and a code
-three times longer is a QR three times denser, read across a table by
-a phone that is not quite still. It also keeps the subscription id off
-the wire, which a photograph of somebody's screen would otherwise
-carry away.
-
-The count is read where a code is spent rather than where it is made,
-so a code made while there was room cannot let a sixth device in.
-Dropping a device takes away its binding **and** its entitlement row —
-not merely the date on it: the subscription is still paid up, so a row
-that had only run out would be dated forward again on that device's
-next ask. The one it holds runs out on its own within the month, which
-is what a licence with no revocation list can promise and all it can.
-
-TURN is Cloudflare's.
-
-## Local mode
-
-The service runs entirely locally for end-to-end tests, with the same
-code and different adapters:
-
-| | Production | Local |
-|---|---|---|
-| Storage | DynamoDB | in-memory, same shape |
-| Sign-in | Apple/Google published keys | `local:<subject>`, a token naming a `sub` |
-| Entitlement | store and Stripe webhooks | an open house: a key that asks is licensed for a month |
-| TURN | Cloudflare | none; localhost connects directly |
-| Signalling, waiting rooms, results | our own relay and a few public ones, listened on together; table events written to one relay everyone reads, ours preferred while up; lobby, signalling and whatever goes unanswered to all | a minimal NIP-01 relay in the repo |
-| Last-resort jurors | woken on demand | always available |
-
-One process, one flag.
-
-**As built.** The browser suites run the site's own worker in-process
-over a `Map`, with `OH_OPEN_HOUSE` set: a key nobody has heard of is
-written a subscription and a device binding like any other and licensed
-for a month, which is one branch inside `entitlementOf` and is never on
-in production. The rig signs with BIP-340's published pair and
-`e2e/build.sh` compiles the app to expect it — a key that licenses one
-machine's rig and nothing else. So the suites exercise the real handler,
-the real signature and the real gate, rather than a door propped open
-for them.
-
-## The relay, and the table over it
-
-`service/` is, so far, the local relay — and only that: matchmaking
-is the players' own business on the relay (doc 04, "The live table"),
-and so are results and ratings. The relay is a NIP-01 subset in a few
-hundred lines of Dart — `EVENT`, `REQ` with filters on ids, authors,
-kinds, `since`, `until`, `limit` and single-letter tags, `CLOSE`, and
-`OK`, `EOSE` and `NOTICE` back. Every event's id and BIP-340 signature
-are checked before anything else sees it. Stored kinds live in memory
-up to a cap; the kinds the table uses are ephemeral (20000–29999),
-forwarded and forgotten, because the protocol's own repeat-and-catch-up
-already recovers a dropped message and nobody needs a relay to remember
-a game.
-
-`packages/table` has the other side: `RelayTransport`, a [Transport]
-that wraps each table message in an ephemeral event of kind 24242,
-tagged with the table id and signed by the sender, and subscribes to
-the same — on every relay in its list, writing to the first that has
-not refused it lately and moving a refused event on to the next
-(`relays.dart`; doc 04, "The live table"). The local relay takes a
-`refuse` policy so a test can be the public relay that turns on a
-client. What arrives is stamped *from* the envelope's signer — the
-peer that sent it, which for a relayed message is not the author — and
-that is the distinction "heard from" rests on. The relay says nothing
-when a peer goes, so the transport never reports a disconnect; the
-heartbeats carry that. Kind 24243 on the same wire is WebRTC
-signalling — an offer, an answer, an ICE candidate — addressed with a
-`p` tag to one recipient, who is the only one subscribed to it, and
-sealed to that recipient's key with NIP-44 (`nip44.dart`, version 2,
-written out in Dart and pinned to the published vectors), since a
-candidate carries an address and a public relay carries the event.
-The two ends' conversation key comes from their keys' shared point
-(`Signer.sharedXWith`), the same ECDH the deal's escrow rests on.
-
-What the path itself carries is measured
-([measurements/relay](../measurements/relay/README.md)) — and it is the
-relay path only: a data channel carries the event as bytes instead,
-which is 36% less again (`packages/table/lib/src/frame.dart`), because
-a channel has our own code at both ends where a relay has to read and
-store what it is given. On the relay, then: 366 bytes of
-envelope on an event, a third more again for anything that is not text,
-a signature to send one and a rehash and a signature to accept one at
-the relay and at every receiver — about 1,650 small events a second on
-a loopback, seven tenths of which is the relay checking them. That
-was the budget for a juror, which had no other path — the case doc 04
-calls "the party that had no channel". A juror drawn from somebody's
-app has one now: the summons introduces it and the seats dial it, so
-its play crosses a data channel and the relay carries its signalling
-(`Transport.reach`, `JurorDuty.dial`). The figures above are still the
-budget for the jurors of last resort here, which run in a Dart VM with
-no peer connection in it and so stay on the lane doc 02 keeps for
-exactly that.
-
-**And what a hand costs it, end to end**
-(`service/tool/wire_over_socket.dart`: a counting proxy in front of
-the relay, a sealed hand with two people and two bot seats the bench
-holds). Five to seven megabytes across the sockets uncompressed; about
-1.5 with **permessage-deflate**, which is 74% off and now agreed to —
-the clients were always offering it and the relay was refusing,
-because `shelf_web_socket` does not do the extension. The upgrade is
-dart:io's own now. Half of what a table sends is base64 of curve
-points, which no compressor touches, and half is JSON keys, hex ids,
-keys and signatures, which go thirteen to one; duplication is what
-makes the ratio as good as it is.
-
-The duplication is worth its own line. Of a megabyte published in a
-hand, the largest single item was deal turns being said again by
-somebody who did not author them: a turn that has not settled is
-repeated, and a repeated shuffle argument is twelve kilobytes every
-time. A seat now says its own turn again after two seconds, and
-everyone else waits ten before carrying it — long enough that
-carrying means what it was built to mean, a table cut in two rather
-than a message dropped once. Measured in the simulator, where the
-count is exact: 21% off everything said and handed over at a jury of
-four, 17% at six.
-
-Nothing negotiates compression in the rig that drives the suites
-(`service/do/ws.mjs` says so in its own header), so every number
-measured there is the uncompressed one.
-
-`service/test/table_over_relay_test.dart` seats two people and two bots
-on the local relay with real keys, real sockets and the wall clock, and
-they play a hand: 28 decisions, every one signed twice and verified by
-the other side, in about four seconds. That is the cost the app pays,
-measured — and it is why the web app will not sign in Dart: the same
-signature that takes 11 ms in the VM takes 100 ms compiled to
-JavaScript, and 0.6 ms as wasm
-([measurements/sign](../measurements/README.md)).
-
-## An object per tag
-
-A relay is a meeting point, and a meeting point costs whatever it holds
-open. Ours is a **Cloudflare Durable Object per tag** (`service/do/`):
-`wss://relay.openhearts.game/<tag>`, the tag in the path because the
-object has to be named before the socket is opened, and everyone on
-that tag lands on that one object wherever they are — no fan-out
-between machines, no database in the middle. Presence is one tag,
-`online`, and one object. Tables and matchmaking have not moved.
-
-**It is preferred, and nothing depends on it.** The beats still go to
-every relay the device can write to, the public ones included: a device
-is online for whoever can hear it, and what another device can reach is
-not ours to assume — a build from before the object existed, a network
-that blocks the host, a deploy that is down. So a device on the object
-and a device on the public relays alone see each other, and the day the
-object is not there presence is exactly what it was before it existed
-(`service/test/presence_object_test.dart`).
-
-**Marked in the list, never assumed.** A relay that keeps one object
-per tag wears `{tag}` where the tag goes, and the client that has a tag
-puts it there (`tagMark`, `presence_relay.dart`). It cannot be
-inferred from a hostname in either direction: a public relay serves
-every tag at its root and would answer a path with a 404, and a
-sharded one cannot serve a client that gives it no tag. That is also
-why the marked relay is in the list presence takes
-(`presenceRelays`, `app/lib/net/relays.dart`) and not in the list
-tables and signalling take — a table has nowhere to put its tag until
-it moves here.
-
-**Hibernation, which is the difference between free and a monthly
-bill.** The object hands its sockets to the runtime
-(`state.acceptWebSocket`) instead of holding them itself
-(`server.accept`), so an open socket costs nothing while nothing is
-being said on it: the object is evicted and charged for none of that
-time, where accepting the socket itself would have held the object —
-and its duration charge — up for as long as anybody was connected, all
-night, on every tag. What an evicted object loses is its memory, so
-each socket carries its own subscriptions
-(`serializeAttachment`) and they come back with it; that ride has a
-size limit, so a socket is held to a few subscriptions and the oldest
-goes as a new one arrives — bounded as it is written, which is the
-rule for everything here.
-
-**Nothing is written down.** Presence is ephemeral by definition,
-forwarded to whoever is listening and forgotten, so the object has no
-storage to pay for, none to read on the way back from hibernation, and
-nothing that could ever need a scheduled sweep. A kind that is not
-ephemeral is refused with a reason rather than quietly dropped, and the
-client writes it to the relays that keep things.
-
-**One relay, two runtimes, one set of tests.** The core
-(`service/do/relay.mjs`) is the NIP-01 subset the Dart relay already
-speaks, written as plain functions over anything that can send a
-string: no Cloudflare imports and no node ones, signatures through the
-very wasm the app carries (`app/web/schnorr.wasm`, handed in compiled
-because a Worker may not compile one at runtime) rather than a third
-implementation of BIP-340. That is what lets it be tested properly.
-`service/do/host.mjs` hosts it on a plain node socket — the handshake
-and frames of RFC 6455 written out, since node ships a WebSocket
-client and no server — and `OH_RELAY=js` puts that host behind the
-`Relay` class the Dart tests already construct, so every suite in
-`service/` runs against either relay with nothing about the tests
-changed:
+Some things have to change for every device at once, faster than a
+release. `config` serves one row the operator writes:
 
 ```bash
-cd service && dart test                  # the Dart relay
-cd service && OH_RELAY=js dart test      # the relay the object runs
-node --test service/do/*.test.mjs        # the core, and the sockets under it
+npx wrangler kv key put --binding OH_STORE 'config|app' \
+  '{"live": false, "banner": {"id": "relays-down-1", "level": "warn",
+    "text": {"en": "Live play is down until 18:00 UTC.", "de": "Live-Spiel bis 18 Uhr UTC aus."}}}'
 ```
 
-The local host takes the simulator's signatures as well as real ones,
-by their length, exactly as the Dart relay does and for the same
-reason (`signing.dart`); the deployed object knows BIP-340 and refuses
-everything else.
+| Field | Effect | Default |
+|---|---|---|
+| `live` | `false` closes the doors to live play (buttons, table links, going online as a juror) and says so. Games in progress play on. | open |
+| `offer` | `false` hides the paid tier from devices that have not bought it. | offered |
+| `relays` | One to eight `wss://` relays on `openhearts.game` or a subdomain, replacing the build's list. All must be valid, or none are taken. Read at app start. Local builds ignore it. | the build's |
+| `banner` | A line on the front door: `id`, `level` (`info`/`warn`), and `text` by language (English required). | none |
+| `feedback` | Where "Tell us what's broken" sends a report: an `https://` page or a `mailto:`. | GitHub issues |
+| `privacy`, `terms` | `https://` links shown under Subscribe. | the site's own pages |
+| `table` | The clocks of tables this device starts, in ms: `graceMs` (2–60 s), `passGraceMs` (2–120 s), `bankMs` (10–300 s), `fixedMs` (15–120 s), `botActsMs` (5–60 s), `botDealsMs` (15–120 s), `quorumLostMs` (10–120 s), `silenceMs` (30–600 s), `jurorSilenceMs` (10–120 s). All or nothing. They ride in the signed start event, so every seat plays by the starter's clocks. | 6, 20, 45, 40, 15, 40, 20, 120, 30 s |
+| `price` | The yearly price shown on the web beside Subscribe, up to 12 characters. Change it together with `stripePrice`. | `$5.99` |
+| `update` | `before: YYYY-MM-DD`. Builds published before that day are asked to update (optionally with `text`). | none |
 
-**Deploying it.** `cd service/do && npx wrangler@4 deploy` — the
-binding (`TABLE`), the class and the SQLite migration are in
-`wrangler.toml`, and a first deploy answers on the worker's own
-`workers.dev` host. The name the app looks for is a Workers custom
-domain on `relay.openhearts.game`, which writes its own DNS record and
-needs the zone to be on the account; until it is, builds find the
-object down and presence rides the public relays, which is the same
-thing that has always been true of `nostr.openhearts.game`.
+The worker validates every field (`configOf`), and the app validates
+them again (`app/lib/net/remote_config.dart`). An invalid field is
+treated as missing, and an unreadable row gives the defaults. Responses
+are cached for a minute. The app keeps the last answer, uses it at the
+next start, and asks again every fifteen minutes while open.
 
-## Language and layout
+`waits` sets how long the app waits on the network — the licence, a
+household, a checkout, TURN, this config and how often it is asked
+again, the relays, the standings, a friends' room's start, a direct
+connection — each in milliseconds (`configEveryMin` in minutes). Each
+field is taken on its own if it is a whole number within its bounds
+(`WAITS_BOUNDS` in the worker, `AppWaits.bounds` in the app, kept equal
+by a test), and the relay's slow and give-up pair only in that order.
 
-The juror runs the bot policy — it plays the bot seats it holds
-([doc 04](04-live-play.md), "Playing a seat nobody holds") — and the
-bot is Dart. So the juror is Dart, and rather than carry a second
-language for two hundred lines of handlers, the whole service is Dart. The one exception is the
-object per tag, which is JavaScript because the runtime it hibernates
-on is: a few hundred lines of NIP-01 that the Dart suites hold to the
-Dart relay's own behaviour, rather than a runtime chosen to keep the
-language. Locally that is one
-`dart run`; in production it is a container, or Dart on a serverless
-runtime — a packaging decision, deferred.
+## The service's settings
 
-```
-packages/engine/     the rules and the bot — shared by app, table and service
-packages/table/      the table protocol — signed events, membership,
-                     departures, the play chain — pure Dart over an
-                     abstract transport and clock, with its simulator
-app/                 Flutter: the table package over WebRTC, and the UI
-service/             handlers, juror, storage adapters, local relay
-e2e/                 Playwright, driving real browsers against the local service
-site/
-docs/
+The service's own numbers live in two rows that are never served:
+
+```bash
+npx wrangler kv key put --binding OH_STORE 'config|service' '{"mostDevices": 5, "licenceDays": 31}'
+npx wrangler kv key put --binding OH_STORE 'config|relay' '{"burst": 30, "perSecond": 2}'
 ```
 
-Extracting the engine into its own package comes before the service
-exists, so nothing is ever imported across the app/service line. The
-table protocol is a package for the same reason, and one more: the same
-code has to run under a simulated network and a real one.
+`config|service` is read by the worker and the Household object, at
+most once a minute per isolate:
 
-## The departure matrix
+| Field | Bounds | Default |
+|---|---|---|
+| `stripePrice`: the price a checkout sells, overriding `OH_STRIPE_PRICE` | price id or lookup key | `OH_STRIPE_PRICE` |
+| `licenceDays` | 1–62 | 31 |
+| `mostDevices` | 1–10 | 5 |
+| `ticketMinutes` | 1–60 | 10 |
+| `ticketReuseMinutes` (less than `ticketMinutes`) | 0–30 | 2 |
+| `turnTtlS` | 600–86,400 | 14,400 |
+| `requestToleranceS` | 30–900 | 300 |
+| `webhookToleranceS` | 60–900 | 300 |
+| `householdChangesPerHour`, `householdReadsPerHour` | 5–500, 10–2,000 | 20, 60 |
+| `activationsPerHour`: an account's activations and the relay's asking | 60–6,000 | 600 |
+| `profileWritesPerHour`: writes of an account's profile | 5–300 | 30 |
 
-The protocol's whole job is to keep four seats playing while people
-come and go, and the cases multiply: how many humans, who goes, how,
-and when. Written out it is thousands of cells, so the tests are in
-two layers that drive the same client code with the network and the
-clock swapped.
+`config|relay` is read by each presence object when it wakes (through
+the relay worker's own `OH_STORE` binding):
 
-**The simulator** (`packages/table`) runs every client as an in-process
-object over a simulated network — controllable latency, drops, and
-partitions — on a virtual clock. The whole matrix runs in seconds,
-every failure replays from its seed, and it runs in CI on every commit.
+| Field | Bounds | Default |
+|---|---|---|
+| `message`: longest message, in characters | 8–256 KiB | 64 KiB |
+| `request`: longest REQ | 256–1,536 | 1,024 |
+| `burst`, `perSecond`: events per socket | 5–200, 1–20 | 30, 2 |
 
-**Real browsers** (`e2e/`): Playwright drives four headless browsers as
-players against the local relay and the built app, with real WebRTC
-between them, through the app's own screens — it finds the buttons,
-the cards and the state pills in the accessibility tree the app grows
-on request. Host a room, join it by code, a hand over WebRTC in under
-half a minute; then the cells only a browser can show: one closed
-mid-hand and replaced by a bot within ten seconds, one stalled on its
-turn and booted by the others when its clock runs out, one that leaves, and the
-last person finishing the hand with three bots. That is what proves
-the transport. The juror stepping in for a table drained to one human
-joins the suite with the jury. It runs in CI on every commit.
+A value that is not a whole number within its bounds keeps its default.
+The bounds stop where a setting would open a hole, such as a licence
+outliving its subscription or a captured request staying valid for an
+hour. Protocol constants (signed statements, code sizes, body limits)
+stay in code.
 
-The axes:
+## Watching it run
 
-| | |
+Monitoring records counts and nothing about anybody. When a Workers
+Analytics Engine dataset is bound as `OH_METRICS`:
+
+- **The worker** (`measure`) writes one line per request: the handler,
+  the status, the milliseconds, and a weight. `config` and `health` are
+  sampled one in ten. An unknown path is recorded as `unknown`.
+- **Each relay object** (`tally`) writes one line a minute with
+  connections, events, deliveries, subscriptions and each kind of
+  refusal. The columns are in the order `tallied` lists them in
+  `service/do/relay.mjs`.
+
+No key, address, tag or location is written. To enable it, bind a
+dataset named `open_hearts_api` on the Pages project and uncomment the
+dataset in `service/do/wrangler.toml`. External ping monitors watch the
+site, the app, `/api/health` and the relay
+([observability/](../observability/README.md)).
+
+### The operator's alerts
+
+While there are few subscribers, the operator is emailed about each one
+(`service/functions/alerts.mjs`, `alerts` in `config/openhearts.json`):
+
+- **A new subscription:** from the Stripe webhook, or the first
+  store purchase bound for a subscription. Told once per subscription
+  in 30 days, however often the webhook is delivered.
+- **A subscriber online:** a device on a subscription asks for its
+  licence, which the app does when it opens. Told at most once per
+  subscription in `onlineQuietMinutes`. Never for a subscription
+  listed in `notOnline`, which names each by the first 16 hex of the
+  SHA-256 of its ID, because the repository is public.
+
+The mail says which store, the first characters of the subscription
+and device, and dates. It never includes an email address or name. It
+goes to `alerts@openhearts.game`, which forwards to where help@ goes
+(`infra/`). It is sent from the relay worker, which holds the `EMAIL`
+binding, through a Household object named `operator-alerts`, which
+mails only `@openhearts.game`. A failed alert never fails the request.
+Set either flag to `false` and deploy to stop it.
+
+## The relay and the bench
+
+The relay's core ([doc 08](08-own-relays.md)), `service/do/relay.mjs`,
+is plain functions with no Cloudflare or Node imports. It checks
+signatures with the app's own `app/web/schnorr.wasm`, passed in
+precompiled because a Worker may not compile wasm at runtime. The Durable
+Object (`TagRelay`, `worker.mjs`) hosts it in production. A plain Node
+socket server (`host.mjs`) hosts it under `OH_RELAY=js`, so the whole
+`service/` suite runs against the deployed relay's code.
+
+`service/lib` has a Dart relay with the same behaviour, the default in
+the Dart tests and in `dart run bin/service.dart` (port 7447). The local
+relays also accept the simulator's fake signatures; the deployed object
+accepts only BIP-340. WebRTC signalling on the relay is sealed to its
+one recipient with NIP-44 v2, since an ICE candidate carries an address.
+
+**The jurors of last resort.** A table with bot seats needs enough
+jurors online to hold them. On a quiet night it calls for jurors on the
+presence tag. The presence object passes the call to the `Bench` object
+(`service/do/bench.mjs`), at most once every twenty seconds. The `Bench`
+object starts a Cloudflare Container running `service/bin/juror.dart`:
+four jurors in one process, with keys derived from `OH_JUROR_SECRET` so
+they are the same across restarts. The bench goes quiet ten minutes
+after its last call with nothing to serve, and the object stops the
+container. The image is built from the repository on every relay deploy
+(`service/bench/build.sh`).
+
+## Deployment
+
+| What | How |
 |---|---|
-| **Live humans at the start** | 1, 2, 3, 4 — bots in the rest. A table reaches 1 by departures too, so this axis is not independent of the others. |
-| **Who goes** | one player; two players in the same window; two in sequence; a juror; the foreman; two jurors; the whole jury |
-| **How** | a signed Leave; a silent drop, found by timeout; a boot when the seat's clock runs out; a two-and-two partition, which is not a departure but looks like one from inside |
-| **When** | on the departed seat's own turn; off it; mid-trick; the last trick of a hand; during the pass; during the deal; at a hand boundary |
+| Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)) |
+| Relay, Household, Bench | `cd service/do && npx wrangler@4 deploy` (`wrangler.toml`: the `TABLE`, `HOUSEHOLD` and `BENCH` objects, the container, `OH_STORE`, `EMAIL`, `OH_SERVICE_KEY`, the domain `relay.openhearts.game`) |
+| Accounts from before | `node service/tool/accounts.mjs`, a dry run unless given `--apply`; once, before the deploy that brings accounts in |
+| An account's data, deleted on request | `node service/tool/forget.mjs <account>`, a dry run unless given `--apply` ([above](#deleting-an-accounts-data)) |
+| Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../infra/README.md)) |
+| Monitoring | `node observability/apply.mjs` |
 
-The juror rows run in `packages/table/test/jury_test.dart`, with the
-jury of [doc 04](04-live-play.md). The sealed rows — the same simulator
-with the verifiable deal of [doc 03](03-fair-deal.md) run for real, its
-proofs made and checked on the virtual clock — run in
-`packages/table/test/sealed_test.dart`: whole games at one, two and
-four people, a leaver mid-hand and during the deal, a table of two
-surviving a crash by the jury's verdict and a juror's escrow piece, and
-a lone player leaving during the pass while their client looks on. The
-chaos walk runs sealed on request (`dart run tool/chaos.dart --sealed 5`), a minute or two a
-seed. Over real sockets (`service/test`): the jury over the relay,
-seeded and sealed; and a juror of last resort summoned into a sealed
-table of four with real keys, carried through the hand it never saw
-dealt while it heartbeats throughout.
+The `Household` object is the relay worker's, built from
+`service/functions/worker.mjs`. A change to what an account's turn can be
+asked (such as `profile`, or `unlink` for `apple-id`) deploys the relay
+first, then the site: the other way round, the new handler asks an
+object that does not know the question yet, which answers 400 and the
+app asks again later (Apple is answered 503).
 
-**The chaos test** is the matrix's complement: random walks through
-the same simulator — departures, partitions, blips, loss and latency at
-random times — checking every few seconds of virtual time that no two
-survivors hold conflicting decisions, that every record verifies as far
-as it goes, and that every state change is one the protocol's explicit
-model (`packages/table/lib/src/model.dart`: a turn is open, acting,
-contested, split or settled; a seat is human, left, booted, absent or
-bot; the table is playing, paused, or finished) allows. Its first hour
-found four things the matrix had not; its first 250 seeds found six
-more, among them a relayed event mistaken for a sign of life, a leave
-that was never re-sent, and a pass lost between a hand opening and its
-bots passing; and its first thousand settled a design question — where
-a silent seat may be removed — by finding a fork in the answer that
-looked more helpful (doc 04, "Silence is answered at the seat's own
-turn"). A thousand seeds now finish or pause for the jury with every
-survivor holding the same record. CI walks forty seeds on every commit;
-`dart run tool/chaos.dart --seeds 1000` walks a thousand.
+Pages secrets: `OH_SERVICE_SECRET`, `OH_ID_HMAC`, `OH_STRIPE_SECRET` (a
+restricted key), `OH_STRIPE_WEBHOOK_SECRET`, `OH_TURN_API_TOKEN`, and
+`OH_PLAY_SERVICE_ACCOUNT` once Play is set up. Everything else that is
+not secret is in `config/openhearts.json`, committed: the service's
+public key, the TURN key's id, the Stripe price, and the store and
+sign-in identifiers (`apple.bundleId`, `product` and `servicesId`;
+`google.package`, `product`, `webClientId` and the Play push audience
+and email). `deploy.sh` compiles the build's from it and ships the file
+to the worker, which reads it beneath the project's settings
+(`service/functions/deployment.mjs`): a variable of the same name set on
+the project wins, as one set by a test does. A field left null is a
+feature left off. Bindings: `OH_STORE` (KV), `OH_RECORDS` (R2),
+`HOUSEHOLD` (production only) and optionally `OH_METRICS`. Previews have
+their own KV and bucket, and no Stripe. The relay's secret is
+`OH_JUROR_SECRET`; its `OH_SERVICE_KEY` is a var in `wrangler.toml`,
+held equal to `config/openhearts.json` by a test, and without it the
+relay carries nobody. `cd service && dart run bin/service_key.dart`
+mints the service key pair and writes the secret half to
+`service.secret`, which is ignored by version control.
 
-**The explorer** (`packages/table/tool/explore.dart`) is the chaos
-test's complement for orderings. Random faults find what random faults
-find — a juror gone, a relay out, loss for a while — and rarely the
-other kind: one peer hearing two things the other way round from
-everybody else, or the one copy of something that mattered not
-arriving at one peer. Five fixes of that kind, undone one at a time,
-and the walk caught one. The explorer takes a small sealed game, runs
-it once to list every event said in its first seconds and every peer
-it went to, and then runs it again once per event, peer and change:
-the first copy lost, or every copy held back a couple of seconds. The
-simulator is deterministic and the change draws no randomness of its
-own (`SimNetwork.steer`), so each run is the first with exactly one
-thing different, held to a finished first trick, one reading of every
-bot seat's juror, and a sound record. Membership changes go first — a
-jury, a top-up, a leave — then the protocol's steps, then the routine
-traffic. The deal's cryptography is remembered across runs
-(`MemoCrypto`), since each run repeats most of the one before: a run
-is a seventh of a second where it was eight, and a scenario's thousand
-or so runs take two to five minutes.
+A deployment with no keys degrades safely: no service key means live
+play is shut, no Stripe means the shop says it is not open, and no TURN
+means tables play over the relay.
 
-Its first sweeps found two faults in code the walk had passed: a
-jury witness lost on its way to the proposer, which nothing ever
-said again (`lost_jury_witness_test.dart`); and a bot seat played
-twice, the same card by its late juror and by the custodian the table
-had given it to, splitting a table of two with nothing to see the
-split (`two_voices_test.dart`). `--match` replays one run with every
-client's trace.
+## Testing
 
-A single change to one message cannot move the scenario's own fault,
-and some faults matter only at a moment — a leave that lands while the
-deal is being built rather than after its keys — so `--fault-at`
-walks the fault through several times, each time's baseline first.
-Measured against five fixes of the kind, each undone in a scratch copy
-of the client: the walk, given eight sealed seeds and about twelve
-minutes each, caught one (a juror saying its own deal step again). The
-explorer caught that one at its 25th run, six seconds in, and one the
-walk missed — bot seats read from the seat list as it stood rather
-than as the hand began — at its 11th, with the leave moved to half a
-second. The other three it missed over five to eight thousand runs
-each: two want a juror summoned into a redraw partway through a hand,
-which only the top-up scenario makes and which plays a whole hand at
-1.7 s a run; the third (a drain after the deal's turns open) the
-simulator never reproduces at all — its own unit test never failed
-either — and it was found in the browsers.
+**Local mode.** The browser suites run the worker in-process over a
+`Map` with `OH_OPEN_HOUSE` set. In that mode any key that asks is written
+a subscription and an account of its own and licensed for a month, and
+`local:<subject>` tokens are accepted as sign-ins. The flag is honoured
+only for requests to `localhost` or `127.0.0.1`, so setting it in
+production does nothing.
+`e2e/build.sh` compiles the app against BIP-340's published test key
+pair, so the suites exercise the real handlers, signatures and licence
+check. The suites' relay is the local Dart one, which asks nobody who
+they are: one device at a time is seen there by presence, and the
+relay's own refusal is proved in `node --test service/do`. With
+`OH_TURN_LOCAL` set as well, `turn` hands out that local TURN
+server with fixed credentials; the rig points it at a coturn it starts
+on 127.0.0.1, so channels in the suites go through TURN as they do in
+production.
 
-What every cell asserts:
+**The departure matrix.** The table protocol's job is to keep four
+seats playing while people come and go. The same client code runs under
+four harnesses:
 
-- **The game reaches its end** with a bot in every departed seat — or,
-  where the survivors are too few to carry a removal and there is no
-  jury to be drawn, the table **pauses and says so**, stays consistent
-  while paused, and ends the game once the departed have been silent
-  as long as a person is given: "juror quorum lost" ([doc
-  04](04-live-play.md), "When quorum is lost anyway").
-- **Every surviving client holds the same record**, event for event,
-  once the network settles.
-- **The record verifies**: every human play signed by its seat's key and
-  legal under the engine, every bot play recomputable from the deal —
-  and at a sealed table, every proof of the deal, every token, every
-  audit, with every play checked against the hand it came from.
-- **Ratings follow doc 04's two rules**: a bot in the winning seat moves
-  nobody; a live winner moves everyone, leavers included.
-- **A play at 14.9 seconds beats a boot at 15.0**, and a peer holding
-  the play rebroadcasts it instead of countersigning the boot.
-- **Nobody is removed without a strict majority** of the last agreed
-  participant set, so a partition never forks: neither side can act,
-  and when it heals there is one record.
-- **Nothing hangs**: the virtual clock advances until the game is over
-  or the pause is explained on screen.
+- **The simulator** (`packages/table`): every client in-process over a
+  simulated network (latency, drops, partitions) on a virtual clock,
+  replayable from a seed. The matrix varies how many people start (1–4),
+  who goes (players, jurors, the whole jury), how (a signed leave, a
+  silent drop, a boot, a partition) and when (on or off turn, mid-trick,
+  during the pass or deal, at a hand boundary).
+- **The chaos walk** (`tool/chaos.dart`, `--seeds N`, `--sealed N`):
+  random faults, checked every few seconds of virtual time against the
+  explicit state model (`packages/table/lib/src/model.dart`). CI walks
+  forty seeds.
+- **The explorer** (`tool/explore.dart`, `--fault-at`, `--match`): one
+  run per message, peer and change (lost or delayed), with nothing else
+  different (`SimNetwork.steer`), to find ordering faults random walks
+  miss.
+- **Real sockets and real browsers**: `service/test` runs the jury and a
+  summoned juror of last resort over the relay; `e2e/` runs four headless
+  browsers over WebRTC ([e2e/README.md](../e2e/README.md)).
+
+Every scenario asserts that the game reaches its end with a bot in each
+departed seat, or pauses, says why, and ends unscored ("juror quorum
+lost"). It also asserts that every survivor holds the same record, that
+the record verifies (every play signed and legal, every bot play
+recomputable, and every proof, token and audit at a sealed table), that
+nobody is removed without a strict majority of the last agreed
+participants, so a partition never forks, and that nothing hangs.

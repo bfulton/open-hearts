@@ -40,9 +40,9 @@ class Arena {
     final score = {for (final p in roster) p: 0};
     final seats = {for (final p in roster) p: 0};
     for (var seed = 0; seed < games; seed++) {
-      // Drawn from a different stream than the deal: seeding both with
-      // the game's seed made the seating a function of the cards, so a
-      // character's luck depended on its place in the roster.
+      // Drawn from a different stream than the deal, so the seating is
+      // not a function of the cards and a character's luck does not
+      // depend on its place in the roster.
       final draw = List.of(roster)..shuffle(Random(seed * 31 + 7));
       final table = draw.take(seatCount).toList();
       final result = playTable(seed, table);

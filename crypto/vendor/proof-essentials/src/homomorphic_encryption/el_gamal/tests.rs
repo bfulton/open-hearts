@@ -3,7 +3,7 @@ mod test {
     use super::super::super::{el_gamal, HomomorphicEncryptionScheme};
     use crate::utils::rand::sample_vector;
 
-    use ark_std::rand::thread_rng;
+    use rand::thread_rng;
     use starknet_curve;
     use std::ops::Mul;
 

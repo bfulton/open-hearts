@@ -18,14 +18,18 @@
 // on stdin, so a Dart test that has installed a `refuse` policy is
 // asked about each event and its answer is what this relay does. The
 // asking is real: a test that counts how often its policy was
-// consulted counts what the relay actually consulted.
+// consulted counts what the relay actually consulted. And `--gate
+// <service key>` asks every socket who it is, as the deployed relay
+// does (relay.mjs, serviceGate), with the bench's mark under
+// OH_JUROR_SECRET; `{"revoke": {account, epoch}}` on stdin is what the
+// account's own object tells the deployed one.
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
-import { createRelay, memoryStore, schnorrVerifier, tagOf } from './relay.mjs';
+import { createRelay, memoryStore, objectRelay, schnorrVerifier, serviceGate, tagOf } from './relay.mjs';
 import { listen } from './ws.mjs';
 
 /// The signature wasm the app carries, checked by the same code in the
@@ -49,15 +53,23 @@ export function alsoFakeSignatures(verify) {
 /// A relay per tag on one port. [refuse] and [log] are handed to every
 /// relay; [onChange] is called whenever the counts a test watches move,
 /// before anything is written back to the socket that moved them.
-export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = null, refuse = null, onChange = null } = {}) {
+/// With [object], each tag's relay is the deployed object's
+/// (worker.mjs): presence's limits on `online`, a table's on every other
+/// tag, and only the lobby kind tagged for the tag stored — so a table
+/// played here meets the rules it will meet on Cloudflare.
+export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = null, refuse = null, onChange = null, object = false, gate = null } = {}) {
   const verify = alsoFakeSignatures(await schnorrVerifier(readFileSync(wasmPath)));
   const relays = new Map();
+  // Who may use it, when asked to ask ([gate] is the service's key).
+  const gating = () => (gate ? serviceGate({ service: gate, verify, bench: process.env.OH_JUROR_SECRET ?? null }) : null);
   const relayFor = (path) => {
     const tag = tagOf(path);
     if (tag === null) return null;
     let relay = relays.get(tag);
     if (!relay) {
-      relay = createRelay({ verify, store: memoryStore(keep), refuse, log: log && ((line) => log(tag ? `${tag}: ${line}` : line)) });
+      relay = object
+        ? objectRelay(verify, { tag: tag || 'online', also: refuse, gate: gating(), count: (what) => what === 'rateLimited' || what === 'refused' || what === 'tooBig' ? log?.(`${tag}: ${what}`) : null })
+        : createRelay({ verify, store: memoryStore(keep), refuse, gate: gating(), log: log && ((line) => log(tag ? `${tag}: ${line}` : line)) });
       relays.set(tag, relay);
     }
     return relay;
@@ -88,6 +100,7 @@ export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = 
           changed();
           connection.send(text);
         },
+        close: (code) => connection.close(code),
       };
       relay.open(socket);
       changed();
@@ -103,6 +116,10 @@ export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = 
     url: `ws://${host}:${server.port}`,
     counts,
     relayFor,
+    /// As the account's own object tells every relay it was seen at.
+    revoke: (account, epoch) => {
+      for (const relay of relays.values()) relay.revoke(account, epoch);
+    },
     close: () => server.close(),
   };
 }
@@ -115,12 +132,16 @@ async function main(argv) {
   let quiet = false;
   let stats = null;
   let control = false;
+  let object = false;
+  let gate = null;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port') port = Number(argv[++i]);
     if (argv[i] === '--keep') keep = Number(argv[++i]);
     if (argv[i] === '--quiet') quiet = true;
     if (argv[i] === '--stats') stats = argv[++i];
     if (argv[i] === '--control') control = true;
+    if (argv[i] === '--object') object = true;
+    if (argv[i] === '--gate') gate = argv[++i];
   }
 
   // A policy on the other end of stdin: ask, and wait for the answer.
@@ -146,7 +167,8 @@ async function main(argv) {
         });
       }
     : null;
-  if (control) {
+  let relay = null;
+  if (control || gate) {
     // A relay asked for over a pipe goes when the pipe does: a test
     // that died without closing it leaves nothing behind.
     createInterface({ input: process.stdin }).on('close', () => process.exit(0)).on('line', (line) => {
@@ -157,6 +179,7 @@ async function main(argv) {
         return;
       }
       if (typeof message.refuse === 'boolean') policy = message.refuse;
+      if (message.revoke && typeof message.revoke.account === 'string') relay?.revoke(message.revoke.account, message.revoke.epoch);
       if (typeof message.answer === 'number') asked.get(message.answer)?.(message.reason ?? null);
       if (message.answer !== undefined) asked.delete(message.answer);
     });
@@ -172,7 +195,7 @@ async function main(argv) {
       }
     : null;
 
-  const relay = await serve({ port, keep, log: quiet ? null : (line) => process.stdout.write(`${line}\n`), refuse, onChange });
+  relay = await serve({ port, keep, log: quiet ? null : (line) => process.stdout.write(`${line}\n`), refuse, onChange, object, gate });
   onChange?.(relay.counts());
   // Always say where, even when quiet: a harness reads this line.
   process.stdout.write(`relay ${relay.url}\n`);

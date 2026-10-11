@@ -33,14 +33,12 @@ void main() {
   });
 
   test('a write before any heartbeat reaches a peer that does not share its first relay', () {
-    // The hole that silenced a live table, at the layer it lives in.
     // Before a heartbeat has crossed, a writer has no idea what the
-    // others read. Narrowing to one relay on that non-evidence made
-    // each client pick its own first — a phone on the public relays,
-    // a client reading the same relays through a bridge under other
-    // names — and when those differ, nothing crosses, including the
-    // heartbeats that would have said where to write. A write floods
-    // until a peer says otherwise, so it cannot fail that way.
+    // others read. Narrowing to one relay on that non-evidence would
+    // have each client pick its own first, and when those differ,
+    // nothing crosses, including the heartbeats that would say where
+    // to write. A write floods until a peer says otherwise, so it
+    // cannot fail that way.
     final clock = VirtualClock();
     final net = SimNetwork(clock)..relays = const ['ra', 'rb', 'rc'];
     final a = net.attach('A');

@@ -2,19 +2,15 @@
 ///
 /// A dropped message is the ordinary reason a turn does not settle,
 /// and the ordinary answer is that whoever said it says it again. A
-/// seat has always done that ([TableClient] `_repeat`). A bot seat's
-/// holder is a juror, and a juror did not: the step it said went
-/// missing and the hand stopped at that turn for good — every peer
-/// heartbeating, nobody at fault, and no path back to it. Nothing
-/// else would have come to the rescue either: the holder skips a turn
-/// that already carries its own action, the carry-forward carries
-/// only what has settled somewhere, and a table waiting on a deal
-/// turn is neither split nor paused, so no appeal is made and no
-/// juror relays anything.
+/// seat does that ([TableClient] `_repeat`), and so does a juror for
+/// the bot seat it holds. Nothing else would come to the rescue: the
+/// holder skips a turn that already carries its own action, the
+/// carry-forward carries only what has settled somewhere, and a table
+/// waiting on a deal turn is neither split nor paused, so no appeal is
+/// made and no juror relays anything.
 ///
 /// One human and three bot seats, which is what matchmaking gives
-/// somebody who asks for a game alone, and the shape the browser
-/// suite stalls on.
+/// somebody who asks for a game alone.
 library;
 
 import 'package:deal/deal.dart';
@@ -25,7 +21,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a bot seat\'s keys lost on the way out are said again, and the hand deals', () {
     final t = SimTable(humans: 1, seed: 4, crypto: crypto, jurors: jurySize);
@@ -73,7 +69,7 @@ void main() {
     var kept = 0;
     // Kept until well past the deal step's allowance, so that timing
     // the holder by its own open turn would give the hand up.
-    const keptFor = TableClient.botDealsWithinMs + 15000;
+    final keptFor = TableClient.botDealsWithinMs + 15000;
     t.net.steer = (from, to, message) {
       if (to != a || message['kind'] != 'deal' || t.clock.nowMs >= keptFor) return null;
       final body = message['body'] as Map<String, Object?>?;

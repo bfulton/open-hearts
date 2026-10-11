@@ -63,7 +63,11 @@ void main() {
     tearDown(() => relay.close());
 
     Future<(RelayTransport, WaitingRoom)> join(String name,
-        {int rating = 1500, int target = gameOverScore, SchnorrSigner? signer}) async {
+        {int rating = 1500,
+        int target = gameOverScore,
+        TableTiming timing = TableTiming.standard,
+        SchnorrSigner? signer,
+        void Function(String)? log}) async {
       final s = signer ?? SchnorrSigner.generate();
       final t = RelayTransport(relays: [relay.url], signer: s, table: poolTag('unrated', target: target));
       await t.ready;
@@ -71,12 +75,14 @@ void main() {
           relay: t,
           pool: 'unrated',
           target: target,
+          timing: timing,
           name: name,
           rating: rating,
           roundMs: 2000,
           botsAfterMs: 3000,
           heartbeatMs: 500,
-          staleMs: 2000);
+          staleMs: 2000,
+          log: log);
       return (t, room);
     }
 
@@ -87,6 +93,39 @@ void main() {
       expect(specs.first.seats.whereType<HumanSeat>().length, 3);
       expect(specs.first.seats.whereType<BotSeat>().length, 1);
       expect(specs.first.rated, isFalse);
+      for (final r in rooms) {
+        r.$2.close();
+        r.$1.close();
+      }
+    });
+
+    test('the host\'s clocks are the table\'s: the seating carries them to every seat', () async {
+      // Three devices whose remote configs say three different clocks.
+      // Whoever hosts the round seats the table, and every seat plays
+      // by the host's — none by its own.
+      //
+      // Normally that is the lowest key, alone. On a machine busy enough
+      // that the host's seating reaches the next in line after its own
+      // turn to host has come, both seat the round and everyone takes
+      // the lower table id (matching.dart): the table plays by the clocks
+      // of a device that seated it, and still of no other.
+      final timings = [
+        for (final grace in [3000, 4000, 5000]) TableTiming.parse({'graceMs': grace}),
+      ];
+      final hosted = <int>{};
+      final rooms = [
+        for (var i = 0; i < 3; i++)
+          await join('T$i', timing: timings[i], log: (line) {
+            if (line.contains(': hosting,')) hosted.add(i);
+          }),
+      ];
+      final specs = await Future.wait(rooms.map((r) => r.$2.seated.first.timeout(const Duration(seconds: 15))));
+      expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table');
+      expect(hosted, isNotEmpty, reason: 'somebody hosted the round');
+      for (final spec in specs) {
+        expect(spec.timing, anyOf([for (final h in hosted) timings[h]]),
+            reason: 'the clocks of the seating\'s host, of ${hosted.toList()..sort()}');
+      }
       for (final r in rooms) {
         r.$2.close();
         r.$1.close();
@@ -142,12 +181,14 @@ void main() {
     test('a device entering a pool is handed this round\'s seatings, not the pool\'s whole history', () async {
       // Every seating is stored, so that a room code's joiner finds the
       // room announced before it arrived; a pool's pile up with it, and
-      // a device pressing Play was handed every one the pool had ever
-      // carried. An hour of a busy pool's rounds, and one from now.
-      final ws = WebSocketChannel.connect(relay.url);
+      // a device pressing Play must not be handed every one the pool has
+      // ever carried. An hour of a busy pool's rounds, and one from now.
+      // A socket a tag: on the deployed relay each tag is its own object.
+      final sockets = <String, WebSocketChannel>{};
       final host = SchnorrSigner.generate();
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      void store(String tag, int at, String what) => ws.sink.add(jsonEncode([
+      void store(String tag, int at, String what) =>
+          sockets.putIfAbsent(tag, () => WebSocketChannel.connect(relaysForTag([relay.url], tag).single)).sink.add(jsonEncode([
             'EVENT',
             NostrEvent.sign(host, kind: TableKinds.lobby, content: jsonEncode({'what': what}), tags: [
               ['t', tag],
@@ -177,7 +218,9 @@ void main() {
 
       entering.close();
       joining.close();
-      await ws.sink.close();
+      for (final ws in sockets.values) {
+        await ws.sink.close();
+      }
     });
 
     test('if the lowest key falls silent, the next seats the round', () async {

@@ -28,7 +28,9 @@ import 'package:engine/engine.dart';
 import 'package:table/table.dart';
 
 import 'avatar.dart';
+import 'l10n/l10n.dart';
 import 'pictures.dart';
+import 'reaction_mute.dart';
 import 'table_model.dart';
 
 class LiveController extends ChangeNotifier implements TableModel {
@@ -47,7 +49,15 @@ class LiveController extends ChangeNotifier implements TableModel {
     this.onResult,
     this.pictures,
     this.paced = true,
+    this.canPlayAgain = false,
+    TableJournal? journal,
+    ReactionLane? reactions,
+    ValueListenable<bool>? reactionMute,
+    int Function()? reactionClock,
   })  : _crypto = crypto,
+        _lane = reactions,
+        _mute = reactionMute ?? ReactionMute.current,
+        _reactionRules = ReactionRules(now: reactionClock),
         client = TableClient(
             spec: spec,
             signer: signer,
@@ -55,7 +65,8 @@ class LiveController extends ChangeNotifier implements TableModel {
             clock: clock ?? WallClock(),
             presence: presence,
             crypto: crypto,
-            dealWorker: dealWorker) {
+            dealWorker: dealWorker,
+            journal: journal) {
     _shown = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
     _shownHolders = List.of(spec.seats);
     _sub = client.changes.listen((_) => _onChange());
@@ -67,6 +78,8 @@ class LiveController extends ChangeNotifier implements TableModel {
       client.writesRefused = reason != null;
       if (!_disposed) notifyListeners();
     });
+    _heardReactions = reactions?.reactions.listen(_heardReaction);
+    _mute.addListener(_muteChanged);
     client.start();
   }
 
@@ -107,6 +120,11 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   /// Whether the view is paced. Tests turn it off.
   final bool paced;
+
+  /// Whether the front door knows how this game began, and so can begin
+  /// another the same way: the pool it was drawn from, or the room it
+  /// was started in. A table come back to after a reload does not.
+  final bool canPlayAgain;
 
   void _pictured() {
     if (!_disposed) notifyListeners();
@@ -183,14 +201,15 @@ class LiveController extends ChangeNotifier implements TableModel {
     final rating = ratingOf;
     final seat = client.mySeat;
     final holder = seat == null ? null : client.spec.seats[seat];
-    final key = holder is HumanSeat ? holder.key : null;
-    if (rating == null || key == null) {
+    // A rating is the account's, whichever of its devices played.
+    final account = holder is HumanSeat ? holder.account : null;
+    if (rating == null || account == null) {
       onResult?.call(result);
       return;
     }
-    final before = rating(key);
+    final before = rating(account);
     onResult?.call(result);
-    final after = rating(key);
+    final after = rating(account);
     if (after.mu != before.mu) ratingChange = (before: before, after: after);
   }
 
@@ -254,7 +273,7 @@ class LiveController extends ChangeNotifier implements TableModel {
       _sheetsShownThrough = hand;
       handJustEnded = (hand: hand, scores: _shown.handScores, totals: _shown.totals, moonShooter: _shown.moonShooter);
       _sheetTimer?.cancel();
-      _sheetTimer = Timer(const Duration(seconds: 6), dismissHandSheet);
+      _sheetTimer = Timer(const Duration(seconds: 6) * tableBeats, dismissHandSheet);
     }
     _shown.nextHand();
     _shownPlayed.clear();
@@ -277,8 +296,8 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Whether this view has to work a seat's move out for itself. A bot
   /// seat is everyone's to compute — unless a juror holds it, and then
   /// its move arrives as a signed event like a person's and its hand
-  /// is not ours to see at all (docs/04-live-play.md, "Playing a seat
-  /// nobody holds"). Asked of the hand being shown, which runs behind
+  /// is not ours to see at all (docs/04-live-play.md). Asked of the
+  /// hand being shown, which runs behind
   /// the table's: a seat can be a person's in the hand on screen and a
   /// bot the jury holds in the one the table is already dealing.
   bool _worksOutMove(int seat) =>
@@ -515,8 +534,47 @@ class LiveController extends ChangeNotifier implements TableModel {
       }
     } finally {
       _pumping = false;
-      if (!_disposed) notifyListeners();
+      if (!_disposed) {
+        notifyListeners();
+        _autoPlay();
+      }
     }
+  }
+
+  // ---- the Auto switch ---------------------------------------------------
+
+  final AutoPilot _auto = AutoPilot();
+
+  @override
+  bool get autoOffered => _auto.offered(this);
+
+  @override
+  bool get autoPlay => _auto.on;
+
+  @override
+  void setAutoPlay(bool on) {
+    _auto.set(this, on);
+    notifyListeners();
+    _autoPlay();
+  }
+
+  /// The player's turn, played for them when the switch is on: their
+  /// own play, sent as any tap sends it. Only once the screen has
+  /// caught up with the table and nothing of theirs is in flight
+  /// ([awaitingPlay]), which is also what keeps it from playing twice —
+  /// the card is pending from the moment it is sent.
+  void _autoPlay() {
+    if (_disposed) return;
+    _auto.watch(this);
+    final card = _auto.cardFor(this);
+    if (card != null) playCard(card);
+  }
+
+  /// Every change the table shows is one the switch may be offered on.
+  @override
+  void notifyListeners() {
+    _auto.watch(this);
+    super.notifyListeners();
   }
 
   Timer? _waitTimer;
@@ -525,7 +583,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   Future<void> _wait(Duration d) {
     final done = Completer<void>();
     _waitTimer?.cancel();
-    _waitTimer = Timer(d, done.complete);
+    _waitTimer = Timer(d * tableBeats, done.complete);
     return done.future;
   }
 
@@ -546,7 +604,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     final r = ratingOf;
     if (r == null) return _plainName(seat);
     final id = switch (client.spec.seats[seat]) {
-      HumanSeat(:final key) => key,
+      HumanSeat(:final account) => account,
       BotSeat(:final persona) => persona.id,
     };
     return '${_plainName(seat)} ${r(id).shown}';
@@ -578,11 +636,15 @@ class LiveController extends ChangeNotifier implements TableModel {
   @override
   List<String> get names => [for (var s = 0; s < seatCount; s++) ratingOf == null ? _plainName(s) : nameWithRating(s)];
 
+  /// The words the table speaks in: the page sets them from the app's
+  /// language (l10n/l10n.dart), and they are English until it does.
+  AppLocalizations words = english;
+
   String _plainName(int s) => s == client.mySeat
-      ? 'You'
+      ? words.you
       : switch (_shownHolders[s]) {
           BotSeat(:final persona) => persona.name,
-          _ => seatNames[s] ?? 'Seat ${s + 1}',
+          _ => seatNames[s] ?? words.seatNumber(s + 1),
         };
 
   @override
@@ -649,7 +711,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   @override
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
-    if (!_shown.legalPlaysFor(mySeat).contains(card)) return refusalFor(_shown, mySeat, card);
+    if (!_shown.legalPlaysFor(mySeat).contains(card)) return refusalFor(_shown, mySeat, card, words);
     // Pending before the client hears of it, for the same reason as the
     // pass: the settlement that clears it can come back synchronously.
     _pendingPlay = card;
@@ -675,18 +737,24 @@ class LiveController extends ChangeNotifier implements TableModel {
 
   @override
   String iconSeedOf(int seat) => switch (_shownHolders[seat]) {
-        HumanSeat(:final key) => key,
+        HumanSeat(:final account) => account,
         BotSeat(:final persona) => persona.name,
       };
 
+  /// The player's own seat is labelled You, and wears the initials of
+  /// the name it is seated under.
+  @override
+  String iconNameOf(int seat) => seat == client.mySeat ? (seatNames[seat] ?? names[seat]) : names[seat];
+
   @override
   Avatar avatarOf(int seat) => switch (_shownHolders[seat]) {
-        HumanSeat(:final key) => _asShown(key, seatAvatars[seat] ?? Avatar.none),
+        HumanSeat(:final account) => _asShown(account, seatAvatars[seat] ?? Avatar.none),
         BotSeat(:final persona) => Avatar.forBot(persona.name),
       };
 
   /// The avatar as this device will draw it: the icon and the colour
-  /// they chose, and their picture only if it is allowed here.
+  /// they chose, and their picture only if it is allowed here — kept
+  /// off by the account, whichever of its devices it comes from.
   Avatar _asShown(String key, Avatar avatar) {
     final picture = avatar.picture;
     final pictures = this.pictures;
@@ -704,10 +772,10 @@ class LiveController extends ChangeNotifier implements TableModel {
     final picture = (seatAvatars[seat] ?? Avatar.none).picture;
     if (picture == null) return null;
     return (
-      key: holder.key,
+      key: holder.account,
       name: names[seat],
-      hidden: pictures.isHidden(holder.key),
-      flagged: pictures.wasFlagged(holder.key, picture),
+      hidden: pictures.isHidden(holder.account),
+      flagged: pictures.wasFlagged(holder.account, picture),
     );
   }
   void boot(int seat) {
@@ -744,20 +812,102 @@ class LiveController extends ChangeNotifier implements TableModel {
     // Before there is a deal at all: a hand with bot seats waits for
     // jurors enough to hold them, because a bot seat nobody holds is
     // a hand everyone can see (docs/04-live-play.md).
-    if (d == null && client.shortOfJurors) return 'Waiting for jurors to hold the bots\' hands';
-    if (d == null) return 'Dealing';
+    if (d == null && client.shortOfJurors) return words.waitingForJurors;
+    if (d == null) return words.dealing;
     return switch (d.phase) {
-      DealPhase.keys => 'Dealing — keys',
-      DealPhase.shuffles => 'Shuffling (${(d.nextShuffler ?? 3) + 1} of 4)',
-      DealPhase.tokens => 'Dealing the cards',
-      DealPhase.declare => 'Opening the cards',
-      _ => 'Dealing',
+      DealPhase.keys => words.dealingKeys,
+      DealPhase.shuffles => words.shuffling((d.nextShuffler ?? 3) + 1),
+      DealPhase.tokens => words.dealingTheCards,
+      DealPhase.declare => words.openingTheCards,
+      _ => words.dealing,
     };
   }
 
   /// The record so far, as the verifier sees it.
   Verification verification() => verifyRecord(client.spec, client.record,
       allowPartial: !client.done, juries: client.juries, crypto: _crypto, releases: client.releases);
+
+  // ---- reactions ---------------------------------------------------------
+  // A seated player's 👍, shown for a moment beside their badge here and
+  // on every other screen at the table and watching it (packages/table,
+  // reactions.dart). Nothing of it reaches the client: it is said on a
+  // lane of its own, beside the table's events and never among them, so
+  // no turn, clock or jury can be moved by one.
+
+  /// Where this table's reactions are said and heard; null where there
+  /// are none.
+  final ReactionLane? _lane;
+  final ReactionRules _reactionRules;
+  StreamSubscription<HeardReaction>? _heardReactions;
+
+  /// Whether this device hides the others' reactions (reaction_mute.dart).
+  final ValueListenable<bool> _mute;
+
+  /// What is showing at each seat, and when it goes.
+  final Map<int, ({SeatReaction shown, Timer gone})> _reacting = {};
+  int _reactions = 0;
+
+  /// Whether this player may react: seated in person at a table that
+  /// carries reactions, and the seat not given up — which a device the
+  /// account was taken up from has done (live/live_page.dart), so only
+  /// the device in use says one. Through to the last trick: a good game
+  /// is said as it ends.
+  bool get canReact => _lane != null && client.amSeated && !_left;
+
+  /// Says [reaction] for this player, and shows it beside their badge:
+  /// at most one every [ReactionRules.gap], and nothing in between.
+  void react(Reaction reaction) {
+    final seat = client.mySeat;
+    if (!canReact || seat == null) return;
+    // The moment it is about, as this screen shows it: the hand, and how
+    // many of its cards have been seen played.
+    final content = _reactionRules.say(reaction, hand: _shown.handNumber, turn: _shownPlayed.length);
+    if (content == null) return;
+    _lane!.sayReaction(content);
+    _showReaction(seat, reaction);
+  }
+
+  /// Somebody else's, as it arrives: shown if it is a reaction from a
+  /// seat held in person here now, by the device holding it, about this
+  /// hand or the one either side, lately, and not too soon after their
+  /// last. A bot's seat has no key to say one with.
+  void _heardReaction(HeardReaction heard) {
+    if (_disposed) return;
+    final seated = {
+      for (final (seat, holder) in client.holders.indexed)
+        if (holder is HumanSeat && seat != client.mySeat) holder.key: seat,
+    };
+    final shown = _reactionRules.hear(heard, seated: seated, hand: client.game.handNumber);
+    if (shown != null) _showReaction(shown.seat, shown.reaction);
+  }
+
+  void _showReaction(int seat, Reaction reaction) {
+    _reacting.remove(seat)?.gone.cancel();
+    _reacting[seat] = (
+      shown: (reaction: reaction, n: ++_reactions),
+      gone: Timer(ReactionRules.shownFor, () {
+        _reacting.remove(seat);
+        if (!_disposed) notifyListeners();
+      }),
+    );
+    notifyListeners();
+  }
+
+  void _muteChanged() {
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Muted, nobody else's: this player's own still shows, since it is
+  /// what they did.
+  @override
+  SeatReaction? reactionAt(int seat) {
+    final shown = _reacting[seat]?.shown;
+    if (shown == null || (seat != client.mySeat && _mute.value)) return null;
+    return shown;
+  }
+
+  @override
+  String nameAlone(int seat) => _plainName(seat);
 
   @override
   void dispose() {
@@ -766,6 +916,11 @@ class LiveController extends ChangeNotifier implements TableModel {
     _sheetTimer?.cancel();
     _sub?.cancel();
     _refusals?.cancel();
+    _heardReactions?.cancel();
+    _mute.removeListener(_muteChanged);
+    for (final r in _reacting.values) {
+      r.gone.cancel();
+    }
     pictures?.removeListener(_pictured);
     // Nothing here reacts to the table any more, whichever way this
     // goes; only the socket waits, and only for a leave that is still

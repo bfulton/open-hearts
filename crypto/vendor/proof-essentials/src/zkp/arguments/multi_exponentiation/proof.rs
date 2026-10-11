@@ -5,12 +5,12 @@ use crate::homomorphic_encryption::HomomorphicEncryptionScheme;
 use crate::utils::vector_arithmetic::dot_product;
 use crate::vector_commitment::HomomorphicCommitmentScheme;
 use crate::zkp::arguments::scalar_powers;
-use ark_marlin::rng::FiatShamirRng;
+use crate::zkp::FiatShamirRng;
 use digest::Digest;
 
-use ark_ff::{to_bytes, Field, Zero};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use ark_std::io::{Read, Write};
+use ark_ff::{Field, Zero};
+use crate::to_bytes;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(CanonicalDeserialize, CanonicalSerialize)]
 pub struct Proof<Scalar, Enc, Comm>

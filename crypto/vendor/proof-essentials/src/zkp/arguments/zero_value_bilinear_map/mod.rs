@@ -6,7 +6,7 @@ use crate::error::CryptoError;
 use crate::vector_commitment::HomomorphicCommitmentScheme;
 use crate::zkp::{arguments::scalar_powers, ArgumentOfKnowledge};
 use ark_ff::Field;
-use ark_marlin::rng::FiatShamirRng;
+use crate::zkp::FiatShamirRng;
 use ark_std::{marker::PhantomData, rand::Rng};
 use digest::Digest;
 

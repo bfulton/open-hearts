@@ -7,11 +7,11 @@
 /// checked against arrive in either order — and in the seeded hand
 /// below they arrive twenty milliseconds the wrong way round.
 ///
-/// Refusing them is right. Throwing them away was not: from there the
-/// only way back was for somebody to say them again, and a carry
+/// Refusing them is right; throwing them away is not. From there the
+/// only way back would be for somebody to say them again, and a carry
 /// holds an event back for eight seconds after the last copy of it
-/// went out (`carryRepeatMs`). Fourteen seeded hands in twenty lost
-/// nine seconds of their deal to exactly that.
+/// went out (`carryRepeatMs`). So the step is kept and looked at again
+/// when the jury lands.
 library;
 
 import 'package:deal/deal.dart';
@@ -22,12 +22,12 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
-  // Seed 1 is one of the hands where the order goes the wrong way; it
-  // dealt in 15.4 s while the ones that got it the right way round
-  // dealt in 6.6 s (tool/time_to_deal.dart). Ten seconds is well
-  // clear of both.
+  // Seed 1 is one of the hands where the order goes the wrong way. Kept
+  // rather than dropped, its step deals in about 6.6 s, as the hands
+  // that get the order right do (tool/time_to_deal.dart); dropped and
+  // waited for, it would take 15. Ten seconds is well clear of both.
   test('a deal step refused for arriving before its jury is kept, not thrown away', () {
     final t = SimTable(humans: 2, seed: 1, crypto: crypto, jurors: jurySize + 4);
     t.start();

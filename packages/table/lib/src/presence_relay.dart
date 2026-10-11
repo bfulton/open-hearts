@@ -10,19 +10,18 @@
 /// of them, since who is online has to be seen by devices that can
 /// read only some of the relays (relays.dart).
 ///
-/// One of those relays may be ours and may keep an object per tag
-/// ([tagMark], docs/06-service.md), in which case the tag goes in the
-/// URL and presence puts its own there. The rest of the list is where
-/// presence keeps working when that one does not answer, which is why
-/// the announcements still go to all of them: a device is online for
-/// whoever can hear it, and what another device can hear is not ours
-/// to assume.
+/// A relay that keeps an object per tag ([tagMark], docs/06-service.md)
+/// takes the tag in its URL, and presence puts its own there. The
+/// announcements go to every relay in the list: a device is online for
+/// whoever can hear it, and what another device can hear is not
+/// assumed.
 library;
 
 import 'dart:async';
 import 'dart:convert';
 
 import 'jury.dart';
+import 'licence.dart';
 import 'nostr.dart';
 import 'relays.dart';
 import 'signing.dart';
@@ -85,8 +84,8 @@ class Summons {
 /// and wants the tag in the URL: `wss://our.relay/{tag}`.
 ///
 /// It has to be marked and cannot be guessed at, in either direction.
-/// A public relay serves every tag on one socket at the root and would
-/// answer a path with a 404, so a client must not put a tag on one; a
+/// A relay that serves every tag on one socket at the root answers a
+/// path with a 404, so a client must not put a tag on one; a
 /// relay that shards has to be told which object to open before the
 /// first message crosses, so a client must put the tag on that one.
 /// Nobody else's URL carries the mark, so the list says which is which
@@ -110,9 +109,16 @@ List<Uri> relaysForTag(List<Uri> relays, String tag) => [
 
 class RelayPresence implements Presence {
   RelayPresence(
-      {required List<Uri> relays, required this.signer, this.status = 'online', this.everyMs = 5000, this.canServe, this.log})
+      {required List<Uri> relays,
+      required this.signer,
+      this.status = 'online',
+      this.everyMs = 5000,
+      this.canServe,
+      this.activation,
+      this.log})
       : relays = Relays.turnedBy(relaysForTag(relays, topic), signer.publicKey) {
     _group = RelayGroup(
+      auth: relayAuthFor(signer),
       urls: this.relays,
       subscriptions: {
         'online': [const Filter(kinds: [TableKinds.presence]).toJson()..['#t'] = [topic]],
@@ -148,6 +154,14 @@ class RelayPresence implements Presence {
   /// everyone within one. Null is always.
   final bool Function()? canServe;
   final void Function(String line)? log;
+
+  /// This device's activation, as the service last gave it
+  /// (licence.dart): said with every beat, so that everyone hears whose
+  /// device this is — a table draws no juror from an account it seats —
+  /// and another device of the same account hears that it has been
+  /// superseded. Read at every beat; null says no account, which only
+  /// the bench of jurors of last resort may do on our relay.
+  final Activation? Function()? activation;
 
   static const topic = 'online';
 
@@ -186,6 +200,31 @@ class RelayPresence implements Presence {
   /// Summonses addressed to this key.
   Stream<Summons> get summonses => _summonses.stream;
 
+  /// The account each key belongs to, as its activation says, and that
+  /// activation's epoch.
+  final Map<PublicKey, ({AccountId account, int epoch})> _accounts = {};
+
+  /// The newest epoch heard for each account, and from which key.
+  final Map<AccountId, ({PublicKey key, int epoch})> _newestOf = {};
+
+  final _superseded = StreamController<Activation>.broadcast();
+
+  /// A later activation of this device's own account, heard from
+  /// another device: this one is no longer the account's in use
+  /// (docs/06-service.md). The relay closes a superseded device's
+  /// sockets itself; this is how a device hears it on a relay that does
+  /// not, and sooner where it does.
+  Stream<Activation> get superseded => _superseded.stream;
+
+  @override
+  AccountId accountOf(PublicKey key) {
+    if (key == signer.publicKey) {
+      final mine = activation?.call();
+      if (mine != null) return mine.account;
+    }
+    return _accounts[key]?.account ?? key;
+  }
+
   /// Tables that said they had nobody to draw from.
   Stream<String> get calls => _calls.stream;
 
@@ -207,7 +246,7 @@ class RelayPresence implements Presence {
     final now = _nowMs;
     return {
       for (final e in _seen.entries)
-        if (now - e.value < withinMs && !_went.contains(e.key)) e.key,
+        if (now - e.value < withinMs && !_went.contains(e.key) && !_outdone(e.key)) e.key,
       if (!_silent && _able) signer.publicKey,
     };
   }
@@ -262,6 +301,15 @@ class RelayPresence implements Presence {
     ]), everywhere: true);
   }
 
+  /// Whether [key] is a device whose account has since been taken up by
+  /// another: it is not online, whatever it last said.
+  bool _outdone(PublicKey key) {
+    final a = _accounts[key];
+    if (a == null) return false;
+    final newest = _newestOf[a.account];
+    return newest != null && newest.key != key && newest.epoch > a.epoch;
+  }
+
   void _announce() {
     if (_silent || _closed) return;
     if (!_able) {
@@ -272,14 +320,69 @@ class RelayPresence implements Presence {
       return;
     }
     _announced = true;
-    _group.publish(NostrEvent.sign(signer, kind: TableKinds.presence, content: jsonEncode({'kind': 'here', 'status': status}), tags: [
-      ['t', topic],
-    ]), everywhere: true);
+    final mine = activation?.call();
+    _group.publish(
+        NostrEvent.sign(signer,
+            kind: TableKinds.presence,
+            content: jsonEncode({'kind': 'here', 'status': status, if (mine != null) 'activation': mine.toJson()}),
+            tags: [
+              ['t', topic],
+            ]),
+        everywhere: true);
   }
+
+  /// What [key]'s beat says of its account: taken where it holds
+  /// ([accountFrom]), and the newest epoch of each account kept, so a
+  /// device superseded is out of [online] from the moment its successor
+  /// is heard, and this device hears when it is the one superseded.
+  void _account(PublicKey key, Object? said) {
+    final act = Activation.parse(said);
+    final account = accountFrom(act, key);
+    if (act == null || account == null) return;
+    _accounts[key] = (account: account, epoch: act.epoch);
+    final newest = _newestOf[account];
+    if (newest == null || act.epoch > newest.epoch || (act.epoch == newest.epoch && newest.key == key)) {
+      _newestOf[account] = (key: key, epoch: act.epoch);
+    }
+    final mine = activation?.call();
+    if (mine != null && key != signer.publicKey && act.supersedes(mine) && !_superseded.isClosed) _superseded.add(act);
+  }
+
+  /// The newest presence each key has said, by its own clock, in
+  /// seconds: anything older from that key is a replay.
+  final Map<PublicKey, int> _newest = {};
+
+  /// How old a presence event may be and still be news, in seconds: a
+  /// few beats. Every presence event is public and any relay will take
+  /// one again once it has forgotten its id, so an old `here` said again
+  /// would make a device that left look online — long enough to be
+  /// seated and booted — and an old `gone` would take a present one out
+  /// (docs/security-review.md).
+  int get _freshS => (everyMs * 4 ~/ 1000).clamp(20, 120);
+
+  /// How far ahead of this device's clock an event may be dated: clocks
+  /// drift, and no further than that.
+  static const _aheadS = 60;
+
+  /// Whether [e] is news: no older than a few beats, not from the
+  /// future, and no older than what its key has already said.
+  bool _fresh(NostrEvent e) {
+    final nowS = _nowMs ~/ 1000;
+    if (e.createdAt < nowS - _freshS || e.createdAt > nowS + _aheadS) return false;
+    final newest = _newest[e.pubkey];
+    if (newest != null && e.createdAt < newest) return false;
+    _newest[e.pubkey] = e.createdAt;
+    return true;
+  }
+
+  /// An event as it came off a relay: what the relays hand [_onEvent],
+  /// for a test to hand it directly.
+  bool receive(Map<String, Object?> raw) => _onEvent(raw);
 
   bool _onEvent(Map<String, Object?> raw) {
     final e = NostrEvent.parse(raw);
     if (e == null || e.kind != TableKinds.presence || e.tag('t') != topic) return false;
+    if (!_fresh(e)) return true;
     Map<String, Object?> c;
     try {
       c = Map<String, Object?>.from(jsonDecode(e.content) as Map);
@@ -288,6 +391,7 @@ class RelayPresence implements Presence {
     }
     switch (c['kind']) {
       case 'here':
+        _account(e.pubkey, c['activation']);
         final now = _nowMs;
         if (now - (_seen[e.pubkey] ?? -_gapMs * 2) > _gapMs) _since[e.pubkey] = now;
         _seen[e.pubkey] = now;
@@ -312,5 +416,6 @@ class RelayPresence implements Presence {
     _group.close();
     _summonses.close();
     _calls.close();
+    _superseded.close();
   }
 }

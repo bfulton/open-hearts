@@ -5,7 +5,8 @@
 /// can take that step: the holder drew the key, and where the keys
 /// never went out there is not even an escrow holding pieces of it.
 /// The hand is given up unscored and the next dealt in its place
-/// (docs/04-live-play.md, "When quorum is lost anyway").
+/// (docs/04-live-play.md).
+@Tags(['slow'])
 library;
 
 import 'package:deal/deal.dart';
@@ -16,7 +17,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   // Both sides of it: the holder goes before its keys are out, so
   // there is no escrow at all; and after them, so there is one and it
@@ -57,7 +58,7 @@ void main() {
     // steps owed and no audit, and the next hand follows; the verifier
     // took that for a deal left unfinished and turned the game down,
     // where the design has it take an abandoned hand as over
-    // (docs/04-live-play.md, "When quorum is lost anyway").
+    // (docs/04-live-play.md).
     test('a game with a hand given up undealt checks out${afterKeys ? ', keys out' : ', before its keys'}', () {
       // Played to a point, so the hand after the one given up ends it.
       final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 4, target: 1);

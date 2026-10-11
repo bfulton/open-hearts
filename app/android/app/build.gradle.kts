@@ -1,4 +1,5 @@
 import java.io.FileInputStream
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -18,7 +19,7 @@ val releaseKeys: Properties? = rootProject.file("key.properties").takeIf { it.ex
 }
 
 android {
-    namespace = "com.openhearts.open_hearts"
+    namespace = "game.openhearts"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -28,10 +29,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.openhearts.open_hearts"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // The Play Store's package name; the service knows it as OH_PLAY_PACKAGE.
+        applicationId = "game.openhearts"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
@@ -65,6 +64,23 @@ android {
 // needs no key and is untouched.
 gradle.taskGraph.whenReady {
     val releasing = allTasks.any { it.project == project && (it.name == "packageRelease" || it.name == "bundleRelease") }
+    // Every live table is sealed, so a release without the deal's native
+    // library is a phone that plays alone and cannot say why.
+    // crypto/build_android.sh puts it, and Schnorr's beside it, here.
+    val missing = listOf("arm64-v8a", "armeabi-v7a", "x86_64").filter { !file("src/main/jniLibs/$it/libdeal.so").exists() }
+    if (releasing && missing.isNotEmpty()) {
+        throw GradleException("No libdeal.so for ${missing.joinToString()}: run crypto/build_android.sh first.")
+    }
+    // The service's public key, which the app takes a licence from
+    // (config/openhearts.json, passed by build_phone.sh): without it live
+    // play is shut, which Play's review would find first. Flutter hands
+    // the build its --dart-define values base64'd, comma between.
+    val defines = (project.findProperty("dart-defines") as String?).orEmpty().split(",").filter { it.isNotEmpty() }
+        .map { String(Base64.getDecoder().decode(it)) }
+    val serviceKey = defines.firstOrNull { it.startsWith("OH_SERVICE_KEY=") }?.removePrefix("OH_SERVICE_KEY=").orEmpty()
+    if (releasing && !Regex("^[0-9a-f]{64}$").matches(serviceKey)) {
+        throw GradleException("A release needs the service key: build with ./build_phone.sh android, which passes config/openhearts.json's serviceKey.")
+    }
     if (releaseKeys == null && releasing) {
         throw GradleException(
             "No android/key.properties: a release is signed with the release key or not built. " +

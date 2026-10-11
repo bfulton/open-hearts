@@ -8,8 +8,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:open_hearts/avatar.dart';
+import 'package:open_hearts/l10n/l10n.dart';
 import 'package:open_hearts/profile_page.dart';
 import 'package:open_hearts/ui/player_icon.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Scrolls to something and presses it. A tap at a point off the
 /// screen lands on whatever is at that point, which is nothing, and
@@ -41,8 +43,11 @@ void main() {
     expect(Avatar.forBot('Westley'), Avatar.forBot('Westley'));
     expect(Avatar.forBot('Westley').icon, isNotNull);
     expect(Avatar.forBot('Westley'), isNot(Avatar.forBot('Buttercup')));
-    for (final key in AvatarIcons.all.keys) {
-      expect(AvatarIcons.names[key], isNotNull, reason: '$key has a name');
+    // Named in every language the app speaks: an icon the message has
+    // no case for falls through to its last, and is called a snowflake.
+    for (final words in [for (final l in AppLocalizations.supportedLocales) lookupAppLocalizations(l)]) {
+      final names = {for (final key in AvatarIcons.all.keys) key: words.avatarIcon(key)};
+      expect(names.values.toSet(), hasLength(names.length), reason: '${words.localeName}: every icon has a name of its own');
     }
     expect(AvatarIcons.all.length, greaterThanOrEqualTo(20));
   });
@@ -62,6 +67,22 @@ void main() {
     expect(centre.r, greaterThan(200), reason: 'the middle of the picture, red');
     expect(centre.b, lessThan(60));
     expect(shrinkPicture(Uint8List.fromList([1, 2, 3])), isNull, reason: 'not a picture');
+  });
+
+  test('a picture keeps none of what the camera wrote in it: not where it was taken', () {
+    // A phone's photograph carries its EXIF through the picker, and the
+    // picture goes to the relays for anyone to read.
+    final photo = img.Image(width: 200, height: 200);
+    img.fill(photo, color: img.ColorRgb8(200, 10, 10));
+    photo.exif.gpsIfd.setGpsLocation(latitude: 48.8584, longitude: 2.2945);
+    photo.exif.imageIfd.make = 'Phone';
+    final taken = Uint8List.fromList(img.encodeJpg(photo));
+    expect(img.decodeJpg(taken)!.exif.gpsIfd.gpsLatitude, isNotNull, reason: 'the photograph says where it was taken');
+    for (final small in [shrinkPicture(taken), shrinkPicture(taken, from: const Rect.fromLTWH(20, 20, 120, 120))]) {
+      final back = img.decodeJpg(small!)!;
+      expect(back.exif.gpsIfd.gpsLatitude, isNull, reason: 'the picture does not');
+      expect(back.exif.isEmpty, isTrue, reason: 'nor anything else the camera wrote');
+    }
   });
 
   testWidgets('what shows: the picture over the icon, the icon over the initials', (tester) async {
@@ -85,6 +106,8 @@ void main() {
   });
 
   testWidgets('the profile: a name, an icon, a colour, Done — and My initials clears it', (tester) async {
+    // The page keeps what it is left with on the device itself.
+    SharedPreferences.setMockInitialValues({});
     // A phone, because the page is longer than a phone and what is
     // below the fold has to be scrolled to, here as there.
     tester.view
@@ -97,7 +120,9 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Builder(
         builder: (context) => TextButton(
-          onPressed: () async => picked = await showProfile(context, current: current, seed: 'k1'),
+          onPressed: () async => picked = await Navigator.of(context).push<Profile>(
+            MaterialPageRoute(builder: (_) => ProfilePage(current: current, seed: 'k1', stats: const Stream.empty())),
+          ),
           child: const Text('open'),
         ),
       ),

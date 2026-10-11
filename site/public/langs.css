@@ -1,0 +1,32 @@
+/* The language pills, and the footer's menu of them: one look for both. */
+.langs { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.langs a, .lang-pick summary {
+  display: block; border: 1px solid var(--edge); border-radius: 999px;
+  padding: 3px 12px; font-size: 14.5px; line-height: 1.6; color: var(--chrome); text-decoration: none;
+}
+.langs a:hover { border-color: var(--chrome-dim); }
+.langs a[aria-current], .lang-pick summary {
+  background: var(--gold); border-color: var(--gold); color: var(--felt-dark); font-weight: 650;
+}
+
+/* The footer's: the page's language as a pill, opening onto the others. */
+.lang-pick { position: relative; display: flex; justify-content: center; }
+.lang-pick summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+.lang-pick summary::-webkit-details-marker { display: none; }
+.lang-pick summary::after {
+  content: ""; width: 6px; height: 6px; margin-top: -3px;
+  border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.lang-pick[open] summary::after { margin-top: 3px; transform: rotate(-135deg); }
+/* At the footer's own size. */
+.lang-pick summary, .lang-pick .langs a { font-size: inherit; line-height: 1.5; padding: 1px 10px; }
+.lang-pick summary::after { width: 5px; height: 5px; }
+.lang-pick summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.lang-pick .langs {
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  margin: 0; padding: 8px; flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+  background: var(--felt-dark); border: 1px solid var(--edge); border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.42); text-align: center; z-index: 1;
+}
+
+@media print { .langs, .lang-pick { display: none; } }

@@ -45,9 +45,8 @@ class NostrEvent {
     );
   }
 
-  /// Parses and checks. Null for anything malformed, misidentified or
-  /// not signed by its claimed author.
-  /// Parses and checks an event: its id is the hash of its content,
+  /// Parses and checks an event, or null for anything malformed or
+  /// misidentified or not signed by its author: its id is the hash of its content,
   /// and its signature holds — unless [verifySignature] is off, for an
   /// envelope whose contents are signed and checked on their own,
   /// since a signature is what an event costs to take.
@@ -177,9 +176,10 @@ class Filter {
   }
 }
 
-/// The kinds the table uses. Ephemeral, all of them: a relay forwards
-/// them to whoever is listening and keeps nothing, and the table's own
-/// repeat-and-catch-up is what recovers a dropped message.
+/// The kinds the table uses. Ephemeral, all of them but the lobby: a
+/// relay forwards them to whoever is listening and keeps nothing, and
+/// the table's own repeat-and-catch-up is what recovers a dropped
+/// message.
 abstract final class TableKinds {
   /// A table event (events.dart) as the content, tagged `t` with the
   /// table id. Signed by the sender, who may be relaying.
@@ -204,4 +204,20 @@ abstract final class TableKinds {
   /// every few seconds while they wait. Ephemeral: whoever is listening
   /// at the time is the whole audience.
   static const waiting = 24245;
+
+  /// Watching a table from outside it (watch.dart), tagged `t` with the
+  /// table id: a watcher saying it is there, or a seated player's view
+  /// of the table for whoever is.
+  static const watch = 24247;
+
+  /// A seated player's quick reaction (reactions.dart), tagged `t` with
+  /// the table id and signed by the seat's own device: one of a fixed
+  /// few codes, shown for a moment beside their badge on every screen at
+  /// the table and every screen watching it, and outside the record.
+  static const react = 24248;
+
+  /// A device answering a relay that asks who it is (NIP-42's kind):
+  /// the relay's challenge, and what the service gave the device to
+  /// show — its activation — signed by its key (relays.dart).
+  static const auth = 22242;
 }

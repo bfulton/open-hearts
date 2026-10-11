@@ -9,8 +9,9 @@ use crate::zkp::arguments::scalar_powers;
 use crate::zkp::arguments::{matrix_elements_product as product_argument, multi_exponentiation};
 use crate::zkp::ArgumentOfKnowledge;
 
-use ark_ff::{to_bytes, Field, Zero};
-use ark_marlin::rng::FiatShamirRng;
+use ark_ff::{Field, Zero};
+use crate::to_bytes;
+use crate::zkp::FiatShamirRng;
 use digest::Digest;
 use rand::Rng;
 

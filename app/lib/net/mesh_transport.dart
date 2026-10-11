@@ -17,22 +17,22 @@
 /// through the relay envelope as JSON while anyone to be reached is
 /// without a channel, because a relay does have to read what it
 /// carries. The table's own dedup by event id absorbs what arrives
-/// twice, and an event's id is the same whichever way it came. That
-/// condition used to be permanently true, because a juror was never
-/// dialled, so every event went to a relay for the whole hand and the
-/// relay was the table's primary path in all but name — the thing
-/// docs/02-multiplayer.md says not to depend on. With every channel up
-/// the lane says nothing at all, which is the point: a table at full
-/// strength costs the relays its presence and its signalling.
+/// twice, and an event's id is the same whichever way it came. The
+/// relay is a fallback, not a primary path (docs/02-multiplayer.md):
+/// with every channel up the lane says nothing at all, and a table at
+/// full strength costs the relays its presence and its signalling.
 ///
 /// What arrives on a channel is from the peer at its far end; what
 /// arrives from the relay is from the envelope's signer. A channel
 /// closing or failing is reported as a disconnect, which the protocol
 /// treats as most of the silence allowance already spent.
 ///
-/// Who offers: of any two peers, the one with the lower key. ICE runs
-/// without servers here — peers on one network, or a dev machine — and
-/// a TURN server is a configuration away (docs/06-service.md).
+/// Who offers: of any two peers, the one with the lower key.
+///
+/// A channel goes through a TURN server and nowhere else, so no peer —
+/// a stranger drawn as a juror among them — ever learns another's
+/// address. Without a TURN server to hand, no channel is made at all and
+/// the relay carries the table.
 library;
 
 import 'dart:async';
@@ -40,6 +40,7 @@ import 'dart:convert';
 
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:table/table.dart';
+import 'remote_config.dart' show waits;
 
 class MeshTransport implements Transport {
   MeshTransport({
@@ -58,7 +59,7 @@ class MeshTransport implements Transport {
   /// Of any two peers, the one with the lower key offers; the other
   /// waits to be offered to.
   void _dial(PublicKey peer) {
-    if (peer == relay.signer.publicKey || _links.containsKey(peer)) return;
+    if (!_channels || peer == relay.signer.publicKey || _links.containsKey(peer)) return;
     if (peer.compareTo(relay.signer.publicKey) > 0) _offerTo(peer);
   }
 
@@ -77,14 +78,30 @@ class MeshTransport implements Transport {
   final RelayTransport relay;
 
   /// Everyone this device dials: the seats at the start, and the
-  /// hand's jurors as [reach] names them. A juror used to be the one
-  /// party with no channel, which is why every message went to the
-  /// relay as well as to the channels; it has one now, and the relay
-  /// is back to what doc 02 gave it — signalling, and the lane for a
-  /// peer whose channel is not up.
+  /// hand's jurors as [reach] names them. The relay is signalling, and
+  /// the lane for a peer whose channel is not up.
   final Set<PublicKey> peers;
   final List<Map<String, Object?>> iceServers;
   final void Function(String line)? log;
+
+  bool get _channels => makesChannels(iceServers);
+
+  /// Whether a device makes channels at all: only with a TURN server.
+  static bool makesChannels(List<Map<String, Object?>> iceServers) => iceServers.any(isTurn);
+
+  /// Whether [server] is a TURN server (not STUN).
+  static bool isTurn(Map<String, Object?> server) {
+    final urls = server['urls'];
+    final list = urls is List ? urls : [urls];
+    return list.any((u) => u is String && (u.startsWith('turn:') || u.startsWith('turns:')));
+  }
+
+  /// What a peer connection is made with: through TURN alone, so the
+  /// browser gathers no address of its own to send.
+  static Map<String, Object?> rtcConfiguration(List<Map<String, Object?>> iceServers) => {
+        'iceServers': iceServers,
+        'iceTransportPolicy': 'relay',
+      };
 
   final Map<PublicKey, _Link> _links = {};
   final _incoming = StreamController<({PublicKey from, Map<String, Object?> message})>.broadcast();
@@ -114,10 +131,9 @@ class MeshTransport implements Transport {
         : RTCDataChannelMessage.fromBinary(frame);
     // A channel can be closing under the send: the browser has it
     // closing, and the state change that says so is still on its way
-    // here. The browser's send throws then, and the throw left this
-    // loop — the peers after it and the relay lane below never had
-    // the message — and went on up into whatever was being handled
-    // when the send was made, which stopped half done. So a channel
+    // here. The browser's send throws then; uncaught, the throw would
+    // skip the peers after it and the relay lane below, and stop
+    // whatever made the send half done. So a channel
     // that refuses is passed over, and the relay carries the message
     // to that peer as it would with no channel up. Whether the
     // channel is up stays the state change's to say: a send can also
@@ -137,9 +153,9 @@ class MeshTransport implements Transport {
         log?.call('${p.substring(0, 6)} channel refused a send ($e); the relay carries it');
       }
     }
-    // And the relay lane for whoever has no channel up — doc 02's
-    // fallback, not a second primary path. With every peer connected
-    // this says nothing at all, which is the point: a table at full
+    // And the relay lane for whoever has no channel up: a fallback
+    // (docs/02-multiplayer.md), not a second primary path. With every
+    // peer connected this says nothing at all, and a table at full
     // strength costs the relays a heartbeat and its signalling.
     if (refused.isNotEmpty || peers.any((p) => p != relay.signer.publicKey && !(_links[p]?.open ?? false))) {
       relay.broadcast(message, everywhere: everywhere);
@@ -153,7 +169,7 @@ class MeshTransport implements Transport {
   void heard(PublicKey peer, List<String> paths) => relay.heard(peer, paths);
 
   Future<RTCPeerConnection> _connection(PublicKey peer) async {
-    final pc = await createPeerConnection({'iceServers': iceServers});
+    final pc = await createPeerConnection(rtcConfiguration(iceServers));
     pc.onIceCandidate = (c) {
       if (c.candidate == null) return;
       relay.signal(peer, Signal(from: '', type: 'ice', payload: {
@@ -182,9 +198,10 @@ class MeshTransport implements Transport {
     // connection open, and its candidates are sealed and published one
     // by one. Some peers never answer — a juror of last resort runs in
     // the service's VM with no WebRTC in it at all — so a dial that has
-    // not come up in [_answerMs] is let go of, and the relay lane
-    // carries that peer, which is what the lane is for.
-    link.giveUp = Timer(const Duration(milliseconds: _answerMs), () => _unanswered(peer));
+    // not come up in time (remote config, waits.meshAnswer) is let go
+    // of, and the relay lane carries that peer, which is what the lane
+    // is for.
+    link.giveUp = Timer(waits.meshAnswer, () => _unanswered(peer));
     final pc = await _connection(peer);
     if (_closed || _links[peer] != link) {
       await pc.close();
@@ -197,9 +214,6 @@ class MeshTransport implements Transport {
     await pc.setLocalDescription(offer);
     relay.signal(peer, Signal(from: '', type: 'offer', payload: {'sdp': offer.sdp}));
   }
-
-  /// How long to wait for an answer before letting a dial go.
-  static const _answerMs = 20000;
 
   /// A dial that never came up. The connection goes, the peer stays
   /// in [peers] so the relay lane keeps carrying it, and the next
@@ -218,9 +232,7 @@ class MeshTransport implements Transport {
     link.channel = null;
     // Dialling again is the lower key's, as dialling is ([_dial]); a
     // side that only answered lets the connection go and waits to be
-    // offered to. It counts no tries, and worked its wait out from
-    // none: a shift by minus one, which throws, inside the browser's
-    // connection callback.
+    // offered to.
     if (peer.compareTo(relay.signer.publicKey) < 0) return;
     final steps = (link.tries - 1).clamp(0, 4);
     Future<void>.delayed(Duration(minutes: 1 << steps), () {
@@ -235,6 +247,9 @@ class MeshTransport implements Transport {
     try {
       switch (s.type) {
         case 'offer':
+          // Not answered where this device makes no channels: the
+          // offerer gives up on it and the relay carries the two.
+          if (!_channels) return;
           // The lower key offers; an offer from a higher key is a peer
           // that came back and started over, and is answered the same.
           final link = _links[s.from] = _Link();

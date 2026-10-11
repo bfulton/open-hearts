@@ -22,19 +22,35 @@ import 'dart:typed_data';
 
 import 'nip44.dart';
 import 'nostr.dart';
+import 'presence_relay.dart' show relaysForTag;
+import 'reactions.dart';
 import 'relays.dart';
 import 'signing.dart';
 import 'transport.dart';
 
-class RelayTransport implements Transport {
+class RelayTransport implements Transport, ReactionLane {
   RelayTransport(
-      {required List<Uri> relays, required this.signer, required this.table, this.log, int pinned = 0, int refusalMs = RelayGroup.defaultRefusalMs})
-      : relays = Relays.turnedBy(relays, table, pinned: pinned) {
+      {required List<Uri> relays,
+      required this.signer,
+      required this.table,
+      this.log,
+      int pinned = 0,
+      int refusalMs = RelayGroup.defaultRefusalMs,
+      bool watchOnly = false})
+      : relays = Relays.turnedBy(relaysForTag(relays, table), table, pinned: pinned) {
+    // The watch lane, and the players' reactions beside it: both are for
+    // anyone looking at the table, watching it or seated at it.
+    final watch = const Filter(kinds: [TableKinds.watch, TableKinds.react]).toJson()..['#t'] = [table];
     _group = RelayGroup(
       urls: this.relays,
       refusalMs: refusalMs,
-      subscriptions: {
+      auth: relayAuthFor(signer),
+      // Someone watching (watch.dart) reads the watch lane, with the
+      // players' reactions on it, and nothing else: not the table's own
+      // traffic, which is not theirs to carry.
+      subscriptions: watchOnly ? {'watch': [watch]} : {
         'table': [
+          watch,
           const Filter(kinds: [TableKinds.table]).toJson()..['#t'] = [table],
           Filter(kinds: const [TableKinds.signal], tags: {
             'p': [signer.publicKey]
@@ -64,8 +80,7 @@ class RelayTransport implements Transport {
   /// Every seating is stored, because a room code's joiner has to be
   /// handed the room announced before it arrived — that history is the
   /// point of a room. A pool's is not: its seatings pile up round after
-  /// round, and a device pressing Play was handed every one the pool
-  /// had ever carried, each useless the moment its round was over.
+  /// round, each useless the moment its round is over.
   static int? _lobbySince(String tag) =>
       tag.startsWith(poolPrefix) ? DateTime.now().millisecondsSinceEpoch ~/ 1000 - poolHistorySeconds : null;
 
@@ -80,6 +95,8 @@ class RelayTransport implements Transport {
   final _disconnected = StreamController<PublicKey>.broadcast();
   final _signals = StreamController<Signal>.broadcast();
   final _lobby = StreamController<NostrEvent>.broadcast();
+  final _watch = StreamController<({PublicKey from, Map<String, Object?> content})>.broadcast();
+  final _reactions = StreamController<HeardReaction>.broadcast();
 
   /// Resolves once some relay has acknowledged the subscription.
   Future<void> get ready => _group.ready;
@@ -110,6 +127,35 @@ class RelayTransport implements Transport {
   /// after that reads [lobbySoFar] first; what the other relays hold
   /// follows as it arrives.
   Stream<NostrEvent> get lobby => _lobby.stream;
+
+  /// The watch lane (watch.dart): a watcher saying it is there, a
+  /// player's view of the table — stamped with who signed it.
+  Stream<({PublicKey from, Map<String, Object?> content})> get watch => _watch.stream;
+
+  /// Says [content] on the watch lane, on every relay: a watcher reads
+  /// whichever it reaches.
+  void sayWatch(Map<String, Object?> content) {
+    _group.publish(NostrEvent.sign(signer, kind: TableKinds.watch, content: jsonEncode(content), tags: [
+      ['t', table],
+    ]), everywhere: true);
+  }
+
+  /// Says a reaction (reactions.dart) on every relay, as the watch lane
+  /// is said: a watcher reads whichever it reaches. A relay that turns
+  /// it away is not taken to be refusing the table's own events
+  /// ([RelayGroup.publish], `aside`) — a reaction is nothing the table
+  /// waits on.
+  @override
+  void sayReaction(String content) {
+    _group.publish(NostrEvent.sign(signer, kind: TableKinds.react, content: content, tags: [
+      ['t', table],
+    ]), everywhere: true, aside: true);
+  }
+
+  /// Everyone else's reactions, as they arrive, not yet believed: the
+  /// screen holds each to [ReactionRules].
+  @override
+  Stream<HeardReaction> get reactions => _reactions.stream;
 
   /// Every lobby event received so far, in order.
   final List<NostrEvent> lobbySoFar = [];
@@ -170,8 +216,8 @@ class RelayTransport implements Transport {
   Set<Uri>? _readBy() => readByFrom(_peerReads, DateTime.now().millisecondsSinceEpoch, 120000);
 
   /// Sends one signalling message to [to], sealed to its key: an
-  /// offer or a candidate carries an address, and a public relay
-  /// carries the event — every relay, since a peer that cannot read
+  /// offer or a candidate carries an address, and a relay carries the
+  /// event — every relay, since a peer that cannot read
   /// one of them still has to be reached, and there are a dozen of
   /// these a table.
   void signal(PublicKey to, Signal s) {
@@ -198,11 +244,14 @@ class RelayTransport implements Transport {
   /// event's envelope signature is not checked here: the relay checked
   /// it before carrying the event, what the envelope carries is signed
   /// by the same key and checked by the client, and every signature
-  /// checked is milliseconds a peer flooded with repeats has not got —
-  /// a juror behind a whole hand drowned in them. Every other kind is
-  /// checked. False for what fails, so the id is not remembered and
+  /// checked is milliseconds a peer flooded with repeats has not got.
+  /// Every other kind is checked. False for what fails, so the id is
+  /// not remembered and
   /// the real event under it still gets in.
   bool _onEvent(Map<String, Object?> raw) {
+    // A reaction nobody here shows — a juror's client, say — is not
+    // worth its signature.
+    if (raw['kind'] == TableKinds.react && !_reactions.hasListener) return true;
     final e = NostrEvent.parse(raw, verifySignature: raw['kind'] != TableKinds.table);
     if (e == null || e.tag('t') != table) return false;
     if (e.kind == TableKinds.lobby || e.kind == TableKinds.waiting) {
@@ -211,7 +260,13 @@ class RelayTransport implements Transport {
       return true;
     }
     if (e.pubkey == signer.publicKey) return true;
-    if (e.kind == TableKinds.table) {
+    if (e.kind == TableKinds.watch) {
+      try {
+        _watch.add((from: e.pubkey, content: Map<String, Object?>.from(jsonDecode(e.content) as Map)));
+      } catch (_) {}
+    } else if (e.kind == TableKinds.react) {
+      _reactions.add((from: e.pubkey, id: e.id, createdAt: e.createdAt, content: e.content));
+    } else if (e.kind == TableKinds.table) {
       try {
         final message = Map<String, Object?>.from(jsonDecode(e.content) as Map);
         _incoming.add((from: e.pubkey, message: message));
@@ -242,13 +297,15 @@ class RelayTransport implements Transport {
     _disconnected.close();
     _signals.close();
     _lobby.close();
+    _watch.close();
+    _reactions.close();
   }
 }
 
 /// One WebRTC signalling message: an offer or answer carrying SDP, or
 /// an ICE candidate. On the wire it is sealed to the recipient's key
-/// (NIP-44, nip44.dart): a candidate carries an address, and a public
-/// relay carries the event.
+/// (NIP-44, nip44.dart): a candidate carries an address, and a relay
+/// carries the event.
 class Signal {
   const Signal({required this.from, required this.type, required this.payload});
 

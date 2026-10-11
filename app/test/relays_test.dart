@@ -1,65 +1,67 @@
 /// Where a build looks for its relays: decided by the build and where
-/// it is served from, never typed in.
+/// it is served from, never typed in — and ours alone
+/// (docs/08-own-relays.md).
 library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/net/duty.dart';
 import 'package:open_hearts/net/relays.dart';
+import 'package:open_hearts/net/remote_config.dart';
 import 'package:table/table.dart';
 
 void main() {
-  test('a deployed build starts on our own relay first, then the public ones', () {
-    final relays = appRelays(base: Uri.parse('https://open-hearts.pages.dev/play/'));
-    expect(relays.map((r) => r.toString()), publicRelays);
-    expect(relays.first.toString(), homeRelay, reason: 'our own relay leads the list');
-    expect(relays.length, greaterThanOrEqualTo(3), reason: 'one relay turning is not the end of a table');
+  test('a deployed build talks to our relay and nobody else', () {
+    final relays = appRelays(base: Uri.parse('https://play.openhearts.game/'), web: true);
+    expect(relays, [Uri.parse(ourRelay)]);
     for (final r in relays) {
       expect(r.scheme, 'wss');
-      expect(r.host, isNotEmpty);
+      expect(RemoteConfig.ours(r), isTrue);
+      expect(r.pathSegments, contains(tagMark), reason: 'one object per tag: the tag goes in the address');
     }
   });
 
-  test('the home relay is pinned primary in a deployed list, and nowhere else', () {
-    expect(pinnedRelays(appRelays(base: Uri.parse('https://open-hearts.pages.dev/play/'))), 1);
-    expect(pinnedRelays(appRelays(base: Uri.parse('http://localhost:8080/'))), 0);
+  test('a phone build is a deployed build, not a local one', () {
+    // A phone's app has no address it was served from.
+    expect(appRelays(base: Uri.parse('file:///'), web: false), [Uri.parse(ourRelay)]);
+    expect(appRelays(base: Uri(), web: false), [Uri.parse(ourRelay)]);
+  });
+
+  test('ours are pinned first, a local relay is not', () {
+    expect(pinnedRelays(appRelays(base: Uri.parse('https://play.openhearts.game/'), web: true)), 1);
+    expect(pinnedRelays(appRelays(base: Uri.parse('http://localhost:8080/'), web: true)), 0);
+    // The browser rig's stand-in for play.openhearts.game is this machine.
+    expect(appRelays(base: Uri.parse('http://play.openhearts.localhost:8080/'), web: true), [Uri.parse(localRelay)]);
     expect(pinnedRelays(const []), 0);
   });
 
-  test('presence puts our per-tag object in front of a deployed list, and nothing in front of a local one', () {
-    final deployed = appRelays(base: Uri.parse('https://open-hearts.pages.dev/play/'));
-    final presence = presenceRelays(deployed);
-    // Uri writes the mark's braces out as escapes; it is the path
-    // segment that carries it, which is how it is read back.
-    expect(presence.first, Uri.parse(homeTagRelay));
-    expect(presence.sublist(1), deployed, reason: 'the relays are still there, and still the fallback');
-    // The mark is what tells a client to put the tag in the path, and
-    // it is ours alone: a public relay serves every tag at its root.
-    expect(presence.first.pathSegments, contains(tagMark));
-    expect(presence.sublist(1).any((r) => r.pathSegments.contains(tagMark)), isFalse);
-    // A local build and the rig have no object of ours to reach.
-    final local = appRelays(base: Uri.parse('http://localhost:8080/'));
-    expect(presenceRelays(local), local);
-    // And what a table is written to never carries it: a table has
-    // nowhere to put a tag, and has not moved to the object.
-    expect(deployed.any((r) => r.pathSegments.contains(tagMark)), isFalse);
-  });
-
-  test('the duty at the door listens on the object, and the juror on the relays', () {
-    // The wiring, not the list. Presence takes the marked relay and
-    // writes its own topic into the path before it opens anything, so
-    // what it holds is the object's address for the tag it is on.
-    final deployed = appRelays(base: Uri.parse('https://open-hearts.pages.dev/play/'));
+  test('a table, a pool, the results and presence each reach the object for their own tag', () {
+    final deployed = appRelays(base: Uri.parse('https://play.openhearts.game/'), web: true);
+    for (final tag in ['mf66d4537', 'queue:anyone', 'results', 'KP4T9MXR']) {
+      final t = RelayTransport(relays: deployed, signer: FakeSigner('t'), table: tag, pinned: pinnedRelays(deployed));
+      addTearDown(t.close);
+      expect(t.relays.single.host, 'relay.openhearts.game');
+      expect(t.relays.single.pathSegments.single, tag, reason: 'the tag written in, not the mark');
+    }
     final duty = Duty.on(deployed, FakeSigner('door'));
     addTearDown(duty.close);
-    final object = duty.presence.relays.where((r) => r.host == Uri.parse(homeTagRelay).host).toList();
-    expect(object, hasLength(1), reason: 'presence is on our object');
-    expect(object.single.pathSegments.single, isNot(tagMark), reason: 'with the tag written in, not the mark');
-    expect(duty.presence.relays.length, deployed.length + 1, reason: 'and the relays behind it, every one');
-    expect(duty.relays, deployed, reason: 'the duty itself, and its juror, are on the relays alone');
+    expect(duty.presence.relays.single.pathSegments.single, 'online');
   });
 
   test('served from localhost, the local relay', () {
-    expect(appRelays(base: Uri.parse('http://localhost:8080/')).map((r) => r.toString()), [localRelay]);
-    expect(appRelays(base: Uri.parse('http://127.0.0.1:41234/?e2e=1')).map((r) => r.toString()), [localRelay]);
+    expect(appRelays(base: Uri.parse('http://localhost:8080/'), web: true).map((r) => r.toString()), [localRelay]);
+    expect(appRelays(base: Uri.parse('http://127.0.0.1:41234/?e2e=1'), web: true).map((r) => r.toString()), [localRelay]);
+  });
+
+  test('served from localhost, the local relay at the port the address names', () {
+    // Each browser suite's relay is on a port of its own (e2e/drive.mjs).
+    expect(appRelays(base: Uri.parse('http://play.openhearts.localhost:41234/room/AB12?e2e=1&relay=40123'), web: true),
+        [Uri.parse('ws://127.0.0.1:40123')]);
+    // A port and nothing else: anything more is no port, and the usual one.
+    for (final nonsense in ['0', '70000', 'evil.example', 'ws://evil.example:1', '']) {
+      expect(appRelays(base: Uri.parse('http://localhost:8080/?relay=${Uri.encodeComponent(nonsense)}'), web: true),
+          [Uri.parse(localRelay)], reason: nonsense);
+    }
+    // And never read where the build is deployed.
+    expect(appRelays(base: Uri.parse('https://play.openhearts.game/?e2e=1&relay=40123'), web: true), [Uri.parse(ourRelay)]);
   });
 }

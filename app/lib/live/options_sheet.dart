@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../game_options.dart';
+import '../l10n/l10n.dart';
 import '../theme.dart';
 
 /// Opens the options over [context]; resolves to what was chosen, or
@@ -34,6 +35,7 @@ class _OptionsSheetState extends State<_OptionsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
@@ -43,18 +45,18 @@ class _OptionsSheetState extends State<_OptionsSheet> {
           children: [
             Row(
               children: [
-                const Expanded(
-                  child: Text('Game options', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Palette.chrome)),
+                Expanded(
+                  child: Text(l10n.gameOptions, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Palette.chrome)),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(_options),
                   style: TextButton.styleFrom(foregroundColor: Palette.gold),
-                  child: const Text('Done', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  child: Text(l10n.done, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            const _Heading('The game ends when someone reaches'),
+            _Heading(l10n.gameEndsAt),
             const SizedBox(height: 8),
             Wrap(
               spacing: 10,
@@ -62,21 +64,21 @@ class _OptionsSheetState extends State<_OptionsSheet> {
               children: [
                 for (final target in GameOptions.targets)
                   _Pick(
-                    label: '$target points',
+                    label: l10n.targetPoints(target),
                     selected: _options.target == target,
                     onTap: () => setState(() => _options = _options.copyWith(target: target)),
                   ),
               ],
             ),
             const SizedBox(height: 18),
-            const _Heading('Rated games move your rating, and the bots\''),
+            _Heading(l10n.ratedMovesRatings),
             const SizedBox(height: 8),
             Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
-                _Pick(label: 'Rated', selected: _options.rated, onTap: () => setState(() => _options = _options.copyWith(rated: true))),
-                _Pick(label: 'Unrated', selected: !_options.rated, onTap: () => setState(() => _options = _options.copyWith(rated: false))),
+                _Pick(label: l10n.rated, selected: _options.rated, onTap: () => setState(() => _options = _options.copyWith(rated: true))),
+                _Pick(label: l10n.unrated, selected: !_options.rated, onTap: () => setState(() => _options = _options.copyWith(rated: false))),
               ],
             ),
           ],

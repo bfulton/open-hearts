@@ -1,11 +1,6 @@
-/// The room's link, in the browser's address bar.
-///
-/// The code is nobody's to type and is shown nowhere: the link is the
-/// way in. So while this device is in a room the address bar is where
-/// that room lives — a refresh comes back to it, and the address is
-/// there to copy for anyone who would rather copy than share. Off the
-/// web there is no address bar, as there is no share sheet
-/// (share.dart), and this does nothing.
+/// The app's address, as far as the app needs to know it: where it was
+/// served from, and how long a room waits as the address asks. Which
+/// page is showing is the router's (router.dart).
 library;
 
 import 'address_io.dart' if (dart.library.js_interop) 'address_web.dart' as platform;
@@ -14,13 +9,11 @@ import 'address_io.dart' if (dart.library.js_interop) 'address_web.dart' as plat
 /// it, as this address asks for it.
 ///
 /// Ten seconds is right for people, who open a link in about one. The
-/// four-browser suite opens four whole apps on one machine, where that
-/// can take as long as the window itself — so the last of them arrives
-/// at a table that has already begun without it, and the suite fails
-/// for a reason that has nothing to do with the game. It asks for
-/// longer instead: `?e2e=1&roomWait=45`. Four in a room is still a
-/// table at once, whatever the wait; all a longer one does is stop a
-/// room starting short.
+/// four-browser suite opens four whole apps on one machine, which can
+/// take as long as the window itself, so it asks for longer:
+/// `?e2e=1&roomWait=45`. Four in a room is still a table at once,
+/// whatever the wait; all a longer one does is stop a room starting
+/// short.
 ///
 /// Only under `?e2e`, which is the address saying this build is being
 /// driven rather than played, and never shorter than [standard] nor
@@ -35,34 +28,44 @@ Duration roomWait(Uri at, {required Duration standard, Duration most = const Dur
   return Duration(seconds: asked.clamp(standard.inSeconds, most.inSeconds));
 }
 
-/// Puts the room under [code] in the address bar, or takes a room out
-/// of it when [code] is null.
-void showRoom(String? code) => platform.showAddress(roomAddress(code, Uri.base));
-
-/// Takes [name] out of the address and leaves the rest of it alone:
-/// for a mark a round trip put there — the `bought` a checkout comes
-/// back with — which a refresh should not act on twice.
-void forgetInAddress(String name) => platform.showAddress(addressWithout(name, Uri.base));
-
-String addressWithout(String name, Uri at) {
-  final params = Map<String, String>.from(at.queryParameters)..remove(name);
-  return Uri(
-    path: at.path.isEmpty ? '/' : at.path,
-    queryParameters: params.isEmpty ? null : params,
-    fragment: at.fragment.isEmpty ? null : at.fragment,
-  ).toString();
+/// How much of its beats a table takes, as this address asks: all of
+/// them, unless the address is under `?e2e` and asks for a share
+/// (`?e2e=1&pace=0.1`), never less than a tenth. The browser suites
+/// play hands by the dozen, and a bot's thinking and a trick held on
+/// the felt are most of a hand's minute; at a tenth the same beats come
+/// in the same order, and the widget tests hold them to their lengths
+/// (game_controller_test.dart).
+double paceIn(Uri at) {
+  // A build served from this machine only: a production page under
+  // `?e2e` plays at the table's own pace.
+  if (!at.queryParameters.containsKey('e2e') || !isLocalHost(at.host)) return 1;
+  final asked = double.tryParse(at.queryParameters['pace'] ?? '');
+  if (asked == null || asked.isNaN) return 1;
+  return asked.clamp(0.1, 1.0);
 }
 
-/// What the address becomes: [at] with the room set or dropped, and
-/// the rest of it left alone — a build driven with `?e2e` stays driven
-/// with it across a refresh.
-String roomAddress(String? code, Uri at) {
-  final params = Map<String, String>.from(at.queryParameters)..remove('room');
-  if (code != null) params['room'] = code;
-  return Uri(
-    // An empty path would leave the address where it is, query and all.
-    path: at.path.isEmpty ? '/' : at.path,
-    queryParameters: params.isEmpty ? null : params,
-    fragment: at.fragment.isEmpty ? null : at.fragment,
-  ).toString();
+/// The score the games this device starts play to, when the address
+/// says, under `?e2e`: a suite that has to see a game's end does not
+/// need fifty points of it (`?e2e=1&target=1`, a game of one hand).
+/// Null otherwise, and the device's own choice stands (game_options.dart).
+int? targetIn(Uri at) {
+  // A build served from this machine only: nobody's link starts a live
+  // game of one hand in production.
+  if (!at.queryParameters.containsKey('e2e') || !isLocalHost(at.host)) return null;
+  final asked = int.tryParse(at.queryParameters['target'] ?? '');
+  return asked == null || asked < 1 || asked > 100 ? null : asked;
 }
+
+/// Whether [host] is this machine: `localhost`, `127.0.0.1`, or a name
+/// under `.localhost`, which a browser takes to be this machine too. The
+/// browser rig serves the site at openhearts.localhost and the app at
+/// play.openhearts.localhost (e2e/drive.mjs), as production serves them
+/// at openhearts.game and play.openhearts.game.
+bool isLocalHost(String host) => host == 'localhost' || host == '127.0.0.1' || host.endsWith('.localhost');
+
+/// Where the app itself is: the address its page was served at, under
+/// which every page's address sits (router.dart) — the root of
+/// play.openhearts.game, or `/play/` on a preview of the site.
+/// What a link to the app is made from, rather than the address of
+/// whichever page happens to be showing.
+Uri appBase() => platform.appBase();

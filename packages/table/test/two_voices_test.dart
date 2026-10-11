@@ -12,10 +12,7 @@
 /// the jury breaks that, and the table must see that it has to rather
 /// than sit at the card for good.
 ///
-/// Found by `tool/explore.dart` in an earlier shape — the juror and a
-/// custodian each saying the card with nothing on the record, which
-/// putting the escrow there has closed. Pinned here in the shape still
-/// open, by holding the juror's card back until a custodian has said
+/// Set up by holding the juror's card back until a custodian has said
 /// its own and letting each person hear a different one first.
 library;
 
@@ -27,7 +24,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('the same card said for a bot seat by its late juror and, after the escrow, a custodian is settled by the jury', () {
     final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize + 2, target: 1);

@@ -6,9 +6,9 @@ mod test {
     use crate::vector_commitment::{pedersen, HomomorphicCommitmentScheme};
     use crate::zkp::{arguments::single_value_product, ArgumentOfKnowledge};
 
-    use ark_marlin::rng::FiatShamirRng;
+    use crate::zkp::FiatShamirRng;
     use ark_std::{rand::thread_rng, UniformRand};
-    use blake2::Blake2s;
+    use blake2::Blake2s256 as Blake2s;
     use starknet_curve;
     use std::iter::Iterator;
 

@@ -245,6 +245,31 @@ void main() {
       expect(game.taken[done.winner], points);
       expect(game.leader, done.winner);
     });
+
+    test('the trick just swept is kept until the next, and gone with the hand', () {
+      final game = _dealt(seed: 33);
+      final bot = Bot();
+      expect(game.lastTrick, isEmpty);
+      for (var i = 0; i < seatCount; i++) {
+        final seat = game.currentSeat!;
+        game.play(seat, bot.chooseCard(_view(game, seat), game.legalPlaysFor(seat)));
+      }
+      final done = game.pendingTrick!;
+      expect(game.lastTrick, isEmpty, reason: 'still on the table, not swept');
+      game.collectTrick();
+      expect([for (final p in game.lastTrick) p.toString()], [for (final p in done.plays) p.toString()]);
+      while (game.phase == Phase.playing) {
+        if (game.pendingTrick != null) {
+          game.collectTrick();
+          continue;
+        }
+        final seat = game.currentSeat!;
+        game.play(seat, bot.chooseCard(_view(game, seat), game.legalPlaysFor(seat)));
+      }
+      expect(game.lastTrick, hasLength(seatCount));
+      game.nextHand();
+      expect(game.lastTrick, isEmpty);
+    });
   });
 
   group('full games', () {

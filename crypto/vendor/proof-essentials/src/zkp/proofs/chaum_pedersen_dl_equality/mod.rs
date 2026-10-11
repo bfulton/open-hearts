@@ -4,24 +4,25 @@ mod test;
 
 use crate::error::CryptoError;
 use crate::zkp::ArgumentOfKnowledge;
-use ark_ec::ProjectiveCurve;
-use ark_marlin::rng::FiatShamirRng;
+use crate::to_bytes::TranscriptCurve;
+use ark_ec::{CurveGroup, PrimeGroup};
+use crate::zkp::FiatShamirRng;
 use ark_std::marker::PhantomData;
 use ark_std::rand::Rng;
 use digest::Digest;
 
-pub struct DLEquality<'a, C: ProjectiveCurve> {
+pub struct DLEquality<'a, C: TranscriptCurve> {
     _group: PhantomData<&'a C>,
 }
 
 #[derive(Copy, Clone)]
-pub struct Parameters<'a, C: ProjectiveCurve> {
-    pub g: &'a C::Affine,
-    pub h: &'a C::Affine,
+pub struct Parameters<'a, C: TranscriptCurve> {
+    pub g: &'a <C as CurveGroup>::Affine,
+    pub h: &'a <C as CurveGroup>::Affine,
 }
 
-impl<'a, C: ProjectiveCurve> Parameters<'a, C> {
-    pub fn new(g: &'a C::Affine, h: &'a C::Affine) -> Self {
+impl<'a, C: TranscriptCurve> Parameters<'a, C> {
+    pub fn new(g: &'a <C as CurveGroup>::Affine, h: &'a <C as CurveGroup>::Affine) -> Self {
         Self { g, h }
     }
 }
@@ -30,19 +31,19 @@ impl<'a, C: ProjectiveCurve> Parameters<'a, C> {
 /// Expects two points $A$ and $B$ such that for some secret $x$ and parameters
 /// $G$ and $H$, $A = xG$ and $B=xH$
 #[derive(Copy, Clone)]
-pub struct Statement<'a, C: ProjectiveCurve>(pub &'a C::Affine, pub &'a C::Affine);
+pub struct Statement<'a, C: TranscriptCurve>(pub &'a <C as CurveGroup>::Affine, pub &'a <C as CurveGroup>::Affine);
 
-impl<'a, C: ProjectiveCurve> Statement<'a, C> {
-    pub fn new(point_a: &'a C::Affine, point_b: &'a C::Affine) -> Self {
+impl<'a, C: TranscriptCurve> Statement<'a, C> {
+    pub fn new(point_a: &'a <C as CurveGroup>::Affine, point_b: &'a <C as CurveGroup>::Affine) -> Self {
         Self(point_a, point_b)
     }
 }
 
-type Witness<C> = <C as ProjectiveCurve>::ScalarField;
+type Witness<C> = <C as PrimeGroup>::ScalarField;
 
 impl<'a, C> ArgumentOfKnowledge for DLEquality<'a, C>
 where
-    C: ProjectiveCurve,
+    C: TranscriptCurve,
 {
     type CommonReferenceString = Parameters<'a, C>;
     type Statement = Statement<'a, C>;

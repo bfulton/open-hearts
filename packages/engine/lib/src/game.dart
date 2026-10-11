@@ -20,6 +20,7 @@ library;
 import 'dart:math';
 
 import 'card.dart';
+import 'deal_seed.dart';
 import 'rules.dart';
 
 /// Where the game is between calls.
@@ -51,9 +52,21 @@ const humanSeat = 0;
 const seatCount = 4;
 
 class HeartsGame {
-  HeartsGame({int? seed, this.sealed = false, this.target = gameOverScore}) : _random = Random(seed) {
+  /// A game dealt from [dealSeed] — or, given an int [seed] instead, by
+  /// [Random] from it: what an `oh1` record replays, and what a test or
+  /// a tool asks for when it wants a game it can name by a number. Given
+  /// neither, a game that deals itself draws a deal seed of its own.
+  HeartsGame({int? seed, DealSeed? dealSeed, this.sealed = false, this.target = gameOverScore})
+      : dealSeed = dealSeed ?? (seed == null && !sealed ? DealSeed.draw() : null),
+        _random = Random(seed) {
+    if (seed != null && dealSeed != null) throw ArgumentError('a game is dealt from one seed, not two');
     _startHand();
   }
+
+  /// The 256 bits every hand of this game is computed from
+  /// (deal_seed.dart). Null at a game dealt by [Random] from an int
+  /// seed, and at a sealed one.
+  final DealSeed? dealSeed;
 
   final Random _random;
 
@@ -121,6 +134,12 @@ class HeartsGame {
   ({List<Play> plays, int winner})? get pendingTrick => _pendingTrick;
   ({List<Play> plays, int winner})? _pendingTrick;
 
+  /// The trick swept last this hand, as it was played; empty before
+  /// the first. What the felt has just shown going to its taker — the
+  /// table reads it to see who showed out (autopilot.dart).
+  List<Play> get lastTrick => List.unmodifiable(_lastTrick);
+  List<Play> _lastTrick = const [];
+
   /// Tricks completed and swept this hand, 0..13.
   int get tricksPlayed => _tricksPlayed;
   int _tricksPlayed = 0;
@@ -170,6 +189,7 @@ class HeartsGame {
     _received = [for (var s = 0; s < seatCount; s++) <Card>[]];
     _trick.clear();
     _pendingTrick = null;
+    _lastTrick = const [];
     _tricksPlayed = 0;
     _heartsBroken = false;
     _handScores = const [];
@@ -184,7 +204,7 @@ class HeartsGame {
       _phase = Phase.dealing;
       return;
     }
-    final deck = List.of(Card.deck)..shuffle(_random);
+    final deck = dealSeed?.deck(_handNumber) ?? (List.of(Card.deck)..shuffle(_random));
     _hands = [
       for (var s = 0; s < seatCount; s++)
         deck.sublist(s * 13, s * 13 + 13)..sort(),
@@ -443,6 +463,7 @@ class HeartsGame {
     if (done == null) throw StateError('no finished trick to collect');
     _taken[done.winner] += pointsIn(done.plays.map((p) => p.card));
     _leader = done.winner;
+    _lastTrick = done.plays;
     _trick.clear();
     _pendingTrick = null;
     _tricksPlayed++;

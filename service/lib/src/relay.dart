@@ -9,12 +9,12 @@
 /// Every event is checked — id and signature — before anything else
 /// sees it. Stored events are kept in memory, newest last, up to a cap;
 /// ephemeral kinds (20000–29999) are forwarded and forgotten, which is
-/// what every kind the table uses is. In production this is a public
-/// relay somebody else runs; locally it is this, one `dart run`.
+/// what every kind the table uses is. Locally the relay is this, one
+/// `dart run`.
 ///
-/// There are two of them now (docs/06-service.md). This one, and the
-/// same subset in JavaScript for the Cloudflare object that carries
-/// presence (`service/do/`). `OH_RELAY=js` puts that one behind this
+/// There are two of them (docs/06-service.md): this one, and the same
+/// subset in JavaScript for the Cloudflare objects that carry presence
+/// and the tables (`service/do/`). `OH_RELAY=js` puts that one behind this
 /// class, so every suite here — the relay's own, a hand played over
 /// real sockets, the jury, the waiting room — runs against whichever
 /// relay is asked for, and the app's side of the wire is only written
@@ -38,13 +38,15 @@ import 'relay_js.dart';
 /// whichever of the two is running underneath.
 abstract class Relay {
   factory Relay({int keep = 10000, void Function(String line)? log, String? Function(NostrEvent event)? refuse}) =>
-      Platform.environment['OH_RELAY'] == 'js'
-          ? JsRelay(keep: keep, log: log, refuse: refuse)
-          : DartRelay(keep: keep, log: log, refuse: refuse);
+      switch (Platform.environment['OH_RELAY']) {
+        'js' => JsRelay(keep: keep, log: log, refuse: refuse),
+        'object' => JsRelay(keep: keep, log: log, refuse: refuse, object: true),
+        _ => DartRelay(keep: keep, log: log, refuse: refuse),
+      };
 
   /// A policy, for a test: the reason to refuse an event that checks
-  /// out, or null to take it — what a public relay does when it
-  /// demands proof of work or rate-limits a client.
+  /// out, or null to take it — what a relay does when it rate-limits a
+  /// client or turns a kind away.
   set refuse(String? Function(NostrEvent event)? policy);
 
   /// The port the relay listens on once [serve] has returned.

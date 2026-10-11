@@ -6,13 +6,11 @@
 /// one bot seat more than another puts every juror on a different
 /// seat, and each then refuses what the others say for theirs. A
 /// person leaving turns their seat into a bot, so a leave still in
-/// flight is exactly that disagreement. Two jurors sixty-five and
-/// four hundred milliseconds behind one fixed two bot seats where
-/// everyone else fixed three, and the hand stopped at a seat whose
-/// keys were nobody's to make (sealed chaos seed 5).
+/// flight is exactly that disagreement, and the hand would stop at a
+/// seat whose keys are nobody's to make.
 ///
-/// The seat list is read from the record now, by the hand a removal
-/// was placed in, so hearing the leave late does not change it.
+/// The seat list is read from the record, by the hand a removal was
+/// placed in, so hearing the leave late does not change it.
 library;
 
 import 'package:deal/deal.dart';
@@ -22,7 +20,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a leave heard late by two jurors does not move the bot seats under them', () {
     final t = SimTable(humans: 3, seed: 12, crypto: crypto, jurors: jurySize);

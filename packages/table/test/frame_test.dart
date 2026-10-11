@@ -5,7 +5,6 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:deal/deal.dart';
 import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
 import 'package:test/test.dart';
@@ -26,7 +25,7 @@ void sameEvent(Map<String, Object?> framed, TableEvent original) {
 
 void main() {
   test('an event of every kind goes to bytes and back', () async {
-    final crypto = await DealCrypto.load();
+    final crypto = await rememberedCrypto();
     final t = SimTable(humans: 2, seed: 7, crypto: crypto, jurors: 4);
     t.start();
     t.clock.runUntil(() => t.clients.first.game.handNumber >= 1, limitMs: 20 * 60 * 1000);

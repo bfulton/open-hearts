@@ -1,83 +1,68 @@
 /// The relays a device talks to: a constant of the build, not a setting.
 ///
-/// A deployed build carries our own relay and a few public ones and
-/// uses them together — listened on all, a table's events written to
-/// the first everyone reads and our own preferred while it is up, what
-/// forms a room and what goes unanswered to all (packages/table,
-/// relays.dart) — so that one relay turning on a table is not the end
-/// of it, and so that nobody has to know what a relay is to sit down.
-/// The deployed site and production run the same list. Two exceptions,
-/// both decided when the build is made, never on the page: a build
-/// made with `--dart-define=OH_RELAYS=…` — the local rig against its
-/// bridges — uses those, and a build served from localhost (`flutter
-/// run`, the browser suite) uses the local relay (service/).
+/// A deployed build talks to our relay and nothing else
+/// (docs/08-own-relays.md): one Cloudflare object per tag
+/// (`service/do/`) — a table, its signalling, a pool's waiting room, a
+/// room code, the results, presence — named in the address before the
+/// socket is opened. The deployed site and production run the same
+/// list. Two exceptions, both decided when the build is made, never on
+/// the page: a build made with `--dart-define=OH_RELAYS=…` — the local
+/// rig against its bridges — uses those, and a build served from
+/// localhost (`flutter run`, the browser suite) uses the local relay
+/// (service/), at the port its address names if it names one. The
+/// remote config may name another relay of ours (net/remote_config.dart),
+/// never anyone else's.
 library;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:table/table.dart';
 
-/// Our own relay, run for the game: the one a deployed build prefers
-/// to write a table's events to while it is up, so the play rides
-/// infrastructure we control and the volunteer relays are reach and
-/// fallback. Baked into the build so it can be turned on without
-/// releasing again; until it is up a build simply finds it down and
-/// uses the others, which is why the same list is safe to ship now.
-const homeRelay = 'wss://nostr.openhearts.game';
+import 'address.dart' show isLocalHost;
+import 'remote_config.dart';
 
-/// Our own relay again, and the one presence is carried on: a
-/// Cloudflare object per tag (docs/06-service.md, `service/do/`),
-/// which is why the tag is in the URL — the object has to be named
-/// before the socket is opened. The mark is `tagMark`
-/// (`packages/table`, presence_relay.dart) and the client that has a
-/// tag puts it there; a client with none cannot use this relay at
-/// all, which is why it is in the presence list and not in the one
-/// tables and signalling take.
-///
-/// It is preferred for what it carries and it is not relied on. Every
-/// beat still goes to the public relays as well, because a device is
-/// online for whoever can hear it and we do not get to assume what
-/// another device can reach — so the day this object is down, or has
-/// never been deployed, presence is exactly what it was before it
-/// existed.
-const homeTagRelay = 'wss://relay.openhearts.game/{tag}';
+/// Our relay: a Cloudflare object per tag, which is why the tag is in
+/// the URL. The mark is `tagMark` (`packages/table`, presence_relay.dart);
+/// whoever opens a socket for a tag puts the tag there.
+const ourRelay = 'wss://relay.openhearts.game/{tag}';
 
-/// The relays a deployed build starts on: our own first, then a few
-/// public ones. The deployed site and production use this same list.
-const publicRelays = [
-  homeRelay,
-  'wss://relay.damus.io',
-  'wss://relay.primal.net',
-  'wss://nos.lol',
-];
+/// The relays a deployed build starts on: ours.
+const deployedRelays = [ourRelay];
 
-/// How many relays at the front of [relays] are ours to run — kept
-/// first in every table's rotation, primary while up. The home relay
-/// leads a deployed build's list; a local or rig list has none of ours.
-int pinnedRelays(List<Uri> relays) =>
-    relays.isNotEmpty && relays.first.toString() == homeRelay ? 1 : 0;
+/// How many relays at the front of [relays] are ours, kept first in
+/// every table's rotation. All of a deployed list; none of a local one.
+int pinnedRelays(List<Uri> relays) => relays.takeWhile(RemoteConfig.ours).length;
 
-/// The relays presence talks on: our per-tag object in front of the
-/// list everything else uses. A build that is not on our relays at
-/// all — a local one, or the rig against its bridges — has no object
-/// of ours to reach and takes the list as it stands.
-///
-/// This is the list [RelayPresence] and the juror's duty want
-/// (`app/lib/net/duty.dart`); [appRelays] stays what a table, its
-/// signalling and the standings are written to, since a table has not
-/// moved to the object and would have nowhere to put its tag.
-List<Uri> presenceRelays(List<Uri> relays) =>
-    pinnedRelays(relays) == 0 ? relays : [Uri.parse(homeTagRelay), ...relays];
-
-/// The local relay, where a build served from localhost looks.
+/// The local relay, where a build served from this machine looks.
 const localRelay = 'ws://127.0.0.1:7447';
+
+/// The local relay at the port the address names (`?relay=7448`), and
+/// at [localRelay]'s otherwise: each browser suite on a machine starts
+/// its relay on a port of its own (e2e/drive.mjs), so two can run side
+/// by side. A port and nothing more, so the address can move a local
+/// build to another relay on this machine and nowhere else; and only
+/// ever read for a build served from this machine ([appRelays]).
+Uri localRelayAt(Uri at) {
+  final port = int.tryParse(at.queryParameters['relay'] ?? '');
+  final local = Uri.parse(localRelay);
+  return port == null || port < 1 || port > 65535 ? local : local.replace(port: port);
+}
 
 /// A dev loop's shortcut: a build made with `--dart-define=OH_RELAYS=…`
 /// (a comma list) talks to those instead. Unset in a normal build.
 const devRelay = String.fromEnvironment('OH_RELAYS');
 
-/// The relays for this build, where it is served from.
-List<Uri> appRelays({Uri? base}) {
+/// The relays for this build, where it is served from: the operator's,
+/// when the remote config names some (net/remote_config.dart), and the
+/// build's own otherwise. A local build and the rig keep theirs whatever
+/// the config says — they are not on anyone's relays but their own.
+///
+/// A phone build has no address it was served from, and is a deployed
+/// build like the site's, not a local one.
+List<Uri> appRelays({Uri? base, RemoteConfig? config, bool web = kIsWeb}) {
   if (devRelay.isNotEmpty) return Relays.parse(devRelay);
-  final host = (base ?? Uri.base).host;
-  if (host == 'localhost' || host == '127.0.0.1' || host.isEmpty) return [Uri.parse(localRelay)];
-  return [for (final r in publicRelays) Uri.parse(r)];
+  final at = base ?? Uri.base;
+  if (web && (isLocalHost(at.host) || at.host.isEmpty)) return [localRelayAt(at)];
+  final named = (config ?? RemoteSettings.current.config).relays;
+  if (named != null) return named;
+  return [for (final r in deployedRelays) Uri.parse(r)];
 }

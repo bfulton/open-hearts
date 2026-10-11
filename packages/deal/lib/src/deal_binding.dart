@@ -37,9 +37,14 @@ typedef _Seal = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, P
 typedef _Open = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 typedef _Shared = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
 
-/// Where the cdylib is: [libraryPath], else the crate's release build
-/// next to this package.
+/// Where the cdylib is: [libraryPath]; on Android the copy packed into
+/// the app (`jniLibs`, by crypto/build_android.sh), which the system
+/// finds by name; on iOS the framework the app embeds (by
+/// crypto/build_ios.sh), found in the app's Frameworks; else the
+/// crate's release build next to this package.
 Future<DealCrypto> load({String? libraryPath}) async {
+  if (libraryPath == null && Platform.isAndroid) return _Ffi(DynamicLibrary.open('libdeal.so'));
+  if (libraryPath == null && Platform.isIOS) return _Ffi(DynamicLibrary.open('deal.framework/deal'));
   final path = libraryPath ?? _defaultPath();
   return _Ffi(DynamicLibrary.open(path));
 }

@@ -25,10 +25,31 @@ class Identity {
       secret = List.generate(32, (_) => rng.nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
       await prefs.setString(_key, secret);
     }
-    return signerFromSecret(secret);
+    // The same signer for the same secret: making one works out its
+    // public key on the curve in Dart, a tenth of a second on the page's
+    // thread and more on a slow phone, and this is asked for everywhere.
+    final made = _made;
+    if (made != null && made.secret == secret) return made.signer;
+    final signer = signerFromSecret(secret);
+    _made = (secret: secret, signer: signer);
+    return signer;
   }
 
+  static ({String secret, Signer signer})? _made;
+
   static Future<String?> name() async => (await SharedPreferences.getInstance()).getString(_nameKey);
+
+  /// The longest name, in characters: what a watched table carries
+  /// (packages/table, watch.dart), and what the service keeps with the
+  /// account (service/functions/worker.mjs, a test holding them equal).
+  static const longestName = 60;
+
+  /// [name] as it is kept: trimmed, nothing in it that is not text,
+  /// and no longer than [longestName].
+  static String nameOf(String name) {
+    final chars = name.replaceAll(RegExp('[\u0000-\u001f\u007f-\u009f]'), '').trim().runes.toList();
+    return String.fromCharCodes(chars.length > longestName ? chars.sublist(0, longestName) : chars).trim();
+  }
 
   static const _avatarKey = 'identity_avatar';
 
@@ -48,5 +69,5 @@ class Identity {
       (await SharedPreferences.getInstance()).setString(_avatarKey, jsonEncode(avatar.toJson()));
 
   static Future<void> setName(String name) async =>
-      (await SharedPreferences.getInstance()).setString(_nameKey, name.trim());
+      (await SharedPreferences.getInstance()).setString(_nameKey, nameOf(name));
 }

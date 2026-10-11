@@ -1,24 +1,23 @@
 use super::{Parameters, Statement};
 use crate::error::CryptoError;
+use crate::to_bytes;
+use crate::to_bytes::TranscriptCurve;
+use crate::zkp::FiatShamirRng;
 
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{to_bytes, PrimeField};
-use ark_marlin::rng::FiatShamirRng;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use ark_std::io::{Read, Write};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::UniformRand;
 use digest::Digest;
 
 #[derive(Copy, Clone, CanonicalDeserialize, CanonicalSerialize, Debug, PartialEq, Eq)]
 pub struct Proof<C>
 where
-    C: ProjectiveCurve,
+    C: TranscriptCurve,
 {
     pub(crate) random_commit: C,
     pub(crate) opening: C::ScalarField,
 }
 
-impl<C: ProjectiveCurve> Proof<C> {
+impl<C: TranscriptCurve> Proof<C> {
     pub fn verify<D: Digest>(
         &self,
         pp: &Parameters<C>,
@@ -34,7 +33,7 @@ impl<C: ProjectiveCurve> Proof<C> {
 
         let c = C::ScalarField::rand(fs_rng);
 
-        if pp.mul(self.opening.into_repr()) + statement.mul(c.into_repr()) != self.random_commit {
+        if *pp * self.opening + *statement * c != self.random_commit {
             return Err(CryptoError::ProofVerificationError(String::from(
                 "Schnorr Identification",
             )));

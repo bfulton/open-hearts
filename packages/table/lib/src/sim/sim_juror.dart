@@ -16,9 +16,13 @@ import 'sim_network.dart';
 import 'virtual_clock.dart';
 
 class SimJuror {
-  SimJuror(this.signer, this.net, this.clock, {this.crypto, this.dealWorker});
+  SimJuror(this.signer, this.net, this.clock, {this.crypto, this.dealWorker, this.account});
 
   final FakeSigner signer;
+
+  /// The account this device is one of, where it is not an account of
+  /// its own: what its presence carries (presence_relay.dart).
+  final String? account;
   final SimNetwork net;
   final VirtualClock clock;
   final DealCrypto? crypto;

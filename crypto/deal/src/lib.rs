@@ -14,13 +14,14 @@
 //! sealed token 64. A shuffle proof is a few kilobytes; its length is
 //! returned. A deck is 52 masked cards, 3328 bytes.
 
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{to_bytes, Field, PrimeField, UniformRand};
+use ark_ec::{AffineRepr, CurveGroup};
+use ark_ff::{Field, PrimeField, UniformRand};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{One, Zero};
 use barnett_smart_card_protocol::discrete_log_cards::{self, DLCards, Parameters};
 use barnett_smart_card_protocol::{BarnettSmartProtocol, Reveal};
 use proof_essentials::homomorphic_encryption::el_gamal::{self, Plaintext};
+use proof_essentials::to_bytes;
 use proof_essentials::utils::permutation::Permutation;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -129,21 +130,21 @@ fn generator() -> Affine {
     static G: OnceLock<Affine> = OnceLock::new();
     *G.get_or_init(|| {
         let (pk, sk) = keys(b"open-hearts generator probe v1  ").expect("probe keys");
-        pk.mul(sk.inverse().expect("a key's secret is not zero").into_repr()).into_affine()
+        (pk * sk.inverse().expect("a key's secret is not zero")).into_affine()
     })
 }
 
 fn write<T: CanonicalSerialize>(v: &T, out: &mut [u8]) -> Option<usize> {
-    let n = v.serialized_size();
+    let n = v.compressed_size();
     if out.len() < n {
         return None;
     }
-    v.serialize(&mut out[..n]).ok()?;
+    v.serialize_compressed(&mut out[..n]).ok()?;
     Some(n)
 }
 
 fn read<T: CanonicalDeserialize>(bytes: &[u8]) -> Option<T> {
-    T::deserialize(bytes).ok()
+    T::deserialize_compressed(bytes).ok()
 }
 
 fn read_deck(bytes: &[u8]) -> Option<Vec<Masked>> {
@@ -196,7 +197,7 @@ pub fn aggregate(pks: &[u8], out: &mut [u8]) -> Option<usize> {
     let mut acc = Curve::zero();
     for chunk in pks.chunks(POINT) {
         let pk = read::<Affine>(chunk)?;
-        acc += pk.into_projective();
+        acc += pk.into_group();
     }
     write(&acc.into_affine(), out)
 }
@@ -275,10 +276,9 @@ pub fn verify_token(pk: &[u8], masked: &[u8], token: &[u8]) -> bool {
 
 /// Tokens for many cards at once, with one argument for the lot.
 ///
-/// A token is 32 bytes and the proof beside it is 96, so a seat
-/// opening the other seats' thirty-nine positions at the deal sent
-/// three quarters proof — and every one of those proofs said the same
-/// thing about the same key. This says it once.
+/// A token is 32 bytes and the proof beside it is 96, and every one
+/// of those proofs says the same thing about the same key. A batch
+/// says it once.
 ///
 /// The standard batch: take public coefficients ρ_i that the prover
 /// cannot choose, from a hash of the whole statement, and argue about
@@ -310,15 +310,15 @@ pub fn reveal_tokens(secret: &[u8], masked_many: &[u8], seed: &[u8], out: &mut [
         cards.push(read::<Masked>(&masked_many[i * MASKED..(i + 1) * MASKED])?);
     }
     for (i, m) in cards.iter().enumerate() {
-        let token: Token = el_gamal::Plaintext(m.0.mul(sk.into_repr()).into_affine());
+        let token: Token = el_gamal::Plaintext((m.0 * sk).into_affine());
         write(&token, &mut out[i * POINT..(i + 1) * POINT])?;
     }
     let (h, b) = batch_points(&pk, &cards, &out[..n * POINT])?;
 
     let mut rng = rng_from(seed);
     let a = Scalar::rand(&mut rng);
-    let a1 = g.mul(a.into_repr()).into_affine();
-    let a2 = h.mul(a.into_repr()).into_affine();
+    let a1 = (g * a).into_affine();
+    let a2 = (h * a).into_affine();
     let c = batch_challenge(&pk, &h, &b, &a1, &a2)?;
     let z = a + c * sk;
 
@@ -355,8 +355,8 @@ pub fn verify_tokens(pk: &[u8], masked_many: &[u8], tokens: &[u8]) -> bool {
         return false;
     };
     let Some(c) = batch_challenge(&pk, &h, &b, &a1, &a2) else { return false };
-    g.mul(z.into_repr()) == a1.into_projective() + pk.mul(c.into_repr())
-        && h.mul(z.into_repr()) == a2.into_projective() + b.mul(c.into_repr())
+    (g * z) == a1.into_group() + (pk * c)
+        && (h * z) == a2.into_group() + (b * c)
 }
 
 /// The two points a batch argues about: H, the cards' first halves
@@ -365,7 +365,7 @@ pub fn verify_tokens(pk: &[u8], masked_many: &[u8], tokens: &[u8]) -> bool {
 /// and the tokens together, so a seat cannot know one before it has
 /// committed to all of them.
 fn batch_points(pk: &Affine, cards: &[Masked], tokens: &[u8]) -> Option<(Affine, Affine)> {
-    use blake2::{Blake2b, Digest};
+    use blake2::{Blake2b512 as Blake2b, Digest};
     let mut bytes = b"open-hearts batch tokens v1".to_vec();
     bytes.extend(to_bytes![pk].ok()?);
     for m in cards {
@@ -378,34 +378,29 @@ fn batch_points(pk: &Affine, cards: &[Masked], tokens: &[u8]) -> Option<(Affine,
     for (i, m) in cards.iter().enumerate() {
         let rho = Scalar::rand(&mut rng);
         let t = read::<Token>(&tokens[i * POINT..(i + 1) * POINT])?;
-        h += m.0.mul(rho.into_repr());
-        b += t.0.mul(rho.into_repr());
+        h += m.0 * rho;
+        b += t.0 * rho;
     }
     Some((h.into_affine(), b.into_affine()))
 }
 
 fn batch_challenge(pk: &Affine, h: &Affine, b: &Affine, a1: &Affine, a2: &Affine) -> Option<Scalar> {
-    use blake2::{Blake2b, Digest};
+    use blake2::{Blake2b512 as Blake2b, Digest};
     let mut bytes = b"open-hearts batch challenge v1".to_vec();
     bytes.extend(to_bytes![pk, h, b, a1, a2].ok()?);
     Some(Scalar::from_le_bytes_mod_order(&Blake2b::digest(&bytes)))
 }
 
-/// Opens a masked card with every seat's token (each checked against
-/// its key): the card's index, 0 to 51, or none if a token is bad or
-/// the result is no card.
-/// A seat's key split in two, so that its cards can be opened without
-/// anyone putting the key back together (docs/04-live-play.md,
-/// "Playing a seat nobody holds"). The shares add to the key behind
-/// [secret]: neither alone is anything, and [share_key] of the two
-/// aggregates to the seat's own public key, which is what says a
-/// split is a split of *that* key.
+/// A seat's key split into additive shares, so that its cards can be
+/// opened without anyone putting the key back together
+/// (docs/04-live-play.md). The shares add to the key behind [secret]:
+/// no smaller set is anything, and [share_key] of them aggregates to
+/// the seat's own public key, which is what says a split is a split
+/// of *that* key.
 ///
-/// The escrow doc 03 describes splits the secret's bytes, which is
-/// enough to rebuild it and no use for anything else. This splits the
-/// key itself, in the field it lives in, and that is the difference
-/// between a departed seat's hand being opened to whoever rebuilds it
-/// and being opened to nobody.
+/// It splits the key itself, in the field it lives in, rather than the
+/// secret's bytes, so a departed seat's cards open position by
+/// position and its key is never rebuilt.
 pub fn split(secret: &[u8], shares: usize, seed: &[u8], out: &mut [u8]) -> Option<usize> {
     if shares < 2 || out.len() < shares * SCALAR {
         return None;
@@ -550,12 +545,10 @@ pub fn bytes_sum(parts: &[u8], len: usize, out: &mut [u8]) -> Option<usize> {
 /// [t] of which rebuild it — where [split] makes shares that are all
 /// needed at once.
 ///
-/// Why a threshold at all: a hand's escrow rests on the jurors it was
-/// sealed to still being reachable when a bot seat has to be opened,
-/// and "every share of a side" is the worst shape availability can
-/// have (docs/04-live-play.md, "The sizing"). "Any two of the jury"
-/// is the same secrecy — one holder alone is nothing — with room to
-/// lose people.
+/// A threshold because a hand's escrow rests on the jurors it was
+/// sealed to still being reachable when a bot seat has to be opened
+/// (docs/04-live-play.md). "Any two of the jury" keeps one holder
+/// alone from being anything, with room to lose people.
 ///
 /// The shares are f(1)..f(n) of a polynomial of degree t−1 whose
 /// constant term is the key, drawn from [seed]. Written in index
@@ -564,8 +557,7 @@ pub fn bytes_sum(parts: &[u8], len: usize, out: &mut [u8]) -> Option<usize> {
 ///
 /// Nothing here ever puts the key back together. A share's token is
 /// scaled by its (public) Lagrange coefficient and the scaled tokens
-/// *add*, exactly as the two halves of [split] add — which is the
-/// property the additive split was chosen for, and it survives.
+/// *add*, exactly as the shares of [split] add.
 pub fn split_threshold(secret: &[u8], n: usize, t: usize, seed: &[u8], out: &mut [u8]) -> Option<usize> {
     if t < 2 || n < t || n > 255 || out.len() < n * SCALAR {
         return None;
@@ -646,14 +638,14 @@ pub fn scalar_sum(parts: &[u8], out: &mut [u8]) -> Option<usize> {
 pub fn point_scale(point: &[u8], scalar: &[u8], out: &mut [u8]) -> Option<usize> {
     let p = read::<Affine>(point)?;
     let s = read::<Scalar>(scalar)?;
-    write(&p.mul(s.into_repr()).into_affine(), out)
+    write(&(p * s).into_affine(), out)
 }
 
 /// One share's public key: what that share's token is checked
 /// against, and one of the keys the seat's own is the sum of.
 pub fn share_key(share: &[u8], out: &mut [u8]) -> Option<usize> {
     let s = read::<Scalar>(share)?;
-    write(&generator().mul(s.into_repr()).into_affine(), out)
+    write(&(generator() * s).into_affine(), out)
 }
 
 /// One share's part of opening a masked card, proved against that
@@ -667,7 +659,7 @@ pub fn share_key(share: &[u8], out: &mut [u8]) -> Option<usize> {
 pub fn share_token(share: &[u8], masked: &[u8], seed: &[u8], out: &mut [u8]) -> Option<usize> {
     let f = fixed();
     let sk = read::<Scalar>(share)?;
-    let pk = generator().mul(sk.into_repr()).into_affine();
+    let pk = (generator() * sk).into_affine();
     let masked = read::<Masked>(masked)?;
     let mut rng = rng_from(seed);
     let (token, proof) = Protocol::compute_reveal_token(&mut rng, &f.pp, &sk, &pk, &masked).ok()?;
@@ -708,11 +700,11 @@ pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8]) -> Option<usize> {
 /// token. Writes [SEALED] bytes of ciphertext and then [SEAL_PROOF] of
 /// argument.
 ///
-/// Sealing hides the token from everyone but the seat it is for, which
-/// is the point, and which used to mean that nobody else could tell an
-/// honest seal from a bad one: a passer could send three cards the
-/// receiver would never open, and no third party could say whose fault
-/// it was (docs/03-fair-deal.md). The argument says, to anybody, that
+/// Sealing hides the token from everyone but the seat it is for, so
+/// without an argument nobody else could tell an honest seal from a
+/// bad one: a passer could send three cards the receiver would never
+/// open, and no third party could say whose fault it was
+/// (docs/03-fair-deal.md). The argument says, to anybody, that
 /// what is inside the ciphertext is the share the owner's key owes for
 /// that card — without saying what the share is.
 ///
@@ -740,16 +732,16 @@ pub fn seal(secret: &[u8], pk_to: &[u8], masked: &[u8], seed: &[u8], out: &mut [
     let mut rng = rng_from(seed);
     let r = Scalar::rand(&mut rng);
 
-    let token = m.0.mul(sk.into_repr());
-    let c1 = g.mul(r.into_repr());
-    let c2 = token + to.mul(r.into_repr());
+    let token = m.0 * sk;
+    let c1 = g * r;
+    let c2 = token + (to * r);
     let sealed: Masked = el_gamal::Ciphertext(c1.into_affine(), c2.into_affine());
 
     let a = Scalar::rand(&mut rng);
     let b = Scalar::rand(&mut rng);
-    let a1 = g.mul(a.into_repr()).into_affine();
-    let a2 = g.mul(b.into_repr()).into_affine();
-    let a3 = (m.0.mul(a.into_repr()) + to.mul(b.into_repr())).into_affine();
+    let a1 = (g * a).into_affine();
+    let a2 = (g * b).into_affine();
+    let a3 = ((m.0 * a) + (to * b)).into_affine();
     let c = seal_challenge(&m, &pk, &to, &sealed, &a1, &a2, &a3)?;
     let z1 = a + c * sk;
     let z2 = b + c * r;
@@ -789,10 +781,10 @@ pub fn verify_seal(pk_owner: &[u8], pk_to: &[u8], masked: &[u8], sealed: &[u8]) 
     let Some(c) = seal_challenge(&m, &pk, &to, &s, &a1, &a2, &a3) else {
         return false;
     };
-    g.mul(z1.into_repr()) == a1.into_projective() + pk.mul(c.into_repr())
-        && g.mul(z2.into_repr()) == a2.into_projective() + s.0.mul(c.into_repr())
-        && m.0.mul(z1.into_repr()) + to.mul(z2.into_repr())
-            == a3.into_projective() + s.1.mul(c.into_repr())
+    (g * z1) == a1.into_group() + (pk * c)
+        && (g * z2) == a2.into_group() + (s.0 * c)
+        && (m.0 * z1) + (to * z2)
+            == a3.into_group() + (s.1 * c)
 }
 
 /// The challenge a sealed token's argument answers: every public part
@@ -809,7 +801,7 @@ fn seal_challenge(
     a2: &Affine,
     a3: &Affine,
 ) -> Option<Scalar> {
-    use blake2::{Blake2b, Digest};
+    use blake2::{Blake2b512 as Blake2b, Digest};
     let bytes = to_bytes![
         b"open-hearts sealed token v1",
         masked.0,
@@ -831,12 +823,12 @@ fn seal_challenge(
 /// bytes; what a seat keeps for another — a share of its deal secret,
 /// held against its leaving — is encrypted with it (packages/deal).
 pub fn shared_secret(secret: &[u8], pk: &[u8], out: &mut [u8]) -> Option<usize> {
-    use blake2::{Blake2s, Digest};
+    use blake2::{Blake2s256 as Blake2s, Digest};
     let (_, sk) = keys(secret)?;
     let pk = read::<Affine>(pk)?;
-    let point = pk.mul(sk.into_repr()).into_affine();
+    let point = (pk * sk).into_affine();
     let mut bytes = Vec::with_capacity(POINT);
-    point.serialize(&mut bytes).ok()?;
+    point.serialize_compressed(&mut bytes).ok()?;
     let digest = Blake2s::digest(&bytes);
     if out.len() < 32 {
         return None;
@@ -849,8 +841,8 @@ pub fn shared_secret(secret: &[u8], pk: &[u8], out: &mut [u8]) -> Option<usize> 
 pub fn open(secret: &[u8], sealed: &[u8], out: &mut [u8]) -> Option<usize> {
     let (_, sk) = keys(secret)?;
     let c = read::<Masked>(sealed)?;
-    let s = c.0.mul(sk.into_repr()).into_affine();
-    let m = c.1 + (-s);
+    let s = (c.0 * sk).into_affine();
+    let m = (c.1 + (-s)).into_affine();
     write(&Plaintext::<Curve>(m), out)
 }
 
@@ -866,9 +858,9 @@ pub fn open_shared(sealed: &[u8], parts: &[u8], out: &mut [u8]) -> Option<usize>
     let c = read::<Masked>(sealed)?;
     let mut sum = Curve::zero();
     for chunk in parts.chunks(POINT) {
-        sum += read::<Affine>(chunk)?.into_projective();
+        sum += read::<Affine>(chunk)?.into_group();
     }
-    let m = c.1 + (-sum.into_affine());
+    let m = (c.1 + (-sum.into_affine())).into_affine();
     write(&Plaintext::<Curve>(m), out)
 }
 
@@ -1184,10 +1176,9 @@ mod tests {
         open(&secrets[2], &sealed, &mut wrong).unwrap();
         assert_ne!(wrong, token[..POINT]);
 
-        // And anybody can check that it is, without opening it. This
-        // is what closes the hole doc 03 left: a passer who sealed the
-        // receiver something else used to be indistinguishable from an
-        // honest one to every third party.
+        // And anybody can check that it is, without opening it, so a
+        // passer who seals the receiver something else is caught by
+        // every third party.
         assert!(verify_seal(&pks[..POINT], &pks[POINT..2 * POINT], masked, &sealed));
         assert!(!verify_seal(&pks[2 * POINT..3 * POINT], &pks[POINT..2 * POINT], masked, &sealed), "not another seat's token");
         assert!(!verify_seal(&pks[..POINT], &pks[2 * POINT..3 * POINT], masked, &sealed), "not sealed to another seat");
@@ -1205,7 +1196,7 @@ mod tests {
         {
             let honest = read::<Masked>(&sealed[..SEALED]).unwrap();
             let elsewhere = read::<Masked>(&deck[MASKED..2 * MASKED]).unwrap();
-            let c2 = (honest.1.into_projective() + elsewhere.1.into_projective()).into_affine();
+            let c2 = (honest.1.into_group() + elsewhere.1.into_group()).into_affine();
             write(&el_gamal::Ciphertext::<Curve>(honest.0, c2), &mut lie[..SEALED]).unwrap();
         }
         let mut got = vec![0u8; POINT];
@@ -1222,6 +1213,7 @@ mod tests {
         assert_eq!(ab, ba);
         assert_ne!(ab, ac);
     }
+
     /// A token sealed to a seat opens from the shares of that seat's
     /// key too — which it has to, since a pass to a seat that then
     /// leaves is a ciphertext only that seat's key could open, and the
@@ -1299,9 +1291,7 @@ mod tests {
 
     /// A departed seat's card, opened by the holders of its key's two
     /// shares — without either of them, or anybody, ever holding the
-    /// key. This is what lets doc 04's computation mean anything: if
-    /// opening a position took the whole key back, the survivors would
-    /// learn the whole hand and there would be nothing left to hide.
+    /// key.
     #[test]
     fn a_split_key_opens_a_card_without_being_put_back_together() {
         let secrets: Vec<[u8; 32]> = (1..=4).map(seed).collect();
@@ -1371,7 +1361,6 @@ mod tests {
         short_pks.extend_from_slice(&pks[POINT..]);
         assert_eq!(unmask(&short_pks, &bare(&short), masked), None, "one share opens nothing");
     }
-
 }
 
 #[cfg(test)]
@@ -1388,7 +1377,7 @@ mod seal_tests {
             secret[0] = i;
             secret[17] = 200 - i;
             let (pk, sk) = keys(&secret).expect("a pair");
-            assert_eq!(g.mul(sk.into_repr()).into_affine(), pk, "pair {i}");
+            assert_eq!((g * sk).into_affine(), pk, "pair {i}");
         }
     }
 }
@@ -1397,10 +1386,9 @@ mod seal_tests {
 mod transcript_tests {
     use super::*;
 
-    /// The reference crate hashed a projective point's Jacobian
+    /// The reference crate hashes a projective point's Jacobian
     /// coordinates into its transcripts, which a serialisation round
-    /// trip does not preserve; the vendored copy normalises. This is
-    /// the regression test for that.
+    /// trip does not preserve; the vendored copy normalises them.
     #[test]
     fn a_key_proof_survives_its_bytes() {
         let f = fixed();
@@ -1434,9 +1422,6 @@ mod wire {
         s
     }
 
-    /// What the deck's m x n factorisation costs on the wire and in
-    /// the browser: the argument's bytes, and the time to make and
-    /// check one. Run with --nocapture, changing M and N above.
     /// The field bytes live in, on its own: that gf_mul and gf_inv are
     /// the field they claim to be, before anything is built on them.
     #[test]
@@ -1649,6 +1634,9 @@ mod wire {
         assert_eq!(split_threshold(&secrets[0], 2, 3, &seed(81), &mut shares), None, "nor more than there are shares");
     }
 
+    /// What the deck's m x n factorisation costs on the wire: the
+    /// argument's bytes, and the time to make and check one. Run with
+    /// --nocapture, changing M and N above.
     #[test]
     fn shuffle_argument_size() {
         let secrets: Vec<[u8; 32]> = (1..=4).map(seed).collect();

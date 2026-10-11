@@ -1,6 +1,9 @@
 /// A whole game, played by thumb, comes out as a record that replays to
-/// the same result — and the record is on the device when it ends.
+/// the same result — and the record is on the device when it ends, and
+/// Home leaves the table.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,7 +33,11 @@ void main() {
       return null;
     });
 
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const TablePage(seed: 11, paced: false)));
+    // Opened from a front door, as the app opens it, so Home has
+    // somewhere to go back to.
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: const Scaffold(body: Text('the door'))));
+    unawaited(tester.state<NavigatorState>(find.byType(Navigator))
+        .push(MaterialPageRoute<void>(builder: (_) => const TablePage(seed: 11, paced: false))));
     await tester.pumpAndSettle();
 
     // Play the game out: pass anything, play the first legal card, next hand.
@@ -74,5 +81,11 @@ void main() {
     // And it is on the device, newest first.
     final kept = await PrefsRecordStore().load();
     expect(kept, [copied]);
+
+    // Done for now: Home, beside the record, leaves the table.
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TablePage), findsNothing);
+    expect(find.text('the door'), findsOneWidget);
   });
 }

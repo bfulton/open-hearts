@@ -15,10 +15,10 @@
 /// The last step is a fold too, not a vanishing: the packet the three
 /// folds leave turns about its own last crease until it is edge-on and
 /// there is nothing to see — the way a book closes. Shrinking it about
-/// its middle instead, which is what this used to do, reads as the
-/// picture being taken away rather than the paper being folded.
+/// its middle instead would read as the picture being taken away rather
+/// than the paper being folded.
 ///
-/// The fold itself is the old flat cheat — the flap keeps its far edge
+/// The fold itself is a flat cheat — the flap keeps its far edge
 /// on the crease and loses its width as the cosine of how far over it
 /// has come — which is what a fold looks like from straight on, and
 /// straight on is where the door is looked at from.
@@ -48,9 +48,8 @@ class FoldingHeart extends StatefulWidget {
   static const turn = Duration(seconds: 9);
 
   /// How long a door just opened shows the heart whole before its first
-  /// turn. It used to fold away the moment the door opened, so the first
-  /// thing anybody saw of the mark was it leaving; a heart has to be
-  /// seen as one before its folding reads as a flourish.
+  /// turn: a heart has to be seen as one before its folding reads as a
+  /// flourish.
   static const first = Duration(seconds: 3);
 
   /// Held at this point of the turn rather than turning, for a still

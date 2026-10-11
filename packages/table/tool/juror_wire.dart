@@ -1,9 +1,8 @@
 /// What a juror holding bot seats says in a hand, in the bytes a table
 /// event goes over the wire as — as JSON, which is what a relay takes,
-/// and as a frame, which is what a channel takes now that a juror is
-/// dialled like anybody else (frame.dart). Run it when the deal's
-/// proofs or the event bodies change, and carry the number to doc 04
-/// ("Playing a seat nobody holds"):
+/// and as a frame, which is what a channel takes, a juror being dialled
+/// like anybody else (frame.dart). Run it when the deal's proofs or the
+/// event bodies change, and carry the number to docs/04-live-play.md:
 ///
 ///     dart run tool/juror_wire.dart
 ///

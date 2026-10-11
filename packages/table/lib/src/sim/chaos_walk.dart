@@ -15,6 +15,7 @@ import 'package:engine/engine.dart';
 
 import '../client.dart';
 import '../events.dart';
+import '../jury.dart';
 import '../model.dart';
 import '../record.dart';
 import '../signing.dart';
@@ -90,9 +91,6 @@ bool _sameList(List<Object?> a, List<Object?> b) {
   return true;
 }
 
-/// Walks [seed] to its end — sealed, with the verifiable deal run for
-/// real, when [crypto] is given — and returns the first invariant it
-/// broke, with the faults that led there, or null when every one held.
 /// Whether any two sides still following the table read a different
 /// juror for a bot seat, once everything has arrived.
 ///
@@ -139,6 +137,42 @@ String? disagreed(SimTable t) {
   return null;
 }
 
+/// A juror drawn by the table from an account seated at it — another
+/// device of a player — or two devices of one account following the
+/// table at once: what accounts and one device at a time are there to
+/// stop (docs/04-live-play.md). A device that has gone does not count.
+String? accountTwice(SimTable t) {
+  final p = t.presence;
+  if (p == null) return null;
+  final seated = t.spec.accounts;
+  for (final c in [...t.clients, for (final j in t.jurors) if (j.client != null) j.client!]) {
+    for (final d in c.juries) {
+      for (final k in d.event.jurors) {
+        if (seated.contains(p.accountOf(k))) return 'a jury drew ${k.substring(0, 4)}, a device of an account seated at the table';
+      }
+    }
+  }
+  final following = <String, int>{};
+  for (final person in t.people) {
+    if (person.gone || !person.client.amSeated) continue;
+    final a = p.accountOf(person.client.signer.publicKey);
+    following[a] = (following[a] ?? 0) + 1;
+  }
+  for (final j in t.jurors) {
+    if (j.gone || j.client == null) continue;
+    final a = p.accountOf(j.signer.publicKey);
+    following[a] = (following[a] ?? 0) + 1;
+  }
+  for (final e in following.entries) {
+    if (e.value > 1) return '${e.key.substring(0, 4)} is at the table on ${e.value} devices at once';
+  }
+  return null;
+}
+
+/// Walks [seed] to its end — sealed, with the verifiable deal run for
+/// real, when [crypto] is given — and returns the first invariant it
+/// broke, with the faults that led there, or null when every one held.
+///
 /// [jurors] strangers to draw from, and with [sweep] each lets go of
 /// the table once it has served, as the duty does ([SimTable]); its
 /// clients' traces go to [jurorLog]. With [workers], every device
@@ -149,8 +183,9 @@ String? walkChaos(int seed,
     int jurors = 4,
     bool sweep = false,
     bool workers = false,
+    bool twins = false,
     void Function(String line)? jurorLog}) {
-  final sc = ChaosScenario(seed, crypto: crypto, jurors: jurors, sweepJurors: sweep, workers: workers);
+  final sc = ChaosScenario(seed, crypto: crypto, jurors: jurors, sweepJurors: sweep, workers: workers, twins: twins);
   final t = sc.table;
   for (final j in t.jurors) {
     j.log = jurorLog;
@@ -167,7 +202,7 @@ String? walkChaos(int seed,
   // And of those, the ones [c] can reach just now. A juror across a
   // partition is up and can do nothing for this side: nothing it says
   // arrives, and the side ends the game on exactly that silence, which
-  // it cannot tell from a crash (doc 04, "When quorum is lost anyway").
+  // it cannot tell from a crash (docs/04-live-play.md).
   Set<PublicKey> reachableFrom(TableClient c) =>
       {for (final k in upNow()) if (t.net.canReach(c.signer.publicKey, k)) k};
 
@@ -185,8 +220,9 @@ String? walkChaos(int seed,
   // still up can open: a held seat with its own juror not among them
   // and fewer of the jurors holding a piece of it than it takes to
   // rebuild it; a departed person's with none of the jury the deal
-  // was sealed to. The table stopped there says so (doc 03), no juror
-  // up could end it, and after long enough the game ends (doc 04):
+  // was sealed to. The table stopped there says so
+  // (docs/03-fair-deal.md), no juror up could end it, and after long
+  // enough the game ends (docs/04-live-play.md):
   // at a play, waiting for the jury; at the audit or a departed
   // seat's hand, stalled opening the hand. Judged here from who
   // really is up, not from what the table believes.
@@ -205,8 +241,15 @@ String? walkChaos(int seed,
   // Stopped where nobody really up could move the table: a seat nobody
   // up could open, or a turn put to the jury — split, or open while
   // the table waits for want of a majority — with none of the hand's
-  // jurors up to rule on it. The game ends there (doc 04), and only
-  // there.
+  // jurors up to rule on it. The game ends there
+  // (docs/04-live-play.md), and only there.
+  // Waiting for a jury that can hold the bot seats, with too few
+  // jurors up and in reach to make one: the hand is never dealt with
+  // its bots in the open, so the table waits and says so, and only a
+  // juror coming up moves it (docs/04-live-play.md). With enough of them up, the
+  // wait is a fault.
+  bool starved(TableClient c) => c.shortOfJurors && reachableFrom(c).length < juryToHoldBots;
+
   bool immovable(TableClient c, Set<PublicKey> up) {
     if (unopenable(c, up)) return true;
     final f = c.failedAt;
@@ -223,6 +266,8 @@ String? walkChaos(int seed,
   String? check(String when) {
     // Read only: what each side waits for, for docs/07-states.md.
     structure?.take(t);
+    final twice = accountTwice(t);
+    if (twice != null) return '$when: $twice';
     final survivors = t.survivors.toList();
     for (final c in survivors) {
       if (c.failure == null || !judged.add(c)) continue;
@@ -299,7 +344,7 @@ String? walkChaos(int seed,
     // two records, not a message in flight (docs/07-states.md). Not a
     // side whose game has ended for a lost quorum: it says nothing new,
     // and a claim it carried just before is one the others may never
-    // hear — over a game that is over, and unscored (sealed seed 2).
+    // hear — over a game that is over, and unscored.
     final playing = [
       for (final p in t.people)
         if (!p.gone && p.client.failure == null) p.client,
@@ -319,12 +364,10 @@ String? walkChaos(int seed,
     // And the way each person went, on every record that has it — the
     // jurors' beside the people's, those that have stopped serving and
     // those whose game ended for a lost quorum among them, since a
-    // record holds only what carried. A leave is carried as a boot is
-    // now, so a seat left on one record and booted on another is two
+    // record holds only what carried. A leave is carried as a boot is,
+    // so a seat left on one record and booted on another is two
     // majorities. The record's key for a removal names its turn and
-    // seat and not the door, and records compared alike with a leave on
-    // one and a boot on the other; the jurors kept theirs for as long as
-    // they served (chaos seed 43).
+    // seat and not the door, so the door is compared here.
     final records = [
       for (final p in t.people) p.client,
       for (final j in t.jurors)
@@ -369,6 +412,7 @@ String? walkChaos(int seed,
       for (final c in survivors) {
         // Ended for a lost quorum, and judged fair when it was seen.
         if (c.tableState == TableState.failed) continue;
+        if (c.tableState == TableState.playing && starved(c)) continue;
         // Stopped for good where nobody up could move it: the game
         // ends rather than wait on a jury that is gone.
         if (immovable(c, up)) {
@@ -394,7 +438,7 @@ String? walkChaos(int seed,
       }
       // With a jury there is no pause a live juror could not end — save
       // the one above, which none could.
-      if (up.isNotEmpty && !survivors.where((c) => c.failure == null).every((c) => unopenable(c, up))) {
+      if (up.isNotEmpty && !survivors.where((c) => c.failure == null).every((c) => unopenable(c, up) || starved(c))) {
         return 'paused with a juror still up; faults were [${faults()}]\n${survivors.first.describe()}';
       }
     }

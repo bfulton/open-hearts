@@ -27,11 +27,17 @@ import 'package:table/table.dart';
 
 import '../avatar.dart';
 import '../crypto/deal.dart';
+import '../l10n/l10n.dart';
 
 class RoomMember {
-  const RoomMember(this.key, this.name, {this.since = 0, this.avatar = Avatar.none});
+  const RoomMember(this.key, this.name, {this.since = 0, this.avatar = Avatar.none, this.licence});
   final PublicKey key;
   final String name;
+
+  /// The service's word that [key] is a device of an account
+  /// (packages/table, licence.dart), from their beats and into the
+  /// start: every seat checks every other's.
+  final Licence? licence;
 
   /// When they arrived, by their own clock (ms): the seat order.
   final int since;
@@ -76,6 +82,20 @@ class _Present {
   int lastHeard = 0;
 }
 
+/// Why a device will not sit at a room's table.
+enum RoomRefusal {
+  /// The leader's bots play by another version of the policy, or the
+  /// start was made by a build that does not seal its tables.
+  otherBuild,
+
+  /// This device cannot run the deal.
+  noDeal,
+
+  /// The start names a seat the service has not vouched for: one whose
+  /// key no licence names, or an account seated twice.
+  unlicensed,
+}
+
 class Room extends ChangeNotifier {
   Room({
     required this.channel,
@@ -83,9 +103,11 @@ class Room extends ChangeNotifier {
     required this.myName,
     this.myAvatar = Avatar.none,
     this.target = gameOverScore,
+    this.timing = TableTiming.standard,
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
     this.startAfterMs = 10000,
+    this.licence,
     int Function()? nowMs,
     Random? random,
     bool? canDeal,
@@ -120,7 +142,9 @@ class Room extends ChangeNotifier {
     required String name,
     Avatar avatar = Avatar.none,
     int target = gameOverScore,
+    TableTiming timing = TableTiming.standard,
     Duration startAfter = Room.startAfter,
+    Licence? licence,
   }) =>
       Room(
         channel: RelayRoomChannel(relay),
@@ -128,7 +152,9 @@ class Room extends ChangeNotifier {
         myName: name,
         myAvatar: avatar,
         target: target,
+        timing: timing,
         startAfterMs: startAfter.inMilliseconds,
+        licence: licence,
       );
 
   static const startAfter = Duration(seconds: 10);
@@ -167,7 +193,19 @@ class Room extends ChangeNotifier {
   /// event, because the four have to agree on when the game ends.
   final int target;
 
+  /// The clocks of a table started here (timing.dart in the table
+  /// package), as this device's remote config has them. Only the
+  /// leader's count, and for the same reason as [target]: four seats
+  /// that disagree about when a boot is due back different sides of
+  /// it.
+  final TableTiming timing;
+
   final int heartbeatMs;
+
+  /// This device's licence, said with every beat and carried into the
+  /// start. Where accounts are checked, a member without one is not
+  /// seated, and a start that seats one is not sat at.
+  final Licence? licence;
 
   /// A member not heard from for this long has left.
   final int staleMs;
@@ -183,13 +221,13 @@ class Room extends ChangeNotifier {
 
   /// Why this device will not sit at the table, if so: the leader's
   /// bots play by a different version of the policy, or this device
-  /// cannot run the deal.
-  String? refusal;
+  /// cannot run the deal. The screen says it ([Room.said]).
+  RoomRefusal? refusal;
 
   /// Whether this device can run the deal: whether it loaded
   /// (crypto/deal.dart), unless a test says. Every live table is
   /// sealed, and a device that cannot run the deal does not sit down
-  /// (docs/03-fair-deal.md, "As built") — nor start one, nor sit at a
+  /// (docs/03-fair-deal.md) — nor start one, nor sit at a
   /// start that is not sealed.
   final bool canDeal;
 
@@ -231,7 +269,7 @@ class Room extends ChangeNotifier {
   List<RoomMember> get members {
     final now = _nowMs();
     final all = [
-      RoomMember(me, myName, since: since, avatar: myAvatar),
+      RoomMember(me, myName, since: since, avatar: myAvatar, licence: licence),
       for (final p in _others.values)
         if (now - p.lastHeard <= staleMs) _withPicture(p.member),
     ];
@@ -254,7 +292,7 @@ class Room extends ChangeNotifier {
 
   RoomMember _withPicture(RoomMember m) {
     final picture = _pictures[m.key];
-    return picture == null ? m : RoomMember(m.key, m.name, since: m.since, avatar: m.avatar.copyWith(picture: picture));
+    return picture == null ? m : RoomMember(m.key, m.name, since: m.since, avatar: m.avatar.copyWith(picture: picture), licence: m.licence);
   }
 
   void _say() {
@@ -266,6 +304,7 @@ class Room extends ChangeNotifier {
       'since': since,
       'policy': botPolicyVersion,
       'avatar': myAvatar.toJson(withPicture: false),
+      if (licence != null) 'licence': licence!.toJson(),
     }, ephemeral: true);
     _lastSaid = _nowMs();
   }
@@ -287,10 +326,10 @@ class Room extends ChangeNotifier {
     // The leader's policy is the table's: a mismatch is known before
     // the start, not at it.
     final lead = _others[leader];
-    if (lead != null && lead.policy != botPolicyVersion) refusal = _mismatch;
+    if (lead != null && lead.policy != botPolicyVersion) refusal = RoomRefusal.otherBuild;
     // Said before it is anyone's start rather than at one: the door
     // takes this device out of the room, and whoever is left leads.
-    if (!canDeal) refusal = noDeal;
+    if (!canDeal) refusal = RoomRefusal.noDeal;
     if (amLeader && !_started && canDeal) {
       final n = members.length;
       if (n >= seatCount || (n >= 2 && now - _lastArrival >= startAfterMs)) start();
@@ -319,8 +358,14 @@ class Room extends ChangeNotifier {
         }
       case 'here':
         if (spec != null) return;
+        // In the room only on the service's word that the key is an
+        // account's device, and never this device's own account again.
+        final licence = Licence.parse(c['licence']);
+        if (!licenceFits(licence, e.pubkey, at: DateTime.fromMillisecondsSinceEpoch(now))) return;
+        if (licence != null && licence.account == this.licence?.account) return;
         final p = _others[e.pubkey];
-        final member = RoomMember(e.pubkey, c['name'] as String? ?? 'Someone', since: c['since'] as int? ?? now, avatar: Avatar.fromJson(c['avatar']));
+        final member = RoomMember(e.pubkey, c['name'] as String? ?? 'Someone',
+            since: c['since'] as int? ?? now, avatar: Avatar.fromJson(c['avatar']), licence: licence);
         if (p == null || now - p.lastHeard > staleMs) {
           // New, or back after going quiet: an arrival either way, and
           // the countdown starts over.
@@ -351,17 +396,12 @@ class Room extends ChangeNotifier {
         // again. One that seats this device and nobody here is held
         // for its sender's next beat, and dropped if none comes.
         //
-        // Except when the start says so itself. The fourth to arrive
-        // is the reason a room of four becomes a table, and that
-        // happens at once: its own first beat goes out, the leader
-        // counts four and starts, and the start can be back before any
-        // beat of the leader's has come round. There is no beat to
-        // wait for either — everyone else is at the table now and has
-        // stopped saying they are in the room — so the fourth would
-        // hold a start naming its own seat until it went stale, and
-        // sit in a room the table had left. A start that seats the
-        // device that sent it, made since this device came into the
-        // room, is that table and not a leftover of an older one.
+        // Except a start that seats the device that sent it, made since
+        // this device came into the room: that is this room's table,
+        // not a leftover. The fourth to arrive gets exactly that, before
+        // any beat of the leader's comes round — and none will, since
+        // everyone else is at the table and has stopped beating — so
+        // holding it would leave the fourth in a room the table has left.
         final seats = c['seats'] as List? ?? const [];
         bool holds(PublicKey? key) => seats.any((raw) => raw is Map && raw['key'] == key);
         final itsOwn = holds(e.pubkey) && at >= since - _skewMs;
@@ -387,35 +427,52 @@ class Room extends ChangeNotifier {
     final seats = <Map<String, Object?>>[];
     for (var s = 0; s < seatCount; s++) {
       if (s < here.length) {
-        seats.add({'key': here[s].key, 'name': here[s].name, 'avatar': here[s].avatar.toJson(withPicture: false)});
+        seats.add({
+          'key': here[s].key,
+          'name': here[s].name,
+          'avatar': here[s].avatar.toJson(withPicture: false),
+          if (here[s].licence != null) 'licence': here[s].licence!.toJson(),
+        });
       } else {
         seats.add({'bot': draw[s].id});
       }
     }
     channel.announce({
       'kind': 'start',
+      // The table's own id, not the code: a code is reused, and two
+      // tables that start under one code — two halves of a room that
+      // could not hear each other — must not hear each other's plays.
+      'table': newTableId(),
       'seed': seed,
       'seats': seats,
       'policy': botPolicyVersion,
       // Every live table is sealed (docs/03-fair-deal.md).
       'sealed': true,
       'target': target,
+      'timing': timing.toJson(),
       'at': _nowMs(),
     });
   }
 
-  static const _mismatch = "Someone's app is on another build than yours — one of you is older. Update, and try again.";
+  /// A refusal as the player is told it.
+  static String said(RoomRefusal refusal, [AppLocalizations? words]) => switch (refusal) {
+        RoomRefusal.otherBuild || RoomRefusal.unlicensed => (words ?? english).roomOtherBuild,
+        RoomRefusal.noDeal => noDeal(words),
+      };
 
   /// What a device that cannot run the deal is told, wherever it tries
   /// to sit at a live table. One whose deal loaded and then stopped —
   /// its worker failed for good (crypto/deal.dart) — can run it again
   /// from the start, and is told so.
-  static String get noDeal => switch ((kIsWeb, dealWorker?.dead ?? false)) {
-        (true, true) => "The deal that keeps the cards honest stopped working on this page. Reload it to start afresh.",
-        (false, true) => "The deal that keeps the cards honest stopped working. Restart the app to start afresh.",
-        (true, false) => "This browser can't run the deal that keeps the cards honest. Try a current Chrome, Firefox or Safari.",
-        (false, false) => "This build can't run the deal that keeps the cards honest, so it can't sit at a live table.",
-      };
+  static String noDeal([AppLocalizations? words]) {
+    final say = words ?? english;
+    return switch ((kIsWeb, dealWorker?.dead ?? false)) {
+      (true, true) => say.noDealPageStopped,
+      (false, true) => say.noDealAppStopped,
+      (true, false) => say.noDealBrowser,
+      (false, false) => say.noDealBuild,
+    };
+  }
 
   void _applyStart(Map<String, Object?> c) {
     final seed = c['seed'] as int;
@@ -430,7 +487,7 @@ class Room extends ChangeNotifier {
           seats.add(BotSeat(Persona.named(m['bot'] as String)));
         } else {
           final key = m['key'] as String;
-          seats.add(HumanSeat(key));
+          seats.add(HumanSeat(key, licence: m['licence'] == null ? null : Licence.parse(m['licence']) ?? (throw const FormatException('licence'))));
           names[s] = m['name'] as String? ?? 'Someone';
           final chosen = key == me ? myAvatar : Avatar.fromJson(m['avatar']);
           final picture = key == me ? myAvatar.picture : _pictures[key];
@@ -447,7 +504,7 @@ class Room extends ChangeNotifier {
     // that has no seat for this device is only news, whatever it runs.
     final mine = seats.any((h) => h is HumanSeat && h.key == me);
     if (mine && c['policy'] != botPolicyVersion) {
-      refusal = _mismatch;
+      refusal = RoomRefusal.otherBuild;
       return;
     }
     // Every live table is sealed: a start that is not was made by
@@ -456,25 +513,39 @@ class Room extends ChangeNotifier {
     // the table could read. One this device cannot deal it cannot sit
     // at either.
     if (mine && c['sealed'] != true) {
-      refusal = _mismatch;
+      refusal = RoomRefusal.otherBuild;
       return;
     }
     if (mine && !canDeal) {
-      refusal = noDeal;
+      refusal = RoomRefusal.noDeal;
       return;
     }
-    // The table's own id, not the code: a code is reused, and two
-    // tables that start under one code — two halves of a room that
-    // could not hear each other — must not hear each other's plays.
-    spec = TableSpec(
-      id: '$code-${seed.toRadixString(36)}-${(c['at'] as int).toRadixString(36)}',
+    // Named by the leader (above): a start without an id is another
+    // build's.
+    final id = c['table'];
+    if (id is! String || !validTableId(id)) {
+      if (mine) refusal = RoomRefusal.otherBuild;
+      return;
+    }
+    final made = TableSpec(
+      id: id,
       seed: seed,
       seats: seats,
       sealed: c['sealed'] == true,
       // The leader's game, not this device's: a start event from a
       // build that had no say says fifty.
       target: c['target'] as int? ?? gameOverScore,
+      // And the leader's clocks: none said is the standard table, and
+      // one out of bounds is too, at every seat alike.
+      timing: TableTiming.parse(c['timing']),
     );
+    // Every seat an account's by the service's word, each account once:
+    // a start that is not is not a table to sit at.
+    if (made.licenceProblem(at: DateTime.fromMillisecondsSinceEpoch(_nowMs())) != null) {
+      if (mine) refusal = RoomRefusal.unlicensed;
+      return;
+    }
+    spec = made;
     seatNames = names;
     seatAvatars = avatars;
   }

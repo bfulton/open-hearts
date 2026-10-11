@@ -12,9 +12,7 @@
 /// rating means what a person's does.
 ///
 /// Nothing here is randomness. A persona is data, so a bot's play stays
-/// a computable consequence of its cards (docs/04-live-play.md), and the
-/// oblivious circuit in oblivious.dart takes the same settings as
-/// constants.
+/// a computable consequence of its cards (docs/04-live-play.md).
 library;
 
 /// What to do with the queen of spades in the pass. (What to do with a
@@ -22,8 +20,7 @@ library;
 /// wide margin, and every persona does it — see [Persona.shortSuitWeight].)
 ///
 /// Each style is a few numbers the pass scoring reads; the getters on
-/// [Persona] spell them out so the bot and its circuit read the same
-/// ones.
+/// [Persona] spell them out.
 enum PassStyle {
   /// The queen goes unless five spades stand behind her, and then she
   /// is worth about as much as a middling heart.
@@ -39,9 +36,8 @@ enum PassStyle {
 
 /// How long a bot appears to think. Rhythm, not strategy: the engine
 /// decides instantly and the table waits this long before showing it.
-/// How long a bot pretends to think. A person's own pace is a
-/// different thing entirely and lives in packages/table (pace.dart):
-/// that one is measured, this one is manners.
+/// A person's own pace is a different thing and lives in packages/table
+/// (pace.dart): that one is measured, this one is manners.
 enum BotPace {
   quick(400, 700),
   measured(600, 1100),
@@ -151,9 +147,9 @@ class Persona {
   /// games to fifty. The whole ladder spans about 170 points: a first
   /// game finishes ahead of the character itself in a little over one
   /// pair in four. The middle half of the characters at one rung sit
-  /// within about thirty points of each other. A game half as long is a
-  /// noisier one, which is what closed the ladder up from the 240
-  /// points it spanned over games to a hundred.
+  /// within about thirty points of each other. Shorter games are
+  /// noisier, which closes the ladder up: over games to a hundred it
+  /// spans about 240.
   static const priors = [1329, 1353, 1365, 1387, 1415, 1431, 1469, 1478, 1500];
 
   /// One line, in the table's voice, for the seat and the lobby.
@@ -444,8 +440,8 @@ class Persona {
     passStyle: PassStyle.keepQueen,
   );
 
-  static const sid = Persona(
-    name: 'Sid',
+  static const tristan = Persona(
+    name: 'Tristan',
     epithet: 'Throws everything, all at once.',
     passStyle: PassStyle.dumpQueen,
     shootLoserShare: 3,
@@ -453,8 +449,8 @@ class Persona {
     pace: BotPace.quick,
   );
 
-  static const nancy = Persona(
-    name: 'Nancy',
+  static const isolde = Persona(
+    name: 'Isolde',
     epithet: 'Wants the queen gone yesterday.',
     passStyle: PassStyle.dumpQueen,
     moonDefenseTrigger: 3,
@@ -577,8 +573,8 @@ class Persona {
     clyde,
     diegoRivera,
     fridaKahlo,
-    sid,
-    nancy,
+    tristan,
+    isolde,
     han,
     leia,
     heathcliff,
@@ -600,9 +596,11 @@ class Persona {
   /// A persona by [id]: a name, or `name/level`.
   static Persona named(String id) {
     final slash = id.indexOf('/');
-    if (slash < 0) return candidates.firstWhere((p) => p.name == id);
-    return candidates
-        .firstWhere((p) => p.name == id.substring(0, slash))
-        .at(int.parse(id.substring(slash + 1)));
+    final name = slash < 0 ? id : id.substring(0, slash);
+    final persona = candidates.firstWhere((p) => p.name == (_renamed[name] ?? name));
+    return slash < 0 ? persona : persona.at(int.parse(id.substring(slash + 1)));
   }
+
+  /// Names a persona had before, as records already kept may carry them.
+  static const _renamed = {'Sid': 'Tristan', 'Nancy': 'Isolde'};
 }

@@ -9,6 +9,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/game_controller.dart';
 import 'package:open_hearts/record_store.dart';
+import 'package:open_hearts/table_model.dart' show tableBeats;
 
 void main() {
   test('the last trick is held, swept, and then the sheet is due, a beat later', () {
@@ -53,6 +54,36 @@ void main() {
       c.nextHand();
       expect(c.sheetDue, isFalse);
       expect(c.game.phase, Phase.passing);
+      c.dispose();
+    });
+  });
+
+  test('at the share of its beats a driven build asks for, every beat is there, that much shorter', () {
+    // `?e2e=1&pace=0.25` (net/address.dart), as a browser suite asks.
+    tableBeats = 0.25;
+    addTearDown(() => tableBeats = 1);
+    fakeAsync((async) {
+      final c = GameController(seed: 4, paced: true, store: MemoryRecordStore());
+      var lastTrickHeldFor = 0;
+      for (var i = 0; i < 16000 && c.game.phase != Phase.handOver; i++) {
+        if (c.awaitingPass) {
+          for (final card in c.game.handOf(c.mySeat).take(3)) {
+            c.toggleSelected(card);
+          }
+          c.confirmPass();
+        } else if (c.awaitingPlay) {
+          expect(c.playCard(c.legalNow.first), isNull);
+        }
+        if (c.game.pendingTrick != null && c.game.handSizeOf(0) == 0) lastTrickHeldFor += 10;
+        async.elapse(const Duration(milliseconds: 10));
+      }
+      expect(c.game.phase, Phase.handOver, reason: 'a hand ends on the fake clock');
+      expect(lastTrickHeldFor, inInclusiveRange(220, 260), reason: 'the trick held a quarter of 950 ms');
+      expect(c.sheetDue, isFalse, reason: 'still a beat of felt first');
+      async.elapse(GameController.sweepBeat * 0.25 - const Duration(milliseconds: 20));
+      expect(c.sheetDue, isFalse);
+      async.elapse(const Duration(milliseconds: 40));
+      expect(c.sheetDue, isTrue, reason: 'due after a quarter of the beat');
       c.dispose();
     });
   });

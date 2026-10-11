@@ -4,10 +4,11 @@
 // Run in a thread of its own, as a browser runs it, with only what a
 // worker has and node does not put in: `self` and its `postMessage`.
 // It is handed its wasm the way the page hands it, and what goes in
-// and out is structured-cloned across the thread, as a browser's is. Its answers are held to the
-// same wasm called directly on this thread — which is what the page's
-// own binding, deal_web.dart, does — including for inputs tampered
-// with, where a check that said yes would be the whole deal gone.
+// and out is structured-cloned across the thread, as a browser's is.
+// Its answers are held to the same wasm called directly on this thread
+// — which is what the page's own binding, deal_web.dart, does —
+// including for inputs tampered with, where a check that said yes
+// would be the whole deal gone.
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
 import { readFileSync } from 'node:fs';

@@ -1,31 +1,32 @@
 use super::super::Ciphertext;
-use ark_ec::{AffineCurve, ProjectiveCurve};
+use crate::to_bytes::TranscriptCurve;
+use ark_ec::AffineRepr;
 use ark_std::{UniformRand, Zero};
 use rand::Rng;
 use std::ops::Mul;
 
-impl<C: ProjectiveCurve> std::ops::Add<Ciphertext<C>> for Ciphertext<C> {
+impl<C: TranscriptCurve> std::ops::Add<Ciphertext<C>> for Ciphertext<C> {
     type Output = Self;
 
     fn add(self, _rhs: Self) -> Self {
-        Self(self.0 + _rhs.0, self.1 + _rhs.1)
+        Self((self.0 + _rhs.0).into_affine(), (self.1 + _rhs.1).into_affine())
     }
 }
 
-impl<C: ProjectiveCurve> Mul<C::ScalarField> for Ciphertext<C> {
+impl<C: TranscriptCurve> Mul<C::ScalarField> for Ciphertext<C> {
     type Output = Self;
     fn mul(self, x: C::ScalarField) -> Self::Output {
-        Self(self.0.mul(x).into_affine(), self.1.mul(x).into_affine())
+        Self((self.0 * x).into_affine(), (self.1 * x).into_affine())
     }
 }
 
-impl<C: ProjectiveCurve> std::iter::Sum for Ciphertext<C> {
+impl<C: TranscriptCurve> std::iter::Sum for Ciphertext<C> {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self(C::Affine::zero(), C::Affine::zero()), |a, b| a + b)
     }
 }
 
-impl<C: ProjectiveCurve> Zero for Ciphertext<C> {
+impl<C: TranscriptCurve> Zero for Ciphertext<C> {
     fn zero() -> Self {
         Self(C::Affine::zero(), C::Affine::zero())
     }
@@ -35,7 +36,7 @@ impl<C: ProjectiveCurve> Zero for Ciphertext<C> {
     }
 }
 
-impl<C: ProjectiveCurve> UniformRand for Ciphertext<C> {
+impl<C: TranscriptCurve> UniformRand for Ciphertext<C> {
     fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
         let c0 = C::rand(rng).into_affine();
         let c1 = C::rand(rng).into_affine();
@@ -48,6 +49,7 @@ impl<C: ProjectiveCurve> UniformRand for Ciphertext<C> {
 mod test {
 
     use super::*;
+    use ark_ec::CurveGroup;
     use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
     use ark_std::UniformRand;
     use rand::thread_rng;
@@ -61,10 +63,10 @@ mod test {
 
         let cipher = Ciphertext::<Projective>(c0, c1);
 
-        let mut serialized = vec![0; cipher.serialized_size()];
-        cipher.serialize(&mut serialized[..]).unwrap();
+        let mut serialized = vec![0; cipher.compressed_size()];
+        cipher.serialize_compressed(&mut serialized[..]).unwrap();
 
-        let deserialized = Ciphertext::<Projective>::deserialize(&serialized[..]).unwrap();
+        let deserialized = Ciphertext::<Projective>::deserialize_compressed(&serialized[..]).unwrap();
         assert_eq!(cipher, deserialized);
     }
 }

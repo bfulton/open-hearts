@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+
 abstract final class Felt {
   static const dark = Color(0xFF06231A);
   static const mid = Color(0xFF0E3B2E);
@@ -41,6 +42,10 @@ abstract final class Palette {
   static const chrome = Color(0xFFE8EFEA);
   static const chromeDim = Color(0x99E8EFEA);
   static const danger = Color(0xFFE0674F);
+
+  /// The game's winner, on the sheet that ends it: the one green thing,
+  /// as [danger] is the red one.
+  static const win = Color(0xFF7FD69B);
 
   /// The mark: the heart the app wears and the name beside it. White,
   /// because gold is what a button is.

@@ -1,11 +1,11 @@
 /// The jury tops back up, and whoever joins is given a share.
 ///
-/// A jury that only shrinks is the shape the sizing was stuck on: a
-/// bot seat's escrow rests on enough of the jurors it was sealed to
-/// still being reachable when the seat's holder goes
-/// (docs/04-live-play.md, "The sizing"). Bringing somebody on is the
-/// lever, and it is worth nothing unless the newcomer is given a
-/// share of what the others hold.
+/// A jury that only shrinks runs out: a bot seat's escrow rests on
+/// enough of the jurors it was sealed to still being reachable when
+/// the seat's holder goes (docs/04-live-play.md). Bringing somebody on
+/// is the lever, and it is worth nothing unless the newcomer is given
+/// a share of what the others hold.
+@Tags(['slow'])
 library;
 
 import 'package:deal/deal.dart';
@@ -16,7 +16,7 @@ import 'package:test/test.dart';
 
 void main() {
   late DealCrypto crypto;
-  setUpAll(() async => crypto = await DealCrypto.load());
+  setUpAll(() async => crypto = await rememberedCrypto());
 
   test('a juror drawn after the deal is given a share of an escrow it was never sealed to', () {
     // More jurors online than a jury takes, so there is somebody to
@@ -265,11 +265,10 @@ void main() {
 
   test('two draws carried the other way round at two sides give each newcomer one place, the record\'s', () {
     // A held seat's pieces are indexed by each custodian's place in the
-    // escrow's list, and the list grew as each draw carried. Two draws
-    // of one hand carried in the other order at two sides gave their
-    // newcomers different places there, and a third place at the
-    // verifier (sealed chaos seed 10, nine strangers). The record says
-    // the order now: a person's own play names the draws that grew it.
+    // escrow's list. Two draws of one hand carried in the other order
+    // at two sides would give their newcomers different places, and a
+    // third place at the verifier, so the record says the order: a
+    // person's own play names the draws that grew it.
     final t = SimTable(humans: 2, seed: 9, crypto: crypto, jurors: jurySize * 3 + 4, target: 1);
     t.net.minLatencyMs = 200;
     t.net.maxLatencyMs = 400;

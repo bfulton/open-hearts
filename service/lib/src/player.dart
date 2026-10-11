@@ -1,9 +1,8 @@
 /// A person at a table over real sockets, played by the bot: the
 /// suites' stand-in for a human, and the measurement tools' too.
 ///
-/// Lifted out of the suite that first needed it so that anything in
-/// this package can seat one — a test, or a tool measuring what a
-/// hand costs on the wire.
+/// Here so that anything in this package can seat one — a test, or a
+/// tool measuring what a hand costs on the wire.
 library;
 
 import 'dart:async';

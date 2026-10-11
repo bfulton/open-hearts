@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 
 import 'package:engine/engine.dart' as engine;
 import 'card_view.dart';
+import '../l10n/l10n.dart';
 
 /// Extra space between two suits in the fan. Grouping is most of what
 /// makes a 13-card row scannable.
@@ -299,7 +300,7 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
             duration: dragging ? Duration.zero : const Duration(milliseconds: 220),
             // Moving within the hand, so easing in and out: gently off
             // the mark and a long settle. Full speed from the first
-            // frame had the neighbours of a played card jump.
+            // frame would make the neighbours of a played card jump.
             curve: Easing.standard,
             left: x,
             bottom: 0,
@@ -315,7 +316,7 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
               child: MergeSemantics(
                 child: Semantics(
                   button: true,
-                  label: card.spoken,
+                  label: context.l10n.card(card),
                   selected: isSelected,
                   enabled: !widget.dimUnplayable || isPlayable,
                   onTap: () => widget.onTap(card),
@@ -391,11 +392,10 @@ class _HandFanState extends State<HandFan> with TickerProviderStateMixin {
                   builder: (context, card) {
                     // Out at speed, not up to speed: a card leaves on
                     // the frame it is tapped, the way a thrown thing
-                    // leaves the hand at its fastest. Easing in instead
-                    // held it still for three frames, which is only
-                    // hidden while the rest of the fan is closing over
-                    // the gap — and the last card of a hand has no rest
-                    // of the fan.
+                    // leaves the hand at its fastest. Easing in would
+                    // hold it still for three frames, hidden only while
+                    // the rest of the fan closes over the gap — and the
+                    // last card of a hand has no rest of the fan.
                     final t = Curves.easeOutCubic.transform(flight.controller.value);
                     return Transform.translate(
                       offset: Offset.lerp(flight.from, flight.travel, t)!,
