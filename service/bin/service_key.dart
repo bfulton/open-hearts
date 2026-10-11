@@ -6,8 +6,8 @@
 /// (OH_SERVICE_KEY, app/lib/net/licence.dart) and is not a secret: it
 /// is printed. The secret half signs licences and belongs in the
 /// project's secrets (OH_SERVICE_SECRET) and nowhere else — not in the
-/// repository, not in a build, not on a device — so it is written to a
-/// file for one paste and then deleted by you.
+/// repository, not in a build, not on a device, not in a file — so it
+/// is printed once, here, to be pasted there.
 ///
 /// Rotating is cheap and takes a month: publish a build naming the new
 /// key, and keep signing with the old secret until the licences it
@@ -19,13 +19,13 @@ import 'dart:math';
 
 import 'package:bip340/bip340.dart' as bip340;
 
-void main(List<String> args) {
-  final to = args.isEmpty ? 'service.secret' : args.first;
+void main() {
   final rng = Random.secure();
   final secret = List.generate(32, (_) => rng.nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  final file = File(to);
-  file.writeAsStringSync(secret);
   stdout
-    ..writeln('OH_SERVICE_KEY    ${bip340.getPublicKey(secret)}')
-    ..writeln('OH_SERVICE_SECRET written to $to — paste it into the project\'s secrets, then delete the file');
+    ..writeln('OH_SERVICE_KEY     ${bip340.getPublicKey(secret)}')
+    ..writeln('OH_SERVICE_SECRET  $secret')
+    ..writeln()
+    ..writeln('The key goes in config/openhearts.json (serviceKey). The secret goes in the')
+    ..writeln('project\'s secrets as OH_SERVICE_SECRET, and nowhere else: it is not kept here.');
 }

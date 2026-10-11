@@ -736,8 +736,8 @@ their own KV and bucket, and no Stripe. The relay's secret is
 `OH_JUROR_SECRET`; its `OH_SERVICE_KEY` is a var in `wrangler.toml`,
 held equal to `config/openhearts.json` by a test, and without it the
 relay carries nobody. `cd service && dart run bin/service_key.dart`
-mints the service key pair and writes the secret half to
-`service.secret`, which is ignored by version control.
+mints the service key pair and prints both halves once; the secret is
+kept nowhere but the project's secrets.
 
 A deployment with no keys degrades safely: no service key means live
 play is shut, no Stripe means the shop says it is not open, and no TURN
