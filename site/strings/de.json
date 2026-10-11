@@ -91,6 +91,8 @@
       "p12": "Ist ein anderes deiner Geräte in deinem Konto, füge das neue von dort hinzu und entferne das verlorene. Wenn nicht, nimm einen Backup-Code: Öffne auf dem neuen Gerät das Menü, wähle <i>Abo aktivieren</i> und gib ihn ein, dann kommt das Gerät in dasselbe Konto, mit deinem Namen, deinem Bild, deiner Wertung und deinen Spielen. Mit Apple oder Google angemeldet? Melde dich auf dem neuen Gerät genauso an. Jedes Gerät im Konto kann <i>Backup-Codes zeigen</i>, und die eines Web-Abos kamen beim Abschluss per E-Mail: Bewahre sie sicher auf. Im App Store oder bei Google Play gekauft? Tippe auf dem neuen Handy auf <i>Abonnieren</i> und dann auf <i>Käufe wiederherstellen</i>.",
       "p21": "Warum steht da, Open Hearts sei auf einem anderen Gerät offen?",
       "p22": "Dein Konto spielt live auf einem Gerät zur Zeit, und genutzt wird das, das zuletzt geöffnet wurde. Das andere tritt zurück: Es verlässt den Tisch, an dem es war, und spielt nicht mehr live; allein spielen kannst du darauf weiter. Tippe auf <i>Hier nutzen</i>, um das Konto zurückzuholen. Ist dein Konto auf dem anderen Gerät in einer Partie, wirst du vorher gefragt, denn diese Partie geht verloren: Ein Bot spielt deinen Platz zu Ende, und eine gewertete Partie zählt als verlassen.",
+      "p23": "Was, wenn sonst niemand online ist?",
+      "p24": "Zehn Sekunden nachdem du zu warten beginnst, füllen Bots die leeren Plätze. Stattdessen kannst du sofort mit Bots spielen oder bis zu fünf Minuten auf einen Menschen warten: Wir erfahren, dass jemand wartet, und vielleicht kommt einer von uns zum Spielen. Was wir erfahren, steht in der <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>.",
       "p13": "Kann ich mit einem Screenreader oder mit größerer Schrift spielen?",
       "p14": "Ja. Jede Karte, jeder Platz, jeder Stich und jeder Punktestand hat einen Namen, den ein Screenreader vorlesen kann. Im Browser drückst du <i>Enable accessibility</i>, die erste Schaltfläche, die ein Screenreader findet, und nutzt für größere Schrift den Zoom des Browsers. In den Apps fürs Handy schaltest du VoiceOver (iPhone) oder TalkBack (Android) ein; die App folgt der Schriftgröße des Handys.",
       "p15": "Kann ich die Sprache wählen?",
@@ -129,7 +131,7 @@
     "header": {
       "title": "Datenschutz",
       "tagline": "Was Open Hearts mit dem macht, was du ihm gibst, in einfachen Worten.",
-      "updated": "Zuletzt aktualisiert am 7. Oktober 2026"
+      "updated": "Zuletzt aktualisiert am 11. Oktober 2026"
     },
     "short": {
       "title": "Kurz gesagt",
@@ -182,7 +184,8 @@
       "p9": "Nur an unser Relay, das auf Cloudflare läuft. Jede Nachricht ist von dem Gerät signiert, das sie gesendet hat, also kann jeder, der eine Kopie behält, zeigen, dass sie echt ist; eine Kopie, die jemand anderes gemacht hat, können wir nicht löschen.",
       "p10": "Was nur dein Tisch sieht",
       "p11": "Die Karten werden unter den Geräten am Tisch so ausgeteilt, dass jede Hand nur von ihrem Spieler gelesen werden kann, und kein Server von uns sieht je eine Hand. Die Züge gehen von Gerät zu Gerät.",
-      "p12": "Diese Verbindungen laufen alle über den Relay-Dienst von Cloudflare (TURN), sodass die anderen Geräte an deinem Tisch nie deine IP-Adresse erfahren — weder die anderen Spieler noch die <b>Juroren</b>: zufällig ausgewählte Apps anderer Spieler, die helfen, einen Tisch zu regeln, und die Plätze der Bots spielen. Cloudflare sieht deine IP-Adresse, wie jeder Server, mit dem du dich verbindest, und leitet den Datenverkehr verschlüsselt weiter, sodass es ihn nicht lesen kann."
+      "p12": "Diese Verbindungen laufen alle über den Relay-Dienst von Cloudflare (TURN), sodass die anderen Geräte an deinem Tisch nie deine IP-Adresse erfahren — weder die anderen Spieler noch die <b>Juroren</b>: zufällig ausgewählte Apps anderer Spieler, die helfen, einen Tisch zu regeln, und die Plätze der Bots spielen. Cloudflare sieht deine IP-Adresse, wie jeder Server, mit dem du dich verbindest, und leitet den Datenverkehr verschlüsselt weiter, sodass es ihn nicht lesen kann.",
+      "p13": "Wartet sonst niemand und du entscheidest dich, auf einen Menschen zu warten, schickt uns unser Dienst eine E-Mail, dass jemand wartet: der Pool, die Uhrzeit und die ersten Zeichen des Schlüssels deines Geräts und deines Abos – nie dein Name oder deine E-Mail-Adresse. Vielleicht kommt einer von uns zum Spielen."
     },
     "subscribing": {
       "title": "Abonnieren",
@@ -191,7 +194,8 @@
       "p3": "Wir könnten also die E-Mail-Adresse eines Abonnenten mit seinem Konto verbinden und damit mit den Namen und Ergebnissen, die dessen Geräte veröffentlicht haben. Diese Verbindung veröffentlichen wir nicht, und wir nutzen sie nur, um dein Abo zu betreiben.",
       "p4": "Wenn du deinem Konto ein weiteres Gerät hinzufügst, speichert unser Dienst einen Eintrag über den Einmal-Code, den du erstellt hast, und welche Geräte ihn erstellt und benutzt haben. Jedes Gerät im Konto kann die Schlüssel der anderen sehen, welches gerade genutzt wird, und sie entfernen. Dein Konto spielt auf einem Gerät zur Zeit: Wer das Spiel auf einem Gerät öffnet, nutzt ab dann dieses, und das vorige spielt nicht mehr live, bis du es zurückholst.",
       "p5": "Ein Konto hat außerdem fünf Backup-Codes, die unser Dienst mit dem Konto speichert und auf dessen Geräten anzeigt, mit einem Vermerk, welche schon benutzt wurden. Wenn du im Web abonniert hast, schicken wir sie beim Abschluss per E-Mail an die Adresse, mit der du bezahlt hast, und erneut, wann immer ein Gerät des Kontos uns darum bittet. Dafür lesen wir die Adresse in dem Moment bei Stripe aus und geben sie an <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, das die E-Mail für uns verschickt; die Adresse speichern wir nicht.",
-      "p6": "Wenn du dich mit Apple oder Google anmeldest, speichern wir eine unkenntlich gemachte Form der Nummer, die sie für deine Anmeldung vergeben — nicht deinen Namen oder deine E-Mail —, verbunden mit deinem Konto, damit eine gleiche Anmeldung auf einem anderen Gerät es in das Konto bringt. Dein Gerät speichert nur, welchen der beiden du genutzt hast. Die Anmeldung selbst übernehmen Apple oder Google, nach ihrer eigenen Datenschutzerklärung; im Web wird ihr Anmeldecode nur geladen, solange ein Anmeldeknopf auf dem Bildschirm ist."
+      "p6": "Wenn du dich mit Apple oder Google anmeldest, speichern wir eine unkenntlich gemachte Form der Nummer, die sie für deine Anmeldung vergeben — nicht deinen Namen oder deine E-Mail —, verbunden mit deinem Konto, damit eine gleiche Anmeldung auf einem anderen Gerät es in das Konto bringt. Dein Gerät speichert nur, welchen der beiden du genutzt hast. Die Anmeldung selbst übernehmen Apple oder Google, nach ihrer eigenen Datenschutzerklärung; im Web wird ihr Anmeldecode nur geladen, solange ein Anmeldeknopf auf dem Bildschirm ist.",
+      "p7": "Wenn ein Abo gekauft wird, schickt uns unser Dienst eine E-Mail mit dem Store, in dem es gekauft wurde, seinen ersten Zeichen und den Daten, bis zu denen es läuft, damit wir den Dienst im Blick behalten, solange er klein ist – nie dein Name oder deine E-Mail-Adresse."
     },
     "broken": {
       "title": "Uns sagen, was kaputt ist",

@@ -658,14 +658,13 @@ While there are few subscribers, the operator is emailed about each one
 - **A new subscription:** from the Stripe webhook, or the first
   store purchase bound for a subscription. Told once per subscription
   in 30 days, however often the webhook is delivered.
-- **A subscriber online:** a device on a subscription asks for its
-  licence, which the app does when it opens. Told at most once per
-  subscription in `onlineQuietMinutes`. Never for a subscription
-  listed in `notOnline`, which names each by the first 16 hex of the
-  SHA-256 of its ID, because the repository is public.
+- **A subscriber waiting for a person:** a device that found its pool
+  empty and chose to wait for a person rather than play bots
+  (`/api/waiting`), so that someone can come and play. Told at most
+  once per subscription in ten minutes.
 
-The mail says which store, the first characters of the subscription
-and device, and dates. It never includes an email address or name. It
+The mail says which store or pool, the first characters of the
+subscription and device, and dates. It never includes an email address or name. It
 goes to `alerts@openhearts.game`, which forwards to where help@ goes
 (`infra/`). It is sent from the relay worker, which holds the `EMAIL`
 binding, through a Household object named `operator-alerts`, which

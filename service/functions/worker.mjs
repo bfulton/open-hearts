@@ -27,7 +27,7 @@
 // own wasm, fetched from the static assets this worker serves.
 
 import { keepRecord, recordMost, recordResponse, tableIdShape } from './records.mjs';
-import { alertOnline, alertSubscribed, sendAlert } from './alerts.mjs';
+import { alertSubscribed, alertWaiting, sendAlert } from './alerts.mjs';
 
 const UPSTREAM = 'https://rtc.live.cloudflare.com/v1/turn/keys';
 
@@ -2501,12 +2501,30 @@ async function licenceRoute(request, env, ctx) {
   if (asked instanceof Response) return asked;
   const open = openHouse(env, request);
   const { status, body } = await licence(asked.key, env, { signer: asked.signer, open });
-  // A subscriber opening the app, for the operator (alerts.mjs).
-  if (status === 200 && !open) {
-    const store = storeOf(env);
-    await after(ctx, store.get(`KEY#${asked.key}`, 'ENTITLEMENT').then((held) => alertOnline(env, store, asked.key, held)));
-  }
   return json(request, status, body);
+}
+
+/// A subscriber's device, finding its pool empty, waiting for a person
+/// rather than playing bots (packages/table, matching.dart): the
+/// operator is told, so that someone can come and play (alerts.mjs).
+/// Signed for the pool and the game, by a device of an account with a
+/// subscription. The answer says nothing of whether anybody was told.
+async function waitingRoute(request, env, ctx) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'waiting', (body) => `${body.pool ?? ''} ${body.target ?? ''}`);
+  if (asked instanceof Response) return asked;
+  const { key, body } = asked;
+  if (typeof body.pool !== 'string' || !/^[a-z]{1,16}$/.test(body.pool) || !Number.isInteger(body.target) || body.target < 1 || body.target > 100) {
+    return json(request, 400, { error: 'a pool and the score its game runs to' });
+  }
+  const store = storeOf(env);
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
+  const account = await deviceAccount(env, store, key);
+  if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
+  if (!openHouse(env, request)) await after(ctx, alertWaiting(env, store, { key, account, pool: body.pool, target: body.target }));
+  return json(request, 200, { ok: true });
 }
 
 async function turn(request, env) {
@@ -3298,6 +3316,7 @@ const ROUTES = {
   backups: (request, env) => backupsRoute(request, env),
   devices: (request, env) => devicesRoute(request, env),
   profile: (request, env) => profileRoute(request, env),
+  waiting: (request, env, ctx) => waitingRoute(request, env, ctx),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),
   'apple-id': (request, env) => appleIdRoute(request, env),

@@ -91,6 +91,8 @@
       "p12": "Se outro aparelho seu está na sua conta, adicione o novo a partir dele e remova o perdido. Se não, use um código de backup: no aparelho novo, abra o menu, escolha <i>Ativar assinatura</i> e digite o código, e o aparelho entra na mesma conta, com seu nome, sua imagem, seu rating e suas partidas. Entrou com Apple ou Google? Entre do mesmo jeito no aparelho novo. Qualquer aparelho da conta pode <i>Mostrar códigos de backup</i>, e os de uma assinatura pela web foram enviados por e-mail quando você assinou: guarde-os em lugar seguro. Comprou na App Store ou no Google Play? No celular novo, toque em <i>Assinar</i> e depois em <i>Restaurar compras</i>.",
       "p21": "Por que aparece que o Open Hearts está aberto em outro aparelho?",
       "p22": "A sua conta joga ao vivo em um aparelho por vez, e o que está em uso é o último que foi aberto. O outro sai de cena: deixa a mesa em que estava e para de jogar ao vivo, mas você ainda pode jogar sozinho nele. Toque em <i>Usar aqui</i> para retomar a conta. Se a sua conta está numa partida no outro aparelho, você é avisado antes, porque essa partida será perdida: um bot termina o seu lugar, e uma partida ranqueada conta como abandonada por você.",
+      "p23": "E se não houver mais ninguém online?",
+      "p24": "Dez segundos depois que você começa a esperar, bots ocupam os lugares vazios. Em vez disso, você pode jogar com bots na hora, ou esperar até cinco minutos por uma pessoa: somos avisados de que alguém está esperando, e talvez um de nós venha jogar. O que nos é dito está na <a href=\"{{base}}/privacy\">política de privacidade</a>.",
       "p13": "Dá para jogar com leitor de tela, ou com letras maiores?",
       "p14": "Sim. Cada carta, lugar, vaza e pontuação tem um nome que um leitor de tela consegue ler. No navegador, aperte <i>Enable accessibility</i>, o primeiro botão que o leitor de tela encontra, e use o zoom do navegador para aumentar o texto. Nos apps para celular, ative o VoiceOver (iPhone) ou o TalkBack (Android); o app segue o tamanho de texto do celular.",
       "p15": "Posso escolher o idioma?",
@@ -129,7 +131,7 @@
     "header": {
       "title": "Privacidade",
       "tagline": "O que o Open Hearts faz com o que você dá a ele, em palavras simples.",
-      "updated": "Última atualização: 7 de outubro de 2026"
+      "updated": "Última atualização: 11 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
@@ -182,7 +184,8 @@
       "p9": "Só para o nosso relay, que roda na Cloudflare. Cada mensagem é assinada pelo aparelho que a enviou, então qualquer um que guarde uma cópia pode mostrar que ela é autêntica; não podemos apagar uma cópia feita por outra pessoa.",
       "p10": "O que só a sua mesa vê",
       "p11": "As cartas são distribuídas entre os aparelhos da mesa de forma que a mão de cada jogador só possa ser lida por ele, e nenhum servidor nosso jamais vê uma mão. As jogadas vão de aparelho para aparelho.",
-      "p12": "Todas essas conexões passam pelo serviço de relay da Cloudflare (TURN), então os outros aparelhos da sua mesa nunca ficam sabendo o seu endereço IP — nem os outros jogadores, nem os <b>jurados</b>: os apps de outros jogadores, sorteados, que ajudam a resolver uma mesa e jogam nos lugares dos bots. A Cloudflare vê o seu endereço IP, como qualquer servidor a que você se conecta, e repassa o tráfego criptografado, de modo que não consegue lê-lo."
+      "p12": "Todas essas conexões passam pelo serviço de relay da Cloudflare (TURN), então os outros aparelhos da sua mesa nunca ficam sabendo o seu endereço IP — nem os outros jogadores, nem os <b>jurados</b>: os apps de outros jogadores, sorteados, que ajudam a resolver uma mesa e jogam nos lugares dos bots. A Cloudflare vê o seu endereço IP, como qualquer servidor a que você se conecta, e repassa o tráfego criptografado, de modo que não consegue lê-lo.",
+      "p13": "Se não houver mais ninguém esperando e você escolher esperar por uma pessoa, o nosso serviço nos manda um e-mail dizendo que alguém está esperando: o grupo, a hora e os primeiros caracteres da chave do seu aparelho e da sua assinatura, nunca o seu nome nem o seu e-mail. Talvez um de nós venha jogar."
     },
     "subscribing": {
       "title": "Assinar",
@@ -191,7 +194,8 @@
       "p3": "Isso significa que poderíamos ligar o endereço de e-mail de um assinante à conta dele e, assim, aos nomes e aos resultados que os aparelhos dela publicaram. Nós não publicamos essa ligação, e só a usamos para manter a sua assinatura funcionando.",
       "p4": "Se você adicionar outro aparelho à sua conta, o nosso serviço guarda um registro do código de uso único que você criou e de quais aparelhos o criaram e o usaram. Qualquer aparelho da conta pode ver as chaves dos outros, qual está em uso, e removê-los. A sua conta joga em um aparelho por vez: abrir o jogo num aparelho faz dele o que está em uso, e o anterior para de jogar ao vivo até você retomá-lo.",
       "p5": "Uma conta também tem cinco códigos de backup, guardados pelo nosso serviço junto com a conta e mostrados nos aparelhos dela, com uma anotação de quais já foram usados. Se você assinou na web, nós os enviamos por e-mail para o endereço com que você pagou quando você assina, e de novo sempre que um aparelho da conta nos pedir. Para isso, lemos o endereço na Stripe naquele momento e o passamos à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, que envia o e-mail por nós; nós não guardamos o endereço.",
-      "p6": "Se você entrar com Apple ou Google, guardamos uma forma embaralhada do número que eles dão ao seu login — não o seu nome nem o seu e-mail — ligada à sua conta, para que entrar do mesmo jeito em outro aparelho o traga para a conta. O seu aparelho guarda só qual dos dois você usou. O login é feito pela Apple ou pelo Google, sob a política de privacidade de cada um; na web, o código de login deles só é baixado enquanto há um botão de login na tela."
+      "p6": "Se você entrar com Apple ou Google, guardamos uma forma embaralhada do número que eles dão ao seu login — não o seu nome nem o seu e-mail — ligada à sua conta, para que entrar do mesmo jeito em outro aparelho o traga para a conta. O seu aparelho guarda só qual dos dois você usou. O login é feito pela Apple ou pelo Google, sob a política de privacidade de cada um; na web, o código de login deles só é baixado enquanto há um botão de login na tela.",
+      "p7": "Quando uma assinatura é comprada, o nosso serviço nos manda um e-mail com a loja em que foi comprada, os primeiros caracteres dela e as datas até quando vale, para podermos acompanhar o serviço enquanto ele é pequeno — nunca o seu nome nem o seu e-mail."
     },
     "broken": {
       "title": "Contar o que está quebrado",

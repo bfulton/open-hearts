@@ -91,6 +91,8 @@
       "p12": "If another of your devices is in your account, add the new one from there and drop the lost one. If not, use a backup code: on the new device, open the menu, choose <i>Activate subscription</i> and enter it, and the device joins the same account, with your name, picture, rating and games. Signed in with Apple or Google? Sign in the same way on the new device instead. Any device in the account can <i>Show backup codes</i>, and a web subscription's were emailed when you subscribed: keep them somewhere safe. Bought in the App Store or Google Play? On the new phone, tap <i>Subscribe</i>, then <i>Restore purchases</i>.",
       "p21": "Why does it say Open Hearts is open on another device?",
       "p22": "Your account plays live on one device at a time, and the one opened most recently is the one in use. The other steps back: it leaves any table it was at and stops playing live, and you can still play alone on it. Tap <i>Use it here</i> to take the account back. If your account is in a game on the other device, you are asked first, because that game will be lost: a bot finishes your seat, and a rated game counts as one you left.",
+      "p23": "What if nobody else is online?",
+      "p24": "Ten seconds after you start waiting, bots fill the empty seats. You can play with bots at once instead, or wait up to five minutes for a person: we are told someone is waiting, and one of us may come and play. What we are told is in the <a href=\"{{base}}/privacy\">privacy policy</a>.",
       "p13": "Can I play with a screen reader, or bigger text?",
       "p14": "Yes. Every card, seat, trick and score has a name a screen reader can read. In a browser, press <i>Enable accessibility</i>, the first button a screen reader finds, and use the browser's zoom for bigger text. In the phone apps, turn on VoiceOver (iPhone) or TalkBack (Android); the app follows the phone's text size.",
       "p15": "Can I pick the language?",
@@ -129,7 +131,7 @@
     "header": {
       "title": "Privacy",
       "tagline": "What Open Hearts does with what you give it, in plain words.",
-      "updated": "Last updated 7 October 2026"
+      "updated": "Last updated 11 October 2026"
     },
     "short": {
       "title": "The short version",
@@ -182,7 +184,8 @@
       "p9": "Only to our relay, which runs on Cloudflare. Every message is signed by the device that sent it, so anyone who keeps a copy can show it is genuine; we cannot delete a copy someone else made.",
       "p10": "What only your table sees",
       "p11": "The cards are dealt between the devices at the table so that each player's hand can be read by that player alone, and no server of ours ever sees a hand. Plays go from device to device.",
-      "p12": "Those connections all go through Cloudflare's relay service (TURN), so the other devices at your table never learn your IP address — not the other players, and not the <b>jurors</b>: the apps of other players, drawn at random, that help settle a table and play the bots' seats. Cloudflare sees your IP address, as any server you connect to does, and passes the traffic on encrypted, so that it cannot read it."
+      "p12": "Those connections all go through Cloudflare's relay service (TURN), so the other devices at your table never learn your IP address — not the other players, and not the <b>jurors</b>: the apps of other players, drawn at random, that help settle a table and play the bots' seats. Cloudflare sees your IP address, as any server you connect to does, and passes the traffic on encrypted, so that it cannot read it.",
+      "p13": "If nobody else is waiting and you choose to wait for a person, our service emails us that someone is waiting: the pool, the time, and the first few characters of your device's key and of your subscription — never your name or email address. One of us may come and play."
     },
     "subscribing": {
       "title": "Subscribing",
@@ -191,7 +194,8 @@
       "p3": "That means we could connect a subscriber's email address with their account, and so with the names and results its devices have published. We do not publish that connection, and we use it only to run your subscription.",
       "p4": "If you add another device to your account, our service keeps a record of the one-use code you made and which devices made and used it. Any device in the account can see the others' keys, which one is in use, and remove them. Your account plays on one device at a time: opening the game on one makes it the one in use, and the device before it stops playing live until you take it back.",
       "p5": "An account also has five backup codes, kept by our service with the account and shown on its devices, with a note of which have been used. If you subscribed on the web, we email them to the address you paid with when you subscribe, and again whenever a device in the account asks us to. To do that we read the address from Stripe at that moment and hand it to <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, which sends the email for us; we do not keep the address.",
-      "p6": "If you sign in with Apple or Google, we keep a scrambled form of the number they give for your sign-in — not your name or email — linked to your account, so that signing in the same way on another device brings it into the account. Your device keeps only which of the two you used. Apple or Google does the signing in, under its own privacy policy; on the web, its sign-in code is fetched only while a sign-in button is on the screen."
+      "p6": "If you sign in with Apple or Google, we keep a scrambled form of the number they give for your sign-in — not your name or email — linked to your account, so that signing in the same way on another device brings it into the account. Your device keeps only which of the two you used. Apple or Google does the signing in, under its own privacy policy; on the web, its sign-in code is fetched only while a sign-in button is on the screen.",
+      "p7": "When a subscription is bought, our service emails us which store it was bought in, the first few characters of it, and the dates it runs to, so that we can keep an eye on the service while it is small — never your name or email address."
     },
     "broken": {
       "title": "Telling us what's broken",

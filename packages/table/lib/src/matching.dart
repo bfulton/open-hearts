@@ -34,7 +34,7 @@ import 'timing.dart';
 
 /// Someone waiting, as the others see them.
 class Waiter {
-  Waiter({required this.key, required this.name, required this.rating, required this.since, this.avatar, this.pace = 0, this.licence});
+  Waiter({required this.key, required this.name, required this.rating, required this.since, this.avatar, this.pace = 0, this.licence, this.botsAfterMs});
 
   final PublicKey key;
   final String name;
@@ -66,6 +66,11 @@ class Waiter {
   /// When they started waiting, ms since the epoch, by their own clock.
   final int since;
 
+  /// How long they will wait for people before bots fill the seats, as
+  /// they last said it ([WaitingRoom.waitForPerson], [WaitingRoom.playWithBots]);
+  /// null for the pool's own.
+  int? botsAfterMs;
+
   /// When their last heartbeat arrived, ms.
   int lastSeen = 0;
 
@@ -90,8 +95,9 @@ class Plan {
 /// the rest, at random. A table is four players whose ratings lie
 /// within a window of each other — [windowPer] points for every round
 /// the first of them has waited, so a lonely rating widens its search
-/// rather than waiting for ever. Once someone has waited [botsAfterMs],
-/// the rest go with bots at their own rating.
+/// rather than waiting for ever. Once someone has waited as long as
+/// they said they would before bots ([Waiter.botsAfterMs], else
+/// [botsAfterMs]), they go with bots at their own rating.
 Plan plan(
   List<Waiter> waiting, {
   required int nowMs,
@@ -135,7 +141,7 @@ Plan plan(
   }
   // Somebody has waited long enough: they go, with bots, and take with
   // them anyone left over within their window.
-  final overdue = left.where((w) => nowMs - w.since >= botsAfterMs).toList();
+  final overdue = left.where((w) => nowMs - w.since >= (w.botsAfterMs ?? botsAfterMs)).toList();
   if (overdue.isNotEmpty) {
     final first = overdue.first;
     final rounds = (nowMs - first.since) ~/ roundMs + 1;
@@ -172,7 +178,7 @@ class WaitingRoom {
     required this.rating,
     this.pace = 0,
     this.roundMs = 5000,
-    this.botsAfterMs = 10000,
+    this.botsAfterMs = defaultBotsAfterMs,
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
     int? nowMs,
@@ -232,8 +238,32 @@ class WaitingRoom {
   /// a waiter without one is not seated by anyone.
   final Licence? licence;
   final int roundMs;
-  final int botsAfterMs;
+
+  /// How long this player waits for people before bots fill the empty
+  /// seats: the pool's ten seconds, unless they chose otherwise
+  /// ([waitForPerson], [playWithBots]).
+  int botsAfterMs;
   final int heartbeatMs;
+
+  /// The pool's wait before bots.
+  static const defaultBotsAfterMs = 10000;
+
+  /// The longest anyone waits for a person: then bots, as for everyone.
+  static const personAtMostMs = 5 * 60 * 1000;
+
+  /// Waits up to [personAtMostMs] for people rather than the pool's ten
+  /// seconds, and says so at once.
+  void waitForPerson() {
+    botsAfterMs = personAtMostMs;
+    _say();
+  }
+
+  /// Takes bots for the empty seats at the next round, and says so at
+  /// once.
+  void playWithBots() {
+    botsAfterMs = 0;
+    _say();
+  }
 
   /// A waiter not heard from for this long has gone.
   final int staleMs;
@@ -277,7 +307,7 @@ class WaitingRoom {
   List<Waiter> get present {
     final now = _now;
     final all = [
-      Waiter(key: me, name: name, rating: rating, since: since, avatar: avatar, licence: licence)..lastSeen = now,
+      Waiter(key: me, name: name, rating: rating, since: since, avatar: avatar, licence: licence, botsAfterMs: botsAfterMs)..lastSeen = now,
       ..._others.values.where((w) => now - w.lastSeen <= staleMs),
     ];
     all.sort((a, b) => a.key.compareTo(b.key));
@@ -295,6 +325,7 @@ class WaitingRoom {
           'name': name,
           'rating': rating,
           if (pace > 0) 'pace': pace,
+          if (botsAfterMs != defaultBotsAfterMs) 'botsAfter': botsAfterMs,
           'since': since,
           if (avatar != null) 'avatar': avatar,
           if (licence != null) 'licence': licence!.toJson(),
@@ -397,6 +428,9 @@ class WaitingRoom {
           ),
         );
         w.lastSeen = _now;
+        // Said again with every heartbeat, and changed by a choice made
+        // while waiting; never past the most anyone waits.
+        w.botsAfterMs = switch (c['botsAfter']) { final int b when b >= 0 && b <= personAtMostMs => b, _ => null };
       case 'match':
         if (e.kind != TableKinds.lobby) return;
         final round = c['round'] as int?;

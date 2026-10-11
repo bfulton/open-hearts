@@ -554,6 +554,42 @@ abstract class AppLocalizations {
   /// **'{seconds} s{others, plural, =0{} =1{, 1 other waiting} other{, {others} others waiting}} — bots fill any seat still empty at ten'**
   String waitedLine(int seconds, int others);
 
+  /// Button while waiting to be seated: stop waiting for people and fill the empty seats with bots now.
+  ///
+  /// In en, this message translates to:
+  /// **'Play now with bots'**
+  String get playNowWithBots;
+
+  /// Button while waiting to be seated: wait up to five minutes for another person instead of playing bots at ten seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for a person'**
+  String get waitForPerson;
+
+  /// Under waitForPerson: how long it waits, and that the people who run the game are emailed that someone is waiting (no name or address).
+  ///
+  /// In en, this message translates to:
+  /// **'Up to five minutes. We\'re told someone is waiting, and may come and play.'**
+  String get waitForPersonHint;
+
+  /// Heading while waiting up to five minutes for another person.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a person'**
+  String get waitingForPerson;
+
+  /// While waiting for a person: time waited as minutes:seconds out of five minutes, how many others are waiting, and that bots fill the empty seats after.
+  ///
+  /// In en, this message translates to:
+  /// **'{waited} of 5:00{others, plural, =0{} =1{, 1 other waiting} other{, {others} others waiting}} — then bots fill the empty seats'**
+  String waitingForPersonLine(String waited, int others);
+
+  /// Heading after choosing to play now with bots, until the table is ready.
+  ///
+  /// In en, this message translates to:
+  /// **'Seating you with bots'**
+  String get seatingWithBots;
+
   /// Button: stop waiting.
   ///
   /// In en, this message translates to:

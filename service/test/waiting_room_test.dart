@@ -52,6 +52,17 @@ void main() {
       expect(p.tables.first.map((x) => x.name), ['solo', 'near']);
       expect(p.leftOver.map((x) => x.name), ['far']);
     });
+
+    test('each waiter\'s own wait for people is kept: up to five minutes for a person, or none', () {
+      final patient = w('patient')..botsAfterMs = WaitingRoom.personAtMostMs;
+      expect(plan([patient], nowMs: 60000, roundMs: round, botsAfterMs: 10000, random: rng).tables, isEmpty,
+          reason: 'a minute in, still waiting for a person');
+      expect(plan([patient], nowMs: WaitingRoom.personAtMostMs, roundMs: round, botsAfterMs: 10000, random: rng).tables.length, 1,
+          reason: 'and at five minutes, bots');
+      final eager = w('eager', since: 1000)..botsAfterMs = 0;
+      expect(plan([eager], nowMs: 1000, roundMs: round, botsAfterMs: 10000, random: rng).tables.single.map((x) => x.name), ['eager'],
+          reason: 'bots at once, when asked for');
+    });
   });
 
   group('over the relay', () {
@@ -85,6 +96,25 @@ void main() {
           log: log);
       return (t, room);
     }
+
+    test('two waiting for a person are left waiting, whoever hosts, until one of them takes bots', () async {
+      final a = await join('A');
+      final b = await join('B');
+      a.$2.waitForPerson();
+      b.$2.waitForPerson();
+      // Past the pool's wait for bots (three seconds here), and nobody is
+      // seated: whoever hosts has heard the other wants a person.
+      final early = Future.any([a.$2.seated.first, b.$2.seated.first]);
+      expect(await early.then((_) => true).timeout(const Duration(seconds: 7), onTimeout: () => false), isFalse);
+      b.$2.playWithBots();
+      final specs = await Future.wait([a.$2.seated.first, b.$2.seated.first].map((f) => f.timeout(const Duration(seconds: 15))));
+      expect(specs.map((s) => s.id).toSet().length, 1, reason: 'one table, the two of them and two bots');
+      expect(specs.first.seats.whereType<HumanSeat>().length, 2);
+      for (final r in [a, b]) {
+        r.$2.close();
+        r.$1.close();
+      }
+    });
 
     test('three waiting are seated together by whoever has the lowest key, with one bot', () async {
       final rooms = [for (final n in ['A', 'B', 'C']) await join(n)];

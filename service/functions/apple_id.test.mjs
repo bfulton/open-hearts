@@ -384,7 +384,7 @@ test('it is counted under its own name, and the operator is not mailed', async (
     OH_METRICS: { writeDataPoint: (line) => lines.push(line) },
     OH_ALERTS_TO: 'alerts@openhearts.game',
     OH_ALERT_SUBSCRIBED: 'on',
-    OH_ALERT_ONLINE: 'on',
+    OH_ALERT_WAITING: 'on',
   };
   await tell(watched, await notice('account-deleted'));
   await tell(watched, await notice('email-disabled'));
