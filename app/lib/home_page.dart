@@ -82,17 +82,17 @@ bool get livePaused => !RemoteSettings.current.config.live;
 /// relays is the build's business (net/relays.dart), not the page's.
 void _relayLog(String line) => debugPrint('relay: $line');
 
-/// With `?e2e` in the address the table's every transition and the
-/// mesh's every channel change go to the console too.
-final _debugging = Uri.base.queryParameters.containsKey('e2e');
+/// In a build being driven (net/address.dart) the table's every
+/// transition and the mesh's every channel change go to the console too.
+final _debugging = driven(Uri.base);
 
 /// The deal a solo game starts from, for a browser test that needs a
-/// particular one (`?e2e&seed=156`); with no `e2e`, never.
+/// particular one (`?e2e&seed=156`); in a build not being driven, never.
 final _dealtFrom = _debugging ? int.tryParse(Uri.base.queryParameters['seed'] ?? '') : null;
 
 /// The score the games started here play to, when a browser test asks
-/// for another (`?e2e&target=1`, net/address.dart); with no `e2e`,
-/// never — the device's own choice, which the door still shows.
+/// for another (`?e2e&target=1`, net/address.dart); otherwise never —
+/// the device's own choice, which the door still shows.
 final _playsTo = targetIn(Uri.base);
 
 class HomePage extends StatefulWidget {

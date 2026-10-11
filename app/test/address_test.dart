@@ -21,15 +21,30 @@ void main() {
 
     // A build being driven can ask for longer, which is what the
     // four-browser suite needs and nothing else does.
-    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=45'), const Duration(seconds: 45));
-    expect(waits('https://play.openhearts.game/?e2e=1'), ten, reason: 'asking for nothing is the rule');
-    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=soon'), ten, reason: 'and neither is nonsense');
+    const here = 'http://play.openhearts.localhost:8123/';
+    expect(waits('$here?e2e=1&roomWait=45'), const Duration(seconds: 45));
+    expect(waits('$here?e2e=1'), ten, reason: 'asking for nothing is the rule');
+    expect(waits('$here?e2e=1&roomWait=soon'), ten, reason: 'and neither is nonsense');
 
     // Longer, never shorter, and never much longer: it is one device's
     // read of a clock the whole room keeps.
-    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=1'), ten);
-    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=-5'), ten);
-    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=99999'), const Duration(minutes: 1));
+    expect(waits('$here?e2e=1&roomWait=1'), ten);
+    expect(waits('$here?e2e=1&roomWait=-5'), ten);
+    expect(waits('$here?e2e=1&roomWait=99999'), const Duration(minutes: 1));
+
+    // And production's own address asks nothing, e2e or not.
+    expect(waits('https://play.openhearts.game/?e2e=1&roomWait=45'), ten);
+  });
+
+  test('only a page served from this machine, under e2e, is a build being driven', () {
+    bool drivenAt(String url) => driven(Uri.parse(url));
+    expect(drivenAt('http://localhost:8080/?e2e=1'), isTrue);
+    expect(drivenAt('http://127.0.0.1:8123/?e2e'), isTrue);
+    expect(drivenAt('http://play.openhearts.localhost:8123/?e2e=1'), isTrue);
+    expect(drivenAt('http://play.openhearts.localhost:8123/'), isFalse, reason: 'not without e2e');
+    expect(drivenAt('https://play.openhearts.game/?e2e=1'), isFalse, reason: 'production is never driven');
+    expect(drivenAt('https://dev.open-hearts.pages.dev/play/?e2e=1'), isFalse, reason: 'nor is a preview');
+    expect(drivenAt('https://evil.localhost.example.com/?e2e=1'), isFalse);
   });
 
   test('a driven build takes the share of its beats and the target its address asks for, and no other does', () {
