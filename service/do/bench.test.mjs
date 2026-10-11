@@ -32,6 +32,11 @@ function container({ startsAfter = 2 } = {}) {
       this.signals.push(n);
       this.running = false;
     },
+    destroyed: 0,
+    async destroy() {
+      this.destroyed++;
+      this.running = false;
+    },
     async setInactivityTimeout(ms) {
       this.timeouts.push(ms);
     },
@@ -99,6 +104,24 @@ test('a call starts the backup jurors, waits for them, and passes the call on', 
   assert.equal(c.started.length, 1);
   assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2']);
   assert.equal((await bench.fetch(new Request('https://bench/wake', { method: 'POST' }))).status, 400, 'a call names its table');
+});
+
+test('backup jurors started with another service key are started again with this one', async () => {
+  const c = container({ startsAfter: 0 });
+  const s = state(c);
+  await wake(new Bench(s, { OH_SERVICE_KEY: 'aa'.repeat(32) }));
+  await wake(new Bench(s, { OH_SERVICE_KEY: 'aa'.repeat(32) }), 'tbl2');
+  assert.equal(c.destroyed, 0, 'the same key: left running');
+  assert.equal(c.started.length, 1);
+  // The relay deployed with a new key: the object is new, the container
+  // is not, and it would hold seats to the old key for as long as calls
+  // kept it awake.
+  const res = await wake(new Bench(s, { OH_SERVICE_KEY: 'bb'.repeat(32) }), 'tbl3');
+  assert.equal(res.status, 200);
+  assert.equal(c.destroyed, 1);
+  assert.equal(c.started.length, 2);
+  assert.equal(c.started[1].env.OH_SERVICE_KEY, 'bb'.repeat(32));
+  assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2', 'tbl3']);
 });
 
 test('left alone while they serve or wait, stopped once they are quiet', async () => {

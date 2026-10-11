@@ -32,6 +32,10 @@ const INACTIVITY_MS = 15 * 60 * 1000;
 const READY_TRIES = 100;
 const READY_WAIT_MS = 200;
 
+/// Where this object notes the service key it last started the
+/// backup jurors with.
+const STARTED_WITH = 'startedWith';
+
 export class Bench {
   constructor(state, env = {}) {
     this.state = state;
@@ -63,6 +67,12 @@ export class Bench {
     const c = this.container;
     if (!c) return false;
     await c.setInactivityTimeout?.(INACTIVITY_MS);
+    // The service key is the container's from when it started, and a
+    // deploy of a new key starts no container afresh: one kept awake by
+    // calls would hold every seat to the old key. So one started with
+    // another key is stopped, and started again with this one.
+    const key = this.env.OH_SERVICE_KEY ?? null;
+    if (c.running && (await this.state.storage.get(STARTED_WITH)) !== key) await c.destroy();
     if (!c.running) {
       c.start({
         enableInternet: true,
@@ -74,6 +84,7 @@ export class Bench {
           ...(this.env.OH_BENCH_PRESENCE_RELAYS ? { OH_PRESENCE_RELAYS: this.env.OH_BENCH_PRESENCE_RELAYS } : {}),
         },
       });
+      await this.state.storage.put(STARTED_WITH, key);
     }
     if (!(await this.ready())) return false;
     try {
