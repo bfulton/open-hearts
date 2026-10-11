@@ -1,0 +1,15 @@
+# The deal's workspace, whose root is crypto/ only so that the vendored
+# crates the deal is built from (vendor/) lie inside it: Cargo then
+# hashes their paths relative to the root rather than the disk, and the
+# deal's wasm is the same bytes from any checkout (build.sh, ../wasm.sh).
+# The other crates are their own workspaces.
+[workspace]
+members = ["deal"]
+exclude = ["schnorr", "schnorr_wasm", "vendor"]
+resolver = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
