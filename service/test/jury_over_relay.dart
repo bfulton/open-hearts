@@ -8,7 +8,7 @@
 /// Silence is shortened from two minutes to ten seconds throughout, so
 /// the test runs in under a minute; the protocol is otherwise the
 /// app's. Run twice: at a seeded table, with one juror, and at a sealed
-/// one, with the bench of four the service runs — a sealed table's bot
+/// one, with the four backup jurors the service runs — a sealed table's bot
 /// seats are dealt only to a jury that can hold them ([juryToHoldBots]),
 /// so one juror would leave it waiting for good. There the jurors also
 /// hold a piece of each person's deal secret and release it so the hand
@@ -87,8 +87,8 @@ void juryOverRelay({required bool sealed}) {
     sub = clients[0].changes.listen((_) {
       final c = clients[0];
       // The quiet seat's hand, opened with the jurors' pieces, in the
-      // hand it went quiet in: from the next, the bench holds the seat
-      // and its cards are dealt to the holder, as a bot's are.
+      // hand it went quiet in: from the next, a backup juror holds the
+      // seat and its cards are dealt to the holder, as a bot's are.
       if (c.game.handNumber == quietHand && c.game.knowsHand(1)) opened = true;
       if (quiet == null && c.juries.isNotEmpty && c.game.phase == Phase.playing && c.awaitingMyPlay) {
         quietHand = c.game.handNumber;
@@ -102,7 +102,7 @@ void juryOverRelay({required bool sealed}) {
       if (c.done && !done.isCompleted) done.complete();
     });
     await done.future.timeout(const Duration(minutes: 4), onTimeout: () {
-      fail('not finished:\n${clients[0].describe()}\nbench: ${bench.serving} tables, '
+      fail('not finished:\n${clients[0].describe()}\nbackup jurors: ${bench.serving} tables, '
           '${bench.jurors.fold(0, (n, j) => n + j.duty.verdicts)} verdicts, online ${bench.online}');
     });
     sub.cancel();
@@ -110,8 +110,8 @@ void juryOverRelay({required bool sealed}) {
     expect(c.done, isTrue);
     expect(c.holders[1], isA<BotSeat>());
     expect(c.juries, isNotEmpty, reason: 'a jury was drawn');
-    expect(c.juries.first.event.jurors.toSet(), benchKeys, reason: 'the jury is the bench, nobody else being online');
-    if (sealed) expect(benchKeys.containsAll(c.botHolders(c.game.handNumber).values), isTrue, reason: 'the bench held the bot seats');
+    expect(c.juries.first.event.jurors.toSet(), benchKeys, reason: 'the jury is the backup jurors, nobody else being online');
+    if (sealed) expect(benchKeys.containsAll(c.botHolders(c.game.handNumber).values), isTrue, reason: 'the backup jurors held the bot seats');
     expect(c.record.any((d) => d.verdict != null), isTrue, reason: 'a verdict settled a turn');
     if (sealed) expect(opened, isTrue, reason: 'the quiet seat\'s hand was opened with the jurors\' pieces');
     final v = verifyRecord(spec, c.record, juries: c.juries, crypto: c0, releases: c.releases);

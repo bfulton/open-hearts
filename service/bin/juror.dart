@@ -4,26 +4,26 @@
 ///
 ///     dart run bin/juror.dart --relay ws://localhost:7447
 ///     OH_JUROR_SECRET=<64 hex> dart run bin/juror.dart --relay wss://a,wss://b
-///     dart run bin/juror.dart --jurors 6      # a wider bench
+///     dart run bin/juror.dart --jurors 6      # more backup jurors
 ///     dart run bin/juror.dart --relay wss://a --presence wss://b/{tag},wss://a --port 8080
 ///
-/// `--presence` is where the bench says it is here and hears calls,
+/// `--presence` is where the jurors say they are here and hear calls,
 /// as a device's presence goes (app/lib/net/relays.dart); `--relay`
-/// is where it follows the tables. With `--port`, it answers on that
+/// is where they follow the tables. With `--port`, it answers on that
 /// port for whatever runs it (service/do/bench.mjs, a Cloudflare
 /// Container): `GET /ping`, `GET /status` — {online, serving} — and
-/// `POST /wake?table=…`, a call passed on, so the bench is online for
+/// `POST /wake?table=…`, a call passed on, so the jurors are online for
 /// that table now rather than at its next call. SIGTERM ends it.
 ///
 /// Several of them, not one: a table whose bot seats the jury holds
 /// needs juryToHoldBots jurors online before it can hold any, and the
-/// call comes exactly when there is nobody else to make that number up
-/// (docs/04-live-play.md). So the bench is that many by default, each
-/// its own identity — derived from the secret given, so the same
-/// deployment keeps the same keys across restarts, or fresh ones when
-/// no secret is set.
+/// call comes exactly when too few others are online to make that
+/// number up (docs/04-live-play.md). So there are that many by
+/// default, each its own identity — derived from the secret given, so
+/// the same deployment keeps the same keys across restarts, or fresh
+/// ones when no secret is set.
 ///
-/// The relay carries them on the bench's own mark, an HMAC of each key
+/// The relay carries them on their own mark, an HMAC of each key
 /// under OH_JUROR_SECRET, which the relay holds too (service/do/relay.mjs,
 /// benchMark); without the secret there is no mark, and only a relay
 /// that asks nobody who they are carries them — a local one. With
@@ -62,16 +62,16 @@ Future<void> main(List<String> args) async {
   final secret = Platform.environment['OH_JUROR_SECRET'];
   final service = Platform.environment['OH_SERVICE_KEY'] ?? '';
   if (RegExp(r'^[0-9a-f]{64}$').hasMatch(service)) licenceService = service;
-  // The bench's mark, for a relay that asks who it is.
+  // The backup jurors' mark, for a relay that asks who they are.
   if (secret != null && secret.isNotEmpty) {
     final mac = Hmac(sha256, utf8.encode(secret));
     relayCredentials = (key) => [
           ['bench', mac.convert(utf8.encode('oh-bench/1\n$key')).toString()],
         ];
   }
-  // One key per seat on the bench. Derived rather than the secret
-  // itself, so that one secret in the environment gives the whole
-  // bench and every restart brings the same keys back.
+  // One key per backup juror. Derived rather than the secret itself,
+  // so that one secret in the environment gives them all and every
+  // restart brings the same keys back.
   final signers = [
     for (var i = 0; i < size; i++)
       if (secret != null && secret.length == 64)
@@ -81,10 +81,10 @@ Future<void> main(List<String> args) async {
   ];
   // The deal's cryptography, to serve sealed tables: the cdylib built
   // by crypto/deal/build.sh, found beside the repository's own build.
-  // Every live table is sealed, so a bench without it could serve none
-  // of them: it would come online when called, be drawn, hold bot
-  // seats and pieces of escrow, and turn every summons down. It does
-  // not start.
+  // Every live table is sealed, so backup jurors without it could
+  // serve none of them: they would come online when called, be drawn,
+  // hold bot seats and pieces of escrow, and turn every summons down.
+  // They do not start.
   final DealCrypto crypto;
   try {
     crypto = await DealCrypto.load();
@@ -106,8 +106,8 @@ Future<void> main(List<String> args) async {
   });
 }
 
-/// The bench's own port, for whatever runs it: whether it is up, what
-/// it is serving, and a call passed on. Nothing here is anybody's to
+/// The backup jurors' own port, for whatever runs them: whether they
+/// are up, what they are serving, and a call passed on. Nothing here is anybody's to
 /// reach but the host's: in a Cloudflare Container only the Worker
 /// that owns it can open the port.
 Future<void> _answer(LastResortBench bench, int port) async {

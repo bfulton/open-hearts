@@ -239,8 +239,8 @@ class Activation {
 /// The account behind [key], from [activation], where accounts are
 /// checked and it holds — or as stated where nothing is checked. Null
 /// when there is none to be had, which is a key the relay admitted on
-/// the service's own word: the bench of jurors of last resort, which
-/// belongs to no account (docs/04-live-play.md).
+/// the service's own word: the backup jurors, who belong to no account
+/// (docs/04-live-play.md).
 AccountId? accountFrom(Activation? activation, PublicKey key, {int? nowS}) {
   if (activation == null || activation.key != key) return null;
   if (!licencesChecked) return activation.account;

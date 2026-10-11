@@ -570,23 +570,23 @@ relay outage, which takes every juror at once; what moves f is the draw
 preferring the settled and the top-up. `juryToHoldBots` is four: three
 would hold, and the fourth is margin for the holder being one that goes.
 
-### Jurors of last resort
+### Backup jurors
 
 A table short of jurors calls for them on the presence tag every ten
-seconds, and a **bench** of four jurors we run comes online
+seconds, and four **backup jurors** we run come online
 (`LastResortBench`, `service/bin/juror.dart`) — four, because a table
 needs four before it can hold any bot seat. Each is its own identity,
 drawn as anyone is and running the same code. This is the one place a
 gameplay event reaches anything of ours, and it says only "a table
 needs a juror".
 
-The bench runs as a Cloudflare Container (`service/bench`,
+The backup jurors run as a Cloudflare Container (`service/bench`,
 `service/do/bench.mjs`). The relay passes a call to the `Bench` object at
 most every twenty seconds, which starts the container if needed and
-hands it the call. The bench goes quiet ten minutes after the last call
+hands it the call. The jurors go quiet ten minutes after the last call
 with nothing to serve and the container is stopped. Anyone can sign a
-call; the worst that does is keep one container awake. The bench has no
-WebRTC, so it reaches tables over the relay lane.
+call; the worst that does is keep one container awake. The backup
+jurors have no WebRTC, so they reach tables over the relay lane.
 
 ### What the jury does not change
 

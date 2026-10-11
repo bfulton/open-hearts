@@ -245,8 +245,9 @@ pure-Dart BIP-340, which is too slow to replay a hand in good time.
   and a juror of the hand. Jurors are other players online, drawn at
   random; when too few are online to make a jury, the service's backup
   jurors make up the number, and they are ours, so for those hands you
-  trust us not to collude with a player at your table. The other exception is that a departed seat's
-  hand is opened from escrow for the rest of that hand (above).
+  trust us not to collude with a player at your table. The other
+  exception is that a departed seat's hand is opened from escrow for
+  the rest of that hand (above).
 - **Nobody can play a card they were not dealt**, because the masked
   card fixes its value.
 - **Every game verifies end to end**, by anyone, after the fact.

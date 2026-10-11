@@ -71,9 +71,9 @@ class SimTable {
         this.jurors.add(juror);
         p.register(juror);
       }
-      // A bench, not one: a table that needs its bot seats held needs
-      // [juryToHoldBots] of them, and when it calls there is nobody
-      // else to make that up (docs/04-live-play.md).
+      // Several backup jurors, not one: a table that needs its bot
+      // seats held needs [juryToHoldBots] of them, and when it calls too
+      // few others are online to make that up (docs/04-live-play.md).
       final bench = lastResorts ?? (lastResort ? juryToHoldBots : 0);
       for (var b = 0; b < bench; b++) {
         final signer = FakeSigner('last-resort$b-$seed');

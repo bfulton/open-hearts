@@ -20,7 +20,7 @@
 // asking is real: a test that counts how often its policy was
 // consulted counts what the relay actually consulted. And `--gate
 // <service key>` asks every socket who it is, as the deployed relay
-// does (relay.mjs, serviceGate), with the bench's mark under
+// does (relay.mjs, serviceGate), with the backup jurors' mark under
 // OH_JUROR_SECRET; `{"revoke": {account, epoch}}` on stdin is what the
 // account's own object tells the deployed one.
 

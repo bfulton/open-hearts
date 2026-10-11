@@ -99,18 +99,18 @@ void main() {
     // The quiet night, which is when a table has bot seats at all:
     // matchmaking gives you bots exactly when it cannot find four
     // people, and that is exactly when there is nobody to draw a jury
-    // from. The call brings up the bench, the bench holds the seats,
+    // from. The call brings up the backup jurors, they hold the seats,
     // and the bots' hands stay hidden (docs/04-live-play.md).
     final t = SimTable(humans: 2, seed: 21, crypto: crypto, lastResort: true);
     t.start();
     expect(t.clock.runUntil(() => t.clients.every((c) => c.game.phase == Phase.passing), limitMs: 300000), isTrue,
-        reason: 'the deal waits for the bench and then completes');
+        reason: 'the deal waits for the backup jurors and then completes');
     expect(t.presence!.calls, greaterThan(0), reason: 'the table called for jurors');
 
     final holders = t.clients.first.botHolders(0);
     expect(holders.length, 2, reason: 'a juror to each bot seat');
     final bench = {for (final j in t.presence!.lastResorts) j.signer.publicKey};
-    expect(holders.values.every(bench.contains), isTrue, reason: 'and they are the bench, since nobody else was online');
+    expect(holders.values.every(bench.contains), isTrue, reason: 'and they are backup jurors, since nobody else was online');
     for (final c in t.clients) {
       for (var s = 0; s < seatCount; s++) {
         expect(c.game.knowsHand(s), s == c.mySeat, reason: 'seat $s as seen by seat ${c.mySeat}');

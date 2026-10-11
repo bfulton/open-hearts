@@ -10,8 +10,8 @@ on our side:
   shop, TURN credentials, remote config and game records.
 - **The relay worker** (`service/do/`): a Durable Object per tag
   ([doc 08](08-own-relays.md)), which carries only an account's device
-  in use; the `Household` object, one per account; and the bench of
-  jurors of last resort (`service/bin/juror.dart` in a container).
+  in use; the `Household` object, one per account; and the backup
+  jurors (`service/bin/juror.dart` in a container).
 
 None of it is in a game's latency path.
 
@@ -417,10 +417,10 @@ duty, the pool and anything it was watching, and shows "Open Hearts is
 now open on another device" with *Use it here*. The service is the
 authority because it is the one party every device of an account
 already trusts and already asks; an activation is the account's turn's
-word, so two devices can never both hold the current one. The bench of
-jurors of last resort answers the challenge with an HMAC of its key
-under `OH_JUROR_SECRET`, which the relay holds too; it belongs to no
-account.
+word, so two devices can never both hold the current one. A backup
+juror answers the challenge with an HMAC of its key under
+`OH_JUROR_SECRET`, which the relay holds too; backup jurors belong to
+no account.
 
 ### The account's profile
 
@@ -673,7 +673,7 @@ binding, through a Household object named `operator-alerts`, which
 mails only `@openhearts.game`. A failed alert never fails the request.
 Set either flag to `false` and deploy to stop it.
 
-## The relay and the bench
+## The relay and the backup jurors
 
 The relay's core ([doc 08](08-own-relays.md)), `service/do/relay.mjs`,
 is plain functions with no Cloudflare or Node imports. It checks
@@ -689,14 +689,14 @@ relays also accept the simulator's fake signatures; the deployed object
 accepts only BIP-340. WebRTC signalling on the relay is sealed to its
 one recipient with NIP-44 v2, since an ICE candidate carries an address.
 
-**The jurors of last resort.** A table with bot seats needs enough
+**The backup jurors.** A table with bot seats needs enough
 jurors online to hold them. On a quiet night it calls for jurors on the
 presence tag. The presence object passes the call to the `Bench` object
 (`service/do/bench.mjs`), at most once every twenty seconds. The `Bench`
 object starts a Cloudflare Container running `service/bin/juror.dart`:
 four jurors in one process, with keys derived from `OH_JUROR_SECRET` so
-they are the same across restarts. The bench goes quiet ten minutes
-after its last call with nothing to serve, and the object stops the
+they are the same across restarts. The jurors go quiet ten minutes
+after their last call with nothing to serve, and the object stops the
 container. The image is built from the repository on every relay deploy
 (`service/bench/build.sh`).
 

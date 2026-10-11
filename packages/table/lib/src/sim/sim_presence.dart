@@ -23,10 +23,10 @@ class SimPresence implements Presence {
   final Map<PublicKey, int> _firstUp = {};
 
   /// The jurors that come online only when a table calls for one —
-  /// the bench of last resort a service would bring up. Several, not
+  /// the backup jurors a service would bring up. Several, not
   /// one: a table with bot seats needs [juryToHoldBots] before a
-  /// juror can hold a seat at all, and the whole point of the call is
-  /// that there is nobody else to make that up.
+  /// juror can hold a seat at all, and the table calls only when too
+  /// few others are online to make that up.
   final List<SimJuror> lastResorts = [];
 
   /// The first of them, for the tests that only care that somebody
@@ -113,7 +113,7 @@ class SimPresence implements Presence {
   @override
   void callForJuror(String table) {
     calls++;
-    // The whole bench, not one of it: a table short of jurors is
+    // All the backup jurors, not one: a table short of jurors is
     // short by as many as the bot seats need, and answering one at a
     // time would take a call for each.
     for (final j in lastResorts) {

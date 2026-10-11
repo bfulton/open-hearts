@@ -10,7 +10,7 @@
 /// seat it does not make keys for, and the hand stops at them.
 ///
 /// So: three people and a bot at a sealed table on the local relay,
-/// and a bench of jurors with nobody else online to draw from. The
+/// and backup jurors with nobody else online to draw from. The
 /// bot seat has to end up held, the hand has to be dealt, and the
 /// table has to reach the hand after it.
 library;
@@ -42,9 +42,9 @@ void main() {
       for (final s in signers) HumanSeat(s.publicKey),
       BotSeat(Persona.roster[2]),
     ]);
-    // A bench, not one: a table that needs its bot seats held needs
-    // [juryToHoldBots] of them, and with nobody else online there is
-    // nothing else to make that up (docs/04-live-play.md).
+    // Several backup jurors, not one: a table that needs its bot seats
+    // held needs [juryToHoldBots] of them, and with nobody else online
+    // there is nothing else to make that up (docs/04-live-play.md).
     final bench = [
       for (var i = 0; i < juryToHoldBots; i++)
         LastResortJuror(relays: [relay.url], signer: FakeSigner('bench$i'), silenceAfterMs: silence, crypto: crypto)..start(),
@@ -78,14 +78,14 @@ void main() {
     });
     await atHandOne.future.timeout(const Duration(minutes: 5), onTimeout: () {
       fail('the table never reached hand 1:\n${c.describe()}\n'
-          'bench: ${[for (final j in bench) '${j.signer.publicKey.substring(0, 4)} '
+          'backup jurors: ${[for (final j in bench) '${j.signer.publicKey.substring(0, 4)} '
               'online ${j.online} serving ${j.duty.serving} '
               '${j.duty.clients[spec.id]?.describe() ?? 'not following'}'].join('\n')}');
     });
     sub.cancel();
 
     // The bot seat was the jury's, not the table's: every peer names
-    // the same juror for it, and that juror is one of the bench.
+    // the same juror for it, and that juror is a backup juror.
     final held = c.botHolders(0);
     expect(held.keys, [3], reason: 'the jury held the bot seat: ${c.describe()}');
     final holder = held[3];

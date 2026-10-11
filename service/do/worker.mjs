@@ -19,7 +19,7 @@
 // And nobody is carried on the service's say-so alone. Every socket is
 // asked who it is, and carried only for a device the service has given
 // a current activation — the device in use of an account with a
-// subscription — or for the bench (relay.mjs, serviceGate). The
+// subscription — or for a backup juror (relay.mjs, serviceGate). The
 // account's own object (Household) is asked whether an activation is
 // still the one in use as a socket shows it, and tells this object to
 // close a device's sockets the moment another device of its account
@@ -57,8 +57,8 @@ export class Bench extends BenchObject {
   }
 }
 
-/// How often one object passes a call on to the bench: a table calls
-/// every ten seconds while it is short, and the bench needs one.
+/// How often one object passes a call on to the backup jurors: a table
+/// calls every ten seconds while it is short, and they need one.
 const WAKE_EVERY_MS = 20 * 1000;
 
 export class TagRelay {
@@ -72,9 +72,9 @@ export class TagRelay {
     this.wokeAt = 0;
   }
 
-  /// A call for a juror heard here, passed to the bench where one is
-  /// bound (wrangler.toml, BENCH). Not awaited by the relay: the caller
-  /// has its OK already, and the bench takes a while to start.
+  /// A call for a juror heard here, passed to the backup jurors where
+  /// they are bound (wrangler.toml, BENCH). Not awaited by the relay:
+  /// the caller has its OK already, and they take a while to start.
   heard(event) {
     const table = callIn(event);
     if (!table || !this.env.BENCH) return;
@@ -129,7 +129,7 @@ export class TagRelay {
   /// Who may use this object (relay.mjs, serviceGate): a device with a
   /// current activation from the service whose key the deployment names
   /// (OH_SERVICE_KEY), still its account's device in use as the
-  /// account's own object says — or the bench, by OH_JUROR_SECRET.
+  /// account's own object says — or a backup juror, by OH_JUROR_SECRET.
   /// Without the service's key nobody is: a relay that carried anybody
   /// would be live play without a subscription.
   gate(verify, tag) {

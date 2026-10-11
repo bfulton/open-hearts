@@ -300,9 +300,9 @@ export async function activationOf(raw, service, verify, nowS) {
 }
 
 /// The mark a juror of last resort shows instead of an activation: an
-/// HMAC of its key under the bench's own secret (OH_JUROR_SECRET), which
-/// the relay holds too. The bench belongs to no account; it is the
-/// service's (docs/04-live-play.md).
+/// HMAC of its key under the backup jurors' own secret
+/// (OH_JUROR_SECRET), which the relay holds too. They belong to no
+/// account; they are the service's (docs/04-live-play.md).
 export async function benchMark(secret, key) {
   const k = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return toHex(new Uint8Array(await crypto.subtle.sign('HMAC', k, encoder.encode(`oh-bench/1\n${key}`))));
@@ -319,14 +319,14 @@ export async function isBenchMark(secret, key, mark) {
   return crypto.subtle.verify('HMAC', k, bytes, encoder.encode(`oh-bench/1\n${key}`));
 }
 
-/// How long the bench's mark is taken for, in seconds, before it is
+/// How long a backup juror's mark is taken for, in seconds, before it is
 /// asked again.
 const benchSeconds = 24 * 60 * 60;
 
 /// The gate a relay holds its sockets to ([createRelay], `gate`): a
 /// fresh challenge per socket, and who answered it — {account, key,
 /// epoch, until} — or {refused: reason}. [service] is the service's
-/// public key, [bench] the bench's secret, or null for no bench; [seen]
+/// public key, [bench] the backup jurors' secret, or null for none; [seen]
 /// asks the account's turn whether an activation is still the one in
 /// use, answering a reason when it is not, or null.
 export function serviceGate({ service, verify, bench = null, seen = null, now = Date.now }) {
@@ -336,7 +336,7 @@ export function serviceGate({ service, verify, bench = null, seen = null, now = 
       const said = (name) => event.tags.find((t) => t[0] === name)?.[1];
       const mark = said('bench');
       if (mark !== undefined) {
-        if (!bench || !(await isBenchMark(bench, event.pubkey, mark))) return { refused: 'restricted: not one of the bench' };
+        if (!bench || !(await isBenchMark(bench, event.pubkey, mark))) return { refused: 'restricted: not a backup juror' };
         return { account: null, key: event.pubkey, epoch: 0, until: Math.floor(now() / 1000) + benchSeconds };
       }
       let raw = null;

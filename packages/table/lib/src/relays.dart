@@ -25,8 +25,8 @@ import 'signing.dart';
 
 /// What a device shows a relay that asks who it is (NIP-42), as tags
 /// beside the relay's challenge in an event its key signs: the
-/// activation the service gave it (licence.dart), or for the bench of
-/// jurors of last resort the mark the relay knows it by. Set once at
+/// activation the service gave it (licence.dart), or for the backup
+/// jurors the mark the relay knows them by. Set once at
 /// startup by whatever holds them; null, or null for a key, and a
 /// challenge goes unanswered — a relay that asks will not carry that
 /// device, which is right for one the service has not vouched for.

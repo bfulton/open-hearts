@@ -205,19 +205,19 @@ class LetGo {
   }
 }
 
-/// A bench of them. A table whose bot seats are the jury's to hold
-/// needs [juryToHoldBots] jurors before it can hold any (jury.dart),
-/// and the call for a last resort comes exactly when there is nobody
-/// else to make that number up — so what answers is a bench rather
-/// than a juror, and a quiet night keeps the bots' hands hidden
-/// instead of handing them back to the table.
+/// The backup jurors: several of them. A table whose bot seats are the
+/// jury's to hold needs [juryToHoldBots] jurors before it can hold any
+/// (jury.dart), and the call for backup jurors comes exactly when too
+/// few others are online to make that number up — so what answers is
+/// several jurors rather than one, and a quiet night keeps the bots'
+/// hands hidden instead of handing them back to the table.
 ///
-/// Each seat on the bench is its own identity, its own presence and
-/// its own duty, so the draw takes them as it takes anyone: one bot
-/// seat each, and none of them holding enough of the deck to subtract
-/// the rest. They are all the service's, which docs/04-live-play.md
-/// allows: the service's rather than another player's, and only when
-/// the room is empty.
+/// Each backup juror is its own identity, its own presence and its own
+/// duty, so the draw takes them as it takes anyone: one bot seat each,
+/// and none of them holding enough of the deck to subtract the rest.
+/// They are all the service's, which docs/04-live-play.md allows: the
+/// service's rather than another player's, and only when too few
+/// others are online to make the jury.
 class LastResortBench {
   LastResortBench({
     required List<Signer> signers,
@@ -241,15 +241,15 @@ class LastResortBench {
 
   final List<LastResortJuror> jurors;
 
-  /// Whether any of the bench is up.
+  /// Whether any of the backup jurors is up.
   bool get online => jurors.any((j) => j.online);
 
-  /// How many tables the bench is serving, counted once a juror.
+  /// How many tables the backup jurors are serving, counted once a juror.
   int get serving => jurors.fold(0, (n, j) => n + j.duty.serving);
 
   /// Called for by [table] some other way than on the relay — the
-  /// service that woke this bench, passing the call on — so the bench
-  /// is online for it now rather than at the table's next call.
+  /// service that woke these jurors, passing the call on — so they are
+  /// online for it now rather than at the table's next call.
   void wake(String table) {
     for (final j in jurors) {
       j.wake(table);

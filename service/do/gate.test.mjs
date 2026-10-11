@@ -1,7 +1,7 @@
 // Who the relay carries (docs/06-service.md, "One device at a time"): a
-// device the service has given a current activation, and the bench; and
-// of an account, only the device in use — a superseded one's sockets
-// are closed and none is opened for it.
+// device the service has given a current activation, and the backup
+// jurors; and of an account, only the device in use — a superseded
+// one's sockets are closed and none is opened for it.
 //
 //   node --test service/do
 
@@ -184,7 +184,7 @@ test('the account\'s turn says it first: the relay closes the superseded device\
   assert.deepEqual(asked, [1, 1], 'asked at every answer');
 });
 
-test('the bench by its mark, and nobody else by it', async () => {
+test('a backup juror by its mark, and nobody else by it', async () => {
   const relay = gated({ bench: 'the bench secret' });
   const j = socket();
   relay.open(j);

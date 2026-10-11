@@ -132,7 +132,7 @@ The slow ones, and why:
   so no flow passes on what another left running. The app is
   built once (`e2e/build.sh`, not again until its sources change), and
   the relay and the jurors are compiled ahead of time once, as the
-  bench's container runs them.
+  backup jurors' container runs them.
 - **The table's beats and clocks, shortened where a suite waits on
   them.** The browser suites open the app at a tenth of its tables'
   beats (`?pace=0.1`); where a cell waits on a table's clock the rig's

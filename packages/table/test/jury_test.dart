@@ -171,7 +171,7 @@ void main() {
       expect(t.run(), isTrue, reason: t.people[0].client.describe());
       expect(t.presence!.calls, greaterThan(0), reason: 'the table called for a juror');
       checkFinishedByJury(t, departedSeats: {1});
-      // Any of the bench: the call brings them all up and the draw
+      // Any of the backup jurors: the call brings them all up and the draw
       // orders them, so which one is foreman is the draw's to say.
       final bench = {for (final j in t.presence!.lastResorts) j.signer.publicKey};
       expect(t.people[0].client.record.where((d) => bench.contains(d.verdict?.author)), isNotEmpty);

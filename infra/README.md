@@ -57,8 +57,8 @@ are read.
 ## What it does not manage, and why
 
 - **The relay worker's own definition.** `open-hearts-relay` — its
-  code, bindings, Durable Object migrations, the bench's container, its
-  vars and custom domain — is `service/do/wrangler.toml`, deployed with
+  code, bindings, Durable Object migrations, the backup jurors'
+  container, its vars and custom domain — is `service/do/wrangler.toml`, deployed with
   `npx wrangler@4.130.0 deploy`. `apply.mjs` reads that file and checks the
   live worker against it (compatibility date, observability, every
   binding and var, the custom domain `relay.openhearts.game` and no
