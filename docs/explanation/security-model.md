@@ -1,12 +1,12 @@
 # Security model
 
-This document reviews what a stranger can make the system do, and how
+This page explains what a stranger can make the system do, and how
 each part defends against it. It covers the Pages worker
 (`service/functions/worker.mjs`), the relay worker (`service/do/`), the
 local relay and juror (`service/bin`, `service/lib`), `deploy.sh`, the
 site's headers, and the app's side of each call (`app/lib/net/`). The
 fairness and privacy of the deal itself are covered in
-[doc 03](fair-deal.md).
+[the fair deal](fair-deal.md).
 
 ## What an attacker starts with
 
@@ -21,9 +21,9 @@ fairness and privacy of the deal itself are covered in
 ## Requests act only for the key that signed them
 
 A public key alone is nobody. Every handler that acts for a device
-(`licence`, `checkout`, `manage`, `store`, `ticket`, `claim`, `devices`,
-`backups`, `profile`, `attest`, `supersede`, `turn`, `record`) requires
-`{key, at, sig}`: a BIP-340 signature by the key over `oh-request/1`, the
+requires `{key, at, sig}` (which handlers they are is in the
+[service reference](../reference/service-api.md)): a BIP-340 signature
+by the key over `oh-request/1`, the
 handler, the key, the second, and whatever else the request asks for
 (`askedBy` and `signedFor` in the worker; `signedAsk` in
 `app/lib/net/licence.dart`). Without this, anyone who had seen a
@@ -33,8 +33,8 @@ and later end it to strand the device.
 
 - The handler name is signed, so a licence request cannot be replayed
   as a code request.
-- Requests more than five minutes from the service's clock are refused
-  (`requestToleranceS`). Nothing is stored to stop a replay inside that
+- Requests too far from the service's clock are refused
+  (`requestToleranceS`, a [service setting](../reference/configuration.md)). Nothing is stored to stop a replay inside that
   window. A replay needs the request itself, which travels only over
   TLS to our own origin, and the one most worth replaying (`ticket`)
   returns its code to whoever sent it. This is accepted.
@@ -58,33 +58,31 @@ an HMAC of the subject (`OH_ID_HMAC`) is stored.
 Sign in with Apple's notifications (`apple-id`) are checked against the
 same key set, issuer and audiences, and an expiry (a day from `iat` when
 the token gives none). They must carry an `events` claim with a type and
-a subject, so an ID token posted there does nothing. All one can do is
-unlink the Apple sign-in it names from its account. A replay unlinks it
-again, which is nothing, so no `jti` is kept. The account's devices,
-backup codes and subscription are not touched, so the person is never
-locked out by it.
+a subject, so an ID token posted there does nothing. The most a genuine
+notice can do is unlink the Apple sign-in it names, which a replay only
+does again, and nothing it does locks the person out
+([when Apple says a sign-in is gone](service.md#when-apple-says-a-sign-in-is-gone)).
 
 ## Licences
 
-A licence is domain-separated (`oh-licence/1`), never runs past what
-was paid for, and is checked against the public key before it is
-issued. The app accepts a licence only through the real BIP-340 path,
-never the simulator's fake signatures (whose "signature" is a hash of
-the signer's public key, and the service's public key is in every build).
-It must also be for the device's own key and in date. A build with no
-service key licenses nobody.
+A licence is domain-separated (`oh-licence/2`) and checked against the
+public key before it is issued ([licence](service.md#licence)). The app
+accepts a licence only through the real BIP-340 path, never the
+simulator's fake signatures, whose "signature" is a hash of the signer's
+public key; the service's public key is in every build, so a fake one
+would license anybody.
 
-Licences are not revocable. That is why they last a month: an ended
-subscription stops renewing, and dropping a device deletes its
-entitlement row so that the row cannot be dated forward again. The
-licence a dropped device already holds runs out on its own.
+Licences are not revocable, which is why they are short. Dropping a
+device deletes its entitlement row, so that the row cannot be dated
+forward again, and the licence the device already holds runs out on its
+own.
 
 ## Payments
 
 - **Stripe's webhook** reads nothing until `Stripe-Signature` verifies
   over the raw body, compared in constant time
-  (`crypto.subtle.verify`). The timestamp must be within five minutes,
-  and every `v1` is tried so a rotating secret works. With no secret
+  (`crypto.subtle.verify`). The timestamp must be recent
+  (`webhookToleranceS`), and every `v1` is tried so a rotating secret works. With no secret
   configured it refuses everything.
 - **A checkout binds a key only if this service opened it.** The key is
   read from `metadata`, which only our checkout writes, never from
@@ -111,30 +109,30 @@ product.
 
 ## Households
 
-- **A code cannot take a device off a subscription somebody paid for.**
-  A claim link is easy to accept from a stranger. Without this rule, a
-  stranger could pull a subscriber's device onto his own subscription and
-  then drop it. A device on another paid-up subscription must drop itself
-  first, and the app asks "Join this subscription?" before spending any
-  code.
-- **Codes** are 128 random bits from `crypto.getRandomValues`, one-use,
-  good for ten minutes, and carry nothing about the subscription. Their
-  rows expire from KV after an hour. Backup codes are 80 bits, and their
+- **A code cannot take a device off a subscription somebody paid for**
+  ([accounts](service.md#accounts)). A claim link is easy to accept from
+  a stranger. Without this rule, a stranger could pull a subscriber's
+  device onto his own subscription and then drop it.
+- **Codes** are 128 random bits from `crypto.getRandomValues`
+  (`TICKET_BYTES`), one-use, good for a few minutes (`ticketMinutes`),
+  and carry nothing about the subscription. Their rows expire from KV
+  soon after (`TICKET_KEPT_S`). Backup codes are 80 bits, and their
   rows are keyed by a digest of the code.
-- **One change at a time.** KV has no compare-and-set, so two claims of
-  one code, or of two codes into the last place, could otherwise both
-  succeed. Every household change goes through the `Household` Durable
-  Object for its subscription. Previews have no `HOUSEHOLD` binding and
-  fall back to a per-isolate queue, so there the race is closed only
-  within an isolate.
-- **Rate.** A household is limited to 20 changes and 60 reads an hour.
+- **One change at a time.** Two claims of one code, or of two codes
+  into the last place, cannot both succeed, since every change to an
+  account takes its turn in one object
+  ([one account at a time](service.md#accounts)). Previews have no
+  `HOUSEHOLD` binding and fall back to a per-isolate queue, so there the
+  race is closed only within an isolate.
+- **Rate.** A household is limited to so many changes and reads an hour
+  (`householdChangesPerHour`, `householdReadsPerHour`).
   Asking for a code while one is outstanding returns the same code, so
   it costs a read, not a write.
 
 ## TURN
 
 TURN credentials are a relay their holder can push any traffic through
-for four hours, billed by the gigabyte. They are minted only for a
+until they expire (`turnTtlS`), billed by the gigabyte. They are minted only for a
 signed request from a device whose subscription stands. A subscriber can
 still mint as many as it likes, which is left to the rate limit below
 and the account's spend alerts (`infra/cloudflare.mjs`).
@@ -150,8 +148,9 @@ object runs on one thread shared by everyone on that tag.
   another key, and nobody can silence a table by saying its events
   first, since a duplicate id can only be the same signed event.
 - Each socket is bounded: message size, REQ size (so a socket's
-  subscriptions always fit the 16 KiB hibernation attachment), at most
-  eight subscriptions, and a burst-then-rate limit on publishing that
+  subscriptions always fit in the attachment a hibernating socket
+  carries), a few subscriptions (`maxSubscriptions`), and a
+  burst-then-rate limit on publishing that
   refuses floods before checking signatures. An event is serialised
   once for all listeners. Presence uses the tighter `objectLimits`,
   tables use `tableLimits`.
@@ -161,9 +160,10 @@ object runs on one thread shared by everyone on that tag.
   writes into another tag's store. Presence stores nothing.
 - **Presence replay.** Every presence event is public and can be sent
   again once a relay forgets its id. A device accepts a `here` or `gone`
-  only if it is at most four beats old, at most a minute in the future,
-  and newer than the last one it took from that key
-  (`presence_replay_test.dart`).
+  only if it is a few beats old at most, not far in the future, and
+  newer than the last one it took from that key
+  (`packages/table/lib/src/presence_relay.dart`,
+  `presence_replay_test.dart`).
 
 The local relays, the Node host and the juror listen on loopback and
 are not deployed. The Node host's WebSocket framing closes the
@@ -172,12 +172,13 @@ frame (`service/do/ws.test.mjs`).
 
 ## The worker as a whole
 
-- **Body limits.** 16 KB for every handler, 2 MiB for a game record,
-  512 KB for Stripe's webhook.
+- **Body limits.** A handler reads at most `MOST_BODY`, a profile
+  `MOST_PROFILE_BODY`, a game record `recordMost`
+  (`service/functions/records.mjs`), and the payment webhooks
+  `MOST_EVENT`.
 - **Rate limits.** A Cloudflare rule limits `/api/*` (except the
   webhooks: Stripe's, the stores' and Sign in with Apple's) and the
-  relay host to 30 requests per 10 seconds per address
-  (`infra/cloudflare.mjs`). An unsigned or wrongly signed request
+  relay host to a rate per address (`infra/cloudflare.mjs`). An unsigned or wrongly signed request
   costs a parse and one signature check and touches no storage.
 - **No SSRF.** Every outbound fetch goes to a fixed host: Cloudflare's
   TURN API, Stripe, Apple's and Google's key sets and Play's API, and the
@@ -192,22 +193,21 @@ frame (`service/do/ws.test.mjs`).
   host to the project. Local origins get CORS only from a local worker.
 - **Errors** describe what went wrong in words and upstream status
   codes, never stack traces or upstream bodies.
-- **Game records** are accepted only from a key seated at the table, and
-  are size-capped. They are verified by whoever views them, not by the
-  worker.
+- **Game records** are accepted only from a subscriber's device in use
+  that is seated at the table and has signed events of its own in the
+  record, within an hourly allowance (`recordsPerHour`), and are
+  size-capped (`service/functions/records.mjs`). They are verified by
+  whoever views them, not by the worker.
 
 ## The site
 
 Every path is served with `Content-Security-Policy: frame-ancestors
 'none'`, `X-Frame-Options: DENY`, HSTS, `nosniff` and a strict referrer
-policy (`site/public/_headers`), so no other page can frame the app and steer
-its one-tap buttons. One page is excepted: `openhearts.game/carry`, which
-hands a device's storage from where the app used to be to
-`play.openhearts.game` ([doc 06](service.md#the-device-carried-over)).
-The worker lets exactly that origin frame it. The page has no buttons, and
-it answers only a message from its parent at exactly that origin,
-addressed back to exactly that origin. The app checks the answer's origin
-and source, and never writes over a key it already has. The app loads one
+policy (`site/public/_headers`), so no other page can frame the app and
+steer its one-tap buttons. One page is excepted: `openhearts.game/carry`,
+which hands a device's storage to `play.openhearts.game`. Only that
+origin may frame it, it has no buttons, and it answers only that origin
+([the device, carried over](service.md#the-device-carried-over)). The app loads one
 third-party script, on play.openhearts.game only: New Relic's browser
 agent, which its loader (`app/web/observability.js`) fetches from
 `js-agent.newrelic.com`. Cloudflare's
@@ -225,5 +225,4 @@ writes it nowhere. `deploy.sh` reads only environment
 variables and pins `wrangler`. The Android release key's properties
 file is never checked in. Every key in the repository is a published
 test vector: BIP-340's test pair (used by the e2e rig and the relay's
-self-check) and NIP-44's vectors. A scan of the full history with
-`detect-secrets` found no credentials.
+self-check) and NIP-44's vectors.

@@ -1,69 +1,58 @@
-# 01 — The development loop
+# How a change reaches a phone
 
 Any commit can be published and opened on a phone within a minute, and
-the running build always says which commit it is.
+the running build always says which commit it is. This page explains how
+that works. The commands are in
+[Deploy the site, app and service](../how-to/deploy.md) and the
+[test suites reference](../reference/test-suites.md).
 
-## Checking a change
+## Two tiers of checks
 
-```bash
-./check.sh quick             # what changed since origin/main, at its fast tier
-./check.sh full              # everything, the browser suites too, before a deploy
-```
+A change is checked at the tier its size calls for. `./check.sh quick`
+runs only the suites the change can reach: the app tests whose imports
+reach a changed file, and the fast tier of each changed package.
+`./check.sh full` runs every suite, the browser suites too, side by side.
+CI runs the same suites on every pull request and on `main`. A newer
+push to a pull request cancels the run it supersedes, so CI's answer is
+always about the latest commit. Why the suites are split this way is in
+[How Open Hearts is tested](testing.md).
 
-`quick` runs the suites a change is in — the app tests whose imports
-reach a changed file, a package's fast tier — and takes under a minute
-for a change to one package. `full` runs every suite side by side and
-ends with a table of verdicts and times. CI runs the same on pull requests and on
-`main`, a newer push to a pull request cancelling the run it
-supersedes. [Doc 09](testing.md) has what each
-suite costs and why.
+## One upload, routed by host
 
-## Publishing
+`deploy.sh` assembles the marketing site, the service's handlers and the
+Flutter web build into one directory and uploads it to one Cloudflare
+Pages project. Because they ship together, the site, the app and the
+service are always the same commit. The worker routes each request by
+its host ([where the app is](service.md#where-the-app-is)): in
+production, `openhearts.game` serves the site, and
+`play.openhearts.game` serves the app at its root with the handlers at
+`/api/`. A preview has no play host, so it serves the same build at
+`/play/`.
 
-```bash
-./deploy.sh [label]          # needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
-./deploy.sh --prune [keep]   # delete older preview deployments (-n: dry run)
-```
-
-`deploy.sh` assembles one directory and uploads it to the Cloudflare
-Pages project `open-hearts`:
-
-| Path | What |
-|---|---|
-| `/` | `site/`, built in each language by `site/build.mjs` |
-| `/api/` | the service's handlers, `service/functions/` published as `_worker.js` ([doc 06](service.md)) |
-| `/play/` | the Flutter web build, `--base-href /` |
-
-The worker routes by host ([doc 06](service.md#where-the-app-is)).
-In production the site is `openhearts.game` and the app is the root of
-`play.openhearts.game`, served from the build's `/play/` directory, with
-the handlers at its `/api/`; `openhearts.game` is the site alone. A preview
-has no play host, so it serves the same build at `/play/`, its worker
-moving the page's base there.
-
-The label names the Pages branch, and every branch gets a stable alias.
-It defaults to `dev` on any working branch, so the latest push is always
-at `https://dev.open-hearts.pages.dev/play/`, and to `main` (production,
-`openhearts.game` and `play.openhearts.game`) on `main`. A production deploy refuses to run without
-the service's public key (`serviceKey` in `config/openhearts.json`),
-since a build without it has live play shut for everyone. Before uploading, the script loads the staged worker, so a
-missing module fails locally instead of at Cloudflare.
+Every Pages branch gets a stable alias. A working branch publishes to
+`dev`, so the latest push is always at the same address, and `main`
+publishes to production. A production deploy refuses to run without the
+service's public key, since a build without it has live play shut for
+everyone ([the licence](service.md#licence)). Before uploading,
+`deploy.sh` loads the staged worker, so a missing module fails on your
+machine rather than at Cloudflare.
 
 ## Knowing which build is running
 
 The build's identity is compiled in. `deploy.sh` generates
-`app/lib/build_info.g.dart` with the short sha, the date and the update
-check turned on, and restores the committed placeholder afterwards. It
-also writes `play/build-info.json` with the same sha.
+`app/lib/build_info.g.dart` with the short commit hash, the date and the
+update check turned on, and restores the committed placeholder
+afterwards. It also writes `play/build-info.json` with the same hash.
 
-- The About page shows the sha and date.
+- The About page shows the hash and the date.
 - A deployed build fetches `build-info.json` at launch and whenever it
-  returns to the foreground. If the published sha differs from its own,
+  returns to the foreground. If the published hash differs from its own,
   it shows a tap-to-reload pill. Local runs, tests and CI keep the
   placeholder, so the pill never appears there.
 - `site/public/_headers` marks the entry points `no-store`, so a cached
   bootstrap cannot load an old build.
-- A sha ending in `+` was deployed from a dirty tree.
+- A hash ending in `+` was deployed from a tree with uncommitted
+  changes.
 
 ## Offline
 
@@ -72,25 +61,16 @@ worker, `app/web/offline_worker.js`, from `app/web/flutter_bootstrap.js`.
 The worker fetches from the network first and keeps a copy of each file.
 It falls back to the copy only when the network fails, so online
 behaviour is unchanged and offline the last loaded build opens.
-`build-info.json` and the service's handlers are never cached.
-`node e2e/offline.mjs` checks this in a browser. At
+`build-info.json` and the service's handlers are never cached. At
 `play.openhearts.game` the worker's scope is the whole host; at a
-preview it is `/play/`.
+preview it is `/play/`. The `offline` browser suite checks this
+([test suites](../reference/test-suites.md)).
 
-## The move to play.openhearts.game
+## Why the wasm is committed
 
-The app used to be at `openhearts.game/play/`, and a browser that played
-there keeps its device — key, licence, name, records, settings — in that
-origin's storage. On its first load at `play.openhearts.game` with no key,
-`app/web/carry.js` asks a hidden frame of `openhearts.game/carry` for
-those entries and writes them before the app starts, waiting 10 s at
-most for that page and 2 s for its answer ([doc 06](service.md#the-device-carried-over)). The old origin
-keeps its copy, so rolling back to serving the app at `/play/` loses
-nobody. `node e2e/move.mjs` drives the old address's 404s, the carry and a preview
-in a browser, on the rig's stand-ins for the two hosts
-(`openhearts.localhost` and `play.openhearts.localhost`).
-
-## Credentials
-
-The Cloudflare token needs Pages: Edit. The relay worker deploys
-separately, from `service/do/wrangler.toml`.
+The deal's and the signatures' WebAssembly (`app/web/deal.wasm`,
+`app/web/schnorr.wasm`) is committed, so building the web app needs no
+Rust. Built with the Rust version CI pins, the wasm is the same bytes
+from any checkout, and CI checks that what is committed is what its
+sources build. A reviewer can therefore trust that the committed wasm is
+the reviewed Rust.
