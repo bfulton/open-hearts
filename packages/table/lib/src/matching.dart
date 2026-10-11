@@ -96,8 +96,9 @@ class Plan {
 /// within a window of each other — [windowPer] points for every round
 /// the first of them has waited, so a lonely rating widens its search
 /// rather than waiting for ever. Once someone has waited as long as
-/// they said they would before bots ([Waiter.botsAfterMs], else
-/// [botsAfterMs]), they go with bots at their own rating.
+/// they said they would before bots ([Waiter.botsAfterMs]; the pool's
+/// [botsAfterMs] for one who said nothing), they go with bots at their
+/// own rating.
 Plan plan(
   List<Waiter> waiting, {
   required int nowMs,
@@ -178,7 +179,7 @@ class WaitingRoom {
     required this.rating,
     this.pace = 0,
     this.roundMs = 5000,
-    this.botsAfterMs = defaultBotsAfterMs,
+    int botsAfterMs = defaultBotsAfterMs,
     this.heartbeatMs = 2000,
     this.staleMs = 7000,
     int? nowMs,
@@ -191,7 +192,9 @@ class WaitingRoom {
     this.target = gameOverScore,
     this.timing = TableTiming.standard,
     this.licence,
-  }) : since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
+  })  : poolBotsAfterMs = botsAfterMs,
+        botsAfterMs = botsAfterMs,
+        since = nowMs ?? DateTime.now().millisecondsSinceEpoch {
     _random = random ?? Random.secure();
     for (final e in List.of(relay.lobbySoFar)) {
       _onLobby(e);
@@ -239,13 +242,17 @@ class WaitingRoom {
   final Licence? licence;
   final int roundMs;
 
+  /// The pool's wait before bots: what every waiter who has said
+  /// nothing else chose, whoever hosts the round.
+  final int poolBotsAfterMs;
+
   /// How long this player waits for people before bots fill the empty
-  /// seats: the pool's ten seconds, unless they chose otherwise
+  /// seats: [poolBotsAfterMs], unless they chose otherwise
   /// ([waitForPerson], [playWithBots]).
   int botsAfterMs;
   final int heartbeatMs;
 
-  /// The pool's wait before bots.
+  /// The pool's wait before bots, unless the room is given another.
   static const defaultBotsAfterMs = 10000;
 
   /// The longest anyone waits for a person: then bots, as for everyone.
@@ -325,7 +332,7 @@ class WaitingRoom {
           'name': name,
           'rating': rating,
           if (pace > 0) 'pace': pace,
-          if (botsAfterMs != defaultBotsAfterMs) 'botsAfter': botsAfterMs,
+          if (botsAfterMs != poolBotsAfterMs) 'botsAfter': botsAfterMs,
           'since': since,
           if (avatar != null) 'avatar': avatar,
           if (licence != null) 'licence': licence!.toJson(),
@@ -357,7 +364,9 @@ class WaitingRoom {
 
   void _hostRound(int round, int now) {
     final all = present;
-    final p = plan(all, nowMs: now, roundMs: roundMs, botsAfterMs: botsAfterMs, random: Random(round));
+    // The pool's wait for anyone who said nothing else: never the
+    // host's own choice, which is the host's alone.
+    final p = plan(all, nowMs: now, roundMs: roundMs, botsAfterMs: poolBotsAfterMs, random: Random(round));
     if (p.tables.isEmpty) return;
     log?.call('$pool round $round: hosting, ${all.length} present, ${p.tables.length} table(s)');
     for (final humans in p.tables) {

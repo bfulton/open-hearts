@@ -19,6 +19,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -674,6 +675,10 @@ class _HomePageState extends State<HomePage> {
       }
       _toTable(spec, queue.seatNames, avatars, again: _play);
     });
+    // The longest this queue has been willing to wait past the pool's
+    // own wait, kept once chosen: taking bots after waiting for a person
+    // comes back to the next round, not to a deadline already passed.
+    var patience = 0;
     _waitClock = Timer.periodic(const Duration(seconds: 1), (_) {
       // Bots take every seat still empty at ten seconds, so a device
       // the relays can hear is seated a round or two after that. One
@@ -683,7 +688,7 @@ class _HomePageState extends State<HomePage> {
       // would turn for ever. So back to the door, saying why.
       // Counted from when bots were due, for one who chose to wait
       // for a person.
-      final patience = queue.botsAfterMs > WaitingRoom.defaultBotsAfterMs ? queue.botsAfterMs - WaitingRoom.defaultBotsAfterMs : 0;
+      patience = max(patience, queue.botsAfterMs - queue.poolBotsAfterMs);
       if (DateTime.now().millisecondsSinceEpoch - queue.since >= stopWaiting.inMilliseconds + patience) {
         setState(() {
           _closeLobby();
@@ -702,7 +707,9 @@ class _HomePageState extends State<HomePage> {
   void _waitForPerson() {
     final queue = _queue;
     final signer = _signer;
-    if (queue == null || signer == null) return;
+    // Offered only at an empty pool (_WaitingView), and only then are we
+    // told (the privacy policy): somebody may have arrived since.
+    if (queue == null || signer == null || queue.present.length > 1) return;
     setState(queue.waitForPerson);
     unawaited(askHandler('waiting', signer, {'pool': queue.pool, 'target': queue.target}, null, what: '${queue.pool} ${queue.target}'));
   }
@@ -1469,9 +1476,9 @@ class OperatorNotes extends StatelessWidget {
 }
 
 /// Waiting to be seated: a round every five seconds, and bots after
-/// ten. Until then a person can take bots at once, or wait up to five
-/// minutes for another person; one waiting for a person can still take
-/// bots whenever they like.
+/// ten. Until then a person alone in the pool can take bots at once, or
+/// wait up to five minutes for another person; one waiting for a person
+/// can still take bots whenever they like.
 class _WaitingView extends StatelessWidget {
   const _WaitingView({required this.queue, required this.onCancel, required this.onWaitForPerson, required this.onPlayWithBots});
 
@@ -1488,7 +1495,9 @@ class _WaitingView extends StatelessWidget {
     final others = queue.present.length - 1 < 0 ? 0 : queue.present.length - 1;
     final patient = queue.botsAfterMs == WaitingRoom.personAtMostMs;
     final eager = queue.botsAfterMs == 0;
-    final choosing = !patient && !eager && waitedMs < queue.botsAfterMs;
+    // Offered while the pool is empty: with somebody else waiting, the
+    // two are seated together at the pool's ten seconds.
+    final choosing = !patient && !eager && others == 0 && waitedMs < queue.botsAfterMs;
     final line = patient
         ? l10n.waitingForPersonLine('${waited ~/ 60}:${(waited % 60).toString().padLeft(2, '0')}', others)
         : eager

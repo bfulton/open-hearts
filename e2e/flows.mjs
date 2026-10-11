@@ -481,9 +481,11 @@ stillFlow('a game watched as it is played, from the link a player shares', async
 
 stillFlow('an empty pool: waiting for a person past the ten seconds, then bots after all', async ({ open, relay }) => {
   // Alone in the pool, Ada chooses to wait for a person: the round
-  // after ten seconds does not seat her with bots, and the screen
-  // counts her wait out of five minutes. Then she takes bots, and is
-  // seated at the next round.
+  // after ten seconds does not seat her with bots, the screen counts
+  // her wait out of five minutes, and the forty seconds after which a
+  // device nobody hears gives up (stopWaiting) do not end it. Then she
+  // takes bots, and is seated at the next round, not sent back to the
+  // door because her wait for a person is over.
   await relay();
   const ada = await open();
   await waitFor(ada, /^Play live/, { what: 'live play open', timeout: 40000 });
@@ -497,8 +499,9 @@ stillFlow('an empty pool: waiting for a person past the ten seconds, then bots a
   await click(ada, /^Wait for a person$/);
   await waitFor(ada, /^Waiting for a person$/);
   await waitFor(ada, /^0:\d\d of 5:00 — then bots fill the empty seats$/, { what: 'the wait counted out of five minutes' });
-  await sleep(16000);
-  if (!(await has(ada, /^Waiting for a person$/))) throw new Error(`seated, or gone, past the pool's ten seconds\nsaw: ${(await texts(ada)).join(' | ')}`);
+  // The count is only on the screen while she is still waiting for a
+  // person: at 0:45 she has outlasted both.
+  await waitFor(ada, /^0:4[5-9] of 5:00 — then bots fill the empty seats$/, { what: 'still waiting at 0:45', timeout: 60000 });
   await click(ada, /^Play now with bots$/);
   await waitFor(ada, /^1 of 1 here  ·  rated$/, { what: 'Ada with three bots, as she asked', timeout: 30000 });
 });
