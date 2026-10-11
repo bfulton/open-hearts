@@ -1,5 +1,5 @@
 //! BIP-340 Schnorr over secp256k1 for the Dart VM, over FFI: the same
-//! functions as the browser's wasm (measurements/sign/wasm), with std.
+//! functions as the browser's wasm (crypto/schnorr_wasm), with std.
 //!
 //! schnorr_sign(sk, msg, aux, out) — 32-byte secret, 32-byte digest,
 //! 32 bytes of auxiliary randomness; writes a 64-byte signature and
