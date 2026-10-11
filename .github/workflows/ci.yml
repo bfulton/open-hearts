@@ -216,6 +216,8 @@ jobs:
         run: node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
       - name: The scripts no suite runs, each still parsing (./check.sh scripts)
         run: ./check.sh scripts
+      - name: The docs, every link, anchor and repository path they name resolving (./check.sh docs)
+        run: ./check.sh docs
 
   # The browser suites (e2e/README.md), three runners at once: the flows
   # one device can drive; four browsers at one table; and the rest — the

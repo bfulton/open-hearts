@@ -93,7 +93,7 @@ node e2e/run.mjs       # four browsers at one table
 node e2e/escrow.mjs    # a bot seat's juror goes, and the escrow opens the seat
 node e2e/offline.mjs   # no network, relay or worker: solo still plays
 node e2e/move.mjs      # openhearts.game/play/ to play.openhearts.game: nothing left at the old address, and the device carried over
-node e2e/shots.mjs     # screenshots at the shapes docs/05 names
+node e2e/shots.mjs     # screenshots at the shapes docs/05-form-factors.md names
 ```
 
 ### Phone releases

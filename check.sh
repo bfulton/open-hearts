@@ -62,6 +62,8 @@ suite_scripts() {
   fi
   return $ok
 }
+# The docs: every link, anchor and repository path they name resolves.
+suite_docs() { node --test docs/links.test.mjs && node docs/links.mjs; }
 suite_app_analyze() { cd app && flutter analyze; }
 # The app's tests: all of them, or those $app_tests names, with
 # $app_flags (quick leaves the layout matrix out: app/dart_test.yaml).
@@ -105,7 +107,7 @@ suite_e2e_offline() { node e2e/offline.mjs; }
 suite_e2e_site() { node e2e/site.mjs; }
 suite_e2e_move() { node e2e/move.mjs; }
 
-all_suites="engine deal table table_slow service service_js service_object relay_js functions site infra workers crypto scripts app_analyze app
+all_suites="engine deal table table_slow service service_js service_object relay_js functions site infra workers crypto scripts docs app_analyze app
   e2e_build e2e_flows e2e_run e2e_escrow e2e_offline e2e_site e2e_move"
 
 # ---- running them ----------------------------------------------------------
@@ -230,6 +232,9 @@ quick() {
       crypto/*) add crypto deal workers ;;
     esac
   done <<< "$files"
+  # Whatever changed, the docs: a file renamed or removed leaves a doc
+  # pointing at nothing, and this takes a second.
+  add docs
   # The app's tests a change can reach, by their imports
   # (app/tool/affected_tests.mjs); all of them when it cannot tell.
   if [ ${#app_files[@]} -gt 0 ]; then
