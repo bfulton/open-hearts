@@ -308,6 +308,17 @@ export async function benchMark(secret, key) {
   return toHex(new Uint8Array(await crypto.subtle.sign('HMAC', k, encoder.encode(`oh-bench/1\n${key}`))));
 }
 
+/// Whether [mark] is [key]'s mark under [secret] ([benchMark]), checked
+/// as an HMAC is checked, in time that says nothing of how much of it
+/// was right.
+export async function isBenchMark(secret, key, mark) {
+  if (typeof mark !== 'string' || !/^[0-9a-f]{64}$/.test(mark)) return false;
+  const k = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+  const bytes = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) bytes[i] = parseInt(mark.slice(i * 2, i * 2 + 2), 16);
+  return crypto.subtle.verify('HMAC', k, bytes, encoder.encode(`oh-bench/1\n${key}`));
+}
+
 /// How long the bench's mark is taken for, in seconds, before it is
 /// asked again.
 const benchSeconds = 24 * 60 * 60;
@@ -325,7 +336,7 @@ export function serviceGate({ service, verify, bench = null, seen = null, now = 
       const said = (name) => event.tags.find((t) => t[0] === name)?.[1];
       const mark = said('bench');
       if (mark !== undefined) {
-        if (!bench || mark !== (await benchMark(bench, event.pubkey))) return { refused: 'restricted: not one of the bench' };
+        if (!bench || !(await isBenchMark(bench, event.pubkey, mark))) return { refused: 'restricted: not one of the bench' };
         return { account: null, key: event.pubkey, epoch: 0, until: Math.floor(now() / 1000) + benchSeconds };
       }
       let raw = null;
