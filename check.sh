@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every check the repository has, as much of it as a change needs
-# (docs/09-testing.md).
+# (docs/explanation/testing.md).
 #
 #   ./check.sh quick [base]   what you touched since base — committed,
 #                             staged or not; origin/main

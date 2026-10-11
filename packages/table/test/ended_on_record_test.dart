@@ -8,7 +8,7 @@
 /// carried: one voice each at the turn, which goes to the move, to a
 /// removal or to the end. Every record then ends at that turn, and the
 /// verifier reads it as a game ended rather than one unfinished
-/// (docs/07-states.md).
+/// (docs/explanation/table-states.md).
 ///
 /// Where no majority can be had — a turn split between a move and a
 /// boot with the jury gone, every voice spent; the last person, who

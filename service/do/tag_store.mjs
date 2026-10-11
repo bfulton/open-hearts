@@ -1,4 +1,4 @@
-// What a tag's object keeps (docs/08-own-relays.md): the lobby kind, in
+// What a tag's object keeps (docs/explanation/relay.md): the lobby kind, in
 // the object's own storage, so a room, a seating or a result is still
 // there when the object wakes from eviction; kept a day, the results for
 // good. Apart from worker.mjs so it can be tested without the runtime.

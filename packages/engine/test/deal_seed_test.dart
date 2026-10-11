@@ -12,7 +12,7 @@ final _counting = DealSeed([for (var i = 0; i < 32; i++) i]);
 void main() {
   group('known answers', () {
     // Computed by a dozen lines of Python with nothing but hmac and
-    // hashlib, from the description in docs/03-fair-deal.md — not from
+    // hashlib, from the description in docs/explanation/fair-deal.md — not from
     // this code — and the same on the VM and in a browser.
     test('the stream is HMAC-SHA-256 of the seed over "deal", the hand and the block', () {
       final hand0 = DealStream(_counting, 0);

@@ -6,7 +6,7 @@ each part defends against it. It covers the Pages worker
 local relay and juror (`service/bin`, `service/lib`), `deploy.sh`, the
 site's headers, and the app's side of each call (`app/lib/net/`). The
 fairness and privacy of the deal itself are covered in
-[doc 03](03-fair-deal.md).
+[doc 03](fair-deal.md).
 
 ## What an attacker starts with
 
@@ -203,7 +203,7 @@ Every path is served with `Content-Security-Policy: frame-ancestors
 policy (`site/public/_headers`), so no other page can frame the app and steer
 its one-tap buttons. One page is excepted: `openhearts.game/carry`, which
 hands a device's storage from where the app used to be to
-`play.openhearts.game` ([doc 06](06-service.md#the-device-carried-over)).
+`play.openhearts.game` ([doc 06](service.md#the-device-carried-over)).
 The worker lets exactly that origin frame it. The page has no buttons, and
 it answers only a message from its parent at exactly that origin,
 addressed back to exactly that origin. The app checks the answer's origin

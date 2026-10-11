@@ -14,7 +14,7 @@
 ///
 /// This is also where a device comes online: it says it is here and
 /// serves as a juror from the front door, not only from a table
-/// (docs/04-live-play.md).
+/// (docs/explanation/live-play.md).
 library;
 
 import 'dart:async';
@@ -69,7 +69,7 @@ import 'ui/update_pill.dart';
 
 /// Whether live play is open on this device: whether it holds a
 /// licence the service signed and the date on it has not passed
-/// (entitlement.dart, docs/06-service.md) — and it has not stepped back
+/// (entitlement.dart, docs/explanation/service.md) — and it has not stepped back
 /// for another device of its account (net/in_use.dart). Solo play
 /// never asks.
 bool get liveOpen => Entitlement.current.live && !InUse.current.elsewhere;
@@ -304,14 +304,14 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _goAbout() => openPage<void>(context, AppPage.about);
 
-  /// Arrived by a code another device showed (docs/06-service.md): this
+  /// Arrived by a code another device showed (docs/explanation/service.md): this
   /// device joins that subscription and is given a licence of its own.
   Future<void> _arriving() async {
     final code = widget.openClaim;
     if (code == null) return;
     // Asked first. A link is anybody's to send, and a code spent on
     // opening it would put this device in whatever household sent it,
-    // without a word to its owner (docs/security-review.md).
+    // without a word to its owner (docs/explanation/security-model.md).
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     final join = await showDialog<bool>(
@@ -626,7 +626,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Every live table is sealed, and a device that cannot run the deal
-  /// does not sit down (docs/03-fair-deal.md). It says so
+  /// does not sit down (docs/explanation/fair-deal.md). It says so
   /// here, at the door, rather than connecting to find out; true when
   /// it has.
   bool _withoutDeal() {
@@ -828,7 +828,7 @@ class _HomePageState extends State<HomePage> {
     setState(() => _closeLobby(address: false));
     // Online *and* at a table, which another table's draw prefers:
     // somebody mid-game has a reason to still be here in a minute
-    // (docs/04-live-play.md). Cleared on the way back
+    // (docs/explanation/live-play.md). Cleared on the way back
     // to the front door, however the table ended. And said to the
     // service: another device of the account asks before taking the
     // account from a game (net/in_use.dart).

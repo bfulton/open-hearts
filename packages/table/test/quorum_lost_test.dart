@@ -9,12 +9,12 @@
 /// together could do to order. So the game ends — a connection
 /// failure, "juror quorum lost", unscored — once the table has been
 /// stopped there for twenty seconds ([TableClient.quorumLostAfterMs];
-/// docs/04-live-play.md).
+/// docs/explanation/live-play.md).
 ///
 /// The same for a turn only the jury can settle — a play met by a
 /// boot, or a table of two with one of them gone — once none of its
 /// jurors is left to rule, rather than pausing for the jury for good
-/// (docs/07-states.md). A side that hears too
+/// (docs/explanation/table-states.md). A side that hears too
 /// little of the table to tell the jury gone from its own connection
 /// gone waits until everyone it cannot hear has been silent as long as
 /// a person is given. And the ending is said: the other side ends with

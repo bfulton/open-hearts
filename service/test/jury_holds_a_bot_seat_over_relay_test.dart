@@ -44,7 +44,7 @@ void main() {
     ]);
     // Several backup jurors, not one: a table that needs its bot seats
     // held needs [juryToHoldBots] of them, and with nobody else online
-    // there is nothing else to make that up (docs/04-live-play.md).
+    // there is nothing else to make that up (docs/explanation/live-play.md).
     final bench = [
       for (var i = 0; i < juryToHoldBots; i++)
         LastResortJuror(relays: [relay.url], signer: FakeSigner('bench$i'), silenceAfterMs: silence, crypto: crypto)..start(),

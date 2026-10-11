@@ -87,7 +87,7 @@ class ChaosScenario {
   /// Accounts on two devices: as it walks, a juror's account or a
   /// seated player's is taken up on a new device, which supersedes the
   /// old one — the old one cut off by the relay where it stands
-  /// (docs/06-service.md, "One device at a time"). A player's new
+  /// (docs/explanation/service.md, "One device at a time"). A player's new
   /// device is online, drawable by any table but this one, and the
   /// seat it left is the table's to take as a departure.
   final bool twins;

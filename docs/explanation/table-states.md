@@ -4,7 +4,7 @@ Every table state, every way out of it, and who can take each one.
 `packages/table/lib/src/model.dart` is the same thing as code, and the
 simulator reads every side against it
 (`packages/table/lib/src/sim/structure.dart`). The protocol these
-machines describe is [doc 04](04-live-play.md).
+machines describe is [doc 04](live-play.md).
 
 ## How a transition is decided
 
@@ -67,7 +67,7 @@ back. All three exits are on the record.
 | human | left | on the record: the leaver's word at the turn they stood at, carried by a majority of the people there |
 
 A seat is an account's, and an account plays on one device at a time
-([doc 06](06-service.md)). Another device taking the account up while
+([doc 06](service.md)). Another device taking the account up while
 it sits here is no new transition: the device at the seat leaves, by
 its own signed leave where any path is still open to it, and otherwise
 falls silent, cut off by the relay — one of the three exits above. The
@@ -132,7 +132,7 @@ A side that is waiting names what for, and who can end it
 A bot seat nobody holds is never waited on: every side works its move
 out, waiting only for the seat's secret if its cards are not open yet.
 
-A side's own deal worker ([doc 03](03-fair-deal.md)) is not a wait of
+A side's own deal worker ([doc 03](fair-deal.md)) is not a wait of
 the table's: a step being checked there is kept until the answer comes
 back. If the worker fails for good, the side can no longer deal
 (`TableClient.cannotDeal`) and leaves; the table sees a seat that left.

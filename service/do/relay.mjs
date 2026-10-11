@@ -1,5 +1,5 @@
 // A NIP-01 relay with no runtime of its own: the subset the table
-// speaks (docs/06-service.md), written as plain functions over
+// speaks (docs/explanation/service.md), written as plain functions over
 // anything that can send a string. The Cloudflare object
 // (worker.mjs) and a plain node host (host.mjs) both drive this file,
 // so what the app meets on Cloudflare is what the Dart suites — the
@@ -52,7 +52,7 @@ export const objectLimits = Object.freeze({
 });
 
 /// How far the operator may move each of [objectLimits], from the row
-/// `config|relay` (docs/06-service.md). The edges are
+/// `config|relay` (docs/explanation/service.md). The edges are
 /// where a limit stops being a tuning: a REQ past 1,536 characters
 /// times eight no longer fits the 16 KiB a socket carries through
 /// hibernation, and a message past 256 KiB is a socket holding the
@@ -261,7 +261,7 @@ export function memoryStore(keep = 10000) {
 
 // ---- who may use it ---------------------------------------------------
 // Live play is a subscription's, and an account is played on one device
-// at a time (docs/06-service.md). So the relay carries a device only on
+// at a time (docs/explanation/service.md). So the relay carries a device only on
 // the service's word that it is the account's device in use now: the
 // activation the service signed for it (packages/table, licence.dart).
 // It asks for one on every socket, before anything else (NIP-42's AUTH:
@@ -302,7 +302,7 @@ export async function activationOf(raw, service, verify, nowS) {
 /// The mark a juror of last resort shows instead of an activation: an
 /// HMAC of its key under the backup jurors' own secret
 /// (OH_JUROR_SECRET), which the relay holds too. They belong to no
-/// account; they are the service's (docs/04-live-play.md).
+/// account; they are the service's (docs/explanation/live-play.md).
 export async function benchMark(secret, key) {
   const k = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return toHex(new Uint8Array(await crypto.subtle.sign('HMAC', k, encoder.encode(`oh-bench/1\n${key}`))));
@@ -762,7 +762,7 @@ export const presenceTag = 'online';
 
 /// The one kind this relay stores: the lobby — a room announced, a
 /// pool's seating, a table started, a player's picture, a game's result
-/// (packages/table, nostr.dart, TableKinds.lobby; docs/08-own-relays.md).
+/// (packages/table, nostr.dart, TableKinds.lobby; docs/explanation/relay.md).
 export const lobbyKind = 4244;
 
 /// The tag game results are written under (packages/table, results.dart,
@@ -845,7 +845,7 @@ export function refusalFor(tag) {
 /// A table's tag carries what presence does not: a deal's steps of up
 /// to some tens of kilobytes, and every seat and juror saying its moves
 /// and repeating what is unsettled, in bursts at the deal. Measured
-/// against real tables through this relay (docs/08-own-relays.md);
+/// against real tables through this relay (docs/explanation/relay.md);
 /// presence keeps [objectLimits].
 export const tableLimits = Object.freeze({
   message: 128 * 1024,
@@ -855,7 +855,7 @@ export const tableLimits = Object.freeze({
 });
 
 /// What one object has seen since it last said so, in the order the
-/// operator's query reads the numbers (docs/06-service.md):
+/// operator's query reads the numbers (docs/explanation/service.md):
 /// counts, never who.
 export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed', 'superseded'];
 

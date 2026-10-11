@@ -1,5 +1,5 @@
 /// Runs the local service: the relay, and with `--juror` the juror of
-/// last resort on it (docs/04-live-play.md) — in this process, which
+/// last resort on it (docs/explanation/live-play.md) — in this process, which
 /// is fine on a dev machine and wrong under load, since a relay
 /// verifies every event it carries and a juror's client verifies them
 /// again; `bin/juror.dart` runs one beside the relay instead, which is
@@ -11,7 +11,7 @@
 ///     dart run bin/service.dart --juror                  # and a juror
 ///
 /// `OH_RELAY=js` runs the relay the Cloudflare object runs instead
-/// (service/do/, docs/06-service.md), on the same port and saying the
+/// (service/do/, docs/explanation/service.md), on the same port and saying the
 /// same line, so anything that starts this process can be pointed at
 /// either relay without knowing which it got.
 library;
@@ -58,7 +58,7 @@ Future<void> main(List<String> args) async {
     // Several of them, because a table with bot seats needs
     // juryToHoldBots online before a juror can hold one at all, and
     // these are what answer when too few others are online
-    // (docs/04-live-play.md).
+    // (docs/explanation/live-play.md).
     final bench = LastResortBench(
       signers: [for (var i = 0; i < juryToHoldBots; i++) SchnorrSigner.generate()],
       relays: [relay.url],

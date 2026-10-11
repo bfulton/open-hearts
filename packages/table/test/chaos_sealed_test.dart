@@ -2,7 +2,7 @@
 /// that exercise a verifier reading a hand's juries in another order
 /// than the table, a hand whose draws arrive out of order (with jurors
 /// let go of and summoned again, too), and an ending judged by jurors
-/// out of reach (`tool/chaos.dart --jurors 9`, docs/07-states.md). A
+/// out of reach (`tool/chaos.dart --jurors 9`, docs/explanation/table-states.md). A
 /// file of their own, since a sealed walk takes a minute or two with
 /// every proof made afresh (seconds when the deal's answers are kept,
 /// package:deal/memo.dart) and the tests of one file run one after

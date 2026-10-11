@@ -5,7 +5,7 @@
 ///
 /// The jury's size is an availability question, so it is answered as
 /// one rather than argued. What a hand needs from its jury is this
-/// (docs/04-live-play.md, packages/deal/lib/src/session.dart):
+/// (docs/explanation/live-play.md, packages/deal/lib/src/session.dart):
 ///
 ///  - **A bot seat whose holder goes** has to be opened from the
 ///    escrow. It is the seat's key in Shamir shares, one to each
@@ -20,7 +20,7 @@
 /// at the start of a hand cannot be reached when its piece is wanted,
 /// a minute or two later. There is no population to measure yet, so
 /// the answer is given across a range of it and the design assumption
-/// named in docs/04-live-play.md rather than buried here.
+/// named in docs/explanation/live-play.md rather than buried here.
 ///
 /// And the honest caveat: this assumes jurors fail independently. What
 /// takes every juror at once — a relay outage — no jury size divides,
@@ -36,7 +36,7 @@ import 'package:engine/args.dart';
 
 const ln2 = 0.6931471805599453;
 
-/// A person leaves in about 8% of hands (docs/04-live-play.md).
+/// A person leaves in about 8% of hands (docs/explanation/live-play.md).
 const personLeaves = 0.08;
 
 /// The most bot seats a table can have; a fourth would be a table with
@@ -103,7 +103,7 @@ double rateFromHalfLife(double seconds) => ln2 / seconds;
 /// The chance one juror is gone by the time a hand of [seconds] is out.
 double goneOver(double rate, double seconds) => 1 - exp(-rate * seconds);
 
-/// A hand is p50 a minute and p90 two (docs/04-live-play.md).
+/// A hand is p50 a minute and p90 two (docs/explanation/live-play.md).
 const handP50 = 60.0;
 const handP90 = 120.0;
 

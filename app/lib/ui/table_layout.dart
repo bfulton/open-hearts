@@ -1,5 +1,5 @@
 /// The table's composition, chosen from the space it is given
-/// (docs/05-form-factors.md).
+/// (docs/explanation/screens.md).
 ///
 /// Top to bottom: the header (menu, where the game stands, the heart),
 /// the felt, the action line, the hand. The player's own score is not a

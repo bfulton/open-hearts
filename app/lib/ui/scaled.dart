@@ -1,6 +1,6 @@
 /// The table's scale: one number for how much bigger than a phone's a
 /// table is drawn, and the widget that draws a piece of it that much
-/// bigger (docs/05-form-factors.md).
+/// bigger (docs/explanation/screens.md).
 ///
 /// The cards on a tablet's felt grow to be read from across a desk, and
 /// the type round them — the names on the badges, the line the table

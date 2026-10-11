@@ -3,7 +3,7 @@
 ///
 /// A jury stays in force until a later one carries: a table of two
 /// with one gone quiet cannot carry a new one, and that is when it
-/// needs the old (docs/04-live-play.md). So a person who goes quiet
+/// needs the old (docs/explanation/live-play.md). So a person who goes quiet
 /// after their last card of a hand is ruled out at the next hand's
 /// pass by the last hand's jury. With the seat gone, the one person
 /// left is the table's majority and carries the hand's own draw, and

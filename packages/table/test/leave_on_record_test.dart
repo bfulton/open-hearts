@@ -5,7 +5,7 @@
 /// has to say the same exit. So the people back a leave as it reaches
 /// them, a majority of them at its turn carries it with the leaver's
 /// own signature among them, and each person backs one way out of a
-/// seat: a leave and a boot cannot both carry (docs/07-states.md).
+/// seat: a leave and a boot cannot both carry (docs/explanation/table-states.md).
 library;
 
 import 'package:engine/engine.dart';

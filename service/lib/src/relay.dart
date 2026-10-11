@@ -12,7 +12,7 @@
 /// what every kind the table uses is. Locally the relay is this, one
 /// `dart run`.
 ///
-/// There are two of them (docs/06-service.md): this one, and the same
+/// There are two of them (docs/explanation/service.md): this one, and the same
 /// subset in JavaScript for the Cloudflare objects that carry presence
 /// and the tables (`service/do/`). `OH_RELAY=js` puts that one behind this
 /// class, so every suite here — the relay's own, a hand played over
@@ -98,7 +98,7 @@ class DartRelay implements Relay {
   /// (`permessage-deflate`, RFC 7692). On: half of what a table sends
   /// is structure — JSON keys, hex ids, keys and signatures — and a
   /// deflate window kept between messages takes that half to a
-  /// thirteenth of itself (docs/06-service.md). Off is for measuring
+  /// thirteenth of itself (docs/explanation/service.md). Off is for measuring
   /// what it is worth.
   ///
   /// The upgrade is dart:io's own rather than a package's, because

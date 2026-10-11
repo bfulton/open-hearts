@@ -1,4 +1,4 @@
-/// The profile is the account's (docs/06-service.md;
+/// The profile is the account's (docs/explanation/service.md;
 /// net/account_profile.dart): a newer one from the account is taken
 /// over this device's, a change made here is kept here and sent — later,
 /// if it cannot go now — a device brought into an account takes its

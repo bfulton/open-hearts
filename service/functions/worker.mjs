@@ -1,5 +1,5 @@
 // The service's handlers as one Cloudflare Pages worker
-// (docs/06-service.md): what runs on our side beside the static site
+// (docs/explanation/service.md): what runs on our side beside the static site
 // and the app. deploy.sh publishes this file and the modules it
 // imports as _worker.js/ at the root of the published directory, where
 // Pages runs it for every request (entry.mjs first); whatever is not a
@@ -51,7 +51,7 @@ export function isLocal(url) {
   }
 }
 
-/// Local mode's open house (docs/06-service.md): every device that asks
+/// Local mode's open house (docs/explanation/service.md): every device that asks
 /// licensed, and `local:` sign-ins taken. Only where it is set and only
 /// on this machine: set in a production project by mistake, it would
 /// license everyone and let anybody sign in as anybody.
@@ -62,7 +62,7 @@ export const openHouse = (env, request) => !!env.OH_OPEN_HOUSE && isLocal(reques
 // The numbers the service runs by — how long a licence lasts, how many
 // devices a subscription carries, how long a code is good for, which
 // Stripe price a checkout sells — read from one row the operator
-// writes, `config|service` in OH_STORE (docs/06-service.md). Not the
+// writes, `config|service` in OH_STORE (docs/explanation/service.md). Not the
 // app's row: nothing here is served to anybody.
 // Each is checked against bounds before it is taken, and one that does
 // not check out is left at its default, so a typo in the row is never
@@ -290,12 +290,12 @@ export const dayAfter = (at, days) => dayOf(new Date(at).getTime() + days * 8640
 /// was paid for.
 const earlier = (a, b) => (a < b ? a : b);
 
-/// An account's id: 32 hex, random (docs/06-service.md).
+/// An account's id: 32 hex, random (docs/explanation/service.md).
 export const isAccount = (a) => typeof a === 'string' && /^[0-9a-f]{32}$/.test(a);
 export const newAccount = () => hex(crypto.getRandomValues(new Uint8Array(16)));
 
 /// Everything the service keeps, as one key-value table
-/// (docs/06-service.md): a lookup by key, never a scan. Cloudflare KV in
+/// (docs/explanation/service.md): a lookup by key, never a scan. Cloudflare KV in
 /// production; a Map stands in for the tests and for local mode.
 export function storeOf(env) {
   const kv = env.OH_STORE;
@@ -315,7 +315,7 @@ export function storeOf(env) {
     },
     /// The sort keys under [pk] that begin with [prefix]. The only
     /// call here that is not a point lookup, and it is bounded by what
-    /// lives under one subscription: five devices (docs/06-service.md).
+    /// lives under one subscription: five devices (docs/explanation/service.md).
     async under(pk, prefix) {
       const found = [];
       let cursor;
@@ -436,7 +436,7 @@ export async function licenceFor(key, account, until, keys) {
 /// which is once a renewal.
 ///
 /// In local mode a key nobody has heard of is entitled on the spot for
-/// a month (docs/06-service.md), on an account of its own — one branch,
+/// a month (docs/explanation/service.md), on an account of its own — one branch,
 /// and it is never on in production.
 export async function entitlementOf(store, key, { now = Date.now(), openHouse = false } = {}) {
   const today = dayOf(now);
@@ -486,7 +486,7 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
 }
 
 // ---- accounts ----------------------------------------------------------
-// What a subscription buys is an account (docs/06-service.md): made
+// What a subscription buys is an account (docs/explanation/service.md): made
 // when the subscription is first paid for, with an id of its own, and
 // every device brought in — the one that paid, one shown a code, one
 // given a backup code, one signed in — is one of its devices. A device
@@ -535,7 +535,7 @@ async function accountPaidUp(store, account, today) {
 
 // ---- one device at a time ------------------------------------------------
 // An account is a person, and a person plays on one device at a time
-// (docs/06-service.md). Which one is the service's to say, in the
+// (docs/explanation/service.md). Which one is the service's to say, in the
 // account's own turn ([inHousehold]): the newest device to take the
 // account up is the one in use, at once, and the one before it is
 // superseded. What the device in use is given is an activation: the
@@ -650,7 +650,7 @@ async function dropActive(account, device, active, revoke) {
 // The name the others see and how they see it — an icon, a colour, a
 // picture — are the account's, as the seat and the rating are: every
 // device of the account shows the same, and a change on one reaches the
-// others (docs/06-service.md). So the service keeps one profile per
+// others (docs/explanation/service.md). So the service keeps one profile per
 // account, beside its devices, with a version that goes up by one at
 // each write. The last write is the profile: there is nothing to merge
 // in a name, and a person changes their own name from one device at a
@@ -1108,7 +1108,7 @@ export async function dateSubscription(store, subscription, { source, txn_ref = 
     ...(final ? { final: true } : {}),
   });
   // The devices under it hold a copy of the date so that a licence is
-  // one read (docs/06-service.md). A renewal may leave those copies
+  // one read (docs/explanation/service.md). A renewal may leave those copies
   // stale — they catch up by themselves, later is harmless. An ending
   // may not: a copy that outlived its subscription would go on
   // licensing a refunded device for as long as a year. Five rows, once:
@@ -1196,7 +1196,7 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
 // Five devices to an account, and any of them can drop another. They
 // are one person's: one of them is in use at a time (one device at a
 // time, above), and unbounded sharing would be an account shared with
-// the internet (docs/06-service.md).
+// the internet (docs/explanation/service.md).
 //
 // A second device is brought in by a code: the subscribed device shows
 // one, the new device arrives carrying it, and it is spent. The code is
@@ -1238,7 +1238,7 @@ const accountOfKey = async (store, key) => {
 /// already outstanding, while it is unspent and has time left: asking
 /// again is a read, not a new row and a listing of the account — a
 /// subscriber asking in a loop would otherwise spend the store's writes
-/// for everyone, Stripe's included (docs/security-review.md).
+/// for everyone, Stripe's included (docs/explanation/security-model.md).
 export async function ticketFor(key, store, { now = Date.now() } = {}) {
   const account = await accountOfKey(store, key);
   if (!account) return { status: 402, body: { error: 'no subscription' } };
@@ -1496,7 +1496,7 @@ export async function dropDevice(key, device, store, { now = Date.now(), active 
 // taking the account up: each reads the account and writes it in
 // separate calls, and KV has no compare-and-set, so two at once could
 // both find room for a fifth device and make six
-// (docs/security-review.md), or both be the device in use. They run one
+// (docs/explanation/security-model.md), or both be the device in use. They run one
 // after another per account instead: in a Durable Object per account
 // where the project binds one as HOUSEHOLD (one object, one thread,
 // wherever in the world the requests come from), and in this isolate's
@@ -1977,7 +1977,7 @@ async function profileRoute(request, env) {
 // never the identifier: it is opaque but stable and joins to a real
 // account, so a leaked table has to join to nothing. And nothing on the
 // KEY# side leads back to the provider — the key is what public records
-// carry (docs/06-service.md).
+// carry (docs/explanation/service.md).
 
 const PROVIDERS = {
   apple: { iss: 'https://appleid.apple.com', jwks: 'https://appleid.apple.com/auth/keys', audience: 'OH_APPLE_AUDIENCE' },
@@ -2026,7 +2026,7 @@ const ALGS = {
 /// bind somebody else's account to the lifter's key.
 export async function whoSignedIn(provider, token, key, env, fetchImpl = fetch, { now = Date.now(), open = false } = {}) {
   // Local mode's own token: a subject and nothing else, taken only
-  // where the open house is (docs/06-service.md). One branch, never on
+  // where the open house is (docs/explanation/service.md). One branch, never on
   // in production, and the rest of the path below is the same path.
   if (open && typeof token === 'string' && token.startsWith('local:')) {
     const sub = token.slice('local:'.length);
@@ -2486,7 +2486,7 @@ async function turn(request, env) {
 
 // ---- Remote config ----------------------------------------------------
 
-/// What the app may be told without a new build (docs/06-service.md):
+/// What the app may be told without a new build (docs/explanation/service.md):
 /// one row in the store, which the operator writes and every device
 /// reads at its start. What is here when there is no row — or a
 /// row this worker cannot read — is what the app does with no config at
@@ -2525,7 +2525,7 @@ export function configOf(raw) {
   if (typeof raw.offer === 'boolean') c.offer = raw.offer;
   // Which relays the tables meet on, in place of the build's. wss only:
   // these carry every live game, and a relay over plain ws would carry
-  // them in the open. And ours only (docs/08-own-relays.md): this is the
+  // them in the open. And ours only (docs/explanation/relay.md): this is the
   // way to move the tables to another relay of ours without a release,
   // never the way back to a public one.
   if (Array.isArray(raw.relays) && raw.relays.length > 0 && raw.relays.length <= MOST_RELAYS) {
@@ -2669,7 +2669,7 @@ function tableTimingOf(raw) {
 }
 
 // ---- is it up ----------------------------------------------------------
-// What an outside monitor asks every minute (docs/06-service.md): not
+// What an outside monitor asks every minute (docs/explanation/service.md): not
 // whether this worker answers — any page would say that — but whether
 // what a purchase needs does. The store is read, and Stripe is asked
 // for the price with the key the service holds, which catches an
@@ -2738,7 +2738,7 @@ async function configRoute(request, env) {
 
 // ---- buying in a store -------------------------------------------------
 // On a phone, live play is the store's own subscription
-// (docs/06-service.md). The device buys, the store hands it a proof,
+// (docs/explanation/service.md). The device buys, the store hands it a proof,
 // and the device brings the proof here, signed as every request is:
 //
 //   App Store    a StoreKit 2 signed transaction: a JWS whose
@@ -3287,7 +3287,7 @@ const ROUTES = {
 /// hour; every one of the rest, which are a person doing something.
 const SAMPLED = { config: 10, health: 10 };
 
-/// One line of numbers a request, for the operator (docs/06-service.md):
+/// One line of numbers a request, for the operator (docs/explanation/service.md):
 /// which handler, what it answered and how long it took — and
 /// how many requests the line stands for, when only some are written.
 /// Never a key, an address or anything else about who asked. Written to
@@ -3306,7 +3306,7 @@ export function measure(env, handler, status, ms, { random = Math.random } = {})
 }
 
 // ---- where the app is ------------------------------------------------------
-// One Pages project, one deployment, routed by host (docs/06-service.md,
+// One Pages project, one deployment, routed by host (docs/explanation/service.md,
 // "Where the app is"). The build's /play/ directory is the app:
 //
 //   play.openhearts.game   the app at the root: /room/ABCD is the build's

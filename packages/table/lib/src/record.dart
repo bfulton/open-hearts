@@ -6,7 +6,7 @@
 /// removal must carry the majority the participants of the moment
 /// required, and every bot move is recomputed rather than read. The
 /// ratings fall out of the replay by the two rules of
-/// docs/04-live-play.md.
+/// docs/explanation/live-play.md.
 library;
 
 import 'dart:convert';
@@ -76,7 +76,7 @@ class Verification {
 /// at — about this turn and this seat, ruling for the very event
 /// recorded.
 ///
-/// A sealed record (docs/03-fair-deal.md) is replayed through the deal
+/// A sealed record (docs/explanation/fair-deal.md) is replayed through the deal
 /// as well, with [crypto]: every key's proof, every shuffle's
 /// argument, every token, the lead card's declaration; then the
 /// secrets from the hand's audit open every card, each play's token
@@ -206,7 +206,7 @@ Verification verifyRecord(
   /// carries. A table of two with one gone quiet carries no draw, so
   /// the old jury rules the seat out; then the one person left is the
   /// table's majority and carries the hand's own draw, which the juror
-  /// who ruled need not be in (docs/04-live-play.md, "Appeals and
+  /// who ruled need not be in (docs/explanation/live-play.md, "Appeals and
   /// verdicts"; `test/verdict_before_the_draw_test.dart`).
   ///
   /// At the turn the hand's own carried, the old jury still rules: the
@@ -726,7 +726,7 @@ Verification verifyRecord(
           // it cannot be opened to show anything. So the record goes
           // on to a later hand with this one's deal short, and that
           // is a hand over, not a deal left unfinished
-          // (docs/04-live-play.md).
+          // (docs/explanation/live-play.md).
           //
           // Only where the record gives a held seat to the escrow with
           // a step of the deal still owed. Every other step has
@@ -744,7 +744,7 @@ Verification verifyRecord(
         }
         // A hand whose audits follow its deal with nothing in between
         // never began: nobody could lead it, so the table opened it to
-        // find out why and gave it up (docs/03-fair-deal.md, and
+        // find out why and gave it up (docs/explanation/fair-deal.md, and
         // _giveUpHand in client.dart). Two things make that legitimate,
         // and both are in the record: every seat's own signed word put
         // the lead card nowhere, and the deal those audits open shows
@@ -929,7 +929,7 @@ Verification verifyRecord(
     // audit opened, the policy has to give the same card. A juror
     // playing a bot badly for somebody at the table is caught here,
     // at the end of the hand rather than at the turn — which is the
-    // price of the hand being hidden (docs/04-live-play.md).
+    // price of the hand being hidden (docs/explanation/live-play.md).
     if (heldAt(game.handNumber)[seat] != null && game.knowsHand(seat)) {
       final want = Bot(persona: (holders[seat] as BotSeat).persona).chooseCard(
         BotView(

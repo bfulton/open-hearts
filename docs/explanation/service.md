@@ -1,15 +1,15 @@
 # 06 — The service
 
 The service is deliberately small. The game is peer to peer
-([doc 02](02-multiplayer.md)), the deal is verifiable
-([doc 03](03-fair-deal.md)), and matchmaking, results and ratings are the
-players' own business on the relay ([doc 04](04-live-play.md)). What runs
+([doc 02](multiplayer.md)), the deal is verifiable
+([doc 03](fair-deal.md)), and matchmaking, results and ratings are the
+players' own business on the relay ([doc 04](live-play.md)). What runs
 on our side:
 
 - **The Pages worker** (`service/functions/`): accounts, licences, the
   shop, TURN credentials, remote config and game records.
 - **The relay worker** (`service/do/`): a Durable Object per tag
-  ([doc 08](08-own-relays.md)), which carries only an account's device
+  ([doc 08](relay.md)), which carries only an account's device
   in use; the `Household` object, one per account; and the backup
   jurors (`service/bin/juror.dart` in a container).
 
@@ -168,7 +168,7 @@ key never leaves it and none is held for it; the licence vouches that
 the key is one of an account's devices. It rides in every seat of a
 start event, in a waiter's and a room member's beats, in a watcher's
 request and in each line of a result, and every peer checks it against
-the same compiled key ([doc 04](04-live-play.md)).
+the same compiled key ([doc 04](live-play.md)).
 
 A licence lasts a month (`licenceDays`), never past what was paid for,
 and is renewed while the subscription lives, so an ended subscription
@@ -470,7 +470,7 @@ beside it which account and version it last matched:
   leaves an account, or is dropped, keeps the last profile it had.
 
 What is published at tables is unchanged: it is read from the device's
-copy, as before ([doc 04](04-live-play.md)).
+copy, as before ([doc 04](live-play.md)).
 
 ### Deleting an account's data
 
@@ -486,7 +486,7 @@ first. Where the `Household` object runs, its note of the device in use
 reached from outside: it is written over the next time the account is
 taken up, which after deletion is never, and holds no name or picture.
 The account's finished games are deleted from R2, and its results from
-the relay, by hand ([doc 08](08-own-relays.md)).
+the relay, by hand ([doc 08](relay.md)).
 
 ### TURN
 
@@ -495,7 +495,7 @@ the relay, by hand ([doc 08](08-own-relays.md)).
 subscription stands, since TURN is billed by the gigabyte. Without the
 secrets it answers 503, and the app makes no data channels and plays
 over the relay: channels go through TURN or not at all, so no peer
-learns another's address ([doc 02](02-multiplayer.md)).
+learns another's address ([doc 02](multiplayer.md)).
 
 ### Game records
 
@@ -639,7 +639,7 @@ bind none.
 No key, address, tag or location is written. Read the counts with the
 Analytics Engine SQL API. External ping monitors watch the
 site, the app, `/api/health` and the relay
-([observability/](../observability/README.md)).
+([observability/](../../observability/README.md)).
 
 ### The operator's alerts
 
@@ -664,7 +664,7 @@ Set either flag to `false` and deploy to stop it.
 
 ## The relay and the backup jurors
 
-The relay's core ([doc 08](08-own-relays.md)), `service/do/relay.mjs`,
+The relay's core ([doc 08](relay.md)), `service/do/relay.mjs`,
 is plain functions with no Cloudflare or Node imports. It checks
 signatures with the app's own `app/web/schnorr.wasm`, passed in
 precompiled because a Worker may not compile wasm at runtime. The Durable
@@ -693,10 +693,10 @@ container. The image is built from the repository on every relay deploy
 
 | What | How |
 |---|---|
-| Site, app and worker | `./deploy.sh` ([doc 01](01-dev-loop.md)) |
+| Site, app and worker | `./deploy.sh` ([doc 01](dev-loop.md)) |
 | Relay, Household, Bench | `cd service/do && npx wrangler@4.130.0 deploy` (`wrangler.toml`: the `TABLE`, `HOUSEHOLD` and `BENCH` objects, the container, `OH_STORE`, `EMAIL`, `OH_SERVICE_KEY`, the domain `relay.openhearts.game`) |
 | An account's data, deleted on request | `node service/tool/forget.mjs <account>`, a dry run unless given `--apply` ([above](#deleting-an-accounts-data)) |
-| Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../infra/README.md)) |
+| Accounts | `node infra/apply.mjs`, a dry run unless given `--apply` ([infra/](../../infra/README.md)) |
 | Monitoring | `node observability/apply.mjs` |
 
 The `Household` object is the relay worker's, built from
@@ -768,7 +768,7 @@ four harnesses:
   miss.
 - **Real sockets and real browsers**: `service/test` runs the jury and a
   summoned juror of last resort over the relay; `e2e/` runs four headless
-  browsers over WebRTC ([e2e/README.md](../e2e/README.md)).
+  browsers over WebRTC ([e2e/README.md](../../e2e/README.md)).
 
 Every scenario asserts that the game reaches its end with a bot in each
 departed seat, or pauses, says why, and ends unscored ("juror quorum

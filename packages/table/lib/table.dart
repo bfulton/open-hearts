@@ -3,7 +3,7 @@
 ///
 /// Pure Dart, like the engine. The app runs it over WebRTC in real
 /// time; the simulator in `sim/` runs it over a scheduler in no time at
-/// all, which is how the departure matrix in docs/06-service.md gets
+/// all, which is how the departure matrix in docs/explanation/service.md gets
 /// run on every commit.
 library;
 

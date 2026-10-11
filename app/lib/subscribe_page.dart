@@ -1,5 +1,5 @@
 /// What live play costs, what the money is for, and which of your
-/// devices it is open on (docs/06-service.md).
+/// devices it is open on (docs/explanation/service.md).
 ///
 /// Everything else is free and stays free — the bots, the records, the
 /// verifiable deal, the engine itself. What is paid for is the part

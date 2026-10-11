@@ -31,7 +31,7 @@ import 'routes.dart';
 const _phone = Size(390, 844);
 
 /// The same phone on its side: height is what is scarce there, and the
-/// composition is a different one (docs/05-form-factors.md).
+/// composition is a different one (docs/explanation/screens.md).
 const _sideways = Size(844, 390);
 
 /// A second table in the same test needs a [key] of its own: the page

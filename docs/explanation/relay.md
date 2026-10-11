@@ -5,7 +5,7 @@ Cloudflare Durable Object per tag (`service/do/`). Deployed builds and
 the jurors of last resort talk to no other relay: the list is a constant
 of the build (`app/lib/net/relays.dart`), and the remote config may move
 tables only to another host under `openhearts.game`
-([doc 06](06-service.md)). The wire format is NIP-01-style signed
+([doc 06](service.md)). The wire format is NIP-01-style signed
 events, our own and free to change.
 
 ## One object per tag
@@ -25,7 +25,7 @@ Every event's id and BIP-340 signature are checked before anything else
 sees it. Sockets hibernate, carrying their subscriptions through
 eviction, so an idle connection costs nothing. Per-socket limits on
 message size, REQ size and publish rate are `objectLimits` for presence
-(configurable, [doc 06](06-service.md)) and `tableLimits` elsewhere
+(configurable, [doc 06](service.md)) and `tableLimits` elsewhere
 (`service/do/relay.mjs`).
 
 ## What is kept, and for how long
@@ -34,7 +34,7 @@ Ephemeral kinds (20000–29999), which are table events, signalling,
 pools, presence and the players' reactions, are forwarded and
 forgotten. The table protocol's own repeats recover a dropped message.
 
-A reaction ([doc 04](04-live-play.md#reactions)) is a code and the
+A reaction ([doc 04](live-play.md#reactions)) is a code and the
 moment it was said at, never words, and the object holds it to that: it
 rides only a table's own tag, tagged with that table and nothing else,
 and an object refuses one anywhere else, longer than 128 characters, or

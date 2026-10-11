@@ -1,4 +1,4 @@
-/// Mints the service's signing pair (docs/06-service.md).
+/// Mints the service's signing pair (docs/explanation/service.md).
 ///
 ///     dart run bin/service_key.dart
 ///

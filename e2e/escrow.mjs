@@ -44,7 +44,7 @@ async function main() {
   const relay = await startRelay({ apart: true });
   // A tenth of a table's beats (app/lib/net/address.dart), and a juror
   // silent for ten seconds rather than thirty is gone (the operator's
-  // word on the clocks, docs/06-service.md; the least it may be,
+  // word on the clocks, docs/explanation/service.md; the least it may be,
   // packages/table, timing.dart).
   const app = await serveApp({ relayPort: relay.port, pace: 0.1, config: { table: { jurorSilenceMs: 10000 } } });
   log(`relay ${relay.url}, app ${app.url}`);
@@ -100,7 +100,7 @@ async function main() {
     log(`the juror holding seat ${gone.seat} (${gone.key}) was taken off the air`);
 
     // She judges it gone and claims the seat for the escrow; the claim
-    // is settled on the record the way a boot is (docs/07-states.md),
+    // is settled on the record the way a boot is (docs/explanation/table-states.md),
     // and the jurors that are left do the rest between themselves.
     //
     // Either way of being gone. A juror taken off the air stops
@@ -109,7 +109,7 @@ async function main() {
     // wins: fifteen seconds with the turn in front of it against ten
     // without a heartbeat here, thirty on a standard table
     // (packages/table, client.dart botActsWithinMs, timing.dart
-    // jurorSilenceMs, docs/04-live-play.md). Both are the same
+    // jurorSilenceMs, docs/explanation/live-play.md). Both are the same
     // judgement and both say so in the same line, so this watches for
     // the line rather than for one of its reasons.
     await traced(said, new RegExp(`bot seat ${gone.seat}: its juror .*; claimed for the escrow`),

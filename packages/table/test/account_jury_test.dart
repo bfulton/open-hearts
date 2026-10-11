@@ -1,5 +1,5 @@
 /// A jury draws nobody of an account seated at the table, by whichever of
-/// its devices (docs/04-live-play.md): a player's laptop online while
+/// its devices (docs/explanation/live-play.md): a player's laptop online while
 /// their phone sits at the table is the player, not a stranger.
 library;
 

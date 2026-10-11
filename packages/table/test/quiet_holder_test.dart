@@ -1,7 +1,7 @@
 /// A bot seat whose juror goes quiet, and the hand that plays on.
 ///
 /// A juror holds each bot seat so that nobody at the table sees its
-/// hand (docs/04-live-play.md). When that juror goes, the seat is
+/// hand (docs/explanation/live-play.md). When that juror goes, the seat is
 /// nobody's: the escrow reopens it to the jury, and the seat has to go
 /// on being played or the hand stops at its turn — with the rest of
 /// the table holding cards it cannot play.

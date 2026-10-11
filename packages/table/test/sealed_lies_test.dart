@@ -19,7 +19,7 @@ void main() {
   /// A table where every seat says it holds the two of clubs nowhere.
   /// Three of them are telling the truth; whichever was dealt the card
   /// is not, and nothing in the deal's proofs can tell them apart
-  /// (docs/03-fair-deal.md) — there is nothing to prove about a card
+  /// (docs/explanation/fair-deal.md) — there is nothing to prove about a card
   /// you say you do not hold. [how] is which kind of modified client
   /// they are. The lie lasts one hand: the seat that told it is out
   /// before another is dealt, and the rest play on honestly.
@@ -123,7 +123,7 @@ void main() {
 
     // Sealing three cards to nothing is caught by every seat, not only
     // the receiver: every seat checks the argument beside a seal
-    // (docs/03-fair-deal.md), so the pass is refused where it
+    // (docs/explanation/fair-deal.md), so the pass is refused where it
     // is made — the seat is left at its own turn with nothing settled,
     // and the clock takes it there.
     expect(t.clock.runUntil(() => t.clients.skip(1).every((c) => c.holders[0] is BotSeat), limitMs: 300000), isTrue,

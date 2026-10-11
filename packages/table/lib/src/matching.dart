@@ -225,7 +225,7 @@ class WaitingRoom {
   /// seating, and every seat takes it from there.
   final TableTiming timing;
 
-  /// Whether this device deals sealed tables (docs/03-fair-deal.md): the tables it
+  /// Whether this device deals sealed tables (docs/explanation/fair-deal.md): the tables it
   /// seats are sealed, and it sits only at sealed ones.
   final bool sealed;
   final int rating;

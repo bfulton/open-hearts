@@ -1,4 +1,4 @@
-// Screenshots of the table at the shapes docs/05-form-factors.md names,
+// Screenshots of the table at the shapes docs/explanation/screens.md names,
 // from the built app in a headless browser, served as the browser suites
 // serve it (drive.mjs) — for looking at a layout before a phone does.
 //

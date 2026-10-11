@@ -2,7 +2,7 @@
 ///
 /// A jury that only shrinks runs out: a bot seat's escrow rests on
 /// enough of the jurors it was sealed to still being reachable when
-/// the seat's holder goes (docs/04-live-play.md). Bringing somebody on
+/// the seat's holder goes (docs/explanation/live-play.md). Bringing somebody on
 /// is the lever, and it is worth nothing unless the newcomer is given
 /// a share of what the others hold.
 @Tags(['slow'])

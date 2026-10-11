@@ -25,7 +25,7 @@ export const synthetics = {
     // The marketing site.
     { name: 'Site', uri: 'https://openhearts.game/', expect: 'Open Hearts' },
     // The app's page; the app itself is a canvas a ping cannot see into.
-    // At its own host (docs/06-service.md, "Where the app is").
+    // At its own host (docs/explanation/service.md, "Where the app is").
     { name: 'App', uri: 'https://play.openhearts.game/', expect: 'Open Hearts' },
     // What a purchase needs: the store read, and Stripe answering the
     // service's key for the price (service/functions/worker.mjs, healthOf).

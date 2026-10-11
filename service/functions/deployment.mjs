@@ -1,6 +1,6 @@
 // The service's configuration that is not secret: config/openhearts.json,
 // committed, reviewed and the same for every deployment. Secrets stay on
-// the Pages project (docs/06-service.md).
+// the Pages project (docs/explanation/service.md).
 //
 // The handlers read their settings off env by their OH_ names, as the
 // tests and the local rig hand them in, so the file is laid under env

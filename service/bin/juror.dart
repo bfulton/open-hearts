@@ -18,7 +18,7 @@
 /// Several of them, not one: a table whose bot seats the jury holds
 /// needs juryToHoldBots jurors online before it can hold any, and the
 /// call comes exactly when too few others are online to make that
-/// number up (docs/04-live-play.md). So there are that many by
+/// number up (docs/explanation/live-play.md). So there are that many by
 /// default, each its own identity — derived from the secret given, so
 /// the same deployment keeps the same keys across restarts, or fresh
 /// ones when no secret is set.

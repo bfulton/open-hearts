@@ -1,4 +1,4 @@
-/// What the app may be told without a new build (docs/06-service.md):
+/// What the app may be told without a new build (docs/explanation/service.md):
 /// whether live play is open to anyone at all,
 /// whether the paid tier is offered, which relays the tables meet on, a
 /// line across the front door, that this build is too old, and the
@@ -320,7 +320,7 @@ class RemoteConfig {
   static final _day = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
   /// A relay of ours: the only kind the config may name
-  /// (docs/08-own-relays.md), so it can move the tables between our
+  /// (docs/explanation/relay.md), so it can move the tables between our
   /// relays and never to a public one.
   static bool ours(Uri u) => u.host == 'openhearts.game' || u.host.endsWith('.openhearts.game');
 

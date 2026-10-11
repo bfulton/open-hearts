@@ -3,8 +3,8 @@
 The table protocol: signed events, membership, departures, juries and
 the sealed deal, over an abstract transport and clock, with a simulated
 network to test it on. How a live table works is
-[doc 04](../../docs/04-live-play.md); its states are
-[doc 07](../../docs/07-states.md).
+[doc 04](../../docs/explanation/live-play.md); its states are
+[doc 07](../../docs/explanation/table-states.md).
 
 ```bash
 (cd ../../crypto/deal && cargo build --release)  # the deal's library

@@ -1,5 +1,5 @@
 /// Signing in with Apple or Google, so the account follows the person
-/// rather than the device (docs/06-service.md).
+/// rather than the device (docs/explanation/service.md).
 ///
 /// A household code brings a second device in while the first is at
 /// hand, and a backup code when it is not; a sign-in is a backup code

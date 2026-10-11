@@ -6,10 +6,10 @@ game server and sub-second latency?
 **Answer.** Yes, and the latency is the easy half. Cards travel over
 WebRTC data channels between the players; the only thing that needs a
 third party is the introduction, which our own relay
-(`relay.openhearts.game`, [doc 08](08-own-relays.md)) does. The hard
+(`relay.openhearts.game`, [doc 08](relay.md)) does. The hard
 half is fairness, which has its own document
-([03 — A deal nobody can rig](03-fair-deal.md)). How a table is formed
-and how it agrees on every turn is [doc 04](04-live-play.md).
+([03 — A deal nobody can rig](fair-deal.md)). How a table is formed
+and how it agrees on every turn is [doc 04](live-play.md).
 
 ## The shape
 
@@ -25,7 +25,7 @@ and how it agrees on every turn is [doc 04](04-live-play.md).
 Signalling is a handful of small messages when someone joins; after
 that every event travels between devices over their data channels. The mesh is the four
 seats plus the hand's jurors — strangers drawn to break deadlocks and
-hold bot seats ([doc 04](04-live-play.md)). A juror is introduced by a
+hold bot seats ([doc 04](live-play.md)). A juror is introduced by a
 summons over the relay and then dialled like a seat. It dials the seats,
 not its fellow jurors, since what passes between jurors is a few small
 events a hand.
@@ -47,7 +47,7 @@ A peer never learns another's address — not the players', and not the
 jurors', who are strangers. Every data channel goes through Cloudflare's
 TURN (`iceTransportPolicy: 'relay'`), with short-lived credentials from
 the service's turn handler (`app/lib/net/turn.dart`,
-[doc 06](06-service.md)), so the browser gathers no address of its own
+[doc 06](service.md)), so the browser gathers no address of its own
 to send. TURN is billed by the gigabyte delivered: a game is at most a
 few tens of megabytes, a tenth of a cent, and the first 1,000 GB a month
 are free. In order:
@@ -76,7 +76,7 @@ it is accepted by nobody.
 What does need deciding is membership: who is still at the table when a
 phone goes into a tunnel. That is settled per turn by a majority of the
 people at it, and by the jury where no majority exists
-([doc 04](04-live-play.md), [doc 07](07-states.md)). There is no
+([doc 04](live-play.md), [doc 07](table-states.md)). There is no
 leader to elect.
 
 ## What this does not solve

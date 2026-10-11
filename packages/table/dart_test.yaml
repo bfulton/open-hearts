@@ -1,4 +1,4 @@
-# How the table's tests run (docs/09-testing.md).
+# How the table's tests run (docs/explanation/testing.md).
 #
 # Four files side by side. Each file plays its tables in an isolate of
 # its own on the simulator's clock, so they share nothing but the

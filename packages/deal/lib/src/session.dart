@@ -1,6 +1,6 @@
 /// One hand's deal, from one seat's side — or from nobody's, for a
 /// juror following the table or the verifier. The protocol of
-/// docs/03-fair-deal.md as a state machine over the primitives in
+/// docs/explanation/fair-deal.md as a state machine over the primitives in
 /// deal.dart: everyone's keys, four shuffles in seat order with their
 /// arguments, reveal tokens for the other seats' positions, one's own
 /// cards opened, the holder of the lead card declared; then, through
@@ -19,7 +19,7 @@
 ///
 /// **Escrow.** Each person splits their secret in two: one piece to
 /// every other person at the table, one piece to every juror
-/// (docs/04-live-play.md), each copy wrapped in the secret
+/// (docs/explanation/live-play.md), each copy wrapped in the secret
 /// the two keys share. Any one person and any one juror can rebuild it
 /// once the table has removed the seat; all the people together hold
 /// noise without a juror's piece, and the jury holds noise without a
@@ -214,7 +214,7 @@ class DealSession {
 
   /// A person's seat, as against a bot's however the bot is held: what
   /// escrow routing turns on, since a bot seat's pieces go to jurors
-  /// alone (docs/04-live-play.md).
+  /// alone (docs/explanation/live-play.md).
   bool _human(int seat) => seats[seat] is HumanDealSeat;
 
   /// A seat that holds a key of its own and so acts for itself: a
@@ -249,7 +249,7 @@ class DealSession {
   /// A departed person this side still cannot answer for. Its secret
   /// rebuilt answers everything; so does holding both shares' tokens
   /// for every position still shut, which opens those positions and
-  /// nothing else and leaves the key where it was (docs/03-fair-deal.md).
+  /// nothing else and leaves the key where it was (docs/explanation/fair-deal.md).
   bool awaitsSecret(int seat) =>
       _gone.contains(seat) && !_secrets.containsKey(seat) && !_coveredByShares(seat);
 
@@ -302,7 +302,7 @@ class DealSession {
     // seat's token, and no amount of this seat's tokens opens it. A
     // pass heard after the last release is exactly the case the
     // release has to be sent again for, so staying uncovered here is
-    // what asks for it (docs/03-fair-deal.md).
+    // what asks for it (docs/explanation/fair-deal.md).
     final sealed = _sealedTo[seat];
     if (sealed != null) {
       final sp = _sealParts[seat];
@@ -461,7 +461,7 @@ class DealSession {
     final secret = _secrets[me]!;
     final proof = _keyProofs[me] ??= crypto.keyProof(secret, _name(me), _draw());
     // Nobody at the table holds a piece of a bot seat: its escrow is
-    // the jury's alone, both sides of it (docs/04-live-play.md). A
+    // the jury's alone, both sides of it (docs/explanation/live-play.md). A
     // person's seat gives one to each of the other people.
     final others = _human(me) ? [for (var s = 0; s < _seats; s++) if (s != me && _human(s)) s] : const <int>[];
     final pieces = <String, String>{};
@@ -511,7 +511,7 @@ class DealSession {
       // secret's pieces answer before the deck is dealt, where a
       // shuffle is still owed, and at the audit; in play it is the
       // shares' tokens that open a departed seat's positions, one at a
-      // time, with the key never anywhere (docs/03-fair-deal.md).
+      // time, with the key never anywhere (docs/explanation/fair-deal.md).
       // Seeded from the secret, not drawn: an extra draw here would
       // move every draw after it and deal a different hand.
       final split = crypto.split(secret, _seed('shares', me), shares: 2);
@@ -569,7 +569,7 @@ class DealSession {
   /// bot seat splits the jury in two and gives the people nothing:
   /// a player with one juror's help is exactly what a bot's hand is
   /// hidden from, so handing players a piece would undo the whole of
-  /// it (docs/04-live-play.md). The price is that a bot seat wants two
+  /// it (docs/explanation/live-play.md). The price is that a bot seat wants two
   /// live jurors where a person's wants one of each; with a jury of
   /// one the second side is empty and the seat cannot be opened at
   /// all, which is the table's business to avoid, not the deal's.
@@ -1054,7 +1054,7 @@ class DealSession {
           } else {
             // A seal is a ciphertext of a card's shape, so a share's
             // part of opening one is a token over the seal itself
-            // (docs/03-fair-deal.md). Both parts, and the token the
+            // (docs/explanation/fair-deal.md). Both parts, and the token the
             // departed key would have opened comes out.
             final a = parts![0]?[p];
             final b = parts[1]?[p];
@@ -1285,7 +1285,7 @@ class DealSession {
   /// the table. What is sealed is for one seat's eyes, so nobody else
   /// can look; the argument says, without looking, that what is in
   /// there is the share this seat's key owes for that card
-  /// (docs/03-fair-deal.md). The reveal proof still travels beside it,
+  /// (docs/explanation/fair-deal.md). The reveal proof still travels beside it,
   /// in the clear, because it is what makes the opened point a whole
   /// token for the receiver to unmask with.
   ///
@@ -1351,7 +1351,7 @@ class DealSession {
       // The argument each seal carries: what is sealed is the share
       // [from]'s key owes for that card. Checked by everyone, so a
       // receiver left with cards it cannot open is the table's
-      // business, not only its own (docs/03-fair-deal.md).
+      // business, not only its own (docs/explanation/fair-deal.md).
       for (var i = 0; i < positions.length; i++) {
         if (!crypto.verifySeal(_pks[from]!, _pks[to]!, _masked(positions[i]), sealed[i])) return false;
       }
@@ -1432,7 +1432,7 @@ class DealSession {
   /// A bot seat's opens to the jury and to nobody else — a piece to
   /// each custodian, sealed to it — because the whole reason a juror
   /// holds the seat is that nobody at the table may see its hand
-  /// (docs/04-live-play.md). Holding a piece is not what it takes to
+  /// (docs/explanation/live-play.md). Holding a piece is not what it takes to
   /// rebuild the secret: hearing [escrowThreshold] of them is, and
   /// a piece said in the clear is heard by the people playing.
   ///
@@ -1498,7 +1498,7 @@ class DealSession {
   // made for it. Two holders make one between them: each sends what
   // its own share is worth towards the newcomer's index, and the
   // newcomer sums them. Neither ever holds the secret, and what each
-  // sends is worth nothing by itself (docs/04-live-play.md).
+  // sends is worth nothing by itself (docs/explanation/live-play.md).
 
   /// Custodians added to [seat] after its keys went out. The index of
   /// a custodian is its place in the list counted from one, so this
@@ -1710,7 +1710,7 @@ class DealSession {
   ///
   /// The share itself never goes anywhere. A share that crossed would
   /// hand the other side every position; a token crosses for one
-  /// position and says nothing about the next (docs/03-fair-deal.md).
+  /// position and says nothing about the next (docs/explanation/fair-deal.md).
   Map<String, Object?>? releaseShareTokens(int seat) {
     final k = myKey ?? (mySeat == null ? null : _keyOf(mySeat!));
     if (k == null || deck == null || !_gone.contains(seat)) return null;

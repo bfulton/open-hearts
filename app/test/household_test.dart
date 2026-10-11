@@ -1,6 +1,6 @@
 /// A subscription is a person's: a code another device arrives with,
 /// five devices to a household, and any of them able to drop another
-/// (docs/06-service.md).
+/// (docs/explanation/service.md).
 ///
 /// The service is a stand-in here, as it is for the TURN credentials
 /// (turn_test.dart): what these prove is this side — the link a code

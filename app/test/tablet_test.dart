@@ -1,5 +1,5 @@
 /// The third composition, and the two things a foldable has to hold
-/// (docs/05-form-factors.md).
+/// (docs/explanation/screens.md).
 ///
 /// A tablet is not a big phone. The felt already stops growing its
 /// cards, so all a wider screen buys is emptier felt and a fan spread so

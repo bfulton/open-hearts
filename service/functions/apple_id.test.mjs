@@ -1,4 +1,4 @@
-// Sign in with Apple's server-to-server notifications (docs/06-service.md):
+// Sign in with Apple's server-to-server notifications (docs/explanation/service.md):
 // a person who stops using Sign in with Apple with the app, or deletes
 // their Apple Account, has the sign-in unlinked from their account, and
 // nothing else of it is touched; the notices about email forwarding are

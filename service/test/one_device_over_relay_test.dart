@@ -1,5 +1,5 @@
 /// One device at a time, over a real socket to the relay the Cloudflare
-/// object runs (service/do/relay.mjs, serviceGate; docs/06-service.md):
+/// object runs (service/do/relay.mjs, serviceGate; docs/explanation/service.md):
 /// a device the service has not given a current activation is carried
 /// nothing, a later device of the account cuts the earlier one off, and
 /// the earlier one hears that it was superseded and stops coming back.

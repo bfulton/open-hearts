@@ -1,6 +1,6 @@
 /// What a screen reader has, and what it is told as it happens — found
 /// by playing a hand with nothing but the accessibility tree, the way a
-/// blind player plays it (docs/05-form-factors.md).
+/// blind player plays it (docs/explanation/screens.md).
 library;
 
 import 'package:engine/engine.dart' as engine;

@@ -5,7 +5,7 @@
 /// the escrow at that turn, and the claim is carried the way a boot is:
 /// by a majority of them, or by the jury where they split. From there
 /// to the end of the hand the seat is played by the first of the
-/// escrow's jurors still about (docs/07-states.md). Every side gives
+/// escrow's jurors still about (docs/explanation/table-states.md). Every side gives
 /// the seat up at the same turn, because the record says so.
 library;
 

@@ -15,7 +15,7 @@
 /// roll back. A seat's own signed leave is carried by a majority in the
 /// same way. When everyone has signed and neither side has a
 /// majority — an even table split down the middle — the turn is stuck,
-/// and the table pauses for the jury (docs/04-live-play.md), which is
+/// and the table pauses for the jury (docs/explanation/live-play.md), which is
 /// the one party that can break it without any two peers ever deciding
 /// it differently.
 ///
@@ -38,9 +38,9 @@
 ///
 /// Bot seats need no events at all. A bot's move is a function of the
 /// deal and the record, so every peer computes it the moment the bot's
-/// turn opens and moves on (docs/04-live-play.md).
+/// turn opens and moves on (docs/explanation/live-play.md).
 ///
-/// At a **sealed** table (docs/03-fair-deal.md) the cards come from the
+/// At a **sealed** table (docs/explanation/fair-deal.md) the cards come from the
 /// verifiable deal rather than the seed, and the deal is turns like any
 /// other: four rounds of one per seat — keys, a shuffle in seat order,
 /// reveal tokens, the lead card declared — each a race the seat wins by
@@ -77,7 +77,7 @@ import 'time_bank.dart';
 import 'timing.dart';
 import 'transport.dart';
 
-/// How a modified client lies (docs/03-fair-deal.md), for the
+/// How a modified client lies (docs/explanation/fair-deal.md), for the
 /// simulator. A seat saying it holds the two of clubs nowhere has
 /// nothing to prove, and nothing can be made to prove it; a token
 /// sealed to one pair of eyes is checked by an argument beside it.
@@ -345,7 +345,7 @@ class TableClient {
 
   /// The accounts that sat down here (spec.dart), whichever of their
   /// devices sat: a jury is drawn from nobody of theirs, since another
-  /// device of a player's account is the player (docs/04-live-play.md).
+  /// device of a player's account is the player (docs/explanation/live-play.md).
   late final Set<String> _seatedAccounts = spec.accounts;
 
   /// Whether [key] is a device of an account seated here, as presence
@@ -428,7 +428,7 @@ class TableClient {
     if (_catchingUp((holders[seat] as HumanSeat).key)) return false;
     // A seat waiting on an answer it is owed is not idle: three of its
     // cards will not open and it cannot play what it cannot see
-    // (docs/03-fair-deal.md). It waits the clock a device answers by,
+    // (docs/explanation/fair-deal.md). It waits the clock a device answers by,
     // and no longer — a table that waited for ever on a passer that
     // will not answer would be the worse hole of the two.
     final t = _openTurnOf(seat);
@@ -505,7 +505,7 @@ class TableClient {
   /// or a modified client that took a path of its own through the hand
   /// and will never reach this one. The seat that says it holds the
   /// lead card nowhere and then deals itself the hand
-  /// (docs/03-fair-deal.md) is exactly that, and without this it would
+  /// (docs/explanation/fair-deal.md) is exactly that, and without this it would
   /// be behind for ever and never bootable.
   bool _catchingUp(PublicKey key) {
     final pos = _lastPosition[key];
@@ -869,7 +869,7 @@ class TableClient {
 
   /// A pass for [seat], said rather than worked out by everyone: a
   /// player's own, or a bot seat's by the juror that holds it
-  /// (docs/04-live-play.md). A bot seat nobody holds needs no event —
+  /// (docs/explanation/live-play.md). A bot seat nobody holds needs no event —
   /// every peer computes the same pass from a hand it can all see.
   void sayPass(int seat, List<Card> cards) {
     final turn = TurnId.pass(game.handNumber, seat);
@@ -886,7 +886,7 @@ class TableClient {
       if (m == null) return;
       if (seat == mySeat && lies == Lie.seal && m['sealed'] != null) {
         // Sealed to nothing anybody holds: the shape of a pass, and
-        // three cards the receiver will never open (docs/03-fair-deal.md).
+        // three cards the receiver will never open (docs/explanation/fair-deal.md).
         final rng = _random ?? Random();
         m['sealed'] = [for (var i = 0; i < passSize; i++) base64.encode([for (var b = 0; b < sealedBytes; b++) rng.nextInt(256)])];
       }
@@ -1174,7 +1174,7 @@ class TableClient {
   /// Whether [seat]'s bot moves are this side's to work out. A bot
   /// seat nobody holds is everyone's to compute. One a juror holds is
   /// that juror's alone: every other peer waits to be told
-  /// (docs/04-live-play.md).
+  /// (docs/explanation/live-play.md).
   ///
   /// Until it is given up to the escrow. A holder that goes quiet is a
   /// seat nobody is playing, and the pieces that open it go to every
@@ -1319,7 +1319,7 @@ class TableClient {
         final cards = game.phase == Phase.playing ? d.handOf(seat) : d.dealtHandOf(seat);
         if (cards == null) {
           // Open in the deal and still not whole: three of it came in
-          // on a pass that will not open (docs/03-fair-deal.md), and
+          // on a pass that will not open (docs/explanation/fair-deal.md), and
           // the engine cannot be given a hand with holes in it. The
           // turn waits, as it does for a secret.
           _trace('seat $seat\'s hand waits: it is not whole here yet');
@@ -2644,7 +2644,7 @@ class TableClient {
   //
   // The cards of a sealed table come from a deal every seat shuffles
   // with a proof, and each person's cards are theirs alone to see
-  // (docs/03-fair-deal.md). Here the deal is turns like any other. At the hand's start
+  // (docs/explanation/fair-deal.md). Here the deal is turns like any other. At the hand's start
   // the four keys turns open at once; when they are settled the
   // shuffle turns open one at a time in seat order; when the deck is
   // done the tokens turns open at once, then the declarations; then
@@ -2691,7 +2691,7 @@ class TableClient {
   /// settles a moment later, and a table with bot seats waits past
   /// that for a jury big enough to hold them — the call for a juror
   /// of last resort is what answers on a quiet night
-  /// (docs/04-live-play.md).
+  /// (docs/explanation/live-play.md).
   ///
   /// It waits for as long as that takes. A bot's hand dealt in the
   /// open is the table's to see, and at two people and two bots that
@@ -3251,7 +3251,7 @@ class TableClient {
   }
 
   /// A hand nobody can finish, opened where it stands and then given
-  /// up. Two things leave one (docs/03-fair-deal.md), and neither can
+  /// up. Two things leave one (docs/explanation/fair-deal.md), and neither can
   /// be undone by waiting:
   ///
   /// - every seat says it holds the two of clubs nowhere, and one of
@@ -3286,7 +3286,7 @@ class TableClient {
 
   /// The deal is open and the hand is given up: nothing was passed and
   /// nothing was played, so nothing is scored, and the next hand is
-  /// dealt in its place (docs/03-fair-deal.md), under a hand number of
+  /// dealt in its place (docs/explanation/fair-deal.md), under a hand number of
   /// its own because that is where its turns live.
   ///
   /// Whoever was dealt the lead card and disclaimed it is marked here
@@ -3330,7 +3330,7 @@ class TableClient {
   /// where the keys never went out there is not even an escrow holding
   /// pieces of it. The hand is given up unscored and the next dealt in
   /// its place, to a jury drawn again without the one that went
-  /// (docs/04-live-play.md).
+  /// (docs/explanation/live-play.md).
   ///
   /// Without an audit, unlike the hand that is opened and given up. A
   /// hand stopped in its deal has nothing to show — nothing was passed
@@ -3596,7 +3596,7 @@ class TableClient {
       // from escrow — a pass has to open too, and this one has not yet.
       // A pass a seat could never open does not get this far: the
       // argument beside each seal is checked before the pass is taken
-      // (docs/03-fair-deal.md). The engine waits rather than take a
+      // (docs/explanation/fair-deal.md). The engine waits rather than take a
       // hand it cannot fill.
       _trace('a pass into seat $to, whose hand is seen here, that will not open here yet: $e');
       return;
@@ -3692,7 +3692,7 @@ class TableClient {
 
   /// Gives whoever has joined the jury a share of every bot seat's
   /// secret, so that the jury tops back up instead of only shrinking
-  /// (docs/04-live-play.md).
+  /// (docs/explanation/live-play.md).
   ///
   /// Two holders make a newcomer's share between them, and which two
   /// is not agreed: each sender says what set it weighed its part
@@ -4530,7 +4530,7 @@ class TableClient {
   /// A bot seat whose juror has gone quiet, or sits on its turn, is a
   /// seat nobody is playing, so it is given up to the escrow like a
   /// departed person's: any [escrowThreshold] of the jury's pieces
-  /// rebuild its secret ([_botActsHere], docs/04-live-play.md).
+  /// rebuild its secret ([_botActsHere], docs/explanation/live-play.md).
   ///
   /// To the jury alone. A departed person's piece goes out in the
   /// clear, because the hand it opens was that person's own and the
@@ -4983,7 +4983,7 @@ class TableClient {
       _judgeAppeals();
       // A juror holding a bot seat owes that seat's deal steps, and
       // owes them again whenever the last look found it too early to
-      // take one (docs/04-live-play.md). The hand's deal may have been
+      // take one (docs/explanation/live-play.md). The hand's deal may have been
       // too early to build as well — the jury that holds its bot seats
       // settles a moment after the hand opens — and nothing else here
       // would ever come back to it.
@@ -5122,7 +5122,7 @@ class TableClient {
   // ---- the jury -----------------------------------------------------------
   //
   // Every hand seats a jury drawn from whoever is online, to break a
-  // deadlock the players cannot (docs/04-live-play.md). Here: the lowest key among
+  // deadlock the players cannot (docs/explanation/live-play.md). Here: the lowest key among
   // the participants heard lately proposes the draw over a snapshot of
   // who is online; the others witness it when the draw is what the
   // snapshot gives and the jurors are people they too have seen; a
@@ -5233,7 +5233,7 @@ class TableClient {
     if (clock.nowMs - _lastProposedAt < (_proposalsThisHand < 3 ? 10000 : 30000)) return;
     final own = juries.any((d) => d.event.hand == hand);
     // Up to strength, not merely alive: a jury that only shrinks runs
-    // out (docs/04-live-play.md). Whoever is drawn now is given a share
+    // out (docs/explanation/live-play.md). Whoever is drawn now is given a share
     // of every bot seat by the ones who hold them ([_topUpJury]). The guard below
     // still stops a redraw that would seat nobody new, so a room with
     // nobody spare proposes nothing.
@@ -5252,7 +5252,7 @@ class TableClient {
     // What a hand's escrow rests on is the jurors it draws still
     // being there when a bot seat has to be opened, and the size of
     // the jury is a poor lever on that where the draw is a good one
-    // (docs/04-live-play.md): somebody mid-game has a
+    // (docs/explanation/live-play.md): somebody mid-game has a
     // reason to still be here in a minute, somebody glancing at the
     // lobby has none.
     //
@@ -5370,7 +5370,7 @@ class TableClient {
       // does not keep backing new ones while that jury is whole, but
       // a jury below strength is one to top up: whoever is drawn now
       // is given a share of every bot seat by the ones who hold them
-      // (docs/04-live-play.md).
+      // (docs/explanation/live-play.md).
       if (earlier != null && earlier.settled && _liveJurors(e.hand).length >= jurySize) return false;
     }
     return true;
@@ -5726,7 +5726,7 @@ class TableClient {
   /// dropped once is never read again: every copy after it is a repeat.
   /// The peer would stop at that removal for good, still counting the
   /// seat a person's, and read every later hand's bot seats a seat
-  /// short of everyone else (docs/04-live-play.md, "Appeals and
+  /// short of everyone else (docs/explanation/live-play.md, "Appeals and
   /// verdicts").
   void _onVerdict(TableEvent event) {
     final turn = event.turn;

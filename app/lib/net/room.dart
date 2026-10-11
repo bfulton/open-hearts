@@ -223,7 +223,7 @@ class Room extends ChangeNotifier {
   /// Whether this device can run the deal: whether it loaded
   /// (crypto/deal.dart), unless a test says. Every live table is
   /// sealed, and a device that cannot run the deal does not sit down
-  /// (docs/03-fair-deal.md) — nor start one, nor sit at a
+  /// (docs/explanation/fair-deal.md) — nor start one, nor sit at a
   /// start that is not sealed.
   final bool canDeal;
 
@@ -442,7 +442,7 @@ class Room extends ChangeNotifier {
       'seed': seed,
       'seats': seats,
       'policy': botPolicyVersion,
-      // Every live table is sealed (docs/03-fair-deal.md).
+      // Every live table is sealed (docs/explanation/fair-deal.md).
       'sealed': true,
       'target': target,
       'timing': timing.toJson(),

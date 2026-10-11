@@ -22,7 +22,7 @@ node e2e/escrow.mjs                     # one browser and three bot seats; a jur
 node e2e/offline.mjs                    # the network taken away a piece at a time, three flows at a time
 node e2e/offline.mjs --only "airplane"
 node e2e/move.mjs                       # openhearts.game/play/ to play.openhearts.game: old address 404, carry-over, previews
-node e2e/shots.mjs                      # screenshots at docs/05's shapes, in app/build/shots/
+node e2e/shots.mjs                      # screenshots at the shapes docs/explanation/screens.md names, in app/build/shots/
 node e2e/site.mjs                       # the marketing site in each language: redirect, choice kept, fits a phone
 node e2e/site_shots.mjs                 # the site's pictures of the game, into site/public/img/ (after a menu change)
 node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
@@ -30,7 +30,7 @@ node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker
 
 Every suite takes `--app-dir <path>` to use a different build. The exit
 code is the verdict. `../check.sh full` runs them all at once, after
-the Dart suites' build (docs/09-testing.md).
+the Dart suites' build (docs/explanation/testing.md).
 
 **Side by side.** Each suite starts its relay on a port of its own and
 names it in every address it opens (`?relay=PORT`, which a build served
@@ -53,7 +53,7 @@ of its tables' beats (`?pace=0.1`: a bot's thinking, a trick held on
 the felt, the score sheet's stay), and where a cell waits on a table's
 clock — a silent person, a silent juror, a lost quorum — the rig's
 handlers serve a remote config that sets that clock to the least it may
-be (`serveApp({ config })`, docs/06-service.md). The device's own waits
+be (`serveApp({ config })`, docs/explanation/service.md). The device's own waits
 on the network are the build's, which `offline.mjs` times. A flow that
 has to see a game's end plays a game of one hand (`?target=1`). All
 three are read only under `?e2e` (app/lib/net/address.dart).
@@ -61,7 +61,7 @@ three are read only under `?e2e` (app/lib/net/address.dart).
 The rig (`drive.mjs`, `serveApp`) serves the site and the app as the
 Pages project does: the site built in every language, the app at its
 `/play/`, and the site's own worker in front of both, routing by host
-([doc 06](../docs/06-service.md#where-the-app-is)). Production's hosts
+([doc 06](../docs/explanation/service.md#where-the-app-is)). Production's hosts
 have stand-ins that Chromium takes to be this machine and to be one site,
 as production's two are: `play.openhearts.localhost` is the app at its
 root (`app.url`, where the suites open it), `openhearts.localhost` the

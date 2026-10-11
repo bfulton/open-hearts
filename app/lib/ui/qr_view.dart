@@ -1,7 +1,7 @@
 /// A QR code, painted.
 ///
 /// The one place this app shows a machine-readable thing to another
-/// machine: a link a second device arrives by (docs/06-service.md). The
+/// machine: a link a second device arrives by (docs/explanation/service.md). The
 /// scanner is whatever camera the other phone already has, so what is
 /// drawn has to be read across a table in a room with the curtains
 /// open — which is the whole of the design here. Dark on white with a

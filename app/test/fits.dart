@@ -44,7 +44,7 @@ import 'package:table/table.dart' show Reaction;
 
 import 'live_page_test.dart' show LiveHarness;
 
-/// The shapes docs/05-form-factors.md names, and the two smallest
+/// The shapes docs/explanation/screens.md names, and the two smallest
 /// phones anyone still plays on.
 const _sizes = [
   Size(320, 568),

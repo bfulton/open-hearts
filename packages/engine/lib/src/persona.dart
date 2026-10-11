@@ -12,7 +12,7 @@
 /// rating means what a person's does.
 ///
 /// Nothing here is randomness. A persona is data, so a bot's play stays
-/// a computable consequence of its cards (docs/04-live-play.md).
+/// a computable consequence of its cards (docs/explanation/live-play.md).
 library;
 
 /// What to do with the queen of spades in the pass. (What to do with a

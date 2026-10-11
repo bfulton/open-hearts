@@ -1,4 +1,4 @@
-// The worker's remote config (docs/06-service.md), in node's own
+// The worker's remote config (docs/explanation/service.md), in node's own
 // test runner: node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -61,7 +61,7 @@ test('a field that does not check out is left at its default, and the rest still
   assert.equal(configOf({ relays: ['wss://ok.openhearts.game', 'https://not-a-relay.example'] }).relays, null);
   assert.equal(configOf({ relays: ['wss://user:pw@ok.openhearts.game'] }).relays, null);
   assert.equal(configOf({ relays: [] }).relays, null);
-  // Ours only (docs/08-own-relays.md): the setting moves the tables
+  // Ours only (docs/explanation/relay.md): the setting moves the tables
   // between our relays, never to anyone else's.
   for (const theirs of ['wss://relay.damus.io', 'wss://openhearts.game.evil.example', 'wss://evilopenhearts.game']) {
     assert.equal(configOf({ relays: [theirs] }).relays, null, theirs);

@@ -1,4 +1,4 @@
-/// The verifiable deal's cryptography (docs/03-fair-deal.md), loaded
+/// The verifiable deal's cryptography (docs/explanation/fair-deal.md), loaded
 /// once at startup: the wasm next to the app on the web, the cdylib
 /// over FFI elsewhere. Null when it could not be loaded, in which case
 /// this device plays no live table at all — every live table is

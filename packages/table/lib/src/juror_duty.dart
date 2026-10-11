@@ -56,7 +56,7 @@ class JurorDuty {
   final int pinned;
 
   /// How a juror talks to the table it is summoned to. The default is
-  /// the relay it was summoned over (docs/02-multiplayer.md). An app
+  /// the relay it was summoned over (docs/explanation/multiplayer.md). An app
   /// hands over a mesh instead: the relay under it for signalling, and
   /// a data channel to each seat, so a juror is dialled like anybody
   /// else at the table.
@@ -215,7 +215,7 @@ class LetGo {
 /// Each backup juror is its own identity, its own presence and its own
 /// duty, so the draw takes them as it takes anyone: one bot seat each,
 /// and none of them holding enough of the deck to subtract the rest.
-/// They are all the service's, which docs/04-live-play.md allows: the
+/// They are all the service's, which docs/explanation/live-play.md allows: the
 /// service's rather than another player's, and only when too few
 /// others are online to make the jury.
 class LastResortBench {
@@ -269,7 +269,7 @@ class LastResortBench {
   }
 }
 
-/// The juror of last resort (docs/04-live-play.md): quiet until a
+/// The juror of last resort (docs/explanation/live-play.md): quiet until a
 /// table says it has nobody to draw from, then online — the same code
 /// every other juror runs — and quiet again once it has been idle for
 /// a while.

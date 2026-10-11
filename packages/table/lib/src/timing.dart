@@ -7,7 +7,7 @@
 /// jury deadline is longer backs nothing the others propose; either way
 /// the table is held up on a question its seats answer differently. So
 /// a table's timing is chosen once, by whoever starts it, from that
-/// device's remote config (docs/06-service.md), and
+/// device's remote config (docs/explanation/service.md), and
 /// rides in the start event everyone signs, as the target does
 /// (`TableSpec.timing`).
 ///
@@ -15,7 +15,7 @@
 /// heartbeat, a carry, a top-up, how often a jury is proposed — and the
 /// proposer's own choice of candidates for a jury: none of it decides
 /// a state, and two seats pacing differently still agree about where
-/// the table is (docs/07-states.md).
+/// the table is (docs/explanation/table-states.md).
 library;
 
 import 'time_bank.dart';
@@ -79,7 +79,7 @@ class TableTiming {
   final int quorumLostMs;
 
   /// How long a person may be silent before a peer boots them at their
-  /// turn without waiting on their clock (docs/04-live-play.md). Two
+  /// turn without waiting on their clock (docs/explanation/live-play.md). Two
   /// minutes, longer than a bank a stalled seat empties in under one,
   /// so that a phone that switches apps for a moment does not come back
   /// to a bot in its seat.

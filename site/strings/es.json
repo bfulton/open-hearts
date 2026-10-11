@@ -128,7 +128,7 @@
       "random": "<b>Aleatorio.</b> En una mesa en vivo, cada dispositivo baraja el mazo por turno y demuestra que barajó con honradez, así que basta con un dispositivo honrado para un reparto justo. Cada mano se abre solo para su jugador: ningún otro jugador la ve, ni ningún servidor. Jugando solo, cada reparto sale del generador aleatorio seguro de tu dispositivo.",
       "witness": "<b>Con testigos.</b> Cada mano sortea jurados: desconocidos elegidos al azar entre otros jugadores en línea, sin nada en juego en la mesa. Juegan los asientos de los bots y guardan partes de las claves de cada jugador, para que la mano pueda terminar si alguien se va sin que nadie pueda abrir solo las cartas de otro. Cuando hay muy pocos jugadores en línea para formar un jurado, los jurados de reserva de nuestro servicio completan el número. Como cualquier jurado, no pueden ver tus cartas solos, solo junto con otro jugador de tu mesa, así que en esas manos confías en que no nos confabulemos.",
       "audit": "<b>Auditado.</b> Tras cada mano, cada dispositivo publica su secreto, así que la partida entera se puede repetir y comprobar cada barajada, carta y jugada. Tras una partida en vivo, <i>Ver la partida entera</i> hace esa comprobación por ti; tras una partida a solas, <i>Copiar registro</i> la guarda.",
-      "more": "Todo el funcionamiento está en <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">la explicación</a>."
+      "more": "Todo el funcionamiento está en <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">la explicación</a>."
     }
   },
   "privacy": {

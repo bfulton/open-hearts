@@ -1,6 +1,6 @@
 /// What a device that has stepped back for another device of its account
 /// shows, over whatever was on the screen (net/in_use.dart,
-/// docs/06-service.md): that Open Hearts is open on another device, and
+/// docs/explanation/service.md): that Open Hearts is open on another device, and
 /// the way to take it back. And before taking the account from a game
 /// on another device, the question: continue here, and lose that game?
 ///

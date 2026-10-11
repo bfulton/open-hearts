@@ -1,4 +1,4 @@
-// The relay as one Cloudflare object per tag (docs/06-service.md).
+// The relay as one Cloudflare object per tag (docs/explanation/service.md).
 //
 // `wss://host/<tag>` is a relay of its own: the worker turns the tag
 // into an object id and hands the socket to that object, so everyone
@@ -29,7 +29,7 @@
 // forwarded to whoever is listening and forgotten — so its object has
 // no storage to pay for and nothing to sweep. A table's or a lobby's
 // tag keeps only the lobby kind tagged for it, in its object's own
-// storage, for a day (tag_store.mjs, docs/08-own-relays.md); anything
+// storage, for a day (tag_store.mjs, docs/explanation/relay.md); anything
 // else that is not ephemeral is refused rather than quietly dropped.
 
 import wasm from '../../app/web/schnorr.wasm';
@@ -108,7 +108,7 @@ export class TagRelay {
     const [verify, limits] = await Promise.all([schnorrVerifier(wasm), limitsFrom(this.env)]);
     const tag = (this.tag ??= (await this.state.storage.get('tag')) ?? presenceTag);
     const presence = tag === presenceTag;
-    // A table's or a lobby's tag keeps the lobby kind (docs/08-own-relays.md):
+    // A table's or a lobby's tag keeps the lobby kind (docs/explanation/relay.md):
     // what an evicted object held comes back from its own storage.
     const kept = tagStore(this.state.storage, tag);
     const relay = objectRelay(verify, {

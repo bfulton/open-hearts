@@ -15,7 +15,7 @@ reach a changed file, a package's fast tier — and takes under a minute
 for a change to one package. `full` runs every suite side by side and
 ends with a table of verdicts and times. CI runs the same on pull requests and on
 `main`, a newer push to a pull request cancelling the run it
-supersedes. [Doc 09](09-testing.md) has what each
+supersedes. [Doc 09](testing.md) has what each
 suite costs and why.
 
 ## Publishing
@@ -31,10 +31,10 @@ Pages project `open-hearts`:
 | Path | What |
 |---|---|
 | `/` | `site/`, built in each language by `site/build.mjs` |
-| `/api/` | the service's handlers, `service/functions/` published as `_worker.js` ([doc 06](06-service.md)) |
+| `/api/` | the service's handlers, `service/functions/` published as `_worker.js` ([doc 06](service.md)) |
 | `/play/` | the Flutter web build, `--base-href /` |
 
-The worker routes by host ([doc 06](06-service.md#where-the-app-is)).
+The worker routes by host ([doc 06](service.md#where-the-app-is)).
 In production the site is `openhearts.game` and the app is the root of
 `play.openhearts.game`, served from the build's `/play/` directory, with
 the handlers at its `/api/`; `openhearts.game` is the site alone. A preview
@@ -84,7 +84,7 @@ there keeps its device — key, licence, name, records, settings — in that
 origin's storage. On its first load at `play.openhearts.game` with no key,
 `app/web/carry.js` asks a hidden frame of `openhearts.game/carry` for
 those entries and writes them before the app starts, waiting 10 s at
-most for that page and 2 s for its answer ([doc 06](06-service.md#the-device-carried-over)). The old origin
+most for that page and 2 s for its answer ([doc 06](service.md#the-device-carried-over)). The old origin
 keeps its copy, so rolling back to serving the app at `/play/` loses
 nobody. `node e2e/move.mjs` drives the old address's 404s, the carry and a preview
 in a browser, on the rig's stand-ins for the two hosts

@@ -1,4 +1,4 @@
-/// The clock a seat plays against (docs/04-live-play.md).
+/// The clock a seat plays against (docs/explanation/live-play.md).
 ///
 /// Not a clock per card. Every decision gets a grace that costs
 /// nothing, and every hand a bank of thinking time that the part of a

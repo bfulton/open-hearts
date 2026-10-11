@@ -1,4 +1,4 @@
-// What the operator watches of the handlers (docs/06-service.md),
+// What the operator watches of the handlers (docs/explanation/service.md),
 // in node's own test runner: node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

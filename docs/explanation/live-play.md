@@ -3,13 +3,13 @@
 How the multiplayer game works: getting to a table, how four devices
 agree on every turn with nobody in charge, what happens when people
 leave, and the jury of strangers that covers what the players cannot.
-How the bytes move is [doc 02](02-multiplayer.md); how the deal stays
-honest is [doc 03](03-fair-deal.md); every state and transition, named,
-is [doc 07](07-states.md).
+How the bytes move is [doc 02](multiplayer.md); how the deal stays
+honest is [doc 03](fair-deal.md); every state and transition, named,
+is [doc 07](table-states.md).
 
 Solo play is free; live play is a subscription, so everyone at a live
 table holds a licence and sits as an account, on one device at a time
-([doc 06](06-service.md), and [Identity](#identity) below). The protocol
+([doc 06](service.md), and [Identity](#identity) below). The protocol
 is `packages/table` — chiefly `client.dart`, `jury.dart`,
 `juror_duty.dart`, `matching.dart` and `record.dart`, the verifier —
 driven by `app/lib/live/live_controller.dart` and `app/lib/net/`.
@@ -20,7 +20,7 @@ There is one screen before a game. The profile behind its top-right
 icon holds a name and an avatar (an icon on a colour, or a 64-pixel
 picture), kept on the device and, for a subscriber, with the account,
 so every device of the account shows the same
-([doc 06](06-service.md#the-accounts-profile)); a picture travels once,
+([doc 06](service.md#the-accounts-profile)); a picture travels once,
 as a stored event. The live area says which game is asked for — fifty points or a
 hundred, rated or unrated — and *Play live* shows how many devices are
 online.
@@ -164,7 +164,7 @@ the old `results` tag, are not folded. The score sheet
 of a rated game shows what it did — "1500 → 1516" — by folding the
 device's own result into the ledger it holds. A rating stated in a pool
 only decides who you sit with. Every live table is sealed
-([doc 03](03-fair-deal.md)), so a rating rests on records anyone can
+([doc 03](fair-deal.md)), so a rating rests on records anyone can
 verify.
 
 ## How a table talks
@@ -172,11 +172,11 @@ verify.
 The transport is a WebRTC data channel to every other person and to the
 hand's jurors, with the relay as the lane behind it while somebody the
 table must reach has no channel open (`MeshTransport`,
-[doc 02](02-multiplayer.md)). The client says who it must reach as it
+[doc 02](multiplayer.md)). The client says who it must reach as it
 learns them (`Transport.reach`: the seats at the start, the jurors as
 each jury carries). The relay list is the build's or the remote
 config's — in a deployed build, one relay, ours, with the tag in the
-address so a table meets in one object ([doc 08](08-own-relays.md),
+address so a table meets in one object ([doc 08](relay.md),
 `app/lib/net/relays.dart`).
 
 A relay must read, check and sometimes store what it carries, so it gets
@@ -274,7 +274,7 @@ Past its grace a seat's remaining clock shows on its badge; at empty, a
 *Boot* button.
 
 A table's clocks are chosen by the device that starts it, from its
-remote config ([doc 06](06-service.md)), and ride in the signed start
+remote config ([doc 06](service.md)), and ride in the signed start
 event (`TableTiming`, `timing.dart`): seats that disagreed about when a
 boot was due would back different sides of it. A start that names none,
 or one out of bounds, is the standard table everywhere. Pacing — how
@@ -304,7 +304,7 @@ they stood at; their signature is their own vote, the others back it as
 it reaches them, and a majority of the people there carries it (at a
 table of two, the other person's backing). Each person backs one way out
 of a seat, so where a leave and a boot cross only one carries
-([doc 07](07-states.md)).
+([doc 07](table-states.md)).
 
 **Boot.** Once a seat's bank is empty and the grace on its current
 decision spent, the *Boot* button appears. It is a **trigger, not a
@@ -363,7 +363,7 @@ would be levers an attacker could optimise.
 
 Every open app that can deal announces itself on the `online` tag every
 five seconds (`presence_relay.dart`, `app/lib/net/duty.dart`), with its
-activation — whose device it is ([doc 06](06-service.md)) — and serves
+activation — whose device it is ([doc 06](service.md)) — and serves
 as a juror when drawn, without the player noticing. Of two devices of
 one account, only the later activation is online. One whose deal
 failed to load announces nothing, since it could serve no sealed table.
@@ -467,7 +467,7 @@ name the draw they were sealed to, and the hand's is the one named by
 the first person's keys to settle, lowest seat first. A held seat's
 juror keys the seat only once that has settled, and from then on a
 seat's holder is whoever's keys settled its first deal round — every
-side and the verifier read the same holder ([doc 07](07-states.md)). A
+side and the verifier read the same holder ([doc 07](table-states.md)). A
 jury redrawn mid-hand changes which jurors may act for an escrowed seat
 without moving who holds it.
 
@@ -495,7 +495,7 @@ as a person does: it is the seat's only voice.
 ### The escrow, and taking a seat over
 
 **A person's deal secret** is split so that any one other person and
-any one juror rebuild it ([doc 03](03-fair-deal.md)): one piece to every
+any one juror rebuild it ([doc 03](fair-deal.md)): one piece to every
 other person, one to every juror. When the table removes the seat, the
 pieces are released and the seat's hand opens to the table for its bot.
 
@@ -659,7 +659,7 @@ every size, language and text size with one at every seat
 
 When a game is over, each player's device sends its record to be kept
 (`game_record.dart`, `app/lib/net/game_records.dart`; the service's
-`record` handler, [doc 06](06-service.md)). The first copy is kept, so
+`record` handler, [doc 06](service.md)). The first copy is kept, so
 the others cost nothing. A record is the table's spec, every decision
 with the signed events behind it, the juries that carried, and the
 escrow pieces released for seats that left. Each seat in it carries its
@@ -690,7 +690,7 @@ A device's identity is a keypair made on the device when first needed
 signatures (`signing.dart`; on the web through the wasm built from
 `crypto/schnorr_wasm`). The key signs every move and
 never leaves the device. A person is an **account**, made when they
-subscribe ([doc 06](06-service.md)), with up to five devices. The
+subscribe ([doc 06](service.md)), with up to five devices. The
 service's licence names a device's key beside its account's id, and
 every peer checks it against the service's key compiled into its build
 (`licence.dart`): a seat whose licence is not the service's word for its

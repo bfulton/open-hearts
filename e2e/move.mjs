@@ -1,5 +1,5 @@
 // The app's move from openhearts.game/play/ to play.openhearts.game
-// (docs/06-service.md, "Where the app is"), in a browser.
+// (docs/explanation/service.md, "Where the app is"), in a browser.
 //
 //   ./e2e/build.sh
 //   node e2e/move.mjs                   # from the repo root

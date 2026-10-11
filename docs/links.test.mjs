@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { anchors, problems, slug } from './links.mjs';
+import { anchors, codeProblems, problems, slug } from './links.mjs';
 
 test('a heading\'s anchor is GitHub\'s', () => {
   assert.equal(slug('What is guaranteed, and what is not'), 'what-is-guaranteed-and-what-is-not');
@@ -37,22 +37,22 @@ test('what resolves passes, and what does not is said with its line', () => {
   const root = repo({
     'README.md': [
       '# Readme',
-      'See [the guide](docs/guide.md#install), [up](#readme) and [the site](https://example.com).',
+      'See [the guide](pages/guide.md#install), [up](#readme) and [the site](https://example.com).',
       'Code is in `src/app.dart` and `src/lib/` and `src/*.dart` and `play/build-info.json`.',
-      'Broken: [gone](docs/gone.md), [no heading](docs/guide.md#nowhere), `src/missing.dart`.',
+      'Broken: [gone](pages/gone.md), [no heading](pages/guide.md#nowhere), `src/missing.dart`.',
       'An ignored output: `out/build/`. Inline `[not](a-link.md)` is code.',
       '```',
       'node src/app.dart src/old.mjs',
       '```',
     ].join('\n'),
-    'docs/guide.md': '# Guide\n\n## Install\n\nBack to [the readme](../README.md).\n',
+    'pages/guide.md': '# Guide\n\n## Install\n\nBack to [the readme](../README.md).\n',
     'src/app.dart': '',
     'src/lib/x.dart': '',
   });
-  const found = problems(root, ['README.md', 'docs/guide.md'], { ignored: (p) => p.startsWith('out/') });
+  const found = problems(root, ['README.md', 'pages/guide.md'], { ignored: (p) => p.startsWith('out/') });
   assert.deepEqual(found, [
-    'README.md:4: docs/gone.md — no such file',
-    'README.md:4: docs/guide.md#nowhere — no such heading in docs/guide.md',
+    'README.md:4: pages/gone.md — no such file',
+    'README.md:4: pages/guide.md#nowhere — no such heading in pages/guide.md',
     'README.md:4: `src/missing.dart` is not in the repository',
     'README.md:7: `src/old.mjs` is not in the repository',
   ]);
@@ -62,4 +62,24 @@ test('a path in a package\'s own README may be from the package', () => {
   const root = repo({ 'pkg/README.md': 'The rules are in `lib/rules.dart`, and `pkg/lib/rules.dart`.\n', 'pkg/lib/rules.dart': '' });
   // `lib/` is not a top-level entry, so only the second is checked, and it is there.
   assert.deepEqual(problems(root, ['pkg/README.md']), []);
+});
+
+test('code that cites the docs: the file, an anchor, and a section named in quotes', () => {
+  const root = repo({
+    'docs/guide.md': '# Guide\n\n## Where the app is\n\n## Appeals and juries\n',
+    'src/a.dart': [
+      '// (docs/guide.md, "Where the app is") and docs/guide.md#where-the-app-is',
+      '// (docs/guide.md, "Appeals and',
+      '// juries"), a quote that runs on',
+      '// docs/gone.md, docs/guide.md#nowhere, (docs/guide.md, "Nowhere")',
+      '// (docs/guide.md, "Neither',
+    ].join('\n'),
+    'src/b.bin': Buffer.from([0, 1, 2, ...Buffer.from('docs/gone.md')]),
+  });
+  assert.deepEqual(codeProblems(root, ['src/a.dart', 'src/b.bin']), [
+    'src/a.dart:4: docs/gone.md — no such file',
+    'src/a.dart:4: docs/guide.md#nowhere — no such heading',
+    'src/a.dart:4: docs/guide.md, "Nowhere" — no such heading',
+    'src/a.dart:5: docs/guide.md, "Neither… — no such heading',
+  ]);
 });

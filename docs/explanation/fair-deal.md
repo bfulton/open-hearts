@@ -47,7 +47,7 @@ functions over bytes in `crypto/deal`.
   came from.
 
 All of this runs as turns of the table protocol
-([doc 04](04-live-play.md), [doc 07](07-states.md)): four rounds before
+([doc 04](live-play.md), [doc 07](table-states.md)): four rounds before
 the pass (keys, shuffle in seat order, tokens, lead declared) and the
 audit after the last trick. Every step is checked by everyone when it
 arrives. A seat that does not take its turn is removed like any other
@@ -127,13 +127,13 @@ it merely dislikes.
 A bot's hand must be hidden from the table too. If it is not, a table
 of two people and two open bots shows each person 39 cards, and the
 other person's hand is the thirteen left over. So each bot seat is held
-by a **juror** ([doc 04](04-live-play.md)). The juror draws the seat's
+by a **juror** ([doc 04](live-play.md)). The juror draws the seat's
 secret as a person would, plays the bot's policy, shuffles with an
 argument and makes tokens with proofs. The table checks all of it
 without seeing the hand. Each juror holds one bot seat, so no juror
 holds enough cards to work out a person's hand by subtraction. The
 juror for each seat is named by the jury draw the deal is sealed to,
-and that draw is on the record ([doc 07](07-states.md)). A bot seat's
+and that draw is on the record ([doc 07](table-states.md)). A bot seat's
 secret is published at the audit like everyone else's, so the verifier
 can check every bot move was the policy's.
 
@@ -187,7 +187,7 @@ to settle when its seal can open, not when it arrives.
 
 The verifier first holds every person's seat to its licence: one the
 service signed for that seat's key, naming its account, and no account
-seated twice ([doc 06](06-service.md)). Then it replays a sealed record
+seated twice ([doc 06](service.md)). Then it replays a sealed record
 through the deal. It checks every key's proof, every shuffle's argument
 against the deck before it, every token and the lead declaration. Then
 the audit's secrets open every card. Each play's token must open the

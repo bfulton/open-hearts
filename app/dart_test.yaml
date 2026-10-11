@@ -1,4 +1,4 @@
-# How the app's tests run (docs/09-testing.md).
+# How the app's tests run (docs/explanation/testing.md).
 tags:
   # The layout matrix at the reader's text size (fits.dart): every shape
   # at every scale, alone and live, in every language. In `flutter test`

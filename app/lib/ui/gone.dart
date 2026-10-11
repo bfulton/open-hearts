@@ -1,5 +1,5 @@
 /// What has gone: the fifty-two, with the ones already played struck
-/// out (docs/05-form-factors.md).
+/// out (docs/explanation/screens.md).
 ///
 /// The one thing a phone genuinely cannot show and a tablet can. It is
 /// also the thing Hearts players keep in their heads and mostly get

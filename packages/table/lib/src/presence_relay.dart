@@ -10,7 +10,7 @@
 /// of them, since who is online has to be seen by devices that can
 /// read only some of the relays (relays.dart).
 ///
-/// A relay that keeps an object per tag ([tagMark], docs/06-service.md)
+/// A relay that keeps an object per tag ([tagMark], docs/explanation/service.md)
 /// takes the tag in its URL, and presence puts its own there. The
 /// announcements go to every relay in the list: a device is online for
 /// whoever can hear it, and what another device can hear is not
@@ -211,7 +211,7 @@ class RelayPresence implements Presence {
 
   /// A later activation of this device's own account, heard from
   /// another device: this one is no longer the account's in use
-  /// (docs/06-service.md). The relay closes a superseded device's
+  /// (docs/explanation/service.md). The relay closes a superseded device's
   /// sockets itself; this is how a device hears it on a relay that does
   /// not, and sooner where it does.
   Stream<Activation> get superseded => _superseded.stream;
@@ -357,7 +357,7 @@ class RelayPresence implements Presence {
   /// one again once it has forgotten its id, so an old `here` said again
   /// would make a device that left look online — long enough to be
   /// seated and booted — and an old `gone` would take a present one out
-  /// (docs/security-review.md).
+  /// (docs/explanation/security-model.md).
   int get _freshS => (everyMs * 4 ~/ 1000).clamp(20, 120);
 
   /// How far ahead of this device's clock an event may be dated: clocks

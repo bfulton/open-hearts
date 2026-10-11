@@ -32,20 +32,20 @@ picked at random, with the service's backup jurors making up the
 number when too few are online. No player sees a bot's cards, and the juror playing a bot's seat
 sees only that hand, never enough to work out a person's; what that
 guarantees, and where it rests on trusting us, is in
-[doc 03](docs/03-fair-deal.md#what-is-guaranteed-and-what-is-not). The deal is Barnett–Smart mental poker with a
+[doc 03](docs/explanation/fair-deal.md#what-is-guaranteed-and-what-is-not). The deal is Barnett–Smart mental poker with a
 Bayer–Groth shuffle argument. Every seat shuffles with a proof, and the
 whole hand is audited and can be replayed once it ends.
 
-Design docs: [01 dev loop](docs/01-dev-loop.md) ·
-[02 multiplayer](docs/02-multiplayer.md) ·
-[03 fair deal](docs/03-fair-deal.md) ·
-[04 live play](docs/04-live-play.md) ·
-[05 screens](docs/05-form-factors.md) ·
-[06 service](docs/06-service.md) ·
-[07 table states](docs/07-states.md) ·
-[08 relay](docs/08-own-relays.md) ·
-[09 testing](docs/09-testing.md) ·
-[security model](docs/security-review.md)
+Design docs: [01 dev loop](docs/explanation/dev-loop.md) ·
+[02 multiplayer](docs/explanation/multiplayer.md) ·
+[03 fair deal](docs/explanation/fair-deal.md) ·
+[04 live play](docs/explanation/live-play.md) ·
+[05 screens](docs/explanation/screens.md) ·
+[06 service](docs/explanation/service.md) ·
+[07 table states](docs/explanation/table-states.md) ·
+[08 relay](docs/explanation/relay.md) ·
+[09 testing](docs/explanation/testing.md) ·
+[security model](docs/explanation/security-model.md)
 
 ## Building and testing
 
@@ -81,7 +81,7 @@ the web build needs no Rust. Built with Rust 1.97.0 it is the same bytes
 from any checkout, and CI checks that what is committed is what its
 sources build. VM tests that deal a sealed hand load the cdylib from
 `crypto/deal/target/release/`, and keep its answers beside it in
-`crypto/deal/target/memo/` ([doc 09](docs/09-testing.md)). The browser
+`crypto/deal/target/memo/` ([doc 09](docs/explanation/testing.md)). The browser
 suites run from the repository root, each start a local relay on a port
 of their own, and run the service's handlers in-process
 ([e2e/README.md](e2e/README.md)):
@@ -93,7 +93,7 @@ node e2e/run.mjs       # four browsers at one table
 node e2e/escrow.mjs    # a bot seat's juror goes, and the escrow opens the seat
 node e2e/offline.mjs   # no network, relay or worker: solo still plays
 node e2e/move.mjs      # openhearts.game/play/ to play.openhearts.game: nothing left at the old address, and the device carried over
-node e2e/shots.mjs     # screenshots at the shapes docs/05-form-factors.md names
+node e2e/shots.mjs     # screenshots at the shapes docs/explanation/screens.md names
 ```
 
 ### Phone releases
@@ -124,13 +124,13 @@ unsigned, once without the key to see it refused.
 
 `./deploy.sh` builds the site and the web app and publishes them to
 Cloudflare Pages. It needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
-([doc 01](docs/01-dev-loop.md)). A build accepts licences only from the
+([doc 01](docs/explanation/dev-loop.md)). A build accepts licences only from the
 service key it was compiled with. Mint the key pair once with
 `cd service && dart run bin/service_key.dart`, put the public half in
 `config/openhearts.json` as `serviceKey`, and set the secret half as the
 Pages secret `OH_SERVICE_SECRET`. A build without the key has live play shut.
 The relay deploys separately: `cd service/do && npx wrangler@4.130.0 deploy`.
-Everything that is not secret is in `config/openhearts.json`; [doc 06](docs/06-service.md) lists the secrets.
+Everything that is not secret is in `config/openhearts.json`; [doc 06](docs/explanation/service.md) lists the secrets.
 
 ### Languages
 

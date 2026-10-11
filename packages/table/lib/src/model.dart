@@ -5,7 +5,7 @@
 /// against, and what the chaos test asserts over. Five machines — a
 /// turn, a seat, a held bot seat, a hand, the table — and, for each
 /// state that waits, what it waits for and who can move it
-/// (docs/07-states.md, which is the prose of this file).
+/// (docs/explanation/table-states.md, which is the prose of this file).
 ///
 /// Every transition says how it is decided ([Decided]): as a settled
 /// event every side holds the same, as a function of those, or by each
@@ -175,7 +175,7 @@ enum Decided {
   /// By each side for itself, from its own clock or from whom it hears.
   /// Nothing in the record says so: two sides can decide it differently
   /// and nothing reconciles them, and a side that joins later has to
-  /// guess. These are what docs/07-states.md lists as decided here.
+  /// guess. These are what docs/explanation/table-states.md lists as decided here.
   here,
 }
 
@@ -237,7 +237,7 @@ const handTransitions = <HandState, Map<HandState, Decided>>{
 /// it ([Wait.movers]); a side waiting on nobody, on somebody who will
 /// never act on it, or on somebody who waits on it in turn, is stuck,
 /// and that is a fact about the sides' states rather than about how
-/// long anything has taken (docs/07-states.md).
+/// long anything has taken (docs/explanation/table-states.md).
 enum WaitKind {
   /// A seat's move: from its person, its juror, or once the seat is the
   /// escrow's, a juror holding a piece of it.

@@ -13,14 +13,22 @@
 // other sites are not fetched: where they point is not this
 // repository's to keep.
 //
-// The vendored crates' Markdown (crypto/vendor/) and ZXing's
-// (app/web/zxing/) are their authors', so are not checked.
+// Code cites the docs too (`docs/explanation/service.md, "Where the app
+// is"`), so every tracked file is read for a docs/….md path: the file
+// is there, an anchor after it names a heading, and a section named in
+// quotes after it is a heading (one whose quote runs onto the next line,
+// a heading that starts so).
+//
+// The vendored crates (crypto/vendor/<crate>/), ZXing (app/web/zxing/)
+// and New Relic's agent (app/web/observability.js) are their authors',
+// so are not checked.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const notOurs = ['crypto/vendor/', 'app/web/zxing/'];
+const notOurs = (f) =>
+  /^crypto\/vendor\/[^/]+\//.test(f) || f.startsWith('app/web/zxing/') || f === 'app/web/observability.js';
 
 /// A heading's anchor as GitHub makes it: lower case, punctuation gone,
 /// spaces to hyphens; the second of a name gets -1, the third -2.
@@ -121,6 +129,42 @@ export function problems(root, files, { ignored = () => false } = {}) {
   return out;
 }
 
+/// What is wrong in what [files] (code, relative to [root]) say of the
+/// docs: one line each, `file:line: why`.
+export function codeProblems(root, files) {
+  const out = [];
+  const anchorsOf = new Map();
+  const anchorsIn = (file) => {
+    if (!anchorsOf.has(file)) anchorsOf.set(file, anchors(readFileSync(join(root, file), 'utf8')));
+    return anchorsOf.get(file);
+  };
+  for (const file of files) {
+    const bytes = readFileSync(join(root, file));
+    if (bytes.subarray(0, 8000).includes(0)) continue;
+    bytes
+      .toString('utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        for (const m of line.matchAll(/\bdocs\/[\w./-]*?\w\.md(?:#([\w-]+))?(?:[,:;]?\s*["“]([^"”]*)(["”])?)?/g)) {
+          const doc = m[0].match(/^docs\/[\w./-]*?\.md/)[0];
+          const where = `${file}:${i + 1}`;
+          if (!existsSync(join(root, doc))) {
+            out.push(`${where}: ${doc} — no such file`);
+            continue;
+          }
+          const [, anchor, title, closed] = m;
+          if (anchor && !anchorsIn(doc).has(anchor)) out.push(`${where}: ${doc}#${anchor} — no such heading`);
+          if (title !== undefined && title.trim()) {
+            const s = slug(title);
+            const found = closed ? anchorsIn(doc).has(s) : [...anchorsIn(doc)].some((a) => a.startsWith(s));
+            if (!found) out.push(`${where}: ${doc}, "${title.trim()}${closed ? '"' : '…'} — no such heading`);
+          }
+        }
+      });
+  }
+  return out;
+}
+
 /// Whether git ignores [path] in [root]: a build output or a secret.
 /// Asked as a directory too, since a rule for one (`/Frameworks/`)
 /// cannot match a path that is not there to be seen as one.
@@ -138,11 +182,18 @@ function gitIgnores(root) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = fileURLToPath(new URL('..', import.meta.url));
-  const files = execFileSync('git', ['ls-files', '*.md'], { cwd: root, encoding: 'utf8' })
+  const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
     .split('\n')
-    .filter((f) => f && !notOurs.some((p) => f.startsWith(p)));
-  const found = problems(root, files, { ignored: gitIgnores(root) });
+    .filter((f) => f && !notOurs(f) && existsSync(join(root, f)));
+  const docs = tracked.filter((f) => f.endsWith('.md'));
+  // Not this check's own test, whose paths are made up to be wrong.
+  const code = tracked.filter((f) => !f.endsWith('.md') && f !== 'docs/links.test.mjs');
+  const found = [...problems(root, docs, { ignored: gitIgnores(root) }), ...codeProblems(root, code)];
   for (const p of found) console.log(p);
-  console.log(found.length ? `${found.length} stale reference(s) in ${files.length} files` : `${files.length} files: every reference resolves`);
+  console.log(
+    found.length
+      ? `${found.length} stale reference(s)`
+      : `${docs.length} docs and ${code.length} other files: every reference resolves`,
+  );
   process.exitCode = found.length ? 1 : 0;
 }

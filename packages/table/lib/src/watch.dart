@@ -19,8 +19,8 @@
 /// with its own device's key and licence, and is answered only where
 /// the licence holds for that key and names an account not seated at
 /// the table — nobody watches their own game from another device
-/// (docs/04-live-play.md). The relay carries no device the service has
-/// not vouched for in the first place (docs/06-service.md).
+/// (docs/explanation/live-play.md). The relay carries no device the service has
+/// not vouched for in the first place (docs/explanation/service.md).
 library;
 
 import 'dart:async';

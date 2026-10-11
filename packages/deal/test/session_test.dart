@@ -210,7 +210,7 @@ void main() {
 
     // A seal is for one seat's eyes, and every seat checks it all the
     // same: the argument beside it says what is in there without
-    // opening it (docs/03-fair-deal.md). A passer that seals the
+    // opening it (docs/explanation/fair-deal.md). A passer that seals the
     // receiver something else is refused here, by everybody, rather
     // than leaving the receiver with three cards it cannot play and
     // nobody else able to say whose fault that was.
@@ -325,7 +325,7 @@ void main() {
     // Seat 3 goes. Nobody releases a piece of its secret here: the
     // people hold one share of its key and the jury the other, and
     // what crosses is each share's tokens for the positions that are
-    // still shut (docs/03-fair-deal.md).
+    // still shut (docs/explanation/fair-deal.md).
     for (final x in [...all, juror]) {
       x.seatLeft(3);
     }
@@ -386,7 +386,7 @@ void main() {
 
     // Then seat 1 goes. That seal is a ciphertext only its key opens,
     // and its key is nobody's, so the parts come from the two shares —
-    // a token over the seal itself (docs/03-fair-deal.md).
+    // a token over the seal itself (docs/explanation/fair-deal.md).
     for (final x in [...all, juror]) {
       x.seatLeft(1);
     }
@@ -415,7 +415,7 @@ void main() {
   test('a bot seat a juror holds escrows to the jury alone: any two jurors open it, a player and a juror cannot', () {
     // Three people and a bot seat held by the first juror. Its key is
     // drawn like a person's rather than hashed from what everyone
-    // knows, so the table cannot compute its hand (docs/04-live-play.md).
+    // knows, so the table cannot compute its hand (docs/explanation/live-play.md).
     final jury = ['juror0', 'juror1', 'juror2', 'juror3'];
     final seats = [
       const HumanDealSeat('a'),
@@ -457,7 +457,7 @@ void main() {
     expect(players[0].knowsSecret(3), isFalse, reason: 'every juror released and the table learned nothing');
 
     // Among the jury it is any two, not two fixed halves
-    // (docs/04-live-play.md). Each juror holds one piece of its own, so
+    // (docs/explanation/live-play.md). Each juror holds one piece of its own, so
     // one more opens the seat, whichever juror it comes from.
     for (var mine = 0; mine < jury.length; mine++) {
       for (var other = 0; other < jury.length; other++) {

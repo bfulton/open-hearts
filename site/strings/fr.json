@@ -128,7 +128,7 @@
       "random": "<b>Aléatoire.</b> À une table en direct, chaque appareil mélange le paquet à son tour et prouve qu'il l'a fait honnêtement : un seul appareil honnête suffit pour une donne équitable. Chaque main ne s'ouvre que pour son joueur : aucun autre joueur ne la voit, ni aucun serveur. En solo, chaque donne vient du générateur aléatoire sécurisé de votre appareil.",
       "witness": "<b>Sous témoins.</b> Chaque main tire au sort des jurés : des inconnus choisis au hasard parmi les autres joueurs en ligne, sans enjeu à la table. Ils jouent les places des bots et gardent des morceaux des clés de chaque joueur, pour qu'une main puisse se terminer si quelqu'un part, sans que personne ne puisse seul ouvrir les cartes d'un autre. Quand trop peu d'autres joueurs sont en ligne pour former un jury, les jurés de réserve de notre service complètent le nombre. Comme tout juré, ils ne peuvent pas voir vos cartes seuls, seulement avec un autre joueur de votre table : pour ces mains, vous nous faites confiance pour ne pas nous entendre avec lui.",
       "audit": "<b>Vérifié.</b> Après chaque main, chaque appareil publie son secret : la partie entière peut être rejouée et chaque mélange, carte et coup vérifiés. Après une partie en direct, <i>Voir toute la partie</i> fait cette vérification pour vous ; après une partie en solo, <i>Copier le relevé</i> la conserve.",
-      "more": "Tout le fonctionnement est expliqué dans <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">la description</a>."
+      "more": "Tout le fonctionnement est expliqué dans <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">la description</a>."
     }
   },
   "privacy": {

@@ -66,7 +66,7 @@ void main() {
 
     // The point of the whole change: a person sees its own cards and
     // nobody else's, where today it would see both bots' as well and
-    // take the other person's hand by subtraction (docs/03-fair-deal.md).
+    // take the other person's hand by subtraction (docs/explanation/fair-deal.md).
     for (final c in t.clients) {
       for (var s = 0; s < seatCount; s++) {
         expect(c.game.knowsHand(s), s == c.mySeat, reason: 'seat $s as seen by seat ${c.mySeat}');
@@ -100,7 +100,7 @@ void main() {
     // matchmaking gives you bots exactly when it cannot find four
     // people, and that is exactly when there is nobody to draw a jury
     // from. The call brings up the backup jurors, they hold the seats,
-    // and the bots' hands stay hidden (docs/04-live-play.md).
+    // and the bots' hands stay hidden (docs/explanation/live-play.md).
     final t = SimTable(humans: 2, seed: 21, crypto: crypto, lastResort: true);
     t.start();
     expect(t.clock.runUntil(() => t.clients.every((c) => c.game.phase == Phase.passing), limitMs: 300000), isTrue,

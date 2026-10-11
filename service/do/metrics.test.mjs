@@ -1,4 +1,4 @@
-// What the operator watches of the relay object (docs/06-service.md):
+// What the operator watches of the relay object (docs/explanation/service.md):
 // counts a minute, never who. node --test service/do
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

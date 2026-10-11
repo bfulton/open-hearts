@@ -1,4 +1,4 @@
-/// Where a solo game's cards come from (docs/03-fair-deal.md): a
+/// Where a solo game's cards come from (docs/explanation/fair-deal.md): a
 /// player's game from a deal seed of its own, which its record carries;
 /// a test's from its int seed.
 library;

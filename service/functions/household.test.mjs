@@ -1,4 +1,4 @@
-// One household at a time (docs/security-review.md): a code
+// One household at a time (docs/explanation/security-model.md): a code
 // spent twice at once lets one device in; asking for a code again is a
 // read; a household is held to so many changes an hour; and a body too
 // big to be ours is not read. node --test service/functions

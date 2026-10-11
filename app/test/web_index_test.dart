@@ -60,7 +60,7 @@ void main() {
   });
 
   test('the page keeps the app for a load with no network, and Flutter\'s stub does not undo it', () {
-    // The bootstrap is ours (docs/01-dev-loop.md):
+    // The bootstrap is ours (docs/explanation/dev-loop.md):
     // it registers the worker that keeps the app, and it starts
     // Flutter's loader without the service worker settings that would
     // register Flutter's own — a stub that unregisters whatever is
@@ -81,7 +81,7 @@ void main() {
 
   test('the device is brought along from where the app used to be before the app reads its storage', () {
     // carry.js asks openhearts.game/carry for the device a load at the
-    // old address left there (docs/06-service.md, "Where the app is"),
+    // old address left there (docs/explanation/service.md, "Where the app is"),
     // and the bootstrap starts the app only once it has an answer or
     // has given up; e2e/move.mjs drives it in a browser.
     final page = File('web/index.html').readAsStringSync();
@@ -107,7 +107,7 @@ void main() {
 
   test('installed, the app turns with the device, as it does in a tab', () {
     // A phone on its side is the second composition, not a mistake
-    // (docs/05-form-factors.md): an installed app locked upright would
+    // (docs/explanation/screens.md): an installed app locked upright would
     // be the one place it could not be had.
     final manifest = jsonDecode(File('web/manifest.json').readAsStringSync()) as Map<String, Object?>;
     expect(manifest['orientation'], anyOf(isNull, 'any'));

@@ -1,4 +1,4 @@
-// Who the relay carries (docs/06-service.md, "One device at a time"): a
+// Who the relay carries (docs/explanation/service.md, "One device at a time"): a
 // device the service has given a current activation, and the backup
 // jurors; and of an account, only the device in use — a superseded
 // one's sockets are closed and none is opened for it.

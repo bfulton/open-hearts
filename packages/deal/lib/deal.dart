@@ -32,7 +32,7 @@ const sealProofBytes = 160;
 ///
 /// Two is the least that is still a secret — one juror alone is
 /// nothing, which is the whole point of a bot seat's hand being
-/// hidden from a player with one juror's help (docs/04-live-play.md).
+/// hidden from a player with one juror's help (docs/explanation/live-play.md).
 /// Above two buys secrecy against a wider ring at the cost of
 /// availability.
 const escrowThreshold = 2;
@@ -88,7 +88,7 @@ abstract class DealCrypto {
 
   /// A seat's key split into [shares] pieces of [scalarBytes] each,
   /// so that a departed seat's cards can be opened without anyone
-  /// putting the key back together (docs/03-fair-deal.md).
+  /// putting the key back together (docs/explanation/fair-deal.md).
   /// [shareKey] of each aggregates to the seat's own public key, which
   /// is what says a split is a split of *that* key, and no smaller set
   /// of them is anything.
@@ -123,7 +123,7 @@ abstract class DealCrypto {
   ///
   /// What it buys is availability: a hand's escrow rests on the
   /// jurors it was sealed to still being reachable when a bot seat has
-  /// to be opened (docs/04-live-play.md). Any two of the jury keeps one
+  /// to be opened (docs/explanation/live-play.md). Any two of the jury keeps one
   /// holder alone from being anything, with room to lose people. The
   /// key is still never anywhere: a share's token is scaled by its
   /// public coefficient and the scaled tokens add.
@@ -183,7 +183,7 @@ abstract class DealCrypto {
   /// Whether a sealed token is the one [pkOwner] owes for [masked],
   /// sealed to [pkTo]. Checked by every seat, not only the one it is
   /// for: that is what catches a passer sending cards the receiver
-  /// can never open (docs/03-fair-deal.md).
+  /// can never open (docs/explanation/fair-deal.md).
   bool verifySeal(Uint8List pkOwner, Uint8List pkTo, Uint8List masked, Uint8List sealed);
 
   /// The token inside a sealed one, with the key it was sealed to.

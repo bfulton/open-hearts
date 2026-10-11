@@ -1,4 +1,4 @@
-/// Buying live play in a phone's own store (docs/06-service.md).
+/// Buying live play in a phone's own store (docs/explanation/service.md).
 ///
 /// The store takes the money and keeps the subscription; the service
 /// is shown what the store handed back — the App Store's signed

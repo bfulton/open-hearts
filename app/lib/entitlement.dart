@@ -1,4 +1,4 @@
-/// What this device may do, and for how long (docs/06-service.md).
+/// What this device may do, and for how long (docs/explanation/service.md).
 ///
 /// Solo play is free and stays free — the bots, the records, the
 /// verifiable deal, the engine itself. Live play is a subscription,

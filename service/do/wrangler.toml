@@ -1,4 +1,4 @@
-# The per-tag relay (worker.mjs, docs/06-service.md).
+# The per-tag relay (worker.mjs, docs/explanation/service.md).
 #
 #   cd service/do && npx wrangler@4.130.0 deploy
 #
@@ -44,7 +44,7 @@ new_sqlite_classes = ["TagRelay"]
 
 # An account's codes, claims, drops and the rest of what changes it,
 # one at a time per account, and a subscription's account found in the
-# subscription's own turn (docs/06-service.md). Bound to the Pages
+# subscription's own turn (docs/explanation/service.md). Bound to the Pages
 # project as HOUSEHOLD (script open-hearts-relay, class Household); it
 # reads and writes the project's own store, the same KV namespace as
 # the Pages project's OH_STORE (open-hearts-store). A HOUSEHOLD bound
@@ -56,7 +56,7 @@ new_sqlite_classes = ["Household"]
 # The relay asks an account's object whether a device's activation is
 # still the one in use as the device opens a socket, and the account's
 # object tells the relay's to close a superseded device's sockets
-# (docs/06-service.md, "One device at a time").
+# (docs/explanation/service.md, "One device at a time").
 [[durable_objects.bindings]]
 name = "HOUSEHOLD"
 class_name = "Household"
@@ -88,7 +88,7 @@ new_sqlite_classes = ["Bench"]
 binding = "OH_STORE"
 id = "5b65151de63341dc9f7a9d417c9b6a4e"
 
-# Backup codes are emailed from the Household (docs/06-service.md) by
+# Backup codes are emailed from the Household (docs/explanation/service.md) by
 # Cloudflare's Email Sending, which needs the Workers Paid plan and the
 # sending domain onboarded to Email Service. Without them the codes are
 # only shown on the devices.
@@ -100,7 +100,7 @@ OH_MAIL_FROM = "noreply@openhearts.game"
 # The service's public key, which an activation has to be signed by, is
 # read from config/openhearts.json (worker.mjs), not set here.
 
-# What the operator watches (docs/06-service.md): a
+# What the operator watches (docs/explanation/service.md): a
 # line of counts a minute from each object in use — connections,
 # events, deliveries, refusals — and nothing about who.
 [[analytics_engine_datasets]]
