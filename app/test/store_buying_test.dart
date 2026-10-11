@@ -176,7 +176,7 @@ void main() {
       (402, {'error': 'not paid'}, 'notPaid', 'The store says that purchase is not paid for.'),
       (409, {'error': 'this device is on another subscription: drop it there first'}, 'onAnotherSubscription',
           'This device is on another subscription. Drop it there first.'),
-      (409, {'error': 'five devices already', 'devices': 5, 'most': 5}, 'fiveDevices',
+      (409, {'error': 'the account has all the devices it can take', 'devices': 5, 'most': 5}, 'accountFull',
           'This subscription has all the devices it can take.'),
       (502, {'error': 'the store is not answering'}, 'storeNotAnswering', 'The store is not answering. Try again in a moment.'),
       (503, {'error': 'the store is not set up yet'}, 'storeNotSetUp', 'Buying in the store is not open yet.'),

@@ -315,7 +315,7 @@ export function storeOf(env) {
     },
     /// The sort keys under [pk] that begin with [prefix]. The only
     /// call here that is not a point lookup, and it is bounded by what
-    /// lives under one subscription: five devices (docs/explanation/service.md).
+    /// lives under one account: its few devices (mostDevices).
     async under(pk, prefix) {
       const found = [];
       let cursor;
@@ -1251,7 +1251,7 @@ export async function ticketFor(key, store, { now = Date.now() } = {}) {
   }
   const devices = await devicesOn(store, account);
   if (devices.length >= S().mostDevices) {
-    return { status: 409, body: { error: 'five devices already', devices: devices.length, most: S().mostDevices } };
+    return { status: 409, body: { error: 'the account has all the devices it can take', devices: devices.length, most: S().mostDevices } };
   }
   const code = nonce();
   const expires_at = new Date(now + S().ticketMinutes * 60000).toISOString();
@@ -1429,7 +1429,7 @@ export async function joinAccount(key, account, store, { now = Date.now(), movin
   const devices = await devicesOn(store, account);
   const already = devices.some((d) => d.key === key);
   if (!already && devices.length >= S().mostDevices) {
-    return { status: 409, body: { error: 'five devices already', devices: devices.length, most: S().mostDevices } };
+    return { status: 409, body: { error: 'the account has all the devices it can take', devices: devices.length, most: S().mostDevices } };
   }
   const today = dayOf(now);
   // A device of another account that is still paid up stays in it. A

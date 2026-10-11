@@ -253,7 +253,7 @@ class Refused {
   /// The service's errors the app has words for (worker.mjs).
   static const _named = {
     'no subscription': 'noSubscription',
-    'five devices already': 'fiveDevices',
+    'the account has all the devices it can take': 'accountFull',
     'not a code': 'notACode',
     'no such code': 'noSuchCode',
     'that code has been used': 'codeUsed',

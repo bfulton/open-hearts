@@ -1,5 +1,5 @@
 /// A subscription is a person's: a code another device arrives with,
-/// five devices to a household, and any of them able to drop another
+/// a few devices to an account, and any of them able to drop another
 /// (docs/explanation/service.md).
 ///
 /// The service is a stand-in here, as it is for the TURN credentials
@@ -128,7 +128,7 @@ void main() {
     expect(asked['key'], me.publicKey);
     expect(asked['sig'], me.sign(requestDigest('ticket', me.publicKey, asked['at'] as int)));
 
-    stand.says('ticket', {'error': 'five devices already'}, status: 409);
+    stand.says('ticket', {'error': 'the account has all the devices it can take'}, status: 409);
     final refused = await askForCode(me);
     expect(refused.answer, isNull);
     expect(refused.refusal?.say(), 'This subscription has all the devices it can take.');

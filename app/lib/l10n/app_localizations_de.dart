@@ -506,7 +506,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String serviceRefusal(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'noSubscription': 'Kein Abo.',
-      'fiveDevices':
+      'accountFull':
           'Dieses Abo hat schon so viele Geräte, wie es tragen kann.',
       'notACode': 'Das ist kein Code.',
       'noSuchCode': 'Diesen Code gibt es nicht.',
