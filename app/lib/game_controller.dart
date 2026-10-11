@@ -194,9 +194,6 @@ class GameController extends ChangeNotifier implements TableModel {
     _pump();
   }
 
-  /// Plays [card] for the player. Returns null on success, or a short
-  /// reason the card is not playable — the message the table shows when
-  /// a dimmed card is tapped.
   @override
   Card? get pendingPlay => null;
 
@@ -238,6 +235,9 @@ class GameController extends ChangeNotifier implements TableModel {
   Set<Card> get passed =>
       _game.phase == Phase.passing ? (_game.passOf(humanSeat) ?? const []).toSet() : const {};
 
+  /// Plays [card] for the player. Returns null on success, or a short
+  /// reason the card is not playable — the message the table shows when
+  /// a dimmed card is tapped.
   @override
   String? playCard(Card card) {
     if (!awaitingPlay) return null;
