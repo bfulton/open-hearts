@@ -97,7 +97,7 @@ class AppWaits {
   /// Opening a checkout.
   final Duration buy;
 
-  /// TURN credentials, before a table goes on with STUN alone.
+  /// TURN credentials, before a table goes on over the relay alone.
   final Duration turn;
 
   /// This config itself.

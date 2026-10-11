@@ -11,7 +11,7 @@ main = "worker.mjs"
 base_dir = "../.."
 compatibility_date = "2025-01-01"
 
-# Where the apps find it (app/lib/net/relays.dart, homeTagRelay).
+# Where the apps find it (app/lib/net/relays.dart, ourRelay).
 routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 
 # The jurors of last resort's image is built from the repo on every
