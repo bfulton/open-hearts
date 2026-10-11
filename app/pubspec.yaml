@@ -19,15 +19,13 @@ dependencies:
   # plurals and dates they need.
   flutter_localizations:
     sdk: flutter
-  intl: any
+  intl: ^0.20.3
 
-  cupertino_icons: ^1.0.8
   # The rules of Hearts, shared with the service. See packages/engine.
   engine:
     path: ../packages/engine
   shared_preferences: ^2.5.5
   flutter_webrtc: ^1.6.2+hotfix.3
-  web_socket_channel: ^3.0.3
   table:
     path: ../packages/table
   deal:
