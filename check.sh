@@ -1,19 +1,11 @@
-# The suites that only count — the Dart and Flutter tests on the
-# simulator's clock and the test clock — run at the lowest priority,
-# beside those that keep time: the browser suites and the service's
-# sockets, whose tables have deadlines a starved process misses, and
-# whose checks hold the app to seconds. The counting suites take what
-# the clocks leave, and all four cores stay busy.
-patient="engine deal table table_slow app app_analyze crypto relay_js functions site infra workers scripts"
-
 #!/usr/bin/env bash
 # Every check the repository has, as much of it as a change needs
 # (docs/09-testing.md).
 #
 #   ./check.sh quick [base]   what you touched since base — committed,
-#                             staged or not; origin/claude/launch-punch-list
+#                             staged or not; origin/main
 #                             unless told — each at its fast tier
-#   ./check.sh full           everything: every tier, the relay both
+#   ./check.sh full           everything: every tier, the relay three
 #                             ways, the browser suites; side by side
 #   ./check.sh <suite>...     the suites named, side by side
 #   ./check.sh list           the suites there are
@@ -47,6 +39,7 @@ suite_table_slow() { cd packages/table && dart test -j "$cores" -t slow; }
 suite_service() { cd service && dart analyze && dart test -j "$cores"; }
 # The same suite against the relay the Cloudflare object runs.
 suite_service_js() { cd service && OH_RELAY=js dart test -j "$cores"; }
+suite_service_object() { cd service && OH_RELAY=object dart test -j "$cores"; }
 suite_relay_js() { node --test service/do/*.test.mjs; }
 suite_functions() { node --test service/functions/*.test.mjs; }
 suite_site() { node --test site/build.test.mjs; }
@@ -67,11 +60,31 @@ suite_scripts() {
 suite_app_analyze() { cd app && flutter analyze; }
 # The app's tests: all of them, or those $app_tests names, with
 # $app_flags (quick leaves the layout matrix out: app/dart_test.yaml).
-# And those that need a page under them (test/web), in Chrome, or the
-# Chromium Playwright brought where there is no Chrome.
+# And those that need a page under them (test/web), in Chrome: the one
+# CHROME_EXECUTABLE names, else a Chrome or Chromium on the PATH or in
+# macOS's Applications, else the Chromium Playwright brought.
 suite_app() {
-  local chrome=${CHROME_EXECUTABLE:-$(ls -d /opt/pw-browsers/chromium-*/chrome-linux*/chrome 2> /dev/null | head -1)}
-  [ -n "$chrome" ] && export CHROME_EXECUTABLE=$chrome
+  local chrome=${CHROME_EXECUTABLE:-} c
+  if [ -z "$chrome" ]; then
+    for c in google-chrome google-chrome-stable chromium chromium-browser; do
+      command -v "$c" > /dev/null && chrome=$(command -v "$c") && break
+    done
+  fi
+  if [ -z "$chrome" ]; then
+    for c in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" "/Applications/Chromium.app/Contents/MacOS/Chromium"; do
+      [ -x "$c" ] && chrome=$c && break
+    done
+  fi
+  if [ -z "$chrome" ]; then
+    chrome=$(ls -d "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"/chromium-*/chrome-linux*/chrome \
+      "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/Library/Caches/ms-playwright}"/chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium \
+      2> /dev/null | head -1)
+  fi
+  if [ -z "$chrome" ]; then
+    echo "app: no Chrome for test/web; set CHROME_EXECUTABLE to one" >&2
+    return 1
+  fi
+  export CHROME_EXECUTABLE=$chrome
   cd app || return 1
   if [ "${app_tests:-}" != none ]; then flutter test -j "$cores" ${app_flags:-} ${app_tests:-} || return 1; fi
   flutter test --platform chrome test/web
@@ -87,7 +100,7 @@ suite_e2e_offline() { node e2e/offline.mjs; }
 suite_e2e_site() { node e2e/site.mjs; }
 suite_e2e_move() { node e2e/move.mjs; }
 
-all_suites="engine deal table table_slow service service_js relay_js functions site infra workers crypto scripts app_analyze app
+all_suites="engine deal table table_slow service service_js service_object relay_js functions site infra workers crypto scripts app_analyze app
   e2e_build e2e_flows e2e_run e2e_escrow e2e_offline e2e_site e2e_move"
 
 # ---- running them ----------------------------------------------------------
@@ -99,7 +112,7 @@ trap 'rm -f "$results"' EXIT
 # simulator's clock and the test clock — run at a lower priority than
 # those that keep time: the browser suites and the service's sockets,
 # whose tables have deadlines a starved process can miss. They take what
-# the clocks leave, and all four cores stay busy.
+# the clocks leave, and every core stays busy.
 patient="engine deal table table_slow app app_analyze crypto"
 
 run() {
@@ -186,7 +199,7 @@ changed_since() {
 }
 
 quick() {
-  local base=${1:-origin/claude/launch-punch-list} files suites=() app_files=()
+  local base=${1:-origin/main} files suites=() app_files=()
   files=$(changed_since "$base")
   if [ -z "$files" ]; then
     echo "nothing changed since $base"
@@ -202,7 +215,7 @@ quick() {
       packages/engine/*) add engine ;;
       packages/deal/*) add deal ;;
       packages/table/*) add table ;;
-      service/do/*) add relay_js service_js ;;
+      service/do/*) add relay_js service_js service_object ;;
       service/functions/*) add functions ;;
       service/*) add service ;;
       site/*) add site e2e_site ;;
@@ -251,11 +264,11 @@ quick() {
 
 # Everything, in two kinds of lane side by side. The suites that count
 # run at the lowest priority (above), all at once. The ones that keep
-# time run in waves no bigger than four cores can carry: the browser
+# time run in waves no bigger than a laptop can carry: the browser
 # suites' build; the move's timings, which hold the app's start to a
-# second and a half; the service's sockets both ways and the escrow;
+# second and a half; the service's sockets all three ways and the escrow;
 # the four-browser run and the network taken away; the flows. All of
-# them at once is no sooner on four cores, only less sure: their tables
+# them at once is no sooner on a few cores, only less sure: their tables
 # keep deadlines that a starved process misses. The Rust crates' own
 # tests where cargo has built them here; a machine that was handed the
 # libraries has nothing to test them with.
@@ -264,7 +277,7 @@ full() {
   [ -d crypto/deal/target/release/.fingerprint ] && command -v cargo > /dev/null && crypto=crypto
   echo "logs in $logs/"
   lanes "table table_slow" "app_analyze app" "engine,deal" "relay_js,functions,site,infra,workers,scripts $crypto" \
-    "e2e_build e2e_move,e2e_site service,service_js,e2e_escrow e2e_run,e2e_offline e2e_flows"
+    "e2e_build e2e_move,e2e_site service,service_js,service_object,e2e_escrow e2e_run,e2e_offline e2e_flows"
   verdict
 }
 

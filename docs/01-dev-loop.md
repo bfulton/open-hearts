@@ -6,7 +6,7 @@ the running build always says which commit it is.
 ## Checking a change
 
 ```bash
-./check.sh quick             # what changed since origin/claude/launch-punch-list, at its fast tier
+./check.sh quick             # what changed since origin/main, at its fast tier
 ./check.sh full              # everything, the browser suites too, before a deploy
 ```
 
