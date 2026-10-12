@@ -3,7 +3,8 @@
 Notable changes to Open Hearts. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Open Hearts has
 no numbered releases yet: every deploy of `main` is the current version,
-so each entry gives the date and commit it landed in.
+so each entry gives the date it landed and its commit or, for a change
+squashed from a pull request, the pull request's number.
 
 ## [Unreleased]
 
@@ -11,7 +12,7 @@ so each entry gives the date and commit it landed in.
 
 - `infra/apply.mjs` checks the Pages secret for Google Play's service
   account whenever `config/openhearts.json` names Play.
-  (2026-10-11, 21a06eb)
+  (2026-10-11, #12)
 - At an empty pool, a player may choose to wait for a person instead of
   playing bots, and the operator is told someone is waiting.
   (2026-10-11, 45cc3a3)
@@ -72,17 +73,17 @@ so each entry gives the date and commit it landed in.
 
 ### Fixed
 
-- Backup jurors still running with an earlier service key are started
-  again with the current one at the next call, so a key rotation
-  reaches them. (2026-10-11, e010ff3)
+- Backup jurors still running with an earlier service key, juror secret
+  or relay setting are started again with the current ones at the next
+  call, so a rotation reaches them. (2026-10-12, #12)
 - A relay object's counts are written when its last socket closes, so a
-  visit shorter than a minute is counted. (2026-10-11, a2f9327)
+  visit shorter than a minute is counted. (2026-10-11, #12)
 - For a missing preview secret, `infra/apply.mjs` printed a command that
-  set production's instead. (2026-10-11, 8b679a4)
+  set production's instead. (2026-10-11, #12)
 - Game results are kept for good again. Since results moved to the
   `standings` tag, the relay had kept only the old `results` tag for
   good, and swept each result a day after storing it. Results swept
-  before this are not recovered. (2026-10-11, 513746e)
+  before this are not recovered. (2026-10-11, #11)
 - A deal seed shorter than 32 bytes is refused rather than panicking.
   (2026-10-11, 21b4fb1)
 - A signed table event whose body is not its kind's shape is dropped at
