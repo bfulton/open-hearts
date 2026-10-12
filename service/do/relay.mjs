@@ -867,10 +867,12 @@ function later(fn, ms) {
   return () => clearTimeout(timer);
 }
 
-/// A tally kept in memory and written as one line of numbers a minute
-/// at most, to [sink] — an Analytics Engine dataset, or nothing. A line
-/// a message would be a line every two seconds for every device online,
-/// for presence alone; a line a minute is one per tag that is in use.
+/// A tally kept in memory and written as one line of numbers to [sink],
+/// an Analytics Engine dataset or nothing: a minute after the line
+/// before it, and at once when the object's last socket goes. A line a
+/// message would be a line every two seconds for every device online,
+/// for presence alone; a line a minute is one per tag that is in use,
+/// and one more for each time a tag's last socket closes.
 /// While counts wait, a timer waits with them to write them at their
 /// minute: an object whose sockets are open hibernates once nothing is
 /// pending, and what it holds in memory goes with it.

@@ -89,7 +89,7 @@ From `service/do/wrangler.toml`.
 | `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The backup jurors (`service/do/bench.mjs`). |
 | `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it, and each relay object reads [relay settings](#relay-settings) from it. |
 | `EMAIL` | Email Sending (`send_email`) | Backup-code emails and the operator's alerts. |
-| `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | One line of counts a minute from each object (`tally` and `tallied` in `service/do/relay.mjs`). |
+| `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
 
 ## Environment variables
 

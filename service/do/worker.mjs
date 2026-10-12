@@ -67,7 +67,8 @@ export class TagRelay {
     this.env = withConfig(env, config);
     this.relay = null;
     // What the operator watches, if the dataset is bound (wrangler.toml,
-    // OH_METRICS): a line of counts a minute, nothing about anyone.
+    // OH_METRICS): a line of counts a minute, and one when the last
+    // socket goes, nothing about anyone.
     this.tally = tally(env.OH_METRICS ?? null);
     this.wokeAt = 0;
   }

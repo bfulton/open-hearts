@@ -476,11 +476,13 @@ bind none.
 - **The worker** (`measure`) writes one line per request: the handler,
   the status, the milliseconds, and a weight. `config` and `health` are
   sampled. An unknown path is recorded as `unknown`.
-- **Each relay object** (`tally`) writes one line a minute with
+- **Each relay object** (`tally`) writes a line of counts:
   connections, events, deliveries, subscriptions and each kind of
-  refusal. Counts waiting for their minute keep a timer pending, so the
-  object is not evicted with them, and the last socket closing writes
-  them at once. The columns are in the order `tallied` lists them in
+  refusal. It writes one a minute while it has sockets, and one at once
+  when its last socket closes, so a tag whose sockets come and go can
+  write more than one a minute. Each line gives the seconds it covers.
+  Counts waiting for their minute keep a timer pending, so the object
+  is not evicted with them. The columns are in the order `tallied` lists them in
   `service/do/relay.mjs`.
 
 No key, address, tag or location is written. Read the counts with the
