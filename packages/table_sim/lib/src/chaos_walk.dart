@@ -1,24 +1,19 @@
 /// One random walk through the simulator's faults, and the invariants
 /// that must hold whatever happens: survivors never hold conflicting
 /// decisions, every record verifies as far as it goes, every observed
-/// state change is one the model in model.dart allows, and once the
-/// faults stop and the network heals no two sides still up hold a
-/// held seat's escrow differently, and the table finishes — or is paused
-/// for the one reason left, the jury gone and nobody online to draw
-/// another, or has ended for it once that went on long enough. The
-/// test walks forty seeds on every commit; the tool walks as many as
-/// asked, sealed too.
+/// state change is one the model in the table's model.dart allows, and
+/// once the faults stop and the network heals no two sides still up
+/// hold a held seat's escrow differently, and the table finishes — or
+/// is paused for the one reason left, the jury gone and nobody online
+/// to draw another, or has ended for it once that went on long enough.
+/// The test walks forty seeds on every commit; the tool walks as many
+/// as asked, sealed too.
 library;
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
+import 'package:table/table.dart';
 
-import '../client.dart';
-import '../events.dart';
-import '../jury.dart';
-import '../model.dart';
-import '../record.dart';
-import '../signing.dart';
 import 'scenarios.dart';
 import 'sim_table.dart';
 import 'structure.dart';
@@ -412,7 +407,7 @@ String? walkChaos(int seed,
         if (j.client != null) j.client!,
     ];
     // Which ways out must read alike everywhere is what seatExits says
-    // of each (model.dart): every one decided on the record.
+    // of each (the table's model.dart): every one decided on the record.
     const doors = {EventKind.leave: SeatState.left, EventKind.boot: SeatState.booted, EventKind.absent: SeatState.absent};
     for (var seat = 0; seat < seatCount; seat++) {
       final exits = <String, List<String>>{};

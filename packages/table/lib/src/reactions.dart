@@ -102,7 +102,7 @@ typedef HeardReaction = ({PublicKey from, String id, int createdAt, String conte
 typedef ShownReaction = ({int seat, Reaction reaction});
 
 /// Where reactions go and come from: the table's tag on the relay
-/// (relay_transport.dart), or a test's hub (sim/sim_reactions.dart).
+/// (relay_transport.dart), or a test's hub (packages/table_sim, sim_reactions.dart).
 abstract interface class ReactionLane {
   /// Says [content] — a [ReactionSaid], encoded — as this device.
   void sayReaction(String content);

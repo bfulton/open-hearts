@@ -22,4 +22,7 @@ dependencies:
 
 dev_dependencies:
   lints: ^6.0.0
+  # Fake signatures, for the tests and tools that need many keys.
+  table_sim:
+    path: ../packages/table_sim
   test: ^1.25.0

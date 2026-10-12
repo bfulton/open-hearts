@@ -27,7 +27,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 |---|---|
 | `engine` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `packages/engine` |
 | `deal` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `packages/deal` |
-| `table` | `dart analyze --fatal-infos` and `dart test -j <cores> -x slow` in `packages/table`: the fast tier |
+| `table` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `packages/table_sim`, then `dart analyze --fatal-infos` and `dart test -j <cores> -x slow` in `packages/table`: the fast tier |
 | `table_slow` | `dart test -j <cores> -t slow` in `packages/table`: the slow tier |
 | `service` | `dart analyze --fatal-infos` and `dart test -j <cores>` in `service`, against the Dart relay |
 | `service_js` | The `service` tests with `OH_RELAY=js`: against the relay the Cloudflare object runs |
@@ -59,7 +59,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `app/lib/`, `app/test/`, `app/web/`, `app/worker/`, `app/pubspec.yaml`, `app/analysis_options.yaml`, `app/l10n.yaml` | `app_analyze`, `app`; and `workers` for `app/web/` and `app/worker/` |
 | `packages/engine/` | `engine` |
 | `packages/deal/` | `deal` |
-| `packages/table/` | `table` |
+| `packages/table/`, `packages/table_sim/` | `table` |
 | `service/do/` | `relay_js`, `service_js`, `service_object` |
 | `service/functions/` | `functions` |
 | `service/tool/*.mjs` | `functions` |
@@ -98,7 +98,7 @@ For the `app` suite, `quick` passes `-x slow`, and runs only the test files that
 | `packages/table` | `concurrency: 4`; declares the tag `slow` | `chaos_sealed_test.dart`, `deal_worker_test.dart`, `game_record_test.dart`, `juror_summoned_again_test.dart`, `late_juror_verdict_test.dart`, `rejoin_test.dart`, `sealed_departures_test.dart`, `sealed_lies_test.dart`, `top_up_test.dart`, `undealt_hand_test.dart`, and the later seeds of `chaos_test.dart` | `dart test -x slow` | `dart test -t slow` |
 | `app` | Declares the tag `slow` | `table_fits_test.dart`, `table_fits_live_test.dart`, `table_fits_live_end_test.dart`, `table_fits_wide_test.dart`: the layout matrix in `app/test/fits.dart` | `flutter test -x slow` | `flutter test`, which runs every test |
 | `service` | `concurrency: 4` | None | `dart test` | None |
-| `packages/engine`, `packages/deal` | None | None | `dart test` | None |
+| `packages/engine`, `packages/deal`, `packages/table_sim` | None | None | `dart test` | None |
 
 - `-j` sets how many test files run at once, and overrides `concurrency`. `check.sh` passes the core count. CI passes 4 for the engine, deal and app, and leaves the table and service at their file's `concurrency`.
 - The tests in `app/test/web/` are marked `@TestOn('browser')`, so they run only under `--platform chrome`.
@@ -144,7 +144,7 @@ Runs on pull requests and on pushes to `main`. A newer push to the same pull req
 |---|---|---|
 | `app` | Builds and tests the Rust crates in `crypto/deal` and `crypto/schnorr`, and tests `crypto/vendor`. Then the engine's and deal's analysis and tests, `flutter analyze`, `flutter test -j 4` (every tier), and `flutter test --platform chrome test/web`. | `engine`, `deal`, `app_analyze`, `app`, and the tests of `crypto` |
 | `web` | `flutter build web` as `deploy.sh` makes it, then `app/worker/build.sh` | None |
-| `table` | Builds the Rust libraries, then `dart test -x slow` and `dart test -t slow` in `packages/table` | `table`, `table_slow` |
+| `table` | Builds the Rust libraries, then the simulator's analysis and tests in `packages/table_sim`, and `dart test -x slow` and `dart test -t slow` in `packages/table` | `table`, `table_slow` |
 | `service` | Builds the Rust libraries, then the `service` tests three ways (`OH_RELAY` unset, `js` and `object`) and `node --test service/do/*.test.mjs` | `service`, `service_js`, `service_object`, `relay_js` |
 | `wasm` | `cargo clippy` on `crypto/deal`, `crypto/schnorr` and `crypto/schnorr_wasm`; builds both wasm files with `crypto/deal/build.sh` and `crypto/schnorr_wasm/build.sh`; fails if `app/web/deal.wasm` or `app/web/schnorr.wasm` differ from what was committed | The clippy part of `crypto` |
 | `node` | The handlers', site's, infrastructure's and page workers' node tests, `./check.sh scripts` and `./check.sh docs` | `functions`, `site`, `infra`, `workers`, `scripts`, `docs` |

@@ -21,8 +21,8 @@ import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:open_hearts/ui/table_view.dart' show ClockText, TableView;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 import 'drawn.dart';
 import 'table_page_test.dart' show fanCards, tapCard;

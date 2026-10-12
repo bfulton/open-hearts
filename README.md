@@ -13,7 +13,8 @@ private to the person holding it.
 | | |
 |---|---|
 | [`packages/engine/`](packages/engine/) | The rules of Hearts and the bots, in pure Dart with no Flutter, no I/O and no clock. The app, the table protocol and the service all use it |
-| [`packages/table/`](packages/table/) | The live table protocol: signed events, seats coming and going, the jury, ratings. Runs over an abstract transport and clock, with a simulator for tests |
+| [`packages/table/`](packages/table/) | The live table protocol: signed events, seats coming and going, the jury, ratings. Runs over an abstract transport and clock |
+| [`packages/table_sim/`](packages/table_sim/) | The table over a simulated network, for tests and tools: a virtual clock, fake signatures, seats that lie, the chaos walk. Nothing that ships includes it |
 | [`packages/deal/`](packages/deal/) | The verifiable deal as Dart sessions over the Rust primitives |
 | [`crypto/`](crypto/) | Rust: the deal (`crypto/deal`, built for the Dart VM and as wasm) and BIP-340 signatures for the VM (`crypto/schnorr`) and the browser (`crypto/schnorr_wasm`) |
 | [`app/`](app/) | The Flutter app, one codebase for web, Android and iOS |

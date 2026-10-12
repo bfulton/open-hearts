@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 /// A relay's lobby channel for one code, shared by every device on
 /// the bus: what one announces, all hear on the next microtask.

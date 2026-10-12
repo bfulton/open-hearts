@@ -18,10 +18,10 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
-import 'package:deal/memo.dart';
 import 'package:engine/engine.dart';
 import 'package:service/service.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -38,7 +38,7 @@ void main() {
   test('a jury drawn over the relay holds the bot seat, and the hand is dealt to it', () async {
     const silence = 30000;
     final signers = [for (var i = 0; i < 3; i++) FakeSigner('p$i')];
-    final spec = TableSpec(id: 'bot-seat-relay', seed: 11, sealed: true, seats: [
+    final spec = TableSpec(id: 'bot-seat-relay', seed: 11, sealed: true, timing: const TableTiming(silenceMs: silence), seats: [
       for (final s in signers) HumanSeat(s.publicKey),
       BotSeat(Persona.roster[2]),
     ]);
@@ -47,7 +47,7 @@ void main() {
     // there is nothing else to make that up (docs/explanation/live-play.md).
     final bench = [
       for (var i = 0; i < juryToHoldBots; i++)
-        LastResortJuror(relays: [relay.url], signer: FakeSigner('bench$i'), silenceAfterMs: silence, crypto: crypto)..start(),
+        LastResortJuror(relays: [relay.url], signer: FakeSigner('bench$i'), crypto: crypto)..start(),
     ];
     final presences = [for (final s in signers) RelayPresence(relays: [relay.url], signer: s)];
     final transports = [for (final s in signers) RelayTransport(relays: [relay.url], signer: s, table: spec.id)];
@@ -60,7 +60,6 @@ void main() {
             transport: transports[i],
             clock: WallClock(),
             presence: presences[i],
-            silenceAfterMs: silence,
             crypto: crypto),
     ];
     final players = [for (final c in clients) Player(c, thinkMs: 250)];

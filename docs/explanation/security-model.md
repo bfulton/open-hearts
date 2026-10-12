@@ -67,9 +67,11 @@ does again, and nothing it does locks the person out
 
 A licence is domain-separated (`oh-licence/2`) and checked against the
 public key before it is issued ([licence](service.md#licence)). The app
-accepts a licence only through the real BIP-340 path, never the
-simulator's fake signatures, whose "signature" is a hash of the signer's
-public key; the service's public key is in every build, so a fake one
+takes BIP-340 signatures and nothing else. The simulator's fake
+signatures, whose "signature" is a hash of the signer's public key, are
+checked only in a process running the simulator (`packages/table_sim`),
+which no build includes, and a licence takes a real signature's length
+even there: the service's public key is in every build, so a fake one
 would license anybody.
 
 Licences are not revocable, which is why they are short. Dropping a

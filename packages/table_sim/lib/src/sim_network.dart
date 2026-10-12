@@ -10,9 +10,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import '../relay_policy.dart';
-import '../signing.dart';
-import '../transport.dart';
+import 'package:table/table.dart';
+
 import 'virtual_clock.dart';
 
 class SimNetwork {
@@ -26,12 +25,12 @@ class SimNetwork {
   /// Fraction of messages lost on a healthy link, 0 to 1.
   double lossRate = 0;
 
-  /// What has crossed the simulated wire: bytes said, and bytes
-  /// handed over — one copy per peer that gets one. The clock here is
-  /// virtual and the network deterministic, so the same seed gives the
-  /// same counts to the byte, which is what makes a protocol change
-  /// measurable at all (tool/wire_in_sim.dart). A real socket's totals
-  /// swing a quarter either way between runs.
+  /// What has crossed the simulated wire: bytes said, and bytes handed
+  /// over — one copy per peer that gets one. The clock here is virtual
+  /// and the network deterministic, so the same seed gives the same
+  /// counts to the byte, which is what makes a protocol change
+  /// measurable at all (packages/table/tool/wire_in_sim.dart). A real
+  /// socket's totals swing a quarter either way between runs.
   int said = 0;
   int handed = 0;
 
@@ -44,11 +43,22 @@ class SimNetwork {
   final Map<String, int> byKind = {};
   final Map<String, int> saidByKind = {};
 
+  /// Told of every message a peer sends, before it goes: a test that
+  /// throws from it has the send fail there, as a socket's write can.
+  void Function(PublicKey from, Map<String, Object?> message)? onSend;
+
+  /// Who made each kind of event said on the wire, by its author: what
+  /// a test asks of who did something, rather than a client counting
+  /// it for the test.
+  final Map<String, Set<PublicKey>> authorsOf = {};
+
   void _tally(PublicKey from, Map<String, Object?> message, String wire, int copies) {
     said += wire.length;
     handed += wire.length * copies;
     final kind = message['kind'];
     if (kind is! String) return;
+    final author = message['author'];
+    if (author is PublicKey) (authorsOf[kind] ??= {}).add(author);
     final own = message['author'] == from ? 'own' : 'carried';
     final key = '$kind $own';
     byKind[key] = (byKind[key] ?? 0) + wire.length * copies;
@@ -65,7 +75,8 @@ class SimNetwork {
   List<String> relays = const [];
 
   /// How long a writer keeps a relay out of its own running after a
-  /// write to it was refused: the protocol's minute (relays.dart).
+  /// write to it was refused: the protocol's minute (the table's
+  /// relays.dart).
   int refusalMs = 60000;
 
   final Random _random;
@@ -159,12 +170,13 @@ class SimNetwork {
   bool Function(PublicKey from, Map<String, Object?> message)? swallow;
 
   /// One copy of one message steered, chosen per copy as it leaves:
-  /// null sends it as the network would, a number of milliseconds
-  /// holds it back that much longer, and a negative number loses it.
-  /// Where [swallow] eats a message at its source, this reaches a
-  /// single recipient — the shape of a reordering, one peer hearing
-  /// two things the other way round from everybody else — which is
-  /// what `tool/explore.dart` walks through one copy at a time.
+  /// null sends it as the network would, a number of milliseconds holds
+  /// it back that much longer, and a negative number loses it. Where
+  /// [swallow] eats a message at its source, this reaches a single
+  /// recipient — the shape of a reordering, one peer hearing two things
+  /// the other way round from everybody else — which is what
+  /// `packages/table/tool/explore.dart` walks through one copy at a
+  /// time.
   ///
   /// The copy's latency is drawn before it is asked, so a steered run
   /// draws the same numbers as an unsteered one and differs from it by
@@ -335,6 +347,7 @@ class SimTransport implements Transport {
 
   @override
   void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
+    _net.onSend?.call(key, message);
     if (_net.relays.isEmpty) return _net._broadcastAll(key, message);
     final now = _net.clock.nowMs;
     final reach = _net.reachOf(key);

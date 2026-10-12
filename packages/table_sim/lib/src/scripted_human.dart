@@ -6,8 +6,8 @@ library;
 import 'dart:async';
 
 import 'package:engine/engine.dart';
+import 'package:table/table.dart';
 
-import '../client.dart';
 import 'sim_network.dart';
 import 'virtual_clock.dart';
 

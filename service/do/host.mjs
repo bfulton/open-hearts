@@ -38,10 +38,11 @@ export const wasmPath = new URL('../../app/web/schnorr.wasm', import.meta.url);
 
 /// The local relay takes the simulator's signatures as well as real
 /// ones, told apart by their length, which is what the Dart relay does
-/// and for the same reason: a simulated table and a real one then share
-/// every line of protocol code, half the repo's suites seat their
-/// players with a `FakeSigner`, and neither has to pay for a signature
-/// it is not testing (packages/table, signing.dart). A fake one is a
+/// in a process running the simulator, and for the same reason: a
+/// simulated table and a real one then share every line of protocol
+/// code, half the repo's suites seat their players with a `FakeSigner`,
+/// and neither has to pay for a signature it is not testing
+/// (packages/table_sim, fake_signer.dart). A fake one is a
 /// hash anybody could compute, so it belongs to a machine running its
 /// own tests and nowhere else — the object on Cloudflare (worker.mjs)
 /// knows BIP-340 and refuses everything else.

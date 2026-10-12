@@ -35,7 +35,7 @@ class TimeBank {
 
   /// The deal's and the audit's turns: a device answers them by itself.
   /// Forty seconds, as a juror has for the same steps of a bot seat
-  /// (TableClient.botDealsWithinMs): on a slow machine a person's
+  /// (TableTiming.botDealsMs): on a slow machine a person's
   /// device takes as long over them.
   final int fixedMs;
 

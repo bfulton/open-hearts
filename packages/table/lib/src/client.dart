@@ -59,13 +59,13 @@
 library;
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 
 import 'clock.dart';
+import 'conduct.dart';
 import 'events.dart';
 import 'journal.dart';
 import 'jury.dart';
@@ -76,33 +76,6 @@ import 'spec.dart';
 import 'time_bank.dart';
 import 'timing.dart';
 import 'transport.dart';
-
-/// How a modified client lies (docs/explanation/fair-deal.md), for the
-/// simulator. A seat saying it holds the two of clubs nowhere has
-/// nothing to prove, and nothing can be made to prove it; a token
-/// sealed to one pair of eyes is checked by an argument beside it.
-/// What the table does about each is worth a test, and there is no
-/// testing it without committing it.
-enum Lie {
-  /// Says it holds the two of clubs nowhere and deals itself the hand
-  /// all the same: it alone knows who leads, and it plays on while the
-  /// rest of the table waits for a lead that is never coming. The loud
-  /// version, and the table's clock has it at the audit it will not
-  /// answer.
-  declare,
-
-  /// The same word, and then it waits with everybody else and answers
-  /// the early audit like an honest seat. The patient version: nothing
-  /// it does is out of step, and only the opened deal says which seat
-  /// was dealt the card it disclaimed.
-  hide,
-
-  /// Seals its pass to nothing: three cards of the right shape that the
-  /// seat it passed to could never open. It gets no further than its own
-  /// turn — every seat checks the argument beside a seal, and a pass
-  /// that fails it is not taken — and the clock has its seat there.
-  seal,
-}
 
 /// Why a table is not moving.
 enum Pause {
@@ -244,7 +217,6 @@ class TableClient {
     required this.signer,
     required this.transport,
     required this.clock,
-    this._silenceAfterMs,
     this.heartbeatMs = 5000,
     this.presence,
     this.crypto,
@@ -270,10 +242,6 @@ class TableClient {
   /// per hand, Boot once both are spent (time_bank.dart).
   TimeBank get timeBank => timing.bank;
 
-  /// How long a person may be silent before the table removes them:
-  /// the table's, unless a test asked for a shorter one.
-  int get silenceAfterMs => _silenceAfterMs ?? timing.silenceMs;
-  final int? _silenceAfterMs;
   final int heartbeatMs;
 
   /// Who is online, and how a juror is summoned; null at a table that
@@ -884,12 +852,8 @@ class TableClient {
       final to = (seat + game.passDirection.seatOffset) % seatCount;
       final m = d.passMessage(to, [for (final p in positions) p!], from: seat);
       if (m == null) return;
-      if (seat == mySeat && lies == Lie.seal && m['sealed'] != null) {
-        // Sealed to nothing anybody holds: the shape of a pass, and
-        // three cards the receiver will never open (docs/explanation/fair-deal.md).
-        final rng = _random ?? Random();
-        m['sealed'] = [for (var i = 0; i < passSize; i++) base64.encode([for (var b = 0; b < sealedBytes; b++) rng.nextInt(256)])];
-      }
+      final sealed = m['sealed'];
+      if (seat == mySeat && sealed is List<String>) m['sealed'] = conduct.sealedPass(sealed, _random ?? Random());
       body.addAll(m);
     } else {
       body['cards'] = [for (final c in cards) c.code];
@@ -1544,7 +1508,7 @@ class TableClient {
     // page reloaded closes its connection too, and comes back to its
     // seat from its journal (journal.dart) if it is still its seat.
     if (_humans.contains(key)) {
-      _lastHeard[key] = clock.nowMs - silenceAfterMs + min(reloadGraceMs, silenceAfterMs);
+      _lastHeard[key] = clock.nowMs - timing.silenceMs + min(reloadGraceMs, timing.silenceMs);
     }
   }
 
@@ -2276,9 +2240,9 @@ class TableClient {
 
   /// The rule for a boot: countersign when this peer agrees of its own
   /// knowledge — the seat's clock has run out by this peer's reckoning,
-  /// or it has been silent past [silenceAfterMs] — and it holds no
-  /// play for the turn; holding the play, rebroadcast that instead,
-  /// since the boot may only have been a dropped message.
+  /// or it has been silent past the table's [TableTiming.silenceMs] —
+  /// and it holds no play for the turn; holding the play, rebroadcast
+  /// that instead, since the boot may only have been a dropped message.
   void _considerCountersigning(TurnId turn, TableEvent boot) {
     if (!amSeated) return;
     final race = _races[turn]!;
@@ -3228,7 +3192,7 @@ class TableClient {
   /// the hand begins — unless nobody declared the lead card.
   void _dealt(DealSession d) {
     if (game.phase != Phase.dealing) return;
-    final leader = lies == Lie.hide ? null : d.leader;
+    final leader = conduct.leader(d.leader);
     if (leader == null) {
       if (_pause != Pause.waitingForLead) _trace('nobody declared the lead card');
       _pause = Pause.waitingForLead;
@@ -3436,7 +3400,7 @@ class TableClient {
     final declare = open(TurnId.deal(h, 3, me));
     if (declare != null) {
       final m = d.myDeclaration();
-      if (m != null) _emitDeal(declare, 3, me, lies == null ? m : {'seat': m['seat'], 'position': -1});
+      if (m != null) _emitDeal(declare, 3, me, conduct.declaration(m));
     }
     final audit = open(TurnId.audit(h, me));
     if (audit != null && !_isEscrowedAudit(audit, me) && (game.phase == Phase.handOver || game.phase == Phase.gameOver || _openingAudit)) {
@@ -3444,9 +3408,9 @@ class TableClient {
     }
   }
 
-  /// How this client lies about the lead card, or null — which is every
-  /// client but a simulated one. See [Lie].
-  Lie? lies;
+  /// What this seat says where it could say something else: the honest
+  /// word, at every table but a simulated one (conduct.dart).
+  SeatConduct conduct = const SeatConduct();
 
   /// A deal step for the seat it is taken for — this side's own, or
   /// the bot seat a juror holds, which is not the same as its seat at
@@ -3738,7 +3702,6 @@ class TableClient {
         final part = d.topUpPart(seat, at: at, have: have);
         if (part == null) continue;
         _toppedUpAt[key] = clock.nowMs;
-        topUpsSent++;
         _emit(EventKind.topup, {
           'hand': hand,
           'about': seat,
@@ -3766,9 +3729,6 @@ class TableClient {
     final dealt = _dealtTo(hand);
     return dealt.isNotEmpty && !dealt.contains(who);
   }
-
-  /// Parts of a new share this side has sent, for a test to look at.
-  int topUpsSent = 0;
 
   /// When this side last sent a part, by seat and index.
   final Map<String, int> _toppedUpAt = {};
@@ -3915,16 +3875,9 @@ class TableClient {
     }
   }
 
-  /// How long a bot seat's holder has to take the seat's turn, a card
-  /// or the pass, at a table of the standard timing; a table's own is
-  /// [TableTiming.botActsMs], where the measurement behind it is.
-  static final botActsWithinMs = TableTiming.standard.botActsMs;
-
-  /// And its deal steps ([TableTiming.botDealsMs]).
-  static final botDealsWithinMs = TableTiming.standard.botDealsMs;
-
   /// Whether the seat's holder has had the seat's turn in front of it
-  /// for longer than that, and said nothing.
+  /// for longer than the table allows ([TableTiming.botActsMs]), and
+  /// said nothing.
   ///
   /// Silence is not the only way a holder fails. One that heartbeats
   /// and does nothing would otherwise hold the seat for as long as it
@@ -4130,11 +4083,6 @@ class TableClient {
   /// Since when this side has been stopped at [_unopenable]'s turn.
   ({TurnId turn, int since})? _unopenableSince;
 
-  /// How long a table stopped at a seat nobody left can open waits,
-  /// saying so, before the game ends ([_judgeQuorum]), at a table of
-  /// the standard timing; a table's own is [TableTiming.quorumLostMs].
-  static final quorumLostAfterMs = TableTiming.standard.quorumLostMs;
-
   /// Ends the game when the table has been stopped at one turn, with
   /// nobody left who could move it, for [TableTiming.quorumLostMs]: a seat
   /// nobody left could open ([_unopenable]), or a turn put to a jury
@@ -4182,7 +4130,7 @@ class TableClient {
   /// stopped at: open [seat], where it waits on one, or else rule.
   bool _unheardAreGone(({TurnId turn, int seat})? seat) {
     if (!participants.every((k) => k == signer.publicKey || _recent(k) || _silent(k))) return false;
-    final heard = _liveJurors(game.handNumber, withinMs: silenceAfterMs);
+    final heard = _liveJurors(game.handNumber, withinMs: timing.silenceMs);
     return seat == null ? heard.isEmpty : !openableBy(game.handNumber, seat.seat, heard.contains);
   }
 
@@ -4825,11 +4773,11 @@ class TableClient {
     _reconsider();
   }
 
-  bool _silent(PublicKey key) => clock.nowMs - (_lastHeard[key] ?? clock.nowMs) >= silenceAfterMs;
+  bool _silent(PublicKey key) => clock.nowMs - (_lastHeard[key] ?? clock.nowMs) >= timing.silenceMs;
 
   // ---- silence -----------------------------------------------------------
   //
-  // A seat silent past [silenceAfterMs] is booted at its own turn
+  // A seat silent past timing.silenceMs is booted at its own turn
   // without waiting on its clock, and nowhere else. A claim made at
   // whatever position a peer is on would be applied to an open turn at
   // different moments by different peers, and two claims in flight at

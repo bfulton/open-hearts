@@ -2,13 +2,14 @@
 /// play chain, over an abstract transport and clock.
 ///
 /// Pure Dart, like the engine. The app runs it over WebRTC in real
-/// time; the simulator in `sim/` runs it over a scheduler in no time at
-/// all, which is how the departure matrix in docs/explanation/service.md gets
-/// run on every commit.
+/// time; the simulator (packages/table_sim) runs it over a scheduler in
+/// no time at all, which is how the departure matrix
+/// (docs/explanation/testing.md) gets run on every commit.
 library;
 
 export 'src/client.dart';
 export 'src/clock.dart';
+export 'src/conduct.dart';
 export 'src/events.dart';
 export 'src/frame.dart';
 export 'src/game_record.dart';

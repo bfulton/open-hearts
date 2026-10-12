@@ -7,8 +7,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:deal/deal.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 /// A real Schnorr signature is 128 hex characters where the
 /// simulator's stand-in is 32.

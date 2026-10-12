@@ -18,8 +18,8 @@ library;
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -57,7 +57,7 @@ void main() {
       final author = message['author'] as String;
       if (author == holder) {
         if (custodian == null) {
-          released ??= t.clock.nowMs + TableClient.botActsWithinMs + 17000;
+          released ??= t.clock.nowMs + TableTiming.standard.botActsMs + 17000;
           return released! - t.clock.nowMs;
         }
         return null;

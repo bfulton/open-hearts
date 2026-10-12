@@ -1,0 +1,20 @@
+name: table_sim
+description: The table over a simulated network, for tests and tools — a scheduler for a clock, fake signatures, seats that lie — kept out of the table the app ships.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  crypto: ^3.0.6
+  deal:
+    path: ../deal
+  engine:
+    path: ../engine
+  table:
+    path: ../table
+
+dev_dependencies:
+  lints: ^5.1.1
+  test: ^1.25.0

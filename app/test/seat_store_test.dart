@@ -10,6 +10,7 @@ import 'package:open_hearts/avatar.dart';
 import 'package:open_hearts/net/seat_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 void main() {
   final me = FakeSigner('me');

@@ -19,10 +19,10 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
-import 'package:deal/memo.dart';
 import 'package:engine/engine.dart';
 import 'package:service/service.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 
@@ -38,9 +38,12 @@ void juryOverRelay({required bool sealed}) {
   tearDown(() => relay.close());
 
   test('a ${sealed ? 'sealed' : 'seeded'} table of two with one gone quiet is finished by the backup juror', () async {
-    const silence = 10000;
+    // The quiet seat goes after the least silence a table's timing may
+    // name (TableTiming.bounds), which every seat and juror reads from
+    // the start event.
+    final silence = TableTiming.bounds['silenceMs']!.$1;
     final signers = [FakeSigner('a'), FakeSigner('b')];
-    final spec = TableSpec(id: 'jury-relay', seed: 5, sealed: sealed, seats: [
+    final spec = TableSpec(id: 'jury-relay', seed: 5, sealed: sealed, timing: TableTiming(silenceMs: silence), seats: [
       HumanSeat(signers[0].publicKey),
       HumanSeat(signers[1].publicKey),
       BotSeat(Persona.roster[3]),
@@ -50,7 +53,6 @@ void juryOverRelay({required bool sealed}) {
     final bench = LastResortBench(
         signers: [for (var i = 0; i < (sealed ? juryToHoldBots : 1); i++) FakeSigner('last-resort-$i')],
         relays: [relay.url],
-        silenceAfterMs: silence,
         crypto: c0)
       ..start();
     final benchKeys = {for (final j in bench.jurors) j.presence.signer.publicKey};
@@ -65,7 +67,6 @@ void juryOverRelay({required bool sealed}) {
             transport: transports[i],
             clock: WallClock(),
             presence: presences[i],
-            silenceAfterMs: silence,
             crypto: c0),
     ];
     // A quarter of a second a decision: at a seeded table nothing waits

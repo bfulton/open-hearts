@@ -16,10 +16,10 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
-import 'package:deal/memo.dart';
 import 'package:engine/engine.dart';
 import 'package:service/service.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -43,11 +43,11 @@ void main() {
     // jurors from the other table — and seldom more than three, where
     // fifty is two to six. What is held is the same: both games end,
     // neither stands still, each hand in its time.
-    final many = TableSpec(id: 'table-many', seed: 3, sealed: true, target: 27, seats: [
+    final many = TableSpec(id: 'table-many', seed: 3, sealed: true, target: 27, timing: const TableTiming(silenceMs: silence), seats: [
       for (final s in signers.take(3)) HumanSeat(s.publicKey),
       BotSeat(Persona.roster[2]),
     ]);
-    final one = TableSpec(id: 'table-one', seed: 4, sealed: true, target: 27, seats: [
+    final one = TableSpec(id: 'table-one', seed: 4, sealed: true, target: 27, timing: const TableTiming(silenceMs: silence), seats: [
       HumanSeat(signers[3].publicKey),
       for (var i = 0; i < 3; i++) BotSeat(Persona.roster[i]),
     ]);
@@ -59,13 +59,13 @@ void main() {
     // stranger like any other (app/lib/net/duty.dart).
     final duties = [
       for (var i = 0; i < 4; i++)
-        JurorDuty(relays: [relay.url], signer: signers[i], presence: presences[i], silenceAfterMs: silence, crypto: crypto)..start(),
+        JurorDuty(relays: [relay.url], signer: signers[i], presence: presences[i], crypto: crypto)..start(),
     ];
     // Backup jurors behind them, as the browser suite has: four people are
     // not enough to hold seven bot seats between two tables.
     final bench = [
       for (var i = 0; i < juryToHoldBots; i++)
-        LastResortJuror(relays: [relay.url], signer: FakeSigner('bench$i'), silenceAfterMs: silence, crypto: crypto)..start(),
+        LastResortJuror(relays: [relay.url], signer: FakeSigner('bench$i'), crypto: crypto)..start(),
     ];
     final transports = [
       for (var i = 0; i < 4; i++)
@@ -80,7 +80,6 @@ void main() {
             transport: transports[i],
             clock: WallClock(),
             presence: presences[i],
-            silenceAfterMs: silence,
             crypto: crypto),
     ];
     final players = [for (final c in clients) Player(c, thinkMs: 250)];

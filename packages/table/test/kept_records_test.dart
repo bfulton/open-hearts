@@ -18,9 +18,8 @@ import 'dart:typed_data';
 
 import 'package:deal/deal.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
-
-import '../tool/kept_records.dart' show threeAndALeaver, threeNames;
 
 Map<String, Object?> fixture(String name) =>
     jsonDecode(utf8.decode(gzip.decode(File('test/fixtures/$name.json.gz').readAsBytesSync()))) as Map<String, Object?>;

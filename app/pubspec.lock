@@ -806,6 +806,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  table_sim:
+    dependency: "direct dev"
+    description:
+      path: "../packages/table_sim"
+      relative: true
+    source: path
+    version: "0.1.0"
   term_glyph:
     dependency: transitive
     description:

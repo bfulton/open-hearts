@@ -1,13 +1,13 @@
-/// Reactions among simulated devices (reactions.dart): what one lane
-/// on the hub says, every other lane hears, stamped with the hub's
-/// clock as a relay's event is stamped by its sender's. No relay, no
-/// signatures — the hub says who said it, which is all a lane is asked.
+/// Reactions among simulated devices (the table's reactions.dart): what
+/// one lane on the hub says, every other lane hears, stamped with the
+/// hub's clock as a relay's event is stamped by its sender's. No relay,
+/// no signatures — the hub says who said it, which is all a lane is
+/// asked.
 library;
 
 import 'dart:async';
 
-import '../reactions.dart';
-import '../signing.dart';
+import 'package:table/table.dart';
 
 class ReactionHub {
   ReactionHub({required this.nowMs});

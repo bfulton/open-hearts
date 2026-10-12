@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/net/http.dart';
 import 'package:open_hearts/net/licence.dart' show requestDigest;
 import 'package:open_hearts/net/turn.dart';
-import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 void main() {
   final signer = FakeSigner('turn');

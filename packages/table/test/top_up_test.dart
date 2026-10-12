@@ -10,8 +10,8 @@ library;
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -27,7 +27,7 @@ void main() {
     // while a hand is running — and seeing one needs the hand still
     // running thirty seconds after a jury has been judged short. Over
     // a data channel a bot seat reaches the escrow soon after its
-    // holder stops playing (client.dart, botActsWithinMs) and the rest
+    // holder stops playing (timing.dart, botActsMs) and the rest
     // of the jury plays it out before there is anything to see.
     t.net.minLatencyMs = 200;
     t.net.maxLatencyMs = 400;
@@ -52,9 +52,10 @@ void main() {
 
     // And the holders make parts of a share for whoever was brought
     // on: two of them, for each newcomer and each bot seat.
+    final toppedUp = t.net.authorsOf['topup'] ?? const <PublicKey>{};
     final sent = [
       for (final j in t.jurors)
-        if (sealedTo.contains(j.signer.publicKey) && (j.client?.topUpsSent ?? 0) > 0) j.signer.publicKey,
+        if (sealedTo.contains(j.signer.publicKey) && toppedUp.contains(j.signer.publicKey)) j.signer.publicKey,
     ];
     expect(sent.length, escrowThreshold, reason: 'two holders answer, not all of them');
 

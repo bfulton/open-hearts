@@ -108,8 +108,8 @@ async function main() {
     // the two the table notices first is a race the deadline usually
     // wins: fifteen seconds with the turn in front of it against ten
     // without a heartbeat here, thirty on a standard table
-    // (packages/table, client.dart botActsWithinMs, timing.dart
-    // jurorSilenceMs, docs/explanation/live-play.md). Both are the same
+    // (packages/table, timing.dart botActsMs and jurorSilenceMs,
+    // docs/explanation/live-play.md). Both are the same
     // judgement and both say so in the same line, so this watches for
     // the line rather than for one of its reasons.
     await traced(said, new RegExp(`bot seat ${gone.seat}: its juror .*; claimed for the escrow`),

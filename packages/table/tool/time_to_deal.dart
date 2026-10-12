@@ -29,8 +29,8 @@ import 'package:deal/deal.dart';
 
 import 'package:engine/args.dart';
 import 'package:engine/engine.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 Future<void> main(List<String> args) async {
   final crypto = await DealCrypto.load();

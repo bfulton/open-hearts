@@ -6,8 +6,8 @@ library;
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 import 'sealed.dart';
@@ -26,9 +26,9 @@ void main() {
   SimTable liarsTable(Lie how, {int seed = 11}) {
     final t = SimTable(humans: 4, seed: seed, crypto: crypto, jurors: juryToHoldBots);
     for (final c in t.clients) {
-      c.lies = how;
+      c.conduct = how;
       c.changes.listen((_) {
-        if (c.game.handNumber > 0) c.lies = null;
+        if (c.game.handNumber > 0) c.conduct = const SeatConduct();
       });
     }
     return t;
@@ -108,9 +108,9 @@ void main() {
   test('a pass sealed to nothing gets no further than its own turn, and the clock has the seat', () {
     final t = SimTable(humans: 4, seed: 3, crypto: crypto, jurors: juryToHoldBots);
     final sealer = t.clients.first;
-    sealer.lies = Lie.seal;
+    sealer.conduct = Lie.seal;
     sealer.changes.listen((_) {
-      if (sealer.game.handNumber > 0) sealer.lies = null;
+      if (sealer.game.handNumber > 0) sealer.conduct = const SeatConduct();
     });
     final into = (0 + PassDirection.forHand(0).seatOffset) % seatCount;
     final receiver = t.clients.firstWhere((c) => c.mySeat == into);

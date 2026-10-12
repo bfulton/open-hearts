@@ -1,7 +1,7 @@
 /// Where an event is written among a set of relays: the one place the
 /// choice lives, so the real relay group (`relays.dart`) and the
-/// simulator (`sim/sim_network.dart`) decide it the same way and
-/// neither can drift from the other. Relays are identified by whatever
+/// simulator (packages/table_sim, `sim_network.dart`) decide it the
+/// same way and neither can drift from the other. Relays are identified by whatever
 /// type the caller uses — a `Uri` for real sockets, a name for the
 /// simulator — so the rules here are generic over it.
 ///

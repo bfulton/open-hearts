@@ -14,8 +14,8 @@ import 'package:open_hearts/net/remote_config.dart' show waits;
 import 'package:open_hearts/net/watching.dart';
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/theme.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 /// Long enough for the next of a hand's rows to be drawn (review_page.dart,
 /// _HandRows).
