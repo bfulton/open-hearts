@@ -68,6 +68,7 @@ import 'clock.dart';
 import 'conduct.dart';
 import 'events.dart';
 import 'journal.dart';
+import 'juror_role.dart';
 import 'jury.dart';
 import 'model.dart';
 import 'sealed_pass.dart';
@@ -693,7 +694,7 @@ class TableClient {
       if (e.value.settled) continue;
       b.writeln('  proposed jury ${e.key.substring(0, 6)} by ${e.value.forAction.map((k) => k.substring(0, 4))}');
     }
-    if (_serving.isNotEmpty) b.writeln('  serving as juror for hands ${_serving.keys.toList()}; appeals ${_appealSeenAt.keys}');
+    if (_juror.summoned) b.writeln('  serving as juror for hands ${_juror.hands.toList()}; appeals ${_juror.appeals}');
     b.writeln('  connected ${connectedToMajority ? 'yes' : 'no'}; heard '
         '${_humans.where((k) => k != signer.publicKey).map((k) => '${k.substring(0, 4)} '
             '${_lastHeard[k] == null ? 'never' : '${clock.nowMs - _lastHeard[k]!} ms ago'}').join(', ')}');
@@ -747,30 +748,14 @@ class TableClient {
 
   bool get shortOfJurors => _shortOfJurors;
 
-  // As a juror: the hands this client serves, each with the jury it was
-  // summoned into, foreman first; the appeals heard; the verdicts given.
-  final Map<int, List<PublicKey>> _serving = {};
-
-  /// The first hand this client was summoned to. Everything before it
-  /// is history the client reads and has no part in: any seat this key
-  /// held earlier was held by a client that has since been let go of,
-  /// with secrets this one never had ([_beforeSummons]); and the duty
-  /// starts no client on a summons to a hand that one had reached
-  /// (juror_duty.dart).
-  int? _summonedFrom;
+  /// This side as a juror: the hands it was summoned to, the appeals
+  /// it hears, the verdicts it gives (juror_role.dart).
+  late final JurorRole _juror = JurorRole(signer: signer, tableId: spec.id, clock: clock, table: _JurorView(this));
 
   /// What this side would have said about a hand before its summons,
   /// and did not ([_emit]): nothing, when every way of acting in one is
   /// closed where it starts, which the chaos walk holds it to.
   int saidBeforeSummons = 0;
-  final Map<TurnId, int> _appealSeenAt = {};
-
-  /// When each appeal was last heard here. An appeal stands while the
-  /// people say it ([appealStandsMs]); one gone unheard that long is a
-  /// table this juror has lost, or one that no longer asks.
-  final Map<TurnId, int> _appealHeardAt = {};
-  final Map<TurnId, int> _verdictAt = {};
-  final Map<TurnId, int> _waitSaidAt = {};
 
   /// Where each peer last said it stood, from its heartbeats.
   final Map<PublicKey, (int, int)> _lastPosition = {};
@@ -1473,10 +1458,8 @@ class TableClient {
       // the jurors, looks again.
       if (event.kind == EventKind.jury) return _reconsiderJury(event);
       // An appeal said again is the same appeal, and it still stands
-      // ([appealStandsMs]).
-      if (event.kind == EventKind.appeal && _appealSeenAt.containsKey(event.turn) && _isParticipant(event.author)) {
-        _appealHeardAt[event.turn] = clock.nowMs;
-      }
+      // ([JurorRole.appealStandsMs]).
+      if (event.kind == EventKind.appeal && _isParticipant(event.author)) _juror.heardAgain(event.turn);
       if (event.kind != EventKind.leave && event.kind != EventKind.release && event.kind != EventKind.topup) _catchUp(event.turn);
       return;
     }
@@ -1863,23 +1846,11 @@ class TableClient {
     }
   }
 
-  /// A juror hears both sides of a table cut in two. From the first
-  /// appeal of a hand to the end of it, the first juror in the draw
-  /// still heard from says again, at once, everything it hears for a
-  /// turn not yet settled, so the votes cross the cut and the table
-  /// runs at its own pace rather than an appeal's. One juror carries,
-  /// not four: a shared relay sees each event twice, not five times.
+  /// A juror carries what it hears across a table cut in two
+  /// ([JurorRole.relayIfAppealed]).
   void _relayIfAppealed(TableEvent event) {
-    if (mySeat != null || _carryingHand != game.handNumber) return;
-    final order = _orderFor(game.handNumber);
-    final carrier = order.where((j) => j == signer.publicKey || _jurorRecent(j)).firstOrNull;
-    if (carrier != signer.publicKey) return;
-    if (_races[event.turn]?.settled == true) return;
-    transport.broadcast(event.toJson());
+    if (mySeat == null) _juror.relayIfAppealed(event);
   }
-
-  /// The hand in which this juror last heard an appeal.
-  int _carryingHand = -1;
 
   bool _jurorRecent(PublicKey j) => clock.nowMs - (_jurorHeard[j] ?? _never) < timing.jurorSilenceMs;
 
@@ -2071,9 +2042,9 @@ class TableClient {
   /// turn ([_outOfTime]), by the clock of the person making it. A vote
   /// against the juror's move in the race for the turn, as a boot is
   /// against a person's, carried the same way — by the people at the
-  /// table, or where they cannot, by the jury ([_judge]) — and what it
-  /// carries is the seat, to the escrow, for the rest of the hand
-  /// ([_carryEscrow]).
+  /// table, or where they cannot, by the jury (juror_role.dart) — and
+  /// what it carries is the seat, to the escrow, for the rest of the
+  /// hand ([_carryEscrow]).
   void _onEscrow(TableEvent event) {
     _relayIfAppealed(event);
     final turn = event.turn;
@@ -2897,10 +2868,10 @@ class TableClient {
   /// open at one side while the others dealt them to a jury.
   ///
   /// Or the hand's first jury as the summons gave it, where the event
-  /// that drew it has not been carried here yet ([_firstSummons]). Only
-  /// that one: a juror topped up mid-hand is summoned with the jury as
-  /// it stands then, and that list names a different holder for each
-  /// seat.
+  /// that drew it has not been carried here yet
+  /// ([JurorRole.firstSummons]). Only that one: a juror topped up
+  /// mid-hand is summoned with the jury as it stands then, and that
+  /// list names a different holder for each seat.
   ({String? id, List<PublicKey> jurors}) _provisionalDraw(int hand) {
     final bots = _botSeatsAt(hand);
     final drawn = _juriesDrawnFor(hand);
@@ -2908,7 +2879,7 @@ class TableClient {
       if (_holdsAll(d.event.jurors, bots)) return (id: d.event.id, jurors: d.event.jurors);
     }
     if (drawn.isNotEmpty) return (id: drawn.first.event.id, jurors: drawn.first.event.jurors);
-    final summoned = _firstSummons[hand];
+    final summoned = _juror.firstSummons(hand);
     return (id: summoned?.juryId, jurors: summoned?.jurors ?? const <PublicKey>[]);
   }
 
@@ -3360,9 +3331,9 @@ class TableClient {
       // ordinary; a juror that can see no assignment at all is one
       // step from being the holder the table is waiting on, and from
       // the outside it looks exactly like a device that has stopped.
-      if (mySeat == null && _serving.containsKey(h) && botHolders(h).isEmpty && holders.any((s) => s is BotSeat)) {
+      if (mySeat == null && _juror.summonedInto(h) != null && botHolders(h).isEmpty && holders.any((s) => s is BotSeat)) {
         _sayOnce(h, 'serving, but no bot seat is held as far as this side can see; '
-            'juries drawn for it ${_juriesDrawnFor(h).length}, summoned into its first ${_firstSummons[h] != null}');
+            'juries drawn for it ${_juriesDrawnFor(h).length}, summoned into its first ${_juror.firstSummons(h) != null}');
       }
       return;
     }
@@ -4827,8 +4798,8 @@ class TableClient {
     // pick one it can hear (transport.dart).
     if (amSeated && !_left) {
       _emit(EventKind.heartbeat, {'hand': game.handNumber, 'step': step, 'reads': transport.paths}, everywhere: everywhere);
-    } else if (mySeat == null && _serving.isNotEmpty && !done) {
-      _emit(EventKind.serve, {'hand': game.handNumber, 'step': step, 'serving': _serving.keys.toList(), 'reads': transport.paths},
+    } else if (mySeat == null && _juror.summoned && !done) {
+      _emit(EventKind.serve, {'hand': game.handNumber, 'step': step, 'serving': _juror.hands.toList(), 'reads': transport.paths},
           everywhere: everywhere);
     }
   }
@@ -4917,7 +4888,7 @@ class TableClient {
       _bootLiars();
       _actOnDeal();
       _releaseTick();
-    } else if (mySeat == null && _serving.isNotEmpty && !done) {
+    } else if (mySeat == null && _juror.summoned && !done) {
       // Its own again, every couple of seconds, while a turn it spoke
       // for stands unsettled. A bot seat's holder is that seat's only
       // voice, and nothing else would come back to a step of the deal
@@ -4928,7 +4899,7 @@ class TableClient {
       // nor paused, so nobody appeals. A juror holding a seat is as
       // much that seat as a person is theirs ([_repeat]).
       _repeat(ownOnly: true);
-      _judgeAppeals();
+      _juror.judgeAppeals();
       // A juror holding a bot seat owes that seat's deal steps, and
       // owes them again whenever the last look found it too early to
       // take one (docs/explanation/live-play.md). The hand's deal may have been
@@ -5109,20 +5080,8 @@ class TableClient {
   /// authority, so a summons that lied would buy nothing.
   Set<PublicKey> _jurorsOf(int hand) => {
         for (final d in _juriesFor(hand)) ...d.event.jurors,
-        ...?_serving[hand],
+        ...?_juror.summonedInto(hand),
       };
-
-  /// The order this client answers appeals in at [hand]: the jury it
-  /// was summoned into most recently by then, or the one in force.
-  List<PublicKey> _orderFor(int hand) {
-    var latest = -1;
-    for (final h in _serving.keys) {
-      if (h <= hand && h > latest) latest = h;
-    }
-    if (latest >= 0) return _serving[latest]!;
-    final inForce = _juriesFor(hand);
-    return inForce.isEmpty ? const [] : inForce.first.event.jurors;
-  }
 
   /// Jurors in force at [hand] heard from lately, or drawn too recently
   /// to have been: within the table's [TableTiming.jurorSilenceMs],
@@ -5135,7 +5094,7 @@ class TableClient {
     // its own heartbeats — so a serving juror left out of here would
     // read as quiet to itself, and hand the seat it is holding back to
     // the escrow half a minute into every hand.
-    if (_serving.containsKey(hand)) live.add(signer.publicKey);
+    if (_juror.summonedInto(hand) != null) live.add(signer.publicKey);
     void consider(Iterable<PublicKey> jurors, int drawn) {
       for (final j in jurors) {
         if (live.contains(j)) continue;
@@ -5152,8 +5111,8 @@ class TableClient {
     // from that same list, and the two have to agree about who is
     // about: a juror named there and missing here is one this side
     // would judge quiet and give a seat up for, its own included.
-    final summoned = _serving[hand];
-    if (summoned != null) consider(summoned, _servingSince[hand] ?? 0);
+    final summoned = _juror.summonedInto(hand);
+    if (summoned != null) consider(summoned, _juror.servingSince(hand) ?? 0);
     return live;
   }
 
@@ -5412,18 +5371,11 @@ class TableClient {
 
   /// Summoned into the jury of [hand] at this table, [jurors] being
   /// the draw, foreman first. The client follows the table from then
-  /// on and answers appeals in its place in the order.
+  /// on and answers appeals in its place in the order (juror_role.dart).
   void serveFor(int hand, List<PublicKey> jurors,
       {String? juryId, bool first = false, List<Map<String, Object?>> draws = const []}) {
     if (mySeat != null) return;
-    _serving[hand] = jurors;
-    _servingSince.putIfAbsent(hand, () => clock.nowMs);
-    _summonedFrom ??= hand;
-    // A summons into the hand's *first* jury is the draw a bot seat's
-    // holder is read from, arriving by the shorter road: kept apart
-    // from the rest so that a redraw, which names the jury as it
-    // stands now, never moves a seat ([botHolders]).
-    if (first && juryId != null) _firstSummons.putIfAbsent(hand, () => (juryId: juryId, jurors: jurors));
+    _juror.summon(hand, jurors, juryId: juryId, first: first);
     // And the hand's draws, each with the witnesses that carried it,
     // taken as a carry would give them. A seat's keys name the draw
     // they were sealed to and are taken only once it has carried here
@@ -5442,41 +5394,10 @@ class TableClient {
   }
 
   /// Whether [hand] is history to this side: it serves as a juror, and
-  /// the hand was over before the first summons that brought it here.
-  ///
-  /// A juror's client is let go of once the table has moved past every
-  /// hand it serves, and a later summons starts a new one, which reads
-  /// the record from the first hand. The key is the same, so the record
-  /// names it as the holder of every bot seat its earlier client held;
-  /// the secrets are not, and never were. Acting on that name, a juror
-  /// drawn again would make fresh keys for a seat its earlier client
-  /// held, take them over the ones on the record — a session keeps its
-  /// own seat's keys and no other — and could verify nothing the table
-  /// shuffled from them.
-  ///
-  /// So an earlier hand is one where this side holds nothing and makes
-  /// no move for any seat: it follows the record there as a player
-  /// does, and says nothing about it ([_emit]). A summons to an earlier
-  /// hand arriving after the first does not move the line back. The
-  /// table was past that hand when it drew the jury that brought this
-  /// client, and the key may have served it in a client before this
-  /// one, heard of from the jury rather than the summons.
-  bool _beforeSummons(int hand) {
-    final from = _summonedFrom;
-    return mySeat == null && from != null && hand < from;
-  }
-
-  /// The first jury of each hand as a summons gave it, where one has
-  /// said so. The event carries the same list and is the authority;
-  /// this is the same thing arriving sooner, and a juror needs it
-  /// sooner: one that does not know it holds a seat cannot make that
-  /// seat's keys, and the hand stops at them.
-  final Map<int, ({String juryId, List<PublicKey> jurors})> _firstSummons = {};
-
-  /// When this side was first summoned to each hand: a summons is the
-  /// jury arriving by another road, and a juror named in it is live
-  /// from then as one named in a jury event would be ([_liveJurors]).
-  final Map<int, int> _servingSince = {};
+  /// the hand was over before the first summons that brought it here
+  /// ([JurorRole.before]). It holds nothing there, makes no move for any
+  /// seat, and says nothing about it ([_emit]).
+  bool _beforeSummons(int hand) => mySeat == null && _juror.before(hand);
 
   /// Whether this client is still a juror of the hand in play or one
   /// to come; false once the table has moved past every hand it served,
@@ -5487,178 +5408,17 @@ class TableClient {
       mySeat == null &&
       !done &&
       _failure == null &&
-      (_serving.keys.any((h) => h >= game.handNumber) || _jurorsOf(game.handNumber).contains(signer.publicKey)) &&
+      (_juror.servesFrom(game.handNumber) || _jurorsOf(game.handNumber).contains(signer.publicKey)) &&
       participants.any((k) => clock.nowMs - (_lastHeard[k] ?? 0) < 5 * 60 * 1000);
 
   /// A juror that stops: no more heartbeats, no more verdicts. The
   /// table notices the silence and draws another.
-  void stopServing() {
-    _serving.clear();
-    _appealSeenAt.clear();
-    _appealHeardAt.clear();
-  }
+  void stopServing() => _juror.stop();
 
   void _onAppeal(TableEvent event) {
     if (mySeat != null && event.seat == mySeat && event.author != signer.publicKey) _insist(event.turn);
     if (mySeat != null || !_isParticipant(event.author)) return;
-    if (!_orderFor(event.hand).contains(signer.publicKey)) return;
-    _appealSeenAt.putIfAbsent(event.turn, () => clock.nowMs);
-    _appealHeardAt[event.turn] = clock.nowMs;
-    _carryingHand = event.hand;
-    _judgeAppeals();
-  }
-
-  /// How long an appeal stands once last heard: three of the people's,
-  /// said every ten seconds while a turn is stuck ([_juryTick]). A
-  /// juror rules by the seat's presence to it, and a juror that has
-  /// lost the table hears every seat fall silent and cannot tell that
-  /// from its own silence. Ruling on an appeal heard minutes before, it
-  /// put the seat out on its own record alone, at a turn the table had
-  /// settled by the seat's own card (`test/juror_cut_off_test.dart`).
-  /// So it carries and rules only while it still hears the appeal; it
-  /// takes it up again as soon as it does.
-  static const appealStandsMs = 30000;
-
-  final Map<TurnId, int> _relayedAt = {};
-
-  void _judgeAppeals() {
-    for (final turn in List.of(_appealSeenAt.keys)) {
-      final race = _races[turn];
-      if (race == null) continue; // still catching up to it
-      if (race.settled) {
-        _appealSeenAt.remove(turn);
-        _appealHeardAt.remove(turn);
-        _relayedAt.remove(turn);
-        continue;
-      }
-      if (clock.nowMs - (_appealHeardAt[turn] ?? _never) >= appealStandsMs) continue;
-      // What this juror holds for the turn, said again every five
-      // seconds while the appeal stands: a table cut in two has its
-      // votes on both sides, and the juror is the one who hears both.
-      final last = _relayedAt[turn];
-      if (last == null || clock.nowMs - last >= 5000) {
-        _relayedAt[turn] = clock.nowMs;
-        // By every path: the two sides of a cut table may read
-        // different relays, and the juror is here to be heard by both.
-        if (race.action != null) transport.broadcast(race.action!.toJson(), everywhere: true);
-        for (final b in race.boots) {
-          transport.broadcast(b.toJson(), everywhere: true);
-        }
-        for (final w in race.witnessEvents) {
-          transport.broadcast(w.toJson(), everywhere: true);
-        }
-      }
-      _judge(turn, race);
-    }
-  }
-
-  /// The rule. A juror rules only when nobody who can still vote, as
-  /// far as it can hear, could carry either side — votes that may yet
-  /// come are carried, not overruled — and then by the seat's presence
-  /// to it: heard and acted, the action stands; silent, the removal.
-  /// Heard and not yet acted is nobody's to decide; the seat's own
-  /// clock runs. The foreman rules first; each juror behind waits five
-  /// seconds more.
-  void _judge(TurnId turn, _Race race) {
-    final order = _orderFor(turn.hand);
-    final place = order.indexOf(signer.publicKey);
-    if (place < 0 || clock.nowMs - _appealSeenAt[turn]! < place * 5000) return;
-    final last = _verdictAt[turn];
-    if (last != null && clock.nowMs - last < 10000) return;
-    final seat = _turnSeat[turn]!;
-    final holder = holders[seat];
-    if (holder is! HumanSeat && (race.boots.isNotEmpty || race.rivals.isEmpty)) {
-      // A held seat's juror's move against the escrow, neither able to
-      // carry — or its move alone, short of a majority because the only
-      // other person at the table has gone silent: ruled as a person's
-      // seat is, by the juror's presence to this one — heard and moved,
-      // the move stands; silent, or out of time on the turn by this
-      // juror's clock, the escrow. Heard and not yet out of time is
-      // nobody's to decide, and with no escrow said there is no other
-      // side to rule for.
-      final of = _participantsAt(turn);
-      final needed = _majority(of);
-      final forAction = race.forAction.intersection(of);
-      final forRemoval = race.forRemoval.intersection(of);
-      final awake = of.difference(forAction).difference(forRemoval).difference(race.forEnd).where((k) => !_silent(k)).length;
-      if (forAction.length + awake >= needed || forRemoval.length + awake >= needed) return;
-      final held = botHolders(turn.hand)[seat];
-      final heard = held != null && _liveJurors(turn.hand).contains(held);
-      final TableEvent winner;
-      final String side;
-      if (heard && race.action != null) {
-        winner = race.action!;
-        side = 'action';
-      } else if (race.boots.isNotEmpty && (!heard || _outOfTime(seat))) {
-        winner = race.boots.first;
-        side = 'removal';
-      } else {
-        return;
-      }
-      _verdictAt[turn] = clock.nowMs;
-      _emit(EventKind.verdict, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'side': side, 'event': winner.toJson()},
-          everywhere: true);
-      return;
-    }
-    if (holder is! HumanSeat) {
-      // A bot seat said two ways, neither able to carry. Either will
-      // do — the same card, by two voices the seat may have — so the
-      // rule is one every juror reaches alone: the lowest id. Nobody is
-      // removed from a bot seat, so there is no other side.
-      final a = race.action;
-      if (a == null || race.rivals.isEmpty || !_rivalsDeadlocked(race, _participantsAt(turn))) return;
-      final winner = [a, ...race.rivals.values].reduce((x, y) => x.id.compareTo(y.id) <= 0 ? x : y);
-      _verdictAt[turn] = clock.nowMs;
-      _emit(EventKind.verdict, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'side': 'action', 'event': winner.toJson()},
-          everywhere: true);
-      return;
-    }
-    final of = _participantsAt(turn);
-    final needed = _majority(of);
-    final forAction = race.forAction.intersection(of);
-    final forRemoval = race.forRemoval.intersection(of);
-    // Whoever has backed this person's leave has given their voice on
-    // the seat's way out, and will back neither its move nor its boot
-    // ([_mayBackBoot]); and a person whose own leave is heard here is
-    // not coming back to move, however long their device goes on
-    // being heard.
-    final leaving = _leaveBackers[holder.key] ?? const <PublicKey>{};
-    final left = _leaves.values.any((c) => c.event.author == holder.key);
-    final awake = of
-        .difference(forAction)
-        .difference(forRemoval)
-        .difference(race.forEnd)
-        .difference(leaving)
-        .where((k) => !_silent(k) && !(left && k == holder.key))
-        .toSet();
-    final actionPossible = forAction.length + awake.length >= needed;
-    final removalPossible = forRemoval.length + awake.difference({holder.key}).length >= needed;
-    final said = _waitSaidAt[turn];
-    if (said == null || clock.nowMs - said >= 10000) {
-      _waitSaidAt[turn] = clock.nowMs;
-      _trace('appeal at $turn: ${forAction.length} for, ${forRemoval.length} against, of ${of.length}; '
-          'awake ${awake.map((k) => '${k.substring(0, 4)} ${clock.nowMs - (_lastHeard[k] ?? clock.nowMs)} ms ago')}; '
-          'action ${race.action != null}; seat ${_silent(holder.key) ? 'silent' : 'heard'}');
-    }
-    if (actionPossible || removalPossible) return;
-    TableEvent winner;
-    String side;
-    if (!_silent(holder.key) && !left) {
-      if (race.action == null) return;
-      winner = race.action!;
-      side = 'action';
-    } else {
-      winner = race.boots.isNotEmpty
-          ? race.boots.first
-          : TableEvent.sign(signer, table: spec.id, kind: EventKind.absent, body: {
-              'hand': turn.hand,
-              'turn': turn.index,
-              'seat': seat,
-            });
-      side = 'removal';
-    }
-    _verdictAt[turn] = clock.nowMs;
-    _emit(EventKind.verdict, {'hand': turn.hand, 'turn': turn.index, 'seat': seat, 'side': side, 'event': winner.toJson()}, everywhere: true);
+    _juror.heardAppeal(event);
   }
 
   /// A verdict, by a juror of the hand as this peer knows the jury,
@@ -5680,7 +5440,7 @@ class TableClient {
     final turn = event.turn;
     final where = _compare(turn);
     if (where > 0) return _defer(event);
-    if (!_jurorsOf(turn.hand).contains(event.author) && !_orderFor(turn.hand).contains(event.author)) {
+    if (!_jurorsOf(turn.hand).contains(event.author) && !_juror.orderFor(turn.hand).contains(event.author)) {
       // And one by a juror not yet known here, at a turn this peer has
       // reached, is not taken as seen: the draw that brought the juror
       // in may still be on its way, and a copy after it is read afresh.
@@ -5831,8 +5591,10 @@ class _Leave {
   bool carried = false;
 }
 
-class _Race {
+class _Race implements TurnVotes {
+  @override
   TableEvent? action;
+  @override
   final List<TableEvent> boots = [];
 
   /// How many times this peer has said the race's evidence again, and
@@ -5849,8 +5611,11 @@ class _Race {
 
   /// Every witness received, so the whole decision can be handed to a
   /// peer that missed some of it.
+  @override
   final List<TableEvent> witnessEvents = [];
+  @override
   final Set<PublicKey> forAction = {};
+  @override
   final Set<PublicKey> forRemoval = {};
 
   /// Claims that the game ends here, and who backs one: the third way a
@@ -5859,7 +5624,9 @@ class _Race {
   /// apart from the move and the removal, and a majority of them ends
   /// the game at the turn, on every record.
   final List<TableEvent> ends = [];
+  @override
   final Set<PublicKey> forEnd = {};
+  @override
   bool settled = false;
   bool split = false;
 
@@ -5869,6 +5636,7 @@ class _Race {
   /// seat can have two — its juror, and a custodian the table gave it
   /// to — each saying the same card for it, and the table has to end
   /// up on one of them.
+  @override
   final Map<String, TableEvent> rivals = {};
   final Map<String, Set<PublicKey>> forRival = {};
 
@@ -5884,4 +5652,72 @@ class _Race {
       ..clear()
       ..addAll(forRival.remove(id) ?? const {});
   }
+}
+
+/// The table as its juror reads it (juror_role.dart): what is the
+/// table's stays here, and the juror asks.
+class _JurorView implements JurorTable {
+  _JurorView(this._c);
+
+  final TableClient _c;
+
+  @override
+  int get handNumber => _c.game.handNumber;
+
+  @override
+  TurnVotes? votesAt(TurnId turn) => _c._races[turn];
+
+  @override
+  int seatAt(TurnId turn) => _c._turnSeat[turn]!;
+
+  @override
+  SeatHolder holderOf(int seat) => _c.holders[seat];
+
+  @override
+  List<PublicKey> juryInForce(int hand) {
+    final inForce = _c._juriesFor(hand);
+    return inForce.isEmpty ? const [] : inForce.first.event.jurors;
+  }
+
+  @override
+  PublicKey? botHolder(int hand, int seat) => _c.botHolders(hand)[seat];
+
+  @override
+  Set<PublicKey> liveJurors(int hand) => _c._liveJurors(hand);
+
+  @override
+  bool jurorRecent(PublicKey key) => _c._jurorRecent(key);
+
+  @override
+  Set<PublicKey> participantsAt(TurnId turn) => _c._participantsAt(turn);
+
+  @override
+  int majority(Set<PublicKey> of) => TableClient._majority(of);
+
+  @override
+  bool silent(PublicKey key) => _c._silent(key);
+
+  @override
+  int? lastHeard(PublicKey key) => _c._lastHeard[key];
+
+  @override
+  Set<PublicKey> leaveBackersOf(PublicKey key) => _c._leaveBackers[key] ?? const <PublicKey>{};
+
+  @override
+  bool hasLeft(PublicKey key) => _c._leaves.values.any((c) => c.event.author == key);
+
+  @override
+  bool outOfTime(int seat) => _c._outOfTime(seat);
+
+  @override
+  bool rivalsDeadlocked(TurnId turn, Set<PublicKey> of) => _c._rivalsDeadlocked(_c._races[turn]!, of);
+
+  @override
+  void emit(EventKind kind, Map<String, Object?> body, {bool everywhere = false}) => _c._emit(kind, body, everywhere: everywhere);
+
+  @override
+  void broadcast(Map<String, Object?> json, {bool everywhere = false}) => _c.transport.broadcast(json, everywhere: everywhere);
+
+  @override
+  void trace(String line) => _c._trace(line);
 }
