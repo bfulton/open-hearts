@@ -2,7 +2,7 @@
 /// once at startup: the wasm next to the app on the web, the cdylib
 /// over FFI elsewhere. Null when it could not be loaded, in which case
 /// this device plays no live table at all — every live table is
-/// sealed — and says so at the door (home_page.dart, net/room.dart).
+/// sealed — and says so at the door (live/lobby.dart, net/room.dart).
 ///
 /// With it, the worker that makes the deal's slow calls, so that a
 /// shuffle or its check does not hold the screen still while it is made:

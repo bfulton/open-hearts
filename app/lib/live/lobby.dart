@@ -1,0 +1,746 @@
+/// The way from the front door to a live table (home_page.dart): the
+/// relays this device connects to, the pool it waits in or the room it
+/// sits in, and the table they open — and, from the moment a relay
+/// answers, this device online to everyone and a juror when drawn
+/// (net/duty.dart, docs/explanation/live-play.md).
+///
+/// The front door shows it and asks it: who this device is, the game it
+/// asks for, a name when it has none, the words to say things in, and
+/// the page a table opens on are the door's. What is said here is said
+/// in the door's words, as it is said.
+library;
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:table/table.dart';
+
+import '../avatar.dart';
+import '../crypto/deal.dart';
+import '../entitlement.dart';
+import '../game_options.dart';
+import '../identity.dart';
+import '../l10n/l10n.dart';
+import '../net/address.dart';
+import '../net/duty.dart';
+import '../net/game_records.dart';
+import '../net/household.dart';
+import '../net/in_use.dart';
+import '../net/mesh_transport.dart';
+import '../net/network.dart';
+import '../net/relays.dart';
+import '../net/remote_config.dart';
+import '../net/room.dart';
+import '../net/seat_store.dart';
+import '../net/standing.dart';
+import '../net/turn.dart';
+import '../pace_store.dart';
+import '../pictures.dart';
+import 'live_controller.dart';
+
+/// Whether live play is open on this device: whether it holds a
+/// licence the service signed and the date on it has not passed
+/// (entitlement.dart, docs/explanation/service.md) — and it has not stepped back
+/// for another device of its account (net/in_use.dart). Solo play
+/// never asks.
+bool get liveOpen => Entitlement.current.live && !InUse.current.elsewhere;
+
+/// Whether the operator has shut live play's doors for everyone, for
+/// now: the remote config's kill switch (net/remote_config.dart).
+bool get livePaused => !RemoteSettings.current.config.live;
+
+/// What the relays say back — a refusal, a notice, a drop — goes to
+/// the console, where a person debugging a table can read it. Which
+/// relays is the build's business (net/relays.dart), not the lobby's.
+void _relayLog(String line) => debugPrint('relay: $line');
+
+/// In a build being driven (net/address.dart) the table's every
+/// transition and the mesh's every channel change go to the console too.
+final _debugging = driven(Uri.base);
+final _dutyLog = _debugging ? (String l) => debugPrint('duty: $l') : null;
+
+/// How often a seated device notes that it is still at its table
+/// (net/seat_store.dart, here): often enough that the note is never far
+/// behind against SeatStore.comeBackWithin, rarely enough that a busy
+/// table is not a write to the device's storage at every event.
+const _seatSavedEvery = Duration(seconds: 10);
+
+/// The two ways into a live game, while one of them is being opened.
+enum Opening { live, friends }
+
+/// When a slow relay is worth a word, and when there is nothing left
+/// to wait for.
+/// (Remote config, `waits`: the build's are eight seconds and forty.)
+Duration get sayItIsSlow => waits.relaySlow;
+Duration get stopWaiting => waits.relayGiveUp;
+
+/// Waits for a relay to answer, and calls [slow] once if it is taking
+/// its time.
+///
+/// How long a relay takes is not the device's to decide — a cold
+/// network, a phone waking up, a crowd on one relay — so the first
+/// deadline only changes what the screen says. The sockets go on
+/// trying behind it and a relay that answers late still counts, which
+/// is the whole point: a device that gave up at eight seconds would sit
+/// on "no relay answered" with an open connection in its hand. The
+/// second deadline is the end of it, and throws [TimeoutException].
+Future<void> waitForRelay(
+  Future<void> ready, {
+  required void Function() slow,
+  Duration? sayIt,
+  Duration? stopAt,
+}) {
+  sayIt ??= sayItIsSlow;
+  stopAt ??= stopWaiting;
+  final then = stopAt - sayIt;
+  return ready.timeout(sayIt, onTimeout: () {
+    slow();
+    return ready.timeout(then);
+  });
+}
+
+class Lobby extends ChangeNotifier {
+  Lobby({
+    required this.who,
+    required this.options,
+    required this.named,
+    required this.words,
+    required this.seat,
+    required this.addressChanged,
+    required this.openRoom,
+  });
+
+  /// Who this device is to everyone else, as the front door has it now.
+  final ({String name, Avatar avatar}) Function() who;
+
+  /// The game this device is asking for, with the score a browser test
+  /// asks for in place of the device's own (net/address.dart, `target`).
+  final GameOptions Function() options;
+
+  /// The name the others will see, asked for if this device has none:
+  /// false when the person says not now.
+  final Future<bool> Function() named;
+
+  /// The front door's words, as it has them now.
+  final AppLocalizations Function() words;
+
+  /// Opens a table's [LiveController] over the front door; true when
+  /// the end of game's Play again was pressed.
+  final Future<bool?> Function(LiveController controller) seat;
+
+  /// The room this device is in changed in a way the address says.
+  final VoidCallback addressChanged;
+
+  /// The room to open onto, from a shared link: the one in the address
+  /// now, which is the room this device is in while it is in one, and
+  /// none once it has left it.
+  final String? Function() openRoom;
+
+  final List<Uri> _relays = appRelays();
+  Signer? _signer;
+  Standing? _standing;
+
+  /// Who this device is on the relays, once it has asked.
+  Signer? get signer => _signer;
+
+  /// This device's ratings, once the relays that answered have said.
+  Standing? get standing => _standing;
+
+  /// How long this device takes over a card, as it has measured itself
+  /// (pace_store.dart). Nothing until it has played enough to know.
+  Pace pace = Pace.fresh;
+
+  /// What this device does with the others' pictures: the list of
+  /// people whose pictures it does not show, and the check it runs on
+  /// the rest (pictures.dart). Read once, carried to the table.
+  Pictures? pictures;
+
+  /// Whether the table now open has already had its cards folded into
+  /// the pace: a table says it is done more than once.
+  bool _paced = false;
+
+  String? _error;
+
+  /// What went wrong the last time, as the front door says it; null
+  /// once a way in is being opened again.
+  String? get error => _error;
+
+  /// Says [why] at the door, where what went wrong is said.
+  void say(String why) {
+    _error = why;
+    _changed();
+  }
+
+  /// Which way in is being opened, while it is being opened. Both are
+  /// a relay connection away and both take a moment, and a spinner on
+  /// the button that was not pressed is the door looking confused.
+  Opening? _opening;
+  Opening? get opening => _opening;
+  bool get busy => _opening != null;
+
+  /// A relay is taking its time and the device is still waiting. Not an
+  /// error — there is nothing to do about it but wait — so it is said
+  /// quietly and it goes as soon as one answers.
+  bool _slow = false;
+  bool get slow => _slow;
+
+  Room? _room;
+  WaitingRoom? _queue;
+  Room? get room => _room;
+  WaitingRoom? get queue => _queue;
+  RelayTransport? _transport;
+  Timer? _waitClock;
+
+  /// What the relays said when every one of them refused this device's
+  /// latest event, while it waits or sits in a room; null while one
+  /// takes them.
+  String? _relayNote;
+  StreamSubscription<String?>? _refusalSub;
+
+  /// Why a wait or a room has gone quiet, when that is known: every
+  /// relay refused this device, or the device says it has no network.
+  /// Unsaid, a room reads as though the others had left it — they drop
+  /// off the list once they have not been heard for a few seconds — and
+  /// a wait as one with nobody else in it. Gone again once the network
+  /// is back.
+  String? get cutOff => _relayNote ?? (deviceOffline() ? words().noRelayAnswered : null);
+
+  /// The ICE servers for this device's next table, fetched once the
+  /// relays answer (turn.dart); none until then, and none at all on
+  /// localhost.
+  List<Map<String, Object?>>? _iceServers;
+
+  /// Since when this device has been listening on the relays for who
+  /// is online; null until they answer. The count is not shown for the
+  /// first announcement period after, since the announcements are
+  /// ephemeral and nobody is heard until they say so again.
+  int? _listeningSinceMs;
+  Timer? _onlineClock;
+
+  StreamSubscription<TableSpec>? _queueSub;
+
+  /// The seat this device is playing in (net/seat_store.dart): kept as
+  /// the game goes, so that a reload comes back to it.
+  SeatStore? _seats;
+
+  bool _disposed = false;
+
+  void _changed() {
+    if (!_disposed) notifyListeners();
+  }
+
+  /// This device on duty (net/duty.dart): online to everyone, and a
+  /// juror when drawn. The one it is already on, after the first.
+  Duty _duty(Signer signer) => Duty.on(_relays, signer, log: _dutyLog, crypto: dealCrypto, dealWorker: dealWorker);
+
+  /// Back from a reload in the middle of a game: straight back into the
+  /// seat, if it can still be this device's. The table may have given it
+  /// to a bot meanwhile, and then the table says so once it has caught
+  /// this device up (live/live_page.dart).
+  Future<void> _comeBack(Signer signer) async {
+    final seats = _seats = await SeatStore.open();
+    final kept = seats.load();
+    if (kept == null || _disposed) return;
+    if (kept.spec.seatOf(signer.publicKey) == null || (kept.spec.sealed && !dealReady)) return seats.clear();
+    _toTable(kept.spec, kept.names, kept.avatars, journal: kept.journal);
+  }
+
+  /// Online from the front door, not only from a table: this device is
+  /// a juror to draw on as soon as the app is open, and it sees who
+  /// else is about.
+  ///
+  /// First, this device takes its account up (net/in_use.dart): the
+  /// relay carries only the account's device in use, and one at a time.
+  /// Asked to wait — the account is in a game on another device — it
+  /// waits for the person's word, on the screen that asks for it.
+  Future<void> goOnline() async {
+    final signer = await Identity.signer();
+    if (_disposed) return;
+    _signer = signer;
+    _changed();
+    if (InUse.current.standing != Use.here) await InUse.current.open(signer);
+    if (_disposed || InUse.current.elsewhere || Duty.current != null) return;
+    unawaited(_comeBack(signer));
+    unawaited(_duty(signer).presence.ready.then((_) {
+      if (_disposed) return;
+      _listeningSinceMs = DateTime.now().millisecondsSinceEpoch;
+      _changed();
+    }));
+    _onlineClock?.cancel();
+    _onlineClock = Timer.periodic(const Duration(seconds: 1), (_) => _changed());
+  }
+
+  /// Another device of the account took it up (net/in_use.dart): nothing
+  /// live is left open here. The pool or the room goes, and the duty and
+  /// any table go with their own listeners (net/duty.dart,
+  /// live/live_page.dart).
+  void stepBack() {
+    _closeLobby();
+    _listeningSinceMs = null;
+    _onlineClock?.cancel();
+    _onlineClock = null;
+    _changed();
+  }
+
+  /// How many devices are online, this one included, once this device
+  /// has listened long enough to have heard everyone; null before.
+  /// This one is counted whether or not it says it is here: one that
+  /// cannot deal says nothing of itself (net/duty.dart), and the
+  /// others around it are still the others.
+  ///
+  /// And null while the device says it has no network: the beats it
+  /// heard before are not who is here now, and it hears nobody new.
+  int? get online {
+    final since = _listeningSinceMs;
+    final duty = Duty.current;
+    if (since == null || duty == null || deviceOffline()) return null;
+    if (DateTime.now().millisecondsSinceEpoch - since < duty.presence.everyMs + 1500) return null;
+    final others = duty.presence.online(withinMs: 15000).difference({duty.presence.signer.publicKey});
+    return others.length + 1;
+  }
+
+  /// Ratings, from the relays that just answered — never from an
+  /// address nobody has confirmed.
+  Future<void> _loadStanding(List<Uri> relays, Signer signer) async {
+    try {
+      final standing = await Standing.load(relays, signer, account: Entitlement.current.licence?.account ?? signer.publicKey);
+      if (_disposed) return;
+      _standing = standing;
+      _changed();
+    } catch (_) {
+      // The rating shows next time.
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _closeLobby(address: false);
+    _onlineClock?.cancel();
+    _refusalSub?.cancel();
+    super.dispose();
+  }
+
+  /// Out of the pool or the room, back to the front door.
+  void leave() {
+    _closeLobby();
+    _changed();
+  }
+
+  /// Everything a waiting room or a room needs while it is open, shut:
+  /// the pool, the room, and the transport they share — a matched or
+  /// started table opens its own.
+  void _closeLobby({bool address = true}) {
+    _queueSub?.cancel();
+    _queueSub = null;
+    _queue?.close();
+    _queue = null;
+    _waitClock?.cancel();
+    _dropRoom(address: address);
+    _transport?.close();
+    _transport = null;
+  }
+
+  /// Lets go of the room. Every way out of one — started, refused,
+  /// left — is an answer to the room's own notification, and a
+  /// [ChangeNotifier] may not be disposed inside one, so the disposal
+  /// waits for the notification to finish.
+  void _dropRoom({bool address = true}) {
+    final room = _room;
+    if (room == null) return;
+    room.removeListener(_onRoom);
+    scheduleMicrotask(room.dispose);
+    _room = null;
+    // Out of the room, so out of the address: a refresh from here is
+    // the front door, not a table that has started or emptied. Not when
+    // a table is opening over the door, which says where it is; the
+    // address is the door's again when it is back on top.
+    if (address) addressChanged();
+  }
+
+  /// Connects to the relays on [tag], or explains why not. Nothing
+  /// goes near a relay without a name on it.
+  Future<RelayTransport?> _connect(String tag, Opening opening) async {
+    // A device that says it has no network will not find a relay by
+    // waiting forty seconds for one (net/network.dart): it is told now,
+    // before a name is asked for or anything is opened.
+    if (deviceOffline()) {
+      _error = words().noRelayAnswered;
+      _changed();
+      return null;
+    }
+    if (!await named() || _disposed) return null;
+    final relays = _relays;
+    _opening = opening;
+    _slow = false;
+    _error = null;
+    _changed();
+    RelayTransport? transport;
+    try {
+      final signer = _signer ??= await Identity.signer();
+      // The relay carries the account's device in use and no other: this
+      // one, before anything is opened — unless the service has just
+      // not answered, and then the relay says what it will.
+      if (InUse.current.standing != Use.here && InUse.current.worthAsking) await InUse.current.open(signer);
+      if (_disposed || InUse.current.elsewhere) {
+        _opening = null;
+        _changed();
+        return null;
+      }
+      transport = RelayTransport(relays: relays, signer: signer, table: tag, log: _relayLog, pinned: pinnedRelays(relays));
+      unawaited(_refusalSub?.cancel());
+      _refusalSub = transport.refusals.listen((r) {
+        if (_disposed) return;
+        _relayNote = r == null ? null : words().noRelayTakesEvents(r);
+        _changed();
+      });
+      await waitForRelay(transport.ready, slow: () {
+        if (_disposed) return;
+        _slow = true;
+        _changed();
+      });
+      if (_disposed) {
+        transport.close();
+        return null;
+      }
+      // A relay answered: from here on this device is online to
+      // everyone, and a juror when drawn.
+      _duty(signer);
+      _iceServers ??= const [];
+      unawaited(iceServersFor(signer).then((servers) {
+        _iceServers = servers;
+        // The same credentials serve this device's juror duty, whose
+        // channels are made when a table summons it (net/duty.dart).
+        Duty.ice = servers;
+      }));
+      if (_standing == null) await _loadStanding(relays, signer);
+      if (_disposed) {
+        transport.close();
+        return null;
+      }
+      _transport = transport;
+      _opening = null;
+      _slow = false;
+      _changed();
+      return transport;
+    } on TimeoutException {
+      // Nothing the player can change but the connection: the relays
+      // are the build's.
+      _fell(transport, (l10n) => l10n.noRelayAnswered);
+    } catch (e) {
+      _fell(transport, (l10n) => l10n.couldNotConnect('$e'));
+    }
+    return null;
+  }
+
+  /// The connection did not come off: the sockets go, and the door
+  /// says why rather than sitting on a spinner.
+  void _fell(RelayTransport? transport, String Function(AppLocalizations l10n) why) {
+    _refusalSub?.cancel();
+    _refusalSub = null;
+    transport?.close();
+    if (_disposed) return;
+    _opening = null;
+    _slow = false;
+    _error = why(words());
+    _changed();
+  }
+
+  /// Every live table is sealed, and a device that cannot run the deal
+  /// does not sit down (docs/explanation/fair-deal.md). It says so
+  /// at the door, rather than connecting to find out; true when it has.
+  bool _withoutDeal() {
+    if (dealReady) return false;
+    _error = Room.noDeal(words());
+    _changed();
+    return true;
+  }
+
+  /// Into the pool the options ask for, and wait to be seated — by
+  /// whoever among the waiting has the lowest key, this device
+  /// included. Everyone in a pool wants the same game, so the score it
+  /// plays to is part of the pool's own name.
+  Future<void> play() async {
+    if (livePaused || _withoutDeal()) return;
+    final options = this.options();
+    final transport = await _connect(poolTag(options.pool, target: options.target), Opening.live);
+    if (transport == null) return;
+    final ledger = _standing?.ledger ?? Ledger();
+    final me = who();
+    final queue = WaitingRoom(
+      relay: transport,
+      pool: options.pool,
+      target: options.target,
+      name: me.name,
+      rating: (_standing?.mine ?? Rating.fresh).shown,
+      // What this device has measured of its own play, so it is seated
+      // with people who play at about its speed (pace_store.dart).
+      pace: pace.stated,
+      botRating: Standing.botPicker(ledger),
+      // Whose device this is, by the service's word: a seating names
+      // every seat's account with it, and every seat checks them all.
+      licence: Entitlement.current.licence,
+      sealed: true,
+      // The tables this device hosts keep its remote config's clocks.
+      timing: RemoteSettings.current.config.table,
+      avatar: me.avatar.isDefault ? null : me.avatar.toJson(withPicture: false),
+      picture: me.avatar.picture == null ? null : base64Encode(me.avatar.picture!),
+    );
+    _queueSub = queue.seated.listen((spec) {
+      if (_disposed) return;
+      // The seating carried each seat's icon and colour; pictures came
+      // on their own, by key.
+      final avatars = <int, Avatar>{};
+      for (var s = 0; s < spec.seats.length; s++) {
+        final h = spec.seats[s];
+        if (h is! HumanSeat) continue;
+        if (h.key == _signer!.publicKey) {
+          avatars[s] = who().avatar;
+          continue;
+        }
+        final chosen = Avatar.fromJson(queue.seatAvatars[s]);
+        final picture = queue.pictures[h.key];
+        avatars[s] = picture == null ? chosen : chosen.copyWith(picture: Avatar.fromJson({'picture': picture}).picture);
+      }
+      _toTable(spec, queue.seatNames, avatars, again: play);
+    });
+    // The longest this queue has been willing to wait past the pool's
+    // own wait, kept once chosen: taking bots after waiting for a person
+    // comes back to the next round, not to a deadline already passed.
+    var patience = 0;
+    _waitClock = Timer.periodic(const Duration(seconds: 1), (_) {
+      // Bots take every seat still empty at ten seconds, so a device
+      // the relays can hear is seated a round or two after that. One
+      // still waiting at the far deadline is one nobody hears — it
+      // went offline, or its relays did — and even the seating it
+      // hosts itself has to come back to it off a relay: the spinner
+      // would turn for ever. So back to the door, saying why.
+      // Counted from when bots were due, for one who chose to wait
+      // for a person.
+      patience = max(patience, queue.botsAfterMs - queue.poolBotsAfterMs);
+      if (DateTime.now().millisecondsSinceEpoch - queue.since >= stopWaiting.inMilliseconds + patience) {
+        _closeLobby();
+        _error = words().noRelayAnswered;
+        _changed();
+        return;
+      }
+      _changed();
+    });
+    _queue = queue;
+    _changed();
+  }
+
+  /// Waits up to five minutes for a person rather than bots at ten
+  /// seconds, and tells the service, so the people who run the game
+  /// hear someone is waiting (service/functions/alerts.mjs).
+  void waitForPerson() {
+    final queue = _queue;
+    final signer = _signer;
+    // Offered only at an empty pool (home_page.dart, _WaitingView), and
+    // only then are we told (the privacy policy): somebody may have
+    // arrived since.
+    if (queue == null || signer == null || queue.present.length > 1) return;
+    queue.waitForPerson();
+    _changed();
+    unawaited(askHandler('waiting', signer, {'pool': queue.pool, 'target': queue.target}, null, what: '${queue.pool} ${queue.target}'));
+  }
+
+  /// The seated table has its own tag on the relays: a fresh transport
+  /// there, WebRTC over it, and the live page over the front door — so
+  /// leaving the table comes back there.
+  ///
+  /// [again] begins another game the way this one began, for the end
+  /// of game's Play again.
+  void _toTable(TableSpec spec, Map<int, String> seatNames, Map<int, Avatar> seatAvatars, {TableJournal? journal, VoidCallback? again}) {
+    final signer = _signer!;
+    final relays = _relays;
+    final relay = RelayTransport(relays: relays, signer: signer, table: spec.id, log: _relayLog, pinned: pinnedRelays(relays));
+    final peers = [for (final h in spec.seats) if (h is HumanSeat) h.key];
+    final ledger = _standing?.ledger ?? Ledger();
+    final controller = LiveController(
+      spec: spec,
+      seatNames: seatNames,
+      seatAvatars: seatAvatars,
+      signer: signer,
+      transport: MeshTransport(
+        relay: relay,
+        peers: peers,
+        iceServers: _iceServers ?? const [],
+        log: _debugging ? (l) => debugPrint('mesh: $l') : null,
+      ),
+      relay: relay,
+      // The players' reactions ride the table's own tag, beside its
+      // events and outside them (packages/table, reactions.dart).
+      reactions: relay,
+      presence: _duty(signer).presence,
+      crypto: dealCrypto,
+      dealWorker: dealWorker,
+      ratingOf: spec.rated ? (id) => ledger.of(id) : null,
+      onResult: (result) {
+        // The fold that turns results into ratings is arithmetic this
+        // device does itself, so the game's own sheet can say what it
+        // did to your rating without waiting to hear the result back
+        // off a relay — and the door behind the table has the new
+        // rating on it when you get there.
+        ledger.apply(result);
+        unawaited(Standing.publish(relays, signer, result).then((taken) {
+          if (!taken) debugPrint('result: no relay took it, after every try');
+        }));
+      },
+      pictures: pictures,
+      canPlayAgain: again != null,
+      journal: _seats?.keep(spec, seatNames, seatAvatars, journal: journal),
+    );
+    if (_debugging) controller.client.log = (l) => debugPrint('table: $l');
+    // Kept for coming back to while the seat is this device's; let go
+    // once the game is over or the seat is not (net/seat_store.dart).
+    var hereAt = 0;
+    controller.addListener(() {
+      final seats = _seats;
+      if (seats == null) return;
+      if (controller.client.done || (controller.client.mySeat != null && !controller.client.amSeated)) {
+        seats.clear();
+        // Over, or out of it: the account no longer sits at this table,
+        // and the service is told now rather than once the page is left,
+        // so the game — kept now — can be looked at from its end
+        // (net/game_records.dart) while the page still shows it.
+        if (InUse.current.seatedTable == spec.id && !InUse.current.elsewhere) InUse.current.seatedAt(null);
+        return;
+      }
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - hereAt < _seatSavedEvery.inMilliseconds) return;
+      hereAt = now;
+      seats.here();
+    });
+    // Anyone with the table's address can watch it being played: one
+    // seated player's device answers them with what everyone at the
+    // table sees (packages/table, watch.dart).
+    final said = words();
+    final watch = WatchBroadcast(
+      heard: relay.watch,
+      say: relay.sayWatch,
+      view: () => WatchedTable.of(controller.client, [
+        for (final (s, holder) in controller.client.holders.indexed)
+          switch (holder) {
+            BotSeat(:final persona) => persona.name,
+            HumanSeat() => seatNames[s] ?? said.seatNumber(s + 1),
+          },
+      ]),
+      answering: () => WatchBroadcast.answers(controller.client, signer.publicKey),
+      // Nobody of an account seated here watches it: their own game.
+      seated: spec.accounts,
+    );
+    controller.addListener(watch.changed);
+    // What this device measured of its own play goes on the device and
+    // nowhere else (pace_store.dart). Folded when the table is done
+    // with, since a game left early is still cards this player took
+    // their own time over.
+    controller.addListener(() {
+      if (!controller.client.done || _paced) return;
+      _paced = true;
+      // The game, kept for anyone to look at afterwards by its address
+      // (net/game_records.dart): every player's device sends it, and the
+      // first is kept.
+      unawaited(keepGame(signer, GameRecord.of(controller.client, names: seatNames)).then((kept) {
+        if (!kept) debugPrint('record: not kept');
+      }));
+      unawaited(PaceStore.fold(controller.client.myCardMs).then((folded) {
+        if (_disposed) return;
+        pace = folded;
+        _changed();
+      }));
+    });
+    _paced = false;
+    _closeLobby(address: false);
+    _changed();
+    // Online *and* at a table, which another table's draw prefers:
+    // somebody mid-game has a reason to still be here in a minute
+    // (docs/explanation/live-play.md). Cleared on the way back
+    // to the front door, however the table ended. And said to the
+    // service: another device of the account asks before taking the
+    // account from a game (net/in_use.dart).
+    Duty.seated = true;
+    InUse.current.seatedAt(spec.id);
+    unawaited(seat(controller).whenComplete(() {
+      Duty.seated = false;
+      if (!InUse.current.elsewhere) InUse.current.seatedAt(null);
+      watch.close();
+      // Off the table by choice: nothing to come back to.
+      _seats?.clear();
+    }).then((playAgain) {
+      if (playAgain == true && !_disposed) again?.call();
+    }));
+  }
+
+  /// Into the room this device arrived at by a link, or a new one of
+  /// its own: nobody types a code, so a room is either started here or
+  /// opened from a link someone sent. Whoever is there is the table,
+  /// and the first to arrive is nobody special. [same] is the room a
+  /// game just ended in, entered again for another.
+  Future<void> enter({String? same}) async {
+    if (livePaused || _withoutDeal()) return;
+    final code = same ?? openRoom() ?? Room.newCode();
+    final transport = await _connect(code, Opening.friends);
+    if (transport == null) return;
+    try {
+      final me = who();
+      final room = Room.enter(
+        relay: transport,
+        code: code,
+        name: me.name,
+        avatar: me.avatar,
+        target: options().target,
+        timing: RemoteSettings.current.config.table,
+        licence: Entitlement.current.licence,
+        // Ten seconds, unless the address asks for longer and is
+        // allowed to (net/address.dart).
+        startAfter: roomWait(Uri.base, standard: waits.roomStart),
+      );
+      room.addListener(_onRoom);
+      _room = room;
+      _changed();
+      // The room is its link, and the link is in the address bar while
+      // this device is in it (net/address.dart).
+      addressChanged();
+    } on TimeoutException {
+      if (_disposed) return;
+      _opening = null;
+      _error = words().noRelayAnswered;
+      _changed();
+    } catch (e) {
+      if (_disposed) return;
+      _opening = null;
+      _error = words().couldNotConnect('$e');
+      _changed();
+    }
+  }
+
+  void _onRoom() {
+    final room = _room;
+    if (room == null || _disposed) return;
+    final spec = room.spec;
+    if (room.refusal != null) {
+      _dropRoom();
+      _error = Room.said(room.refusal!, words());
+      _changed();
+      return;
+    }
+    if (spec != null) {
+      if (!room.seated) {
+        // A table under this code started without a seat for this
+        // device: back to the front door, where the line can be read.
+        _dropRoom();
+        _error = words().tableFilledWithoutYou;
+        _changed();
+        return;
+      }
+      room.removeListener(_onRoom);
+      final code = room.code;
+      _toTable(spec, room.seatNames, room.seatAvatars, again: () => enter(same: code));
+      return;
+    }
+    _changed();
+  }
+}

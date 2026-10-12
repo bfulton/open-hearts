@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/live/lobby.dart';
 import 'package:open_hearts/net/buying.dart' show priceShown;
 import 'package:open_hearts/net/licence.dart';
 import 'package:open_hearts/net/relays.dart';

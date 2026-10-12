@@ -73,7 +73,7 @@ void main() {
   test('a handler that never answers is given its few seconds, and no servers after', () async {
     // It takes the request and says nothing: a worker that has hung. The
     // credentials are fetched beside the relays rather than in front of
-    // them (home_page.dart), so nothing on the screen waits on this.
+    // them (live/lobby.dart), so nothing on the screen waits on this.
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((_) {});
     try {

@@ -190,7 +190,7 @@ class _ReviewPageState extends State<ReviewPage> {
 
   Future<void> _check() async {
     // Opened as the game ends, the copy may still be on its way from a
-    // player's device (home_page.dart): asked again for a little while
+    // player's device (live/lobby.dart): asked again for a little while
     // (waits.recordSoon) before there is said to be none.
     KeptGame? record;
     try {
