@@ -168,6 +168,12 @@ class AppWaits {
     var giveUp = take('relayGiveUpMs', s.relayGiveUp);
     // Saying it is slow comes before giving up, or it is never said.
     if (slow >= giveUp) (slow, giveUp) = (s.relaySlow, s.relayGiveUp);
+    var again = take('recordAgainMs', s.recordAgain);
+    var recordFor = take('recordForMs', s.recordFor);
+    var soon = take('recordSoonMs', s.recordSoon);
+    // Asking for a record again comes within both spans it is asked
+    // over, or none of the three is the operator's.
+    if (again > recordFor || again > soon) (again, recordFor, soon) = (s.recordAgain, s.recordFor, s.recordSoon);
     return AppWaits(
       licence: take('licenceMs', s.licence),
       household: take('householdMs', s.household),
@@ -182,9 +188,9 @@ class AppWaits {
       roomStart: take('roomStartMs', s.roomStart),
       meshAnswer: take('meshAnswerMs', s.meshAnswer),
       record: take('recordMs', s.record),
-      recordAgain: take('recordAgainMs', s.recordAgain),
-      recordFor: take('recordForMs', s.recordFor),
-      recordSoon: take('recordSoonMs', s.recordSoon),
+      recordAgain: again,
+      recordFor: recordFor,
+      recordSoon: soon,
     );
   }
 

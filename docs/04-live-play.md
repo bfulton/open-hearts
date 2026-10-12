@@ -47,9 +47,15 @@ The rule:
 - once someone has waited ten seconds without a full table, they get
   one, with bots at their own rating in the empty seats.
 
-Two hosts with different views may seat someone twice. Everyone takes
-the seating with the lower table id, and the other table's empty seat is
-booted at its first turn.
+Two hosts with different views may both seat a round: the next in line
+steps in when the host's seating has not reached it in time. A device
+takes the lowest table id among the seatings naming it that arrive within
+a tenth of a round of the first, and no later one. Usually that is the
+same table for everyone. When a seating reaches some devices in time and
+others too late, people seated together end up at different tables. Each
+person still sits at exactly one table, and a seat nobody comes to is
+booted at its first turn and played by a bot. Only something in charge
+could rule this out, and nothing is.
 
 A seating names each seat's licence. Nobody sits at one where a seat's
 licence is not the service's word for that seat's key, or where an

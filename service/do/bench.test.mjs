@@ -120,7 +120,7 @@ test('left alone while they serve or wait, stopped once they are quiet', async (
   assert.deepEqual(await bench.status(), { running: false, online: false, serving: 0 });
 });
 
-test('backup jurors that do not answer is given one more look, then stopped', async () => {
+test('backup jurors that do not answer are given one more look, then stopped', async () => {
   const c = container({ startsAfter: 0 });
   const s = state(c);
   const bench = new Bench(s, {});

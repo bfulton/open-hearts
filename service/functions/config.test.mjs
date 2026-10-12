@@ -138,12 +138,15 @@ test('a table timing is served whole where every field checks out, and left out 
   assert.equal(configOf({ live: false, table: { graceMs: 1 } }).live, false);
 });
 
-test('the waits are served field by field, each within its bounds, the relay pair in order', () => {
+test('the waits are served field by field, each within its bounds, the relay pair and the record three in order', () => {
   assert.equal(configOf({}).waits, undefined, 'none set: the app keeps its own');
   assert.deepEqual(configOf({ waits: { licenceMs: 9000, buyMs: 1, configEveryMin: 30, junk: 5 } }).waits, { licenceMs: 9000, configEveryMin: 30 });
   assert.equal(configOf({ waits: { licenceMs: 9000.5 } }).waits, undefined, 'whole numbers only');
   assert.deepEqual(configOf({ waits: { relaySlowMs: 10000, relayGiveUpMs: 60000 } }).waits, { relaySlowMs: 10000, relayGiveUpMs: 60000 });
   assert.equal(configOf({ waits: { relaySlowMs: 30000, relayGiveUpMs: 20000 } }).waits, undefined, 'slow after giving up: neither');
+  assert.deepEqual(configOf({ waits: { recordAgainMs: 5000, recordForMs: 20000, recordSoonMs: 5000 } }).waits, { recordAgainMs: 5000, recordForMs: 20000, recordSoonMs: 5000 });
+  assert.equal(configOf({ waits: { recordAgainMs: 30000, recordSoonMs: 2000 } }).waits, undefined, 'asked again past the short span: none');
+  assert.equal(configOf({ waits: { recordAgainMs: 20000 } }).waits, undefined, 'past the build\'s short span of nine seconds: none');
   assert.equal(configOf({ waits: [1, 2] }).waits, undefined);
 });
 

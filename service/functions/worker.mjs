@@ -2610,6 +2610,8 @@ export const WAITS_BOUNDS = Object.freeze({
 /// The waits the row sets, each field taken on its own when it is a
 /// whole number within its bounds; null when none is. The relay's pair
 /// goes together or not at all: saying it is slow comes before giving up.
+/// So do the record's three: asking again comes within both spans it is
+/// asked over.
 export function waitsOf(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const out = {};
@@ -2623,6 +2625,14 @@ export function waitsOf(raw) {
     if (slow >= giveUp) {
       delete out.relaySlowMs;
       delete out.relayGiveUpMs;
+    }
+  }
+  if ('recordAgainMs' in out || 'recordForMs' in out || 'recordSoonMs' in out) {
+    const again = out.recordAgainMs ?? 3000;
+    if (again > (out.recordForMs ?? 60000) || again > (out.recordSoonMs ?? 9000)) {
+      delete out.recordAgainMs;
+      delete out.recordForMs;
+      delete out.recordSoonMs;
     }
   }
   return Object.keys(out).length ? out : null;

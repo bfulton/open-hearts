@@ -346,8 +346,11 @@ String? walkChaos(int seed,
       // never comes back from it.
       for (var s = 0; s < seatCount; s++) {
         final heldNow = c.heldSeatState(s);
-        if (heldNow == null) continue;
         final was = o.held[s];
+        if (heldNow == null) {
+          if (was != null) return '$when: hand $hand held seat $s went $was → not held';
+          continue;
+        }
         if (was != null && was != heldNow && !heldSeatClosure[was]!.contains(heldNow)) {
           return '$when: hand $hand held seat $s went $was → $heldNow';
         }
