@@ -35,7 +35,7 @@ squashed from a pull request, the pull request's number.
   to the person any longer; Stripe's payment records of a web
   subscription still hold its email address and its device's key. The
   privacy policy says so in every language.
-  (2026-10-12, d9b1ba3, 3a45e5e, 96537e6)
+  (2026-10-12, #13)
 - Backup jurors make up a short jury, not only an empty one.
   (2026-10-11, db71b17)
 - A game's record is kept only from the device in use of a subscriber
