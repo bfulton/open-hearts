@@ -8,7 +8,7 @@
 #                as the _worker.js/ directory, entry.mjs its index.js)
 #   /play/       the Flutter web build, base-href / : served at the root
 #                of play.openhearts.game, and at /play/ on a preview
-#                (the worker routes by host, docs/06-service.md)
+#                (the worker routes by host, docs/explanation/service.md)
 #
 # Publishing is for looking at, not for keeping: every upload is a
 # deployment Cloudflare keeps for ever, and a few dozen of them make
@@ -168,7 +168,7 @@ echo "==> building $BUILD_TAG -> $LABEL"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 node site/build.mjs "$STAGE"
-# The service's handlers (docs/06-service.md) run as the Pages worker:
+# The service's handlers (docs/explanation/service.md) run as the Pages worker:
 # _worker.js/ at the root of what is published answers /api/…, and
 # hands everything else to the static assets. Its secrets — the TURN
 # key — are the project's, set in the Pages dashboard, never here.
@@ -199,7 +199,7 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
 # file above, not a flag.
 #
 # OH_SERVICE_KEY (serviceKey in the config) names the service this build
-# will take a licence from, and no other (docs/06-service.md,
+# will take a licence from, and no other (docs/explanation/service.md,
 # app/lib/net/licence.dart): the public half of the pair `dart run
 # bin/service_key.dart` mints, whose secret is set on the Pages project as
 # OH_SERVICE_SECRET and lives nowhere else. A build published without it has live play shut, which
@@ -208,7 +208,7 @@ node --input-type=module -e "await import('file://$(cd "$STAGE" && pwd)/_worker.
 #
 # OH_GOOGLE_CLIENT_ID and OH_APPLE_SERVICE_ID (google.webClientId and
 # apple.servicesId in the config) are the sign-in providers' identifiers
-# (docs/06-service.md, app/lib/net/provider_tokens.dart).
+# (docs/explanation/service.md, app/lib/net/provider_tokens.dart).
 # Neither is a secret. A build without one offers no sign-in with that
 # provider.
 #

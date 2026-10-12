@@ -1,4 +1,4 @@
-// The account's profile (docs/06-service.md): kept with the account,
+// The account's profile (docs/explanation/service.md): kept with the account,
 // read by any of its devices, written only by its device in use and
 // only in the shape the app makes, each write the next version, held to
 // an allowance of its own an hour — and gone with the account's data

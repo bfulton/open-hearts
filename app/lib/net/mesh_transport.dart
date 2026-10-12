@@ -18,7 +18,7 @@
 /// without a channel, because a relay does have to read what it
 /// carries. The table's own dedup by event id absorbs what arrives
 /// twice, and an event's id is the same whichever way it came. The
-/// relay is a fallback, not a primary path (docs/02-multiplayer.md):
+/// relay is a fallback, not a primary path (docs/explanation/multiplayer.md):
 /// with every channel up the lane says nothing at all, and a table at
 /// full strength costs the relays its presence and its signalling.
 ///
@@ -154,7 +154,7 @@ class MeshTransport implements Transport {
       }
     }
     // And the relay lane for whoever has no channel up: a fallback
-    // (docs/02-multiplayer.md), not a second primary path. With every
+    // (docs/explanation/multiplayer.md), not a second primary path. With every
     // peer connected this says nothing at all, and a table at full
     // strength costs the relays a heartbeat and its signalling.
     if (refused.isNotEmpty || peers.any((p) => p != relay.signer.publicKey && !(_links[p]?.open ?? false))) {
@@ -196,7 +196,7 @@ class MeshTransport implements Transport {
     final link = _links[peer] = _Link()..tries = tries;
     // An offer that is never answered is not free: it holds a peer
     // connection open, and its candidates are sealed and published one
-    // by one. Some peers never answer — a juror of last resort runs in
+    // by one. Some peers never answer — a backup juror runs in
     // the service's VM with no WebRTC in it at all — so a dial that has
     // not come up in time (remote config, waits.meshAnswer) is let go
     // of, and the relay lane carries that peer, which is what the lane

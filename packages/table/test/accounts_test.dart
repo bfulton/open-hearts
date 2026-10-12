@@ -1,4 +1,4 @@
-/// Accounts at the table (docs/04-live-play.md, docs/06-service.md): a
+/// Accounts at the table (docs/explanation/live-play.md, docs/explanation/service.md): a
 /// seat is the account its licence names, checked by every peer against
 /// the service's key; results and ratings are the accounts'; a jury draws
 /// nobody of an account seated at the table; and a device superseded by

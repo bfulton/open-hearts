@@ -53,7 +53,7 @@ Future<void> main() async {
   Entitlement.current.addListener(InUse.current.licenceChanged);
   // What this device may do, before the front door is drawn: read off
   // the device, so a device that cannot reach us answers anyway, and
-  // asked of the service behind the first frame (docs/06-service.md) —
+  // asked of the service behind the first frame (docs/explanation/service.md) —
   // and asked again, a little further apart each time, until the
   // service answers: a start on a slow network is not a start without
   // a subscription.
@@ -95,7 +95,7 @@ void _askAgain() => Timer(waits.configEvery, () {
 /// as a juror, and a table that has drawn it should not have to wait
 /// out a missed heartbeat to find that out — five seconds in which a
 /// hand's escrow rests on somebody who is gone
-/// (docs/04-live-play.md). So say it, and say it again
+/// (docs/explanation/live-play.md). So say it, and say it again
 /// on the way back. Best effort by its nature: a crash, a killed tab
 /// or a dead link says nothing at all, which is why silence is still
 /// timed out.

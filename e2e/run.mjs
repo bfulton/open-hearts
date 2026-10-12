@@ -72,7 +72,7 @@ const aHand = 480000;
 async function main() {
   const relay = await startRelay();
   // A tenth of a table's beats (app/lib/net/address.dart), and the
-  // operator's word on the clocks (docs/06-service.md): a person silent
+  // operator's word on the clocks (docs/explanation/service.md): a person silent
   // for half a minute rather than two is gone, and a bank of ten
   // seconds rather than forty-five is spent — the least either may be
   // (packages/table, timing.dart). The cells are the same; their waits
@@ -236,7 +236,7 @@ async function main() {
     // the same second can each be sure of a different three of
     // themselves, two of them lead, and the room comes apart into two
     // tables under one code — which the table id is there to keep
-    // apart (docs/04-live-play.md) but which is not a table of four.
+    // apart (docs/explanation/live-play.md) but which is not a table of four.
     //
     // They have as long as they need to get there: the room is waiting
     // for a fourth rather than counting down (`driven`, above). By the
@@ -287,7 +287,7 @@ async function main() {
     // Cell 4: two people left, and Bao's browser goes off his turn. Ada
     // alone is no majority of two and claims nothing; her next play
     // waits on a vote that will never come, and the table asks the
-    // jury — the service's juror of last resort, called for when this
+    // jury — the service's backup juror, called for when this
     // table found nobody else online. It rules once Bao has been
     // silent half a minute (the rig's config): Ada's play stands, and at
     // Bao's own turn his seat goes to a bot. Ada finishes the hand with

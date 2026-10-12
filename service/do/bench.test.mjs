@@ -1,4 +1,4 @@
-// The jurors of last resort as a Cloudflare Container (bench.mjs): a
+// The backup jurors as a Cloudflare Container (bench.mjs): a
 // call heard on the presence relay starts the backup jurors and is
 // passed to them; they are left alone while they serve or wait, and
 // stopped once they have gone quiet. The container here is a stand-in with the
@@ -30,6 +30,11 @@ function container({ startsAfter = 2 } = {}) {
     },
     signal(n) {
       this.signals.push(n);
+      this.running = false;
+    },
+    destroyed: 0,
+    async destroy() {
+      this.destroyed++;
       this.running = false;
     },
     async setInactivityTimeout(ms) {
@@ -99,6 +104,62 @@ test('a call starts the backup jurors, waits for them, and passes the call on', 
   assert.equal(c.started.length, 1);
   assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2']);
   assert.equal((await bench.fetch(new Request('https://bench/wake', { method: 'POST' }))).status, 400, 'a call names its table');
+});
+
+test('backup jurors started with anything else are started again with this', async () => {
+  const c = container({ startsAfter: 0 });
+  const s = state(c);
+  const env = { OH_SERVICE_KEY: 'aa'.repeat(32), OH_JUROR_SECRET: 'cc'.repeat(32), OH_BENCH_RELAYS: 'wss://r1', OH_BENCH_PRESENCE_RELAYS: 'wss://p1' };
+  await wake(new Bench(s, env));
+  await wake(new Bench(s, { ...env }), 'tbl2');
+  assert.equal(c.destroyed, 0, 'the same: left running');
+  assert.equal(c.started.length, 1);
+  assert.ok(!String(await s.storage.get('startedWith')).includes('cc'.repeat(32)), 'the secret is not kept');
+  // The relay deployed with each changed in turn: the object is new,
+  // the container is not, and it would go on with the old for as long
+  // as calls kept it awake.
+  const changes = [
+    ['OH_SERVICE_KEY', 'bb'.repeat(32), 'OH_SERVICE_KEY'],
+    ['OH_JUROR_SECRET', 'dd'.repeat(32), 'OH_JUROR_SECRET'],
+    ['OH_BENCH_RELAYS', 'wss://r2', 'OH_RELAYS'],
+    ['OH_BENCH_PRESENCE_RELAYS', 'wss://p2', 'OH_PRESENCE_RELAYS'],
+  ];
+  for (const [i, [name, value, inside]] of changes.entries()) {
+    env[name] = value;
+    const res = await wake(new Bench(s, { ...env }), `tbl${i + 3}`);
+    assert.equal(res.status, 200);
+    assert.equal(c.destroyed, i + 1, name);
+    assert.equal(c.started.length, i + 2, name);
+    assert.equal(c.started.at(-1).env[inside], value, name);
+  }
+  assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2', 'tbl3', 'tbl4', 'tbl5', 'tbl6']);
+  // A deploy with the environment as it was: a new image, which a
+  // running container does not take until it starts again.
+  await wake(new Bench(s, { ...env, CF_VERSION_METADATA: { id: 'v1' } }), 'tbl7');
+  assert.equal(c.destroyed, changes.length + 1, 'the first deploy that says which');
+  await wake(new Bench(s, { ...env, CF_VERSION_METADATA: { id: 'v1' } }), 'tbl8');
+  assert.equal(c.destroyed, changes.length + 1, 'the same deploy: left running');
+  await wake(new Bench(s, { ...env, CF_VERSION_METADATA: { id: 'v2' } }), 'tbl9');
+  assert.equal(c.destroyed, changes.length + 2, 'another deploy: started again');
+  assert.equal(c.started.at(-1).env.CF_VERSION_METADATA, undefined, 'the version is not passed in');
+});
+
+test('a container started afresh gets its minute, whatever the one before it missed', async () => {
+  const c = container({ startsAfter: 0 });
+  const s = state(c);
+  await wake(new Bench(s, {}));
+  // It stops answering, and misses one look.
+  c.bench.answers = false;
+  await new Bench(s, {}).alarm();
+  assert.equal(await s.storage.get('unanswered'), true);
+  // It ends before the next look, and the next call starts another.
+  c.running = false;
+  c.bench.answers = true;
+  assert.equal((await wake(new Bench(s, {}), 'tbl2')).status, 200);
+  // The new one misses its first look: given its minute, not stopped.
+  c.bench.answers = false;
+  await new Bench(s, {}).alarm();
+  assert.deepEqual(c.signals, []);
 });
 
 test('left alone while they serve or wait, stopped once they are quiet', async () => {

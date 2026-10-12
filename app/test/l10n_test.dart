@@ -152,7 +152,7 @@ void main() {
         expect({for (final s in engine.Suit.values) words.refuseFollowSuit(s.name)}, hasLength(4));
         expect({for (final d in engine.PassDirection.values) words.pass(d)}, hasLength(4));
         const named = [
-          'noSubscription', 'fiveDevices', 'notACode', 'noSuchCode', 'codeUsed', 'codeRunOut', 'notADevice', //
+          'noSubscription', 'accountFull', 'notACode', 'noSuchCode', 'codeUsed', 'codeRunOut', 'notADevice', //
           'onAnotherSubscription', 'clockOff', 'other',
         ];
         expect({for (final r in named) words.serviceRefusal(r)}, hasLength(named.length));

@@ -10,7 +10,7 @@
 /// until the caller sweeps it, which is what gives the UI a beat to show
 /// the fourth card without the engine knowing about time.
 ///
-/// A **sealed** game (docs/03-fair-deal.md) takes its cards from outside
+/// A **sealed** game (docs/explanation/fair-deal.md) takes its cards from outside
 /// rather than from the seed, and may not know every hand: a seat's
 /// cards can be hidden from this side, in which case the engine tracks
 /// how many it holds and checks its plays as far as the rules allow
@@ -484,7 +484,7 @@ class HeartsGame {
   /// scored: no hand happened.
   ///
   /// There is one reason for it and it is not a rule of Hearts. At a
-  /// sealed table (docs/03-fair-deal.md) a seat that holds the two of
+  /// sealed table (docs/explanation/fair-deal.md) a seat that holds the two of
   /// clubs can say it holds it nowhere: nothing can be made to prove
   /// otherwise, and nobody can lead. No hand can be got out of that, so
   /// it is given up; what the table does about the seat is the table's

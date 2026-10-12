@@ -28,7 +28,7 @@ void main() {
   });
   tearDown(() => relay.close());
 
-  test('the juror of last resort follows a sealed table of four through its first hand', () async {
+  test('the backup juror follows a sealed table of four through its first hand', () async {
     const silence = 10000;
     // Real keys throughout: a signature checked is what an event costs
     // a peer, and the juror's load is the point.

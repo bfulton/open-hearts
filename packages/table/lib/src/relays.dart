@@ -2,7 +2,7 @@
 ///
 /// Any relay can go down or start refusing a client's events, and a
 /// play that reaches nobody gets its seat booted for silence. So a
-/// client holds a short list (docs/08-own-relays.md). It keeps a
+/// client holds a short list (docs/explanation/relay.md). It keeps a
 /// subscription open on every relay in
 /// the list and writes each event to the first that has not refused it
 /// lately; a refusal moves the same event on to the next, and when
@@ -36,7 +36,7 @@ List<List<String>>? Function(PublicKey key)? relayCredentials;
 /// relay's reason: `superseded:` — another device of the account is the
 /// one in use now — or `restricted:` — not admitted at all. The relay
 /// has closed or will close the socket, and retrying will not change
-/// its mind (docs/06-service.md, "One device at a time").
+/// its mind (docs/explanation/service.md, "One device at a time").
 void Function(String reason)? relayTurnedAway;
 
 /// How [signer] answers a relay's challenge: the AUTH event, or null

@@ -166,7 +166,7 @@ async function applyPages() {
   const summary = [];
   for (const [env, want] of Object.entries(pages.environments)) {
     const have = project.deployment_configs?.[env] ?? {};
-    const { patch, lines, owner: theirs } = pagesEnvPlan(want, have, ids);
+    const { patch, lines, owner: theirs } = pagesEnvPlan(want, have, ids, env);
     for (const line of theirs) owner(`${p} ${env}: ${line.replace('<project>', p)}`);
     for (const line of lines) say(`${p} ${env}: ${line}`);
     if (write && Object.keys(patch).length) await cf('PATCH', `${acct}/pages/projects/${p}`, { deployment_configs: { [env]: patch } });

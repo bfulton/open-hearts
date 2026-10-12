@@ -1,6 +1,6 @@
 /// Every side's state read at one moment, and the ways a table can be
 /// stuck that are facts about those states rather than about how long
-/// anything has taken (docs/07-states.md).
+/// anything has taken (docs/explanation/table-states.md).
 ///
 /// Each side says what it waits for and who can end each wait
 /// ([TableClient.waits]). A wait is covered when one of those who can

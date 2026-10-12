@@ -9,7 +9,7 @@
 /// read again: the juror stopped at the removal for good, counted the
 /// seat a person's, and read every later hand's bot seats a seat short
 /// of the table — one juror on a seat the table gave another
-/// (docs/07-states.md). The chaos walk found it
+/// (docs/explanation/table-states.md). The chaos walk found it
 /// (`tool/chaos.dart --sealed-only 4 --jurors 9 --sweep --twins`).
 ///
 /// The same for a verdict carrying a held seat's keys, heard before

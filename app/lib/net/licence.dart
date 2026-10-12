@@ -1,4 +1,4 @@
-/// What a device holds instead of a receipt (docs/06-service.md).
+/// What a device holds instead of a receipt (docs/explanation/service.md).
 ///
 /// A licence is a short statement signed by the service's key —
 /// this device's key, its account, a date, and the plan — which the app checks
@@ -46,7 +46,7 @@ const serviceKey = String.fromEnvironment('OH_SERVICE_KEY');
 /// served by, which is the site the worker runs beside — or on a phone,
 /// the app's address its build names (address_io.dart). Over http as
 /// well as https — the browser suite serves the app and the handlers
-/// together on localhost (docs/06-service.md) — and nowhere at all
+/// together on localhost (docs/explanation/service.md) — and nowhere at all
 /// when there is no origin, which is a build asking nobody rather than
 /// asking anybody.
 ///

@@ -1,4 +1,4 @@
-/// The jurors of last resort on their own: quiet on the relay until a
+/// The backup jurors on their own: quiet on the relay until a
 /// table says it has nobody to draw a jury from, then online to serve
 /// it.
 ///
@@ -18,7 +18,7 @@
 /// Several of them, not one: a table whose bot seats the jury holds
 /// needs juryToHoldBots jurors online before it can hold any, and the
 /// call comes exactly when too few others are online to make that
-/// number up (docs/04-live-play.md). So there are that many by
+/// number up (docs/explanation/live-play.md). So there are that many by
 /// default, each its own identity — derived from the secret given, so
 /// the same deployment keeps the same keys across restarts, or fresh
 /// ones when no secret is set.
@@ -96,7 +96,7 @@ Future<void> main(List<String> args) async {
       signers: signers, relays: relays, presenceRelays: presence.isEmpty ? null : presence, log: print, crypto: crypto);
   bench.start();
   final keys = [for (final s in signers) s.publicKey.substring(0, 8)].join(' ');
-  print('jurors of last resort $keys listening on ${Relays.format(relays)}'
+  print('backup jurors $keys listening on ${Relays.format(relays)}'
       '${presence.isEmpty ? '' : ', present on ${Relays.format(presence)}'}');
   if (port != null) await _answer(bench, port);
   ProcessSignal.sigterm.watch().listen((_) {

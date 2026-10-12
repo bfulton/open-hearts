@@ -1,5 +1,5 @@
 /// Bringing this device onto a subscription already bought
-/// (docs/06-service.md): with the code another of the subscriber's
+/// (docs/explanation/service.md): with the code another of the subscriber's
 /// devices shows, scanned or typed, or with a backup code from the
 /// email. Here the person has come for it, so unlike a link that
 /// arrives from anywhere (home_page.dart), there is nothing to ask

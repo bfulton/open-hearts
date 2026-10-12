@@ -1,4 +1,4 @@
-// What the operator watches of the relay object (docs/06-service.md):
+// What the operator watches of the relay object (docs/explanation/service.md):
 // counts a minute, never who. node --test service/do
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -65,6 +65,22 @@ test('a flood is counted as what it is, before it costs a signature', async () =
   assert.equal(counts.counts.tooBig, 1);
 });
 
+test('the last socket gone writes the counts so far, inside the minute', () => {
+  let t = 0;
+  const points = [];
+  const counts = tally({ writeDataPoint: (p) => points.push(p) }, { now: () => t });
+  counts.count('opened', 2);
+  t = 5000;
+  counts.closed(1);
+  assert.equal(points.length, 0, 'another still on: the minute runs on');
+  t = 9000;
+  counts.closed(0);
+  assert.equal(points.length, 1, 'nobody left: written before the object can be evicted');
+  assert.equal(points[0].doubles[tallied.indexOf('opened')], 2);
+  assert.equal(points[0].doubles[tallied.indexOf('closed')], 2);
+  assert.equal(points[0].doubles.at(-1), 9, 'the seconds it covers');
+});
+
 test('no dataset is no writing, and a quiet minute writes no line', () => {
   let t = 0;
   const points = [];
@@ -73,4 +89,37 @@ test('no dataset is no writing, and a quiet minute writes no line', () => {
   counts.flush();
   assert.equal(points.length, 0);
   tally(null).count('opened');
+});
+
+test('counts waiting for their minute keep a timer, so the object is not evicted with them', () => {
+  let t = 0;
+  const points = [];
+  const timers = [];
+  const after = (fn, ms) => {
+    const timer = { fn, ms, cancelled: false };
+    timers.push(timer);
+    return () => { timer.cancelled = true; };
+  };
+  const counts = tally({ writeDataPoint: (p) => points.push(p) }, { now: () => t, after });
+  t = 15000;
+  counts.count('opened');
+  assert.equal(timers.length, 1, 'a count waiting: a timer pending');
+  assert.equal(timers[0].ms, 45000, 'for the rest of its minute');
+  counts.count('events', 3);
+  assert.equal(timers.length, 1, 'one timer, however many counts');
+  // Nothing else happens: the timer is all that writes them.
+  t = 60000;
+  timers[0].fn();
+  assert.equal(points.length, 1);
+  assert.equal(points[0].doubles[tallied.indexOf('events')], 3);
+  // The next count, the next minute's timer; written early, it is let go.
+  t = 61000;
+  counts.count('opened');
+  assert.equal(timers.length, 2);
+  counts.closed(0);
+  assert.equal(timers[1].cancelled, true);
+  // No dataset: nothing to write, and no timer to keep the object.
+  const none = [];
+  tally(null, { now: () => t, after: (fn, ms) => none.push(ms) }).count('opened');
+  assert.deepEqual(none, []);
 });

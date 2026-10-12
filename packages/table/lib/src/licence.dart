@@ -1,4 +1,4 @@
-/// What the service vouches for, and nothing more (docs/06-service.md):
+/// What the service vouches for, and nothing more (docs/explanation/service.md):
 /// that a device belongs to an account, and that the account's
 /// subscription stands — a [Licence] — and which of the account's
 /// devices is the one in use now — an [Activation].
@@ -161,7 +161,7 @@ bool licenceFits(Licence? licence, PublicKey key, {DateTime? at}) {
 
 /// Which of an account's devices is the one in use: the service's word,
 /// given to the newest device to take the account up and renewed while
-/// it is in use (docs/06-service.md, "One device at a time").
+/// it is in use (docs/explanation/service.md, "One device at a time").
 ///
 /// [epoch] counts the times the account has been taken up, so of two
 /// activations for one account the later is plain without asking the
@@ -241,7 +241,7 @@ class Activation {
 /// checked and it holds — or as stated where nothing is checked. Null
 /// when there is none to be had, which is a key the relay admitted on
 /// the service's own word: the backup jurors, who belong to no account
-/// (docs/04-live-play.md).
+/// (docs/explanation/live-play.md).
 AccountId? accountFrom(Activation? activation, PublicKey key, {DateTime? at}) {
   if (activation == null || activation.key != key) return null;
   if (!licencesChecked) return activation.account;

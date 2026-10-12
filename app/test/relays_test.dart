@@ -1,6 +1,6 @@
 /// Where a build looks for its relays: decided by the build and where
 /// it is served from, never typed in — and ours alone
-/// (docs/08-own-relays.md).
+/// (docs/explanation/relay.md).
 library;
 
 import 'package:flutter_test/flutter_test.dart';

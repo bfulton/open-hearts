@@ -35,7 +35,7 @@ abstract class Signer {
 
   /// Thirty-two bytes this key shares with the holder of [other] and
   /// nobody else: the same from either end. What a seat wraps the
-  /// escrow shares of its deal secret in (docs/03-fair-deal.md), so
+  /// escrow shares of its deal secret in (docs/explanation/fair-deal.md), so
   /// they can travel in the open to the seats and jurors named.
   Uint8List sharedSecretWith(PublicKey other);
 

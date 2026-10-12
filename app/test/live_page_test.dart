@@ -62,7 +62,7 @@ class LiveHarness {
         target: target);
     // Jurors to draw from, for the seats a bot sits in: at a sealed
     // table those are a juror's to hold and play, and their hands are
-    // not this screen's to see (docs/04-live-play.md).
+    // not this screen's to see (docs/explanation/live-play.md).
     if (jurors > 0) {
       final p = presence = SimPresence(net, clock);
       for (var j = 0; j < jurors; j++) {

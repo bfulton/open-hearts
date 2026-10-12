@@ -1,4 +1,8 @@
-# 05 — Screens
+# Screens
+
+This page explains how the app lays itself out on every screen, and the
+design rules behind it. The sizes and timings it describes are constants
+in the files it names.
 
 The web build and the app builds are the same product. The layout
 depends on the space the table is given, never on the device. There are
@@ -6,31 +10,26 @@ no platform checks, no device lists and no user-agent sniffing. A phone
 turning sideways, a foldable opening, Split View and a desktop window
 being resized are all the same event: new constraints.
 
-| | Roughly |
-|---|---|
-| Phone, portrait | 390 × 844 |
-| Phone, landscape | 844 × 390 |
-| Tablet | iPad, Android tablets |
-| Foldable | a phone closed, a small tablet open |
-| Desktop web | any size, resized mid-game |
-
-Rotating, unfolding or resizing mid-hand never costs the game.
+The app is checked at the shapes people play on: a phone upright and on
+its side, a tablet, a foldable closed and open, and a desktop window of
+any size, resized mid-game. The shapes themselves are listed in
+`app/test/fits.dart`, and `e2e/shots.mjs` screenshots the built app at
+each. Rotating, unfolding or resizing mid-hand never costs the game:
 `app/test/tablet_test.dart` and the widget tests for the phone on its
-side check this. `node e2e/shots.mjs` screenshots the built app at each
-shape.
+side check this.
 
 ## Portrait and landscape
 
-`app/lib/ui/table_layout.dart` treats the table as landscape when it is
-more than 1.2 times wider than it is tall. A near-square window is laid
-out as portrait, where the fan of cards needs the width. The two
-compositions share every widget. Both have a 40-point header: the menu
-on the left, the hand number and pass direction in the middle, and on
-the right a heart that stays whole until hearts are broken. They differ
-in the hand row. In landscape it is 100 points tall instead of 128, and
-the fan steps up to eight tenths of a card instead of two thirds, so the
-shorter cards show more of themselves. On a wide felt the trick lies
-flatter and the seat badges fit on one line.
+`app/lib/ui/table_layout.dart` treats the table as landscape only when
+it is clearly wider than it is tall (`isLandscape`). A near-square window
+is laid out as portrait, where the fan of cards needs the width. The two
+compositions share every widget. Both have the same header: the menu on
+the left, the hand number and pass direction in the middle, and on the
+right a heart that stays whole until hearts are broken. They differ in
+the hand row: in landscape it is shorter, and the fan steps further
+between cards (`app/lib/ui/hand_fan.dart`), so the shorter cards show
+more of themselves. On a wide felt the trick lies flatter and the seat
+badges fit on one line.
 
 All four seats, yours included, have a badge on the felt. Each badge is
 the same gap from the card it labels, on all four sides, so it reads as
@@ -51,19 +50,19 @@ never shifts.
 A phone layout scaled up is the wrong answer: enormous cards and a fan
 you have to reach across the device to touch.
 
-- **The table holds a width.** Past 900 points it stops spreading.
-  Leftover width of 260 to 420 points becomes a rail. With less there is
-  no rail, and with more the table takes the width back. The table and
-  its rail are centred together.
-- **The cards grow with the felt.** The card cap is 0.17 of the felt's
-  shortest side, clamped between 76 points (a phone's) and 108.
+- **The table holds a width.** Past its width (`tableWidth`), the table
+  stops spreading. Leftover width becomes a rail beside it once there is
+  enough for one (`railLeast`), and the rail stops growing at a most
+  (`railMost`); any width past that is margin. The table and its rail
+  are centred together.
+- **The cards grow with the felt,** as a share of the felt's shortest
+  side, from a phone's size up to a most (`app/lib/ui/scaled.dart`).
 - **The type grows with the cards.** The table has one scale, from 1 on
-  a phone up to 108/76. Badges, the table's line, the action line and the
-  rail are all drawn at that scale (`app/lib/ui/scaled.dart`). The header
-  stays the same size everywhere.
-- **The table sits low.** On a felt with height to spare, seven tenths
-  of the spare goes above the far seat and three tenths below your own
-  badge.
+  a phone up to the cards' most over their least. Badges, the table's
+  line, the action line and the rail are all drawn at that scale. The
+  header stays the same size everywhere.
+- **The table sits low.** On a felt with height to spare, most of the
+  spare goes above the far seat and the rest below your own badge.
 
 The rail shows what a phone has no room for: **what has gone**. That is
 the 52 cards with the played ones struck through, plus a line counting
@@ -87,11 +86,12 @@ changes hands travels the way the table is laid out
 - **The hand closes** over a gap and opens for an arrival.
 
 Arrivals decelerate, departures accelerate, and moves within the screen
-ease both in and out (Flutter's `Easing`). A play takes 240 ms, a pass
-420 ms, a trick sweep 300 ms and the fan settle 220 ms. Animations that
-are triggered by a tap begin one frame in, so the first drawn frame is
-never a frame of nothing. With `MediaQuery.disableAnimations` the table
-is identical, just with nothing in flight.
+ease both in and out (Flutter's `Easing`). Each movement is a fraction
+of a second, a pass a little longer than a play; the durations are in
+`app/lib/ui/hand_fan.dart` and `app/lib/ui/table_view.dart`. Animations
+that a tap triggers begin one frame in, so the first drawn frame is never
+a frame of nothing. With `MediaQuery.disableAnimations` the table is
+identical, just with nothing in flight.
 
 At the end of a hand the last trick is named and swept, there is a beat
 of bare felt, and then the score sheet comes down. At a live table the
@@ -99,18 +99,19 @@ next hand is already being dealt underneath. The beat is a step of the
 screen's walk through the record, not a separate timer, so incoming
 events cannot cut it short.
 
-The heart on the front door folds and opens over nine seconds, then
-holds still until twenty seconds have passed. It requests no frames
-between turns.
+The heart on the front door folds and opens, then holds still for a
+while (`app/lib/ui/folding_heart.dart`). It requests no frames between
+turns.
 
 ## Profile pictures
 
-A badge is 64 pixels across, and people are rarely in the middle of
-their own photos. So the crop is chosen by hand: drag to move, pinch to
-zoom, and what is inside the circle is what gets kept. The photo is
-requested at 1,000 pixels so a tight crop still has detail. The crop
-arithmetic is `Window` in `app/lib/ui/photo_crop.dart`, tested on its own
-in `app/test/photo_crop_test.dart`.
+A badge is small, and people are rarely in the middle of their own
+photos. So the crop is chosen by hand: drag to move, pinch to zoom, and
+what is inside the circle is what gets kept. The photo is requested
+large enough that a tight crop still has detail
+(`app/lib/profile_page.dart`). The crop arithmetic is `Window` in
+`app/lib/ui/photo_crop.dart`, tested on its own in
+`app/test/photo_crop_test.dart`.
 
 ## Colour
 
@@ -124,10 +125,14 @@ action. `app/test/palette_test.dart` checks this.
 ## Text size
 
 The table follows the reader's text size up to twice the ordinary
-(WCAG 1.4.4), at every shape above and in every language.
-`app/test/table_fits_test.dart` plays a game alone and a live one
-through every phase at text ×1, ×1.3, ×1.5 and ×2. It fails on any
-overflow, any line cut short, and anything drawn over anything else.
+(WCAG 1.4.4), at every shape above and in every language. The
+`table_fits` tests play through every phase at every text size the
+matrix in `app/test/fits.dart` lists: a game alone
+(`app/test/table_fits_test.dart`), a live one
+(`app/test/table_fits_live_test.dart` and
+`app/test/table_fits_live_end_test.dart`) and a wide felt
+(`app/test/table_fits_wide_test.dart`). They fail on any overflow, any
+line cut short, and anything drawn over anything else.
 
 - **Words keep the size the reader asked for.** The header, the action
   line, the line under your badge and the score sheets wrap rather
@@ -147,8 +152,9 @@ overflow, any line cut short, and anything drawn over anything else.
   says each card's name.
 - **The felt gives way last.** Badges, and the line beside your badge on
   a wide felt, scale into the room the felt has. Where even the smallest
-  trick will not fit, which happens at ×2 on a phone on its side, the
-  whole felt is drawn slightly smaller rather than run off the screen.
+  trick will not fit, which happens at twice the text size on a phone on
+  its side, the whole felt is drawn slightly smaller rather than run off
+  the screen.
 
 ## Screen readers
 
@@ -162,8 +168,10 @@ the front door has a name.
 
 On the web, Flutter builds the tree only after the hidden "Enable
 accessibility" button is pressed. This is Flutter's default and spares
-other visitors the cost. The e2e suites pass `?e2e=1`, which builds the
-tree from the start. Known gaps: a card chosen to pass is announced as
-"current" rather than "selected". Cards on the felt are read in the
-order they are drawn. The led card is marked "led", and play order
-follows the seats round from it.
+other visitors the cost. The browser suites pass `?e2e=1`, which builds
+the tree from the start.
+
+Known gaps: a card chosen to pass is announced as "current" rather than
+"selected", and cards on the felt are read in the order they are drawn.
+The led card is marked "led", and play order follows the seats round
+from it.

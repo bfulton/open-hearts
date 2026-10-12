@@ -1,4 +1,4 @@
-/// The licence, as the app reads one (docs/06-service.md).
+/// The licence, as the app reads one (docs/explanation/service.md).
 ///
 /// The service signs it and the app checks it, in two languages on one
 /// curve. So the pin here is a licence the worker actually minted —

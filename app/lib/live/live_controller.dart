@@ -216,7 +216,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Whether the record has left behind the hand the view is still
   /// showing: nothing of it remains, and what comes next is a later
   /// hand's. That is a hand the table gave up where it stood
-  /// (docs/03-fair-deal.md) — nobody could lead it, or a pass into a
+  /// (docs/explanation/fair-deal.md) — nobody could lead it, or a pass into a
   /// seat would never open — and there is nothing more of it to show.
   ///
   /// Asked only where the view has run out of things to do of its own:
@@ -284,7 +284,7 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// Whether this view has to work a seat's move out for itself. A bot
   /// seat is everyone's to compute — unless a juror holds it, and then
   /// its move arrives as a signed event like a person's and its hand
-  /// is not ours to see at all (docs/04-live-play.md). Asked of the
+  /// is not ours to see at all (docs/explanation/live-play.md). Asked of the
   /// hand being shown, which runs behind
   /// the table's: a seat can be a person's in the hand on screen and a
   /// bot the jury holds in the one the table is already dealing.
@@ -799,7 +799,7 @@ class LiveController extends ChangeNotifier implements TableModel {
     final d = client.deal;
     // Before there is a deal at all: a hand with bot seats waits for
     // jurors enough to hold them, because a bot seat nobody holds is
-    // a hand everyone can see (docs/04-live-play.md).
+    // a hand everyone can see (docs/explanation/live-play.md).
     if (d == null && client.shortOfJurors) return words.waitingForJurors;
     if (d == null) return words.dealing;
     return switch (d.phase) {

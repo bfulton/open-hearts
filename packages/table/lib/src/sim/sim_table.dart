@@ -73,7 +73,7 @@ class SimTable {
       }
       // Several backup jurors, not one: a table that needs its bot
       // seats held needs [juryToHoldBots] of them, and when it calls too
-      // few others are online to make that up (docs/04-live-play.md).
+      // few others are online to make that up (docs/explanation/live-play.md).
       final bench = lastResorts ?? (lastResort ? juryToHoldBots : 0);
       for (var b = 0; b < bench; b++) {
         final signer = FakeSigner('last-resort$b-$seed');
@@ -159,7 +159,7 @@ class SimTable {
   final List<ScriptedHuman> people = [];
 
   /// Strangers online who can be drawn as jurors; the last is the
-  /// juror of last resort when there is one.
+  /// backup juror when there is one.
   final List<SimJuror> jurors = [];
   SimPresence? presence;
 

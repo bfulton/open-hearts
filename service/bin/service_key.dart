@@ -1,4 +1,4 @@
-/// Mints the service's signing pair (docs/06-service.md).
+/// Mints the service's signing pair (docs/explanation/service.md).
 ///
 ///     dart run bin/service_key.dart
 ///
@@ -9,9 +9,9 @@
 /// repository, not in a build, not on a device, not in a file — so it
 /// is printed once, here, to be pasted there.
 ///
-/// Rotating is cheap and takes a month: publish a build naming the new
-/// key, and keep signing with the old secret until the licences it
-/// signed have run out.
+/// Rotating replaces the pair everywhere at once, since every part
+/// checks against one key and the worker signs only with a matching
+/// pair (docs/how-to/rotate-the-service-key.md).
 library;
 
 import 'dart:io';

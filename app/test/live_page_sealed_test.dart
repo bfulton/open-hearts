@@ -23,7 +23,7 @@ void main() {
   testWidgets('a bot seat a juror holds plays from the record, and its hand is no more open than a person\'s', (tester) async {
     // The screen works a bot's moves out for itself, which it can only
     // do with the bot's hand in front of it. A seat a juror holds has
-    // no hand to show it (docs/04-live-play.md), so its moves have to
+    // no hand to show it (docs/explanation/live-play.md), so its moves have to
     // come off the record like a person's — and a screen that waited
     // for the hand instead would stop at the pass and never play.
     final crypto = await rememberedCrypto();

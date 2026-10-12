@@ -12,7 +12,7 @@
 // So it is the network first, always, and this copy only when the
 // network fails. Online nothing changes: every file is asked for as it
 // was, a new deploy is what loads, and a cached bootstrap cannot lie
-// about which build is running (docs/01-dev-loop.md). Offline the last
+// about which build is running (docs/explanation/dev-loop.md). Offline the last
 // build that loaded is the one that opens. What is never kept is what
 // has to be fresh or nothing: the build check (build-info.json, which
 // says nothing rather than something stale) and the service's handlers

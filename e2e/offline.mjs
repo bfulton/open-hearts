@@ -279,7 +279,7 @@ flow('the relays there and silent', async ({ context, open }) => {
 
 // What the shop says depends on how it failed: a worker that answered
 // at all answered that the shop is shut, which is what a deployment
-// with no keys says (docs/06-service.md); one that did not was out of
+// with no keys says (docs/explanation/service.md); one that did not was out of
 // reach.
 const shopShut = /^The shop is not open yet\.$/;
 const shopGone = /^Could not reach the shop\. Try again in a moment\.$/;
@@ -372,7 +372,7 @@ async function main() {
       const relayPort = await freePort();
       // A tenth of a table's beats (app/lib/net/address.dart), and the
       // operator's word that a table stopped for jurors it cannot hear
-      // ends sooner (docs/06-service.md; the least each may be,
+      // ends sooner (docs/explanation/service.md; the least each may be,
       // packages/table, timing.dart). The device's own waits — on the
       // relays, the service, the shop — are the build's, which is what
       // this suite times.

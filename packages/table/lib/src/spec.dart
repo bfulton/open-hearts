@@ -61,7 +61,7 @@ class TableSpec {
 
   final String id;
 
-  /// Whether the cards come from the verifiable deal (docs/03-fair-deal.md) rather
+  /// Whether the cards come from the verifiable deal (docs/explanation/fair-deal.md) rather
   /// than the seed: every hand shuffled by every seat with proofs, each
   /// person's cards known to them alone. Every live table; solo play
   /// and most of the simulator deal from the seed.
@@ -148,7 +148,7 @@ class TableSpec {
   /// every person's seat names its account with a licence the service
   /// signed for that very key ([licenceFits]) — given [at], one good
   /// then — and no account sits twice. A table that fails this is not
-  /// sat at, not served and not believed (docs/04-live-play.md).
+  /// sat at, not served and not believed (docs/explanation/live-play.md).
   /// Nothing is asked where accounts are not checked.
   String? licenceProblem({DateTime? at}) {
     final seen = <AccountId>{};

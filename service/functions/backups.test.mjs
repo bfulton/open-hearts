@@ -102,7 +102,7 @@ test('a code turned away by a full household is still good', async () => {
   const codes = (await backupsFor(KEY, store, null, { now })).body.codes.map((c) => c.code);
   for (let i = 1; i <= 4; i++) assert.equal((await redeemBackup(device(i), codes[i - 1], store, { now })).status, 200);
   assert.equal((await devicesOn(store, await accountOf(store))).length, 5);
-  assert.notEqual((await redeemBackup(device(6), codes[4], store, { now })).status, 200, 'five devices already');
+  assert.notEqual((await redeemBackup(device(6), codes[4], store, { now })).status, 200, 'the account has all the devices it can take');
   assert.equal((await backupsFor(KEY, store, null, { now })).body.codes[4].used, false);
 });
 

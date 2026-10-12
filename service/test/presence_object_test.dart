@@ -2,7 +2,7 @@
 /// object is not there.
 ///
 /// The deployed relay keeps one object per tag and wants the tag in the
-/// URL (docs/06-service.md, `service/do/`), which is the only thing
+/// URL (docs/explanation/service.md, `service/do/`), which is the only thing
 /// about it a client has to know. Otherwise presence is as on any
 /// relay: the beats go to every relay in the device's list, so a device
 /// that cannot reach the object is still online through the others.

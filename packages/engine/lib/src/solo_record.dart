@@ -192,7 +192,7 @@ class ReplayedHand {
   final List<Card> humanPass;
 
   /// Each seat's thirteen as dealt, before the pass: what anybody can
-  /// work out from the seed alone (docs/03-fair-deal.md).
+  /// work out from the seed alone (docs/explanation/fair-deal.md).
   final List<List<Card>> dealt;
 }
 

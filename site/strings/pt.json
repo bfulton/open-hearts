@@ -128,7 +128,7 @@
       "random": "<b>Aleatório.</b> Numa mesa ao vivo, cada aparelho embaralha o baralho por vez e prova que embaralhou com honestidade, então basta um aparelho honesto para uma distribuição justa. Cada mão só se abre para o seu jogador: nenhum outro jogador a vê, nem servidor algum. Jogando sozinho, cada distribuição vem do gerador aleatório seguro do seu aparelho.",
       "witness": "<b>Com testemunhas.</b> Cada mão sorteia jurados: desconhecidos escolhidos ao acaso entre outros jogadores online, sem nada em jogo na mesa. Eles jogam os lugares dos bots e guardam pedaços das chaves de cada jogador, para que a mão possa terminar se alguém sair sem que ninguém, sozinho, consiga abrir as cartas de outro. Quando há poucos jogadores online para formar um júri, os jurados reserva do nosso serviço completam o número. Como qualquer jurado, eles não conseguem ver as suas cartas sozinhos, só junto com outro jogador da sua mesa; então, nessas mãos, você confia que não vamos fazer conluio.",
       "audit": "<b>Auditado.</b> Depois de cada mão, cada aparelho publica o seu segredo, então a partida inteira pode ser refeita e cada embaralhada, carta e jogada conferida. Depois de uma partida ao vivo, <i>Ver a partida inteira</i> faz essa conferência por você; depois de uma partida sozinho, <i>Copiar registro</i> a guarda.",
-      "more": "Como tudo funciona está <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">nesta explicação</a>."
+      "more": "Como tudo funciona está <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">nesta explicação</a>."
     }
   },
   "privacy": {

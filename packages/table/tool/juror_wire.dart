@@ -2,7 +2,7 @@
 /// event goes over the wire as — as JSON, which is what a relay takes,
 /// and as a frame, which is what a channel takes, a juror being dialled
 /// like anybody else (frame.dart). Run it when the deal's proofs or the
-/// event bodies change, and carry the number to docs/04-live-play.md:
+/// event bodies change, and carry the number to docs/explanation/live-play.md:
 ///
 ///     dart run tool/juror_wire.dart
 ///

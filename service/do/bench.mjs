@@ -1,5 +1,5 @@
-// The jurors of last resort, as a Cloudflare Container
-// (docs/04-live-play.md; service/bench builds the image).
+// The backup jurors, as a Cloudflare Container
+// (docs/explanation/live-play.md; service/bench builds the image).
 //
 // A table with bot seats is dealt only to a jury that can hold them, and
 // on a quiet night there is nobody online to make one. The table then
@@ -32,6 +32,17 @@ const INACTIVITY_MS = 15 * 60 * 1000;
 const READY_TRIES = 100;
 const READY_WAIT_MS = 200;
 
+/// Where this object notes what it last started the backup jurors
+/// with: a digest of their environment, which holds a secret, and of
+/// the deploy that started them.
+const STARTED_WITH = 'startedWith';
+
+/// The SHA-256 of [env] as JSON, in hex.
+async function digestOf(env) {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(env))));
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export class Bench {
   constructor(state, env = {}) {
     this.state = state;
@@ -63,17 +74,29 @@ export class Bench {
     const c = this.container;
     if (!c) return false;
     await c.setInactivityTimeout?.(INACTIVITY_MS);
+    const env = {
+      ...(this.env.OH_JUROR_SECRET ? { OH_JUROR_SECRET: this.env.OH_JUROR_SECRET } : {}),
+      // The service's public key, to check the seats' licences by.
+      ...(this.env.OH_SERVICE_KEY ? { OH_SERVICE_KEY: this.env.OH_SERVICE_KEY } : {}),
+      ...(this.env.OH_BENCH_RELAYS ? { OH_RELAYS: this.env.OH_BENCH_RELAYS } : {}),
+      ...(this.env.OH_BENCH_PRESENCE_RELAYS ? { OH_PRESENCE_RELAYS: this.env.OH_BENCH_PRESENCE_RELAYS } : {}),
+    };
+    // The environment and the image are the container's from when it
+    // started, and a deploy starts no container afresh: Cloudflare's
+    // rollouts pass over containers an object starts, which take their
+    // image at start. One kept awake by calls would hold every seat to
+    // an old service key, sign with an old juror secret the relay no
+    // longer takes, or speak an old build's protocol. So one started
+    // with another environment, or under another deploy
+    // (CF_VERSION_METADATA, wrangler.toml), is stopped and started again.
+    const started = await digestOf({ env, version: this.env.CF_VERSION_METADATA?.id ?? null });
+    if (c.running && (await this.state.storage.get(STARTED_WITH)) !== started) await c.destroy();
     if (!c.running) {
-      c.start({
-        enableInternet: true,
-        env: {
-          ...(this.env.OH_JUROR_SECRET ? { OH_JUROR_SECRET: this.env.OH_JUROR_SECRET } : {}),
-          // The service's public key, to check the seats' licences by.
-          ...(this.env.OH_SERVICE_KEY ? { OH_SERVICE_KEY: this.env.OH_SERVICE_KEY } : {}),
-          ...(this.env.OH_BENCH_RELAYS ? { OH_RELAYS: this.env.OH_BENCH_RELAYS } : {}),
-          ...(this.env.OH_BENCH_PRESENCE_RELAYS ? { OH_PRESENCE_RELAYS: this.env.OH_BENCH_PRESENCE_RELAYS } : {}),
-        },
-      });
+      c.start({ enableInternet: true, env });
+      await this.state.storage.put(STARTED_WITH, started);
+      // A fresh container gets its minute's grace (alarm), whatever the
+      // one before it had missed.
+      await this.state.storage.delete('unanswered');
     }
     if (!(await this.ready())) return false;
     try {

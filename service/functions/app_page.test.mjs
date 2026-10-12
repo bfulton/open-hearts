@@ -1,4 +1,4 @@
-// Where the app is (worker.mjs, serveStatic; docs/06-service.md): one
+// Where the app is (worker.mjs, serveStatic; docs/explanation/service.md): one
 // deployment, routed by host. play.openhearts.game is the app at its
 // root, from the build's /play/; openhearts.game is the site, and sends
 // /play/… on to the app's host; a preview serves the app at /play/.

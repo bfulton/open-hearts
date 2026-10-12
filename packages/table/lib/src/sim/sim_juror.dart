@@ -71,7 +71,7 @@ class SimJuror {
   Exit? exit;
   bool gone = false;
 
-  /// For a juror of last resort: whether a table has called for it.
+  /// For a backup juror: whether a table has called for it.
   bool called = false;
 
   /// The verdicts this juror gave, for tests.

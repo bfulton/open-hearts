@@ -499,7 +499,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String serviceRefusal(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'noSubscription': 'No hay suscripción.',
-      'fiveDevices':
+      'accountFull':
           'Esta suscripción ya tiene todos los dispositivos que admite.',
       'notACode': 'Eso no es un código.',
       'noSuchCode': 'Ese código no existe.',

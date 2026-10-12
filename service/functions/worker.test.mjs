@@ -731,7 +731,7 @@ test('five devices is a household; a sixth is refused, and no code is made for o
   assert.equal((await devicesOn(store, await accountOfSub(store, 'sub_9'))).length, 5);
   const sixth = await ticketFor(KEY, store, { now });
   assert.equal(sixth.status, 409);
-  assert.deepEqual(sixth.body, { error: 'five devices already', devices: 5, most: 5 });
+  assert.deepEqual(sixth.body, { error: 'the account has all the devices it can take', devices: 5, most: 5 });
 });
 
 test('a code made before the fifth device cannot let a sixth in', async () => {
@@ -1154,7 +1154,7 @@ test('a full account turns a sign-in away as it turns a code away', async () => 
   await attest(who, KEY, store, login, { now });
   const turned = await supersede(who, OTHER, store, { OH_STORE: kvOf(store) }, login, { now });
   assert.equal(turned.status, 409);
-  assert.equal(turned.body.error, 'five devices already');
+  assert.equal(turned.body.error, 'the account has all the devices it can take');
 });
 
 test('a sign-in linked to no account has nothing to bring a device into', async () => {

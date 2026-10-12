@@ -1,4 +1,4 @@
-# 03 — The fair deal
+# The fair deal
 
 Four strangers need to agree that the cards were shuffled fairly, and
 each of them needs to see only their own hand. A shared seed does not
@@ -47,7 +47,7 @@ functions over bytes in `crypto/deal`.
   came from.
 
 All of this runs as turns of the table protocol
-([doc 04](04-live-play.md), [doc 07](07-states.md)): four rounds before
+([live play](live-play.md), [table states](table-states.md)): four rounds before
 the pass (keys, shuffle in seat order, tokens, lead declared) and the
 audit after the last trick. Every step is checked by everyone when it
 arrives. A seat that does not take its turn is removed like any other
@@ -55,24 +55,24 @@ silent seat.
 
 One Rust crate builds twice. It builds as a cdylib that the Dart VM
 loads over FFI (tests, the verifier, the service's juror), and as a
-roughly 500 KB wasm that the browser loads with no glue code. Every random
-value comes in as a seed from the caller. The wasm has no entropy source
-of its own. The reference's three crates are vendored (`crypto/vendor`),
-since upstream is unmaintained. They are ported from arkworks 0.3 to
-0.6 with every byte that crosses the wire or is kept unchanged: keys,
-masked cards, shuffles, every proof, and the Fiat–Shamir transcripts
-behind them. 0.3's transcript encoding and ark-marlin's Fiat–Shamir
-generator are kept as they were. A device on the older library and one
-on the newer sit at one table, and every game the older one kept still
-verifies. Golden vectors written by the 0.3 library hold this: the
+wasm that the browser loads with no glue code (`app/web/deal.wasm`).
+Every random value comes in as a seed from the caller. The wasm has no
+entropy source of its own.
+
+The reference's three crates are vendored (`crypto/vendor`), since
+upstream is unmaintained, and built on a current arkworks. Every byte
+that crosses the wire or is kept is fixed: keys, masked cards, shuffles,
+every proof, and the Fiat–Shamir transcripts behind them, which keep the
+reference's transcript encoding and ark-marlin's Fiat–Shamir generator.
+Golden vectors written by the reference's own library hold this: the
 deal's every call on fixed seeds, bent inputs and odd encodings among
 them, replayed natively, over FFI and in the committed wasm
-(`crypto/deal/tests/golden.rs`). So do two sealed games the 0.3 library
-kept, verified by the table's tests and by the review page in the
-browser. One fix is the project's own: a point is normalised before it
-is written into a proof's transcript. Otherwise a proof made from
-Jacobian coordinates and checked from its serialised bytes would hash
-different values, and every proof here crosses a wire.
+(`crypto/deal/tests/golden.rs`). So do two sealed games that library
+kept, which the table's tests and the review page in the browser still
+verify. One fix is the project's own: a point is normalised before it is
+written into a proof's transcript. Otherwise a proof made from Jacobian
+coordinates and checked from its serialised bytes would hash different
+values, and every proof here crosses a wire.
 
 ### A batch of tokens under one argument
 
@@ -82,8 +82,9 @@ instead. Coefficients ρᵢ are taken from a hash of the key, the cards
 and the tokens, and one argument shows log_G(pk) = log_H(B), where
 H = Σ ρᵢ·C1ᵢ and B = Σ ρᵢ·Tᵢ. Getting any token wrong moves B off sk·H.
 Moving it back would require knowing the ρᵢ before committing, and the
-hash prevents that. The batch cuts a seat's tokens round from 7,386
-bytes to 2,169 (`reveal_tokens` in `crypto/deal/src/lib.rs`). A token
+hash prevents that. The batch makes a seat's tokens round under a third
+of the size of 39 tokens each with its own proof (`tokens_len` against
+`TOKEN` in `crypto/deal/src/lib.rs`). A token
 that travels alone, in a declaration, a play or a pass, carries its own
 proof.
 
@@ -105,8 +106,9 @@ randomness `r`, which satisfy:
 
 A Σ-protocol over both witnesses (commit to a random pair, derive the
 challenge from a hash of the statement, answer `z1 = a + c·sk` and
-`z2 = b + c·r`) proves this without revealing the token. It is 160
-bytes, and every seat checks it before accepting the pass. A pass that
+`z2 = b + c·r`) proves this without revealing the token. It is five
+group elements and scalars (`SEAL_PROOF` in `crypto/deal/src/lib.rs`),
+and every seat checks it before accepting the pass. A pass that
 fails the check never settles, and the passer's clock runs out at its
 own turn. The receiver never has to complain.
 
@@ -127,13 +129,13 @@ it merely dislikes.
 A bot's hand must be hidden from the table too. If it is not, a table
 of two people and two open bots shows each person 39 cards, and the
 other person's hand is the thirteen left over. So each bot seat is held
-by a **juror** ([doc 04](04-live-play.md)). The juror draws the seat's
+by a **juror** ([live play](live-play.md)). The juror draws the seat's
 secret as a person would, plays the bot's policy, shuffles with an
 argument and makes tokens with proofs. The table checks all of it
 without seeing the hand. Each juror holds one bot seat, so no juror
 holds enough cards to work out a person's hand by subtraction. The
 juror for each seat is named by the jury draw the deal is sealed to,
-and that draw is on the record ([doc 07](07-states.md)). A bot seat's
+and that draw is on the record ([table states](table-states.md)). A bot seat's
 secret is published at the audit like everyone else's, so the verifier
 can check every bot move was the policy's.
 
@@ -153,8 +155,8 @@ two table keys share (Diffie–Hellman on the same curve):
   noise, and so does the whole jury. With no jury, the pieces go to the
   other people, and all of them are needed.
 - **A bot seat a juror holds** is split into Shamir shares over GF(2⁸),
-  one per juror, and any `escrowThreshold` (2) of them rebuild it. One
-  juror alone has nothing. The pieces are released sealed to the other
+  one per juror, and any `escrowThreshold` of them rebuild it
+  (`packages/deal/lib/deal.dart`). One juror alone has nothing. The pieces are released sealed to the other
   custodians while the hand is played, since a piece said in the clear
   would also be heard by the players. Once the hand is over they are
   released in the clear, with the audit. A juror drawn later gets a
@@ -166,10 +168,11 @@ When the table removes a seat, each holder releases its piece, and
 repeats the release every few seconds until the secret is known. The
 seat's turns stall meanwhile, and the screen says so. A held bot seat
 passes to the escrow when the record gives it there: the players claim
-it at its turn when its juror is gone or out of time. If fewer than two
-of its custodians remain and nobody who could open it is back within
-twenty seconds, the game ends unscored as a connection failure
-("juror quorum lost").
+it at its turn when its juror is gone or out of time. If fewer than
+`escrowThreshold` of its custodians remain and nobody who could open it
+is back within the lost-quorum clock (`quorumLostMs`), the game ends
+unscored as a connection failure ("juror quorum lost";
+[the lost-quorum ending](table-states.md#the-lost-quorum-ending)).
 
 **Open.** Rebuilding a departed seat's secret opens that seat's whole
 hand to whoever rebuilt it. `crypto/deal` and `DealSession` also
@@ -187,7 +190,7 @@ to settle when its seal can open, not when it arrives.
 
 The verifier first holds every person's seat to its licence: one the
 service signed for that seat's key, naming its account, and no account
-seated twice ([doc 06](06-service.md)). Then it replays a sealed record
+seated twice ([the service](service.md)). Then it replays a sealed record
 through the deal. It checks every key's proof, every shuffle's argument
 against the deck before it, every token and the lead declaration. Then
 the audit's secrets open every card. Each play's token must open the
@@ -199,7 +202,7 @@ A record that continues past the end of the game is rejected.
 
 ## Cost, and keeping it off the page
 
-A shuffle with its argument is the costly step: about a tenth of a
+Roughly, a shuffle with its argument is the costly step: about a tenth of a
 second natively, and three or four times that in a browser's wasm, with
 checking one a little less. A token, sealed or not, takes a millisecond
 or two to make or check natively, and a few in a browser. A four-person
@@ -218,8 +221,9 @@ slow result itself, it stops, says what it needs (`DealSession.wanted`),
 and continues from the answers (`resume`). Each answer is matched by a
 hash of the call. A slow call that was not sent to the worker throws
 (`PreparedDeal`), and the simulator's tests hold that count to zero.
-A worker that fails, or makes no progress for six five-second ticks, is
-replaced once (`ResilientDealWorker`). The ticks use the page's own
+A worker that fails, or makes no progress for several ticks, is
+replaced once (`ResilientDealWorker` in `packages/deal/lib/src/work.dart`).
+The ticks use the page's own
 timer, so a sleeping phone is not judged stalled. If the replacement also
 fails, the device cannot deal (`TableClient.cannotDeal`). Seated, it
 leaves at once and says so. As a juror, it stops following the table,
@@ -296,56 +300,15 @@ hand. The target appears only when it is not fifty. `oh1` records carry
 an integer seed for `dart:math`'s `Random` and still replay. The tests
 and tools name games the same way.
 
-`cd packages/engine && dart run tool/replay.dart '<record>'` prints every
-hand and trick. To check a deal without any of this code, the following
-prints hand `h` (player, west, north, east) using only Python's standard
-library:
-
-```python
-import hashlib, hmac, struct, sys
-
-seed, hand = bytes.fromhex(sys.argv[1]), int(sys.argv[2])
-words = []
-for block in range(16):  # a deal needs seven blocks; sixteen is plenty
-    mac = hmac.new(seed, b'deal' + struct.pack('>II', hand, block), hashlib.sha256)
-    words += struct.unpack('>8I', mac.digest())
-deck = list(range(52))
-for i in range(51, 0, -1):
-    n = i + 1
-    while words[0] >= 2**32 - 2**32 % n:
-        words.pop(0)
-    j = words.pop(0) % n
-    deck[i], deck[j] = deck[j], deck[i]
-cards = [r + s for s in 'CDSH' for r in '2 3 4 5 6 7 8 9 10 J Q K A'.split()]
-for seat in range(4):
-    print(' '.join(cards[c] for c in sorted(deck[13 * seat:13 * seat + 13])))
-```
+To replay a record, or to check a deal with nothing but Python, see
+[Replay a solo game or check a deal by hand](../how-to/replay-a-game.md).
 
 The seed is on the device, so a player who goes looking can read the
 bots' hands in their own game. Nothing can prevent that in a game
 against your own device. What is guaranteed is a uniform deal from an
 unpredictable generator, reproduced exactly on every replay.
 
-## Tests
-
-- `packages/deal`: every primitive round trips. Four sessions in one
-  process deal, pass, play, lose a seat and rebuild it, and audit, and a
-  verifier that saw only the messages checks the result. The share-token
-  path opens a departed seat's hand and a pass sealed to it while
-  `knowsSecret` stays false.
-- `packages/table/test/sealed_test.dart`: whole sealed games at one, two
-  and four people that verify to the end. It covers leaving mid-hand and
-  during the deal, and a table of two surviving a crash through the jury.
-  It also commits both faults for real, every seat disclaiming the 2♣ and
-  a pass sealed to nothing, and each game still finishes and verifies.
-- `service/test` runs the jury sealed over real sockets, and the browser
-  suites deal every hand this way.
-- `packages/engine/test/deal_seed_test.dart` and `solo_record_test.dart`
-  cover the solo deal. They check the generator against known answers
-  worked out in Python from this description, rejection of uneven draws,
-  uniformity over all orders of four cards, and a χ² over 52 × 52
-  positions that two broken shuffles fail. They also check that records
-  of both versions replay trick for trick, on the VM and in Chrome.
+How the deal is tested is in [testing](testing.md#the-deal).
 
 ## References
 

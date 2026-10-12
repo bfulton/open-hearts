@@ -21,7 +21,7 @@ export const stripe = {
   /// Hosts a webhook of ours points at; one elsewhere is not ours.
   hosts: ['openhearts.game', 'open-hearts.pages.dev'],
 
-  /// $5.99 a year, paid up front (docs/06-service.md). Found by its
+  /// $5.99 a year, paid up front (docs/explanation/service.md). Found by its
   /// lookup key, which is what the service is given
   /// (OH_STRIPE_PRICE): a new price takes the key over and nothing else
   /// changes. A price's amount cannot be edited, so a change to it here

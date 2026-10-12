@@ -1,4 +1,4 @@
-//! The verifiable deal (docs/03-fair-deal.md): Barnett–Smart mental
+//! The verifiable deal (docs/explanation/fair-deal.md): Barnett–Smart mental
 //! poker with the Bayer–Groth shuffle argument, from
 //! geometryxyz/mental-poker on the Starknet curve, wrapped as flat
 //! functions over byte buffers so the same build serves the browser
@@ -394,7 +394,7 @@ fn batch_challenge(pk: &Affine, h: &Affine, b: &Affine, a1: &Affine, a2: &Affine
 
 /// A seat's key split into additive shares, so that its cards can be
 /// opened without anyone putting the key back together
-/// (docs/04-live-play.md). The shares add to the key behind [secret]:
+/// (docs/explanation/live-play.md). The shares add to the key behind [secret]:
 /// no smaller set is anything, and [share_key] of them aggregates to
 /// the seat's own public key, which is what says a split is a split
 /// of *that* key.
@@ -548,7 +548,7 @@ pub fn bytes_sum(parts: &[u8], len: usize, out: &mut [u8]) -> Option<usize> {
 ///
 /// A threshold because a hand's escrow rests on the jurors it was
 /// sealed to still being reachable when a bot seat has to be opened
-/// (docs/04-live-play.md). "Any two of the jury" keeps one holder
+/// (docs/explanation/live-play.md). "Any two of the jury" keeps one holder
 /// alone from being anything, with room to lose people.
 ///
 /// The shares are f(1)..f(n) of a polynomial of degree t−1 whose
@@ -588,7 +588,7 @@ pub fn split_threshold(secret: &[u8], n: usize, t: usize, seed: &[u8], out: &mut
 /// coefficient·(share·C1) is the seat's own token, and the card comes
 /// out. At another index it is what the share is worth towards *that*
 /// index's share — which is how a newcomer to the jury is given one
-/// without anybody rebuilding the key (docs/04-live-play.md).
+/// without anybody rebuilding the key (docs/explanation/live-play.md).
 ///
 /// [have] is one byte per index, each 1..=255 and distinct; [index]
 /// must be among them.
@@ -702,7 +702,7 @@ pub fn unmask(pks: &[u8], tokens: &[u8], masked: &[u8]) -> Option<usize> {
 /// without an argument nobody else could tell an honest seal from a
 /// bad one: a passer could send three cards the receiver would never
 /// open, and no third party could say whose fault it was
-/// (docs/03-fair-deal.md). The argument says, to anybody, that
+/// (docs/explanation/fair-deal.md). The argument says, to anybody, that
 /// what is inside the ciphertext is the share the owner's key owes for
 /// that card — without saying what the share is.
 ///

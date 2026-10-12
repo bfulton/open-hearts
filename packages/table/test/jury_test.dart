@@ -1,4 +1,4 @@
-/// The jury (docs/04-live-play.md), on the simulator: the rows of the
+/// The jury (docs/explanation/live-play.md), on the simulator: the rows of the
 /// departure matrix that need strangers online — a table of two with
 /// one gone quiet, a partition the jury can see across, a juror gone,
 /// the foreman gone, the whole jury gone, and nobody to draw from.
@@ -162,7 +162,7 @@ void main() {
       t.stop();
     });
 
-    test('nobody online to draw from: the table says so, and a juror of last resort answers', () {
+    test('nobody online to draw from: the table says so, and a backup juror answers', () {
       final t = SimTable(humans: 2, seed: 67, lastResort: true);
       t.people[1]
         ..exit = Exit.idle
@@ -181,8 +181,8 @@ void main() {
     // Nobody comes. The table cannot go on without a juror, and none
     // can be found: once the other person has been silent as long as a
     // person is given, the game ends rather than wait for good
-    // (docs/04-live-play.md).
-    test('nobody online and no last resort: the table pauses and says why, then the game ends', () {
+    // (docs/explanation/live-play.md).
+    test('nobody online and no backup jurors: the table pauses and says why, then the game ends', () {
       final t = SimTable(humans: 2, seed: 68, withPresence: true);
       t.people[1]
         ..exit = Exit.idle

@@ -1,4 +1,4 @@
-/// The departure matrix from docs/06-service.md, run on the simulator.
+/// The departure matrix from docs/explanation/service.md, run on the simulator.
 ///
 /// Every cell plays a whole game with some of its humans leaving the
 /// way and at the moment the cell says, then checks what every cell
@@ -7,7 +7,7 @@
 /// and the table either finishes or — its survivors too few to carry a
 /// removal, and no jury to rule for them — pauses, says why, and once
 /// the departed have been silent as long as a person is given, ends:
-/// juror quorum lost (docs/04-live-play.md).
+/// juror quorum lost (docs/explanation/live-play.md).
 library;
 
 import 'package:engine/engine.dart';

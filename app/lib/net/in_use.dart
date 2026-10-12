@@ -1,4 +1,4 @@
-/// One device at a time (docs/06-service.md).
+/// One device at a time (docs/explanation/service.md).
 ///
 /// An account is a person, and a person plays on one device at a time:
 /// the newest device to take the account up is the one in use, at once,

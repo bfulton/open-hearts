@@ -1,6 +1,6 @@
 /// Quick reactions at a live table: a seated player's 👍 or 😬, shown
 /// for a moment beside their badge on every screen at the table and on
-/// every screen watching it (docs/04-live-play.md).
+/// every screen watching it (docs/explanation/live-play.md).
 ///
 /// A fixed few, and no free text, so there is nothing to moderate: a
 /// reaction on the wire is a short code from [Reaction], never words,

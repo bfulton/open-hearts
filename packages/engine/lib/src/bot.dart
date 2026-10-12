@@ -28,7 +28,7 @@ import 'rules.dart';
 /// event carries this number, and a client whose number differs does
 /// not sit down. Bump it whenever a change to bot.dart, persona.dart
 /// or the pass and play rules they read could change a single card —
-/// or to what a table is (6: the sealed deal, docs/03-fair-deal.md).
+/// or to what a table is (6: the sealed deal, docs/explanation/fair-deal.md).
 const botPolicyVersion = 6;
 
 /// The public information a bot decides from.

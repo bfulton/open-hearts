@@ -187,7 +187,7 @@ export async function startRelay({ apart = false, port = null, tag = suite, say 
       out += d.toString();
       const m = out.match(/relay (ws:\/\/\S+)/);
       if (m) resolveUrl(m[1]);
-      // The jurors of last resort's own lines, once the relay is up.
+      // The backup jurors' own lines, once the relay is up.
       if (relayLog) relayLog.write(d);
       if (m && bench.length === 0) {
         if (apart) {
@@ -238,7 +238,7 @@ function startJuror([cmd, ...args], relay, secret, relayLog, size, say) {
     for (const line of d.toString().split('\n')) {
       if (line === '') continue;
       said.push(line);
-      const m = line.match(/^jurors of last resort (\w{8}) /);
+      const m = line.match(/^backup jurors (\w{8}) /);
       if (m) named(m[1]);
       if (/juror|summoned|called|verdict|done with/.test(line)) say(`juror: ${line.trim()}`);
     }
@@ -253,7 +253,7 @@ const types = {
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.frag': 'application/octet-stream', '.symbols': 'text/plain',
 };
 
-/// The service's handlers in local mode (docs/06-service.md): the same
+/// The service's handlers in local mode (docs/explanation/service.md): the same
 /// worker the site runs, over a Map instead of a key-value store, with
 /// the open house on — a device that asks is licensed for a month, so
 /// the suite plays live without a shop to buy from. The service's own
@@ -301,7 +301,7 @@ export async function startTurn({ tag = suite } = {}) {
 async function handlersFor(serve, turn, records, config) {
   const { default: handler, memoryStore } = await import(new URL('../service/functions/worker.mjs', import.meta.url));
   const store = memoryStore();
-  // The operator's remote config (docs/06-service.md), where a suite
+  // The operator's remote config (docs/explanation/service.md), where a suite
   // sets one: the row the worker checks and serves at /api/config.
   if (config) await store.put('config', 'app', config);
   const env = {
@@ -351,7 +351,7 @@ const recordsBucket = () => ({
 /// The site and the app, served as the site's Pages project serves them:
 /// one directory — the site built in every language at the root, the app
 /// at /play/ — behind the site's own worker (service/functions/worker.mjs),
-/// which routes by host (docs/06-service.md, "Where the app is").
+/// which routes by host (docs/explanation/service.md, "Where the app is").
 /// Production's hosts have stand-ins here that a browser takes to be
 /// this machine, and that are one site to it, as production's are:
 ///

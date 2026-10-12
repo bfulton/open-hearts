@@ -1,6 +1,6 @@
 /// The jury: strangers drawn from whoever is online, per hand, to
 /// break a deadlock the players at a table cannot break themselves
-/// (docs/04-live-play.md).
+/// (docs/explanation/live-play.md).
 ///
 /// The draw is a function of the deal's own randomness, the hand and
 /// a snapshot of who is online that the table agrees on, so nobody at
@@ -12,7 +12,7 @@ import 'dart:math';
 
 import 'signing.dart';
 
-/// How many jurors a hand draws (docs/04-live-play.md): four
+/// How many jurors a hand draws (docs/explanation/live-play.md): four
 /// answers the escrow, whose exposure is the 8% of hands where
 /// somebody leaves. Holding bot seats is the other role and wants six
 /// — its exposure is every hand with a bot, and the count has to cover
@@ -39,7 +39,7 @@ List<PublicKey> drawJury(int seed, int hand, Iterable<PublicKey> snapshot, {int 
 }
 
 /// Which juror holds which bot seat, one seat each
-/// (docs/04-live-play.md). Deterministic
+/// (docs/explanation/live-play.md). Deterministic
 /// in the jury and the seats, so every peer computes the same
 /// assignment from the same proposal and the verifier recomputes it
 /// afterwards.
@@ -90,7 +90,7 @@ abstract class Presence {
   /// The draw takes whoever is online, which mixes somebody in the
   /// middle of a game with somebody glancing at the lobby, and a
   /// hand's escrow rests on the ones it draws still being there when
-  /// a bot seat has to be opened (docs/04-live-play.md). Preferring
+  /// a bot seat has to be opened (docs/explanation/live-play.md). Preferring
   /// the settled ones costs nothing and needs no
   /// agreement: a proposer may narrow its own candidates as it likes,
   /// since what the table checks is that each juror is somebody *it*
@@ -104,7 +104,7 @@ abstract class Presence {
 
   /// The account [key] belongs to, as its presence says: a table draws
   /// no juror from an account it seats, by whichever of the account's
-  /// devices (docs/04-live-play.md). The key itself where nothing names
+  /// devices (docs/explanation/live-play.md). The key itself where nothing names
   /// one — an account of one device.
   String accountOf(PublicKey key);
 
@@ -112,7 +112,7 @@ abstract class Presence {
   /// spec and the hand.
   void summon(PublicKey juror, Map<String, Object?> summons);
 
-  /// Says that [table] found nobody to draw from, so that a juror of
-  /// last resort can come online.
+  /// Says that [table] found nobody to draw from, so that a backup
+  /// juror can come online.
   void callForJuror(String table);
 }

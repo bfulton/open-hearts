@@ -1,6 +1,6 @@
 /// Who this device is: one keypair, made the first time it is needed
 /// and kept on the device. The public key is the identity at a table
-/// and the secret never leaves (docs/04-live-play.md).
+/// and the secret never leaves (docs/explanation/live-play.md).
 library;
 
 import 'dart:convert';

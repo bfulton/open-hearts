@@ -1,4 +1,4 @@
-/// Buying live play (docs/06-service.md).
+/// Buying live play (docs/explanation/service.md).
 ///
 /// On the web that is Stripe Checkout, in subscription mode: this
 /// device asks the service for a session with its own key in the
@@ -28,7 +28,7 @@ import 'store_buying.dart';
 /// What live play costs a year, as it is written on the front door
 /// (`pricePerYear`, l10n). The shape of the price is chosen by the fees
 /// — a year rather than a month, since a card's fixed thirty cents is
-/// paid once (docs/06-service.md).
+/// paid once (docs/explanation/service.md).
 const priceAmount = r'$5.99';
 
 /// The price as shown: the store's, in a store build, since it is the

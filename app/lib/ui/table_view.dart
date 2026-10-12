@@ -202,7 +202,7 @@ class TableView extends StatelessWidget {
         // so seventy-six points is the whole of what fits; a tablet's
         // felt is further away and has room, and cards that stayed a
         // phone's size on it would be a phone's game with green around
-        // it (docs/05-form-factors.md). That is the table's scale, the
+        // it (docs/explanation/screens.md). That is the table's scale, the
         // one its type is drawn at too.
         final most = TableScale.phoneCard * scale;
         var cardWidth = [

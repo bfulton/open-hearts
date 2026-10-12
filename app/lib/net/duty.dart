@@ -1,5 +1,5 @@
 /// What every open app does for the tables it is not at: says it is
-/// online, and serves as a juror when drawn (docs/04-live-play.md) —
+/// online, and serves as a juror when drawn (docs/explanation/live-play.md) —
 /// while it can deal. Every live table is sealed, so a device whose
 /// deal did not load, or whose worker has failed for good since, could
 /// serve none of them: it says nothing of itself, and still hears the
@@ -70,7 +70,7 @@ class Duty {
       // A juror here is a device like any other: it takes the table's
       // seats as peers and is dialled by them, so the play reaches it
       // on a data channel rather than through the relay
-      // (docs/02-multiplayer.md). The relay under the mesh is what
+      // (docs/explanation/multiplayer.md). The relay under the mesh is what
       // signals the channels into being, and the lane for whatever has
       // no channel yet.
       dial: (spec, lane) => MeshTransport(
@@ -96,7 +96,7 @@ class Duty {
   /// Says whether this device is at a table, which presence carries so
   /// that another table's draw can prefer it: somebody mid-game has a
   /// reason to still be here in a minute where somebody in the lobby
-  /// has none (docs/04-live-play.md).
+  /// has none (docs/explanation/live-play.md).
   static set seated(bool v) {
     final p = _current?.presence;
     if (p != null) p.status = v ? RelayPresence.seated : 'online';

@@ -1,5 +1,5 @@
 /// A subscription buys an account, and an account is a person's, not a
-/// device's (docs/06-service.md).
+/// device's (docs/explanation/service.md).
 ///
 /// So a second device has to be able to come into the same account. The way
 /// that costs nothing to type: the subscribed device shows a code, and
@@ -253,7 +253,7 @@ class Refused {
   /// The service's errors the app has words for (worker.mjs).
   static const _named = {
     'no subscription': 'noSubscription',
-    'five devices already': 'fiveDevices',
+    'the account has all the devices it can take': 'accountFull',
     'not a code': 'notACode',
     'no such code': 'noSuchCode',
     'that code has been used': 'codeUsed',

@@ -8,7 +8,7 @@
 /// those, and a heartbeat; the jury's four (jury.dart): a proposal
 /// of who the hand's jurors are, a juror's heartbeat while it serves,
 /// an appeal of a turn the players cannot settle, and a verdict; and
-/// the sealed deal's three (docs/03-fair-deal.md): a step of the deal —
+/// the sealed deal's three (docs/explanation/fair-deal.md): a step of the deal —
 /// keys, a shuffle, tokens, the lead declared, the audit — the release
 /// of a piece of a departed seat's secret, and a part of a new piece
 /// for a juror brought on mid-hand. A claim that a held bot seat's
@@ -29,7 +29,7 @@ enum EventKind { pass, play, leave, boot, absent, witness, heartbeat, jury, serv
 
 /// Which moment of a hand an event is about. A hand has four pass turns
 /// (one per seat, all open at once) followed by fifty-two play turns.
-/// At a sealed table (docs/03-fair-deal.md) they are preceded by the
+/// At a sealed table (docs/explanation/fair-deal.md) they are preceded by the
 /// deal's turns — four rounds of four, one per seat: keys, shuffle,
 /// tokens, the lead declared — and followed by four audit turns.
 class TurnId {

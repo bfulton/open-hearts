@@ -1,5 +1,5 @@
 // What a tag's object keeps, and for how long (tag_store.mjs,
-// docs/08-own-relays.md), against a storage that behaves as an
+// docs/explanation/relay.md), against a storage that behaves as an
 // object's does: keys in order, list by prefix and end, one alarm.
 
 import assert from 'node:assert/strict';

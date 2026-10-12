@@ -106,7 +106,7 @@ void main() {
 
     // A token sealed to seat 1, with the argument that it is the token
     // seat 0 owes for that card. Seat 1 alone opens it; anybody checks
-    // it (docs/03-fair-deal.md).
+    // it (docs/explanation/fair-deal.md).
     final masked0 = maskedAt(deck, 0);
     final token = d.revealToken(secrets[0], masked0, seed(50));
     final sealed = d.seal(secrets[0], pks[1], masked0, seed(51));

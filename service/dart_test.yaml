@@ -1,4 +1,4 @@
-# How the service's tests run (docs/09-testing.md).
+# How the service's tests run (docs/explanation/testing.md).
 #
 # Four files side by side: each starts its own relay on a port the
 # system picks (Relay.serve), so none can hear another's tables.

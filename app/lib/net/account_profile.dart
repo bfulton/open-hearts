@@ -1,4 +1,4 @@
-/// The profile is the account's, not the device's (docs/06-service.md).
+/// The profile is the account's, not the device's (docs/explanation/service.md).
 ///
 /// The name the others see, the icon and colour or picture they see it
 /// on: an account is a person, and a person is the same on every device

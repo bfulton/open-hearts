@@ -1,5 +1,5 @@
 # Analyze, test, and prove the web build still builds: everything
-# ./check.sh full runs (docs/09-testing.md), in jobs side by side.
+# ./check.sh full runs (docs/explanation/testing.md), in jobs side by side.
 #
 # On pull requests and on main. A push that supersedes another on the
 # same pull request cancels it; on main every push is kept.
@@ -55,7 +55,7 @@ jobs:
         with:
           path: crypto/deal/target/memo
           key: deal-memo-app-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.toml', 'crypto/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
-      # The deal's cryptography (docs/03-fair-deal.md): the cdylib the VM
+      # The deal's cryptography (docs/explanation/fair-deal.md): the cdylib the VM
       # tests load.
       # The browser's wasm is committed (app/web/deal.wasm).
       - name: Deal and Schnorr (Rust — the cdylibs for the VM; the golden vectors; the vendored proof crates)
@@ -216,6 +216,8 @@ jobs:
         run: node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
       - name: The scripts no suite runs, each still parsing (./check.sh scripts)
         run: ./check.sh scripts
+      - name: The docs, every link, anchor and repository path they name resolving (./check.sh docs)
+        run: ./check.sh docs
 
   # The browser suites (e2e/README.md), three runners at once: the flows
   # one device can drive; four browsers at one table; and the rest — the

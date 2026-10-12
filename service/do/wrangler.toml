@@ -1,4 +1,4 @@
-# The per-tag relay (worker.mjs, docs/06-service.md).
+# The per-tag relay (worker.mjs, docs/explanation/service.md).
 #
 #   cd service/do && npx wrangler@4.130.0 deploy
 #
@@ -11,10 +11,10 @@ main = "worker.mjs"
 base_dir = "../.."
 compatibility_date = "2025-01-01"
 
-# Where the apps find it (app/lib/net/relays.dart, homeTagRelay).
+# Where the apps find it (app/lib/net/relays.dart, ourRelay).
 routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 
-# The jurors of last resort's image is built from the repo on every
+# The backup jurors' image is built from the repo on every
 # deploy (service/bench/build.sh): the juror compiled from the table
 # code as it is now, never a stage left over from an earlier deploy, so
 # the backup jurors always speak the app's protocol. Needs cargo and dart
@@ -22,6 +22,13 @@ routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 [build]
 command = "../bench/build.sh"
 cwd = "."
+
+# Which deploy this is. With it the Bench object (bench.mjs) restarts
+# backup jurors whose container is still running from an earlier
+# deploy: an object's container takes its image when it starts, and no
+# rollout replaces it.
+[version_metadata]
+binding = "CF_VERSION_METADATA"
 
 # Logs, the worker's and the jurors' container's own output, kept seven
 # days in Workers Logs. Without them a stalled table shows a running
@@ -44,7 +51,7 @@ new_sqlite_classes = ["TagRelay"]
 
 # An account's codes, claims, drops and the rest of what changes it,
 # one at a time per account, and a subscription's account found in the
-# subscription's own turn (docs/06-service.md). Bound to the Pages
+# subscription's own turn (docs/explanation/service.md). Bound to the Pages
 # project as HOUSEHOLD (script open-hearts-relay, class Household); it
 # reads and writes the project's own store, the same KV namespace as
 # the Pages project's OH_STORE (open-hearts-store). A HOUSEHOLD bound
@@ -56,12 +63,12 @@ new_sqlite_classes = ["Household"]
 # The relay asks an account's object whether a device's activation is
 # still the one in use as the device opens a socket, and the account's
 # object tells the relay's to close a superseded device's sockets
-# (docs/06-service.md, "One device at a time").
+# (docs/explanation/service.md, "One device at a time").
 [[durable_objects.bindings]]
 name = "HOUSEHOLD"
 class_name = "Household"
 
-# The jurors of last resort, as a Cloudflare Container (bench.mjs; the
+# The backup jurors, as a Cloudflare Container (bench.mjs; the
 # image is service/bench, built by its build.sh). The presence relay
 # above passes a table's call for a juror to it, and it runs only while
 # they are serving or waiting to be drawn. Built by [build] above on
@@ -88,7 +95,7 @@ new_sqlite_classes = ["Bench"]
 binding = "OH_STORE"
 id = "5b65151de63341dc9f7a9d417c9b6a4e"
 
-# Backup codes are emailed from the Household (docs/06-service.md) by
+# Backup codes are emailed from the Household (docs/explanation/service.md) by
 # Cloudflare's Email Sending, which needs the Workers Paid plan and the
 # sending domain onboarded to Email Service. Without them the codes are
 # only shown on the devices.
@@ -100,7 +107,7 @@ OH_MAIL_FROM = "noreply@openhearts.game"
 # The service's public key, which an activation has to be signed by, is
 # read from config/openhearts.json (worker.mjs), not set here.
 
-# What the operator watches (docs/06-service.md): a
+# What the operator watches (docs/explanation/service.md): a
 # line of counts a minute from each object in use — connections,
 # events, deliveries, refusals — and nothing about who.
 [[analytics_engine_datasets]]

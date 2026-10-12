@@ -3,9 +3,10 @@
 // (taken from the live accounts, ids kept, nothing secret in them).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
-import { pages, relay, zones } from './cloudflare.mjs';
+import { pages, playSecrets, relay, zones } from './cloudflare.mjs';
 import {
   budgetPlan,
   describe,
@@ -192,6 +193,7 @@ const liveProduction = () => ({
     OH_STRIPE_SECRET: secret,
     OH_STRIPE_WEBHOOK_SECRET: secret,
     OH_TURN_API_TOKEN: secret,
+    ...Object.fromEntries(playSecrets.map((name) => [name, secret])),
   },
   kv_namespaces: { OH_STORE: { namespace_id: '5b65' } },
   durable_object_namespaces: { HOUSEHOLD: { namespace_id: 'fcae' } },
@@ -207,7 +209,7 @@ test('Pages: production as it is matches', () => {
 
 test('Pages: preview has its own store and no household', () => {
   const have = liveProduction();
-  for (const k of ['OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET']) delete have.env_vars[k];
+  for (const k of ['OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', ...playSecrets]) delete have.env_vars[k];
   have.kv_namespaces.OH_STORE.namespace_id = 'ab41';
   have.r2_buckets.OH_RECORDS.name = 'open-hearts-records-preview';
   delete have.durable_object_namespaces;
@@ -246,6 +248,23 @@ test('Pages: a missing secret is set by hand, and nothing is patched for it', ()
   assert.match(plan.owner[1], /OH_SERVICE_SECRET is plain_text, not a secret/);
   // The plain value it holds is not repeated.
   assert.doesNotMatch(plan.owner.join(' '), /oops/);
+});
+
+test('Pages: the command for a missing secret sets it in its own environment', () => {
+  const production = liveProduction();
+  delete production.env_vars.OH_ID_HMAC;
+  const [prod] = pagesEnvPlan(pages.environments.production, production, ids, 'production').owner;
+  assert.match(prod, /secret put OH_ID_HMAC --project-name <project>`$/);
+  const preview = liveProduction();
+  delete preview.env_vars.OH_ID_HMAC;
+  const [prev] = pagesEnvPlan(pages.environments.production, preview, ids, 'preview').owner;
+  assert.match(prev, /secret put OH_ID_HMAC --project-name <project> --env preview`$/);
+});
+
+test("Pages: production wants Play's service account when the config names Play, as the worker does", () => {
+  const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
+  const named = Boolean(config.google?.package && config.google?.product);
+  assert.equal(pages.environments.production.secrets.includes('OH_PLAY_SERVICE_ACCOUNT'), named);
 });
 
 test("Pages: a secret's value is never in a line", () => {

@@ -37,7 +37,7 @@ void main() {
     for (final c in t.survivors) {
       expect(c.seatStateOf(2), SeatState.left);
       // From the next deal on the seat is a bot a juror holds, and a
-      // bot seat is nobody at the table's to see (docs/04-live-play.md).
+      // bot seat is nobody at the table's to see (docs/explanation/live-play.md).
       expect(c.game.knowsHand(2), isFalse, reason: 'a jury-held bot seat is not the players\' to see');
     }
     agree(t);

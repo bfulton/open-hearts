@@ -147,7 +147,7 @@ String? disagreed(SimTable t) {
 /// A juror drawn by the table from an account seated at it — another
 /// device of a player — or two devices of one account following the
 /// table at once: what accounts and one device at a time are there to
-/// stop (docs/04-live-play.md). A device that has gone does not count.
+/// stop (docs/explanation/live-play.md). A device that has gone does not count.
 String? accountTwice(SimTable t) {
   final p = t.presence;
   if (p == null) return null;
@@ -209,7 +209,7 @@ String? walkChaos(int seed,
   // And of those, the ones [c] can reach just now. A juror across a
   // partition is up and can do nothing for this side: nothing it says
   // arrives, and the side ends the game on exactly that silence, which
-  // it cannot tell from a crash (docs/04-live-play.md).
+  // it cannot tell from a crash (docs/explanation/live-play.md).
   Set<PublicKey> reachableFrom(TableClient c) =>
       {for (final k in upNow()) if (t.net.canReach(c.signer.publicKey, k)) k};
 
@@ -228,8 +228,8 @@ String? walkChaos(int seed,
   // and fewer of the jurors holding a piece of it than it takes to
   // rebuild it; a departed person's with none of the jury the deal
   // was sealed to. The table stopped there says so
-  // (docs/03-fair-deal.md), no juror up could end it, and after long
-  // enough the game ends (docs/04-live-play.md):
+  // (docs/explanation/fair-deal.md), no juror up could end it, and after long
+  // enough the game ends (docs/explanation/live-play.md):
   // at a play, waiting for the jury; at the audit or a departed
   // seat's hand, stalled opening the hand. Judged here from who
   // really is up, not from what the table believes.
@@ -249,11 +249,11 @@ String? walkChaos(int seed,
   // up could open, or a turn put to the jury — split, or open while
   // the table waits for want of a majority — with none of the hand's
   // jurors up to rule on it. The game ends there
-  // (docs/04-live-play.md), and only there.
+  // (docs/explanation/live-play.md), and only there.
   // Waiting for a jury that can hold the bot seats, with too few
   // jurors up and in reach to make one: the hand is never dealt with
   // its bots in the open, so the table waits and says so, and only a
-  // juror coming up moves it (docs/04-live-play.md). With enough of them up, the
+  // juror coming up moves it (docs/explanation/live-play.md). With enough of them up, the
   // wait is a fault.
   bool starved(TableClient c) => c.shortOfJurors && reachableFrom(c).length < juryToHoldBots;
 
@@ -271,7 +271,7 @@ String? walkChaos(int seed,
   final judged = <TableClient>{};
 
   String? check(String when) {
-    // Read only: what each side waits for, for docs/07-states.md.
+    // Read only: what each side waits for, for docs/explanation/table-states.md.
     structure?.take(t);
     final twice = accountTwice(t);
     if (twice != null) return '$when: $twice';
@@ -379,7 +379,7 @@ String? walkChaos(int seed,
     // A held seat given to the escrow is on the record, so once the
     // faults have stopped and the network has healed, two sides still
     // playing at the same hand hold the seat alike: anything else is
-    // two records, not a message in flight (docs/07-states.md). Not a
+    // two records, not a message in flight (docs/explanation/table-states.md). Not a
     // side whose game has ended for a lost quorum: it says nothing new,
     // and a claim it carried just before is one the others may never
     // hear — over a game that is over, and unscored.

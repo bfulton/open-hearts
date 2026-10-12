@@ -128,7 +128,7 @@
       "random": "<b>Zufällig.</b> An einem Live-Tisch mischt jedes Gerät das Deck der Reihe nach und beweist, dass es ehrlich gemischt hat; ein ehrliches Gerät genügt für ein faires Geben. Jede Hand öffnet sich nur für ihren Spieler: Kein anderer Spieler sieht sie, und kein Server. Allein kommt jedes Geben aus dem sicheren Zufallsgenerator deines Geräts.",
       "witness": "<b>Bezeugt.</b> Jede Hand lost Geschworene aus: Fremde, zufällig gewählt unter anderen Spielern, die online sind, ohne Einsatz am Tisch. Sie spielen die Plätze der Bots und verwahren Teile der Schlüssel jedes Spielers, damit eine Hand zu Ende gespielt werden kann, wenn jemand geht, ohne dass einer allein die Karten eines anderen öffnen kann. Sind zu wenige andere Spieler online, um Geschworene zu stellen, ergänzt unser Dienst sie mit Ersatzgeschworenen. Wie alle Geschworenen können sie deine Karten nicht allein sehen, nur zusammen mit einem anderen Spieler an deinem Tisch – in diesen Händen vertraust du also darauf, dass wir uns nicht absprechen.",
       "audit": "<b>Geprüft.</b> Nach jeder Hand veröffentlicht jedes Gerät sein Geheimnis, sodass sich die ganze Partie nachspielen und jedes Mischen, jede Karte und jeder Zug prüfen lässt. Nach einer Live-Partie übernimmt <i>Die ganze Partie ansehen</i> diese Prüfung für dich; nach einer Partie allein bewahrt <i>Protokoll kopieren</i> sie auf.",
-      "more": "Wie alles funktioniert, steht in <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/03-fair-deal.md\">der Beschreibung</a>."
+      "more": "Wie alles funktioniert, steht in <a href=\"https://github.com/bfulton/open-hearts/blob/main/docs/explanation/fair-deal.md\">der Beschreibung</a>."
     }
   },
   "privacy": {

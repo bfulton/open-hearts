@@ -1,4 +1,4 @@
-/// One device at a time (docs/06-service.md; net/in_use.dart): the
+/// One device at a time (docs/explanation/service.md; net/in_use.dart): the
 /// device in use holds an activation the service signed, and the one
 /// before steps back, says so over everything, and can take the account
 /// back — asked first when the other is in a game.

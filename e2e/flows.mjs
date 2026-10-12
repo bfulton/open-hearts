@@ -237,7 +237,7 @@ stillFlow('a game alone, and the record it leaves', async ({ open, relay }) => {
   await sleep(500);
   const record = await page.evaluate('navigator.clipboard.readText()');
   // A game dealt from 256 bits of the secure generator, which the record
-  // names (docs/03-fair-deal.md).
+  // names (docs/explanation/fair-deal.md).
   if (!/^oh2:[0-9a-f]{64}:/.test(record ?? '')) throw new Error(`the record does not look like one: ${JSON.stringify((record ?? '').slice(0, 80))}`);
   // And it is a record the tool can read: every trick, from the seed
   // and the player's own choices.
@@ -659,7 +659,7 @@ stillFlow('a reload mid-hand comes back to the seat, and the hand plays on', asy
 });
 
 stillFlow('a second device, brought in by the code the first one shows', async ({ open }) => {
-  // A subscription is a person's, not a device's (docs/06-service.md).
+  // A subscription is a person's, not a device's (docs/explanation/service.md).
   // The first device shows a code; the second arrives carrying it, and
   // ends up on the same subscription rather than one of its own — which
   // is the thing worth proving here, since the rig's open house would
@@ -703,7 +703,7 @@ stillFlow('a second device, brought in by the code the first one shows', async (
 });
 
 stillFlow('one device at a time: the newest opened wins, and the other takes it back — asked first when it is at a table', async ({ open, relay }) => {
-  // An account plays on one device at a time (docs/06-service.md). The
+  // An account plays on one device at a time (docs/explanation/service.md). The
   // second device comes into the first one's account by its code, and
   // opening it is taking the account up: the first steps back, off the
   // relays, and says so. Taken back, the second does. And a device at a
@@ -772,7 +772,7 @@ async function profileShown(page) {
 }
 
 stillFlow('the profile is the account\'s: changed on one device, the other shows it at its next start', async ({ open, relay }) => {
-  // The name and how you look are the account's (docs/06-service.md):
+  // The name and how you look are the account's (docs/explanation/service.md):
   // kept by the service with the account, written from the device in
   // use, and read by the others when they start. Two devices of one
   // account, brought together as the device-at-a-time flow brings them.

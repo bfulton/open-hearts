@@ -1,7 +1,7 @@
 /// The relays a device talks to: a constant of the build, not a setting.
 ///
 /// A deployed build talks to our relay and nothing else
-/// (docs/08-own-relays.md): one Cloudflare object per tag
+/// (docs/explanation/relay.md): one Cloudflare object per tag
 /// (`service/do/`) — a table, its signalling, a pool's waiting room, a
 /// room code, the results, presence — named in the address before the
 /// socket is opened. The deployed site and production run the same

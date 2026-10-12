@@ -17,6 +17,11 @@ import { readFileSync } from 'node:fs';
 
 const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
 
+/// Google Play's purchases are checked with a service account's key
+/// (playToken in service/functions/worker.mjs), which the worker wants
+/// once the config names Play's package and product, as here.
+export const playSecrets = config.google?.package && config.google?.product ? ['OH_PLAY_SERVICE_ACCOUNT'] : [];
+
 export const app = {
   key: 'open-hearts',
   name: 'Open Hearts',
@@ -32,7 +37,7 @@ export const pages = {
   productionBranch: 'main',
   /// Besides open-hearts.pages.dev, which every project has. The site
   /// at the apex, the app at play (one deployment: the worker routes by
-  /// host, docs/06-service.md). Each needs its CNAME to the project in
+  /// host, docs/explanation/service.md). Each needs its CNAME to the project in
   /// its zone's dns, below; diff.test.mjs holds the two together.
   domains: ['openhearts.game', 'play.openhearts.game'],
   /// Cloudflare Web Analytics, which injects a beacon script into every
@@ -43,17 +48,17 @@ export const pages = {
       compatibilityDate: '2026-09-09',
       compatibilityFlags: [],
       /// None: what is not secret is in config/openhearts.json, which
-      /// the deploy ships with the worker (docs/06-service.md).
+      /// the deploy ships with the worker (docs/explanation/service.md).
       vars: {},
       /// Encrypted: names only. apply.mjs checks each is set, and cannot
       /// set one (it has no value to set), so a missing one is set by
       /// hand: `npx wrangler pages secret put NAME --project-name open-hearts`.
-      secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN'],
+      secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN', ...playSecrets],
       kv: { OH_STORE: 'open-hearts-store' },
       r2: { OH_RECORDS: 'open-hearts-records' },
       /// The household object lives in the relay worker (wrangler.toml).
       durableObjects: { HOUSEHOLD: { script: 'open-hearts-relay', class: 'Household' } },
-      /// Counts and nothing about anybody (docs/06-service.md).
+      /// Counts and nothing about anybody (docs/explanation/service.md).
       analyticsEngine: { OH_METRICS: 'open_hearts_api' },
     },
     preview: {
@@ -127,7 +132,7 @@ export const relay = {
 /// every load rather than kept for Cloudflare's four hours
 /// (site/public/_headers); and email_obfuscation is off (it rewrites
 /// help@ on the site's pages and injects a script to put it back,
-/// docs/06-service.md). SSL's mode is left to automatic mode (it chose
+/// docs/explanation/service.md). SSL's mode is left to automatic mode (it chose
 /// Full), so `ssl` itself is not pinned.
 const tls = {
   ssl_automatic_mode: 'auto',

@@ -11,7 +11,7 @@
 /// The second walks just the sealed seeds named — the ones a longer
 /// walk said broke, again after a fix, without the hour in between.
 /// The third also reads every side against the state machines as it
-/// walks (docs/07-states.md). The fourth draws from more
+/// walks (docs/explanation/table-states.md). The fourth draws from more
 /// strangers than a jury, each letting go of the table once it has
 /// served, as the duty does, and summoned again later. The fifth has
 /// every device make the deal's slow calls in a worker that takes a

@@ -130,7 +130,7 @@ List<Card> legalPlays({
 }
 
 /// What can be said of [card] as a play from a hand nobody on this
-/// side can see (a sealed table, docs/03-fair-deal.md): the one rule
+/// side can see (a sealed table, docs/explanation/fair-deal.md): the one rule
 /// that needs no hand. Leading the first trick, it must be the 2♣.
 /// Following suit, the first trick's no-points rule and leading a
 /// heart before hearts are broken all turn on what else the hand

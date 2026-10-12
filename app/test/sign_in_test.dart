@@ -1,5 +1,5 @@
 /// Signing in with Apple or Google, so a subscription follows the
-/// person (docs/06-service.md): the nonce a token carries, what is sent
+/// person (docs/explanation/service.md): the nonce a token carries, what is sent
 /// to `attest` and `supersede`, and what the Subscription page does with
 /// each answer.
 ///

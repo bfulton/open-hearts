@@ -48,7 +48,7 @@ test('stylesheets, scripts and pictures are linked by their content, so a deploy
 });
 
 test("every link to the game goes to play.openhearts.game, in the page's language", () => {
-  // The app has an origin of its own (docs/06-service.md, "Where the
+  // The app has an origin of its own (docs/explanation/service.md, "Where the
   // app is"), so it no longer shares the site's storage, where the
   // language links keep a choice: the language goes in the address.
   const out = mkdtempSync(join(tmpdir(), 'site-'));

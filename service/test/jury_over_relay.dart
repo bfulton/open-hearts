@@ -1,7 +1,7 @@
 /// The jury over real sockets, for jury_over_relay_test.dart (a seeded
 /// table) and jury_over_relay_sealed_test.dart (a sealed one), which run
 /// side by side: two people at a table on the local
-/// relay, presence on it, and the service's juror of last resort. One
+/// relay, presence on it, and the service's backup juror. One
 /// person goes quiet off turn; the other, no majority of two, asks;
 /// the juror is called for, drawn, summoned, follows, and rules.
 ///
@@ -37,7 +37,7 @@ void juryOverRelay({required bool sealed}) {
   });
   tearDown(() => relay.close());
 
-  test('a ${sealed ? 'sealed' : 'seeded'} table of two with one gone quiet is finished by the juror of last resort', () async {
+  test('a ${sealed ? 'sealed' : 'seeded'} table of two with one gone quiet is finished by the backup juror', () async {
     const silence = 10000;
     final signers = [FakeSigner('a'), FakeSigner('b')];
     final spec = TableSpec(id: 'jury-relay', seed: 5, sealed: sealed, seats: [
@@ -70,7 +70,7 @@ void juryOverRelay({required bool sealed}) {
     ];
     // A quarter of a second a decision: at a seeded table nothing waits
     // for the jury, and a game to fifty played in thirty-millisecond
-    // decisions is over before the juror of last resort is so much as
+    // decisions is over before the backup juror is so much as
     // called for — ten seconds of nobody else online.
     final players = [for (final c in clients) Player(c, thinkMs: 250)];
     for (final c in clients) {

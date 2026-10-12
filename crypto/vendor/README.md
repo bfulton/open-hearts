@@ -1,6 +1,6 @@
 # Vendored proof crates
 
-The deal's cryptography (docs/03-fair-deal.md) is Geometry's reference
+The deal's cryptography (docs/explanation/fair-deal.md) is Geometry's reference
 implementation of Barnett–Smart mental poker with a Bayer–Groth shuffle
 argument, on the Starknet curve. All three crates are vendored here,
 each under its own licence, because upstream is unmaintained and was

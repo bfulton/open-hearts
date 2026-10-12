@@ -1,4 +1,4 @@
-# The jurors of last resort (service/bin/juror.dart), as Cloudflare
+# The backup jurors (service/bin/juror.dart), as Cloudflare
 # runs them: service/do/bench.mjs starts this when a table calls for a
 # juror and nobody is there, and stops it when the jurors have gone
 # quiet. Built from what build.sh stages; run ./build.sh first. The base

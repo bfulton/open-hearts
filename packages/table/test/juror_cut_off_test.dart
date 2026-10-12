@@ -1,7 +1,7 @@
 /// A juror cut off from the table, and the appeal it heard before.
 ///
 /// A juror rules by the seat's presence to it: silent two minutes, the
-/// removal stands (docs/04-live-play.md). A juror that has lost the
+/// removal stands (docs/explanation/live-play.md). A juror that has lost the
 /// table hears that silence from every seat, and cannot tell it from
 /// its own. It went on ruling on an appeal heard minutes before: with
 /// one person of two silent the turn was stuck, the jurors heard the

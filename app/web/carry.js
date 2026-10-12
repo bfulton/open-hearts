@@ -1,7 +1,7 @@
 // The device brought along from where the app used to be.
 //
 // The app was served at openhearts.game/play/ and is now served at
-// play.openhearts.game (docs/06-service.md, "Where the app is"). What
+// play.openhearts.game (docs/explanation/service.md, "Where the app is"). What
 // makes a device itself — its secret key, its licence, its name and
 // picture, its records and settings — is in the browser's storage under
 // `flutter.*`, and storage is per origin: at the new address a device

@@ -2,7 +2,7 @@
 ///
 /// Both are about the same thing: a hand's escrow rests on the jurors
 /// it drew still being there when a bot seat has to be opened
-/// (docs/04-live-play.md), and the levers on that are
+/// (docs/explanation/live-play.md), and the levers on that are
 /// how quickly a departure is noticed and how likely the drawn are to
 /// stay — not how many are drawn.
 library;

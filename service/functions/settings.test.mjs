@@ -1,4 +1,4 @@
-// The service's own settings (docs/06-service.md): one
+// The service's own settings (docs/explanation/service.md): one
 // row the operator writes, every number checked against its bounds, and
 // what the service then does by them. node --test service/functions
 import assert from 'node:assert/strict';

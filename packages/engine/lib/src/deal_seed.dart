@@ -1,4 +1,4 @@
-/// Where a solo game's cards come from (docs/03-fair-deal.md).
+/// Where a solo game's cards come from (docs/explanation/fair-deal.md).
 ///
 /// A new game draws 256 bits from the platform's secure generator, and
 /// every hand of it is computed from them: HMAC-SHA-256 keyed by the
