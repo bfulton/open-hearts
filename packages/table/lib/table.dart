@@ -9,6 +9,7 @@ library;
 
 export 'src/client.dart';
 export 'src/clock.dart';
+export 'src/conduct.dart';
 export 'src/events.dart';
 export 'src/frame.dart';
 export 'src/game_record.dart';

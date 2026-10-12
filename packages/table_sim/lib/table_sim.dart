@@ -7,6 +7,7 @@ library;
 
 export 'src/chaos_walk.dart';
 export 'src/fake_signer.dart';
+export 'src/lies.dart';
 export 'src/memo_crypto.dart';
 export 'src/scenarios.dart';
 export 'src/scripted_human.dart';

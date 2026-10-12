@@ -59,13 +59,13 @@
 library;
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
 
 import 'clock.dart';
+import 'conduct.dart';
 import 'events.dart';
 import 'journal.dart';
 import 'jury.dart';
@@ -76,33 +76,6 @@ import 'spec.dart';
 import 'time_bank.dart';
 import 'timing.dart';
 import 'transport.dart';
-
-/// How a modified client lies (docs/explanation/fair-deal.md), for the
-/// simulator. A seat saying it holds the two of clubs nowhere has
-/// nothing to prove, and nothing can be made to prove it; a token
-/// sealed to one pair of eyes is checked by an argument beside it.
-/// What the table does about each is worth a test, and there is no
-/// testing it without committing it.
-enum Lie {
-  /// Says it holds the two of clubs nowhere and deals itself the hand
-  /// all the same: it alone knows who leads, and it plays on while the
-  /// rest of the table waits for a lead that is never coming. The loud
-  /// version, and the table's clock has it at the audit it will not
-  /// answer.
-  declare,
-
-  /// The same word, and then it waits with everybody else and answers
-  /// the early audit like an honest seat. The patient version: nothing
-  /// it does is out of step, and only the opened deal says which seat
-  /// was dealt the card it disclaimed.
-  hide,
-
-  /// Seals its pass to nothing: three cards of the right shape that the
-  /// seat it passed to could never open. It gets no further than its own
-  /// turn — every seat checks the argument beside a seal, and a pass
-  /// that fails it is not taken — and the clock has its seat there.
-  seal,
-}
 
 /// Why a table is not moving.
 enum Pause {
@@ -884,12 +857,8 @@ class TableClient {
       final to = (seat + game.passDirection.seatOffset) % seatCount;
       final m = d.passMessage(to, [for (final p in positions) p!], from: seat);
       if (m == null) return;
-      if (seat == mySeat && lies == Lie.seal && m['sealed'] != null) {
-        // Sealed to nothing anybody holds: the shape of a pass, and
-        // three cards the receiver will never open (docs/explanation/fair-deal.md).
-        final rng = _random ?? Random();
-        m['sealed'] = [for (var i = 0; i < passSize; i++) base64.encode([for (var b = 0; b < sealedBytes; b++) rng.nextInt(256)])];
-      }
+      final sealed = m['sealed'];
+      if (seat == mySeat && sealed is List<String>) m['sealed'] = conduct.sealedPass(sealed, _random ?? Random());
       body.addAll(m);
     } else {
       body['cards'] = [for (final c in cards) c.code];
@@ -3228,7 +3197,7 @@ class TableClient {
   /// the hand begins — unless nobody declared the lead card.
   void _dealt(DealSession d) {
     if (game.phase != Phase.dealing) return;
-    final leader = lies == Lie.hide ? null : d.leader;
+    final leader = conduct.leader(d.leader);
     if (leader == null) {
       if (_pause != Pause.waitingForLead) _trace('nobody declared the lead card');
       _pause = Pause.waitingForLead;
@@ -3436,7 +3405,7 @@ class TableClient {
     final declare = open(TurnId.deal(h, 3, me));
     if (declare != null) {
       final m = d.myDeclaration();
-      if (m != null) _emitDeal(declare, 3, me, lies == null ? m : {'seat': m['seat'], 'position': -1});
+      if (m != null) _emitDeal(declare, 3, me, conduct.declaration(m));
     }
     final audit = open(TurnId.audit(h, me));
     if (audit != null && !_isEscrowedAudit(audit, me) && (game.phase == Phase.handOver || game.phase == Phase.gameOver || _openingAudit)) {
@@ -3444,9 +3413,9 @@ class TableClient {
     }
   }
 
-  /// How this client lies about the lead card, or null — which is every
-  /// client but a simulated one. See [Lie].
-  Lie? lies;
+  /// What this seat says where it could say something else: the honest
+  /// word, at every table but a simulated one (conduct.dart).
+  SeatConduct conduct = const SeatConduct();
 
   /// A deal step for the seat it is taken for — this side's own, or
   /// the bot seat a juror holds, which is not the same as its seat at
