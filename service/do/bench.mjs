@@ -32,9 +32,15 @@ const INACTIVITY_MS = 15 * 60 * 1000;
 const READY_TRIES = 100;
 const READY_WAIT_MS = 200;
 
-/// Where this object notes the service key it last started the
-/// backup jurors with.
+/// Where this object notes what it last started the backup jurors
+/// with: a digest of their environment, which holds a secret.
 const STARTED_WITH = 'startedWith';
+
+/// The SHA-256 of [env] as JSON, in hex.
+async function digestOf(env) {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(env))));
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 export class Bench {
   constructor(state, env = {}) {
@@ -67,24 +73,23 @@ export class Bench {
     const c = this.container;
     if (!c) return false;
     await c.setInactivityTimeout?.(INACTIVITY_MS);
-    // The service key is the container's from when it started, and a
-    // deploy of a new key starts no container afresh: one kept awake by
-    // calls would hold every seat to the old key. So one started with
-    // another key is stopped, and started again with this one.
-    const key = this.env.OH_SERVICE_KEY ?? null;
-    if (c.running && (await this.state.storage.get(STARTED_WITH)) !== key) await c.destroy();
+    const env = {
+      ...(this.env.OH_JUROR_SECRET ? { OH_JUROR_SECRET: this.env.OH_JUROR_SECRET } : {}),
+      // The service's public key, to check the seats' licences by.
+      ...(this.env.OH_SERVICE_KEY ? { OH_SERVICE_KEY: this.env.OH_SERVICE_KEY } : {}),
+      ...(this.env.OH_BENCH_RELAYS ? { OH_RELAYS: this.env.OH_BENCH_RELAYS } : {}),
+      ...(this.env.OH_BENCH_PRESENCE_RELAYS ? { OH_PRESENCE_RELAYS: this.env.OH_BENCH_PRESENCE_RELAYS } : {}),
+    };
+    // The environment is the container's from when it started, and a
+    // deploy that changes it starts no container afresh: one kept awake
+    // by calls would hold every seat to an old service key, or sign
+    // with an old juror secret the relay no longer takes. So one
+    // started with another is stopped, and started again with this one.
+    const started = await digestOf(env);
+    if (c.running && (await this.state.storage.get(STARTED_WITH)) !== started) await c.destroy();
     if (!c.running) {
-      c.start({
-        enableInternet: true,
-        env: {
-          ...(this.env.OH_JUROR_SECRET ? { OH_JUROR_SECRET: this.env.OH_JUROR_SECRET } : {}),
-          // The service's public key, to check the seats' licences by.
-          ...(this.env.OH_SERVICE_KEY ? { OH_SERVICE_KEY: this.env.OH_SERVICE_KEY } : {}),
-          ...(this.env.OH_BENCH_RELAYS ? { OH_RELAYS: this.env.OH_BENCH_RELAYS } : {}),
-          ...(this.env.OH_BENCH_PRESENCE_RELAYS ? { OH_PRESENCE_RELAYS: this.env.OH_BENCH_PRESENCE_RELAYS } : {}),
-        },
-      });
-      await this.state.storage.put(STARTED_WITH, key);
+      c.start({ enableInternet: true, env });
+      await this.state.storage.put(STARTED_WITH, started);
     }
     if (!(await this.ready())) return false;
     try {

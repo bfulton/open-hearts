@@ -89,7 +89,7 @@ Every part above checks against exactly one key, so there is no overlap between 
 
    This order is the reverse of the usual one in [Deploy the site, app and service](deploy.md). Deploying the relay first would turn away every device at once, since they all hold activations signed by the old key, until the site was deployed.
 
-   A deploy does not restart the backup jurors' container, which takes `OH_SERVICE_KEY` when it starts. The `Bench` object restarts a running container whose key is not the relay's at the next call for a juror (`wake` in `service/do/bench.mjs`), so the backup jurors check seats against the new key from then on.
+   A deploy does not restart the backup jurors' container, which takes `OH_SERVICE_KEY` when it starts. At the next call for a juror, the `Bench` object restarts a running container that was started with anything other than what it would start one with now: the service key, `OH_JUROR_SECRET`, or the relay overrides (`wake` in `service/do/bench.mjs`). The backup jurors check seats against the new key from then on.
 
 1. Release the phone builds in both stores.
 

@@ -106,22 +106,33 @@ test('a call starts the backup jurors, waits for them, and passes the call on', 
   assert.equal((await bench.fetch(new Request('https://bench/wake', { method: 'POST' }))).status, 400, 'a call names its table');
 });
 
-test('backup jurors started with another service key are started again with this one', async () => {
+test('backup jurors started with anything else are started again with this', async () => {
   const c = container({ startsAfter: 0 });
   const s = state(c);
-  await wake(new Bench(s, { OH_SERVICE_KEY: 'aa'.repeat(32) }));
-  await wake(new Bench(s, { OH_SERVICE_KEY: 'aa'.repeat(32) }), 'tbl2');
-  assert.equal(c.destroyed, 0, 'the same key: left running');
+  const env = { OH_SERVICE_KEY: 'aa'.repeat(32), OH_JUROR_SECRET: 'cc'.repeat(32), OH_BENCH_RELAYS: 'wss://r1', OH_BENCH_PRESENCE_RELAYS: 'wss://p1' };
+  await wake(new Bench(s, env));
+  await wake(new Bench(s, { ...env }), 'tbl2');
+  assert.equal(c.destroyed, 0, 'the same: left running');
   assert.equal(c.started.length, 1);
-  // The relay deployed with a new key: the object is new, the container
-  // is not, and it would hold seats to the old key for as long as calls
-  // kept it awake.
-  const res = await wake(new Bench(s, { OH_SERVICE_KEY: 'bb'.repeat(32) }), 'tbl3');
-  assert.equal(res.status, 200);
-  assert.equal(c.destroyed, 1);
-  assert.equal(c.started.length, 2);
-  assert.equal(c.started[1].env.OH_SERVICE_KEY, 'bb'.repeat(32));
-  assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2', 'tbl3']);
+  assert.ok(!String(await s.storage.get('startedWith')).includes('cc'.repeat(32)), 'the secret is not kept');
+  // The relay deployed with each changed in turn: the object is new,
+  // the container is not, and it would go on with the old for as long
+  // as calls kept it awake.
+  const changes = [
+    ['OH_SERVICE_KEY', 'bb'.repeat(32), 'OH_SERVICE_KEY'],
+    ['OH_JUROR_SECRET', 'dd'.repeat(32), 'OH_JUROR_SECRET'],
+    ['OH_BENCH_RELAYS', 'wss://r2', 'OH_RELAYS'],
+    ['OH_BENCH_PRESENCE_RELAYS', 'wss://p2', 'OH_PRESENCE_RELAYS'],
+  ];
+  for (const [i, [name, value, inside]] of changes.entries()) {
+    env[name] = value;
+    const res = await wake(new Bench(s, { ...env }), `tbl${i + 3}`);
+    assert.equal(res.status, 200);
+    assert.equal(c.destroyed, i + 1, name);
+    assert.equal(c.started.length, i + 2, name);
+    assert.equal(c.started.at(-1).env[inside], value, name);
+  }
+  assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2', 'tbl3', 'tbl4', 'tbl5', 'tbl6']);
 });
 
 test('left alone while they serve or wait, stopped once they are quiet', async () => {
