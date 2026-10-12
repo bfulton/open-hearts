@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { wasmPath } from './host.mjs';
-import { lobbyKind, objectRelay, refusalFor, schnorrVerifier, storedKeep } from './relay.mjs';
+import { lobbyKind, objectRelay, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
 import { keys, signing } from './sign.mjs';
 import { KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
 
@@ -123,11 +123,20 @@ test('a day on, the sweep deletes what is a day old and leaves the rest', async 
   assert.equal(st.alarm, null);
 });
 
+test('the tag kept for good is the one the table package publishes results on', () => {
+  // Ratings are folded from every result (packages/table, results.dart),
+  // so a result swept with the day's rooms is a rating that changes.
+  const dart = readFileSync(new URL('../../packages/table/lib/src/results.dart', import.meta.url), 'utf8');
+  const published = dart.match(/static const tag = '([^']+)';/)?.[1];
+  assert.ok(published, 'GameResult.tag in results.dart');
+  assert.equal(resultsTag, published);
+});
+
 test('results are kept for good: no sweep, and storage keeps what memory lets go of', async () => {
   const st = storage();
-  const kept = tagStore(st, 'results');
-  const result = await lobby(keys[0], 'results', 1000);
-  const later = await lobby(keys[1], 'results', 2000);
+  const kept = tagStore(st, resultsTag);
+  const result = await lobby(keys[0], resultsTag, 1000);
+  const later = await lobby(keys[1], resultsTag, 2000);
   await kept.keep(result, null, { now: 0 });
   await kept.keep(later, result, { now: 0 });
   assert.equal(st.alarm, null);
@@ -135,7 +144,7 @@ test('results are kept for good: no sweep, and storage keeps what memory lets go
   assert.equal(await kept.sweep({ now: 100 * KEPT_MS }), false);
   assert.equal(st.rows.size, 2);
   // What is loaded is the newest the memory holds.
-  assert.equal(storedKeep('results'), 20000);
+  assert.equal(storedKeep(resultsTag), 20000);
   assert.equal((await kept.load()).size, 2);
 });
 

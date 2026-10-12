@@ -307,7 +307,7 @@ test('a burst from one socket is answered in the order it was sent', async () =>
 test('the tag in the path is what names an object, and only a tag does', () => {
   // Everything this repo puts on a `t` tag: the one presence topic,
   // the standings, a pool, a table id, a room code.
-  for (const tag of ['online', 'results', 'queue:unrated', 'queue:rated:50', 'half-deaf-table', 'AB12CD']) {
+  for (const tag of ['online', 'standings', 'queue:unrated', 'queue:rated:50', 'half-deaf-table', 'AB12CD']) {
     assert.equal(tagOf(`/${tag}`), tag);
   }
   // The root names no object: the worker turns that away, and the node
@@ -513,7 +513,7 @@ test("a reaction rides a table's tag: carried to whoever reads it there, and kep
 
 test("a reaction anywhere but its table's tag, tagged otherwise, too big or not the shape of one, is refused and goes nowhere", async () => {
   // Presence, the standings, a pool, a room's code: no table there.
-  for (const tag of ['online', 'results', 'queue:rated:50', 'AB12CD34']) {
+  for (const tag of ['online', 'standings', 'queue:rated:50', 'AB12CD34']) {
     const relay = objectRelay(verify, { tag });
     const a = socket();
     relay.open(a);
