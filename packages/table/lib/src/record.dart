@@ -112,7 +112,6 @@ Verification verifyRecord(
     for (final h in spec.seats)
       if (h is HumanSeat) h.key,
   };
-  final removedAt = <PublicKey, TurnId>{};
   final played = <Card>{};
   var index = 0;
 
@@ -627,7 +626,6 @@ Verification verifyRecord(
               '(${backers.length} of ${d.among.length})';
         }
       }
-      removedAt[holder.key] = d.turn;
       holders[seat] = BotSeat(spec.replacementFor(seat));
       deal?.seatLeft(seat);
     }
