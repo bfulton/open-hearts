@@ -217,7 +217,6 @@ class TableClient {
     required this.signer,
     required this.transport,
     required this.clock,
-    this._silenceAfterMs,
     this.heartbeatMs = 5000,
     this.presence,
     this.crypto,
@@ -243,10 +242,6 @@ class TableClient {
   /// per hand, Boot once both are spent (time_bank.dart).
   TimeBank get timeBank => timing.bank;
 
-  /// How long a person may be silent before the table removes them:
-  /// the table's, unless a test asked for a shorter one.
-  int get silenceAfterMs => _silenceAfterMs ?? timing.silenceMs;
-  final int? _silenceAfterMs;
   final int heartbeatMs;
 
   /// Who is online, and how a juror is summoned; null at a table that
@@ -1513,7 +1508,7 @@ class TableClient {
     // page reloaded closes its connection too, and comes back to its
     // seat from its journal (journal.dart) if it is still its seat.
     if (_humans.contains(key)) {
-      _lastHeard[key] = clock.nowMs - silenceAfterMs + min(reloadGraceMs, silenceAfterMs);
+      _lastHeard[key] = clock.nowMs - timing.silenceMs + min(reloadGraceMs, timing.silenceMs);
     }
   }
 
@@ -2245,9 +2240,9 @@ class TableClient {
 
   /// The rule for a boot: countersign when this peer agrees of its own
   /// knowledge — the seat's clock has run out by this peer's reckoning,
-  /// or it has been silent past [silenceAfterMs] — and it holds no
-  /// play for the turn; holding the play, rebroadcast that instead,
-  /// since the boot may only have been a dropped message.
+  /// or it has been silent past the table's [TableTiming.silenceMs] —
+  /// and it holds no play for the turn; holding the play, rebroadcast
+  /// that instead, since the boot may only have been a dropped message.
   void _considerCountersigning(TurnId turn, TableEvent boot) {
     if (!amSeated) return;
     final race = _races[turn]!;
@@ -3707,7 +3702,6 @@ class TableClient {
         final part = d.topUpPart(seat, at: at, have: have);
         if (part == null) continue;
         _toppedUpAt[key] = clock.nowMs;
-        topUpsSent++;
         _emit(EventKind.topup, {
           'hand': hand,
           'about': seat,
@@ -3735,9 +3729,6 @@ class TableClient {
     final dealt = _dealtTo(hand);
     return dealt.isNotEmpty && !dealt.contains(who);
   }
-
-  /// Parts of a new share this side has sent, for a test to look at.
-  int topUpsSent = 0;
 
   /// When this side last sent a part, by seat and index.
   final Map<String, int> _toppedUpAt = {};
@@ -3884,16 +3875,9 @@ class TableClient {
     }
   }
 
-  /// How long a bot seat's holder has to take the seat's turn, a card
-  /// or the pass, at a table of the standard timing; a table's own is
-  /// [TableTiming.botActsMs], where the measurement behind it is.
-  static final botActsWithinMs = TableTiming.standard.botActsMs;
-
-  /// And its deal steps ([TableTiming.botDealsMs]).
-  static final botDealsWithinMs = TableTiming.standard.botDealsMs;
-
   /// Whether the seat's holder has had the seat's turn in front of it
-  /// for longer than that, and said nothing.
+  /// for longer than the table allows ([TableTiming.botActsMs]), and
+  /// said nothing.
   ///
   /// Silence is not the only way a holder fails. One that heartbeats
   /// and does nothing would otherwise hold the seat for as long as it
@@ -4099,11 +4083,6 @@ class TableClient {
   /// Since when this side has been stopped at [_unopenable]'s turn.
   ({TurnId turn, int since})? _unopenableSince;
 
-  /// How long a table stopped at a seat nobody left can open waits,
-  /// saying so, before the game ends ([_judgeQuorum]), at a table of
-  /// the standard timing; a table's own is [TableTiming.quorumLostMs].
-  static final quorumLostAfterMs = TableTiming.standard.quorumLostMs;
-
   /// Ends the game when the table has been stopped at one turn, with
   /// nobody left who could move it, for [TableTiming.quorumLostMs]: a seat
   /// nobody left could open ([_unopenable]), or a turn put to a jury
@@ -4151,7 +4130,7 @@ class TableClient {
   /// stopped at: open [seat], where it waits on one, or else rule.
   bool _unheardAreGone(({TurnId turn, int seat})? seat) {
     if (!participants.every((k) => k == signer.publicKey || _recent(k) || _silent(k))) return false;
-    final heard = _liveJurors(game.handNumber, withinMs: silenceAfterMs);
+    final heard = _liveJurors(game.handNumber, withinMs: timing.silenceMs);
     return seat == null ? heard.isEmpty : !openableBy(game.handNumber, seat.seat, heard.contains);
   }
 
@@ -4794,11 +4773,11 @@ class TableClient {
     _reconsider();
   }
 
-  bool _silent(PublicKey key) => clock.nowMs - (_lastHeard[key] ?? clock.nowMs) >= silenceAfterMs;
+  bool _silent(PublicKey key) => clock.nowMs - (_lastHeard[key] ?? clock.nowMs) >= timing.silenceMs;
 
   // ---- silence -----------------------------------------------------------
   //
-  // A seat silent past [silenceAfterMs] is booted at its own turn
+  // A seat silent past timing.silenceMs is booted at its own turn
   // without waiting on its clock, and nowhere else. A claim made at
   // whatever position a peer is on would be applied to an open turn at
   // different moments by different peers, and two claims in flight at

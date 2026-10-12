@@ -40,7 +40,7 @@ void main() {
     // is over before anything is looked at: three allowances of
     // fifteen seconds outlasted the rest of this one, and what was
     // looked at was the next hand's deal.
-    t.clock.advance(TableClient.botActsWithinMs + 6000);
+    t.clock.advance(TableTiming.standard.botActsMs + 6000);
     expect(c.jury.live, greaterThan(0), reason: 'the jury is still being heard');
 
     // And the hand goes on rather than sitting at that seat's turn.

@@ -57,7 +57,7 @@ void main() {
       final author = message['author'] as String;
       if (author == holder) {
         if (custodian == null) {
-          released ??= t.clock.nowMs + TableClient.botActsWithinMs + 17000;
+          released ??= t.clock.nowMs + TableTiming.standard.botActsMs + 17000;
           return released! - t.clock.nowMs;
         }
         return null;

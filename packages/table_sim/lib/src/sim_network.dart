@@ -43,11 +43,18 @@ class SimNetwork {
   final Map<String, int> byKind = {};
   final Map<String, int> saidByKind = {};
 
+  /// Who made each kind of event said on the wire, by its author: what
+  /// a test asks of who did something, rather than a client counting
+  /// it for the test.
+  final Map<String, Set<PublicKey>> authorsOf = {};
+
   void _tally(PublicKey from, Map<String, Object?> message, String wire, int copies) {
     said += wire.length;
     handed += wire.length * copies;
     final kind = message['kind'];
     if (kind is! String) return;
+    final author = message['author'];
+    if (author is PublicKey) (authorsOf[kind] ??= {}).add(author);
     final own = message['author'] == from ? 'own' : 'carried';
     final key = '$kind $own';
     byKind[key] = (byKind[key] ?? 0) + wire.length * copies;

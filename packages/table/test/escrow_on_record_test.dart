@@ -240,7 +240,7 @@ void main() {
     // Its audit held back ten seconds past the escrow, which is
     // claimed once a deal step's allowance is up; the seat's pieces kept
     // from the people until four seconds after that.
-    final late = TableClient.botDealsWithinMs + 10000;
+    final late = TableTiming.standard.botDealsMs + 10000;
     int? said;
     TableEvent? audit;
     t.net.steer = (from, to, message) {
@@ -328,7 +328,7 @@ void main() {
     final MapEntry(key: seat, value: holder) = a.botHolders(hand).entries.first;
     // Kept from a five seconds past the deal step's allowance, so a
     // claims the seat while b has its keys.
-    final until = t.clock.nowMs + TableClient.botDealsWithinMs + 5000;
+    final until = t.clock.nowMs + TableTiming.standard.botDealsMs + 5000;
     t.net.steer = (from, to, message) {
       final body = message['body'] as Map<String, Object?>;
       // Every copy, whoever passes it on: the people say an unsettled
@@ -471,7 +471,7 @@ void main() {
       // The juror's card lands three seconds after the seat's
       // allowance is up and the escrow claimed for it.
       if (kind == 'play' && message['author'] == at.holder && body['hand'] == at.hand && body['seat'] == at.seat) {
-        cardAt ??= t.clock.nowMs + TableClient.botActsWithinMs + 3000;
+        cardAt ??= t.clock.nowMs + TableTiming.standard.botActsMs + 3000;
         return t.clock.nowMs < cardAt! ? cardAt! - t.clock.nowMs : null;
       }
       if (kind == 'escrow') {

@@ -29,7 +29,6 @@ void main() {
   tearDown(() => relay.close());
 
   test('the backup juror follows a sealed table of four through its first hand', () async {
-    const silence = 10000;
     // Real keys throughout: a signature checked is what an event costs
     // a peer, and the juror's load is the point.
     final signers = [for (var i = 0; i < 4; i++) SchnorrSigner.generate()];
@@ -39,7 +38,6 @@ void main() {
     final juror = LastResortJuror(
         relays: [relay.url],
         signer: SchnorrSigner.generate(),
-        silenceAfterMs: silence,
         crypto: crypto,
         log: (l) => sink.writeln('juror $l'))
       ..start();
@@ -55,7 +53,6 @@ void main() {
             transport: transports[i],
             clock: WallClock(),
             presence: presences[i],
-            silenceAfterMs: silence,
             crypto: crypto),
     ];
     final players = [for (final c in clients) Player(c)];

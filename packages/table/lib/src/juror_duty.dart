@@ -26,7 +26,6 @@ class JurorDuty {
       required this.presence,
       this.log,
       Clock? clock,
-      this.silenceAfterMs,
       this.pinned = 0,
       this.dial,
       this.crypto,
@@ -40,10 +39,6 @@ class JurorDuty {
   final RelayPresence presence;
   final void Function(String line)? log;
   final Clock clock;
-
-  /// The silence a juror's clients count as absence: null for each
-  /// table's own (`TableTiming.silenceMs`), shorter in a test.
-  final int? silenceAfterMs;
 
   /// The deal's primitives, to serve at sealed tables.
   final DealCrypto? crypto;
@@ -105,7 +100,7 @@ class JurorDuty {
         return;
       }
       final client =
-          TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, silenceAfterMs: silenceAfterMs, crypto: crypto, dealWorker: dealWorker);
+          TableClient(spec: s.spec, signer: signer, transport: transport, clock: clock, crypto: crypto, dealWorker: dealWorker);
       client.log = log;
       t = _tables[s.spec.id] = (client: client, transport: transport);
       client.changes.listen((_) {
@@ -225,7 +220,6 @@ class LastResortBench {
     List<Uri>? presenceRelays,
     void Function(String line)? log,
     int idleMs = 10 * 60 * 1000,
-    int? silenceAfterMs,
     DealCrypto? crypto,
   }) : jurors = [
           for (final s in signers)
@@ -235,7 +229,6 @@ class LastResortBench {
                 signer: s,
                 log: log,
                 idleMs: idleMs,
-                silenceAfterMs: silenceAfterMs,
                 crypto: crypto),
         ];
 
@@ -284,10 +277,9 @@ class LastResortJuror {
       required this.signer,
       this.log,
       this.idleMs = 10 * 60 * 1000,
-      int? silenceAfterMs,
       DealCrypto? crypto}) {
     presence = RelayPresence(relays: presenceRelays ?? relays, signer: signer, status: 'last-resort', log: log)..silent = true;
-    duty = JurorDuty(relays: relays, signer: signer, presence: presence, log: log, silenceAfterMs: silenceAfterMs, crypto: crypto);
+    duty = JurorDuty(relays: relays, signer: signer, presence: presence, log: log, crypto: crypto);
   }
 
   final List<Uri> relays;

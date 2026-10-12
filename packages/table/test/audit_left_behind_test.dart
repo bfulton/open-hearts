@@ -83,7 +83,7 @@ void main() {
         final body = message['body'] as Map<String, Object?>;
         holder = from;
         turn = TurnId(body['hand'] as int, body['turn'] as int);
-        until = t.clock.nowMs + TableClient.botActsWithinMs + 1000;
+        until = t.clock.nowMs + TableTiming.standard.botActsMs + 1000;
       }
       return from == holder && to != b.signer.publicKey && t.clock.nowMs < until ? -1 : null;
     };

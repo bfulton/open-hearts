@@ -8,7 +8,7 @@
 /// hand whose cards have been seen, which enough jurors leaving
 /// together could do to order. So the game ends — a connection
 /// failure, "juror quorum lost", unscored — once the table has been
-/// stopped there for twenty seconds ([TableClient.quorumLostAfterMs];
+/// stopped there for twenty seconds ([TableTiming.quorumLostMs];
 /// docs/explanation/live-play.md).
 ///
 /// The same for a turn only the jury can settle — a play met by a
@@ -54,13 +54,13 @@ void main() {
     expect(c.botHolders(hand).keys, contains(c.game.currentSeat), reason: 'at a held seat');
     // And still says so once the jury drawn again is heard from, which
     // is moments after the pause.
-    t.clock.advance(TableClient.quorumLostAfterMs ~/ 2);
+    t.clock.advance(TableTiming.standard.quorumLostMs ~/ 2);
     expect(c.custodiansOf(hand).length, greaterThan(drawn.length), reason: 'a jury was drawn again');
     expect(c.tableState, TableState.pausedForJury, reason: 'with nothing in it to open the seat with:\n${c.describe()}');
 
     expect(t.clock.runUntil(() => t.clients.every((c) => c.tableState == TableState.failed), limitMs: 4 * 60 * 1000), isTrue,
         reason: 'the game ended:\n${c.describe()}');
-    expect(t.clock.nowMs - pausedAt, greaterThanOrEqualTo(TableClient.quorumLostAfterMs), reason: 'and not before the table had waited');
+    expect(t.clock.nowMs - pausedAt, greaterThanOrEqualTo(TableTiming.standard.quorumLostMs), reason: 'and not before the table had waited');
     for (final c in t.clients) {
       expect(c.failure, Failure.jurorQuorumLost);
       expect(c.done, isFalse, reason: 'unfinished, so unscored');
@@ -100,7 +100,7 @@ void main() {
     }
     expect(t.clock.runUntil(() => c.pause == Pause.waitingForJury, limitMs: 3 * 60 * 1000), isTrue,
         reason: 'the table said it was waiting for the jury:\n${c.describe()}');
-    t.clock.advance(TableClient.quorumLostAfterMs ~/ 2);
+    t.clock.advance(TableTiming.standard.quorumLostMs ~/ 2);
     expect(c.tableState, TableState.pausedForJury, reason: 'still waiting, not ended: ${c.describe()}');
     for (final j in drawn) {
       t.net.comeOnline(j);
@@ -133,7 +133,7 @@ void main() {
     final stoppedAt = t.clock.nowMs;
     final seat = c.stalled.values.first;
     expect(t.clock.runUntil(() => c.failure != null, limitMs: 4 * 60 * 1000), isTrue, reason: 'the game ended:\n${c.describe()}');
-    expect(t.clock.nowMs - stoppedAt, greaterThanOrEqualTo(TableClient.quorumLostAfterMs));
+    expect(t.clock.nowMs - stoppedAt, greaterThanOrEqualTo(TableTiming.standard.quorumLostMs));
     expect(c.failure, Failure.jurorQuorumLost);
     expect(c.failedAt?.seat, seat);
     for (final c in t.clients.take(3)) {
@@ -177,7 +177,7 @@ void main() {
     expect(x.tableState, TableState.pausedForJury);
     expect(t.clock.runUntil(() => x.failure != null && y.failure != null, limitMs: 3 * 60 * 1000), isTrue,
         reason: 'the game ended:\n${x.describe()}\n${y.describe()}');
-    expect(t.clock.nowMs - splitAt, greaterThanOrEqualTo(TableClient.quorumLostAfterMs), reason: 'and not before the table had waited');
+    expect(t.clock.nowMs - splitAt, greaterThanOrEqualTo(TableTiming.standard.quorumLostMs), reason: 'and not before the table had waited');
     for (final c in [x, y]) {
       expect(c.failure, Failure.jurorQuorumLost);
       expect(c.failedAt?.turn, turn);
@@ -210,7 +210,7 @@ void main() {
     expect(x.tableState, TableState.pausedForJury, reason: 'waiting, and saying so:\n${x.describe()}');
     expect(x.failure, isNull, reason: 'not while the other might be the one cut off');
     expect(t.clock.runUntil(() => x.failure != null, limitMs: 3 * 60 * 1000), isTrue, reason: 'the game ended:\n${x.describe()}');
-    expect(t.clock.nowMs - goneAt, greaterThanOrEqualTo(120 * 1000 + TableClient.quorumLostAfterMs),
+    expect(t.clock.nowMs - goneAt, greaterThanOrEqualTo(120 * 1000 + TableTiming.standard.quorumLostMs),
         reason: 'the silence a person is given, and the twenty seconds after it');
     expect(x.failure, Failure.jurorQuorumLost);
     expect(x.failedAt?.turn, turn);
@@ -357,7 +357,7 @@ void main() {
     t.clock.advance(90 * 1000);
     expect(c.failure, isNull, reason: 'not while the other might be the one cut off');
     expect(t.clock.runUntil(() => c.failure != null, limitMs: 3 * 60 * 1000), isTrue, reason: 'the game ended:\n${c.describe()}');
-    expect(t.clock.nowMs - goneAt, greaterThanOrEqualTo(120 * 1000 + TableClient.quorumLostAfterMs));
+    expect(t.clock.nowMs - goneAt, greaterThanOrEqualTo(120 * 1000 + TableTiming.standard.quorumLostMs));
     expect(c.failure, Failure.jurorQuorumLost);
     final juror = t.jurors.firstWhere((j) => j.signer.publicKey == kept).client!;
     expect(t.clock.runUntil(() => !juror.serving, limitMs: 10 * 1000), isTrue, reason: 'and the juror heard it:\n${juror.describe()}');

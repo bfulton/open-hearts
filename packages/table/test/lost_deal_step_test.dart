@@ -57,8 +57,8 @@ void main() {
   // from that player for a while: the rest of the table settles the
   // step and goes on, and that player is behind. It hears the others
   // heartbeat from further on, and its own copy of the turn is still
-  // open. The holder's deal steps are on a clock (TableClient
-  // botDealsWithinMs), and that player timed the holder by its own
+  // open. The holder's deal steps are on a clock (TableTiming
+  // botDealsMs), and that player timed the holder by its own
   // open turn — judged it idle, gave the seat to the escrow and the
   // hand up undealt, by itself, while the table dealt the hand without
   // it. Behind is the one place the holder cannot be timed from.
@@ -69,7 +69,7 @@ void main() {
     var kept = 0;
     // Kept until well past the deal step's allowance, so that timing
     // the holder by its own open turn would give the hand up.
-    final keptFor = TableClient.botDealsWithinMs + 15000;
+    final keptFor = TableTiming.standard.botDealsMs + 15000;
     t.net.steer = (from, to, message) {
       if (to != a || message['kind'] != 'deal' || t.clock.nowMs >= keptFor) return null;
       final body = message['body'] as Map<String, Object?>?;
