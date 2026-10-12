@@ -153,7 +153,7 @@ class _RecordVerifier {
   final allEscrows = <int, Set<int>>{};
 
   /// Who said each held seat's keys, by hand: the seat's own juror from
-  /// then on, as the table reads it (_asKeyed in client.dart).
+  /// then on, as the table reads it (_asKeyed in deal_driver.dart).
   final keyedBy = <int, Map<int, PublicKey>>{};
 
   /// Fills [allRemovals], [allEscrows] and [keyedBy] from the whole
@@ -269,8 +269,8 @@ class _RecordVerifier {
   /// The bot seats a jury holds at [hand], if it holds any: the ones
   /// that were bots when the hand began. A person who leaves turns
   /// their seat into one from the next hand, not this one — that hand
-  /// is opened from their escrow in the clear (_botSeatsAt in
-  /// client.dart).
+  /// is opened from their escrow in the clear (botSeatsAt in
+  /// deal_driver.dart).
   List<int> botSeatsAt(int hand) => [
         for (var s = 0; s < seatCount; s++)
           if (switch (spec.seats[s]) {
@@ -289,7 +289,7 @@ class _RecordVerifier {
   }
 
   /// The draw each hand's deal was sealed to, as the table reads it
-  /// (_checkSealed in client.dart): named by the keys of the first
+  /// (checkSealed in deal_driver.dart): named by the keys of the first
   /// person at the table, lowest seat first, whose keys for the hand
   /// are on the record — passing over a person removed at or before
   /// their own keys. Null where those keys name none, or there is
@@ -358,7 +358,7 @@ class _RecordVerifier {
   }
 
   /// Why a seat's keys are not sealed where the table would take them
-  /// (_keysNameTheDraw in client.dart), or null: a person's name none,
+  /// (keysNameTheDraw in deal_driver.dart), or null: a person's name none,
   /// or a draw the hand carried that holds every bot seat; a held
   /// seat's name the draw the hand was sealed to, and come from the
   /// juror that draw names for the seat.
@@ -826,8 +826,8 @@ class _RecordVerifier {
         // A hand given up in its deal: a bot seat's juror went with
         // a step of the seat still owed, and nobody else can take it
         // — the juror drew the key. The table gives the hand up
-        // unscored and deals the next (_giveUpUndealtHand in
-        // client.dart), with no audit, since the seat that stopped
+        // unscored and deals the next (giveUpUndealtHand in
+        // deal_driver.dart), with no audit, since the seat that stopped
         // it cannot be opened to show anything. So the record goes
         // on to a later hand with this one's deal short, and that
         // is a hand over, not a deal left unfinished
@@ -850,7 +850,7 @@ class _RecordVerifier {
       // A hand whose audits follow its deal with nothing in between
       // never began: nobody could lead it, so the table opened it to
       // find out why and gave it up (docs/explanation/fair-deal.md, and
-      // _giveUpHand in client.dart). Two things make that legitimate,
+      // giveUpHand in deal_driver.dart). Two things make that legitimate,
       // and both are in the record: every seat's own signed word put
       // the lead card nowhere, and the deal those audits open shows
       // one of them holding it. What the record must not then contain

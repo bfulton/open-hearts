@@ -13,9 +13,9 @@
 ///
 ///  - a juror will not publish its seat's keys until the record has
 ///    said which draw the deal is sealed to — the first person's keys,
-///    settled (`_checkSealed`);
+///    settled (`DealDriver.checkSealed`);
 ///  - a hand with bot seats waits for a jury big enough to hold them
-///    (`_startDealWhenReady`, with no time limit), which on a table
+///    (`DealDriver.startWhenReady`, with no time limit), which on a table
 ///    with jurors about is over as soon as the draw carries.
 ///
 /// The simulator's clock is virtual, so these are the protocol's own

@@ -3,8 +3,8 @@
 ///
 /// A juror brought on mid-hand reads the hand's redraw before the draw
 /// the deal was sealed to, fixes the bot seats from the wrong one, and
-/// builds its deal again when the right one comes (_refixHolders in
-/// client.dart). The settled steps go back in before whatever was held
+/// builds its deal again when the right one comes (refixHolders in
+/// deal_driver.dart). The settled steps go back in before whatever was held
 /// back for the deal: the other way round, one held-back seat's keys
 /// would go into a session that has none of the others', the round of
 /// keys would close with the deal still at its keys, and nothing would

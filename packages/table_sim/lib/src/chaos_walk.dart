@@ -102,7 +102,7 @@ bool _sameList(List<Object?> a, List<Object?> b) {
 /// what the other says for the seat: one waits for keys the other
 /// juror is busy not making. It is legal for that to happen while a
 /// draw or a departure is still in flight, which is what
-/// `_refixHolders` repairs; what is never legal is for it to stand
+/// `DealDriver.refixHolders` repairs; what is never legal is for it to stand
 /// after the faults have stopped and the network has healed.
 ///
 /// A side that has heard no jury for the hand answers nothing, and
