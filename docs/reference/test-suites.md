@@ -62,6 +62,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `packages/table/` | `table` |
 | `service/do/` | `relay_js`, `service_js`, `service_object` |
 | `service/functions/` | `functions` |
+| `service/tool/*.mjs` | `functions` |
 | Any other path under `service/` | `service` |
 | `site/` | `site`, `e2e_site` |
 | `infra/` | `infra` |

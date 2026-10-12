@@ -139,7 +139,7 @@
     "header": {
       "title": "Privacidad",
       "tagline": "Qué hace Open Hearts con lo que le das, en palabras sencillas.",
-      "updated": "Última actualización: 11 de octubre de 2026"
+      "updated": "Última actualización: 12 de octubre de 2026"
     },
     "short": {
       "title": "En resumen",
@@ -222,7 +222,7 @@
       "title": "Cuánto tiempo se guardan las cosas",
       "p1": "<b>En tu dispositivo:</b> hasta que las borres.",
       "p2": "<b>En nuestro relé:</b> las jugadas, la presencia y la espera de partida: no se guardan. Las salas, los asientos y las imágenes: un día. Los resultados de las partidas: mientras se calculen las clasificaciones a partir de ellos.",
-      "p3": "<b>Las partidas en vivo terminadas:</b> para siempre, en el almacenamiento de Cloudflare, salvo que nos pidas borrar una en la que jugaste.",
+      "p3": "<b>Las partidas en vivo terminadas:</b> para siempre, en el almacenamiento de Cloudflare. Si nos pides borrar los datos de tu cuenta, tu nombre se quita de las partidas en las que jugaste; las jugadas se quedan, para los demás jugadores.",
       "p4": "<b>Los registros de cuenta y suscripción de nuestro servicio, incluido el perfil de tu cuenta:</b> mientras dure la suscripción, y después hasta que nos pidas borrarlos. Un perfil cambiado sustituye al anterior. La nota de qué dispositivo está en uso se sustituye cada vez que otro de tus dispositivos abre el juego.",
       "p5": "<b>Stripe:</b> el tiempo que exijan la política de Stripe y la ley sobre registros de pagos.",
       "p6": "<b>Cloudflare y Google:</b> según sus propias políticas.",
@@ -233,7 +233,7 @@
       "p1": "Juega solo, y nada sobre ti sale de tu dispositivo.",
       "p2": "Juega en vivo con un nombre que no sea el tuyo real, y sin imagen.",
       "p3": "Cambia tu nombre o tu imagen cuando quieras; si estás suscrito, el cambio llega a todos los dispositivos de tu cuenta. Lo que ya se publicó se queda donde está.",
-      "p4": "Pídenos una copia de lo que nuestro servicio guarda sobre tu cuenta, su perfil y sus dispositivos, o pídenos que lo borremos, incluidos los resultados que sus dispositivos publicaron en nuestro relé.",
+      "p4": "Pídenos una copia de lo que nuestro servicio guarda sobre tu cuenta, su perfil y sus dispositivos, o pídenos que lo borremos. Después, tu nombre se quita de las partidas terminadas en las que jugaste, y los resultados que tus dispositivos publicaron se quedan en nuestro relé, para las clasificaciones, sin tu nombre: cada uno sigue nombrando el número de tu cuenta y la clave pública de tu dispositivo. Si te suscribiste en la web, los registros de pago de Stripe siguen guardando tu correo electrónico con la clave pública de tu dispositivo, que esos resultados nombran, mientras Stripe los conserve.",
       "p5": "Donde la ley de protección de datos te dé derechos — a ver, corregir o borrar lo que se guarda sobre ti, a oponerte o a reclamar ante tu autoridad de protección de datos —, también los tienes aquí."
     },
     "children": {

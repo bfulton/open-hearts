@@ -26,6 +26,15 @@ export const recordMost = 2 * 1024 * 1024;
 
 const keyIn = (table) => `tables/${table}.json`;
 
+/// Where an account forgotten on request is marked in the bucket
+/// (service/tool/forget.mjs writes it): a game kept after the mark is
+/// kept without the account's name. R2 reads what was last written, so
+/// a record checked after the mark is in sees it.
+export const forgottenKey = (account) => `forgotten/${account}`;
+
+/// An account's number (worker.mjs, isAccount).
+const accountShape = /^[0-9a-f]{32}$/;
+
 /// The id an event of [table] has: the hash of what it says, as the
 /// table writes it (packages/table, events.dart, `_canonical`) — the
 /// body's own keys in order, nothing else reordered.
@@ -54,7 +63,8 @@ async function signedInto(record, key, table, verify) {
   return false;
 }
 
-/// Keeps [text], a record [key] sent for [table]: {status, body}.
+/// Keeps [text], a record [key] sent for [table], without the name of
+/// any account forgotten on request (withoutForgotten): {status, body}.
 /// [verify] checks a signature: (key, digest, signature) => bool.
 export async function keepRecord(bucket, key, table, text, { verify }) {
   if (!bucket) return { status: 503, body: { error: 'records are not kept here' } };
@@ -75,7 +85,9 @@ export async function keepRecord(bucket, key, table, text, { verify }) {
     return { status: 403, body: { error: 'a record with none of your own moves in it' } };
   }
   if (await bucket.head(keyIn(table))) return { status: 200, body: { kept: true, already: true } };
-  const packed = await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+  const kept = await withoutForgotten(bucket, record, text);
+  if (kept === null) return { status: 422, body: { error: 'a record that cannot be kept without a forgotten name' } };
+  const packed = await new Response(new Blob([kept]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
   await bucket.put(keyIn(table), packed, {
     httpMetadata: { contentType: 'application/json', contentEncoding: 'gzip' },
     customMetadata: { from: key },
@@ -83,8 +95,68 @@ export async function keepRecord(bucket, key, table, text, { verify }) {
   return { status: 200, body: { kept: true } };
 }
 
-/// The record kept for [table], as a response: packed, as it is kept,
-/// and for good — a finished game does not change.
+/// [text], the record sent, as it is to be kept: without the names of
+/// the seats whose licence names an account forgotten on request. Such
+/// a game was played while the account's last licence ran, or ended
+/// while forget.mjs went through the kept games. Rewritten only if
+/// JSON.stringify gives back [text] as it was sent, since an event's id
+/// is a digest of its body as its reader parses it; null when it would
+/// not.
+async function withoutForgotten(bucket, record, text) {
+  const accounts = new Set(record.spec.seats.map((s) => s?.licence?.account).filter((a) => typeof a === 'string' && accountShape.test(a)));
+  let without = record;
+  let named = 0;
+  for (const account of accounts) {
+    if (!(await bucket.head(forgottenKey(account)))) continue;
+    const w = withoutNames(without, account);
+    if (!w?.named.length) continue;
+    without = w.record;
+    named += w.named.length;
+  }
+  if (!named) return text;
+  return JSON.stringify(record) === text ? JSON.stringify(without) : null;
+}
+
+/// [record] with the names of the seats [account] sat in taken out:
+/// {record, named}, where [named] are the seats whose name went, or
+/// null when the account sat in none. A seat is the account's when its
+/// licence names it, or, in a game from before seats carried licences,
+/// when its key is one of the account's devices ([keys]). The names are
+/// kept beside the record unsigned, as each device said it was called,
+/// so the record verifies as before and stays the other players' game,
+/// with no name on those seats.
+export function withoutNames(record, account, keys = []) {
+  const its = (seat) => (seat?.licence ? seat.licence.account === account : keys.includes(seat?.key));
+  const seats = (record?.spec?.seats ?? []).flatMap((seat, i) => (its(seat) ? [i] : []));
+  if (!seats.length) return null;
+  const { names: was, ...rest } = record;
+  const names = { ...(was ?? {}) };
+  const named = seats.filter((i) => String(i) in names);
+  for (const i of named) delete names[String(i)];
+  return { record: Object.keys(names).length ? { ...rest, names } : rest, named };
+}
+
+/// Every kept game [account] sat in, by its licence or one of its
+/// devices' [keys], with its name taken off it: for a deletion asked
+/// for. [bucket] lists, reads and writes records as the operator's tool
+/// reaches R2 (service/tool/r2.mjs), a record as its JSON. With [dry],
+/// writes nothing. Returns {key, named} for each game changed, or that
+/// would be.
+export async function anonymizeGames(bucket, account, { keys = [], dry = false } = {}) {
+  const changed = [];
+  for (const key of await bucket.list('tables/')) {
+    const without = withoutNames(await bucket.get(key), account, keys);
+    if (!without?.named.length) continue;
+    changed.push({ key, named: without.named });
+    if (!dry) await bucket.put(key, without.record);
+  }
+  return changed;
+}
+
+/// The record kept for [table], as a response: packed, as it is kept.
+/// Its moves never change; a name beside them can go, when its account
+/// is forgotten, and a copy a browser kept before then is that
+/// browser's, as any copy a device keeps is its own.
 export async function recordResponse(bucket, table, headers = {}) {
   if (!bucket) return Response.json({ error: 'records are not kept here' }, { status: 503, headers });
   if (typeof table !== 'string' || !tableIdShape.test(table)) return Response.json({ error: 'a table id, 32 hex' }, { status: 400, headers });

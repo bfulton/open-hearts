@@ -97,9 +97,9 @@ From `service/do/wrangler.toml`.
 
 | Variable | Read by | What it is |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | `deploy.sh` (required), `infra/apply.mjs`, `service/tool/forget.mjs` (required) | A Cloudflare API token. `forget.mjs` needs Workers KV Storage: Edit. |
+| `CLOUDFLARE_API_TOKEN` | `deploy.sh` (required), `infra/apply.mjs`, `service/tool/forget.mjs` (required) | A Cloudflare API token. |
 | `CLOUDFLARE_ACCOUNT_ID` | `deploy.sh` (required), `infra/apply.mjs`, `service/tool/forget.mjs` (required) | The Cloudflare account ID. |
-| `STRIPE_API_KEY` | `infra/apply.mjs` | The Stripe key for the Stripe part. |
+| `STRIPE_API_KEY` | `infra/apply.mjs`, `service/tool/forget.mjs` | The Stripe key: for `infra/apply.mjs`'s Stripe part, and for `forget.mjs --find` with an email address. |
 | `OH_HELP_FORWARD` | `infra/apply.mjs` | Where `help@` and `alerts@` forward. When unset, the destination is only checked to be verified. |
 | `OH_ALERT_EMAIL` | `infra/apply.mjs`, `observability/apply.mjs` | Who the Cloudflare spend alerts and the New Relic alerts email. |
 | `NEW_RELIC_API_KEY` | `observability/apply.mjs` (required) | A New Relic User key. |
@@ -115,7 +115,7 @@ From `service/do/wrangler.toml`.
 What each script does with the Cloudflare API token, which is what the token needs to allow:
 
 - `deploy.sh` publishes to the Pages project and, with `--prune`, lists and deletes its deployments.
-- `service/tool/forget.mjs` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit).
+- `service/tool/forget.mjs` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
 - `infra/apply.mjs` reads every resource that `infra/cloudflare.mjs` defines, and with `--apply` changes them.
 - The relay's deploy (`npx wrangler deploy` in `service/do`) uploads the relay worker with its Durable Objects, its container image and its custom domain.
 

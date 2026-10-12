@@ -224,6 +224,7 @@ quick() {
       packages/table/*) add table ;;
       service/do/*) add relay_js service_js service_object ;;
       service/functions/*) add functions ;;
+      service/tool/*.mjs) add functions ;;
       service/*) add service ;;
       site/*) add site e2e_site ;;
       infra/*) add infra ;;

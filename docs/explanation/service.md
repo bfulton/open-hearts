@@ -390,21 +390,26 @@ What is published at tables is read from the device's copy
 
 ### Deleting an account's data
 
-On request (the privacy policy's choices), every row kept for the
+On request (the privacy policy's choices), the account is forgotten.
+Its name comes off every kept game it played (`anonymizeGames`), which
+stays the other players' game: the names are kept beside a record
+unsigned, so the record verifies as before. The account is marked
+forgotten first, so a game kept later, such as one its last licence
+let it finish, is kept without its name. Every row kept for the
 account is deleted (`forgetAccount`): those under `ACCOUNT#` (its
 devices, code, backup codes, sign-in, device in use and profile), each
 device's `ENTITLEMENT`, the rows its codes and sign-in are found by, and
-its subscription's `SUB#` rows. A subscription still paid up is
+the `SUB#` rows of every subscription it has had. A subscription still paid up is
 cancelled first. Where the `Household` object runs, its note of the
 device in use (its key, the epoch, times, the table it said it sat at,
 and the relay objects it was seen at) is in the object's own storage and
 is not reached from outside. It is written over the next time the
 account is taken up, which after deletion is never, and it holds no name
-or picture. The account's finished games are deleted from R2 by hand
-([delete an account's data](../how-to/delete-an-accounts-data.md)). Its
-results stay on the relay, under its account number, which nothing left
-in the service ties to the person; a result cannot be changed in any
-case, since every copy is signed by the device that published it.
+or picture. Its results stay on the relay, under its account number,
+which nothing left in the service ties to the person; a result cannot be
+changed in any case, since every copy is signed by the device that
+published it
+([delete an account's data](../how-to/delete-an-accounts-data.md)).
 
 ## TURN
 

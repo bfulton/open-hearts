@@ -139,7 +139,7 @@
     "header": {
       "title": "Privacy",
       "tagline": "What Open Hearts does with what you give it, in plain words.",
-      "updated": "Last updated 11 October 2026"
+      "updated": "Last updated 12 October 2026"
     },
     "short": {
       "title": "The short version",
@@ -222,7 +222,7 @@
       "title": "How long things are kept",
       "p1": "<b>On your device:</b> until you remove them.",
       "p2": "<b>On our relay:</b> moves, presence and waiting for a game: not kept. Rooms, seatings and pictures: a day. Game results: for as long as the ratings are worked out from them.",
-      "p3": "<b>Finished live games:</b> for good, in Cloudflare's storage, unless you ask us to delete one you played in.",
+      "p3": "<b>Finished live games:</b> for good, in Cloudflare's storage. If you ask us to delete your account's data, your name comes off the games you played; the moves stay, for the other players.",
       "p4": "<b>Our service's account and subscription records, your account's profile among them:</b> while the subscription runs, and afterwards until you ask us to delete them. A changed profile replaces the one before. The note of which device is in use is replaced each time another of your devices opens the game.",
       "p5": "<b>Stripe:</b> as long as Stripe's policy and the law on payment records require.",
       "p6": "<b>Cloudflare and Google:</b> under their own policies.",
@@ -233,7 +233,7 @@
       "p1": "Play alone, and nothing about you leaves your device.",
       "p2": "Play live with a name that is not your real one, and with no picture.",
       "p3": "Change your name or picture at any time; if you subscribe, the change reaches all your account's devices. What was already published stays where it is.",
-      "p4": "Ask us for a copy of what our service keeps about your account, its profile and its devices, or ask us to delete it, including the results its devices published on our relay.",
+      "p4": "Ask us for a copy of what our service keeps about your account, its profile and its devices, or ask us to delete it. Then your name comes off the finished games you played, and the results your devices published stay on our relay, for the ratings, without your name: each still names your account's number and your device's public key. If you subscribed on the web, Stripe's payment records still hold your email address with your device's public key, which those results name, for as long as Stripe keeps them.",
       "p5": "Where data protection law gives you rights — to see, correct or delete what is held about you, to object, or to complain to your data protection authority — you have them here too."
     },
     "children": {

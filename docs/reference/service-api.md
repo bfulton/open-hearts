@@ -132,9 +132,9 @@ Everything the worker keeps is in the Workers KV namespace `OH_STORE`, one key p
 
 A subscription's ID is `sub_…` for Stripe, `apple:<original transaction ID>` for the App Store, `google:<digest>` for Google Play, and `local-<16 hex>` in local mode.
 
-`service/tool/forget.mjs` deletes an account's rows (`forgetAccount`).
+`service/tool/forget.mjs` deletes an account's rows (`forgetAccount`), and takes its name off its kept games (`anonymizeGames` in `service/functions/records.mjs`).
 
-The worker keeps finished games' records in the R2 bucket `OH_RECORDS`, as `tables/<table>.json`, gzipped, with the sender's key as the custom metadata `from` (`keepRecord` in `service/functions/records.mjs`).
+The worker keeps finished games' records in the R2 bucket `OH_RECORDS`, as `tables/<table>.json`, gzipped, with the sender's key as the custom metadata `from` (`keepRecord` in `service/functions/records.mjs`). A record rewritten when an account is forgotten keeps its gzip and content type, and has no `from`. An account forgotten on request is marked as `forgotten/<account>` in the same bucket. A record sent later is kept without the names of seats whose licence names a marked account, and is refused with 422 if `JSON.stringify` would not give back the text as it was sent.
 
 ## Profile
 
