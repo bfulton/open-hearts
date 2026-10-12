@@ -144,6 +144,24 @@ test('backup jurors started with anything else are started again with this', asy
   assert.equal(c.started.at(-1).env.CF_VERSION_METADATA, undefined, 'the version is not passed in');
 });
 
+test('a container started afresh gets its minute, whatever the one before it missed', async () => {
+  const c = container({ startsAfter: 0 });
+  const s = state(c);
+  await wake(new Bench(s, {}));
+  // It stops answering, and misses one look.
+  c.bench.answers = false;
+  await new Bench(s, {}).alarm();
+  assert.equal(await s.storage.get('unanswered'), true);
+  // It ends before the next look, and the next call starts another.
+  c.running = false;
+  c.bench.answers = true;
+  assert.equal((await wake(new Bench(s, {}), 'tbl2')).status, 200);
+  // The new one misses its first look: given its minute, not stopped.
+  c.bench.answers = false;
+  await new Bench(s, {}).alarm();
+  assert.deepEqual(c.signals, []);
+});
+
 test('left alone while they serve or wait, stopped once they are quiet', async () => {
   const c = container({ startsAfter: 0 });
   const s = state(c);

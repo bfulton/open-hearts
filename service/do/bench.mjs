@@ -94,6 +94,9 @@ export class Bench {
     if (!c.running) {
       c.start({ enableInternet: true, env });
       await this.state.storage.put(STARTED_WITH, started);
+      // A fresh container gets its minute's grace (alarm), whatever the
+      // one before it had missed.
+      await this.state.storage.delete('unanswered');
     }
     if (!(await this.ready())) return false;
     try {
