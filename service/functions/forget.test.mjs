@@ -7,7 +7,7 @@ import { test } from 'node:test';
 
 import { gunzipSync } from 'node:zlib';
 
-import { accountsNamed, accountsPaidBy, memoryStore } from './worker.mjs';
+import { accountsNamed, accountsPaidBy, forgetAccount, memoryStore } from './worker.mjs';
 import { anonymizeGames, withoutNames } from './records.mjs';
 import { restBucket } from '../tool/r2.mjs';
 
@@ -195,4 +195,24 @@ test('the operator\'s tool lists every page of kept games, cursor by cursor', as
   assert.deepEqual(await bucket.list('tables/'), ['tables/a.json', 'tables/b.json']);
   assert.equal(asked.length, 2);
   assert.ok(asked.every((q) => new URLSearchParams(q).get('prefix') === 'tables/'), 'each page asks for the prefix');
+});
+
+test('every subscription an account has had goes with it, and nobody else\'s', async () => {
+  const store = memoryStore();
+  // Ada's first subscription lapsed, and a second took the account on.
+  await store.put(`ACCOUNT#${ADA}`, 'META', { subscription: 'sub_new' });
+  for (const [sub, account] of [['sub_old', ADA], ['sub_new', ADA], ['sub_bao', BAO]]) {
+    await store.put(`SUB#${sub}`, 'ACCOUNT', { account });
+    await store.put(`SUB#${sub}`, 'META', { source: 'stripe', renews_at: '2026-01-01', cancelled_at: null });
+    await store.put(`SUB#${sub}`, 'CUSTOMER', { customer: `cus_${sub}` });
+  }
+  const would = await forgetAccount(store, ADA, { dry: true, keys: keysOf(store) });
+  for (const row of ['SUB#sub_old|ACCOUNT', 'SUB#sub_old|META', 'SUB#sub_old|CUSTOMER', 'SUB#sub_new|ACCOUNT']) assert.ok(would.includes(row), row);
+  assert.equal(new Set(would).size, would.length, 'each row once');
+  assert.equal(store.rows.has('SUB#sub_old|ACCOUNT'), true, 'a dry run deletes nothing');
+  await forgetAccount(store, ADA, { keys: keysOf(store) });
+  assert.deepEqual([...store.rows.keys()].filter((k) => k.startsWith('SUB#')).sort(), ['SUB#sub_bao|ACCOUNT', 'SUB#sub_bao|CUSTOMER', 'SUB#sub_bao|META']);
+  // The address the old subscription was paid with finds nobody now.
+  const stripe = async (path) => (path.startsWith('/customers/search') ? { data: [{ id: 'cus_1', email: 'ada@example.com' }] } : { data: [{ id: 'sub_old' }] });
+  assert.deepEqual(await accountsPaidBy(store, stripe, 'ada@example.com'), []);
 });

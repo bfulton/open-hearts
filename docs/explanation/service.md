@@ -399,7 +399,7 @@ let it finish, is kept without its name. Every row kept for the
 account is deleted (`forgetAccount`): those under `ACCOUNT#` (its
 devices, code, backup codes, sign-in, device in use and profile), each
 device's `ENTITLEMENT`, the rows its codes and sign-in are found by, and
-its subscription's `SUB#` rows. A subscription still paid up is
+the `SUB#` rows of every subscription it has had. A subscription still paid up is
 cancelled first. Where the `Household` object runs, its note of the
 device in use (its key, the epoch, times, the table it said it sat at,
 and the relay objects it was seen at) is in the object's own storage and

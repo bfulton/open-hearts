@@ -2,8 +2,8 @@
 // choices; docs/how-to/delete-an-accounts-data.md): its name taken off
 // the games it played, which stay the other players', and every row the
 // service keeps for it deleted — its devices and their entitlements, its
-// codes, its sign-in, its device in use, its profile — and its
-// subscription's. Its results stay on the relay, under an account
+// codes, its sign-in, its device in use, its profile — and those of
+// every subscription it has had. Its results stay on the relay, under an account
 // number nothing left in the service ties to it.
 //
 //   node service/tool/forget.mjs --find <name or email>   the accounts it names
@@ -93,7 +93,7 @@ async function main(argv) {
   const keys = (await store.under(`ACCOUNT#${target}`, 'DEVICE#')).map((sk) => sk.slice('DEVICE#'.length));
   const games = await anonymizeGames(bucket, target, { keys, dry: !apply });
   for (const { key, named } of games) console.log(`${apply ? 'took' : 'would take'} the name off ${key}, seat ${named.join(', ')}`);
-  const rows = await forgetAccount(store, target, { dry: !apply });
+  const rows = await forgetAccount(store, target, { dry: !apply, keys: store.list });
   // A household code is a code: its row is said, and not its name.
   for (const row of rows) console.log(`${apply ? 'deleted' : 'would delete'} ${row.replace(/^TICKET#[^|]+/, 'TICKET#…')}`);
   console.log(`${games.length} game(s) and ${rows.length} row(s) ${apply ? 'changed' : 'to change; --apply changes them'}`);

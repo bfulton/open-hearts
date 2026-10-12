@@ -788,9 +788,11 @@ export async function profileWritten(op, store, active, { now = Date.now() } = {
 /// Deletes [account]'s rows: the account's own (its devices, its code,
 /// backup codes, sign-in, device in use and profile), each of its
 /// devices' entitlements, the rows its codes and its sign-in are found
-/// by, and its subscription's. Returns the rows, as `PK|SK`. With
-/// [dry], deletes nothing and says what it would.
-export async function forgetAccount(store, account, { dry = false } = {}) {
+/// by, and those of every subscription it has had. Returns the rows, as
+/// `PK|SK`. With [dry], deletes nothing and says what it would. [keys]
+/// lists the store's keys under a prefix, as accountsNamed takes it:
+/// without it, only the subscription the account has now is found.
+export async function forgetAccount(store, account, { dry = false, keys = null } = {}) {
   if (!isAccount(account)) return [];
   const gone = [];
   const del = async (pk, sk) => {
@@ -807,9 +809,19 @@ export async function forgetAccount(store, account, { dry = false } = {}) {
   if (typeof login === 'string' && login.startsWith('LOGIN#')) await del(login, 'IDENTITY');
   const ticket = (await store.get(pk, 'TICKET'))?.code;
   if (typeof ticket === 'string') await del(`TICKET#${ticket}`, 'META');
-  const subscription = (await store.get(pk, 'META'))?.subscription;
-  if (typeof subscription === 'string' && (await store.get(`SUB#${subscription}`, 'ACCOUNT'))?.account === account) {
-    for (const sk of await store.under(`SUB#${subscription}`, '')) await del(`SUB#${subscription}`, sk);
+  // Every subscription that names it: the one it has now, and any that
+  // lapsed before a later one took the account on (accountFor), whose
+  // rows still name it and would still tie its number to a payment.
+  const subscriptions = new Set();
+  const current = (await store.get(pk, 'META'))?.subscription;
+  if (typeof current === 'string') subscriptions.add(current);
+  for (const key of keys ? await keys('SUB#') : []) {
+    const sub = /^SUB#(.+)\|ACCOUNT$/.exec(key)?.[1];
+    if (sub) subscriptions.add(sub);
+  }
+  for (const sub of subscriptions) {
+    if ((await store.get(`SUB#${sub}`, 'ACCOUNT'))?.account !== account) continue;
+    for (const sk of await store.under(`SUB#${sub}`, '')) await del(`SUB#${sub}`, sk);
   }
   for (const sk of await store.under(pk, '')) await del(pk, sk);
   return gone;
