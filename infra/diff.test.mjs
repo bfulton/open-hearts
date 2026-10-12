@@ -400,7 +400,7 @@ test("toml: the relay's own wrangler.toml reads", () => {
   assert.deepEqual(wrangler.routes, [{ pattern: 'relay.openhearts.game', custom_domain: true }]);
   assert.deepEqual(
     wranglerBindings(wrangler).map((b) => `${b.type}:${b.name}`).sort(),
-    ['analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'send_email:EMAIL'],
+    ['analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
   );
 });
 
@@ -411,6 +411,7 @@ const liveRelay = () => ({
     observability: { enabled: true },
     bindings: [
       { class_name: 'Bench', name: 'BENCH', namespace_id: 'fba6', type: 'durable_object_namespace' },
+      { name: 'CF_VERSION_METADATA', type: 'version_metadata' },
       { name: 'EMAIL', type: 'send_email' },
       { class_name: 'Household', name: 'HOUSEHOLD', namespace_id: 'a1c3', type: 'durable_object_namespace' },
       { name: 'OH_JUROR_SECRET', type: 'secret_text' },
@@ -434,7 +435,7 @@ test('relay: as deployed, it matches wrangler.toml', () => {
 test('relay: each kind of drift is said', () => {
   const live = liveRelay();
   live.settings.compatibility_date = '2024-01-01';
-  live.settings.bindings = live.settings.bindings.filter((b) => b.name !== 'EMAIL');
+  live.settings.bindings = live.settings.bindings.filter((b) => b.name !== 'EMAIL' && b.name !== 'CF_VERSION_METADATA');
   live.settings.bindings.find((b) => b.name === 'OH_MAIL_FROM').text = 'other@openhearts.game';
   live.settings.bindings.push({ name: 'EXTRA', type: 'plain_text', text: '' });
   live.secrets = [];
@@ -443,7 +444,7 @@ test('relay: each kind of drift is said', () => {
   live.namespaces = live.namespaces.filter((n) => n.class !== 'Household');
   live.containers[0].max_instances = 3;
   const problems = relayProblems(wrangler, relay, live).join('\n');
-  for (const said of [/compatibility date/, /EMAIL .* not on the worker/, /OH_MAIL_FROM: text/, /EXTRA .* not in wrangler.toml/, /OH_JUROR_SECRET is not set/, /relay.openhearts.game is not attached/, /workers.dev address is on/, /namespace for Household/, /max_instances is 3/]) {
+  for (const said of [/compatibility date/, /EMAIL .* not on the worker/, /CF_VERSION_METADATA .* not on the worker/, /OH_MAIL_FROM: text/, /EXTRA .* not in wrangler.toml/, /OH_JUROR_SECRET is not set/, /relay.openhearts.game is not attached/, /workers.dev address is on/, /namespace for Household/, /max_instances is 3/]) {
     assert.match(problems, said);
   }
 });
