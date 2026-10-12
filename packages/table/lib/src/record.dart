@@ -158,7 +158,8 @@ class _RecordVerifier {
 
   /// Fills [allRemovals], [allEscrows] and [keyedBy] from the whole
   /// record. Only once the record is past what it is refused for before
-  /// any decision is read ([run]): a removal names its seat by index.
+  /// any decision is read ([unreadable]): a removal names its seat by
+  /// index.
   void readAhead() {
     for (final d in record) {
       if (!d.removal) continue;
@@ -704,6 +705,21 @@ class _RecordVerifier {
   bool givenUpUndealt(DealSession d) =>
       (escrowedInDeal[game.handNumber] ?? const <int>{}).any((s) => !d.hasDeclared(s));
 
+  /// Why a decision in the record cannot be read at all, or null. Each
+  /// names its seat by index, and the replay reads the seat by it from
+  /// the start, ahead of where the decision is checked ([readAhead],
+  /// [growCustodians]); and a removal is carried by a claim that can
+  /// carry one ([Decision.removalKinds]).
+  String? unreadable() {
+    for (final d in record) {
+      final e = d.event;
+      final seat = e.body['seat'];
+      if (seat is! int || seat < 0 || seat >= seatCount) return 'the ${e.kind.name} at ${d.turn} names no seat at the table';
+      if (d.removal && !Decision.removalKinds.contains(e.kind)) return 'the ${e.kind.name} at ${d.turn} is recorded as a removal';
+    }
+    return null;
+  }
+
   /// The replay, decision by decision, to the verification it comes to.
   Verification run() {
     if (spec.sealed && crypto == null) return fail('a sealed record needs the deal\'s cryptography to check');
@@ -713,6 +729,8 @@ class _RecordVerifier {
     // date to: a record is read long after it ran out.
     final unlicensed = spec.licenceProblem();
     if (unlicensed != null) return fail(unlicensed);
+    final unread = unreadable();
+    if (unread != null) return fail(unread);
     readAhead();
 
     final jury = checkJuries();

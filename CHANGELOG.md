@@ -91,6 +91,13 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- A kept game's record with a decision that names no seat at the table,
+  or with a removal carried by anything but a boot, an absence, a leave,
+  an escrow or the game's end, now fails its check and says why. Before,
+  the check stopped with an error, or at a person's seat took such a
+  removal as a boot. And when a check stops with any error, the game's
+  page says it could not check the game; in the phone apps it went on
+  saying it was checking. (2026-10-12, #23)
 - `infra/apply.mjs` took the relay's version metadata binding for one
   not in `service/do/wrangler.toml`, and asked for a fix by hand where
   the worker matched. (2026-10-12, #14)
