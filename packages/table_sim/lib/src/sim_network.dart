@@ -43,6 +43,10 @@ class SimNetwork {
   final Map<String, int> byKind = {};
   final Map<String, int> saidByKind = {};
 
+  /// Told of every message a peer sends, before it goes: a test that
+  /// throws from it has the send fail there, as a socket's write can.
+  void Function(PublicKey from, Map<String, Object?> message)? onSend;
+
   /// Who made each kind of event said on the wire, by its author: what
   /// a test asks of who did something, rather than a client counting
   /// it for the test.
@@ -343,6 +347,7 @@ class SimTransport implements Transport {
 
   @override
   void broadcast(Map<String, Object?> message, {bool everywhere = false}) {
+    _net.onSend?.call(key, message);
     if (_net.relays.isEmpty) return _net._broadcastAll(key, message);
     final now = _net.clock.nowMs;
     final reach = _net.reachOf(key);
