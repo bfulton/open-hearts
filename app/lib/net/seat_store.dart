@@ -1,5 +1,5 @@
 /// The seat this device is playing in, kept on the device so that a
-/// page reloaded mid-game comes back to it (home_page.dart; packages/
+/// page reloaded mid-game comes back to it (live/lobby.dart; packages/
 /// table, journal.dart).
 ///
 /// What is kept: the table (its spec, and the names and looks it was

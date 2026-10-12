@@ -2,7 +2,7 @@
 ///
 /// Only ever an answer one way. A browser that says it is online may
 /// still reach nothing — a captive portal, a train between masts — so
-/// a relay is waited for all the same (home_page.dart, `waitForRelay`).
+/// a relay is waited for all the same (live/lobby.dart, `waitForRelay`).
 /// A browser that says it is offline is in airplane mode or has no
 /// signal, and waiting forty seconds for a relay will not change that:
 /// the door says so at once instead. Off the web nothing here is told,

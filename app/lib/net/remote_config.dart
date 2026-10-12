@@ -107,7 +107,7 @@ class AppWaits {
   final Duration configEvery;
 
   /// A relay slow to answer: when the screen says so, and when it is
-  /// given up on (home_page.dart, waitForRelay).
+  /// given up on (live/lobby.dart, waitForRelay).
   final Duration relaySlow;
   final Duration relayGiveUp;
 

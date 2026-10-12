@@ -18,6 +18,7 @@ import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/game_options.dart';
 import 'package:open_hearts/home_page.dart';
 import 'package:open_hearts/identity.dart';
+import 'package:open_hearts/live/lobby.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
 import 'package:open_hearts/router.dart';
