@@ -9,6 +9,9 @@ so each entry gives the date and commit it landed in.
 
 ### Added
 
+- `infra/apply.mjs` checks the Pages secret for Google Play's service
+  account whenever `config/openhearts.json` names Play.
+  (2026-10-11, 21a06eb)
 - At an empty pool, a player may choose to wait for a person instead of
   playing bots, and the operator is told someone is waiting.
   (2026-10-11, 45cc3a3)
@@ -69,6 +72,13 @@ so each entry gives the date and commit it landed in.
 
 ### Fixed
 
+- Backup jurors still running with an earlier service key are started
+  again with the current one at the next call, so a key rotation
+  reaches them. (2026-10-11, e010ff3)
+- A relay object's counts are written when its last socket closes, so a
+  visit shorter than a minute is counted. (2026-10-11, a2f9327)
+- For a missing preview secret, `infra/apply.mjs` printed a command that
+  set production's instead. (2026-10-11, 8b679a4)
 - Game results are kept for good again. Since results moved to the
   `standings` tag, the relay had kept only the old `results` tag for
   good, and swept each result a day after storing it. Results swept
