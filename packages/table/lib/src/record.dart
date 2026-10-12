@@ -100,31 +100,86 @@ Verification verifyRecord(
   DealCrypto? crypto,
   List<TableEvent> releases = const [],
   TableReplay? replay,
-}) {
-  // A record that ends the game where nobody could move the table ends
-  // mid-hand, before the audit that opens every seat's cards: what it
-  // says is checked as far as the cards known allow, as a partial
-  // record's is, and then it is over ([Verification.ended]).
-  final partialOk = allowPartial || record.any((d) => d.removal && d.event.kind == EventKind.ended);
-  final game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target);
-  final holders = List.of(spec.seats);
-  final humans = {
-    for (final h in spec.seats)
-      if (h is HumanSeat) h.key,
-  };
-  final removedAt = <PublicKey, TurnId>{};
+}) =>
+    _RecordVerifier(spec, record, allowPartial: allowPartial, juries: juries, crypto: crypto, releases: releases, replay: replay)
+        .run();
+
+/// One replay of a record ([verifyRecord]): the game rebuilt decision
+/// by decision, and what the record has said so far that the decisions
+/// after are held to.
+class _RecordVerifier {
+  _RecordVerifier(
+    this.spec,
+    this.record, {
+    required bool allowPartial,
+    required this.juries,
+    required this.crypto,
+    required this.releases,
+    required this.replay,
+  })  : // A record that ends the game where nobody could move the table ends
+        // mid-hand, before the audit that opens every seat's cards: what it
+        // says is checked as far as the cards known allow, as a partial
+        // record's is, and then it is over ([Verification.ended]).
+        partialOk = allowPartial || record.any((d) => d.removal && d.event.kind == EventKind.ended),
+        game = HeartsGame(seed: spec.seed, sealed: spec.sealed, target: spec.target),
+        holders = List.of(spec.seats),
+        humans = {
+          for (final h in spec.seats)
+            if (h is HumanSeat) h.key,
+        };
+
+  final TableSpec spec;
+  final List<Decision> record;
+  final List<Decision> juries;
+  final DealCrypto? crypto;
+  final List<TableEvent> releases;
+  final TableReplay? replay;
+  final bool partialOk;
+  final HeartsGame game;
+  final List<SeatHolder> holders;
+  final Set<PublicKey> humans;
   final played = <Card>{};
   var index = 0;
 
-  Verification fail(String why) => Verification(ok: false, reason: why, winners: const [], ratings: const {}, finalHolders: holders);
+  /// Every removal in the record, wherever it sits: the smallest set a
+  /// peer could legitimately have measured against at a turn is everyone
+  /// less all of these made by then — including ones recorded at the
+  /// same position but later in the record's order ([readAhead]).
+  final allRemovals = <PublicKey, TurnId>{};
 
-  if (spec.sealed && crypto == null) return fail('a sealed record needs the deal\'s cryptography to check');
-  // Every seat an account's, by the service's word that its key is one
-  // of the account's devices (licence.dart): what makes the names, the
-  // ratings and the result the accounts'. No clock to hold a licence's
-  // date to: a record is read long after it ran out.
-  final unlicensed = spec.licenceProblem();
-  if (unlicensed != null) return fail(unlicensed);
+  /// The held seats the record gives to the escrow, by hand, for the
+  /// same reason: a seat the hand will lose is opened from its pieces
+  /// from the start of the replay ([feedSecrets]).
+  final allEscrows = <int, Set<int>>{};
+
+  /// Who said each held seat's keys, by hand: the seat's own juror from
+  /// then on, as the table reads it (_asKeyed in client.dart).
+  final keyedBy = <int, Map<int, PublicKey>>{};
+
+  /// Fills [allRemovals], [allEscrows] and [keyedBy] from the whole
+  /// record. Only once the record is past what it is refused for before
+  /// any decision is read ([run]): a removal names its seat by index.
+  void readAhead() {
+    for (final d in record) {
+      if (!d.removal) continue;
+      final h = spec.seats[d.event.seat];
+      if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
+    }
+    for (final d in record) {
+      if (d.removal && d.event.kind == EventKind.escrow) allEscrows.putIfAbsent(d.turn.hand, () => {}).add(d.event.seat);
+    }
+    for (final d in record) {
+      final e = d.event;
+      if (d.removal || e.kind != EventKind.deal || e.round != 0 || humans.contains(e.author)) continue;
+      keyedBy.putIfAbsent(d.turn.hand, () => {})[e.seat] = e.author;
+    }
+  }
+
+  /// Whether a hand the replay has been through could be checked only
+  /// as far as the cards known allow: the verification is then partial.
+  var incomplete = false;
+
+  Verification fail(String why) => Verification(ok: false, reason: why, winners: const [], ratings: const {}, finalHolders: holders);
 
   Verification partial() =>
       Verification(ok: true, reason: 'verified so far', winners: const [], ratings: const {}, finalHolders: holders, complete: false);
@@ -146,23 +201,6 @@ Verification verifyRecord(
     return a.position <= b.position;
   }
 
-  // Every removal in the record, wherever it sits: the smallest set a
-  // peer could legitimately have measured against at a turn is everyone
-  // less all of these made by then — including ones recorded at the
-  // same position but later in the record's order.
-  final allRemovals = <PublicKey, TurnId>{};
-  for (final d in record) {
-    if (!d.removal) continue;
-    final h = spec.seats[d.event.seat];
-    if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
-  }
-  // And the held seats the record gives to the escrow, by hand, for
-  // the same reason: a seat the hand will lose is opened from its
-  // pieces from the start of the replay ([feedSecrets]).
-  final allEscrows = <int, Set<int>>{};
-  for (final d in record) {
-    if (d.removal && d.event.kind == EventKind.escrow) allEscrows.putIfAbsent(d.turn.hand, () => {}).add(d.event.seat);
-  }
   Set<PublicKey> floorAt(TurnId turn) => {
     for (final k in humans)
       if (!allRemovals.containsKey(k) || !atOrBefore(allRemovals[k]!, turn)) k,
@@ -255,7 +293,7 @@ Verification verifyRecord(
   /// are on the record — passing over a person removed at or before
   /// their own keys. Null where those keys name none, or there is
   /// nobody at the table to key the hand, its bot seats dealt in the
-  /// open; not [said] where the record stops before them.
+  /// open; not `said` where the record stops before them.
   final sealed = <int, ({bool said, String? jury})>{};
   ({bool said, String? jury}) sealedAt(int hand) => sealed.putIfAbsent(hand, () {
         final bots = botSeatsAt(hand);
@@ -340,15 +378,6 @@ Verification verifyRecord(
     if (!at.said || named != at.jury) return 'hand $hand: seat $seat\'s keys are sealed to another draw than the hand\'s';
     if (heldAt(hand)[seat] != e.author) return 'hand $hand: seat $seat keyed by a juror the hand\'s draw does not name for it';
     return null;
-  }
-
-  /// Who said each held seat's keys, by hand: the seat's own juror from
-  /// then on, as the table reads it (_asKeyed in client.dart).
-  final keyedBy = <int, Map<int, PublicKey>>{};
-  for (final d in record) {
-    final e = d.event;
-    if (d.removal || e.kind != EventKind.deal || e.round != 0 || humans.contains(e.author)) continue;
-    keyedBy.putIfAbsent(d.turn.hand, () => {})[e.seat] = e.author;
   }
 
   /// The held seats the record has given to the escrow, by hand, as
@@ -473,31 +502,6 @@ Verification verifyRecord(
     if (among.isEmpty || !humans.containsAll(among)) return false;
     if (!among.containsAll(floorAt(turn))) return false;
     return witnesses.intersection(among).length >= among.length ~/ 2 + 1;
-  }
-
-  for (final d in juries) {
-    final e = d.event;
-    if (!d.jury || e.kind != EventKind.jury) return fail('a jury that is not a jury proposal');
-    if (!humans.contains(e.author)) return fail('a jury proposed by someone not at the table');
-    List<PublicKey> snapshot;
-    List<PublicKey> drawn;
-    try {
-      snapshot = e.snapshot;
-      drawn = e.jurors;
-    } catch (_) {
-      return fail('a malformed jury proposal');
-    }
-    if (snapshot.any(humans.contains)) return fail('a jury drawn from the table itself');
-    final expected = drawJury(spec.seed, e.hand, snapshot);
-    if (expected.length != drawn.length || Iterable<int>.generate(drawn.length).any((i) => expected[i] != drawn[i])) {
-      return fail('a jury for hand ${e.hand} that is not the draw its snapshot gives');
-    }
-    if (!carried(d.witnesses, d.turn, d.among)) {
-      return fail('a jury for hand ${e.hand} without a majority behind it (${d.witnesses.length} of ${d.among.length})');
-    }
-    jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
-    final at = ownJuryAt[e.hand];
-    if (at == null || e.turn.position < at.position) ownJuryAt[e.hand] = e.turn;
   }
 
   /// Whether [d] is carried by a verdict: a juror of a jury in force at
@@ -627,7 +631,6 @@ Verification verifyRecord(
               '(${backers.length} of ${d.among.length})';
         }
       }
-      removedAt[holder.key] = d.turn;
       holders[seat] = BotSeat(spec.replacementFor(seat));
       deal?.seatLeft(seat);
     }
@@ -701,199 +704,294 @@ Verification verifyRecord(
   bool givenUpUndealt(DealSession d) =>
       (escrowedInDeal[game.handNumber] ?? const <int>{}).any((s) => !d.hasDeclared(s));
 
-  var incomplete = false;
+  /// The replay, decision by decision, to the verification it comes to.
+  Verification run() {
+    if (spec.sealed && crypto == null) return fail('a sealed record needs the deal\'s cryptography to check');
+    // Every seat an account's, by the service's word that its key is one
+    // of the account's devices (licence.dart): what makes the names, the
+    // ratings and the result the accounts'. No clock to hold a licence's
+    // date to: a record is read long after it ran out.
+    final unlicensed = spec.licenceProblem();
+    if (unlicensed != null) return fail(unlicensed);
+    readAhead();
 
-  while (game.phase != Phase.gameOver) {
-    final why = takeRemovals();
-    if (why != null) return fail(why);
-    if (endedBy != null) return endedHere();
-    if (game.phase == Phase.dealing) {
-      final d = deal ?? startDeal();
-      scanAudits(d);
-      feedSecrets(d, all: false);
-      final dealDone =
-          !(index < record.length && record[index].turn.hand == game.handNumber && record[index].turn.isDeal) ||
-          d.phase == DealPhase.dealt ||
-          d.phase == DealPhase.audited;
-      if (dealDone) {
-        if (d.phase != DealPhase.dealt && d.phase != DealPhase.audited) {
-          if (partialOk && index >= record.length) return partial();
-          // A hand given up in its deal: a bot seat's juror went with
-          // a step of the seat still owed, and nobody else can take it
-          // — the juror drew the key. The table gives the hand up
-          // unscored and deals the next (_giveUpUndealtHand in
-          // client.dart), with no audit, since the seat that stopped
-          // it cannot be opened to show anything. So the record goes
-          // on to a later hand with this one's deal short, and that
-          // is a hand over, not a deal left unfinished
-          // (docs/explanation/live-play.md).
-          //
-          // Only where the record gives a held seat to the escrow with
-          // a step of the deal still owed. Every other step has
-          // somebody to take it: a person's is theirs until they are
-          // removed, and the record shows the removal; a seat nobody
-          // holds is worked out by everyone. And nothing of the hand
-          // was passed or played, so there is nothing to check of it
-          // beyond the steps that were said.
-          if (index < record.length && record[index].turn.hand > game.handNumber && givenUpUndealt(d)) {
-            game.abandonHand();
-            deal = null;
-            continue;
-          }
-          return fail('hand ${game.handNumber}: the deal is not complete (${d.phase.name})');
-        }
-        // A hand whose audits follow its deal with nothing in between
-        // never began: nobody could lead it, so the table opened it to
-        // find out why and gave it up (docs/explanation/fair-deal.md, and
-        // _giveUpHand in client.dart). Two things make that legitimate,
-        // and both are in the record: every seat's own signed word put
-        // the lead card nowhere, and the deal those audits open shows
-        // one of them holding it. What the record must not then contain
-        // is the hand played on with every card in the open, and it
-        // cannot: the audits are where the hand ends.
-        final givenUp = nextIsAudit();
-        // A newcomer's piece is released like any other, and has to be
-        // placed here as the table placed it, or a seat given to the
-        // escrow and opened at the table from a topped-up juror's piece
-        // would never open here.
-        growCustodians(d, game.handNumber, index);
-        feedSecrets(d, all: true);
-        if (givenUp) {
-          if (!d.leadDisclaimed) {
-            return fail('hand ${game.handNumber}: opened before it began, though a seat said where the lead card was');
-          }
-          final v = takeAudits();
-          if (v != null) return v;
-          if (d.lied == null) {
-            return fail('hand ${game.handNumber}: given up, though the open deal shows a seat that could have led it');
-          }
+    final jury = checkJuries();
+    if (jury != null) return jury;
+    while (game.phase != Phase.gameOver) {
+      final why = takeRemovals();
+      if (why != null) return fail(why);
+      if (endedBy != null) return endedHere();
+      final stop = switch (game.phase) {
+        Phase.dealing => dealStep(),
+        Phase.passing => passStep(),
+        Phase.handOver => handOverStep(),
+        _ => playStep(),
+      };
+      if (stop != null) return stop;
+    }
+    if (deal != null) {
+      // The last hand is audited too — after whatever the record removes
+      // at its audits, which comes first at their position as at every
+      // hand's. Taken straight to the audits, a claim for the escrow at
+      // one of them would stop the replay before any audit, and leave the
+      // hand's audits and that claim unchecked.
+      final why = takeRemovals();
+      if (why != null) return fail(why);
+      if (endedBy != null) return endedHere();
+      final v = takeAudits();
+      if (v != null) return v;
+      replay?._ended(game, deal);
+    }
+    // And nothing after: a decision the replay never reached is one it
+    // never checked.
+    if (index < record.length) {
+      final d = record[index];
+      return fail('the record goes on past the end of the game: ${d.removal ? 'a removal' : 'a ${d.event.kind.name}'} at ${d.turn}');
+    }
+    if (incomplete) return partial();
+
+    final winners = game.winners;
+    final ratings = <PublicKey, int>{};
+    final botWon = winners.any((s) => holders[s] is BotSeat);
+    for (var s = 0; s < seatCount; s++) {
+      final original = spec.seats[s];
+      if (original is! HumanSeat) continue;
+      ratings[original.key] = botWon ? 0 : (winners.contains(s) ? 1 : -1);
+    }
+    return Verification(ok: true, reason: 'verified', winners: winners, ratings: ratings, finalHolders: holders);
+  }
+
+  /// Every jury the table carried, checked: drawn as its snapshot
+  /// gives, carried by a majority of its moment. Null when they all
+  /// are, else the verification to return.
+  Verification? checkJuries() {
+    for (final d in juries) {
+      final e = d.event;
+      if (!d.jury || e.kind != EventKind.jury) return fail('a jury that is not a jury proposal');
+      if (!humans.contains(e.author)) return fail('a jury proposed by someone not at the table');
+      List<PublicKey> snapshot;
+      List<PublicKey> drawn;
+      try {
+        snapshot = e.snapshot;
+        drawn = e.jurors;
+      } catch (_) {
+        return fail('a malformed jury proposal');
+      }
+      if (snapshot.any(humans.contains)) return fail('a jury drawn from the table itself');
+      final expected = drawJury(spec.seed, e.hand, snapshot);
+      if (expected.length != drawn.length || Iterable<int>.generate(drawn.length).any((i) => expected[i] != drawn[i])) {
+        return fail('a jury for hand ${e.hand} that is not the draw its snapshot gives');
+      }
+      if (!carried(d.witnesses, d.turn, d.among)) {
+        return fail('a jury for hand ${e.hand} without a majority behind it (${d.witnesses.length} of ${d.among.length})');
+      }
+      jurors.putIfAbsent(e.hand, () => {}).addAll(drawn);
+      final at = ownJuryAt[e.hand];
+      if (at == null || e.turn.position < at.position) ownJuryAt[e.hand] = e.turn;
+    }
+    return null;
+  }
+
+  /// The next step of a sealed hand's deal; or, the deal done, the hand
+  /// dealt. Null to go on, else the verification to return.
+  Verification? dealStep() {
+    final d = deal ?? startDeal();
+    scanAudits(d);
+    feedSecrets(d, all: false);
+    final dealDone =
+        !(index < record.length && record[index].turn.hand == game.handNumber && record[index].turn.isDeal) ||
+        d.phase == DealPhase.dealt ||
+        d.phase == DealPhase.audited;
+    if (dealDone) {
+      if (d.phase != DealPhase.dealt && d.phase != DealPhase.audited) {
+        if (partialOk && index >= record.length) return partial();
+        // A hand given up in its deal: a bot seat's juror went with
+        // a step of the seat still owed, and nobody else can take it
+        // — the juror drew the key. The table gives the hand up
+        // unscored and deals the next (_giveUpUndealtHand in
+        // client.dart), with no audit, since the seat that stopped
+        // it cannot be opened to show anything. So the record goes
+        // on to a later hand with this one's deal short, and that
+        // is a hand over, not a deal left unfinished
+        // (docs/explanation/live-play.md).
+        //
+        // Only where the record gives a held seat to the escrow with
+        // a step of the deal still owed. Every other step has
+        // somebody to take it: a person's is theirs until they are
+        // removed, and the record shows the removal; a seat nobody
+        // holds is worked out by everyone. And nothing of the hand
+        // was passed or played, so there is nothing to check of it
+        // beyond the steps that were said.
+        if (index < record.length && record[index].turn.hand > game.handNumber && givenUpUndealt(d)) {
           game.abandonHand();
           deal = null;
-          continue;
+          return null;
         }
-        final leader = d.leader;
-        if (leader == null) return fail('hand ${game.handNumber}: nobody declared the lead card');
-        final hands = <List<Card>?>[];
-        for (var s = 0; s < seatCount; s++) {
-          final cards = d.dealtHandOf(s);
-          if (cards == null && !partialOk) return fail('hand ${game.handNumber}: seat $s\'s cards were never opened');
-          if (cards == null) incomplete = true;
-          hands.add(cards == null ? null : [for (final i in cards) Card.deck[i]]);
+        return fail('hand ${game.handNumber}: the deal is not complete (${d.phase.name})');
+      }
+      // A hand whose audits follow its deal with nothing in between
+      // never began: nobody could lead it, so the table opened it to
+      // find out why and gave it up (docs/explanation/fair-deal.md, and
+      // _giveUpHand in client.dart). Two things make that legitimate,
+      // and both are in the record: every seat's own signed word put
+      // the lead card nowhere, and the deal those audits open shows
+      // one of them holding it. What the record must not then contain
+      // is the hand played on with every card in the open, and it
+      // cannot: the audits are where the hand ends.
+      final givenUp = nextIsAudit();
+      // A newcomer's piece is released like any other, and has to be
+      // placed here as the table placed it, or a seat given to the
+      // escrow and opened at the table from a topped-up juror's piece
+      // would never open here.
+      growCustodians(d, game.handNumber, index);
+      feedSecrets(d, all: true);
+      if (givenUp) {
+        if (!d.leadDisclaimed) {
+          return fail('hand ${game.handNumber}: opened before it began, though a seat said where the lead card was');
         }
-        game.declareLeader(leader);
-        game.deal(hands);
-        continue;
+        final v = takeAudits();
+        if (v != null) return v;
+        if (d.lied == null) {
+          return fail('hand ${game.handNumber}: given up, though the open deal shows a seat that could have led it');
+        }
+        game.abandonHand();
+        deal = null;
+        return null;
       }
-      // The next step owed: the first unsettled seat of the round the
-      // deal is at, in the order the table opens them.
-      final round = switch (d.phase) {
-        DealPhase.keys => 0,
-        DealPhase.shuffles => 1,
-        DealPhase.tokens => 2,
-        _ => 3,
-      };
-      if (index >= record.length) return partialOk ? partial() : fail('the record ends mid-deal');
-      final next = record[index];
-      final e = next.event;
-      if (e.kind != EventKind.deal || !next.turn.isDeal) return fail('hand ${game.handNumber}: expected a deal step, saw ${e.kind.name}');
-      if (next.turn.dealRound != round || e.round != round) {
-        return fail('hand ${game.handNumber}: a deal step of round ${e.round} where round $round is owed');
-      }
-      final seat = next.turn.dealSeat;
-      final (dec, whyNot) = takeAction(next.turn, seat, EventKind.deal);
-      if (whyNot != null) return fail(whyNot);
-      if (dec == null) return partial();
-      if (round == 0) {
-        final why = keysNameTheDraw(e, seat, game.handNumber);
-        if (why != null) return fail(why);
-      }
-      final b = Map<String, Object?>.from(e.body);
-      final ok = switch (round) {
-        0 => d.acceptKeys(b),
-        1 => d.acceptShuffle(b),
-        2 => d.acceptTokens(b),
-        _ => d.acceptDeclaration(b),
-      };
-      if (!ok) return fail('hand ${game.handNumber}: a deal step by seat $seat that does not verify (round $round)');
-      continue;
-    }
-    if (game.phase == Phase.passing) {
+      final leader = d.leader;
+      if (leader == null) return fail('hand ${game.handNumber}: nobody declared the lead card');
+      final hands = <List<Card>?>[];
       for (var s = 0; s < seatCount; s++) {
-        // A bot seat a juror holds said its pass in the record, like a
-        // person's; only one nobody holds is recomputed here.
-        if (holders[s] is BotSeat && heldAt(game.handNumber)[s] == null && !game.hasPassed(s)) {
-          final whyNot = botActs(s, passing: true);
-          if (whyNot != null) return partialOk ? partial() : fail(whyNot);
-        }
+        final cards = d.dealtHandOf(s);
+        if (cards == null && !partialOk) return fail('hand ${game.handNumber}: seat $s\'s cards were never opened');
+        if (cards == null) incomplete = true;
+        hands.add(cards == null ? null : [for (final i in cards) Card.deck[i]]);
       }
-      if (game.phase != Phase.passing) continue;
-      if (index >= record.length) return partialOk ? partial() : fail('the record ends mid-pass');
-      final d = record[index++];
-      final e = d.event;
-      if (e.kind != EventKind.pass) return fail('expected a pass, saw ${e.kind.name}');
-      if (!mayAct(e.seat, e.author, d.turn.hand)) return fail('a pass by a key that did not hold seat ${e.seat}');
-      if (!carried(d.witnesses, d.turn, d.among) && !byVerdict(d)) {
-        return fail(
-          'a pass at ${d.turn} by seat ${e.seat} without a majority behind it '
-          '(${d.witnesses.length} of ${d.among.length})',
-        );
+      game.declareLeader(leader);
+      game.deal(hands);
+      return null;
+    }
+    // The next step owed: the first unsettled seat of the round the
+    // deal is at, in the order the table opens them.
+    final round = switch (d.phase) {
+      DealPhase.keys => 0,
+      DealPhase.shuffles => 1,
+      DealPhase.tokens => 2,
+      _ => 3,
+    };
+    if (index >= record.length) return partialOk ? partial() : fail('the record ends mid-deal');
+    final next = record[index];
+    final e = next.event;
+    if (e.kind != EventKind.deal || !next.turn.isDeal) return fail('hand ${game.handNumber}: expected a deal step, saw ${e.kind.name}');
+    if (next.turn.dealRound != round || e.round != round) {
+      return fail('hand ${game.handNumber}: a deal step of round ${e.round} where round $round is owed');
+    }
+    final seat = next.turn.dealSeat;
+    final (dec, whyNot) = takeAction(next.turn, seat, EventKind.deal);
+    if (whyNot != null) return fail(whyNot);
+    if (dec == null) return partial();
+    if (round == 0) {
+      final why = keysNameTheDraw(e, seat, game.handNumber);
+      if (why != null) return fail(why);
+    }
+    final b = Map<String, Object?>.from(e.body);
+    final ok = switch (round) {
+      0 => d.acceptKeys(b),
+      1 => d.acceptShuffle(b),
+      2 => d.acceptTokens(b),
+      _ => d.acceptDeclaration(b),
+    };
+    if (!ok) return fail('hand ${game.handNumber}: a deal step by seat $seat that does not verify (round $round)');
+    return null;
+  }
+
+  /// The pass: a bot seat nobody holds worked out, the next pass taken.
+  /// Null to go on, else the verification to return.
+  Verification? passStep() {
+    for (var s = 0; s < seatCount; s++) {
+      // A bot seat a juror holds said its pass in the record, like a
+      // person's; only one nobody holds is recomputed here.
+      if (holders[s] is BotSeat && heldAt(game.handNumber)[s] == null && !game.hasPassed(s)) {
+        final whyNot = botActs(s, passing: true);
+        if (whyNot != null) return partialOk ? partial() : fail(whyNot);
       }
-      final dl = deal;
-      if (dl != null) {
-        final b = Map<String, Object?>.from(e.body);
-        final to = (e.seat + game.passDirection.seatOffset) % seatCount;
-        if (b['from'] != e.seat || b['to'] != to) return fail('a pass by seat ${e.seat} not to seat $to');
-        final positions = [for (final p in b['positions'] as List) p as int];
-        if (positions.length != passSize || !dl.acceptPass(b)) return fail('a pass by seat ${e.seat} the deal does not take');
-        final cards = <Card>[];
-        for (final p in positions) {
-          final c = dl.openedCardAt(p);
-          if (c == null) break;
-          cards.add(Card.deck[c]);
+    }
+    if (game.phase != Phase.passing) return null;
+    if (index >= record.length) return partialOk ? partial() : fail('the record ends mid-pass');
+    final d = record[index++];
+    final e = d.event;
+    if (e.kind != EventKind.pass) return fail('expected a pass, saw ${e.kind.name}');
+    if (!mayAct(e.seat, e.author, d.turn.hand)) return fail('a pass by a key that did not hold seat ${e.seat}');
+    if (!carried(d.witnesses, d.turn, d.among) && !byVerdict(d)) {
+      return fail(
+        'a pass at ${d.turn} by seat ${e.seat} without a majority behind it '
+        '(${d.witnesses.length} of ${d.among.length})',
+      );
+    }
+    final dl = deal;
+    if (dl != null) {
+      final b = Map<String, Object?>.from(e.body);
+      final to = (e.seat + game.passDirection.seatOffset) % seatCount;
+      if (b['from'] != e.seat || b['to'] != to) return fail('a pass by seat ${e.seat} not to seat $to');
+      final positions = [for (final p in b['positions'] as List) p as int];
+      if (positions.length != passSize || !dl.acceptPass(b)) return fail('a pass by seat ${e.seat} the deal does not take');
+      final cards = <Card>[];
+      for (final p in positions) {
+        final c = dl.openedCardAt(p);
+        if (c == null) break;
+        cards.add(Card.deck[c]);
+      }
+      final leader = dl.leader;
+      if (leader != null) game.declareLeader(leader);
+      // As with a play: a bot seat a juror holds said this pass, so
+      // the policy on its opened hand has to give the same three.
+      if (heldAt(game.handNumber)[e.seat] != null && cards.length == passSize && game.knowsHand(e.seat)) {
+        final want = Bot(persona: (holders[e.seat] as BotSeat).persona).choosePass(game.handOf(e.seat));
+        if (want.toSet().length != cards.toSet().length || !want.every(cards.contains)) {
+          return fail('a pass by seat ${e.seat} that the policy does not pass');
         }
-        final leader = dl.leader;
-        if (leader != null) game.declareLeader(leader);
-        // As with a play: a bot seat a juror holds said this pass, so
-        // the policy on its opened hand has to give the same three.
-        if (heldAt(game.handNumber)[e.seat] != null && cards.length == passSize && game.knowsHand(e.seat)) {
-          final want = Bot(persona: (holders[e.seat] as BotSeat).persona).choosePass(game.handOf(e.seat));
-          if (want.toSet().length != cards.toSet().length || !want.every(cards.contains)) {
-            return fail('a pass by seat ${e.seat} that the policy does not pass');
-          }
-        }
-        try {
-          game.setPass(e.seat, cards.length == passSize ? cards : null);
-        } catch (_) {
-          return fail('an illegal pass by seat ${e.seat}');
-        }
-        if (cards.length != passSize) incomplete = true;
-        continue;
       }
       try {
-        game.setPass(e.seat, [for (final c in e.body['cards'] as List) Card.parse(c as String)]);
+        game.setPass(e.seat, cards.length == passSize ? cards : null);
       } catch (_) {
         return fail('an illegal pass by seat ${e.seat}');
       }
-      continue;
+      if (cards.length != passSize) incomplete = true;
+      return null;
     }
-    if (game.phase == Phase.handOver) {
-      // A sealed hand ends with its audits, one per person still
-      // seated; then the next deal.
-      final v = takeAudits();
-      if (v != null) return v;
-      // Every card open now: what each seat was dealt, and held after
-      // the pass, for whoever is looking at the game afterwards.
-      replay?._ended(game, deal);
-      game.nextHand();
-      deal = null;
-      continue;
+    try {
+      game.setPass(e.seat, [for (final c in e.body['cards'] as List) Card.parse(c as String)]);
+    } catch (_) {
+      return fail('an illegal pass by seat ${e.seat}');
     }
+    return null;
+  }
+
+  /// The hand over: a sealed hand's audits, then the next hand. Null to
+  /// go on, else the verification to return.
+  Verification? handOverStep() {
+    // A sealed hand ends with its audits, one per person still
+    // seated; then the next deal.
+    final v = takeAudits();
+    if (v != null) return v;
+    // Every card open now: what each seat was dealt, and held after
+    // the pass, for whoever is looking at the game afterwards.
+    replay?._ended(game, deal);
+    game.nextHand();
+    deal = null;
+    return null;
+  }
+
+  /// The next card: a bot seat nobody holds worked out, a person's or a
+  /// held seat's taken from the record. Null to go on, else the
+  /// verification to return.
+  Verification? playStep() {
     final seat = game.currentSeat!;
     if (holders[seat] is BotSeat && heldAt(game.handNumber)[seat] == null) {
       final whyNot = botActs(seat, passing: false);
       if (whyNot != null) return partialOk ? partial() : fail(whyNot);
       sweep();
-      continue;
+      return null;
     }
     if (index >= record.length) return partialOk ? partial() : fail('the record ends with seat $seat to play');
     final d = record[index++];
@@ -949,37 +1047,8 @@ Verification verifyRecord(
     game.play(seat, card);
     played.add(card);
     sweep();
+    return null;
   }
-  if (deal != null) {
-    // The last hand is audited too — after whatever the record removes
-    // at its audits, which comes first at their position as at every
-    // hand's. Taken straight to the audits, a claim for the escrow at
-    // one of them would stop the replay before any audit, and leave the
-    // hand's audits and that claim unchecked.
-    final why = takeRemovals();
-    if (why != null) return fail(why);
-    if (endedBy != null) return endedHere();
-    final v = takeAudits();
-    if (v != null) return v;
-    replay?._ended(game, deal);
-  }
-  // And nothing after: a decision the replay never reached is one it
-  // never checked.
-  if (index < record.length) {
-    final d = record[index];
-    return fail('the record goes on past the end of the game: ${d.removal ? 'a removal' : 'a ${d.event.kind.name}'} at ${d.turn}');
-  }
-  if (incomplete) return partial();
-
-  final winners = game.winners;
-  final ratings = <PublicKey, int>{};
-  final botWon = winners.any((s) => holders[s] is BotSeat);
-  for (var s = 0; s < seatCount; s++) {
-    final original = spec.seats[s];
-    if (original is! HumanSeat) continue;
-    ratings[original.key] = botWon ? 0 : (winners.contains(s) ? 1 : -1);
-  }
-  return Verification(ok: true, reason: 'verified', winners: winners, ratings: ratings, finalHolders: holders);
 }
 
 
