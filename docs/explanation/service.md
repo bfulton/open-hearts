@@ -391,9 +391,10 @@ What is published at tables is read from the device's copy
 ### Deleting an account's data
 
 On request (the privacy policy's choices), the account is forgotten.
-Its name comes off every kept game it played (`anonymizeGames`), which
-stays the other players' game: the names are kept beside a record
-unsigned, so the record verifies as before. The account is marked
+Its name comes off every kept game it played, found by the licence at
+its seat (`anonymizeGames`), which stays the other players' game: the
+names are kept beside a record unsigned, so the record verifies as
+before. The account is marked
 forgotten first, so a game kept later, such as one its last licence
 let it finish, is kept without its name. Every row kept for the
 account is deleted (`forgetAccount`): those under `ACCOUNT#` (its
@@ -428,9 +429,12 @@ many an hour, is in the
 [service reference](../reference/service-api.md#handlers). Looking at one
 is live play: `review` serves it only to a device with a subscription
 that is its account's device in use, and not while the account sits at
-that table. The worker vouches for nothing else. Every viewer replays
-the record through the verifier before showing a card, seats' licences
-included ([game records](live-play.md#game-records)).
+that table. The worker keeps only seats the app would show: each
+person's carries the service's licence for its key, as every seating
+does, which is what ties a name beside the record to an account. It
+vouches for nothing else. Every viewer replays the record through the
+verifier before showing a card
+([game records](live-play.md#game-records)).
 
 ## Storage
 

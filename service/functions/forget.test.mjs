@@ -111,12 +111,7 @@ test('a kept game loses the names of the seats an account sat in, and nothing el
   assert.deepEqual(withoutNames(game('t3', [ADA, BAO], { 1: 'Bao' }), ADA).named, []);
   // Never sat there, or at a seat without a licence: not its game.
   assert.equal(withoutNames(game('t4', [BAO, null], { 0: 'Bao', 1: 'X' }), ADA), null);
-  // From before seats carried licences: its seat is one of its devices'.
-  const old = game('t5', [null, BAO], { 0: 'Ada', 1: 'Bao' });
-  assert.deepEqual(withoutNames(old, ADA, ['0'.repeat(64)]).named, [0]);
-  assert.equal(withoutNames(old, ADA, ['9'.repeat(64)]), null, 'another device: not its seat');
-  // A licensed seat is whose its licence says, whatever key it has.
-  assert.equal(withoutNames(game('t6', [BAO], { 0: 'Bao' }), ADA, ['0'.repeat(64)]), null);
+  assert.equal(withoutNames(game('t4', [BAO, null], { 0: 'Bao', 1: 'X' }), undefined), null, 'no account: no seat, not even a bot\'s');
   assert.equal(withoutNames(null, ADA), null);
 });
 
@@ -137,19 +132,17 @@ test('every game an account played has its name taken off, and a dry run changes
       kept.set(key, record);
     },
   };
-  // Ada's device sat at t5 before seats carried licences.
-  const keys = ['1'.repeat(64)];
-  const would = await anonymizeGames(bucket, ADA, { keys, dry: true });
-  assert.deepEqual(would, [{ key: 'tables/t1.json', named: [0] }, { key: 'tables/t3.json', named: [1] }, { key: 'tables/t5.json', named: [1] }]);
+  const would = await anonymizeGames(bucket, ADA, { dry: true });
+  assert.deepEqual(would, [{ key: 'tables/t1.json', named: [0] }, { key: 'tables/t3.json', named: [1] }]);
   assert.deepEqual(written, [], 'a dry run writes nothing');
-  assert.deepEqual(await anonymizeGames(bucket, ADA, { keys }), would);
-  assert.deepEqual(written, ['tables/t1.json', 'tables/t3.json', 'tables/t5.json']);
-  assert.deepEqual(kept.get('tables/t5.json').names, { 0: 'Cy' });
+  assert.deepEqual(await anonymizeGames(bucket, ADA), would);
+  assert.deepEqual(written, ['tables/t1.json', 'tables/t3.json']);
   assert.deepEqual(kept.get('tables/t1.json').names, { 1: 'Bao' });
   assert.deepEqual(kept.get('tables/t3.json').names, { 0: 'Cy' });
   assert.deepEqual(kept.get('tables/t2.json').names, { 0: 'Bao', 1: 'Cy' }, 'a game it never sat in: untouched');
+  assert.deepEqual(kept.get('tables/t5.json').names, { 0: 'Cy', 1: 'Ada' }, 'a seat without a licence: no account\'s, whatever name it gave');
   // Run again, there is nothing left to do.
-  assert.deepEqual(await anonymizeGames(bucket, ADA, { keys }), []);
+  assert.deepEqual(await anonymizeGames(bucket, ADA), []);
 });
 
 test('the operator\'s tool rewrites only a record it would write back as it was sent', async (t) => {

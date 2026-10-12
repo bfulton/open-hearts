@@ -1984,7 +1984,10 @@ async function recordRoute(request, env) {
   if (!account || !(await entitlementOf(store, key))) return json(request, 402, { error: 'no subscription' });
   const ok = await inHousehold(env, account, { op: 'record', key, account });
   if (ok.status !== 200) return json(request, ok.status, ok.body);
-  const { status, body } = await keepRecord(env.OH_RECORDS, key, sent.table, sent.record, { verify: (k, d, s) => signer.verify(k, d, s) });
+  const { status, body } = await keepRecord(env.OH_RECORDS, key, sent.table, sent.record, {
+    verify: (k, d, s) => signer.verify(k, d, s),
+    service: serviceKeys(env)?.service,
+  });
   return json(request, status, body);
 }
 

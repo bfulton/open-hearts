@@ -80,8 +80,8 @@ async function main(argv) {
   // The mark first: a game kept from then on, one that ends while this
   // runs or that the account plays while its last licence runs, is kept
   // without its name (records.mjs, keepRecord). Then the games already
-  // kept, while the rows still say which devices were the account's. A
-  // run that stops part way is run again.
+  // kept, by their seats' licences, and then the rows. A run that stops
+  // part way is run again.
   const mark = forgottenKey(target);
   if (await bucket.get(mark)) {
     console.log(`${mark} is marked`);
@@ -89,9 +89,7 @@ async function main(argv) {
     if (apply) await bucket.put(mark, { forgotten: dayOf(Date.now()) });
     console.log(`${apply ? 'marked' : 'would mark'} ${mark}, for the games kept from then on`);
   }
-  // Its devices, for the games from before seats carried licences.
-  const keys = (await store.under(`ACCOUNT#${target}`, 'DEVICE#')).map((sk) => sk.slice('DEVICE#'.length));
-  const games = await anonymizeGames(bucket, target, { keys, dry: !apply });
+  const games = await anonymizeGames(bucket, target, { dry: !apply });
   for (const { key, named } of games) console.log(`${apply ? 'took' : 'would take'} the name off ${key}, seat ${named.join(', ')}`);
   const rows = await forgetAccount(store, target, { dry: !apply, keys: store.list });
   // A household code is a code: its row is said, and not its name.

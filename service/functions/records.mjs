@@ -15,6 +15,9 @@
 // hash of its own content, and whose signature checks. A record made
 // up by somebody who never played there has none, and neither has a
 // copy of somebody else's game with one's key written into a seat.
+// And its seats are ones the app would show: each person's carries the
+// service's licence for its key (licenceProblem), which is what ties a
+// name beside the record to an account, for forgetting one.
 
 /// A table's id (packages/table, spec.dart, newTableId).
 export const tableIdShape = /^[0-9a-f]{32}$/;
@@ -40,9 +43,39 @@ const accountShape = /^[0-9a-f]{32}$/;
 /// body's own keys in order, nothing else reordered.
 export async function eventIdOf(table, event) {
   const body = Object.fromEntries(Object.entries(event.body).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-  const text = JSON.stringify([table, event.author, event.kind, body]);
+  return sha256Hex(JSON.stringify([table, event.author, event.kind, body]));
+}
+
+/// SHA-256 of [text], hex.
+async function sha256Hex(text) {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
   return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/// What a licence is the service's signature over: this, and then the
+/// device's key, its account, its last day and the plan, a line each
+/// (worker.mjs, licenceFor; packages/table, licence.dart).
+const licenceStatement = 'oh-licence/2';
+
+/// Why [seats] are not seats the app would show, or null: every
+/// person's seat carries a licence the service ([service], its public
+/// key) signed for the seat's key, and no account sits twice, as the
+/// app checks a record before showing it (packages/table, spec.dart,
+/// licenceProblem). Not the licence's date: a record is read long after
+/// it ran out. [verify] writes what it is given into fixed buffers, so
+/// a signature is held to its shape first.
+async function licenceProblem(seats, service, verify) {
+  const seated = new Set();
+  for (const [s, seat] of seats.entries()) {
+    if (typeof seat?.bot === 'string') continue;
+    const { key, account, until, plan, sig } = seat?.licence ?? {};
+    const lines = [key, account, until, plan];
+    const shaped = key === seat?.key && lines.every((v) => typeof v === 'string' && !v.includes('\n')) && /^[0-9a-f]{128}$/.test(sig ?? '');
+    if (!shaped || !verify(service, await sha256Hex([licenceStatement, ...lines].join('\n')), sig)) return `seat ${s} has no licence for its key`;
+    if (seated.has(account)) return `seat ${s} is an account already seated`;
+    seated.add(account);
+  }
+  return null;
 }
 
 /// How many of the sender's own events are looked at before giving up:
@@ -66,7 +99,11 @@ async function signedInto(record, key, table, verify) {
 /// Keeps [text], a record [key] sent for [table], without the name of
 /// any account forgotten on request (withoutForgotten): {status, body}.
 /// [verify] checks a signature: (key, digest, signature) => bool.
-export async function keepRecord(bucket, key, table, text, { verify }) {
+/// [service] is the service's public key where it signs licences
+/// (worker.mjs, serviceKeys), and then every person's seat must carry
+/// one (licenceProblem); where it signs none, nothing is checked, as
+/// in an app built without one (licence.dart, licencesChecked).
+export async function keepRecord(bucket, key, table, text, { verify, service = null }) {
   if (!bucket) return { status: 503, body: { error: 'records are not kept here' } };
   if (typeof table !== 'string' || !tableIdShape.test(table)) return { status: 400, body: { error: 'a table id, 32 hex' } };
   if (typeof text !== 'string' || text.length > recordMost) return { status: 413, body: { error: 'not a record this size' } };
@@ -84,6 +121,8 @@ export async function keepRecord(bucket, key, table, text, { verify }) {
   if (!(await signedInto(record, key, table, verify))) {
     return { status: 403, body: { error: 'a record with none of your own moves in it' } };
   }
+  const unlicensed = service ? await licenceProblem(spec.seats, service, verify) : null;
+  if (unlicensed) return { status: 403, body: { error: unlicensed } };
   if (await bucket.head(keyIn(table))) return { status: 200, body: { kept: true, already: true } };
   const kept = await withoutForgotten(bucket, record, text);
   if (kept === null) return { status: 422, body: { error: 'a record that cannot be kept without a forgotten name' } };
@@ -120,14 +159,12 @@ async function withoutForgotten(bucket, record, text) {
 /// [record] with the names of the seats [account] sat in taken out:
 /// {record, named}, where [named] are the seats whose name went, or
 /// null when the account sat in none. A seat is the account's when its
-/// licence names it, or, in a game from before seats carried licences,
-/// when its key is one of the account's devices ([keys]). The names are
-/// kept beside the record unsigned, as each device said it was called,
-/// so the record verifies as before and stays the other players' game,
-/// with no name on those seats.
-export function withoutNames(record, account, keys = []) {
-  const its = (seat) => (seat?.licence ? seat.licence.account === account : keys.includes(seat?.key));
-  const seats = (record?.spec?.seats ?? []).flatMap((seat, i) => (its(seat) ? [i] : []));
+/// licence names it: every person's seat in a kept game has one
+/// (licenceProblem). The names are kept beside the record unsigned, as
+/// each device said it was called, so the record verifies as before and
+/// stays the other players' game, with no name on those seats.
+export function withoutNames(record, account) {
+  const seats = (record?.spec?.seats ?? []).flatMap((seat, i) => (seat?.licence && seat.licence.account === account ? [i] : []));
   if (!seats.length) return null;
   const { names: was, ...rest } = record;
   const names = { ...(was ?? {}) };
@@ -136,16 +173,16 @@ export function withoutNames(record, account, keys = []) {
   return { record: Object.keys(names).length ? { ...rest, names } : rest, named };
 }
 
-/// Every kept game [account] sat in, by its licence or one of its
-/// devices' [keys], with its name taken off it: for a deletion asked
-/// for. [bucket] lists, reads and writes records as the operator's tool
-/// reaches R2 (service/tool/r2.mjs), a record as its JSON. With [dry],
-/// writes nothing. Returns {key, named} for each game changed, or that
-/// would be.
-export async function anonymizeGames(bucket, account, { keys = [], dry = false } = {}) {
+/// Every kept game [account] sat in, by its licence, with its name
+/// taken off it: for a deletion asked for. [bucket] lists, reads and
+/// writes records as the operator's tool reaches R2
+/// (service/tool/r2.mjs), a record as its JSON. With [dry], writes
+/// nothing. Returns {key, named} for each game changed, or that would
+/// be.
+export async function anonymizeGames(bucket, account, { dry = false } = {}) {
   const changed = [];
   for (const key of await bucket.list('tables/')) {
-    const without = withoutNames(await bucket.get(key), account, keys);
+    const without = withoutNames(await bucket.get(key), account);
     if (!without?.named.length) continue;
     changed.push({ key, named: without.named });
     if (!dry) await bucket.put(key, without.record);
