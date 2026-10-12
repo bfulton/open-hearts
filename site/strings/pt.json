@@ -139,7 +139,7 @@
     "header": {
       "title": "Privacidade",
       "tagline": "O que o Open Hearts faz com o que você dá a ele, em palavras simples.",
-      "updated": "Última atualização: 11 de outubro de 2026"
+      "updated": "Última atualização: 12 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
@@ -222,7 +222,7 @@
       "title": "Por quanto tempo as coisas são guardadas",
       "p1": "<b>No seu aparelho:</b> até você removê-las.",
       "p2": "<b>No nosso relay:</b> jogadas, presença e espera por uma partida: não são guardadas. Salas, lugares ocupados e imagens: um dia. Resultados das partidas: enquanto os ratings forem calculados a partir deles.",
-      "p3": "<b>Partidas ao vivo terminadas:</b> para sempre, no armazenamento da Cloudflare, a não ser que você nos peça para apagar uma em que jogou.",
+      "p3": "<b>Partidas ao vivo terminadas:</b> para sempre, no armazenamento da Cloudflare. Se você nos pedir para apagar os dados da sua conta, seu nome sai das partidas em que você jogou; as jogadas ficam, para os outros jogadores.",
       "p4": "<b>Os registros de conta e de assinatura do nosso serviço, incluindo o perfil da sua conta:</b> enquanto a assinatura estiver valendo e, depois, até você nos pedir para apagá-los. Um perfil alterado substitui o anterior. A anotação de qual aparelho está em uso é substituída cada vez que outro aparelho seu abre o jogo.",
       "p5": "<b>Stripe:</b> pelo tempo que a política da Stripe e a lei sobre registros de pagamento exigirem.",
       "p6": "<b>Cloudflare e Google:</b> conforme as políticas deles.",
@@ -233,7 +233,7 @@
       "p1": "Jogue sozinho, e nada sobre você sai do seu aparelho.",
       "p2": "Jogue ao vivo com um nome que não seja o seu nome verdadeiro, e sem imagem.",
       "p3": "Mude seu nome ou sua imagem quando quiser; se você for assinante, a mudança chega a todos os aparelhos da sua conta. O que já foi publicado continua onde está.",
-      "p4": "Peça uma cópia do que o nosso serviço guarda sobre a sua conta, o perfil e os aparelhos dela, ou peça que apaguemos isso, incluindo os resultados que os aparelhos dela publicaram no nosso relay.",
+      "p4": "Peça uma cópia do que o nosso serviço guarda sobre a sua conta, o perfil e os aparelhos dela, ou peça que apaguemos isso. Depois, seu nome sai das partidas terminadas em que você jogou, e os resultados que os seus aparelhos publicaram ficam no nosso relay, para os ratings, só com o número da sua conta. Se você assinou na web, os registros de pagamento da Stripe continuam guardando o seu endereço de e-mail com a chave pública do seu aparelho, que esses resultados citam, enquanto a Stripe os mantiver.",
       "p5": "Onde a lei de proteção de dados lhe der direitos — de ver, corrigir ou apagar o que é guardado sobre você, de se opor, ou de reclamar à autoridade de proteção de dados — você também os tem aqui."
     },
     "children": {

@@ -139,7 +139,7 @@
     "header": {
       "title": "Confidentialité",
       "tagline": "Ce qu'Open Hearts fait de ce que vous lui confiez, en termes simples.",
-      "updated": "Dernière mise à jour : 11 octobre 2026"
+      "updated": "Dernière mise à jour : 12 octobre 2026"
     },
     "short": {
       "title": "En bref",
@@ -222,7 +222,7 @@
       "title": "Durée de conservation",
       "p1": "<b>Sur votre appareil :</b> jusqu'à ce que vous les supprimiez.",
       "p2": "<b>Sur notre relais :</b> coups, présence et attente d'une partie : non conservés. Salles, placements et images : un jour. Résultats des parties : aussi longtemps que les classements en sont calculés.",
-      "p3": "<b>Parties en direct terminées :</b> définitivement, dans le stockage de Cloudflare, sauf si vous nous demandez d'en supprimer une à laquelle vous avez joué.",
+      "p3": "<b>Parties en direct terminées :</b> définitivement, dans le stockage de Cloudflare. Si vous nous demandez de supprimer les données de votre compte, votre nom est retiré des parties auxquelles vous avez joué ; les coups restent, pour les autres joueurs.",
       "p4": "<b>Relevés de compte et d'abonnement de notre service, profil de votre compte compris :</b> tant que l'abonnement court, puis jusqu'à ce que vous nous demandiez de les supprimer. Un profil modifié remplace le précédent. La note indiquant l'appareil utilisé est remplacée chaque fois qu'un autre de vos appareils ouvre le jeu.",
       "p5": "<b>Stripe :</b> aussi longtemps que l'exigent la politique de Stripe et la loi sur les relevés de paiement.",
       "p6": "<b>Cloudflare et Google :</b> selon leurs propres politiques.",
@@ -233,7 +233,7 @@
       "p1": "Jouez seul, et rien sur vous ne quitte votre appareil.",
       "p2": "Jouez en direct sous un nom qui n'est pas votre vrai nom, et sans image.",
       "p3": "Changez votre nom ou votre image quand vous voulez ; si vous êtes abonné, la modification atteint tous les appareils de votre compte. Ce qui a déjà été publié reste où il est.",
-      "p4": "Demandez-nous une copie de ce que notre service conserve sur votre compte, son profil et ses appareils, ou demandez-nous de le supprimer, y compris les résultats que ses appareils ont publiés sur notre relais.",
+      "p4": "Demandez-nous une copie de ce que notre service conserve sur votre compte, son profil et ses appareils, ou demandez-nous de le supprimer. Ensuite, votre nom est retiré des parties terminées auxquelles vous avez joué, et les résultats que vos appareils ont publiés restent sur notre relais, pour les classements, sous le seul numéro de votre compte. Si vous vous êtes abonné sur le web, les relevés de paiement de Stripe gardent toujours votre adresse e-mail avec la clé publique de votre appareil, que ces résultats mentionnent, aussi longtemps que Stripe les conserve.",
       "p5": "Là où la loi sur la protection des données vous donne des droits — accéder à ce qui est détenu sur vous, le rectifier ou le supprimer, vous y opposer, ou porter plainte auprès de votre autorité de protection des données —, vous les avez ici aussi."
     },
     "children": {

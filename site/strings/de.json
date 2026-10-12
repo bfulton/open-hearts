@@ -139,7 +139,7 @@
     "header": {
       "title": "Datenschutz",
       "tagline": "Was Open Hearts mit dem macht, was du ihm gibst, in einfachen Worten.",
-      "updated": "Zuletzt aktualisiert am 11. Oktober 2026"
+      "updated": "Zuletzt aktualisiert am 12. Oktober 2026"
     },
     "short": {
       "title": "Kurz gesagt",
@@ -222,7 +222,7 @@
       "title": "Wie lange etwas gespeichert wird",
       "p1": "<b>Auf deinem Gerät:</b> bis du es entfernst.",
       "p2": "<b>Auf unserem Relay:</b> Züge, Anwesenheit und das Warten auf ein Spiel: nicht gespeichert. Räume, Platzierungen und Bilder: einen Tag. Spielergebnisse: so lange, wie die Wertungen daraus berechnet werden.",
-      "p3": "<b>Beendete Live-Spiele:</b> dauerhaft, im Speicher von Cloudflare, außer du bittest uns, eines zu löschen, in dem du gespielt hast.",
+      "p3": "<b>Beendete Live-Spiele:</b> dauerhaft, im Speicher von Cloudflare. Bittest du uns, die Daten deines Kontos zu löschen, wird dein Name aus den Spielen entfernt, in denen du gespielt hast; die Züge bleiben, für die anderen Spieler.",
       "p4": "<b>Die Konto- und Abo-Einträge unseres Dienstes, einschließlich des Profils deines Kontos:</b> solange das Abo läuft, und danach, bis du uns bittest, sie zu löschen. Ein geändertes Profil ersetzt das vorige. Der Vermerk, welches Gerät gerade genutzt wird, wird jedes Mal ersetzt, wenn ein anderes deiner Geräte das Spiel öffnet.",
       "p5": "<b>Stripe:</b> so lange, wie die Richtlinien von Stripe und das Gesetz für Zahlungsbelege es verlangen.",
       "p6": "<b>Cloudflare und Google:</b> nach ihren eigenen Richtlinien.",
@@ -233,7 +233,7 @@
       "p1": "Spiel allein, dann verlässt nichts über dich dein Gerät.",
       "p2": "Spiel live mit einem Namen, der nicht dein echter ist, und ohne Bild.",
       "p3": "Ändere deinen Namen oder dein Bild jederzeit; mit einem Abo erreicht die Änderung alle Geräte deines Kontos. Was schon veröffentlicht wurde, bleibt, wo es ist.",
-      "p4": "Bitte uns um eine Kopie dessen, was unser Dienst über dein Konto, sein Profil und seine Geräte speichert, oder bitte uns, es zu löschen, einschließlich der Ergebnisse, die seine Geräte auf unserem Relay veröffentlicht haben.",
+      "p4": "Bitte uns um eine Kopie dessen, was unser Dienst über dein Konto, sein Profil und seine Geräte speichert, oder bitte uns, es zu löschen. Danach wird dein Name aus den beendeten Spielen entfernt, in denen du gespielt hast, und die Ergebnisse, die deine Geräte veröffentlicht haben, bleiben für die Wertungen auf unserem Relay, nur unter der Nummer deines Kontos. Wenn du im Web abonniert hast, enthalten die Zahlungsbelege bei Stripe weiterhin deine E-Mail-Adresse mit dem öffentlichen Schlüssel deines Geräts, den diese Ergebnisse nennen, so lange, wie Stripe sie aufbewahrt.",
       "p5": "Wo dir das Datenschutzrecht Rechte gibt — einzusehen, zu berichtigen oder zu löschen, was über dich gespeichert ist, zu widersprechen oder dich bei deiner Datenschutzbehörde zu beschweren —, hast du sie auch hier."
     },
     "children": {
