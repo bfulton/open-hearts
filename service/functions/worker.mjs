@@ -779,8 +779,11 @@ export async function profileWritten(op, store, active, { now = Date.now() } = {
 
 // ---- an account's data, deleted -------------------------------------------
 // On request (the privacy policy's choices): everything the service
-// keeps for an account, its profile included, by
-// `node service/tool/forget.mjs <account>`.
+// keeps for an account, its profile included, and its name off the
+// games it played (records.mjs, withoutNames), by
+// `node service/tool/forget.mjs <account>`. What stays, its results on
+// the relay, names its account number, which nothing left in the
+// service ties to it.
 
 /// Deletes [account]'s rows: the account's own (its devices, its code,
 /// backup codes, sign-in, device in use and profile), each of its
@@ -810,6 +813,59 @@ export async function forgetAccount(store, account, { dry = false } = {}) {
   }
   for (const sk of await store.under(pk, '')) await del(pk, sk);
   return gone;
+}
+
+/// The accounts whose profile is called [name], case and the spaces at
+/// its ends aside: for a deletion asked for by the name played under.
+/// [keys] lists the store's keys under a prefix, which the operator's
+/// tool can do (service/tool/kv.mjs) and the worker never does.
+export async function accountsNamed(store, keys, name) {
+  const wanted = typeof name === 'string' ? name.trim().toLowerCase() : '';
+  if (!wanted) return [];
+  const found = [];
+  for (const key of await keys('ACCOUNT#')) {
+    const account = /^ACCOUNT#([0-9a-f]{32})\|PROFILE$/.exec(key)?.[1];
+    if (!account) continue;
+    const called = (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.name;
+    if (typeof called === 'string' && called.trim().toLowerCase() === wanted) found.push(account);
+  }
+  return found;
+}
+
+/// Every item of the Stripe list or search at [path], page by page: a
+/// search pages by its `next_page`, a list after its last item.
+async function stripeAll(stripe, path) {
+  const items = [];
+  let more = '';
+  for (;;) {
+    const page = await stripe(`${path}&limit=100${more}`);
+    const data = page?.data ?? [];
+    items.push(...data);
+    if (!page?.has_more || !data.length) return items;
+    more = page.next_page ? `&page=${encodeURIComponent(page.next_page)}` : `&starting_after=${encodeURIComponent(data.at(-1).id)}`;
+  }
+}
+
+/// The accounts that web subscriptions paid for with [email] stand
+/// behind: for a deletion asked for by the address paid with, as Stripe
+/// holds it, case aside. Stripe's search, not its list: the list's
+/// filter counts case, and the search matches words, so what it finds
+/// is held to the whole address. [stripe] GETs a path of Stripe's API
+/// and gives its JSON.
+export async function accountsPaidBy(store, stripe, email) {
+  const wanted = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (!wanted.includes('@')) return [];
+  const query = `email:"${wanted.replace(/["\\]/g, '\\$&')}"`;
+  const customers = (await stripeAll(stripe, `/customers/search?query=${encodeURIComponent(query)}`))
+    .filter((c) => typeof c?.email === 'string' && c.email.trim().toLowerCase() === wanted);
+  const found = new Set();
+  for (const customer of customers) {
+    for (const sub of await stripeAll(stripe, `/subscriptions?customer=${encodeURIComponent(customer.id)}&status=all`)) {
+      const account = (await store.get(`SUB#${sub.id}`, 'ACCOUNT'))?.account;
+      if (isAccount(account)) found.add(account);
+    }
+  }
+  return [...found];
 }
 
 // ---- who is asking -----------------------------------------------------
