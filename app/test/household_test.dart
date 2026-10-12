@@ -26,6 +26,7 @@ import 'package:open_hearts/subscribe_page.dart';
 import 'package:open_hearts/ui/qr_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 import 'home_page_test.dart' show licenceThisDevice;
 import 'routes.dart';

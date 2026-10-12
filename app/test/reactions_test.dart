@@ -27,6 +27,7 @@ import 'package:open_hearts/ui/reactions.dart';
 import 'package:open_hearts/ui/table_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 import 'live_page_test.dart' show LiveHarness, pumpLive;
 

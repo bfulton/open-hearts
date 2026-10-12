@@ -164,7 +164,7 @@ The harnesses:
   jury), how (a signed leave, a silent drop, a boot, a partition) and
   when (on or off turn, mid-trick, during the pass or deal, at a hand
   boundary).
-- The chaos walk (`packages/table/lib/src/sim/chaos_walk.dart`, run by
+- The chaos walk (`packages/table_sim/lib/src/chaos_walk.dart`, run by
   `chaos_test.dart`, `chaos_sealed_test.dart` and
   `packages/table/tool/chaos.dart`) throws random
   faults at simulated tables: devices dropping, relays failing, loss,
@@ -181,7 +181,7 @@ The harnesses:
   or every copy late and nothing else different (`SimNetwork.steer`),
   and holds each run to what the table owes. It finds the ordering
   faults that random walks miss.
-- The structure checker (`packages/table/lib/src/sim/structure.dart`)
+- The structure checker (`packages/table_sim/lib/src/structure.dart`)
   reads every side against the
   [table's machines](table-states.md#the-machines) during a run and at
   its end ([how it is checked](table-states.md#how-it-is-checked)).

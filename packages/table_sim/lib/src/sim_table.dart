@@ -7,14 +7,9 @@ import 'dart:math';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
-import '../client.dart';
-import '../journal.dart';
-import '../jury.dart';
-import '../licence.dart';
-import '../signing.dart';
-import '../spec.dart';
-import '../time_bank.dart';
-import '../timing.dart';
+import 'package:table/table.dart';
+
+import 'fake_signer.dart';
 import 'scripted_human.dart';
 import 'sim_deal_worker.dart';
 import 'sim_juror.dart';
@@ -174,7 +169,7 @@ class SimTable {
   /// table; a modified one whose record parted from the table's never
   /// does, and stays a survivor to itself alone. A test with such a
   /// client at the table names the honest set itself rather than ask
-  /// here — see the lie tests in sealed_test.dart.
+  /// here — see the lie tests in packages/table/test/sealed_lies_test.dart.
   Iterable<TableClient> get survivors =>
       people.where((p) => !p.gone && p.client.amSeated).map((p) => p.client);
 

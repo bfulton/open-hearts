@@ -21,6 +21,7 @@ import 'package:open_hearts/net/provider_tokens.dart';
 import 'package:open_hearts/net/sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 import 'home_page_test.dart' show licenceThisDevice;
 import 'household_test.dart' show Stand, signedFor, standUp;

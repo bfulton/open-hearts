@@ -51,8 +51,8 @@ import 'dart:io';
 import 'package:deal/deal.dart';
 import 'package:engine/args.dart';
 import 'package:engine/engine.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 /// A game to explore: how it is built, what it does to itself on the
 /// way, and how long it has.
@@ -180,7 +180,7 @@ String? runOnce(Scenario s, DealCrypto crypto,
     StructureLog? structure}) {
   final t = s.build(crypto);
   // Read every second, and once more at the end: what each side waits
-  // for against who can end it (lib/src/sim/structure.dart).
+  // for against who can end it (packages/table_sim/lib/src/structure.dart).
   if (structure != null) {
     void read() {
       structure.take(t);

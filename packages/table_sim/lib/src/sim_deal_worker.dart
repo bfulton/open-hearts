@@ -10,8 +10,7 @@
 library;
 
 import 'package:deal/deal.dart';
-
-import '../clock.dart';
+import 'package:table/table.dart';
 
 class SimDealWorker implements DealWorker {
   SimDealWorker(this.crypto, this.clock, {this.costMs = browserMs});

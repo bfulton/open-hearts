@@ -14,8 +14,8 @@ import 'package:deal/deal.dart';
 // ignore_for_file: avoid_print
 
 import 'package:engine/args.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 Future<void> main(List<String> args) async {
   final seed = intArg(args, 'seed', 0);

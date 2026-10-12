@@ -8,6 +8,7 @@ import 'package:open_hearts/net/duty.dart';
 import 'package:open_hearts/net/relays.dart';
 import 'package:open_hearts/net/remote_config.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 void main() {
   test('a deployed build talks to our relay and nobody else', () {

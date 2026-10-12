@@ -3,9 +3,8 @@
 /// juror's process if it is up.
 library;
 
-import '../jury.dart';
-import '../signing.dart';
-import '../spec.dart';
+import 'package:table/table.dart';
+
 import 'sim_juror.dart';
 import 'sim_network.dart';
 import 'virtual_clock.dart';
@@ -41,9 +40,9 @@ class SimPresence implements Presence {
     if (juror.account case final account?) accounts[juror.signer.publicKey] = account;
   }
 
-  /// The account each key belongs to, where it is not an account of
-  /// its own: what a device's activation says in its presence
-  /// (presence_relay.dart). The players' as well as the jurors', so a
+  /// The account each key belongs to, where it is not an account of its
+  /// own: what a device's activation says in its presence (the table's
+  /// presence_relay.dart). The players' as well as the jurors', so a
   /// table can tell another device of a player's account.
   final Map<PublicKey, String> accounts = {};
 
@@ -86,7 +85,7 @@ class SimPresence implements Presence {
   /// event: it goes to the juror's presence over a relay rather than
   /// down a data channel, so it is slower than the hand's own steps,
   /// and the gap decides what a juror has in hand before it has a
-  /// deal to put it in (`test/deal_before_the_deal_test.dart`).
+  /// deal to put it in (`packages/table/test/deal_before_the_deal_test.dart`).
   int summonsMs = 50;
 
   /// Whether a summons carries the hand's draws. Without them a juror

@@ -4,8 +4,8 @@
 /// the foreman gone, the whole jury gone, and nobody to draw from.
 library;
 
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 import 'matrix_test.dart' show checkAgreement;

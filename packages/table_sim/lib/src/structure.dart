@@ -31,10 +31,8 @@
 /// still read when a run ends is what nothing was going to end.
 library;
 
-import '../client.dart';
-import '../events.dart';
-import '../model.dart';
-import '../signing.dart';
+import 'package:table/table.dart';
+
 import 'sim_table.dart';
 
 /// How a wait can be stuck.

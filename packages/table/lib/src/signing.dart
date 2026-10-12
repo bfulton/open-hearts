@@ -3,12 +3,10 @@
 /// An identity is a keypair in Nostr's format — a 32-byte x-only
 /// secp256k1 public key and BIP-340 Schnorr signatures — so the same key
 /// signs plays at the table and presence on the relays. [Signer] is what
-/// a client holds; [verify] is what everyone runs on everyone else.
-///
-/// The simulator needs thousands of signatures per game and cares about
-/// none of them being forgeable, so [FakeSigner] produces a hash the
-/// verifier recognises. It exercises every code path the real one does,
-/// at a thousandth of the cost, and a real key never touches it.
+/// a client holds; [verify] is what everyone runs on everyone else, and
+/// it takes BIP-340 and nothing else. The simulator's stand-in signer,
+/// and the check that takes its signatures, are the simulator's
+/// (packages/table_sim).
 library;
 
 import 'dart:convert';
@@ -46,19 +44,10 @@ abstract class Signer {
   Uint8List sharedXWith(PublicKey other);
 }
 
-/// Whether a fake signature counts as a signature here. False until
-/// this process makes a [FakeSigner], which only a simulation or a test
-/// ever does — see [FakeSigner] for why it must be off everywhere else.
-bool fakeSignaturesPass = false;
-
-/// Checks [signatureHex] over [digestHex] by [key]. Recognises both real
-/// and fake signatures, by their length, so a simulated table and a real
-/// one share every line of protocol code — but a fake one only where
-/// fake signers exist.
+/// Checks [signatureHex] over [digestHex] by [key], with
+/// [schnorrVerifier]: false for a signature that does not hold, and for
+/// anything that is not one.
 bool verify(PublicKey key, String digestHex, String signatureHex) {
-  if (signatureHex.length == FakeSigner.length) {
-    return fakeSignaturesPass && FakeSigner.check(key, digestHex, signatureHex);
-  }
   try {
     return schnorrVerifier(key, digestHex, signatureHex);
   } catch (_) {
@@ -71,7 +60,9 @@ bool verify(PublicKey key, String digestHex, String signatureHex) {
 /// (crypto/schnorr_wasm), the VM its cdylib (schnorr_native.dart): the
 /// same k256 code compiled, which is what makes checking every event
 /// of a table, several times a turn, cheap enough not to notice. Set
-/// once, at startup, before any event is parsed.
+/// once, at startup, before any event is parsed. A process running the
+/// simulator also has its fake signatures' check put in front of it
+/// (packages/table_sim, `FakeSigner`).
 bool Function(PublicKey key, String digestHex, String signatureHex) schnorrVerifier = bip340.verify;
 
 /// How a real signature is made: secret, digest and thirty-two bytes of
@@ -133,48 +124,6 @@ class SchnorrSigner implements Signer {
 }
 
 List<int> _unhex(String hex) => [for (var i = 0; i < hex.length; i += 2) int.parse(hex.substring(i, i + 2), radix: 16)];
-
-/// A stand-in for tests: the "signature" is a hash of key and digest.
-///
-/// Anyone could forge it, and that is not a detail: what it hashes is
-/// the signer's *public* key, which everyone at a table has. A peer
-/// could sign as any other seat simply by making the hash. So [verify]
-/// takes one only where fake signers are in use, and making one is what
-/// says so — a simulation and a test make them, and nothing a person
-/// runs ever does. Arming it here rather than at each entry point is
-/// the point: an entry point can be forgotten.
-class FakeSigner implements Signer {
-  FakeSigner(String name) : publicKey = sha256Hex(utf8.encode('fake:$name')) {
-    fakeSignaturesPass = true;
-  }
-
-  static const length = 32; // half a real signature, so never mistaken
-
-  @override
-  final PublicKey publicKey;
-
-  @override
-  String sign(String digestHex) => _tag(publicKey, digestHex);
-
-  static String _tag(PublicKey key, String digestHex) =>
-      sha256Hex(utf8.encode('$key|$digestHex')).substring(0, length);
-
-  static bool check(PublicKey key, String digestHex, String sig) => _tag(key, digestHex) == sig;
-
-  /// A hash of the two keys — anyone could compute it, as anyone could
-  /// forge the signature. Symmetric, which is all the simulator needs.
-  @override
-  Uint8List sharedSecretWith(PublicKey other) {
-    final pair = [publicKey, other]..sort();
-    return Uint8List.fromList(sha256.convert(utf8.encode('fake-shared:${pair[0]}|${pair[1]}')).bytes);
-  }
-
-  @override
-  Uint8List sharedXWith(PublicKey other) {
-    final pair = [publicKey, other]..sort();
-    return Uint8List.fromList(sha256.convert(utf8.encode('fake-shared-x:${pair[0]}|${pair[1]}')).bytes);
-  }
-}
 
 /// The digest an event is signed over: SHA-256 of its canonical bytes.
 String digestOf(Uint8List canonical) => sha256Hex(canonical);

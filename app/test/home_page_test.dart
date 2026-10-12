@@ -10,7 +10,6 @@ library;
 import 'dart:async';
 
 import 'package:deal/deal.dart';
-import 'package:deal/memo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
@@ -27,6 +26,7 @@ import 'package:open_hearts/ui/folding_heart.dart';
 import 'package:open_hearts/ui/header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 import 'household_test.dart' show signedFor, standUp;
 import 'room_test.dart' show Bus;

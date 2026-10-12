@@ -14,35 +14,21 @@ void main() {
       schnorrVerifier = (k, d, x) => x == 'yes';
       expect(verify(s.publicKey, digest, 'yes'), isTrue);
       expect(verify(s.publicKey, digest, sig), isFalse);
-      // Fake signatures never reach it.
-      final f = FakeSigner('x');
-      expect(verify(f.publicKey, digest, f.sign(digest)), isTrue);
     } finally {
       schnorrVerifier = before;
     }
   });
 
-  test('a fake signature is forgeable from a public key, so it counts only where fake signers are', () {
-    // What a FakeSigner signs with is a hash of its own public key, and
-    // a table's every key is public. Anyone at one could sign as anyone
-    // else at it. The flag is what keeps that inside simulations, and
-    // making a FakeSigner is what sets it — so a process that never
-    // makes one never takes one, whatever a peer sends.
-    final was = fakeSignaturesPass;
-    fakeSignaturesPass = false;
-    try {
-      const key = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
-      final digest = sha256Hex([7, 7, 7]);
-      final forged = sha256Hex('$key|$digest'.codeUnits).substring(0, FakeSigner.length);
-      expect(verify(key, digest, forged), isFalse, reason: 'no fake signer here, so no fake signature');
-      // A simulation makes one, and from then on its own tables work.
-      final sim = FakeSigner('seat0');
-      expect(fakeSignaturesPass, isTrue, reason: 'making one is what arms it');
-      expect(verify(sim.publicKey, digest, sim.sign(digest)), isTrue);
-      expect(verify(key, digest, forged), isTrue, reason: 'which is exactly why it is off elsewhere');
-    } finally {
-      fakeSignaturesPass = was;
-    }
+  test('the table takes no fake signature: one forged from a public key is no signature here', () {
+    // The simulator's FakeSigner signs with a hash of its own public
+    // key, and a table's every key is public: anyone at one could sign
+    // as anyone else at it. The check that takes them is the
+    // simulator's (packages/table_sim), and this file never loads it,
+    // as nothing a person runs does.
+    const key = 'dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659';
+    final digest = sha256Hex([7, 7, 7]);
+    final forged = sha256Hex('$key|$digest'.codeUnits).substring(0, 32);
+    expect(verify(key, digest, forged), isFalse);
   });
 
   test('BIP-340 vector 1 signs and verifies with the Dart implementation', () {
@@ -79,13 +65,6 @@ void main() {
     expect(b.sharedSecretWith(a.publicKey), a.sharedSecretWith(b.publicKey));
   });
 
-  test('fake keys share a hash, symmetric, that a real key never produces', () {
-    final a = FakeSigner('a');
-    final b = FakeSigner('b');
-    expect(a.sharedSecretWith(b.publicKey), b.sharedSecretWith(a.publicKey));
-    expect(a.sharedSecretWith(b.publicKey), isNot(a.sharedSecretWith(FakeSigner('c').publicKey)));
-  });
-
   test('the native library signs and checks what the Dart implementation does, and checks at least twenty times faster', () async {
     final before = (schnorrVerifier, schnorrSigning);
     try {
@@ -101,6 +80,8 @@ void main() {
       expect(await installNativeSchnorr(), isTrue);
       expect(verify(s.publicKey, digest, dart), isTrue, reason: 'a Dart signature checks natively');
       expect(verify(s.publicKey, sha256Hex([1]), dart), isFalse);
+      expect(verify(s.publicKey, digest, sha256Hex('${s.publicKey}|$digest'.codeUnits).substring(0, 32)), isFalse,
+          reason: 'nor a fake signature, natively');
       // Timed against Dart in the same run, so a machine under load
       // slows both alike: what is held is the ratio, which is a hundred
       // or more where the library is the one in use and about one where

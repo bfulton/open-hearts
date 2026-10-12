@@ -19,7 +19,7 @@
 /// work.dart), where otherwise they take none. The sixth puts accounts
 /// on two devices as it walks: a juror's or a seated player's account
 /// taken up on a new device, which supersedes the old one
-/// (lib/src/sim/scenarios.dart).
+/// (packages/table_sim/lib/src/scenarios.dart).
 ///
 /// Prints every broken invariant with the faults that led there, and
 /// exits non-zero if there was one.
@@ -32,7 +32,7 @@ import 'dart:io';
 
 import 'package:deal/deal.dart';
 import 'package:engine/args.dart';
-import 'package:table/src/sim/sim.dart';
+import 'package:table_sim/table_sim.dart';
 
 Future<void> main(List<String> args) async {
   final seeds = intArg(args, 'seeds', 250);
@@ -42,7 +42,7 @@ Future<void> main(List<String> args) async {
   final started = DateTime.now();
   var failed = 0;
   // `--structure`: every five seconds of each walk, what every side
-  // waits for, read against who can end it (lib/src/sim/structure.dart).
+  // waits for, read against who can end it (packages/table_sim/lib/src/structure.dart).
   // Measures; decides nothing.
   final measure = flagArg(args, 'structure');
   // `--jurors N --sweep`: more strangers than a jury, each letting go

@@ -3,8 +3,8 @@
 /// their phone sits at the table is the player, not a stranger.
 library;
 
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 /// Every key any jury of [t] drew, as each side holds them.

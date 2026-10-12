@@ -5,8 +5,9 @@ library;
 import 'dart:math';
 
 import 'package:deal/deal.dart';
+import 'package:table/table.dart';
 
-import '../signing.dart';
+import 'fake_signer.dart';
 import 'scripted_human.dart';
 import 'sim_juror.dart';
 import 'sim_table.dart';

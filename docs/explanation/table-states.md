@@ -9,7 +9,7 @@ The machines are code: `turnTransitions`, `seatTransitions` and
 `seatExits`, `heldSeatTransitions`, `handTransitions` and
 `tableTransitions` in `packages/table/lib/src/model.dart` list every
 state, every way out of it, and how each is decided. The simulator reads
-every side against them (`packages/table/lib/src/sim/structure.dart`),
+every side against them (`packages/table_sim/lib/src/structure.dart`),
 and the chaos walk fails any run that steps outside them.
 
 ## How a transition is decided
@@ -332,7 +332,7 @@ table settles it on the record.
 
 ## How it is checked
 
-The structure checker (`packages/table/lib/src/sim/structure.dart`)
+The structure checker (`packages/table_sim/lib/src/structure.dart`)
 reads every side against these machines during a run and at its end, reporting waits stuck and sides apart. What counts
 is what is still read at the end among sides still online; mid-run, an
 event in flight is ordinary.

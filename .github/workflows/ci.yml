@@ -124,6 +124,8 @@ jobs:
           key: deal-memo-table-${{ hashFiles('crypto/deal/src/**', 'crypto/deal/Cargo.toml', 'crypto/Cargo.*', 'crypto/vendor/**/*.rs', 'crypto/vendor/**/Cargo.toml') }}
       - name: Deal and Schnorr (Rust — the cdylibs for the VM)
         run: cd crypto/deal && cargo build --release --locked && cd ../schnorr && cargo build --release --locked
+      - name: The table's simulator (packages/table_sim — its own checks)
+        run: cd packages/table_sim && dart pub get && dart analyze --fatal-infos && dart test
       - name: Table (the protocol over a simulated network — the departure matrix, sealed tables)
         run: cd packages/table && dart pub get && dart analyze --fatal-infos && dart test -x slow
       - name: Table, the slow tier (whole sealed games under every departure, the chaos walks)

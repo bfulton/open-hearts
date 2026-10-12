@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/net/licence.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 /// BIP-340's own published pair, which the worker's tests sign with.
 const _serviceSecret = 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef';
@@ -101,21 +102,22 @@ void main() {
   test('a fake table\'s signature is not a licence, however well it is made', () {
     // A FakeSigner's signature is a hash of the signer's *public* key
     // and the digest, so anyone who can read a key can make one — and
-    // the service's key is printed in every build. Everything else
-    // signed here is checked with verify(), which takes them so that a
-    // simulated table and a real one share every line of protocol
-    // code. A licence is not, and this is why.
-    final licence = _for(_device, DateTime.utc(2027, 1, 1));
-    final forged = sha256Hex(utf8.encode('$_service|${licence.digest}')).substring(0, FakeSigner.length);
-    final passedOff = Licence(key: licence.key, account: licence.account, until: licence.until, plan: licence.plan, signature: forged);
-    final was = fakeSignaturesPass;
-    fakeSignaturesPass = true; // as it is wherever a simulation runs
+    // the service's key is printed in every build. The table takes
+    // none; a process running the simulator does, so that a simulated
+    // table and a real one share every line of protocol code. A licence
+    // takes a real signature's length even there, and this is that
+    // process.
+    final before = schnorrVerifier;
     try {
-      expect(verify(_service, passedOff.digest, forged), isTrue, reason: 'the general check takes it');
+      FakeSigner('a simulation'); // as wherever a simulation runs
+      final licence = _for(_device, DateTime.utc(2027, 1, 1));
+      final forged = sha256Hex(utf8.encode('$_service|${licence.digest}')).substring(0, FakeSigner.length);
+      final passedOff = Licence(key: licence.key, account: licence.account, until: licence.until, plan: licence.plan, signature: forged);
+      expect(verify(_service, passedOff.digest, forged), isTrue, reason: 'the general check takes it here');
       expect(passedOff.signedBy(_service), isFalse, reason: 'and a licence does not, even here');
       expect(passedOff.holdsFor(_device, service: _service, at: DateTime.utc(2026, 12, 31)), isFalse);
     } finally {
-      fakeSignaturesPass = was;
+      schnorrVerifier = before;
     }
   });
 

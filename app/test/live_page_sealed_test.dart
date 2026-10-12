@@ -12,8 +12,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/table_model.dart';
 import 'package:open_hearts/ui/table_view.dart' show TableView;
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 import 'live_page_test.dart' show act, harnessSeat, pumpLive;
 

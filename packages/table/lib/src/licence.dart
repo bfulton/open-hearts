@@ -30,8 +30,7 @@ bool validAccount(String id) => RegExp(r'^[0-9a-f]{32}$').hasMatch(id);
 ///
 /// Empty in the simulator and in the tests that do not set one, and
 /// then an account is taken as stated: nothing is asked of a seat and
-/// nothing checked, the same way a fake signature passes only where
-/// fake signers exist. A build compiled without a key never gets that
+/// nothing checked. A build compiled without a key never gets that
 /// far: it is told nothing by anybody, and no live table opens on it
 /// (app/lib/net/licence.dart).
 String licenceService = '';
@@ -91,19 +90,12 @@ class Licence {
 
   /// Signed by the holder of [service].
   ///
-  /// The curve itself, never [verify]: that one also takes a simulated
-  /// table's fake signature, which is a hash of the signer's *public*
-  /// key and so is forgeable by anyone who can read one. A fake table
-  /// can afford that; the one statement that says what was paid for
-  /// cannot.
-  bool signedBy(PublicKey service) {
-    if (service.length != 64 || signature.length != 128) return false;
-    try {
-      return schnorrVerifier(service, digest, signature);
-    } catch (_) {
-      return false;
-    }
-  }
+  /// A real signature's length and nothing shorter: in a process
+  /// running the simulator, [verify] also takes its fake signatures,
+  /// which are a hash of the signer's *public* key and so forgeable by
+  /// anyone who can read one. A fake table can afford that; the one
+  /// statement that says what was paid for cannot, even there.
+  bool signedBy(PublicKey service) => service.length == 64 && signature.length == 128 && verify(service, digest, signature);
 
   /// Still good at [at]: the date is the last day, so it runs to the
   /// end of that day.
@@ -190,16 +182,9 @@ class Activation {
 
   String get digest => sha256Hex(utf8.encode(canonical));
 
-  /// Signed by the holder of [service], on the curve itself (see
-  /// [Licence.signedBy]).
-  bool signedBy(PublicKey service) {
-    if (service.length != 64 || signature.length != 128) return false;
-    try {
-      return schnorrVerifier(service, digest, signature);
-    } catch (_) {
-      return false;
-    }
-  }
+  /// Signed by the holder of [service], with a real signature's length
+  /// (see [Licence.signedBy]).
+  bool signedBy(PublicKey service) => service.length == 64 && signature.length == 128 && verify(service, digest, signature);
 
   /// Not run out at [at], as a [Licence] says it with [Licence.goodAt].
   bool goodAt(DateTime at) => at.millisecondsSinceEpoch ~/ 1000 < until;

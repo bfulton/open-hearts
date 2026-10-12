@@ -6,11 +6,9 @@ library;
 import 'dart:math';
 
 import 'package:deal/deal.dart';
+import 'package:table/table.dart';
 
-import '../client.dart';
-import '../juror_duty.dart';
-import '../signing.dart';
-import '../spec.dart';
+import 'fake_signer.dart';
 import 'scripted_human.dart';
 import 'sim_network.dart';
 import 'virtual_clock.dart';
@@ -21,7 +19,7 @@ class SimJuror {
   final FakeSigner signer;
 
   /// The account this device is one of, where it is not an account of
-  /// its own: what its presence carries (presence_relay.dart).
+  /// its own: what its presence carries (the table's presence_relay.dart).
   final String? account;
   final SimNetwork net;
   final VirtualClock clock;
@@ -33,7 +31,7 @@ class SimJuror {
   /// Whether this juror can serve: not while its deal worker has
   /// failed for good. One that cannot is not online (`SimPresence`),
   /// as a device's presence says nothing of it then
-  /// (presence_relay.dart, `RelayPresence.canServe`).
+  /// (the table's presence_relay.dart, `RelayPresence.canServe`).
   bool get canServe => !(dealWorker?.dead ?? false);
 
   /// The client following the table, from the first summons on.
@@ -44,9 +42,9 @@ class SimJuror {
 
   /// Whether the client is let go of once the table has moved past
   /// every hand it was summoned to, as the duty does every ten seconds
-  /// (juror_duty.dart). A later summons to the same table then starts a
-  /// client afresh, which reads the record from the first hand — with
-  /// nothing of what the one before it drew.
+  /// (the table's juror_duty.dart). A later summons to the same table
+  /// then starts a client afresh, which reads the record from the first
+  /// hand — with nothing of what the one before it drew.
   bool sweeps = false;
 
   /// Clients let go of that way, for tests.
@@ -86,9 +84,9 @@ class SimJuror {
       return;
     }
     if (c == null || c.spec.id != spec.id) {
-      // As the duty refuses one (juror_duty.dart): a summons that
-      // reached a juror that cannot deal before it stopped saying it
-      // was here.
+      // As the duty refuses one (the table's juror_duty.dart): a
+      // summons that reached a juror that cannot deal before it stopped
+      // saying it was here.
       if (spec.sealed && !canServe) return;
       c?.close();
       // A client of its own draws, as a new process's are: one seeded

@@ -20,8 +20,8 @@
 /// the verifier turns it down.
 library;
 
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 import 'package:test/test.dart';
 
 void main() {

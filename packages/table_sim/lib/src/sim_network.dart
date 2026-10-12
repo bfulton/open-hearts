@@ -10,9 +10,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import '../relay_policy.dart';
-import '../signing.dart';
-import '../transport.dart';
+import 'package:table/table.dart';
+
 import 'virtual_clock.dart';
 
 class SimNetwork {
@@ -26,12 +25,12 @@ class SimNetwork {
   /// Fraction of messages lost on a healthy link, 0 to 1.
   double lossRate = 0;
 
-  /// What has crossed the simulated wire: bytes said, and bytes
-  /// handed over — one copy per peer that gets one. The clock here is
-  /// virtual and the network deterministic, so the same seed gives the
-  /// same counts to the byte, which is what makes a protocol change
-  /// measurable at all (tool/wire_in_sim.dart). A real socket's totals
-  /// swing a quarter either way between runs.
+  /// What has crossed the simulated wire: bytes said, and bytes handed
+  /// over — one copy per peer that gets one. The clock here is virtual
+  /// and the network deterministic, so the same seed gives the same
+  /// counts to the byte, which is what makes a protocol change
+  /// measurable at all (packages/table/tool/wire_in_sim.dart). A real
+  /// socket's totals swing a quarter either way between runs.
   int said = 0;
   int handed = 0;
 
@@ -65,7 +64,8 @@ class SimNetwork {
   List<String> relays = const [];
 
   /// How long a writer keeps a relay out of its own running after a
-  /// write to it was refused: the protocol's minute (relays.dart).
+  /// write to it was refused: the protocol's minute (the table's
+  /// relays.dart).
   int refusalMs = 60000;
 
   final Random _random;
@@ -159,12 +159,13 @@ class SimNetwork {
   bool Function(PublicKey from, Map<String, Object?> message)? swallow;
 
   /// One copy of one message steered, chosen per copy as it leaves:
-  /// null sends it as the network would, a number of milliseconds
-  /// holds it back that much longer, and a negative number loses it.
-  /// Where [swallow] eats a message at its source, this reaches a
-  /// single recipient — the shape of a reordering, one peer hearing
-  /// two things the other way round from everybody else — which is
-  /// what `tool/explore.dart` walks through one copy at a time.
+  /// null sends it as the network would, a number of milliseconds holds
+  /// it back that much longer, and a negative number loses it. Where
+  /// [swallow] eats a message at its source, this reaches a single
+  /// recipient — the shape of a reordering, one peer hearing two things
+  /// the other way round from everybody else — which is what
+  /// `packages/table/tool/explore.dart` walks through one copy at a
+  /// time.
   ///
   /// The copy's latency is drawn before it is asked, so a steered run
   /// draws the same numbers as an unsteered one and differs from it by

@@ -3,7 +3,7 @@ library;
 
 import 'dart:collection';
 
-import '../clock.dart';
+import 'package:table/table.dart';
 
 class VirtualClock implements Clock {
   int _now = 0;

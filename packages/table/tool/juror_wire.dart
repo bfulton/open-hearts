@@ -14,8 +14,8 @@ library;
 import 'dart:convert';
 
 import 'package:deal/deal.dart';
-import 'package:table/src/sim/sim.dart';
 import 'package:table/table.dart';
+import 'package:table_sim/table_sim.dart';
 
 void main() async {
   final crypto = await DealCrypto.load();
