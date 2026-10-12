@@ -120,14 +120,14 @@ async function withoutForgotten(bucket, record, text) {
 /// [record] with the names of the seats [account] sat in taken out:
 /// {record, named}, where [named] are the seats whose name went, or
 /// null when the account sat in none. A seat is the account's when its
-/// licence names it, or, in a game from before seats carried licences,
-/// when its key is one of the account's devices ([keys]). The names are
+/// licence names it: every person's seat in a kept game has one, since
+/// where accounts are checked a seating without is refused
+/// (licenceProblem, packages/table/lib/src/spec.dart). The names are
 /// kept beside the record unsigned, as each device said it was called,
 /// so the record verifies as before and stays the other players' game,
 /// with no name on those seats.
-export function withoutNames(record, account, keys = []) {
-  const its = (seat) => (seat?.licence ? seat.licence.account === account : keys.includes(seat?.key));
-  const seats = (record?.spec?.seats ?? []).flatMap((seat, i) => (its(seat) ? [i] : []));
+export function withoutNames(record, account) {
+  const seats = (record?.spec?.seats ?? []).flatMap((seat, i) => (seat?.licence && seat.licence.account === account ? [i] : []));
   if (!seats.length) return null;
   const { names: was, ...rest } = record;
   const names = { ...(was ?? {}) };
@@ -136,16 +136,16 @@ export function withoutNames(record, account, keys = []) {
   return { record: Object.keys(names).length ? { ...rest, names } : rest, named };
 }
 
-/// Every kept game [account] sat in, by its licence or one of its
-/// devices' [keys], with its name taken off it: for a deletion asked
-/// for. [bucket] lists, reads and writes records as the operator's tool
-/// reaches R2 (service/tool/r2.mjs), a record as its JSON. With [dry],
-/// writes nothing. Returns {key, named} for each game changed, or that
-/// would be.
-export async function anonymizeGames(bucket, account, { keys = [], dry = false } = {}) {
+/// Every kept game [account] sat in, by its licence, with its name
+/// taken off it: for a deletion asked for. [bucket] lists, reads and
+/// writes records as the operator's tool reaches R2
+/// (service/tool/r2.mjs), a record as its JSON. With [dry], writes
+/// nothing. Returns {key, named} for each game changed, or that would
+/// be.
+export async function anonymizeGames(bucket, account, { dry = false } = {}) {
   const changed = [];
   for (const key of await bucket.list('tables/')) {
-    const without = withoutNames(await bucket.get(key), account, keys);
+    const without = withoutNames(await bucket.get(key), account);
     if (!without?.named.length) continue;
     changed.push({ key, named: without.named });
     if (!dry) await bucket.put(key, without.record);

@@ -77,6 +77,11 @@ squashed from a pull request, the pull request's number.
 
 ### Removed
 
+- The 17 games kept before seats carried licences (4 to 6 October
+  2026), whose names nothing but a device's key tied to an account, and
+  with them `service/tool/forget.mjs` matching a seat by the account's
+  devices. Every game kept since names each person's account by the
+  licence at their seat. (2026-10-12, #15)
 - The path that adopted subscriptions from before accounts, after a
   count showed none in production. (2026-10-11, 0520e34)
 

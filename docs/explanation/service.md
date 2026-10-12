@@ -391,9 +391,10 @@ What is published at tables is read from the device's copy
 ### Deleting an account's data
 
 On request (the privacy policy's choices), the account is forgotten.
-Its name comes off every kept game it played (`anonymizeGames`), which
-stays the other players' game: the names are kept beside a record
-unsigned, so the record verifies as before. The account is marked
+Its name comes off every kept game it played, found by the licence at
+its seat (`anonymizeGames`), which stays the other players' game: the
+names are kept beside a record unsigned, so the record verifies as
+before. The account is marked
 forgotten first, so a game kept later, such as one its last licence
 let it finish, is kept without its name. Every row kept for the
 account is deleted (`forgetAccount`): those under `ACCOUNT#` (its
