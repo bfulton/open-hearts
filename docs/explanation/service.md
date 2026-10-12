@@ -22,7 +22,7 @@ None of it is in a game's latency path.
 
 ## Where the app is
 
-`service/functions/worker.mjs`, published as `_worker.js`, answers
+`service/functions/worker.mjs`, published in `_worker.js/`, answers
 `/api/<name>` and hands every other path to the static assets. One Pages
 project and one deployment serve the site, the app and the handlers,
 and the worker routes by host
@@ -560,11 +560,11 @@ deploy (`service/bench/build.sh`).
 ## Deployment
 
 The `Household` object is the relay worker's, built from
-`service/functions/worker.mjs`. So a change to what an account's turn
-can be asked deploys the relay first, then the site
-([deploy](../how-to/deploy.md)). The other way round, the new handler
-asks an object that does not know the question yet, which answers 400,
-and the app asks again later.
+`service/functions/household.mjs` and the modules it imports. So a
+change to what an account's turn can be asked deploys the relay first,
+then the site ([deploy](../how-to/deploy.md)). The other way round, the
+new handler asks an object that does not know the question yet, which
+answers 400, and the app asks again later.
 
 Secrets are set by hand and checked only by name. Everything else that
 is not secret is in `config/openhearts.json`, committed: the service's

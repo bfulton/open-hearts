@@ -8,7 +8,11 @@ import { readFile } from 'node:fs/promises';
 
 import { alertsOf, alertSubscribed, alertWaiting, sendAlert } from './alerts.mjs';
 import { configEnv } from './deployment.mjs';
-import worker, { Household, memoryStore, record, signerOn } from './worker.mjs';
+import worker from './worker.mjs';
+import { Household } from './household.mjs';
+import { signerOn } from './licence.mjs';
+import { memoryStore } from './rows.mjs';
+import { record } from './stripe.mjs';
 import { keys } from '../do/sign.mjs';
 
 const KEY = 'ab'.repeat(32);

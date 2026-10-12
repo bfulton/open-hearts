@@ -2,40 +2,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
-import worker, {
-  activate,
-  activeInStore,
-  allowedOrigin,
-  askedBy,
-  attest,
-  checkout,
-  claimWith,
-  dayAfter,
-  dayOf,
-  devicesOn,
-  dropDevice,
-  entitlementOf,
-  forgetProviderKeys,
-  householdOp,
-  licence,
-  licenceFor,
-  manage,
-  openHouse,
-  loginRow,
-  memoryStore,
-  mint,
-  record,
-  requestStatement,
-  sameSite,
-  serversOf,
-  signerOn,
-  supersede,
-  ticketFor,
-  useSettings,
-  forgetSettings,
-  webhookSigned,
-  whoSignedIn,
-} from './worker.mjs';
+import worker from './worker.mjs';
+import { claimWith, devicesOn, entitlementOf, ticketFor } from './accounts.mjs';
+import { activate, activeInStore, dropDevice, householdOp } from './household.mjs';
+import { allowedOrigin, askedBy, requestStatement } from './http.mjs';
+import { licence, licenceFor, signerOn } from './licence.mjs';
+import { attest, loginRow } from './logins.mjs';
+import { dayAfter, dayOf, memoryStore } from './rows.mjs';
+import { forgetSettings, openHouse, useSettings } from './settings.mjs';
+import { forgetProviderKeys, supersede, whoSignedIn } from './signin.mjs';
+import { checkout, manage, record, sameSite, webhookSigned } from './stripe.mjs';
+import { mint, serversOf } from './turn.mjs';
 import { eventIdOf } from './records.mjs';
 import { keys } from '../do/sign.mjs';
 

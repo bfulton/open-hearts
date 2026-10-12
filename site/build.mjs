@@ -31,7 +31,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const origin = 'https://openhearts.game';
 /// Where the app is (docs/explanation/service.md, "Where the app is"). A preview
 /// serves its own instead, at /play/: its worker points these links
-/// there (service/functions/worker.mjs).
+/// there (service/functions/app_host.mjs).
 export const app = 'https://play.openhearts.game';
 
 /// The apps' store listings, once they are live. Until then the site's

@@ -41,7 +41,7 @@ class Identity {
 
   /// The longest name, in characters: what a watched table carries
   /// (packages/table, watch.dart), and what the service keeps with the
-  /// account (service/functions/worker.mjs, a test holding them equal).
+  /// account (service/functions/profile.mjs, a test holding them equal).
   static const longestName = 60;
 
   /// [name] as it is kept: trimmed, nothing in it that is not text,

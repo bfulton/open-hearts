@@ -44,10 +44,10 @@ import { withConfig } from '../functions/deployment.mjs';
 import config from '../../config/openhearts.json';
 
 // One object per account, through which its codes, claims, drops and
-// device in use run one at a time (service/functions/worker.mjs, "one
+// device in use run one at a time (service/functions/household.mjs, "one
 // account at a time"). It lives here because a Pages project cannot
 // define a Durable Object of its own, only bind one.
-export { Household } from '../functions/worker.mjs';
+export { Household } from '../functions/household.mjs';
 
 // The backup jurors, a Cloudflare Container started when a table
 // calls for a juror and nobody is there (bench.mjs).

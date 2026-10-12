@@ -1,4 +1,4 @@
-// Where the app is (worker.mjs, serveStatic; docs/explanation/service.md): one
+// Where the app is (app_host.mjs, serveStatic; docs/explanation/service.md): one
 // deployment, routed by host. play.openhearts.game is the app at its
 // root, from the build's /play/; openhearts.game is the site, and sends
 // /play/… on to the app's host; a preview serves the app at /play/.
@@ -6,7 +6,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import worker, { appHostFor, appPage, isAppHost } from './worker.mjs';
+import worker from './worker.mjs';
+import { appHostFor, appPage, isAppHost } from './app_host.mjs';
 
 /// Static assets that answer each path with itself, and say which paths
 /// were asked for: an address with no extension, or .html, as a page

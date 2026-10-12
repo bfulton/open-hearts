@@ -30,7 +30,7 @@ Future<void> main() async {
   reportErrors();
   // Addresses are paths, `/subscription`, not `/#/subscription`: the
   // site's worker answers every address of play.openhearts.game (and of
-  // /play/ on a preview) with the app (service/functions/worker.mjs),
+  // /play/ on a preview) with the app (service/functions/app_host.mjs),
   // and the router reads the rest.
   usePathUrlStrategy();
   // The end-to-end suite drives the app through its accessibility

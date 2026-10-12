@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 const config = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
 
 /// Google Play's purchases are checked with a service account's key
-/// (playToken in service/functions/worker.mjs), which the worker wants
+/// (playToken in service/functions/stores.mjs), which the worker wants
 /// once the config names Play's package and product, as here.
 export const playSecrets = config.google?.package && config.google?.product ? ['OH_PLAY_SERVICE_ACCOUNT'] : [];
 

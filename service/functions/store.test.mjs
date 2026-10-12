@@ -1,4 +1,4 @@
-// Buying in a store (worker.mjs, "buying in a store"): an App Store
+// Buying in a store (stores.mjs, "buying in a store"): an App Store
 // transaction is taken only when its chain ends at the trusted root and
 // Apple's marks are where Apple puts them; a Play token only when Play
 // says what it is; and a purchase puts a device on its subscription by
@@ -6,25 +6,15 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { afterEach, test } from 'node:test';
-import worker, {
-  APPLE_ROOT_G3,
-  appleSigned,
-  appleTransaction,
-  certOf,
-  devicesOn,
-  entitlementOf,
-  forgetAppleRoots,
-  forgetHouseholds,
-  forgetPlayAccess,
-  forgetProviderKeys,
-  memoryStore,
-  playPurchase,
-  record,
-  signedBy,
-  signerOn,
-  storeAccountOf,
-  trustAppleRoots,
-} from './worker.mjs';
+import worker from './worker.mjs';
+import { devicesOn, entitlementOf } from './accounts.mjs';
+import { forgetHouseholds } from './household.mjs';
+import { signerOn } from './licence.mjs';
+import { memoryStore } from './rows.mjs';
+import { forgetProviderKeys } from './signin.mjs';
+import { forgetPlayAccess, playPurchase, storeAccountOf } from './stores.mjs';
+import { record } from './stripe.mjs';
+import { APPLE_ROOT_G3, appleSigned, appleTransaction, certOf, forgetAppleRoots, signedBy, trustAppleRoots } from './x509.mjs';
 import { keys } from '../do/sign.mjs';
 import * as pki from './store.fixtures.mjs';
 

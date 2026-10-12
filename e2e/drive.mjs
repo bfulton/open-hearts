@@ -299,7 +299,8 @@ export async function startTurn({ tag = suite } = {}) {
 }
 
 async function handlersFor(serve, turn, records, config) {
-  const { default: handler, memoryStore } = await import(new URL('../service/functions/worker.mjs', import.meta.url));
+  const { default: handler } = await import(new URL('../service/functions/worker.mjs', import.meta.url));
+  const { memoryStore } = await import(new URL('../service/functions/rows.mjs', import.meta.url));
   const store = memoryStore();
   // The operator's remote config (docs/explanation/service.md), where a suite
   // sets one: the row the worker checks and serves at /api/config.

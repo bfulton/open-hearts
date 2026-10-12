@@ -104,7 +104,7 @@ class TableTiming {
 
   /// What each field may be, in milliseconds, least and most. The
   /// worker checks a remote config's `table` against the same
-  /// (service/functions/worker.mjs, `tableTimingOf`).
+  /// (service/functions/config.mjs, `tableTimingOf`).
   static const bounds = {
     'graceMs': (2000, 60000),
     'passGraceMs': (2000, 120000),

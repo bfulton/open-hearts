@@ -66,7 +66,7 @@ export const stripe = {
     login_page: { enabled: false },
   },
 
-  /// Entitlement (`/api/stripe`, service/functions/worker.mjs). It reads
+  /// Entitlement (`/api/stripe`, service/functions/stripe.mjs). It reads
   /// checkout.session.completed and .async_payment_succeeded and the
   /// subscription's changes; the other checkout and subscription events
   /// are received, answered and ignored.

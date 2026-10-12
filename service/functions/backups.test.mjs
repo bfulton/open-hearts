@@ -4,21 +4,10 @@
 // node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  BACKUP_CODES,
-  backupCodeOf,
-  backupMailText, backupMailHtml,
-  backupsFor,
-  backupsMade,
-  devicesOn,
-  entitlementOf,
-  mailerOf,
-  memoryStore,
-  payerEmail,
-  payerLookup,
-  record,
-  redeemBackup,
-} from './worker.mjs';
+import { BACKUP_CODES, backupCodeOf, backupsFor, backupsMade, devicesOn, entitlementOf, redeemBackup } from './accounts.mjs';
+import { backupMailHtml, backupMailText, mailerOf } from './household.mjs';
+import { memoryStore } from './rows.mjs';
+import { payerEmail, payerLookup, record } from './stripe.mjs';
 
 const KEY = 'ab'.repeat(32);
 const now = Date.UTC(2026, 9, 2);

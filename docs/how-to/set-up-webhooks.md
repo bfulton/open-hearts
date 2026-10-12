@@ -47,7 +47,7 @@ From here on, `node infra/apply.mjs --apply` keeps the endpoint's events and ena
 
 1. In Google Cloud, create a Pub/Sub topic for the notifications, and give `google-play-developer-notifications@system.gserviceaccount.com` the Pub/Sub Publisher role on it.
 1. Create a push subscription on the topic to `https://play.openhearts.game/api/play`, with authentication on. Choose the service account it pushes as, and an audience.
-1. Put the service account's email in `config/openhearts.json` as `google.playPushEmail`, and the audience as `google.playPushAudience`. The handler accepts a push only when the token's `email` and `aud` match these (`pushedByPlay` in `service/functions/worker.mjs`). Commit the change to `main`, and deploy the site.
+1. Put the service account's email in `config/openhearts.json` as `google.playPushEmail`, and the audience as `google.playPushAudience`. The handler accepts a push only when the token's `email` and `aud` match these (`pushedByPlay` in `service/functions/stores.mjs`). Commit the change to `main`, and deploy the site.
 1. In the Google Play Console, under the app's monetization setup, turn on real-time notifications and enter the topic's full name.
 
 ## Check it worked

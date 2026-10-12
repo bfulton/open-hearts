@@ -35,7 +35,7 @@ const keyIn = (table) => `tables/${table}.json`;
 /// a record checked after the mark is in sees it.
 export const forgottenKey = (account) => `forgotten/${account}`;
 
-/// An account's number (worker.mjs, isAccount).
+/// An account's number (rows.mjs, isAccount).
 const accountShape = /^[0-9a-f]{32}$/;
 
 /// The id an event of [table] has: the hash of what it says, as the
@@ -54,7 +54,7 @@ async function sha256Hex(text) {
 
 /// What a licence is the service's signature over: this, and then the
 /// device's key, its account, its last day and the plan, a line each
-/// (worker.mjs, licenceFor; packages/table, licence.dart).
+/// (licence.mjs, licenceFor; packages/table, licence.dart).
 const licenceStatement = 'oh-licence/2';
 
 /// Why [seats] are not seats the app would show, or null: every
@@ -83,7 +83,7 @@ async function licenceProblem(seats, service, verify) {
 const triedAtMost = 8;
 
 /// Whether [record] holds an event [key] signed at [table]. [verify] is
-/// the service's BIP-340 check (worker.mjs, signerOn).
+/// the service's BIP-340 check (licence.mjs, signerOn).
 async function signedInto(record, key, table, verify) {
   let tried = 0;
   for (const d of record.record) {
@@ -100,7 +100,7 @@ async function signedInto(record, key, table, verify) {
 /// any account forgotten on request (withoutForgotten): {status, body}.
 /// [verify] checks a signature: (key, digest, signature) => bool.
 /// [service] is the service's public key where it signs licences
-/// (worker.mjs, serviceKeys), and then every person's seat must carry
+/// (licence.mjs, serviceKeys), and then every person's seat must carry
 /// one (licenceProblem); where it signs none, nothing is checked, as
 /// in an app built without one (licence.dart, licencesChecked).
 export async function keepRecord(bucket, key, table, text, { verify, service = null }) {

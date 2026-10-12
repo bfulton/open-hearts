@@ -119,7 +119,7 @@ String? claimInAddress([Uri? at]) {
 /// What a person typed, pasted or scanned, as a code the service takes:
 /// a link carrying one, a code off another device's screen (32 hex), or
 /// a backup code — or null when it is none of them. Read generously, as
-/// the service reads it (worker.mjs, `backupCodeOf`).
+/// the service reads it (accounts.mjs, `backupCodeOf`).
 String? codeIn(String text) {
   final t = text.trim();
   if (t.isEmpty || t.length > 2048) return null;
@@ -250,7 +250,7 @@ class Refused {
   /// The service's own words, in English.
   final String? said;
 
-  /// The service's errors the app has words for (worker.mjs).
+  /// The service's errors the app has words for (service/functions/).
   static const _named = {
     'no subscription': 'noSubscription',
     'the account has all the devices it can take': 'accountFull',

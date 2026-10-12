@@ -8,7 +8,7 @@ import { test } from 'node:test';
 
 import { keys } from '../do/sign.mjs';
 import { eventIdOf, forgottenKey, keepRecord, recordMost, recordResponse } from './records.mjs';
-import { licenceFor, signerOn } from './worker.mjs';
+import { licenceFor, signerOn } from './licence.mjs';
 
 // Devices that can sign: BIP-340's published pairs, the second skipped
 // as the worker's tests skip it (it is their service's own).

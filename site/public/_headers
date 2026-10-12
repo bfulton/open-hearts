@@ -21,7 +21,7 @@
 # Never cached: these are how a new deploy reaches a phone that already
 # has the app open; a stale bootstrap would keep an old build running.
 # The app's files are these on every host: play.openhearts.game's worker
-# reads /main.dart.js from /play/main.dart.js (service/functions/worker.mjs).
+# reads /main.dart.js from /play/main.dart.js (service/functions/app_host.mjs).
 # /carry, the one page that may be framed (by play.openhearts.game, and
 # nobody else), has its framing set by the worker.
 /play/

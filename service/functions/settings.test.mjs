@@ -3,23 +3,12 @@
 // what the service then does by them. node --test service/functions
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
-import {
-  SERVICE_BOUNDS,
-  SERVICE_DEFAULTS,
-  S,
-  checkout,
-  forgetPriceIds,
-  claimWith,
-  forgetSettings,
-  memoryStore,
-  mint,
-  record,
-  sequencer,
-  serviceSettingsOf,
-  settle,
-  ticketFor,
-  useSettings,
-} from './worker.mjs';
+import { claimWith, ticketFor } from './accounts.mjs';
+import { sequencer } from './household.mjs';
+import { memoryStore } from './rows.mjs';
+import { S, SERVICE_BOUNDS, SERVICE_DEFAULTS, forgetSettings, serviceSettingsOf, settle, useSettings } from './settings.mjs';
+import { checkout, forgetPriceIds, record } from './stripe.mjs';
+import { mint } from './turn.mjs';
 
 const KEY = 'ab'.repeat(32);
 const now = Date.now();

@@ -2,7 +2,7 @@
 // (forget.mjs).
 
 /// OH_STORE through Cloudflare's API, behind the calls the worker's
-/// store makes (service/functions/worker.mjs, storeOf).
+/// store makes (service/functions/rows.mjs, storeOf).
 export function restStore({ token, account, namespace }) {
   const base = `https://api.cloudflare.com/client/v4/accounts/${account}/storage/kv/namespaces/${namespace}`;
   const auth = { authorization: `Bearer ${token}` };
