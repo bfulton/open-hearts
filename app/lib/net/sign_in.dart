@@ -32,7 +32,7 @@ enum Provider { apple, google }
 
 /// The nonce a provider's token has to carry for this device: the hash
 /// of its key under a tag of its own. The service checks it against
-/// the key the request is signed by (worker.mjs, `whoSignedIn`), so a
+/// the key the request is signed by (signin.mjs, `whoSignedIn`), so a
 /// token lifted from somebody else's sign-in binds nothing to the
 /// lifter.
 String signInNonce(PublicKey key) => sha256Hex(utf8.encode('oh-signin/1\n$key'));

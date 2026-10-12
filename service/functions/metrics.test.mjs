@@ -2,7 +2,8 @@
 // in node's own test runner: node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import worker, { measure } from './worker.mjs';
+import worker from './worker.mjs';
+import { measure } from './metrics.mjs';
 
 /// An Analytics Engine dataset that keeps what it was given.
 const dataset = () => ({

@@ -196,7 +196,7 @@ class AccountProfile extends ChangeNotifier {
   }
 
   /// What the service says of a profile it will never take
-  /// (worker.mjs, `profileOf`). Any other refusal — a service part way
+  /// (profile.mjs, `profileOf`). Any other refusal — a service part way
   /// through a deploy among them — is asked again.
   static const _malformed = {'not a profile', 'not a name', 'not one of the icons', 'not one of the colours', 'not a picture'};
 

@@ -28,7 +28,7 @@ export const synthetics = {
     // At its own host (docs/explanation/service.md, "Where the app is").
     { name: 'App', uri: 'https://play.openhearts.game/', expect: 'Open Hearts' },
     // What a purchase needs: the store read, and Stripe answering the
-    // service's key for the price (service/functions/worker.mjs, healthOf).
+    // service's key for the price (service/functions/health.mjs, healthOf).
     { name: 'Service health', uri: 'https://play.openhearts.game/api/health', expect: '"ok":true' },
     // The relay's worker, which also wakes the jurors of last
     // resort (service/do/worker.mjs).

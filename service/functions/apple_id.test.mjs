@@ -7,24 +7,15 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { readFile } from 'node:fs/promises';
-import worker, {
-  appleIdNotice,
-  claimWith,
-  dropDevice,
-  forgetHouseholds,
-  forgetProviderKeys,
-  forgetSettings,
-  householdOp,
-  inHousehold,
-  loginRow,
-  memoryStore,
-  record,
-  signerOn,
-  storeOf,
-  ticketFor,
-  unlinkSignIn,
-  useSettings,
-} from './worker.mjs';
+import worker from './worker.mjs';
+import { claimWith, ticketFor } from './accounts.mjs';
+import { dropDevice, forgetHouseholds, householdOp, inHousehold } from './household.mjs';
+import { signerOn } from './licence.mjs';
+import { loginRow, unlinkSignIn } from './logins.mjs';
+import { memoryStore, storeOf } from './rows.mjs';
+import { forgetSettings, useSettings } from './settings.mjs';
+import { appleIdNotice, forgetProviderKeys } from './signin.mjs';
+import { record } from './stripe.mjs';
 import { ALERTS_OBJECT } from './alerts.mjs';
 import { configEnv } from './deployment.mjs';
 import { keys } from '../do/sign.mjs';

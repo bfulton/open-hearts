@@ -10,7 +10,7 @@
 /// cannot now, has the config it last had, and one that never had any
 /// has none — which is the app as the build made it, every door open
 /// and nothing said. The worker checks every field before it serves the
-/// row (service/functions/worker.mjs, configOf), and this checks them
+/// row (service/functions/config.mjs, configOf), and this checks them
 /// again: a config is only ever able to narrow what the build does, or
 /// say something, and a bad one is never worse than none.
 library;

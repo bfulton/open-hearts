@@ -64,7 +64,7 @@ Uri? handlerFor(String handler, Uri at) {
 /// What every handler is asked with: this device's key, the second the
 /// request is made, and the key's signature over both and over what is
 /// asked for — the code being spent, the device being dropped — or
-/// nothing (service/functions/worker.mjs).
+/// nothing (service/functions/http.mjs, signedFor).
 ///
 /// A key is public: it signs every event this device says at a table,
 /// and the relays hand those to anybody. So the service acts for a key

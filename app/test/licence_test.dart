@@ -2,7 +2,7 @@
 ///
 /// The service signs it and the app checks it, in two languages on one
 /// curve. So the pin here is a licence the worker actually minted —
-/// `service/functions/worker.mjs`, `licenceFor` — rather than one this
+/// `service/functions/licence.mjs`, `licenceFor` — rather than one this
 /// side made for itself: a canonical statement that drifted apart would
 /// otherwise pass on both sides and fail between them.
 library;

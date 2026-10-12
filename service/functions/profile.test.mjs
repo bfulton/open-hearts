@@ -6,23 +6,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
-import worker, {
-  PROFILE_COLOURS,
-  PROFILE_ICONS,
-  PROFILE_NAME_MOST,
-  PROFILE_PICTURE_MOST,
-  SERVICE_DEFAULTS,
-  activeInStore,
-  claimWith,
-  forgetAccount,
-  forgetHouseholds,
-  householdOp,
-  memoryStore,
-  profileOf,
-  record,
-  signerOn,
-  ticketFor,
-} from './worker.mjs';
+import worker from './worker.mjs';
+import { claimWith, ticketFor } from './accounts.mjs';
+import { forgetAccount } from './deletion.mjs';
+import { activeInStore, forgetHouseholds, householdOp } from './household.mjs';
+import { signerOn } from './licence.mjs';
+import { PROFILE_COLOURS, PROFILE_ICONS, PROFILE_NAME_MOST, PROFILE_PICTURE_MOST, profileOf } from './profile.mjs';
+import { memoryStore } from './rows.mjs';
+import { SERVICE_DEFAULTS } from './settings.mjs';
+import { record } from './stripe.mjs';
 import { keys } from '../do/sign.mjs';
 
 const wasm = await readFile(new URL('../../app/web/schnorr.wasm', import.meta.url));

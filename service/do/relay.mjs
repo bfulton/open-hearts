@@ -288,7 +288,7 @@ async function sha256Hex(text) {
 /// The activation [raw] says, as {account, key, epoch, until}, when the
 /// service ([service], its public key) signed it and it has not run out
 /// at [nowS]; null otherwise. The statement is the service's
-/// (service/functions/worker.mjs, activationFor).
+/// (service/functions/licence.mjs, activationFor).
 export async function activationOf(raw, service, verify, nowS) {
   if (!raw || typeof raw !== 'object' || !hex64.test(service ?? '')) return null;
   const { account, key, epoch, until, sig } = raw;
@@ -706,7 +706,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 
     /// [account]'s device in use is now the one of [epoch]: the sockets
     /// of any device of it from before are closed, and none is opened
-    /// for one (the account's turn says so, service/functions/worker.mjs).
+    /// for one (the account's turn says so, service/functions/household.mjs).
     revoke(account, epoch) {
       supersede(account, epoch);
     },

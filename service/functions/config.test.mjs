@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import worker, { CONFIG_DEFAULTS, TABLE_TIMING_BOUNDS, WAITS_BOUNDS, configOf } from './worker.mjs';
+import worker from './worker.mjs';
+import { CONFIG_DEFAULTS, TABLE_TIMING_BOUNDS, WAITS_BOUNDS, configOf } from './config.mjs';
 
 /// Cloudflare KV as the worker reads it: a JSON value by key.
 const kvWith = (rows) => ({

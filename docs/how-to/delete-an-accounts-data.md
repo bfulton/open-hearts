@@ -2,7 +2,7 @@
 
 Use this guide when a person asks for their account's data to be deleted, as the privacy policy offers.
 
-`service/tool/forget.mjs` forgets the account. It takes the account's name off every kept game it played (`anonymizeGames` in `service/functions/records.mjs`), and deletes every row the service keeps for it in `OH_STORE` (`forgetAccount` in `service/functions/worker.mjs`): its devices and their entitlements, its codes and backup codes, its sign-in, its device in use, its profile, and the rows of every subscription it has had. Its results stay on the relay, under its account number, which nothing left in the service ties to the person.
+`service/tool/forget.mjs` forgets the account. It takes the account's name off every kept game it played (`anonymizeGames` in `service/functions/records.mjs`), and deletes every row the service keeps for it in `OH_STORE` (`forgetAccount` in `service/functions/deletion.mjs`): its devices and their entitlements, its codes and backup codes, its sign-in, its device in use, its profile, and the rows of every subscription it has had. Its results stay on the relay, under its account number, which nothing left in the service ties to the person.
 
 ## Before you begin
 
@@ -49,7 +49,7 @@ Use this guide when a person asks for their account's data to be deleted, as the
 
 - **The account's results on the relay.** A result names each seat's account number and device key, and never a name or an email. A result cannot be changed in any case: each copy is signed by the device that published it, and every player's copy names every seat.
 - **Its kept games, without its name.** The moves stay, for the other players. A browser that opened a game before the run keeps its own copy.
-- **Its `Household` object's note of the device in use**: the device's key, how many times the account was taken up, times, the table it last sat at, and the relay tags it opened since (the `active` entry of `Household` in `service/functions/worker.mjs`). Nothing outside the object can reach it. It is written over only when the account is taken up again, which after deletion never happens. It holds no name or picture.
+- **Its `Household` object's note of the device in use**: the device's key, how many times the account was taken up, times, the table it last sat at, and the relay tags it opened since (the `active` entry of `Household` in `service/functions/household.mjs`). Nothing outside the object can reach it. It is written over only when the account is taken up again, which after deletion never happens. It holds no name or picture.
 - **Stripe's own record of a web subscription**, which holds the email address and, in the subscription's metadata, the paying device's key.
 - Copies of results, records and table events that other people's devices keep, which the service cannot reach.
 

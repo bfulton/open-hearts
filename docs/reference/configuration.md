@@ -42,7 +42,7 @@ Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `node infra/a
 
 | Secret | Production | Preview | Read by | Without it |
 |---|---|---|---|---|
-| `OH_SERVICE_SECRET` | Yes | Yes | `serviceSigned` in `service/functions/worker.mjs`: signs licences (`licenceFor`) and activations (`activationFor`) | Handlers that sign answer 503. A secret that does not match `OH_SERVICE_KEY` also answers 503. |
+| `OH_SERVICE_SECRET` | Yes | Yes | `serviceSigned` in `service/functions/licence.mjs`: signs licences (`licenceFor`) and activations (`activationFor`) | Handlers that sign answer 503. A secret that does not match `OH_SERVICE_KEY` also answers 503. |
 | `OH_ID_HMAC` | Yes | Yes | `loginRow`: the HMAC key a sign-in's subject is stored under | `attest`, `supersede` and `apple-id` answer 503. |
 | `OH_STRIPE_SECRET` | Yes | No | `checkout`, `manage`, `payerLookup`, `healthOf` | `checkout` and `manage` answer 503. `health` reports Stripe as not configured. Backup codes are not emailed. |
 | `OH_STRIPE_WEBHOOK_SECRET` | Yes | No | `webhookSigned` | The `stripe` webhook answers 400 to every delivery. |
@@ -74,7 +74,7 @@ From `pages.environments` in `infra/cloudflare.mjs`. Pages also provides `ASSETS
 | `OH_STORE` | Workers KV | `open-hearts-store` | `open-hearts-store-preview` | Every row the service keeps. See [Storage](service-api.md#storage). |
 | `OH_RECORDS` | R2 bucket | `open-hearts-records` | `open-hearts-records-preview` | Finished games' records (`service/functions/records.mjs`). |
 | `HOUSEHOLD` | Durable Object (script `open-hearts-relay`, class `Household`) | Bound | Not bound | Runs each account's operations one at a time, and sends the operator's alerts. |
-| `OH_METRICS` | Workers Analytics Engine | Dataset `open_hearts_api` | Not bound | One line per request, sampled for `config` and `health` (`measure` and `SAMPLED` in `service/functions/worker.mjs`). |
+| `OH_METRICS` | Workers Analytics Engine | Dataset `open_hearts_api` | Not bound | One line per request, sampled for `config` and `health` (`measure` and `SAMPLED` in `service/functions/metrics.mjs`). |
 
 Without `HOUSEHOLD`, the worker runs each account's operations in a queue in its own isolate (`inHousehold`), and sends no alerts.
 
@@ -149,7 +149,7 @@ Compile-time values the app reads with `String.fromEnvironment`. They are not en
 
 ## Remote config
 
-The row `config|app` in `OH_STORE`, which the `config` handler serves to every device. The worker checks each field (`configOf` in `service/functions/worker.mjs`), and the app checks each again (`RemoteConfig.parse` in `app/lib/net/remote_config.dart`). A field that fails its check is left at its default. An absent or unreadable row serves `CONFIG_DEFAULTS`.
+The row `config|app` in `OH_STORE`, which the `config` handler serves to every device. The worker checks each field (`configOf` in `service/functions/config.mjs`), and the app checks each again (`RemoteConfig.parse` in `app/lib/net/remote_config.dart`). A field that fails its check is left at its default. An absent or unreadable row serves `CONFIG_DEFAULTS`.
 
 | Field | Check | Default | Effect |
 |---|---|---|---|
@@ -169,7 +169,7 @@ The `config` handler answers with `cache-control: public, max-age=60`. The app k
 
 ### Waits
 
-Each field of `waits` is taken on its own when it is a whole number within its bounds. Bounds are `WAITS_BOUNDS` in `service/functions/worker.mjs` and `AppWaits.bounds` in `app/lib/net/remote_config.dart`; `service/functions/config.test.mjs` holds the two equal. Defaults are the `AppWaits` constructor. All values are milliseconds, except `configEveryMin`, which is minutes.
+Each field of `waits` is taken on its own when it is a whole number within its bounds. Bounds are `WAITS_BOUNDS` in `service/functions/config.mjs` and `AppWaits.bounds` in `app/lib/net/remote_config.dart`; `service/functions/config.test.mjs` holds the two equal. Defaults are the `AppWaits` constructor. All values are milliseconds, except `configEveryMin`, which is minutes.
 
 | Field | `AppWaits` field | What the app waits for |
 |---|---|---|
@@ -199,7 +199,7 @@ Two groups go together. When a group breaks its rule, the worker drops every fie
 
 The row `config|service` in `OH_STORE`. It is never served. The Pages worker and the `Household` object read it at most once a minute per isolate (`settle`, `SETTINGS_KEPT_MS`). Each number is taken when it is a whole number within its bounds, and otherwise keeps its default (`serviceSettingsOf`).
 
-Defaults and bounds: `SERVICE_DEFAULTS` and `SERVICE_BOUNDS` in `service/functions/worker.mjs`.
+Defaults and bounds: `SERVICE_DEFAULTS` and `SERVICE_BOUNDS` in `service/functions/settings.mjs`.
 
 | Field | What it sets |
 |---|---|
@@ -236,7 +236,7 @@ Defaults and bounds: `objectLimits` and `objectLimitBounds` in `service/do/relay
 
 The clocks a table plays by. The device that starts a table takes them from the `table` field of its [remote config](#remote-config), and they ride in the signed start event (`TableSpec.timing` in `packages/table/lib/src/spec.dart`), so every seat plays by the same clocks. A start event with no timing, or with any field of the wrong type or out of bounds, gives the standard table (`TableTiming.parse`).
 
-Bounds: `TableTiming.bounds` in `packages/table/lib/src/timing.dart`, and the same values in `TABLE_TIMING_BOUNDS` in `service/functions/worker.mjs`. All values are milliseconds.
+Bounds: `TableTiming.bounds` in `packages/table/lib/src/timing.dart`, and the same values in `TABLE_TIMING_BOUNDS` in `service/functions/config.mjs`. All values are milliseconds.
 
 | Field | Default in | What it times |
 |---|---|---|

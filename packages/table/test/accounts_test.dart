@@ -38,7 +38,7 @@ void main() {
   setUp(() => licenceService = _service);
   tearDown(() => licenceService = '');
 
-  test('the worker\'s own activation reads here (service/functions/worker.mjs, activationFor)', () {
+  test('the worker\'s own activation reads here (service/functions/licence.mjs, activationFor)', () {
     // Minted by the worker for this test, and not to be regenerated to
     // make it pass: it failing means the two sides have drifted.
     final act = Activation.parse({

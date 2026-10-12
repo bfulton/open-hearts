@@ -8,7 +8,7 @@
 ///
 /// Looking at a game is live play, which is a subscription's: the
 /// service shows a record only to an account's device in use, and not
-/// of a game its account is at (service/functions/worker.mjs, review).
+/// of a game its account is at (service/functions/worker.mjs, reviewRoute).
 library;
 
 import 'dart:convert';

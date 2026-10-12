@@ -27,7 +27,7 @@ const now = () => T * 1000;
 const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 const sha = async (text) => hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))));
 
-/// What the service signs for [pair] (service/functions/worker.mjs,
+/// What the service signs for [pair] (service/functions/licence.mjs,
 /// activationFor), signed here with the service's own secret.
 async function activation(pair, { account = ACCOUNT, epoch = 1, until = T + 3600 } = {}) {
   const digest = await sha(`oh-active/1\n${account}\n${pair.public}\n${epoch}\n${until}`);

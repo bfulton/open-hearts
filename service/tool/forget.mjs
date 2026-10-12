@@ -25,7 +25,8 @@ import { pathToFileURL } from 'node:url';
 
 import { pages } from '../../infra/cloudflare.mjs';
 import { anonymizeGames, forgottenKey } from '../functions/records.mjs';
-import { accountsNamed, accountsPaidBy, dayOf, forgetAccount, isAccount } from '../functions/worker.mjs';
+import { accountsNamed, accountsPaidBy, forgetAccount } from '../functions/deletion.mjs';
+import { dayOf, isAccount } from '../functions/rows.mjs';
 import { restStore } from './kv.mjs';
 import { restBucket } from './r2.mjs';
 

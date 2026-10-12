@@ -8,7 +8,7 @@ The public half is `serviceKey` in `config/openhearts.json`. The secret half is 
 
 | Part | Holds | Uses it to |
 |---|---|---|
-| Pages worker (`service/functions/worker.mjs`) | `OH_SERVICE_SECRET`, and `serviceKey` from the deployed config | Sign licences and activations (`serviceSigned`). It signs only when the two halves are a pair, and otherwise answers 503 to `licence` and `activate`. |
+| Pages worker (`service/functions/worker.mjs`) | `OH_SERVICE_SECRET`, and `serviceKey` from the deployed config | Sign licences and activations (`serviceSigned` in `service/functions/licence.mjs`). It signs only when the two halves are a pair, and otherwise answers 503 to `licence` and `activate`. |
 | Web app | `serviceKey`, compiled in by `deploy.sh` | Accept a licence or an activation only if this key signed it (`Entitlement` in `app/lib/entitlement.dart`, `InUse` in `app/lib/net/in_use.dart`), and check every seat's licence at a table (`licenceService` in `packages/table/lib/src/licence.dart`). |
 | Phone apps | `serviceKey`, compiled in by `build_phone.sh` (`app/tool/defines.mjs`) | The same as the web app. |
 | Relay worker (`service/do/worker.mjs`) | `serviceKey` from the config, read when it is deployed | Carry a device only with an activation this key signed (`gate`). |

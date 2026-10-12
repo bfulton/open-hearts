@@ -70,7 +70,7 @@ const flows = [
         expect(res.location === undefined, `${from} was sent to ${res.location}`);
       }
       // The handler answers there: 200, or 503 for the Stripe the rig has
-      // not got (worker.mjs, healthOf) — not the site's 404.
+      // not got (health.mjs, healthOf) — not the site's 404.
       const health = await head(app.url, '/api/health');
       expect(health.status === 200 || health.status === 503, `the app's host's health: ${health.status}`);
     },

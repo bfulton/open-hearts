@@ -24,7 +24,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 1. Decide what to deploy. Deploy the site after any change to the site, the app, the handlers or `config/openhearts.json`. Deploy the relay worker as well when anything it is built from has changed:
 
    - `service/do/`
-   - `service/functions/worker.mjs` and the modules it imports, since the `Household` object comes from there
+   - `service/functions/household.mjs` and the modules it imports, since the `Household` object comes from there
    - `config/openhearts.json`, which the relay worker reads when it is deployed
    - `app/web/schnorr.wasm`
    - the backup jurors' code: `service/bin/juror.dart` and the `packages/` it imports

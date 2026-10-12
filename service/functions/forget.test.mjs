@@ -7,7 +7,8 @@ import { test } from 'node:test';
 
 import { gunzipSync } from 'node:zlib';
 
-import { accountsNamed, accountsPaidBy, forgetAccount, memoryStore } from './worker.mjs';
+import { accountsNamed, accountsPaidBy, forgetAccount } from './deletion.mjs';
+import { memoryStore } from './rows.mjs';
 import { anonymizeGames, withoutNames } from './records.mjs';
 import { restBucket } from '../tool/r2.mjs';
 

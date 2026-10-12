@@ -2,7 +2,7 @@
 ///
 /// Every data channel goes through TURN (net/mesh_transport.dart). The
 /// credentials come from the service's turn-creds handler
-/// (docs/explanation/service.md; service/functions/worker.mjs) — Cloudflare's
+/// (docs/explanation/service.md; service/functions/turn.mjs) — Cloudflare's
 /// TURN in production, the rig's own on this machine — short-lived, and
 /// fetched when a device connects so they are in hand when its table
 /// starts. With none to give, a device makes no channels and its table

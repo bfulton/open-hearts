@@ -4,18 +4,12 @@
 // big to be ours is not read. node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import worker, {
-  SERVICE_DEFAULTS,
-  Household,
-  claimWith,
-  devicesOn,
-  forgetHouseholds,
-  inHousehold,
-  memoryStore,
-  record,
-  sequencer,
-  ticketFor,
-} from './worker.mjs';
+import worker from './worker.mjs';
+import { claimWith, devicesOn, ticketFor } from './accounts.mjs';
+import { Household, forgetHouseholds, inHousehold, sequencer } from './household.mjs';
+import { memoryStore } from './rows.mjs';
+import { SERVICE_DEFAULTS } from './settings.mjs';
+import { record } from './stripe.mjs';
 
 const KEY = 'ab'.repeat(32);
 const now = Date.now();

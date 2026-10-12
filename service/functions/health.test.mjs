@@ -1,9 +1,11 @@
-// What an outside monitor asks (worker.mjs, "is it up"): the store read
+// What an outside monitor asks (health.mjs): the store read
 // and Stripe asked for the price with the service's key, kept for half a
 // minute. node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import worker, { forgetHealth, healthOf, memoryStore } from './worker.mjs';
+import worker from './worker.mjs';
+import { forgetHealth, healthOf } from './health.mjs';
+import { memoryStore } from './rows.mjs';
 
 const kv = (store) => ({
   get: async (at) => (store.rows.has(at) ? JSON.parse(store.rows.get(at)) : null),
