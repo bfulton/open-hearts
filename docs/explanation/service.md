@@ -478,7 +478,9 @@ bind none.
   sampled. An unknown path is recorded as `unknown`.
 - **Each relay object** (`tally`) writes one line a minute with
   connections, events, deliveries, subscriptions and each kind of
-  refusal. The columns are in the order `tallied` lists them in
+  refusal. Counts waiting for their minute keep a timer pending, so the
+  object is not evicted with them, and the last socket closing writes
+  them at once. The columns are in the order `tallied` lists them in
   `service/do/relay.mjs`.
 
 No key, address, tag or location is written. Read the counts with the

@@ -9,7 +9,7 @@ For why the checks are split this way, see [how Open Hearts is tested](../explan
 | Command | What it runs |
 |---|---|
 | `./check.sh quick [base]` | The suites that the paths changed since `base` belong to, each at its fast tier. `base` defaults to `origin/main`. Changed paths are those in the commits since the merge base, the index, the working tree and untracked files. See [What quick runs](#what-quick-runs). |
-| `./check.sh full` | Every suite except `docs`, at every tier, in lanes. See [What full runs](#what-full-runs). |
+| `./check.sh full` | Every suite, at every tier, in lanes. See [What full runs](#what-full-runs). |
 | `./check.sh <suite>...` | The suites named, side by side. |
 | `./check.sh list` | Prints the suite names. |
 | `./check.sh`, `-h` or `--help` | Prints the usage, and exits with 2. |
@@ -86,10 +86,9 @@ For the `app` suite, `quick` passes `-x slow`, and runs only the test files that
 | 1 | `table`, then `table_slow` |
 | 2 | `app_analyze`, then `app` (every tier) |
 | 3 | `engine` and `deal` |
-| 4 | `relay_js`, `functions`, `site`, `infra`, `workers` and `scripts`; then `crypto`, only where `crypto/deal` has been built with cargo here and `cargo` is on the `PATH` |
+| 4 | `relay_js`, `functions`, `site`, `infra`, `workers`, `scripts` and `docs`; then `crypto`, only where `crypto/deal` has been built with cargo here and `cargo` is on the `PATH` |
 | 5 | `e2e_build`; then `e2e_move` and `e2e_site`; then `service`, `service_js`, `service_object` and `e2e_escrow`; then `e2e_run` and `e2e_offline`; then `e2e_flows` |
 
-`full` does not run `docs`.
 
 ## Tiers and test settings
 

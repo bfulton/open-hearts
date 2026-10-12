@@ -33,7 +33,8 @@ const READY_TRIES = 100;
 const READY_WAIT_MS = 200;
 
 /// Where this object notes what it last started the backup jurors
-/// with: a digest of their environment, which holds a secret.
+/// with: a digest of their environment, which holds a secret, and of
+/// the deploy that started them.
 const STARTED_WITH = 'startedWith';
 
 /// The SHA-256 of [env] as JSON, in hex.
@@ -80,12 +81,15 @@ export class Bench {
       ...(this.env.OH_BENCH_RELAYS ? { OH_RELAYS: this.env.OH_BENCH_RELAYS } : {}),
       ...(this.env.OH_BENCH_PRESENCE_RELAYS ? { OH_PRESENCE_RELAYS: this.env.OH_BENCH_PRESENCE_RELAYS } : {}),
     };
-    // The environment is the container's from when it started, and a
-    // deploy that changes it starts no container afresh: one kept awake
-    // by calls would hold every seat to an old service key, or sign
-    // with an old juror secret the relay no longer takes. So one
-    // started with another is stopped, and started again with this one.
-    const started = await digestOf(env);
+    // The environment and the image are the container's from when it
+    // started, and a deploy starts no container afresh: Cloudflare's
+    // rollouts pass over containers an object starts, which take their
+    // image at start. One kept awake by calls would hold every seat to
+    // an old service key, sign with an old juror secret the relay no
+    // longer takes, or speak an old build's protocol. So one started
+    // with another environment, or under another deploy
+    // (CF_VERSION_METADATA, wrangler.toml), is stopped and started again.
+    const started = await digestOf({ env, version: this.env.CF_VERSION_METADATA?.id ?? null });
     if (c.running && (await this.state.storage.get(STARTED_WITH)) !== started) await c.destroy();
     if (!c.running) {
       c.start({ enableInternet: true, env });

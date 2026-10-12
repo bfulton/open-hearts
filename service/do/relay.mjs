@@ -859,14 +859,28 @@ export const tableLimits = Object.freeze({
 /// counts, never who.
 export const tallied = ['opened', 'closed', 'events', 'delivered', 'subscriptions', 'rateLimited', 'invalid', 'refused', 'duplicate', 'tooBig', 'malformed', 'superseded'];
 
+/// [fn] in [ms], as a cancel: a timer node does not wait for, so a
+/// test's tally does not hold its process open.
+function later(fn, ms) {
+  const timer = setTimeout(fn, ms);
+  timer?.unref?.();
+  return () => clearTimeout(timer);
+}
+
 /// A tally kept in memory and written as one line of numbers a minute
 /// at most, to [sink] — an Analytics Engine dataset, or nothing. A line
 /// a message would be a line every two seconds for every device online,
 /// for presence alone; a line a minute is one per tag that is in use.
-export function tally(sink, { every = 60000, now = Date.now } = {}) {
+/// While counts wait, a timer waits with them to write them at their
+/// minute: an object whose sockets are open hibernates once nothing is
+/// pending, and what it holds in memory goes with it.
+export function tally(sink, { every = 60000, now = Date.now, after = later } = {}) {
   let counts = Object.fromEntries(tallied.map((k) => [k, 0]));
   let since = now();
+  let pending = null;
   const flush = () => {
+    pending?.();
+    pending = null;
     const t = now();
     if (sink && tallied.some((k) => counts[k] > 0)) {
       try {
@@ -882,6 +896,7 @@ export function tally(sink, { every = 60000, now = Date.now } = {}) {
     if (!(what in counts)) return;
     counts[what] += n;
     if (now() - since >= every) flush();
+    else if (sink && !pending) pending = after(flush, since + every - now());
   };
   return {
     count,

@@ -73,11 +73,13 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
-- Backup jurors still running with an earlier service key, juror secret
-  or relay setting are started again with the current ones at the next
-  call, so a rotation reaches them. (2026-10-12, #12)
-- A relay object's counts are written when its last socket closes, so a
-  visit shorter than a minute is counted. (2026-10-11, #12)
+- Backup jurors still running from an earlier deploy, or with an
+  earlier service key, juror secret or relay setting, are started again
+  at the next call, so a new image or a rotation reaches them.
+  (2026-10-12, #12)
+- A relay object's counts are no longer lost when it is evicted inside
+  their minute: a timer is kept while counts wait, and the last socket
+  closing writes them at once. (2026-10-12, #12)
 - For a missing preview secret, `infra/apply.mjs` printed a command that
   set production's instead. (2026-10-11, #12)
 - Game results are kept for good again. Since results moved to the

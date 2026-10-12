@@ -133,6 +133,15 @@ test('backup jurors started with anything else are started again with this', asy
     assert.equal(c.started.at(-1).env[inside], value, name);
   }
   assert.deepEqual(c.bench.woken, ['tbl1', 'tbl2', 'tbl3', 'tbl4', 'tbl5', 'tbl6']);
+  // A deploy with the environment as it was: a new image, which a
+  // running container does not take until it starts again.
+  await wake(new Bench(s, { ...env, CF_VERSION_METADATA: { id: 'v1' } }), 'tbl7');
+  assert.equal(c.destroyed, changes.length + 1, 'the first deploy that says which');
+  await wake(new Bench(s, { ...env, CF_VERSION_METADATA: { id: 'v1' } }), 'tbl8');
+  assert.equal(c.destroyed, changes.length + 1, 'the same deploy: left running');
+  await wake(new Bench(s, { ...env, CF_VERSION_METADATA: { id: 'v2' } }), 'tbl9');
+  assert.equal(c.destroyed, changes.length + 2, 'another deploy: started again');
+  assert.equal(c.started.at(-1).env.CF_VERSION_METADATA, undefined, 'the version is not passed in');
 });
 
 test('left alone while they serve or wait, stopped once they are quiet', async () => {
