@@ -63,7 +63,9 @@ function scan(text) {
 }
 
 /// The anchors a Markdown file has: its headings', and any <a id> or
-/// <a name> in it.
+/// <a name> in it. A repeated heading is numbered as GitHub numbers it
+/// (github-slugger): past every slug already given, its own included,
+/// so `Notes`, `Notes-1`, `Notes` are notes, notes-1 and notes-2.
 export function anchors(text) {
   const out = new Set();
   const seen = new Map();
@@ -71,9 +73,13 @@ export function anchors(text) {
     const h = line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/);
     if (h) {
       const base = slug(h[1]);
-      const n = seen.get(base) ?? 0;
-      seen.set(base, n + 1);
-      out.add(n === 0 ? base : `${base}-${n}`);
+      let given = base;
+      while (seen.has(given)) {
+        seen.set(base, seen.get(base) + 1);
+        given = `${base}-${seen.get(base)}`;
+      }
+      seen.set(given, 0);
+      out.add(given);
     }
     for (const a of line.matchAll(/<a\s+(?:id|name)="([^"]+)"/g)) out.add(a[1]);
   }

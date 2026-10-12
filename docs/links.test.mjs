@@ -19,6 +19,9 @@ test('a heading\'s anchor is GitHub\'s', () => {
 test('anchors: each heading once, a repeat numbered, a fenced one not a heading', () => {
   const a = anchors(['# Top', '## Notes', '```', '# not a heading', '```', '## Notes', '<a id="kept"></a>'].join('\n'));
   assert.deepEqual([...a].sort(), ['kept', 'notes', 'notes-1', 'top']);
+  // A number a heading already has is passed over, as GitHub does.
+  assert.deepEqual([...anchors(['## Notes', '## Notes-1', '## Notes', '## Notes'].join('\n'))], ['notes', 'notes-1', 'notes-2', 'notes-3']);
+  assert.deepEqual([...anchors(['## Notes-1', '## Notes', '## Notes'].join('\n'))], ['notes-1', 'notes', 'notes-2']);
 });
 
 // A repository of its own, so that git says what is tracked.
