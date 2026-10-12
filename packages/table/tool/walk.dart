@@ -45,7 +45,7 @@ Future<void> main(List<String> args) async {
     print('=== survivor ${c.signer.publicKey.substring(0, 6)}: ${c.describe()}');
     final h = c.game.handNumber;
     String k(PublicKey p) => p.substring(0, 4);
-    print('=== holders ${c.botHolders(h).map((s, p) => MapEntry(s, k(p)))}; custodians ${c.custodiansOf(h).map(k).toList()}; '
+    print('=== holders ${c.botHolders(h).map((s, p) => MapEntry(s, k(p)))}; custodians ${c.escrow.custodians(h).map(k).toList()}; '
         'up ${[for (final j in t.liveJurors) k(j.signer.publicKey)]}; waiting on a gone jury ${c.waitingOnGoneJury}');
   }
   for (final j in t.jurors) {

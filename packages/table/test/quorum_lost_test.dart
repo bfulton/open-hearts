@@ -55,7 +55,7 @@ void main() {
     // And still says so once the jury drawn again is heard from, which
     // is moments after the pause.
     t.clock.advance(TableTiming.standard.quorumLostMs ~/ 2);
-    expect(c.custodiansOf(hand).length, greaterThan(drawn.length), reason: 'a jury was drawn again');
+    expect(c.escrow.custodians(hand).length, greaterThan(drawn.length), reason: 'a jury was drawn again');
     expect(c.tableState, TableState.pausedForJury, reason: 'with nothing in it to open the seat with:\n${c.describe()}');
 
     expect(t.clock.runUntil(() => t.clients.every((c) => c.tableState == TableState.failed), limitMs: 4 * 60 * 1000), isTrue,
@@ -418,7 +418,7 @@ void main() {
     t.clients.last.leave();
     expect(t.clock.runUntil(() => c.pause == Pause.openingHand, limitMs: 60 * 1000), isTrue, reason: 'stopped at the leaver\'s seat');
     final seat = c.stalled.values.first;
-    expect(c.pieceHoldersOf(hand, seat), isNotEmpty, reason: 'the jury holds pieces of the leaver\'s hand');
+    expect(c.escrow.pieceHolders(hand, seat), isNotEmpty, reason: 'the jury holds pieces of the leaver\'s hand');
     expect(t.clock.runUntil(() => c.game.handNumber > hand, limitMs: 5 * 60 * 1000), isTrue,
         reason: 'the hand was played out once the pieces came:\n${c.describe()}');
     for (final x in t.clients.take(3)) {

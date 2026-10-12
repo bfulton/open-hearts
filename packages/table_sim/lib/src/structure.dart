@@ -131,7 +131,7 @@ List<Finding> readStructure(SimTable t) {
       // seat's own juror or a quorum of those holding a piece of it; a
       // departed person's, one of the jury it was sealed to.
       final seat0 = w.seat;
-      if (w.kind == WaitKind.secret && t0 != null && seat0 != null && !c.openableBy(t0.hand, seat0, up)) {
+      if (w.kind == WaitKind.secret && t0 != null && seat0 != null && !c.escrow.openableBy(t0.hand, seat0, up)) {
         out.add(Finding(Stuck.onNobody, me, '$w$paused: too few of its pieces held by anyone up', cutOff: off(me)));
         continue;
       }

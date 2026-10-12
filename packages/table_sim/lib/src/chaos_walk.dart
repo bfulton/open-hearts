@@ -237,7 +237,7 @@ String? walkChaos(int seed,
       for (final e in c.stalled.entries) (hand: e.key.hand, seat: e.value),
     ];
     if (waits.isEmpty) return false;
-    return waits.every((x) => !c.openableBy(x.hand, x.seat, up.contains));
+    return waits.every((x) => !c.escrow.openableBy(x.hand, x.seat, up.contains));
   }
 
   // Stopped where nobody really up could move the table: a seat nobody
