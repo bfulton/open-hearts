@@ -29,12 +29,13 @@ squashed from a pull request, the pull request's number.
 
 - A request to delete an account's data forgets the account:
   `service/tool/forget.mjs` finds it by name or email, takes its name off
-  the games it played, and deletes its rows. Its results stay on the
+  the games it played, and deletes its rows. The account is marked, so a
+  game kept later is kept without its name. Its results stay on the
   relay under its account number, which nothing the service keeps ties
   to the person any longer; Stripe's payment records of a web
   subscription still hold its email address and its device's key. The
   privacy policy says so in every language.
-  (2026-10-12, d9b1ba3, 96537e6)
+  (2026-10-12, d9b1ba3, 3a45e5e, 96537e6)
 - Backup jurors make up a short jury, not only an empty one.
   (2026-10-11, db71b17)
 - A game's record is kept only from the device in use of a subscriber

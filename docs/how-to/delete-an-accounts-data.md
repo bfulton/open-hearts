@@ -33,7 +33,7 @@ Use this guide when a person asks for their account's data to be deleted, as the
    node service/tool/forget.mjs "$account"
    ```
 
-   It prints a `would take the name off` line for each kept game the account played, with its seats, and a `would delete` line for each row, by key. It reads every kept game, so it takes a while.
+   It prints a `would mark` line for the account, a `would take the name off` line for each kept game the account played, with its seats, and a `would delete` line for each row, by key. It reads every kept game, so it takes a while.
 
    If it stops with `would not be written back as it was sent`, the tool can't rewrite that game without changing how its events read. Don't go on; report it as a bug.
 
@@ -43,7 +43,7 @@ Use this guide when a person asks for their account's data to be deleted, as the
    node service/tool/forget.mjs "$account" --apply
    ```
 
-   The games go first, while the rows still say which devices were the account's. If the run stops part way, run it again.
+   The tool first marks the account forgotten in `OH_RECORDS`, as `forgotten/<account>`. A game kept from then on is kept without its name (`keepRecord` in `service/functions/records.mjs`): one that ends while the run goes, or one the account plays while its last licence runs. The games already kept go next, while the rows still say which devices were the account's. If the run stops part way, run it again.
 
 ## What stays
 
@@ -55,7 +55,7 @@ Use this guide when a person asks for their account's data to be deleted, as the
 
 ## Check it worked
 
-1. Run the dry run again. It prints `0 game(s) and 0 row(s) to change; --apply changes them`:
+1. Run the dry run again. It prints `forgotten/<account> is marked` and `0 game(s) and 0 row(s) to change; --apply changes them`. A game whose upload was checked a moment before the mark went in can still show up here; if one does, run `--apply` again:
 
    ```bash
    node service/tool/forget.mjs "$account"
