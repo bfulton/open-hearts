@@ -126,21 +126,7 @@ class _RecordVerifier {
         humans = {
           for (final h in spec.seats)
             if (h is HumanSeat) h.key,
-        } {
-    for (final d in record) {
-      if (!d.removal) continue;
-      final h = spec.seats[d.event.seat];
-      if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
-    }
-    for (final d in record) {
-      if (d.removal && d.event.kind == EventKind.escrow) allEscrows.putIfAbsent(d.turn.hand, () => {}).add(d.event.seat);
-    }
-    for (final d in record) {
-      final e = d.event;
-      if (d.removal || e.kind != EventKind.deal || e.round != 0 || humans.contains(e.author)) continue;
-      keyedBy.putIfAbsent(d.turn.hand, () => {})[e.seat] = e.author;
-    }
-  }
+        };
 
   final TableSpec spec;
   final List<Decision> record;
@@ -158,7 +144,7 @@ class _RecordVerifier {
   /// Every removal in the record, wherever it sits: the smallest set a
   /// peer could legitimately have measured against at a turn is everyone
   /// less all of these made by then — including ones recorded at the
-  /// same position but later in the record's order.
+  /// same position but later in the record's order ([readAhead]).
   final allRemovals = <PublicKey, TurnId>{};
 
   /// The held seats the record gives to the escrow, by hand, for the
@@ -169,6 +155,25 @@ class _RecordVerifier {
   /// Who said each held seat's keys, by hand: the seat's own juror from
   /// then on, as the table reads it (_asKeyed in client.dart).
   final keyedBy = <int, Map<int, PublicKey>>{};
+
+  /// Fills [allRemovals], [allEscrows] and [keyedBy] from the whole
+  /// record. Only once the record is past what it is refused for before
+  /// any decision is read ([run]): a removal names its seat by index.
+  void readAhead() {
+    for (final d in record) {
+      if (!d.removal) continue;
+      final h = spec.seats[d.event.seat];
+      if (h is HumanSeat && !allRemovals.containsKey(h.key)) allRemovals[h.key] = d.turn;
+    }
+    for (final d in record) {
+      if (d.removal && d.event.kind == EventKind.escrow) allEscrows.putIfAbsent(d.turn.hand, () => {}).add(d.event.seat);
+    }
+    for (final d in record) {
+      final e = d.event;
+      if (d.removal || e.kind != EventKind.deal || e.round != 0 || humans.contains(e.author)) continue;
+      keyedBy.putIfAbsent(d.turn.hand, () => {})[e.seat] = e.author;
+    }
+  }
 
   /// Whether a hand the replay has been through could be checked only
   /// as far as the cards known allow: the verification is then partial.
@@ -708,6 +713,7 @@ class _RecordVerifier {
     // date to: a record is read long after it ran out.
     final unlicensed = spec.licenceProblem();
     if (unlicensed != null) return fail(unlicensed);
+    readAhead();
 
     final jury = checkJuries();
     if (jury != null) return jury;
