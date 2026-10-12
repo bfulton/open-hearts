@@ -25,7 +25,7 @@ Use this guide when a person asks for their account's data to be deleted, as the
    account=0123456789abcdef0123456789abcdef
    ```
 
-   TODO(owner): How does the operator find the account of a person who subscribed in the App Store or Google Play, or who gives only the name they play under? The service keeps no row from a name to an account, and a store subscription's id is `apple:<original transaction id>` or `google:<hash of the purchase token>`.
+   No tool yet finds the account of a person who subscribed in the App Store or Google Play, or who gives only the name they play under: the service keeps no row from a name to an account.
 
 1. Make sure the subscription is cancelled. The tool refuses an account whose subscription is still paid up and has no cancellation, since its next renewal would find nothing to renew. For a web subscription, cancel it in Stripe. A store subscription is cancelled by the person, in their store.
 1. See what would be deleted. Without `--apply`, the tool only reads:
@@ -48,15 +48,15 @@ Use this guide when a person asks for their account's data to be deleted, as the
    npx wrangler@"$WRANGLER_VERSION" r2 object delete "open-hearts-records/tables/$table.json" --remote
    ```
 
-   TODO(owner): How does the operator find the tables an account played at? R2 keys records by table, the service keeps no index from an account to its tables, and the repository has no tool that lists them.
+   No tool yet finds the tables an account played at: R2 keys records by table, and nothing indexes them by account.
 
-1. Leave the account's recent results on the relay to expire. The relay keeps a result on the `standings` tag for a day (`KEPT_MS` in `service/do/tag_store.mjs`), and then deletes it by itself.
-
-   TODO(owner): The relay keeps the results on the old `results` tag for good (`resultsTag` in `service/do/relay.mjs`), and has no way for the operator to delete a stored event. Do an account's results there have to be deleted on request, and how?
+1. Leave the account's results on the relay. A result names each seat's account number and device key, and never a name or an email. Once the rows above are deleted, nothing the service keeps ties that number to the person. A result cannot be changed in any case: each copy is signed by the device that published it, and every player's copy names every seat.
 
 ## What stays
 
 - The account's `Household` object keeps its own note of the device in use: the device's key, how many times the account was taken up, times, the table it last sat at, and the relay tags it opened since (the `active` entry of `Household` in `service/functions/worker.mjs`). Nothing outside the object can reach it. It is written over only when the account is taken up again, which after deletion never happens. It holds no name or picture.
+- The account's results on the relay, under its account number (above).
+- Stripe's own record of a web subscription, which holds the email address and, in the subscription's metadata, the paying device's key.
 - Copies of results, records and table events that other people's devices keep, which the service cannot reach.
 
 ## Check it worked

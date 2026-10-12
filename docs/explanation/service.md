@@ -400,9 +400,11 @@ device in use (its key, the epoch, times, the table it said it sat at,
 and the relay objects it was seen at) is in the object's own storage and
 is not reached from outside. It is written over the next time the
 account is taken up, which after deletion is never, and it holds no name
-or picture. The account's finished games are deleted from R2, and its
-results from the relay, by hand
-([delete an account's data](../how-to/delete-an-accounts-data.md)).
+or picture. The account's finished games are deleted from R2 by hand
+([delete an account's data](../how-to/delete-an-accounts-data.md)). Its
+results stay on the relay, under its account number, which nothing left
+in the service ties to the person; a result cannot be changed in any
+case, since every copy is signed by the device that published it.
 
 ## TURN
 
