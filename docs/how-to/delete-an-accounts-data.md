@@ -43,7 +43,7 @@ Use this guide when a person asks for their account's data to be deleted, as the
    node service/tool/forget.mjs "$account" --apply
    ```
 
-   The tool first marks the account forgotten in `OH_RECORDS`, as `forgotten/<account>`. A game kept from then on is kept without its name (`keepRecord` in `service/functions/records.mjs`): one that ends while the run goes, or one the account plays while its last licence runs. The games already kept go next, while the rows still say which devices were the account's. If the run stops part way, run it again.
+   The tool first marks the account forgotten in `OH_RECORDS`, as `forgotten/<account>`. A game kept from then on is kept without its name (`keepRecord` in `service/functions/records.mjs`): one that ends while the run goes, or one the account plays while its last licence runs. The games already kept go next, while the rows still say which devices were the account's. If the run stops part way, run it again. Forget one account at a time: two runs at once can each write back a game the other has just changed, putting a name back.
 
 ## What stays
 

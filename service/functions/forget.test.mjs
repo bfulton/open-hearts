@@ -179,3 +179,20 @@ test('the operator\'s tool rewrites only a record it would write back as it was 
     body: { v: 1 },
   }]);
 });
+
+test('the operator\'s tool lists every page of kept games, cursor by cursor', async (t) => {
+  const asked = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const u = new URL(url);
+    asked.push(u.search);
+    const cursor = u.searchParams.get('cursor');
+    const page = cursor === 'c1'
+      ? { success: true, result: [{ key: 'tables/b.json' }], result_info: { is_truncated: false } }
+      : { success: true, result: [{ key: 'tables/a.json' }], result_info: { is_truncated: true, cursor: 'c1' } };
+    return Response.json(page);
+  });
+  const bucket = restBucket({ token: 't', account: 'a', bucket: 'b' });
+  assert.deepEqual(await bucket.list('tables/'), ['tables/a.json', 'tables/b.json']);
+  assert.equal(asked.length, 2);
+  assert.ok(asked.every((q) => new URLSearchParams(q).get('prefix') === 'tables/'), 'each page asks for the prefix');
+});

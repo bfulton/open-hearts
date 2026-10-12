@@ -233,7 +233,7 @@
       "p1": "Jogue sozinho, e nada sobre você sai do seu aparelho.",
       "p2": "Jogue ao vivo com um nome que não seja o seu nome verdadeiro, e sem imagem.",
       "p3": "Mude seu nome ou sua imagem quando quiser; se você for assinante, a mudança chega a todos os aparelhos da sua conta. O que já foi publicado continua onde está.",
-      "p4": "Peça uma cópia do que o nosso serviço guarda sobre a sua conta, o perfil e os aparelhos dela, ou peça que apaguemos isso. Depois, seu nome sai das partidas terminadas em que você jogou, e os resultados que os seus aparelhos publicaram ficam no nosso relay, para os ratings, só com o número da sua conta. Se você assinou na web, os registros de pagamento da Stripe continuam guardando o seu endereço de e-mail com a chave pública do seu aparelho, que esses resultados citam, enquanto a Stripe os mantiver.",
+      "p4": "Peça uma cópia do que o nosso serviço guarda sobre a sua conta, o perfil e os aparelhos dela, ou peça que apaguemos isso. Depois, seu nome sai das partidas terminadas em que você jogou, e os resultados que os seus aparelhos publicaram ficam no nosso relay, para os ratings, sem o seu nome: cada um continua citando o número da sua conta e a chave pública do seu aparelho. Se você assinou na web, os registros de pagamento da Stripe continuam guardando o seu endereço de e-mail com a chave pública do seu aparelho, que esses resultados citam, enquanto a Stripe os mantiver.",
       "p5": "Onde a lei de proteção de dados lhe der direitos — de ver, corrigir ou apagar o que é guardado sobre você, de se opor, ou de reclamar à autoridade de proteção de dados — você também os tem aqui."
     },
     "children": {

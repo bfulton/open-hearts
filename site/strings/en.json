@@ -233,7 +233,7 @@
       "p1": "Play alone, and nothing about you leaves your device.",
       "p2": "Play live with a name that is not your real one, and with no picture.",
       "p3": "Change your name or picture at any time; if you subscribe, the change reaches all your account's devices. What was already published stays where it is.",
-      "p4": "Ask us for a copy of what our service keeps about your account, its profile and its devices, or ask us to delete it. Then your name comes off the finished games you played, and the results your devices published stay on our relay, for the ratings, under your account's number alone. If you subscribed on the web, Stripe's payment records still hold your email address with your device's public key, which those results name, for as long as Stripe keeps them.",
+      "p4": "Ask us for a copy of what our service keeps about your account, its profile and its devices, or ask us to delete it. Then your name comes off the finished games you played, and the results your devices published stay on our relay, for the ratings, without your name: each still names your account's number and your device's public key. If you subscribed on the web, Stripe's payment records still hold your email address with your device's public key, which those results name, for as long as Stripe keeps them.",
       "p5": "Where data protection law gives you rights — to see, correct or delete what is held about you, to object, or to complain to your data protection authority — you have them here too."
     },
     "children": {
