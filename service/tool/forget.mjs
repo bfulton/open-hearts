@@ -24,7 +24,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 import { pages } from '../../infra/cloudflare.mjs';
-import { anonymizeGames } from '../functions/records.mjs';
+import { anonymizeGames, forgottenKey } from '../functions/records.mjs';
 import { accountsNamed, accountsPaidBy, dayOf, forgetAccount, isAccount } from '../functions/worker.mjs';
 import { restStore } from './kv.mjs';
 import { restBucket } from './r2.mjs';
@@ -76,9 +76,19 @@ async function main(argv) {
   if (sub && !sub.cancelled_at && sub.renews_at && sub.renews_at >= dayOf(Date.now())) {
     fail(`${subscription} is still paid up to ${sub.renews_at}; cancel it first`, 1);
   }
-  // The games first, while the rows still say which devices were the
-  // account's; a run that stops part way is run again.
   const bucket = restBucket({ token, account, bucket: pages.environments.production.r2.OH_RECORDS });
+  // The mark first: a game kept from then on, one that ends while this
+  // runs or that the account plays while its last licence runs, is kept
+  // without its name (records.mjs, keepRecord). Then the games already
+  // kept, while the rows still say which devices were the account's. A
+  // run that stops part way is run again.
+  const mark = forgottenKey(target);
+  if (await bucket.get(mark)) {
+    console.log(`${mark} is marked`);
+  } else {
+    if (apply) await bucket.put(mark, { forgotten: dayOf(Date.now()) });
+    console.log(`${apply ? 'marked' : 'would mark'} ${mark}, for the games kept from then on`);
+  }
   // Its devices, for the games from before seats carried licences.
   const keys = (await store.under(`ACCOUNT#${target}`, 'DEVICE#')).map((sk) => sk.slice('DEVICE#'.length));
   const games = await anonymizeGames(bucket, target, { keys, dry: !apply });

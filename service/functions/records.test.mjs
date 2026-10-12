@@ -7,7 +7,7 @@ import { gunzipSync } from 'node:zlib';
 import { test } from 'node:test';
 
 import { keys } from '../do/sign.mjs';
-import { eventIdOf, keepRecord, recordMost, recordResponse } from './records.mjs';
+import { eventIdOf, forgottenKey, keepRecord, recordMost, recordResponse } from './records.mjs';
 import { signerOn } from './worker.mjs';
 
 // Devices that can sign: BIP-340's published pairs, the second skipped
@@ -127,4 +127,49 @@ test('a kept record comes back as it was sent, packed and for good; none is a 40
   assert.equal(gunzipSync(Buffer.from(await res.arrayBuffer())).toString(), record());
   assert.equal((await recordResponse(b, 'f'.repeat(32))).status, 404);
   assert.equal((await recordResponse(b, 'nope')).status, 400);
+});
+
+test('a game sent after an account was forgotten is kept without its name', async () => {
+  const FORGOTTEN = 'f'.repeat(32);
+  const OTHER = 'e'.repeat(32);
+  const licence = (key, account) => ({ key, account, until: '2026-11-01', plan: 'annual', sig: '00'.repeat(64) });
+  // Bao's seat is the forgotten account's: it played on while its last
+  // licence ran, and Ada's device sends the game.
+  const licensed = (r) => {
+    r.spec.seats[0].licence = licence(ADA, OTHER);
+    r.spec.seats[1].licence = licence(BAO, FORGOTTEN);
+    r.names = { 0: 'Ada', 1: 'Bao' };
+    return r;
+  };
+  const b = bucket();
+  b.kept.set(forgottenKey(FORGOTTEN), { body: Buffer.from('{}') });
+  assert.deepEqual(await keep(b, ADA, TABLE, record(licensed)), { status: 200, body: { kept: true } });
+  const kept = JSON.parse(gunzipSync(b.kept.get(`tables/${TABLE}.json`).body).toString());
+  assert.deepEqual(kept.names, { 0: 'Ada' });
+  assert.deepEqual({ ...kept, names: undefined }, { ...JSON.parse(record(licensed)), names: undefined }, 'the rest as it was sent');
+
+  // Only Bao named, and Bao forgotten: no names at all.
+  const b2 = bucket();
+  b2.kept.set(forgottenKey(FORGOTTEN), { body: Buffer.from('{}') });
+  await keep(b2, ADA, TABLE, record((r) => ({ ...licensed(r), names: { 1: 'Bao' } })));
+  assert.equal('names' in JSON.parse(gunzipSync(b2.kept.get(`tables/${TABLE}.json`).body).toString()), false);
+
+  // Nobody forgotten, or the forgotten seat unnamed: kept as it was sent,
+  // byte for byte, written however the device wrote it.
+  const spaced = JSON.stringify(licensed(structuredClone(game)), null, 1);
+  const b3 = bucket();
+  await keep(b3, ADA, TABLE, spaced);
+  assert.equal(gunzipSync(b3.kept.get(`tables/${TABLE}.json`).body).toString(), spaced);
+  const b4 = bucket();
+  b4.kept.set(forgottenKey(FORGOTTEN), { body: Buffer.from('{}') });
+  const unnamed = JSON.stringify({ ...licensed(structuredClone(game)), names: { 0: 'Ada' } }, null, 1);
+  await keep(b4, ADA, TABLE, unnamed);
+  assert.equal(gunzipSync(b4.kept.get(`tables/${TABLE}.json`).body).toString(), unnamed);
+
+  // A forgotten name in a record JSON.stringify would not give back as
+  // it was sent: refused, not kept with the name nor rewritten.
+  const b5 = bucket();
+  b5.kept.set(forgottenKey(FORGOTTEN), { body: Buffer.from('{}') });
+  assert.equal((await keep(b5, ADA, TABLE, spaced)).status, 422);
+  assert.equal(b5.kept.has(`tables/${TABLE}.json`), false);
 });
