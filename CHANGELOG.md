@@ -82,6 +82,9 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- `infra/apply.mjs` took the relay's version metadata binding for one
+  not in `service/do/wrangler.toml`, and asked for a fix by hand where
+  the worker matched. (2026-10-12, #14)
 - Backup jurors still running from an earlier deploy, or with an
   earlier service key, juror secret or relay setting, are started again
   at the next call, so a new image or a rotation reaches them.
