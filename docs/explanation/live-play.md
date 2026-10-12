@@ -11,8 +11,9 @@ rules the record holds them to, is in [table states](table-states.md).
 Solo play is free and live play is a subscription, so everyone at a
 live table holds a licence and sits as an account, on one device at a
 time ([the service](service.md), and [identity](#identity) below). The
-protocol is `packages/table`, chiefly `client.dart`, `jury.dart`,
-`juror_duty.dart`, `matching.dart` and `record.dart` (the verifier). The
+protocol is `packages/table`, chiefly `client.dart` (with
+`juror_role.dart`, this side as a juror), `jury.dart`, `juror_duty.dart`,
+`matching.dart` and `record.dart` (the verifier). The
 app drives it from `app/lib/live/live_controller.dart` and
 `app/lib/net/`.
 
