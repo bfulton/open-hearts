@@ -429,9 +429,12 @@ many an hour, is in the
 [service reference](../reference/service-api.md#handlers). Looking at one
 is live play: `review` serves it only to a device with a subscription
 that is its account's device in use, and not while the account sits at
-that table. The worker vouches for nothing else. Every viewer replays
-the record through the verifier before showing a card, seats' licences
-included ([game records](live-play.md#game-records)).
+that table. The worker keeps only seats the app would show: each
+person's carries the service's licence for its key, as every seating
+does, which is what ties a name beside the record to an account. It
+vouches for nothing else. Every viewer replays the record through the
+verifier before showing a card
+([game records](live-play.md#game-records)).
 
 ## Storage
 

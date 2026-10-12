@@ -1431,11 +1431,17 @@ test('a game\'s record: sent by a player signed for its table, kept, and shown o
   const body = { hand: 0, turn: 4, seat: 0, card: '2C' };
   const id = await eventIdOf(table, { author: ADA.public, kind: 'play', body });
   const play = { id, author: ADA.public, kind: 'play', body, sig: signer.sign(ADA.secret, id) };
-  const record = JSON.stringify({
-    v: 1,
-    spec: { id: table, seats: [{ key: ADA.public }, { key: BAO.public }, { bot: 'Romeo' }, { bot: 'Juliet' }] },
-    record: [{ turn: [0, 4], event: play, witnesses: [] }],
-  });
+  // Each person's seat with the service's licence for its key, as a
+  // seating carries them.
+  const service = { signer, secret: SERVICE_SECRET, service: SERVICE_KEY };
+  const seats = [
+    { key: ADA.public, licence: await licenceFor(ADA.public, ACCT, '2027-01-01', service) },
+    { key: BAO.public, licence: await licenceFor(BAO.public, '0b'.repeat(16), '2027-01-01', service) },
+    { bot: 'Romeo' },
+    { bot: 'Juliet' },
+  ];
+  const recordOf = (seats) => JSON.stringify({ v: 1, spec: { id: table, seats }, record: [{ turn: [0, 4], event: play, witnesses: [] }] });
+  const record = recordOf(seats);
   // Signed for another table: not this one's.
   const wrong = await worker.fetch(send('record', await asking(ADA, 'record', { what: 'f'.repeat(32), table, record })), env);
   assert.equal(wrong.status, 401);
@@ -1445,6 +1451,12 @@ test('a game\'s record: sent by a player signed for its table, kept, and shown o
   assert.equal((await worker.fetch(send('review', await asking(ADA, 'review', { what: table, table })), env)).status, 409, 'nor looked at');
   assert.equal(kept.size, 0);
   await worker.fetch(send('activate', await asking(ADA, 'activate', { what: 'open ', want: 'open' })), env);
+  // Seats the app would not show: Bao's without its licence.
+  const unlicensed = recordOf(seats.map((s, i) => (i === 1 ? { key: BAO.public } : s)));
+  const refused = await worker.fetch(send('record', await asking(ADA, 'record', { what: table, table, record: unlicensed })), env);
+  assert.equal(refused.status, 403);
+  assert.deepEqual(await refused.json(), { error: 'seat 1 has no licence for its key' });
+  assert.equal(kept.size, 0);
   const sent = await worker.fetch(send('record', await asking(ADA, 'record', { what: table, table, record })), env);
   assert.equal(sent.status, 200);
   assert.deepEqual(await sent.json(), { kept: true });

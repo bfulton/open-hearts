@@ -27,6 +27,9 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- A game's record is kept only when each person's seat carries the
+  service's licence for its key and no account sits twice, as the app
+  checks before it shows one. (2026-10-12, #15)
 - A request to delete an account's data forgets the account:
   `service/tool/forget.mjs` finds it by name or email, takes its name off
   the games it played, and deletes its rows. The account is marked, so a
@@ -81,7 +84,8 @@ squashed from a pull request, the pull request's number.
   2026), whose names nothing but a device's key tied to an account, and
   with them `service/tool/forget.mjs` matching a seat by the account's
   devices. Every game kept since names each person's account by the
-  licence at their seat. (2026-10-12, #15)
+  licence at their seat, and the service now refuses one that does not.
+  (2026-10-12, #15)
 - The path that adopted subscriptions from before accounts, after a
   count showed none in production. (2026-10-11, 0520e34)
 

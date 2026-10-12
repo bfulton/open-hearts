@@ -8,7 +8,7 @@ import { test } from 'node:test';
 
 import { keys } from '../do/sign.mjs';
 import { eventIdOf, forgottenKey, keepRecord, recordMost, recordResponse } from './records.mjs';
-import { signerOn } from './worker.mjs';
+import { licenceFor, signerOn } from './worker.mjs';
 
 // Devices that can sign: BIP-340's published pairs, the second skipped
 // as the worker's tests skip it (it is their service's own).
@@ -115,6 +115,36 @@ test('only a record with moves its sender signed at that table in it', async () 
   assert.equal((await keep(b, ADA, TABLE, forged)).status, 403, 'not signed by them');
   assert.equal(b.kept.size, 0);
   assert.equal((await keep(b, ADA, TABLE, record())).status, 200, 'and the game as it was is kept');
+});
+
+test('where the service signs licences, only seats the app would show: each person\'s licensed for its key, each account once', async () => {
+  // The worker's tests' service: BIP-340's second pair.
+  const [other, service] = keys;
+  const by = (pair) => ({ signer, secret: pair.secret, service: pair.public });
+  const keepChecked = (text) => keepRecord(bucket(), ADA, TABLE, text, { verify: signer.verify, service: service.public });
+  const A = 'a'.repeat(32);
+  const B = 'b'.repeat(32);
+  const adas = await licenceFor(ADA, A, '2026-11-01', by(service));
+  const baos = await licenceFor(BAO, B, '2026-11-01', by(service));
+  const seated = (bao) => record((r) => {
+    r.spec.seats[0].licence = adas;
+    if (bao) r.spec.seats[1].licence = bao;
+    return r;
+  });
+  for (const [text, error, what] of [
+    [record(), 'seat 0 has no licence for its key', 'none at all'],
+    [seated(null), 'seat 1 has no licence for its key', 'none at one seat'],
+    [seated(adas), 'seat 1 has no licence for its key', 'another device\'s'],
+    [seated({ ...baos, account: A }), 'seat 1 has no licence for its key', 'changed after it was signed'],
+    [seated({ ...baos, sig: 'ab' }), 'seat 1 has no licence for its key', 'not a signature'],
+    [seated(await licenceFor(BAO, B, '2026-11-01', by(other))), 'seat 1 has no licence for its key', 'another service\'s'],
+    [seated(await licenceFor(BAO, A, '2026-11-01', by(service))), 'seat 1 is an account already seated', 'one account at two seats'],
+  ]) {
+    assert.deepEqual(await keepChecked(text), { status: 403, body: { error } }, what);
+  }
+  assert.deepEqual(await keepChecked(seated(baos)), { status: 200, body: { kept: true } });
+  // Not its date: a game is read, and sent, after licences run out.
+  assert.deepEqual(await keepChecked(seated(await licenceFor(BAO, B, '2020-01-01', by(service)))), { status: 200, body: { kept: true } });
 });
 
 test('a kept record comes back as it was sent, packed and for good; none is a 404', async () => {
