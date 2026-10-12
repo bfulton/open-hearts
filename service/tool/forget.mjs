@@ -8,9 +8,9 @@
 //
 // Refuses an account whose subscription is still paid up: that is
 // cancelled first, or its next renewal would find nothing to renew.
-// What else is kept for the account is deleted where it lives: its
-// finished games' records in R2, and its results on the relay
-// (docs/explanation/relay.md).
+// Its finished games' records in R2 are deleted by hand, and its
+// results stay on the relay, under an account number nothing left in
+// the service ties to it (docs/how-to/delete-an-accounts-data.md).
 //
 // Needs CLOUDFLARE_API_TOKEN (Workers KV Storage: Edit) and
 // CLOUDFLARE_ACCOUNT_ID, and reads the namespace id from

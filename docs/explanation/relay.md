@@ -47,9 +47,9 @@ Rooms, seatings, starts and pictures are kept only as long as a room
 can be in use (`KEPT_MS` in `service/do/tag_store.mjs`). Results are
 kept for good, under the tag every result carries (`GameResult.tag` in
 `packages/table/lib/src/results.dart`), because every rating is folded
-from all of them ([ratings](live-play.md#ratings)). An account's results
-can be deleted on request
-([Delete an account's data](../how-to/delete-an-accounts-data.md)).
+from all of them ([ratings](live-play.md#ratings)). They stay when an
+account's data is deleted on request
+([what stays](../how-to/delete-an-accounts-data.md#what-stays)).
 
 ## Reactions
 

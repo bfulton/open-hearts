@@ -62,7 +62,7 @@ The alerts are not a row. They are `alerts.subscribed` and `alerts.waiting` in `
 
 ## Check it worked
 
-1. For remote config, ask the handler what it serves. Each field that passed its check appears with your value, and a field that failed appears at its default.
+1. For remote config, ask the handler what it serves. A field that passed its check appears with your value. One that failed appears at its default or, for `table` and each wait, is left out, and the app uses its own value ([remote config](../reference/configuration.md#remote-config)).
 
    ```bash
    curl -s https://play.openhearts.game/api/config
