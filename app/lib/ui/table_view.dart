@@ -135,264 +135,32 @@ class TableView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final game = controller.game;
-    final pending = game.pendingTrick;
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        final box = constraints.biggest;
-        // How much bigger than a phone's this table is drawn: its
-        // layout's, or on a felt of its own, the felt's.
-        final scale = TableScale.maybeOf(context) ?? TableScale.forFelt(box);
-        final edge = _badgeInset * scale;
-        final badgeGap = _badgeGap * scale;
-        // The row for the line the table says grows with the line, at the
-        // reader's text size: what the felt says is read, and the trick
-        // is what gives way to it. In portrait it floats in the room
-        // under the near seat, which is its row and a phone's row of air.
-        final pillRow = (_pillRow + _Pill.growth(context)) * scale;
-        final pillRoom = pillRow + _pillRow * scale;
-        // A wide felt — a landscape phone — lays the trick out flatter
-        // and its badges on one line, since height is what it lacks.
-        final wide = box.width > box.height * 1.3;
-        final offsets = wide ? _wideTrickOffset : _trickOffset;
-        // The line in the corner sits beside the seat across the felt
-        // where there is room for it: clear of the widest that seat's
-        // badge can be (the trick's own width), and above where the side
-        // seats' badges can start — the trick's top for a stacked one,
-        // which can be as tall as the trick, and on a wide felt the
-        // middle of the smallest trick, where a badge of one line sits.
-        // Where there is not — a phone upright, or large type — it has a
-        // strip of its own at the top, and the table comes down under
-        // it. Drawn at the table's scale.
+        final at = _FeltLayout(context, constraints.biggest, corner);
+        final box = at.box;
+        final scale = at.scale;
+        final edge = at.edge;
+        final badgeGap = at.badgeGap;
+        final line = at.line;
+        final gap = at.gap;
+        final trickBox = at.trickBox;
+        final sideRoom = at.sideRoom;
+        final wide = at.wide;
         final note = corner;
-        final noteSize = note == null ? Size.zero : FeltCorner.sizeOf(context, note.text, (box.width - 2 * edge) / scale) * scale;
-        // The side badges' room: from the felt's edge to the trick's
-        // outer card, less a gap. A name has to fit it, wrapped if it
-        // must; and on a felt too narrow for both, the trick gives way
-        // rather than running under the badges. Upright, that is what
-        // holds a card's width: as wide as leaves the side badges their
-        // least, which is the hand's size from a 360-point phone up. On
-        // a wide felt the trick lies flat and a share of the width does.
-        final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
-        double sideRoomFor(double cw) => box.width / 2 - cw * reach - edge - badgeGap;
-        final leastRoom = SeatBadge.leastWidth * scale;
-        final across = wide ? box.width * 0.16 : (box.width / 2 - edge - badgeGap - leastRoom) / reach;
-        final widest = (wide ? 3.6 : 2.9) * math.min(across, TableScale.phoneCard * scale);
-        final tight = SeatBadge.tightLine * scale;
-        final sidesFrom = tight + (wide ? math.max(0.0, (cardHeightFor(34) * 2.3 - tight) / 2) : 0.0);
-        final beside = edge + noteSize.width + badgeGap <= (box.width - widest) / 2 && edge + noteSize.height + badgeGap <= sidesFrom;
-        final noteRow = note == null || beside ? 0.0 : edge + noteSize.height + badgeGap;
-        // The badges hold to their cards, so it is the trick that gives
-        // way, never the layout that overflows: the two facing badges
-        // and their gaps — and in portrait the row kept for the line
-        // under the table — come off the height before the trick is
-        // sized, and it takes what is left of whichever dimension runs
-        // out first.
-        // Portrait keeps room under the near badge for the line the
-        // table says, and a row of air, so the line sits in the middle
-        // of it rather than against the badge. And a badge is as tall
-        // as a face wants unless that would leave the cards under what
-        // a card can be read at, where it takes the smaller size back.
-        double cardsUnder(double line) =>
-            (box.height - noteRow - 2 * (line + badgeGap) - (wide ? 0.0 : pillRoom)) / ((wide ? 2.3 : _trickTall) / cardAspect);
-        final line = (cardsUnder(SeatBadge.line * scale) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine) * scale;
-        // The biggest a card is allowed to be, from the felt's own
-        // size. A phone is held at arm's length and its felt is small,
-        // so seventy-six points is the whole of what fits; a tablet's
-        // felt is further away and has room, and cards that stayed a
-        // phone's size on it would be a phone's game with green around
-        // it (docs/explanation/screens.md). That is the table's scale, the
-        // one its type is drawn at too.
-        final most = TableScale.phoneCard * scale;
-        var cardWidth = [
-          across,
-          cardsUnder(line),
-          most,
-        ].reduce((a, b) => a < b ? a : b).clamp(34.0, most);
-        if (sideRoomFor(cardWidth) < leastRoom) {
-          cardWidth = ((box.width / 2 - edge - badgeGap - leastRoom) / reach).clamp(34.0, cardWidth);
-        }
-        final sideRoom = sideRoomFor(cardWidth).clamp(leastRoom, box.width);
-        final cardHeight = cardHeightFor(cardWidth);
-        final trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * _trickTall);
 
-        // A badge hugs what it says, up to the room it has: the width
-        // of the trick's own column for the seat across the felt and
-        // your own, and the strip between a card and the felt's edge
-        // for the two at the sides.
-        final facing = trickBox.width;
-        // The side strips start nearer the middle than the far and near
-        // badges may reach, the pinwheel having brought the side cards
-        // in: a side seat's reaction, which can run up or down into those
-        // badges' rows, keeps this far in from its strip's inner edge.
-        final clearOfFacing = math.max(0.0, facing / 2 - cardWidth * reach);
-
-        // A badge is laid out at a phone's scale and drawn at the
-        // table's, so the room it is given here is in a phone's points.
-        Widget badge(int position) => SeatBadge(
-              onHold: onHold == null ? null : () => onHold!(controller.seatAt(position)),
-              seat: controller.seatAt(position),
-              position: position,
-              name: controller.names[controller.seatAt(position)],
-              iconName: controller.iconNameOf(controller.seatAt(position)),
-              game: game,
-              onTurn: game.currentSeat == controller.seatAt(position),
-              won: pending?.winner == controller.seatAt(position),
-              clockMs: controller.clockMs(controller.seatAt(position)),
-              iconSeed: controller.iconSeedOf(controller.seatAt(position)),
-              avatar: controller.avatarOf(controller.seatAt(position)),
-              // The seat across the felt reads the same way as the
-              // player's own line at the near edge: one line, icon
-              // first. The side badges have a strip, so they stack.
-              oneLine: wide || position.isEven,
-              maxWidth: (!wide && position.isEven ? facing : sideRoom) / scale,
-              // A stacked badge takes the height of the row it is in,
-              // which is the taller of the pair's (below).
-              height: wide || position.isEven ? line / scale : null,
-              iconSize: wide || position.isEven ? SeatBadge.iconOn(line / scale) : SeatBadge.iconIn(cardHeight / scale),
-            );
-
-        // The trick, as one centred block. Slots hold their place so
-        // arriving cards never shove the layout around.
-        final trick = _Trick(
-          size: trickBox,
-          offsets: offsets,
-          cardWidth: cardWidth,
-          cardHeight: cardHeight,
-          cards: [
-            for (var position = 0; position < seatCount; position++)
-              _cardFrom(game, controller.seatAt(position)) ?? (position == 0 ? controller.pendingPlay : null),
-          ],
-          orders: [
-            for (var position = 0; position < seatCount; position++)
-              _orderOf(game, controller.seatAt(position)) ??
-                  (position == 0 && controller.pendingPlay != null ? game.trick.length : null),
-          ],
-          names: [
-            for (var position = 0; position < seatCount; position++) controller.names[controller.seatAt(position)],
-          ],
-          winner: pending == null ? null : controller.positionOf(pending.winner),
-        );
-
-        // Under the trick, never across it: who took it, or whose turn
-        // it is.
-        final Widget pill = pending != null
-            ? _TrickResult(
-                you: pending.winner == controller.mySeat,
-                name: controller.names[pending.winner],
-                points: pointsIn(pending.plays.map((p) => p.card)),
-              )
-            : game.phase == Phase.playing && controller.pendingPlay == null
-                ? _TurnHint(game: game, mySeat: controller.mySeat)
-                : const SizedBox.shrink();
-
-        // All four seats are on the felt, each badge the same gap from
-        // the card it labels, so every badge reads as that card's
-        // label. The trick's block is a little deeper than the cards in
-        // it, which the gaps above and below take off. What is left
-        // over is the rail: in portrait it goes to the far end, above
-        // the seat across the table, because the band under the felt
-        // already floats the action line (table_layout.dart); on a wide
-        // felt, where the action line sits on a row of its own, it is
-        // split evenly and the table rides in the middle.
-        final inset = trickBox.height / 2 - (offsets[2]!.dy.abs() * cardHeight * 1.02 + cardHeight / 2);
-        final gap = (badgeGap - inset).clamp(0.0, badgeGap);
-        // Where a side badge's inner edge falls: a gap out from the far
-        // edge of the card beside it, measured from the middle of the
-        // felt.
-        final sideOut = (box.width - 2 * edge) / 2 + cardWidth * reach + badgeGap;
-        // Each badge hugs its name, so the two of a pair are each laid
-        // out over a ghost of the other, which takes up its room and
-        // draws nothing: whichever name is the longer, the pair come out
-        // one size.
-        Widget ghost(int position) => BadgeGhost(child: badge(position));
-
-        Widget seat(int position) {
-          final pair = Stack(
-            children: [
-              // The two ghosts make the box; the badge fills it.
-              ghost(position),
-              ghost((position + 2) % seatCount),
-              Positioned.fill(child: badge(position)),
-            ],
-          );
-          // A side badge is anchored by its inner edge, a gap out from
-          // its card (below), and runs out towards the felt's edge as
-          // far as its name takes it. It is as tall as its name and
-          // numbers make it, up to the trick's own height, between the
-          // badges above and below it: past that, at the largest type
-          // on the smallest felt, it scales what it holds into that.
-          return Scaled(
-            scale: scale,
-            child: wide || position.isEven
-                ? SizedBox(height: line / scale, child: pair)
-                : ConstrainedBox(constraints: BoxConstraints(maxHeight: trickBox.height / scale), child: pair),
-          );
-        }
-
-        // Where the table sits in the felt. A phone's felt is the size
-        // of its table and the slack is a few points either way, so it
-        // is centred and that is that. A tablet's has height the cards
-        // will never grow into, and there the table sits low: the room
-        // beyond the far seat reads as the far end of the table, while
-        // the room under your own badge is the gap between you and your
-        // own cards, and wants to be small.
-        final cluster = noteRow + 2 * line + 2 * gap + trickBox.height + (wide ? 0.0 : pillRoom);
-        final slack = (box.height - cluster).clamp(0.0, double.infinity);
-        final above = noteRow + (slack > _roomToSpare ? slack * 0.7 : slack / 2);
-
-        // A seat's reaction while it shows (ui/reactions.dart), beside
-        // its badge in room nothing else is drawn in, and never over a
-        // card: across the felt, to the left of the far badge; at the
-        // sides, over the right-hand badge and under the left-hand one,
-        // each in the strip its badge stands in, so the two run off into
-        // opposite corners and neither meets the seats across; and at
-        // the near edge the player's own, in the place of the button
-        // that sent it, on the far side of the badge from the left-hand
-        // seat's. Drawn at the table's scale, as big as the room lets it
-        // be. The tail points at the badge.
-        final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-        Widget shows(Widget? child) => AnimatedSwitcher(
-              duration: still ? Duration.zero : const Duration(milliseconds: 180),
-              child: child ?? const SizedBox.shrink(),
-            );
-        Widget? bubble(int position, AxisDirection tail) {
-          final seat = controller.seatAt(position);
-          final shown = controller.reactionAt(seat);
-          if (shown == null) return null;
-          return Scaled(
-            key: ValueKey(shown.n),
-            scale: scale,
-            child: ReactionBubble(reaction: shown.reaction, name: controller.nameAlone(seat), tail: tail),
-          );
-        }
-
-        // The line in the corner, where it shares a row with the far
-        // seat — beside it, on a wide felt — is room the far seat's
-        // reaction keeps clear of; and where it runs across the top of
-        // the felt, the right-hand seat's keeps under it.
-        final noteBottom = edge + noteSize.height;
-        final northReserve = note != null && beside && noteBottom > above && edge < above + line ? noteSize.width + badgeGap : 0.0;
-        final eastTop = note != null && noteSize.width > sideOut ? noteBottom + badgeGap : edge;
-        // How far the side seats' reactions may run: over the right-hand
-        // badge up to the top of the felt, and under the left-hand one
-        // down past the near seat's row — the player's own reaction and
-        // the button are on the other side of it. On a wide felt the far
-        // and near badges may run as wide as the side strips, and the two
-        // keep to the trick's own rows.
-        final trickTop = above + line + gap;
-        final eastUp = wide ? gap : math.max(0.0, trickTop - eastTop);
-        final westDown = wide ? gap : gap + line;
+        Widget seat(int position) => _Seat(view: this, at: at, position: position);
+        Widget? bubble(int position, AxisDirection tail) => _bubble(controller, position, tail, scale);
 
         // The player's own corner: the button, or their reaction.
         final mine = bubble(0, wide ? AxisDirection.right : AxisDirection.left) ?? (react == null ? null : Scaled(scale: scale, child: react!));
+        final pill = _says(controller);
 
         final table = Padding(
           padding: EdgeInsets.symmetric(horizontal: edge),
           child: Column(
             children: [
-              SizedBox(height: above),
+              SizedBox(height: at.above),
               // The far badge holds the middle, as it always has, and its
               // reaction comes in on the left of it.
               SizedBox(
@@ -401,8 +169,8 @@ class TableView extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Padding(
-                        padding: EdgeInsets.only(left: northReserve, right: badgeGap),
-                        child: Align(alignment: Alignment.centerRight, child: shows(bubble(2, AxisDirection.right))),
+                        padding: EdgeInsets.only(left: at.northReserve, right: badgeGap),
+                        child: Align(alignment: Alignment.centerRight, child: _Shows(bubble(2, AxisDirection.right))),
                       ),
                     ),
                     seat(2),
@@ -418,36 +186,36 @@ class TableView extends StatelessWidget {
                   alignment: Alignment.center,
                   children: [
                     Positioned(
-                      right: sideOut,
+                      right: at.sideOut,
                       width: sideRoom,
                       top: 0,
-                      bottom: -westDown,
+                      bottom: -at.westDown,
                       child: _SideSeat(
                         badge: seat(1),
-                        bubble: shows(bubble(1, AxisDirection.up)),
+                        bubble: _Shows(bubble(1, AxisDirection.up)),
                         home: Rect.fromLTWH(0, 0, sideRoom, trickBox.height),
                         anchoredRight: true,
                         up: false,
                         gap: badgeGap,
-                        clear: clearOfFacing,
+                        clear: at.clearOfFacing,
                       ),
                     ),
                     Positioned(
-                      left: sideOut,
+                      left: at.sideOut,
                       width: sideRoom,
-                      top: -eastUp,
+                      top: -at.eastUp,
                       bottom: 0,
                       child: _SideSeat(
                         badge: seat(3),
-                        bubble: shows(bubble(3, AxisDirection.down)),
-                        home: Rect.fromLTWH(0, eastUp, sideRoom, trickBox.height),
+                        bubble: _Shows(bubble(3, AxisDirection.down)),
+                        home: Rect.fromLTWH(0, at.eastUp, sideRoom, trickBox.height),
                         anchoredRight: false,
                         up: true,
                         gap: badgeGap,
-                        clear: clearOfFacing,
+                        clear: at.clearOfFacing,
                       ),
                     ),
-                    Align(alignment: Alignment.center, child: trick),
+                    Align(alignment: Alignment.center, child: _Trick.of(controller, at)),
                   ],
                 ),
               ),
@@ -467,7 +235,7 @@ class TableView extends StatelessWidget {
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(right: badgeGap),
-                          child: Align(alignment: Alignment.centerRight, child: shows(mine)),
+                          child: Align(alignment: Alignment.centerRight, child: _Shows(mine)),
                         ),
                       ),
                       seat(0),
@@ -495,7 +263,7 @@ class TableView extends StatelessWidget {
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(left: badgeGap),
-                          child: Align(alignment: Alignment.centerLeft, child: shows(mine)),
+                          child: Align(alignment: Alignment.centerLeft, child: _Shows(mine)),
                         ),
                       ),
                     ],
@@ -528,7 +296,7 @@ class TableView extends StatelessWidget {
                   ),
                 ],
               );
-        if (cluster <= box.height) return felt;
+        if (at.cluster <= box.height) return felt;
         // Shorter than the least of a table: the smallest trick, its
         // badges and the line, which only the largest type on a phone
         // on its side comes to. The table is drawn smaller to fit
@@ -538,27 +306,315 @@ class TableView extends StatelessWidget {
           size: box,
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: SizedBox(width: box.width, height: cluster, child: felt),
+            child: SizedBox(width: box.width, height: at.cluster, child: felt),
           ),
         );
       },
     );
   }
+}
 
-  Card? _cardFrom(HeartsGame game, int seat) {
-    for (final p in game.trick) {
-      if (p.seat == seat) return p.card;
+/// Where everything on a felt [box] big goes: how big the cards are,
+/// how much room each badge has, and where the rows fall.
+class _FeltLayout {
+  _FeltLayout(BuildContext context, this.box, ({String text, Color tone})? note) {
+    // How much bigger than a phone's this table is drawn: its
+    // layout's, or on a felt of its own, the felt's.
+    scale = TableScale.maybeOf(context) ?? TableScale.forFelt(box);
+    edge = _badgeInset * scale;
+    badgeGap = _badgeGap * scale;
+    // The row for the line the table says grows with the line, at the
+    // reader's text size: what the felt says is read, and the trick
+    // is what gives way to it. In portrait it floats in the room
+    // under the near seat, which is its row and a phone's row of air.
+    final pillRow = (_pillRow + _Pill.growth(context)) * scale;
+    final pillRoom = pillRow + _pillRow * scale;
+    // A wide felt — a landscape phone — lays the trick out flatter
+    // and its badges on one line, since height is what it lacks.
+    wide = box.width > box.height * 1.3;
+    offsets = wide ? _wideTrickOffset : _trickOffset;
+    // The line in the corner sits beside the seat across the felt
+    // where there is room for it: clear of the widest that seat's
+    // badge can be (the trick's own width), and above where the side
+    // seats' badges can start — the trick's top for a stacked one,
+    // which can be as tall as the trick, and on a wide felt the
+    // middle of the smallest trick, where a badge of one line sits.
+    // Where there is not — a phone upright, or large type — it has a
+    // strip of its own at the top, and the table comes down under
+    // it. Drawn at the table's scale.
+    final noteSize = note == null ? Size.zero : FeltCorner.sizeOf(context, note.text, (box.width - 2 * edge) / scale) * scale;
+    // The side badges' room: from the felt's edge to the trick's
+    // outer card, less a gap. A name has to fit it, wrapped if it
+    // must; and on a felt too narrow for both, the trick gives way
+    // rather than running under the badges. Upright, that is what
+    // holds a card's width: as wide as leaves the side badges their
+    // least, which is the hand's size from a 360-point phone up. On
+    // a wide felt the trick lies flat and a share of the width does.
+    final reach = offsets[3]!.dx * 1.15 + 0.5; // the east card's far edge, in card widths from the middle
+    double sideRoomFor(double cw) => box.width / 2 - cw * reach - edge - badgeGap;
+    final leastRoom = SeatBadge.leastWidth * scale;
+    final across = wide ? box.width * 0.16 : (box.width / 2 - edge - badgeGap - leastRoom) / reach;
+    final widest = (wide ? 3.6 : 2.9) * math.min(across, TableScale.phoneCard * scale);
+    final tight = SeatBadge.tightLine * scale;
+    final sidesFrom = tight + (wide ? math.max(0.0, (cardHeightFor(34) * 2.3 - tight) / 2) : 0.0);
+    final beside = edge + noteSize.width + badgeGap <= (box.width - widest) / 2 && edge + noteSize.height + badgeGap <= sidesFrom;
+    final noteRow = note == null || beside ? 0.0 : edge + noteSize.height + badgeGap;
+    // The badges hold to their cards, so it is the trick that gives
+    // way, never the layout that overflows: the two facing badges
+    // and their gaps — and in portrait the row kept for the line
+    // under the table — come off the height before the trick is
+    // sized, and it takes what is left of whichever dimension runs
+    // out first.
+    // Portrait keeps room under the near badge for the line the
+    // table says, and a row of air, so the line sits in the middle
+    // of it rather than against the badge. And a badge is as tall
+    // as a face wants unless that would leave the cards under what
+    // a card can be read at, where it takes the smaller size back.
+    double cardsUnder(double line) =>
+        (box.height - noteRow - 2 * (line + badgeGap) - (wide ? 0.0 : pillRoom)) / ((wide ? 2.3 : _trickTall) / cardAspect);
+    line = (cardsUnder(SeatBadge.line * scale) >= 34.0 ? SeatBadge.line : SeatBadge.tightLine) * scale;
+    // The biggest a card is allowed to be, from the felt's own
+    // size. A phone is held at arm's length and its felt is small,
+    // so seventy-six points is the whole of what fits; a tablet's
+    // felt is further away and has room, and cards that stayed a
+    // phone's size on it would be a phone's game with green around
+    // it (docs/explanation/screens.md). That is the table's scale, the
+    // one its type is drawn at too.
+    final most = TableScale.phoneCard * scale;
+    var cardWidth = [
+      across,
+      cardsUnder(line),
+      most,
+    ].reduce((a, b) => a < b ? a : b).clamp(34.0, most);
+    if (sideRoomFor(cardWidth) < leastRoom) {
+      cardWidth = ((box.width / 2 - edge - badgeGap - leastRoom) / reach).clamp(34.0, cardWidth);
     }
-    return null;
+    this.cardWidth = cardWidth;
+    sideRoom = sideRoomFor(cardWidth).clamp(leastRoom, box.width);
+    cardHeight = cardHeightFor(cardWidth);
+    trickBox = wide ? Size(cardWidth * 3.6, cardHeight * 2.3) : Size(cardWidth * 2.9, cardHeight * _trickTall);
+
+    // A badge hugs what it says, up to the room it has: the width
+    // of the trick's own column for the seat across the felt and
+    // your own, and the strip between a card and the felt's edge
+    // for the two at the sides.
+    facing = trickBox.width;
+    // The side strips start nearer the middle than the far and near
+    // badges may reach, the pinwheel having brought the side cards
+    // in: a side seat's reaction, which can run up or down into those
+    // badges' rows, keeps this far in from its strip's inner edge.
+    clearOfFacing = math.max(0.0, facing / 2 - cardWidth * reach);
+
+    // All four seats are on the felt, each badge the same gap from
+    // the card it labels, so every badge reads as that card's
+    // label. The trick's block is a little deeper than the cards in
+    // it, which the gaps above and below take off. What is left
+    // over is the rail: in portrait it goes to the far end, above
+    // the seat across the table, because the band under the felt
+    // already floats the action line (table_layout.dart); on a wide
+    // felt, where the action line sits on a row of its own, it is
+    // split evenly and the table rides in the middle.
+    final inset = trickBox.height / 2 - (offsets[2]!.dy.abs() * cardHeight * 1.02 + cardHeight / 2);
+    gap = (badgeGap - inset).clamp(0.0, badgeGap);
+    // Where a side badge's inner edge falls: a gap out from the far
+    // edge of the card beside it, measured from the middle of the
+    // felt.
+    sideOut = (box.width - 2 * edge) / 2 + cardWidth * reach + badgeGap;
+
+    // Where the table sits in the felt. A phone's felt is the size
+    // of its table and the slack is a few points either way, so it
+    // is centred and that is that. A tablet's has height the cards
+    // will never grow into, and there the table sits low: the room
+    // beyond the far seat reads as the far end of the table, while
+    // the room under your own badge is the gap between you and your
+    // own cards, and wants to be small.
+    cluster = noteRow + 2 * line + 2 * gap + trickBox.height + (wide ? 0.0 : pillRoom);
+    final slack = (box.height - cluster).clamp(0.0, double.infinity);
+    above = noteRow + (slack > _roomToSpare ? slack * 0.7 : slack / 2);
+
+    // The line in the corner, where it shares a row with the far
+    // seat — beside it, on a wide felt — is room the far seat's
+    // reaction keeps clear of; and where it runs across the top of
+    // the felt, the right-hand seat's keeps under it.
+    final noteBottom = edge + noteSize.height;
+    northReserve = note != null && beside && noteBottom > above && edge < above + line ? noteSize.width + badgeGap : 0.0;
+    final eastTop = note != null && noteSize.width > sideOut ? noteBottom + badgeGap : edge;
+    // How far the side seats' reactions may run: over the right-hand
+    // badge up to the top of the felt, and under the left-hand one
+    // down past the near seat's row — the player's own reaction and
+    // the button are on the other side of it. On a wide felt the far
+    // and near badges may run as wide as the side strips, and the two
+    // keep to the trick's own rows.
+    final trickTop = above + line + gap;
+    eastUp = wide ? gap : math.max(0.0, trickTop - eastTop);
+    westDown = wide ? gap : gap + line;
   }
 
-  /// Where in the trick [seat]'s card was played: 0 led it.
-  int? _orderOf(HeartsGame game, int seat) {
-    for (var i = 0; i < game.trick.length; i++) {
-      if (game.trick[i].seat == seat) return i;
-    }
-    return null;
+  /// The felt's own size.
+  final Size box;
+
+  /// How much bigger than a phone's this table is drawn, and the
+  /// badges' inset from the felt's edge and gap from their cards at it.
+  late final double scale, edge, badgeGap;
+
+  /// Whether the felt is wide — a landscape phone — and the trick lies
+  /// flat, and where each seat's card sits in it.
+  late final bool wide;
+  late final Map<int, Offset> offsets;
+
+  /// A badge's row, the cards, and the trick's block.
+  late final double line, cardWidth, cardHeight;
+  late final Size trickBox;
+
+  /// The room a badge has: across the felt and at the near edge
+  /// ([facing]), and at the sides ([sideRoom]), whose inner edge is
+  /// [sideOut] from the middle; and how far a side seat's reaction keeps
+  /// in from it ([clearOfFacing]).
+  late final double facing, sideRoom, sideOut, clearOfFacing;
+
+  /// The gap between a badge's row and the trick, the room above the far
+  /// seat, and the height of the whole table.
+  late final double gap, above, cluster;
+
+  /// How much of the far seat's row the line in the corner keeps from
+  /// its reaction, and how far the side seats' reactions run past their
+  /// strips: the right-hand one up, the left-hand one down.
+  late final double northReserve, eastUp, westDown;
+}
+
+/// A seat's badge on the felt. Each badge hugs its name, so the two of a
+/// pair — the seats across from each other — are each laid out over a
+/// ghost of the other, which takes up its room and draws nothing:
+/// whichever name is the longer, the pair come out one size.
+class _Seat extends StatelessWidget {
+  const _Seat({required this.view, required this.at, required this.position});
+
+  final TableView view;
+  final _FeltLayout at;
+  final int position;
+
+  /// A badge is laid out at a phone's scale and drawn at the table's, so
+  /// the room it is given here is in a phone's points.
+  Widget _badge(int position) {
+    final controller = view.controller;
+    final game = controller.game;
+    final seat = controller.seatAt(position);
+    final scale = at.scale;
+    final wide = at.wide;
+    return SeatBadge(
+      onHold: view.onHold == null ? null : () => view.onHold!(controller.seatAt(position)),
+      seat: seat,
+      position: position,
+      name: controller.names[seat],
+      iconName: controller.iconNameOf(seat),
+      game: game,
+      onTurn: game.currentSeat == seat,
+      won: game.pendingTrick?.winner == seat,
+      clockMs: controller.clockMs(seat),
+      iconSeed: controller.iconSeedOf(seat),
+      avatar: controller.avatarOf(seat),
+      // The seat across the felt reads the same way as the
+      // player's own line at the near edge: one line, icon
+      // first. The side badges have a strip, so they stack.
+      oneLine: wide || position.isEven,
+      maxWidth: (!wide && position.isEven ? at.facing : at.sideRoom) / scale,
+      // A stacked badge takes the height of the row it is in,
+      // which is the taller of the pair's (below).
+      height: wide || position.isEven ? at.line / scale : null,
+      iconSize: wide || position.isEven ? SeatBadge.iconOn(at.line / scale) : SeatBadge.iconIn(at.cardHeight / scale),
+    );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final pair = Stack(
+      children: [
+        // The two ghosts make the box; the badge fills it.
+        BadgeGhost(child: _badge(position)),
+        BadgeGhost(child: _badge((position + 2) % seatCount)),
+        Positioned.fill(child: _badge(position)),
+      ],
+    );
+    // A side badge is anchored by its inner edge, a gap out from
+    // its card (below), and runs out towards the felt's edge as
+    // far as its name takes it. It is as tall as its name and
+    // numbers make it, up to the trick's own height, between the
+    // badges above and below it: past that, at the largest type
+    // on the smallest felt, it scales what it holds into that.
+    return Scaled(
+      scale: at.scale,
+      child: at.wide || position.isEven
+          ? SizedBox(height: at.line / at.scale, child: pair)
+          : ConstrainedBox(constraints: BoxConstraints(maxHeight: at.trickBox.height / at.scale), child: pair),
+    );
+  }
+}
+
+/// A seat's reaction while it shows (ui/reactions.dart), beside its
+/// badge in room nothing else is drawn in, and never over a card: across
+/// the felt, to the left of the far badge; at the sides, over the
+/// right-hand badge and under the left-hand one, each in the strip its
+/// badge stands in, so the two run off into opposite corners and neither
+/// meets the seats across; and at the near edge the player's own, in the
+/// place of the button that sent it, on the far side of the badge from
+/// the left-hand seat's. Drawn at the table's scale, as big as the room
+/// lets it be. The tail points at the badge. Null while the seat has
+/// none up.
+Widget? _bubble(TableModel controller, int position, AxisDirection tail, double scale) {
+  final seat = controller.seatAt(position);
+  final shown = controller.reactionAt(seat);
+  if (shown == null) return null;
+  return Scaled(
+    key: ValueKey(shown.n),
+    scale: scale,
+    child: ReactionBubble(reaction: shown.reaction, name: controller.nameAlone(seat), tail: tail),
+  );
+}
+
+/// [child] coming and going, or nothing.
+class _Shows extends StatelessWidget {
+  const _Shows(this.child);
+
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return AnimatedSwitcher(
+      duration: still ? Duration.zero : const Duration(milliseconds: 180),
+      child: child ?? const SizedBox.shrink(),
+    );
+  }
+}
+
+/// Under the trick, never across it: who took it, or whose turn it is.
+Widget _says(TableModel controller) {
+  final game = controller.game;
+  final pending = game.pendingTrick;
+  return pending != null
+      ? _TrickResult(
+          you: pending.winner == controller.mySeat,
+          name: controller.names[pending.winner],
+          points: pointsIn(pending.plays.map((p) => p.card)),
+        )
+      : game.phase == Phase.playing && controller.pendingPlay == null
+          ? _TurnHint(game: game, mySeat: controller.mySeat)
+          : const SizedBox.shrink();
+}
+
+Card? _cardFrom(HeartsGame game, int seat) {
+  for (final p in game.trick) {
+    if (p.seat == seat) return p.card;
+  }
+  return null;
+}
+
+/// Where in the trick [seat]'s card was played: 0 led it.
+int? _orderOf(HeartsGame game, int seat) {
+  for (var i = 0; i < game.trick.length; i++) {
+    if (game.trick[i].seat == seat) return i;
+  }
+  return null;
 }
 
 /// A side badge where it has always been — held against its card by
@@ -668,6 +724,33 @@ class _Trick extends StatefulWidget {
   /// The position that has taken the finished trick, while it is still
   /// on the table; null at every other moment.
   final int? winner;
+
+  /// The trick as [controller] has it, as one centred block laid out as
+  /// [at] says. Slots hold their place so arriving cards never shove
+  /// the layout around.
+  factory _Trick.of(TableModel controller, _FeltLayout at) {
+    final game = controller.game;
+    final pending = game.pendingTrick;
+    return _Trick(
+      size: at.trickBox,
+      offsets: at.offsets,
+      cardWidth: at.cardWidth,
+      cardHeight: at.cardHeight,
+      cards: [
+        for (var position = 0; position < seatCount; position++)
+          _cardFrom(game, controller.seatAt(position)) ?? (position == 0 ? controller.pendingPlay : null),
+      ],
+      orders: [
+        for (var position = 0; position < seatCount; position++)
+          _orderOf(game, controller.seatAt(position)) ??
+              (position == 0 && controller.pendingPlay != null ? game.trick.length : null),
+      ],
+      names: [
+        for (var position = 0; position < seatCount; position++) controller.names[controller.seatAt(position)],
+      ],
+      winner: pending == null ? null : controller.positionOf(pending.winner),
+    );
+  }
 
   @override
   State<_Trick> createState() => _TrickState();
