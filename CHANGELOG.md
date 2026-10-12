@@ -69,6 +69,10 @@ so each entry gives the date and commit it landed in.
 
 ### Fixed
 
+- Game results are kept for good again. Since results moved to the
+  `standings` tag, the relay had kept only the old `results` tag for
+  good, and swept each result a day after storing it. Results swept
+  before this are not recovered. (2026-10-11, 513746e)
 - A deal seed shorter than 32 bytes is refused rather than panicking.
   (2026-10-11, 21b4fb1)
 - A signed table event whose body is not its kind's shape is dropped at
