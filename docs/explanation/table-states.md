@@ -170,6 +170,15 @@ backing it is handed.
 
 It is not settled in the seat's own next turn: at a table of two that
 turn could never come, since every turn before it needs both people.
+
+It is made at the leaver's own position, or at the next one where its
+device has already moved or backed a move there, so that the move and
+the vote count the same at every side. Whatever the seat still owes
+where it stood, its device still says: the pass at once, chosen as the
+bot taking the seat over would choose it, and a step of the deal when
+the step comes due. Nothing else settles it. No removal reaches back to
+that turn, and at a table of two a boot of it needs the leaver's own
+vote (`packages/table/test/leave_owing_a_turn_test.dart`).
 Where one voice per exit leaves no majority either way (two backing
 the leave, two booting the seat), the turn is split and the jury rules
 it. A person known to have backed a seat's leave is not a vote still to

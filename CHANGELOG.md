@@ -91,6 +91,13 @@ squashed from a pull request, the pull request's number.
 
 ### Fixed
 
+- At a table of two, a player who leaves during the pass or the deal,
+  just after backing a move for a seat the jury holds, no longer stops
+  the game. Their device now makes the pass the bot would make, or the
+  deal step the seat owes, before the leave takes effect. Before, the
+  table waited for the other player to boot the seat and a juror to
+  rule, and for good if the leaver's device stayed connected.
+  (2026-10-13, #26)
 - A kept game's record with a decision that names no seat at the table,
   or with a removal carried by anything but a boot, an absence, a leave,
   an escrow or the game's end, now fails its check and says why. Before,

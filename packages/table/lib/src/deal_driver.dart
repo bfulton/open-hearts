@@ -42,9 +42,12 @@ abstract interface class DealTable {
   /// The game is over, and at a sealed table its last hand audited.
   bool get done;
 
-  /// Whether this side has left its seat, and whether it has stopped
-  /// following the table.
-  bool get left;
+  /// Whether this side still says its own steps at [turn]: every turn
+  /// until it leaves, and after that the turns before the place its
+  /// leave was made at, which are still its own (TableClient.leave).
+  bool ownsTurn(TurnId turn);
+
+  /// Whether this side has stopped following the table.
   bool get closed;
 
   /// This side's seat, where it sat down, and whether it still holds
@@ -818,7 +821,7 @@ class DealDriver {
   /// when the hand is over.
   void act() {
     final d = _deal;
-    if (d == null || table.left || table.done) return;
+    if (d == null || table.done) return;
     // The seat this side acts for in the deal: its own if it is a
     // player, or the bot seat it holds if it is a juror. A player that
     // has been removed acts for nothing.
@@ -838,7 +841,7 @@ class DealDriver {
     }
     TurnId? open(TurnId t) {
       final r = table.votesAt(t);
-      return r != null && !r.settled && r.action == null ? t : null;
+      return r != null && !r.settled && r.action == null && table.ownsTurn(t) ? t : null;
     }
 
     final keys = open(TurnId.deal(h, 0, me));
