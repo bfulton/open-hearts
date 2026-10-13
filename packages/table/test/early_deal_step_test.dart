@@ -2,7 +2,7 @@
 ///
 /// A bot seat's keys name the custodians they were sealed to, and a
 /// peer refuses them until it has seen all of those keys proposed as
-/// jurors (client.dart, `_validDeal`). A juror hears a hand's jury a
+/// jurors (deal_driver.dart, `validStep`). A juror hears a hand's jury a
 /// moment after the table does, so the keys and the jury it is
 /// checked against arrive in either order — and in the seeded hand
 /// below they arrive twenty milliseconds the wrong way round.

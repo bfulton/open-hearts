@@ -6,8 +6,8 @@
 /// they were sealed to, and the draw named by the first person whose
 /// keys settle is the hand's. A held seat's keys are taken only after
 /// that, naming the same draw, from the juror it names for the seat;
-/// its juror waits for it (_checkSealed in client.dart, sealedAt in
-/// record.dart).
+/// its juror waits for it (checkSealed in deal_driver.dart, sealedAt
+/// in record.dart).
 library;
 
 import 'package:deal/deal.dart';

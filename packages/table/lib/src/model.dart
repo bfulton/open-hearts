@@ -93,6 +93,26 @@ enum SeatState { human, left, booted, absent, bot }
 
 enum TableState { playing, pausedForJury, pausedForPeers, pausedForDeal, finished, failed }
 
+/// Why a table is not moving.
+enum Pause {
+  /// A removal is proposed that the players at the table cannot decide
+  /// among themselves — two humans, one silent.
+  waitingForJury,
+
+  /// A removal is proposed and there are not enough peers reachable to
+  /// carry it: the table is partitioned or most of it has gone quiet.
+  waitingForPeers,
+
+  /// A departed seat's hand is being opened from the pieces of its
+  /// secret the others escrowed; its bot cannot move until it is.
+  openingHand,
+
+  /// The deal is done and nobody declared the lead card: its holder
+  /// lied, which only a modified client does, and the hand cannot
+  /// start. The audit would expose who; the table says so and waits.
+  waitingForLead,
+}
+
 /// The transitions each machine allows, as data, so a test can check
 /// that nothing observed steps outside them.
 const turnTransitions = <TurnState, Set<TurnState>>{
@@ -210,8 +230,8 @@ enum HandState { awaitingJury, dealing, passing, playing, auditing, opening, ove
 
 const handTransitions = <HandState, Map<HandState, Decided>>{
   // The draw a deal is sealed to is the one the first person's keys
-  // name, or none where nobody at the table keys the hand (client.dart,
-  // _checkSealed).
+  // name, or none where nobody at the table keys the hand
+  // (deal_driver.dart, checkSealed).
   HandState.awaitingJury: {HandState.dealing: Decided.onRecord},
   HandState.dealing: {
     HandState.passing: Decided.fromRecord,

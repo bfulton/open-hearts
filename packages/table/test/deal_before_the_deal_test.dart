@@ -5,7 +5,7 @@
 /// juror learns it is one from a summons that can be slower than
 /// that, so it can hold the steps before it has a deal to put them in.
 /// They are kept rather than dropped, a turn that is not open yet
-/// being no turn to be wrong for, and `_startDeal` drains them once
+/// being no turn to be wrong for, and `DealDriver` drains them once
 /// it has opened the hand's turns: the other drains run when a turn
 /// settles, when a jury changes and when the assignment is fixed
 /// again, and these steps are what this side needs to settle its

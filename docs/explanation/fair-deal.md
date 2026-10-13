@@ -216,7 +216,7 @@ Slow calls never run on the page's thread. The page runs the wasm in a
 Web Worker, `app/web/deal_worker.js` (an isolate on the VM;
 `packages/deal/lib/src/work.dart`). The session stays synchronous. The
 table sends the slow calls a step needs to the worker and parks the step
-until they are back (`TableClient._workedOut`). When the session needs a
+until they are back (`DealDriver._workedOut`). When the session needs a
 slow result itself, it stops, says what it needs (`DealSession.wanted`),
 and continues from the answers (`resume`). Each answer is matched by a
 hash of the call. A slow call that was not sent to the worker throws

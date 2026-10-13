@@ -205,7 +205,7 @@ class ChaosScenario {
           // A departure turns a seat into a bot, and which seats are
           // bots is half of who holds them — so a departure still in
           // flight is two sides answering that differently, which is
-          // the race `_botSeatsAt` is there for. Departures otherwise
+          // the race `DealDriver.botSeatsAt` is there for. Departures otherwise
           // reach everyone at once bar the ordinary latency, and a
           // relay going half-deaf lasts tens of seconds rather than the
           // second or two that puts one side a step behind another. So
