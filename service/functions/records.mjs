@@ -27,6 +27,12 @@ export const tableIdShape = /^[0-9a-f]{32}$/;
 /// device can make the bucket hold.
 export const recordMost = 2 * 1024 * 1024;
 
+/// The form of record kept (packages/table, game_record.dart,
+/// GameRecord.version): one whose removals carry the signed word of
+/// everyone who backed them. Games kept in the form before stay as
+/// they were; none is kept in it now.
+export const recordVersion = 2;
+
 const keyIn = (table) => `tables/${table}.json`;
 
 /// Where an account forgotten on request is marked in the bucket
@@ -113,8 +119,9 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
   } catch {
     return { status: 400, body: { error: 'not a record' } };
   }
+  if (record?.v !== recordVersion) return { status: 400, body: { error: `a record of form ${recordVersion}` } };
   const spec = record?.spec;
-  if (record?.v !== 1 || spec?.id !== table || !Array.isArray(spec?.seats) || !Array.isArray(record?.record)) {
+  if (spec?.id !== table || !Array.isArray(spec?.seats) || !Array.isArray(record?.record)) {
     return { status: 400, body: { error: 'not this table\'s record' } };
   }
   if (!spec.seats.some((s) => s?.key === key)) return { status: 403, body: { error: 'only a player at the table sends its record' } };

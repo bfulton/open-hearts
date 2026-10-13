@@ -31,7 +31,7 @@ async function said(pair, kind, body, table = TABLE) {
 /// A game's record, as its players send it: a play each from Ada and
 /// Bao.
 const game = {
-  v: 1,
+  v: 2,
   spec: { id: TABLE, seed: 1, seats: [{ key: ADA }, { key: BAO }, { bot: 'Romeo' }, { bot: 'Juliet' }] },
   record: [
     { turn: [0, 4], event: await said(ada, 'play', { hand: 0, turn: 4, seat: 0, card: '2C' }), witnesses: [BAO] },
@@ -90,6 +90,8 @@ test('only a player at that table, with that table\'s record, of a game\'s size'
   assert.equal((await keep(b, ADA, TABLE, named('f'.repeat(32)))).status, 400, 'another table\'s');
   assert.equal((await keep(b, ADA, TABLE, 'not json')).status, 400);
   assert.equal((await keep(b, ADA, TABLE, JSON.stringify({ v: 2, spec: { id: TABLE } }))).status, 400);
+  // The form before, whose removals named their backers by key alone.
+  assert.deepEqual(await keep(b, ADA, TABLE, record((r) => ({ ...r, v: 1 }))), { status: 400, body: { error: 'a record of form 2' } });
   assert.equal((await keep(b, ADA, TABLE, ' '.repeat(recordMost + 1))).status, 413);
   assert.equal((await keep(null, ADA, TABLE, record())).status, 503, 'no bucket bound');
   assert.equal(b.kept.size, 0);

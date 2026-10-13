@@ -647,8 +647,13 @@ When a game is over, each player's device sends its record to be kept
 [game records](service.md#game-records)). The first copy is kept, so the
 others cost nothing. A record is the table's spec, every decision with
 the signed events behind it, the juries that carried, and the escrow
-pieces released for seats that left. Each seat in it carries its
-licence, so the record says whose each seat was. Whoever opens a game
+pieces released for seats that left. Behind a removal are its backers'
+own signed words, the claims against the seat or that the game ends and
+the witnesses of one, so the verifier counts its majority from
+signatures, not from the keys the record names. A game kept before
+records carried them, in the record's first form, names a removal's
+backers by key alone; it still opens, checked by those keys. Each seat
+in it carries its licence, so the record says whose each seat was. Whoever opens a game
 fetches it by table id and verifies it before showing a card
 (`app/lib/review_page.dart`): a copy that verifies is the game, whoever
 kept it. That is a device with a subscription, its account's device in
