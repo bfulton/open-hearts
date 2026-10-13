@@ -311,7 +311,7 @@ for (const [how, answer, shop] of [
     // And a device with no licence, at the shop.
     const stranger = await open({ fresh: true, route: ['**/api/**', answer] });
     await click(stranger, /^Subscribe$/);
-    await waitFor(stranger, /^Cancel whenever you like/, { what: 'the shop' });
+    await waitFor(stranger, /^By subscribing, you agree to the Terms of use\.$/, { what: 'the shop' });
     await sleep(600); // the door's own Subscribe, still in the tree while the page slides over it
     await click(stranger, /^Subscribe$/);
     await within(stranger, shop, fast ? 3 : 15, 'the shop');

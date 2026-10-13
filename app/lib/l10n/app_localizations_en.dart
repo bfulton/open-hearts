@@ -552,8 +552,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Playing alone is free and always will be, and so are the records, the engine and every line of this. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.';
 
   @override
-  String get cancelWhenever =>
-      'Cancel whenever you like; the year you paid for runs out on its own.';
+  String webRenewal(String price) {
+    return '$price a year, paid on Stripe\'s page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.';
+  }
+
+  @override
+  String get subscribeAgrees =>
+      'By subscribing, you agree to the Terms of use.';
 
   @override
   String get storeSubscriptionLater =>

@@ -19,7 +19,7 @@ import { sendAlert } from './alerts.mjs';
 import { attest, unlinkSignIn } from './logins.mjs';
 import { profileRead, profileWritten } from './profile.mjs';
 import { storeOf } from './rows.mjs';
-import { S, notConfigured, settle } from './settings.mjs';
+import { S, SITE, notConfigured, settle } from './settings.mjs';
 import { bindPurchase } from './subscriptions.mjs';
 
 // ---- one device at a time ------------------------------------------------
@@ -208,7 +208,11 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
     case 'backups':
       return backupsFor(op.key, store, mail, { rotate: op.rotate === true, send: op.send === true, email: op.email ?? null, why: op.why ?? null, now });
     case 'made':
-      return backupsMade(op.account, op.email ?? null, store, mail, { now });
+      return backupsMade(op.account, op.email ?? null, store, mail, {
+        now,
+        charge: op.charge ?? null,
+        subscription: typeof op.subscription === 'string' ? op.subscription : null,
+      });
     case 'bind':
       return bindPurchase(op, store, { now });
     case 'drop':
@@ -288,55 +292,130 @@ export function revokerOf(env) {
 /// OH_MAIL_FROM. Null where either is missing, and the codes are only
 /// shown on the devices. No reply address: a reply would quote the codes
 /// to whoever reads it, so the mail sends questions to the support page.
+/// With a [purchase] ({charge}), the email that answers a payment: the
+/// codes, after what was bought and how to cancel it.
 export function mailerOf(env) {
   const from = env.OH_MAIL_FROM;
   if (!env.EMAIL || typeof from !== 'string' || !from.includes('@')) return null;
-  return (to, codes) =>
+  return (to, codes, purchase = null) =>
     env.EMAIL.send({
       to,
       from: { email: from, name: 'Open Hearts' },
-      subject: 'Your Open Hearts backup codes',
-      text: backupMailText(codes),
-      html: backupMailHtml(codes),
+      subject: purchase ? 'Your Open Hearts subscription' : 'Your Open Hearts backup codes',
+      text: backupMailText(codes, purchase),
+      html: backupMailHtml(codes, purchase),
     });
 }
 
-/// The email itself: the codes, and how to use one.
-export function backupMailText(codes) {
+/// [charge] — Stripe's amount, in the currency's smallest unit, and the
+/// currency — as money: `$5.99 USD`. Null for anything else.
+export function moneyOf(charge) {
+  if (!Number.isSafeInteger(charge?.amount) || charge.amount < 0 || typeof charge.currency !== 'string' || !/^[a-z]{3}$/i.test(charge.currency)) {
+    return null;
+  }
+  const currency = charge.currency.toUpperCase();
+  try {
+    const format = new Intl.NumberFormat('en-US', { style: 'currency', currency });
+    return `${format.format(charge.amount / 10 ** format.resolvedOptions().maximumFractionDigits)} ${currency}`;
+  } catch {
+    return null;
+  }
+}
+
+/// What a payment's email says before the codes: what was bought, that
+/// it renews by itself and at what, and how to cancel it, in a form the
+/// buyer keeps (California's automatic renewal law asks for this
+/// acknowledgment; the terms say the rest). As paragraphs, each a list
+/// of [text, link?] pieces, for the text and the page alike.
+function subscribedParagraphs(purchase) {
+  const paid = moneyOf(purchase?.charge);
   return [
-    'Your Open Hearts backup codes:',
-    '',
-    ...codes.map((c) => `  ${c}`),
-    '',
-    'Each one brings one device into your account, once. On the device:',
-    'menu, Activate subscription, and type or paste a code.',
-    '',
-    'Any device of the account shows these codes under Subscription, can',
-    'email them here again, and can replace them with new ones, after',
-    'which the codes above stop working.',
-    '',
-    'Keep them private: anyone with a code can bring a device into your',
-    'account. Replies to this email are not read; for help, see',
-    'https://openhearts.game/support',
-    '',
-    'Open Hearts — https://openhearts.game',
-  ].join('\n');
+    [['Thank you for subscribing to Open Hearts live play.']],
+    [
+      [
+        `${paid ? `You paid ${paid} for a year of it. ` : ''}The subscription renews automatically every year, on the ` +
+          'date you subscribed, at the price then in force, until you cancel. We will tell you before a price change ' +
+          'applies, and Stripe emails you a reminder before each renewal.',
+      ],
+    ],
+    [
+      ['To cancel: in the game, open the menu, then Subscription, then Manage subscription; or see '],
+      [`${SITE}/support#cancel`, `${SITE}/support#cancel`],
+      ['. Cancelling stops the next renewal, and live play keeps working until the end of the year you paid for.'],
+    ],
+    [['The terms you agreed to: '], [`${SITE}/terms`, `${SITE}/terms`]],
+  ];
+}
+
+/// [text] in lines of at most [width], broken between words.
+function wrapped(text, width = 70) {
+  const lines = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/// What a purchase's email says in place of the codes when every one
+/// has been used: a purchase is told of all the same.
+const ALL_USED = 'Every backup code of your account has been used. Any device of the account can make new ones, under Subscription.';
+
+/// The email itself: the codes, and how to use one — after, for a
+/// [purchase], what was bought ([subscribedParagraphs]).
+export function backupMailText(codes, purchase = null) {
+  const before = purchase
+    ? subscribedParagraphs(purchase).flatMap((p) => [...wrapped(p.map(([words]) => words).join('')), ''])
+    : [];
+  const kept = codes.length
+    ? [
+        purchase ? 'Your backup codes:' : 'Your Open Hearts backup codes:',
+        '',
+        ...codes.map((c) => `  ${c}`),
+        '',
+        'Each one brings one device into your account, once. On the device:',
+        'menu, Activate subscription, and type or paste a code.',
+        '',
+        'Any device of the account shows these codes under Subscription, can',
+        'email them here again, and can replace them with new ones, after',
+        'which the codes above stop working.',
+        '',
+        'Keep them private: anyone with a code can bring a device into your',
+        'account. Replies to this email are not read; for help, see',
+      ]
+    : [...wrapped(ALL_USED), '', 'Replies to this email are not read; for help, see'];
+  return [...before, ...kept, `${SITE}/support`, '', `Open Hearts — ${SITE}`].join('\n');
 }
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /// The same email as a page, for the mail readers that prefer one: the
 /// same words, the codes set in a fixed-width face.
-export function backupMailHtml(codes) {
+export function backupMailHtml(codes, purchase = null) {
   const code = (c) => `<div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;letter-spacing:1px;margin:4px 0">${escapeHtml(c)}</div>`;
+  const piece = ([words, link]) => (link ? `<a href="${escapeHtml(link)}">${escapeHtml(words)}</a>` : escapeHtml(words));
+  const before = purchase ? subscribedParagraphs(purchase).map((p) => `<p>${p.map(piece).join('')}</p>`) : [];
+  const help = `Replies to this email are not read; for help, see <a href="${SITE}/support">openhearts.game/support</a>.`;
+  const kept = codes.length
+    ? [
+        `<p>${purchase ? 'Your backup codes:' : 'Your Open Hearts backup codes:'}</p>`,
+        `<div style="margin:12px 0 16px 0">${codes.map(code).join('')}</div>`,
+        '<p>Each one brings one device into your account, once. On the device: menu, <b>Activate subscription</b>, and type or paste a code.</p>',
+        '<p>Any device of the account shows these codes under Subscription, can email them here again, and can replace them with new ones, after which the codes above stop working.</p>',
+        `<p>Keep them private: anyone with a code can bring a device into your account. ${help}</p>`,
+      ]
+    : [`<p>${escapeHtml(ALL_USED)}</p>`, `<p>${help}</p>`];
   return [
     '<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1b1b1b">',
-    '<p>Your Open Hearts backup codes:</p>',
-    `<div style="margin:12px 0 16px 0">${codes.map(code).join('')}</div>`,
-    '<p>Each one brings one device into your account, once. On the device: menu, <b>Activate subscription</b>, and type or paste a code.</p>',
-    '<p>Any device of the account shows these codes under Subscription, can email them here again, and can replace them with new ones, after which the codes above stop working.</p>',
-    '<p>Keep them private: anyone with a code can bring a device into your account. Replies to this email are not read; for help, see <a href="https://openhearts.game/support">openhearts.game/support</a>.</p>',
-    '<p style="color:#666">Open Hearts — <a href="https://openhearts.game">openhearts.game</a></p>',
+    ...before,
+    ...kept,
+    `<p style="color:#666">Open Hearts — <a href="${SITE}">openhearts.game</a></p>`,
     '</body></html>',
   ].join('\n');
 }

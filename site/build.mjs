@@ -28,7 +28,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const origin = 'https://openhearts.game';
+/// Where the site is. The service's emails and Stripe's checkout link
+/// its pages here too (SITE, service/functions/settings.mjs).
+export const origin = 'https://openhearts.game';
 /// Where the app is (docs/explanation/service.md, "Where the app is"). A preview
 /// serves its own instead, at /play/: its worker points these links
 /// there (service/functions/app_host.mjs).

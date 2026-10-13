@@ -20,7 +20,6 @@ import 'package:table/table.dart';
 import '../l10n/l10n.dart';
 import 'buying_io.dart' if (dart.library.js_interop) 'buying_web.dart' as platform;
 import 'household.dart' show askService;
-import 'http.dart' as http;
 import 'licence.dart';
 import 'remote_config.dart';
 import 'store_buying.dart';
@@ -93,32 +92,33 @@ enum BuyRefusal {
   }
 }
 
-/// Opens a checkout for [signer]'s key and leaves for it. Returns a
-/// reason when it could not, which the screen says rather than sitting
-/// there having apparently done nothing; null when the browser is on
-/// its way there.
-Future<BuyRefusal?> buy(Signer signer, {Uri? endpoint, Uri? from, Duration? timeout}) async {
+/// Opens a checkout for [signer]'s key and leaves for it, in the app's
+/// language [lang]: Stripe's page, and what it asks the buyer to agree
+/// to. Returns a reason when it could not, which the screen says rather
+/// than sitting there having apparently done nothing; null when the
+/// browser is on its way there.
+Future<BuyRefusal?> buy(Signer signer, {String? lang, Uri? endpoint, Uri? from, Duration? timeout}) async {
   timeout ??= waits.buy;
   if (!canLeaveForStripe) return BuyRefusal.notHere;
   final url = endpoint ?? handlerAt('checkout');
   if (url == null) return BuyRefusal.notHere;
   final at = from ?? Uri.base;
-  String? body;
+  ({int status, String body}) answer;
   try {
-    body = await http
-        .postJson(
-            url,
-            jsonEncode({
-              ...signedAsk(signer, 'checkout'),
-              'back': returnAddress(at, bought: true),
-              'cancelled': returnAddress(at, bought: false),
-            }))
-        .timeout(timeout);
+    answer = await askService(
+      url,
+      jsonEncode({
+        ...signedAsk(signer, 'checkout'),
+        'back': returnAddress(at, bought: true),
+        'cancelled': returnAddress(at, bought: false),
+        'lang': ?lang,
+      }),
+    ).timeout(timeout);
   } catch (_) {
     return BuyRefusal.unreachable;
   }
-  if (body == null) return BuyRefusal.shut;
-  final to = _checkoutUrl(body);
+  if (answer.status != 200) return BuyRefusal.shut;
+  final to = _checkoutUrl(answer.body);
   if (to == null) return BuyRefusal.shut;
   leaveFor(to);
   return null;

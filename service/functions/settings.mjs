@@ -155,3 +155,8 @@ export const notConfigured = (what) => ({ error: `service not configured: ${what
 /// lookup key, which is the same in test mode and live and moves to a
 /// new price in the dashboard with nothing changed here.
 export const STRIPE_PRICE = /^(price_[A-Za-z0-9]{1,64}|(?!price_)[A-Za-z0-9_.:-]{1,200})$/;
+
+/// The site, where the terms, the privacy policy and the support page
+/// are: what an email or Stripe's checkout sends a person to. Not the
+/// app's host, which answers every path with the game.
+export const SITE = 'https://openhearts.game';

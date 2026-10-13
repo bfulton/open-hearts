@@ -4,7 +4,7 @@
 
 import { paidFor } from './accounts.mjs';
 import { dayOf, isAccount } from './rows.mjs';
-import { S, STRIPE_PRICE } from './settings.mjs';
+import { S, SITE, STRIPE_PRICE } from './settings.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 
 // ---- buying, on the web ------------------------------------------------
@@ -96,8 +96,58 @@ export function checkoutBranding(back) {
   };
 }
 
-/// A checkout session for [key], as Stripe answers: {status, body}.
-export async function checkout(key, back, cancelled, env, fetchImpl = fetch) {
+/// What checkout says about renewing, in the app's language (`lang`,
+/// as the site names it) or English: the box the buyer ticks to agree
+/// to the terms, which Stripe will not let them pay without, and the
+/// line under the button. The subscription renews by itself, so the
+/// buyer agrees to that in so many words before paying, and is told
+/// how to stop it (California's automatic renewal law; the terms say
+/// the rest). Stripe adds its own words about the charge.
+export const CHECKOUT_WORDS = Object.freeze({
+  en: {
+    locale: 'en',
+    agree: 'I agree to the [Terms of Use]({terms}), and that this subscription renews automatically every year, at the price then in force, until I cancel it.',
+    submit: 'It renews automatically every year until you cancel. Cancel any time in the game: menu, Subscription, Manage subscription.',
+  },
+  es: {
+    locale: 'es',
+    agree: 'Acepto las [Condiciones de uso]({terms}) y que esta suscripción se renueve automáticamente cada año, al precio vigente entonces, hasta que la cancele.',
+    submit: 'Se renueva automáticamente cada año hasta que la canceles. Cancélala cuando quieras en el juego: menú, Suscripción, Gestionar suscripción.',
+  },
+  pt: {
+    locale: 'pt-BR',
+    agree: 'Aceito os [Termos de uso]({terms}) e que esta assinatura seja renovada automaticamente todo ano, pelo preço em vigor na época, até que eu a cancele.',
+    submit: 'Ela é renovada automaticamente todo ano até você cancelar. Cancele quando quiser no jogo: menu, Assinatura, Gerenciar assinatura.',
+  },
+  de: {
+    locale: 'de',
+    agree: 'Ich stimme den [Nutzungsbedingungen]({terms}) zu und damit, dass sich dieses Abo jedes Jahr automatisch zum dann geltenden Preis verlängert, bis ich es kündige.',
+    submit: 'Es verlängert sich jedes Jahr automatisch, bis du kündigst. Kündigen kannst du jederzeit im Spiel: Menü, Abo, Abo verwalten.',
+  },
+  fr: {
+    locale: 'fr',
+    agree: "J'accepte les [Conditions d'utilisation]({terms}), et que cet abonnement se renouvelle automatiquement chaque année, au prix alors en vigueur, jusqu'à ce que je le résilie.",
+    submit: "Il se renouvelle automatiquement chaque année jusqu'à ce que vous le résiliiez. Résiliez-le quand vous voulez dans le jeu : menu, Abonnement, Gérer l'abonnement.",
+  },
+});
+
+/// [CHECKOUT_WORDS] as a checkout's fields: Stripe's page in the same
+/// language, the box to tick, linking the terms in that language, and
+/// the line under the button.
+export function checkoutTerms(lang) {
+  const code = typeof lang === 'string' && Object.hasOwn(CHECKOUT_WORDS, lang) ? lang : 'en';
+  const words = CHECKOUT_WORDS[code];
+  return {
+    locale: words.locale,
+    'consent_collection[terms_of_service]': 'required',
+    'custom_text[terms_of_service_acceptance][message]': words.agree.replace('{terms}', `${SITE}${code === 'en' ? '' : `/${code}`}/terms`),
+    'custom_text[submit][message]': words.submit,
+  };
+}
+
+/// A checkout session for [key], as Stripe answers: {status, body}, in
+/// the app's language [lang] ([checkoutTerms]).
+export async function checkout(key, back, cancelled, env, fetchImpl = fetch, { lang = 'en' } = {}) {
   const secret = env.OH_STRIPE_SECRET;
   const named = S().stripePrice ?? env.OH_STRIPE_PRICE;
   if (!secret || typeof named !== 'string' || !STRIPE_PRICE.test(named)) return { status: 503, body: { error: 'the shop is not open yet' } };
@@ -122,6 +172,7 @@ export async function checkout(key, back, cancelled, env, fetchImpl = fetch) {
     client_reference_id: key,
     'subscription_data[metadata][key]': key,
     ...checkoutBranding(back),
+    ...checkoutTerms(lang),
   });
   let res;
   try {

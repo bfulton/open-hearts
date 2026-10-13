@@ -139,7 +139,7 @@
     "header": {
       "title": "Privacidade",
       "tagline": "O que o Open Hearts faz com o que você dá a ele, em palavras simples.",
-      "updated": "Última atualização: 12 de outubro de 2026"
+      "updated": "Última atualização: 13 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
@@ -201,7 +201,7 @@
       "p2": "Assinar cria uma conta: um número aleatório, não o seu nome nem o seu e-mail. Nós damos à Stripe a chave pública do seu aparelho para que o pagamento possa ser associado a ela. Em troca, o nosso serviço guarda um registro curto: qual conta a assinatura paga, quais chaves de aparelho estão na conta e quando cada uma foi adicionada, qual está em uso agora, e as datas até quando a assinatura vale. Ele também guarda o perfil da sua conta — o nome, o ícone, a cor e a imagem que você escolheu — para que todos os aparelhos da conta mostrem os mesmos, e uma mudança em um chegue aos outros. Na Stripe, podemos ver o seu endereço de e-mail, nome, país, bandeira do cartão, os quatro últimos dígitos do cartão e os seus pagamentos.",
       "p3": "Isso significa que poderíamos ligar o endereço de e-mail de um assinante à conta dele e, assim, aos nomes e aos resultados que os aparelhos dela publicaram. Nós não publicamos essa ligação, e só a usamos para manter a sua assinatura funcionando.",
       "p4": "Se você adicionar outro aparelho à sua conta, o nosso serviço guarda um registro do código de uso único que você criou e de quais aparelhos o criaram e o usaram. Qualquer aparelho da conta pode ver as chaves dos outros, qual está em uso, e removê-los. A sua conta joga em um aparelho por vez: abrir o jogo num aparelho faz dele o que está em uso, e o anterior para de jogar ao vivo até você retomá-lo.",
-      "p5": "Uma conta também tem cinco códigos de backup, guardados pelo nosso serviço junto com a conta e mostrados nos aparelhos dela, com uma anotação de quais já foram usados. Se você assinou na web, nós os enviamos por e-mail para o endereço com que você pagou quando você assina, e de novo sempre que um aparelho da conta nos pedir. Para isso, lemos o endereço na Stripe naquele momento e o passamos à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, que envia o e-mail por nós; nós não guardamos o endereço.",
+      "p5": "Uma conta também tem cinco códigos de backup, guardados pelo nosso serviço junto com a conta e mostrados nos aparelhos dela, com uma anotação de quais já foram usados. Se você assinou na web, escrevemos para o endereço com que você pagou só em três casos: quando você assina, com o que comprou, como a assinatura é renovada, como cancelar e os códigos; de novo com os códigos, sempre que um aparelho da conta nos pedir; e antes que uma mudança de preço passe a valer, para avisar você. Para isso, lemos o endereço na Stripe naquele momento e o passamos à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, que envia o e-mail por nós; nós não guardamos o endereço. A Stripe também escreve para você sobre os seus pagamentos, como recibos e um lembrete antes de cada renovação, conforme a política de privacidade dela.",
       "p6": "Se você entrar com Apple ou Google, guardamos uma forma embaralhada do número que eles dão ao seu login — não o seu nome nem o seu e-mail — ligada à sua conta, para que entrar do mesmo jeito em outro aparelho o traga para a conta. O seu aparelho guarda só qual dos dois você usou. O login é feito pela Apple ou pelo Google, sob a política de privacidade de cada um; na web, o código de login deles só é baixado enquanto há um botão de login na tela.",
       "p7": "Quando uma assinatura é comprada, o nosso serviço nos manda um e-mail com a loja em que foi comprada, os primeiros caracteres dela e as datas até quando vale, para podermos acompanhar o serviço enquanto ele é pequeno — nunca o seu nome nem o seu e-mail."
     },
@@ -215,7 +215,7 @@
       "p2": "Nada de identificadores de publicidade, e nada que siga você de app em app ou de site em site.",
       "p3": "Nada de cookies nas nossas páginas. A Stripe cria os dela, no site dela, quando você compra.",
       "p4": "Nada de localização, contatos ou microfone. A câmera, só enquanto você escaneia um código para adicionar um aparelho; a imagem fica no aparelho.",
-      "p5": "Nenhum endereço de e-mail guardado por nós, nada de senha, e nenhuma conta a não ser que você assine. E-mails são enviados só com os códigos de backup, como descrito acima.",
+      "p5": "Nenhum endereço de e-mail guardado por nós, nada de senha, e nenhuma conta a não ser que você assine. Só escrevemos para você sobre uma assinatura, como descrito acima: nada mais, e nada de publicidade.",
       "p6": "Nada de chat."
     },
     "kept": {
@@ -238,7 +238,7 @@
     },
     "children": {
       "title": "Crianças",
-      "p1": "O Open Hearts não é feito para crianças com menos de 13 anos, e elas não devem jogar ao vivo, já que isso mostra um nome e uma imagem para estranhos. Se você acha que uma criança publicou algo por meio dele, avise a gente e faremos o que pudermos para remover."
+      "p1": "O Open Hearts não é feito para crianças com menos de 13 anos, e os <a href=\"{{base}}/terms#age\">termos</a> não as deixam jogar ao vivo, já que isso mostra um nome e uma imagem para estranhos. Se você acha que uma criança publicou algo por meio dele, avise a gente e faremos o que pudermos para remover."
     },
     "changes": {
       "title": "Mudanças",
@@ -257,7 +257,7 @@
     "header": {
       "title": "Termos de uso",
       "tagline": "O acordo entre você e o Open Hearts, em palavras simples.",
-      "updated": "Última atualização: 11 de outubro de 2026"
+      "updated": "Última atualização: 13 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
@@ -272,8 +272,12 @@
     },
     "who": {
       "title": "Com quem é este acordo",
-      "p1": "Estes termos são um acordo entre você e o Open Hearts (\"nós\"), mantido por Bright Fulton, cujo endereço está em <a href=\"#contact\">Contato</a>. Eles cobrem este site, o jogo em <a href=\"{{play}}\">play.openhearts.game</a>, os apps do Open Hearts para celular e o serviço de jogo ao vivo. Ao usar qualquer um deles, você concorda com estes termos. Se não concordar, por favor não os use.",
+      "p1": "Estes termos são um acordo entre você e Bright Fulton, que mantém o Open Hearts como pessoa física e cujo endereço está em <a href=\"#contact\">Contato</a> (\"Open Hearts\", \"nós\"). Eles cobrem este site, o jogo em <a href=\"{{play}}\">play.openhearts.game</a>, os apps do Open Hearts para celular e o serviço de jogo ao vivo. Ao usar qualquer um deles, você concorda com estes termos. Se não concordar, por favor não os use.",
       "p2": "Como tratamos informações sobre você está na <a href=\"{{base}}/privacy\">política de privacidade</a>, que faz parte destes termos."
+    },
+    "age": {
+      "title": "Idade",
+      "p1": "Qualquer pessoa pode jogar sozinha. Para jogar ao vivo, é preciso ter pelo menos 13 anos. Se você tem menos de 18, só pode assinar com a concordância de um dos pais ou responsável, que aceita estes termos em seu nome e é responsável pela assinatura."
     },
     "appStore": {
       "title": "Se você baixou o app na App Store",
@@ -299,7 +303,7 @@
       "p11": "<b>A assinatura renova automaticamente todo ano</b>, pelo preço em vigor na época, e é cobrada no mesmo meio de pagamento, até você cancelar. Se o preço mudar, o novo preço só vale a partir da sua próxima renovação, e a loja, ou nós, no caso da web, vai avisar você antes disso.",
       "p12": "<b>App Store:</b> o pagamento é cobrado na sua Conta Apple quando você confirma a compra. A assinatura renova a não ser que seja cancelada pelo menos 24 horas antes do fim do ano em curso, e a renovação é cobrada na sua conta nas 24 horas anteriores a isso.",
       "p13": "<b>Google Play:</b> a renovação e a cobrança seguem as regras do Google Play, mostradas quando você compra.",
-      "p14": "<b>Web:</b> a compra é feita pela Stripe, e a Stripe cobra no cartão que você informou a ela, todo ano, na data em que você assinou pela primeira vez.",
+      "p14": "<b>Web:</b> a compra é feita pela Stripe, e a Stripe cobra no cartão que você informou a ela, todo ano, na data em que você assinou pela primeira vez. Antes de você pagar, a página de pagamento da Stripe pede que você aceite estes termos e a renovação anual. Depois, enviamos por e-mail o que você comprou, como a assinatura é renovada e como cancelar, e a Stripe envia um lembrete antes de cada renovação.",
       "p15": "Cancelamento",
       "p16": "Você pode cancelar a qualquer momento. Cancelar interrompe a próxima renovação; o jogo ao vivo continua funcionando até o fim do ano que você pagou.",
       "p17": "Como cancelar — no app, em cada loja e quando você não tem mais nenhum dos seus aparelhos — está na <a href=\"{{base}}/support#cancel\">página de suporte</a>.",
@@ -308,7 +312,9 @@
       "p22": "<b>Web:</b> fale com a gente. Onde a lei do lugar em que você mora lhe der o direito de desistir da compra ou de receber um reembolso, você tem esse direito, e vamos analisar com justiça qualquer outro pedido.",
       "p23": "Uma assinatura reembolsada deixa de ser renovada, e o jogo ao vivo nos aparelhos dela acaba quando a licença atual deles vencer, em cerca de um mês.",
       "p24": "Seus aparelhos",
-      "p25": "Assinar cria uma conta, à qual pertencem a assinatura e os aparelhos dela. Não há senha, e a conta joga ao vivo em um aparelho por vez: abrir o jogo em outro aparelho dela leva o jogo ao vivo para lá, e uma partida deixada no primeiro conta como abandonada por você. Se você apagar os dados do jogo ou desinstalar o app no seu único aparelho da conta, traga o novo com um código de backup, ou entrando com Apple ou Google como antes. Ou fale com a gente usando o endereço de e-mail com que pagou na web, e ajudaremos no que pudermos."
+      "p25": "Assinar cria uma conta, à qual pertencem a assinatura e os aparelhos dela. Não há senha, e a conta joga ao vivo em um aparelho por vez: abrir o jogo em outro aparelho dela leva o jogo ao vivo para lá, e uma partida deixada no primeiro conta como abandonada por você. Se você apagar os dados do jogo ou desinstalar o app no seu único aparelho da conta, traga o novo com um código de backup, ou entrando com Apple ou Google como antes. Ou fale com a gente usando o endereço de e-mail com que pagou na web, e ajudaremos no que pudermos.",
+      "p26": "Seu aparelho como jurado",
+      "p27": "Enquanto o jogo está aberto no aparelho em que a sua conta joga ao vivo, esse aparelho pode ser sorteado como jurado nas mesas de outros assinantes, uma mão de cada vez: ajuda a distribuir as cartas, joga nos lugares dos bots e resolve as vezes que os jogadores não conseguem resolver. É assim que as mesas ao vivo funcionam sem que nenhum servidor nosso veja uma mão, e o aparelho de cada assinante faz a sua parte. Isso usa um pouco dos dados, da bateria e do processamento do aparelho enquanto o jogo está aberto, e o aparelho não é sorteado enquanto o jogo está em segundo plano nem depois de fechado. O que ele compartilha, e com quem, está na <a href=\"{{base}}/privacy\">política de privacidade</a>."
     },
     "table": {
       "title": "Numa mesa ao vivo",
@@ -320,7 +326,30 @@
       "p6": "trapacear: mostrar cartas a outro jogador, jogar em vários lugares de uma mesma mesa, ou alterar o jogo para levar vantagem;",
       "p7": "atacar, sobrecarregar ou tentar derrubar o serviço, os relays ou os aparelhos de outros jogadores, ou usá-los para qualquer coisa que não seja jogar.",
       "p8": "Um jogador que para de jogar pode ser expulso pela mesa, e um bot fica com o lugar. Um jogador que sai de uma partida ranqueada termina em último. Você pode esconder a imagem de outro jogador no seu próprio aparelho a qualquer momento.",
-      "p9": "Para denunciar um jogador ou uma imagem, fale com a gente (abaixo). Podemos deixar de renovar o jogo ao vivo de um aparelho que desrespeite estas regras e, se fizermos isso sem um bom motivo, reembolsaremos a parte não usada de uma assinatura feita na web."
+      "p9": "Para denunciar um jogador ou uma imagem, fale com a gente (abaixo). Se um aparelho ou uma conta desrespeitar estas regras, podemos remover o nome ou a imagem dele, suspendê-lo do jogo ao vivo na hora e deixar de emitir para os aparelhos dele as licenças de que o jogo ao vivo precisa. Se fizermos isso sem um bom motivo, reembolsaremos a parte não usada de uma assinatura feita na web."
+    },
+    "content": {
+      "title": "O que você publica",
+      "p1": "Seu nome, seu ícone, sua cor e sua imagem, e os registros e resultados das partidas que você joga, são seus. Para que o jogo ao vivo funcione, você nos concede uma licença mundial, não exclusiva e gratuita para guardá-los, copiá-los, publicá-los e repassá-los pelo nosso serviço e pelo nosso relay, e para mostrá-los aos outros jogadores e a qualquer um que leia o relay, como descreve a <a href=\"{{base}}/privacy\">política de privacidade</a>, pelo tempo que ela diz que são guardados. Você confirma que tem o direito de usar qualquer imagem que escolher e que o que você publica não viola os direitos de ninguém."
+    },
+    "copyright": {
+      "title": "Direitos autorais",
+      "p1": "Se você acredita que algo publicado por meio do Open Hearts, como o nome ou a imagem de um jogador, viola seus direitos autorais, envie uma notificação ao nosso contato para direitos autorais:",
+      "p2": "Segundo a Digital Millennium Copyright Act dos Estados Unidos, a notificação deve incluir:",
+      "p3": "sua assinatura física ou eletrônica, como titular dos direitos ou pessoa autorizada a agir em nome dele;",
+      "p4": "a obra protegida que você diz ter sido violada;",
+      "p5": "o material que você diz que a viola, com o necessário para encontrá-lo, como o nome do jogador e onde você o viu;",
+      "p6": "seu nome, endereço, telefone e e-mail;",
+      "p7": "uma declaração de que você acredita de boa-fé que o uso não é autorizado pelo titular dos direitos, por seu representante ou pela lei;",
+      "p8": "uma declaração de que as informações da notificação são exatas e, sob pena de perjúrio, de que você é o titular ou está autorizado a agir em nome dele.",
+      "p9": "Quando uma notificação está completa, removemos o material ou bloqueamos o acesso a ele sem demora, e avisamos quem o publicou.",
+      "p10": "Se algo que você publicou foi removido e você acredita que foi por engano ou identificação errada, pode enviar uma contranotificação ao mesmo contato. Ela deve incluir:",
+      "p11": "sua assinatura física ou eletrônica;",
+      "p12": "o material removido e onde ele aparecia antes da remoção;",
+      "p13": "uma declaração, sob pena de perjúrio, de que você acredita de boa-fé que ele foi removido por engano ou identificação errada;",
+      "p14": "seu nome, endereço e telefone, e uma declaração de que você aceita a jurisdição do tribunal federal de distrito do distrito do seu endereço (ou, fora dos Estados Unidos, de qualquer distrito em que possamos ser encontrados) e de que aceitará a citação de quem enviou a notificação ou de seu representante.",
+      "p15": "Enviamos a contranotificação completa a quem enviou a notificação e recolocamos o material entre 10 e 14 dias úteis depois de recebê-la, a menos que essa pessoa nos informe antes que entrou com uma ação judicial para impedir a violação.",
+      "p16": "Encerramos o jogo ao vivo de um aparelho ou de uma conta que viole direitos autorais repetidamente. Quem enviar uma notificação ou contranotificação com uma declaração falsa, sabendo disso, pode responder por perdas e danos."
     },
     "code": {
       "title": "O código, e o nome",
@@ -328,7 +357,8 @@
     },
     "warranty": {
       "title": "Sem garantia",
-      "p1": "O Open Hearts é fornecido \"no estado em que se encontra\" e \"conforme disponível\". Na medida em que a lei permitir, não fazemos promessas sobre ele além das que estão nestes termos: nem que ele estará livre de bugs ou interrupções, nem que servirá para um fim específico, nem que servidores mantidos por outras pessoas vão guardar ou apagar alguma coisa."
+      "p1": "<b>O Open Hearts é fornecido \"no estado em que se encontra\" e \"conforme disponível\". Na medida em que a lei permitir, rejeitamos todas as garantias, expressas ou implícitas, incluindo as garantias implícitas de comerciabilidade, de adequação a um fim específico e de não violação.</b>",
+      "p2": "Em outras palavras: além das promessas destes termos, não prometemos que o Open Hearts estará livre de bugs ou interrupções, que servirá para um fim específico, nem que servidores mantidos por outras pessoas vão guardar ou apagar alguma coisa."
     },
     "liability": {
       "title": "Limites da nossa responsabilidade",
@@ -350,7 +380,7 @@
     "contact": {
       "title": "Contato",
       "p1": "Escreva para <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, ou mande uma carta para:",
-      "p2": "Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
+      "p2": "Bright Fulton<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p3": "Relatos de bugs são bem-vindos como issues em <a href=\"https://github.com/bfulton/open-hearts/issues\">github.com/bfulton/open-hearts/issues</a>, que são públicas. Mais ajuda está na <a href=\"{{base}}/support\">página de suporte</a>."
     }
   }

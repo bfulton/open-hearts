@@ -248,33 +248,40 @@ const backupsShown = (row) => ({ codes: row.codes.map((c) => ({ code: c.code, us
 /// {row, unsent}, [unsent] null when it went and otherwise why not —
 /// `no address`, `no mail` (Email Sending not bound here), `no codes`
 /// (all used) or `failed`. Every one that did not go is logged; the
-/// codes are on every device of the account regardless.
-async function mailBackups(store, account, row, email, mail, { now, why = null }) {
+/// codes are on every device of the account regardless. A [purchase]
+/// of [subscription] is told of even with every code used, and noted
+/// as `acknowledged`.
+async function mailBackups(store, account, row, email, mail, { now, why = null, purchase = null, subscription = null }) {
   const codes = row.codes.filter((c) => c.used_at === null).map((c) => c.code);
-  const unsent = !mail ? 'no mail' : typeof email !== 'string' || !email.includes('@') ? 'no address' : codes.length === 0 ? 'no codes' : null;
+  const unsent = !mail ? 'no mail' : typeof email !== 'string' || !email.includes('@') ? 'no address' : codes.length === 0 && !purchase ? 'no codes' : null;
   if (unsent) {
     console.log(`backup codes for ${account}: not sent: ${unsent}${why ? ` (${String(why).slice(0, 200)})` : ''}`);
     return { row, unsent };
   }
   try {
-    await mail(email, codes);
+    await mail(email, codes, purchase);
   } catch (e) {
     console.log(`backup codes for ${account}: not sent: ${e?.code ?? ''} ${e?.message ?? e}`);
     return { row, unsent: 'failed' };
   }
   console.log(`backup codes for ${account}: sent`);
-  const sent = { ...row, emailed_at: new Date(now).toISOString() };
+  const sent = { ...row, emailed_at: new Date(now).toISOString(), ...(subscription ? { acknowledged: subscription } : {}) };
   await store.put(`ACCOUNT#${account}`, 'BACKUP', sent);
   return { row: sent, unsent: null };
 }
 
-/// An account just paid for: its codes, made once, and sent to the
-/// payer once. A webhook delivered twice finds them made, and sends
-/// only if the first send did not go.
-export async function backupsMade(account, email, store, mail, { now = Date.now() } = {}) {
+/// An account just paid for, by [subscription]: its codes, made once,
+/// and the purchase told to the payer once — what they subscribed to,
+/// how it renews and how to cancel it ([charge], the checkout's:
+/// {amount, currency}) — with the codes. A webhook delivered twice
+/// finds the subscription told of, and sends only if the first send
+/// did not go; an account bought again once its subscription has ended
+/// is a new subscription, and is told of that one too.
+export async function backupsMade(account, email, store, mail, { now = Date.now(), charge = null, subscription = null } = {}) {
   let row = await store.get(`ACCOUNT#${account}`, 'BACKUP');
   if (!row) row = await makeBackups(store, account, { now });
-  if (!row.emailed_at) ({ row } = await mailBackups(store, account, row, email, mail, { now }));
+  const told = subscription ? row.acknowledged === subscription : row.emailed_at !== null;
+  if (!told) ({ row } = await mailBackups(store, account, row, email, mail, { now, purchase: { charge }, subscription }));
   return { status: 200, body: { made_at: row.made_at, emailed: row.emailed_at !== null } };
 }
 

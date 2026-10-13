@@ -557,8 +557,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Jugar solo es gratis y siempre lo será, igual que los registros, el motor y cada línea de esto. Lo que pagas cubre la parte que nos cuesta mantener: poner a los jugadores en contacto, un relé cuando dos dispositivos no encuentran un camino directo, y un jurado cuando una mesa se queda sola.';
 
   @override
-  String get cancelWhenever =>
-      'Cancela cuando quieras; el año que pagaste termina por sí solo.';
+  String webRenewal(String price) {
+    return '$price al año, que pagas en la página de Stripe. Se renueva sola cada año hasta que la canceles, cuando quieras, en Gestionar suscripción; el año que pagaste termina por sí solo.';
+  }
+
+  @override
+  String get subscribeAgrees =>
+      'Al suscribirte, aceptas las Condiciones de uso.';
 
   @override
   String get storeSubscriptionLater =>

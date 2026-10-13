@@ -309,7 +309,7 @@ async function checkoutRoute(request, env) {
   const back = sameSite(body.back, request.url);
   const cancelled = sameSite(body.cancelled, request.url);
   if (!back || !cancelled) return json(request, 400, { error: 'somewhere on this site to come back to' });
-  const { status, body: out } = await checkout(key, back, cancelled, env);
+  const { status, body: out } = await checkout(key, back, cancelled, env, fetch, { lang: body.lang });
   return json(request, status, out);
 }
 
@@ -346,10 +346,13 @@ async function stripeRoute(request, env, ctx) {
   const done = await record(event, store);
   if (done?.bound) await after(ctx, alertSubscribed(env, store, { subscription: done.subscription, source: 'stripe', key: done.bound }));
   // A subscription just paid for: its account's backup codes, sent to
-  // the email the checkout was paid with. Not kept: it is on the event.
+  // the email the checkout was paid with, with what it paid. Not kept:
+  // it is on the event.
   if (done?.bound && done.account) {
-    const email = event.data?.object?.customer_details?.email ?? null;
-    await inHousehold(env, done.account, { op: 'made', account: done.account, email });
+    const paid = event.data?.object;
+    const email = paid?.customer_details?.email ?? null;
+    const charge = Number.isSafeInteger(paid?.amount_total) && typeof paid?.currency === 'string' ? { amount: paid.amount_total, currency: paid.currency } : null;
+    await inHousehold(env, done.account, { op: 'made', account: done.account, subscription: done.subscription, email, charge });
   }
   // Anything not ours is still a delivery taken: a webhook that gets an
   // error back is a webhook Stripe keeps sending.

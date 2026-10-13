@@ -162,7 +162,8 @@ class _SubscribePageState extends State<SubscribePage> {
       _leaving = true;
       _refusal = null;
     });
-    final refusal = await buy(await Identity.signer());
+    final lang = Localizations.localeOf(context).languageCode;
+    final refusal = await buy(await Identity.signer(), lang: lang);
     if (!mounted) return;
     // No refusal means the browser is on its way to the checkout, and
     // this page is about to stop existing: the spinner stays.
@@ -460,6 +461,8 @@ class _SubscribePageState extends State<SubscribePage> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
                       ),
+                      const SizedBox(height: 6),
+                      _agrees(l10n),
                       if (shop.pending) ...[
                         const SizedBox(height: 12),
                         Text(
@@ -475,12 +478,20 @@ class _SubscribePageState extends State<SubscribePage> {
                         onPressed: waiting ? null : _restore,
                         child: Text(l10n.restorePurchases),
                       ),
-                    ] else
+                    ] else ...[
+                      // The same four on the web, where Stripe takes the
+                      // payment: California's automatic renewal law asks
+                      // for them beside the button.
                       Text(
-                        canBuyHere ? l10n.cancelWhenever : l10n.storeSubscriptionLater,
+                        canBuyHere ? l10n.webRenewal(priceShown) : l10n.storeSubscriptionLater,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 11.5, color: Palette.chromeDim),
+                        style: const TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
                       ),
+                      if (canBuyHere) ...[
+                        const SizedBox(height: 6),
+                        _agrees(l10n),
+                      ],
+                    ],
                     const SizedBox(height: 6),
                     TextButton(onPressed: waiting ? null : () => showActivate(context), child: Text(l10n.haveACode)),
                     ..._account(subscribed: false, waiting: waiting),
@@ -508,6 +519,14 @@ class _SubscribePageState extends State<SubscribePage> {
       ),
     );
   }
+
+  /// That buying is agreeing to the terms, which are linked at the
+  /// page's foot: the line under each way of buying.
+  static Widget _agrees(AppLocalizations l10n) => Text(
+    l10n.subscribeAgrees,
+    textAlign: TextAlign.center,
+    style: const TextStyle(fontSize: 11.5, height: 1.45, color: Palette.chromeDim),
+  );
 
   /// A subscription is a person's, not a device's: so the page a
   /// subscriber sees is about which of their devices it is on.

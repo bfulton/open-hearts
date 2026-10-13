@@ -734,11 +734,17 @@ abstract class AppLocalizations {
   /// **'Playing alone is free and always will be, and so are the records, the engine and every line of this. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.'**
   String get whatMoneyPaysFor;
 
-  /// Under the Subscribe button.
+  /// Under the Subscribe button on the web, where Stripe takes the payment: the price, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.
   ///
   /// In en, this message translates to:
-  /// **'Cancel whenever you like; the year you paid for runs out on its own.'**
-  String get cancelWhenever;
+  /// **'{price} a year, paid on Stripe\'s page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.'**
+  String webRenewal(String price);
+
+  /// Under the Subscribe button, on the web and in the stores: buying is agreeing to the terms, linked just below.
+  ///
+  /// In en, this message translates to:
+  /// **'By subscribing, you agree to the Terms of use.'**
+  String get subscribeAgrees;
 
   /// Under the Subscribe button, on a device that cannot buy yet.
   ///

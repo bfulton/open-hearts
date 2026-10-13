@@ -668,9 +668,18 @@
   "@whatMoneyPaysFor": {
     "description": "On the Live play page, under the points."
   },
-  "cancelWhenever": "Cancel whenever you like; the year you paid for runs out on its own.",
-  "@cancelWhenever": {
-    "description": "Under the Subscribe button."
+  "webRenewal": "{price} a year, paid on Stripe's page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.",
+  "@webRenewal": {
+    "description": "Under the Subscribe button on the web, where Stripe takes the payment: the price, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.",
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "subscribeAgrees": "By subscribing, you agree to the Terms of use.",
+  "@subscribeAgrees": {
+    "description": "Under the Subscribe button, on the web and in the stores: buying is agreeing to the terms, linked just below."
   },
   "storeSubscriptionLater": "On a phone this will be the store's own subscription. Until the app is in the stores, live play is bought on the web.",
   "@storeSubscriptionLater": {
