@@ -249,8 +249,10 @@ String? walkChaos(int seed,
   // jurors up and in reach to make one: the hand is never dealt with
   // its bots in the open, so the table waits and says so, and only a
   // juror coming up moves it (docs/explanation/live-play.md). With enough of them up, the
-  // wait is a fault.
-  bool starved(TableClient c) => c.shortOfJurors && reachableFrom(c).length < juryToHoldBots;
+  // wait is a fault. Not counting the jurors the side has let go of
+  // for holding a seat's turn and not playing it, which it does not
+  // draw again (TableClient.letGo).
+  bool starved(TableClient c) => c.shortOfJurors && reachableFrom(c).difference(c.letGo).length < juryToHoldBots;
 
   bool immovable(TableClient c, Set<PublicKey> up) {
     if (unopenable(c, up)) return true;

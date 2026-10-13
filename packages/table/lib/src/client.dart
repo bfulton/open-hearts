@@ -802,6 +802,9 @@ class TableClient {
   StreamSubscription<void>? _incoming;
   StreamSubscription<void>? _drops;
   bool _left = false;
+
+  /// Where this side's leave was made ([leave]); null until it is.
+  TurnId? _leftAt;
   bool _closed = false;
   bool _notifying = false;
   bool _notifyAgain = false;
@@ -913,12 +916,26 @@ class TableClient {
   /// turn, and a vote this peer cast counts the same everywhere, rather
   /// than for peers that settled the turn before the leave arrived and
   /// not for peers that did not.
+  ///
+  /// Made at the next position, the leave leaves this seat's own turn
+  /// here to this seat: a removal there does not reach back to it, and
+  /// at a table of two people a boot of it needs the leaver's own vote,
+  /// which a leaver gives nobody. So what the seat still owes here it
+  /// says itself. A pass is made now, as the bot taking the seat over
+  /// would make it; a step of the deal, which may not be due yet, the
+  /// deal goes on making for it until the leave's position comes
+  /// ([DealTable.ownsTurn]).
   void leave() {
     if (!amSeated || _left) return;
-    _left = true;
-    var at = _positionOf(mySeat!);
+    final here = _positionOf(mySeat!);
+    var at = here;
     final votedHere = _myWitness.keys.any((t) => _atOrBefore(t, at) && _atOrBefore(at, t));
     if (_acted(at) || votedHere) at = _positionAfter(at, mySeat!);
+    _left = true;
+    _leftAt = at;
+    if (at != here && here.isPass && !_acted(here)) {
+      sayPass(mySeat!, Bot(persona: spec.replacementFor(mySeat!)).choosePass(game.handOf(mySeat!)));
+    }
     _emit(EventKind.leave, {'hand': at.hand, 'turn': at.index, 'seat': mySeat}, everywhere: true);
   }
 
@@ -3179,6 +3196,10 @@ class TableClient {
   /// out ([_proposeJury]).
   final Set<PublicKey> _letGo = {};
 
+  /// The jurors this side will not draw again ([_letGo]): up and in
+  /// reach, and still no use to a table waiting on a jury.
+  Set<PublicKey> get letGo => Set.unmodifiable(_letGo);
+
   /// When each bot seat's turn became its holder's to take, by turn
   /// and holder. Cleared with the hand, and small in it: one entry per
   /// turn a bot seat is on.
@@ -4580,7 +4601,7 @@ class _DealView implements DealTable {
   bool get done => _c.done;
 
   @override
-  bool get left => _c._left;
+  bool ownsTurn(TurnId turn) => !_c._left || !TableClient._atOrBefore(_c._leftAt!, turn);
 
   @override
   bool get closed => _c._closed;
