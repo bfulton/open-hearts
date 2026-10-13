@@ -139,9 +139,14 @@ class Decision {
   /// The turn settled, or the turn at which a departure was made.
   final TurnId turn;
 
-  /// The action (pass or play), or one of the claims that carried the
-  /// removal (a boot, an absence, or the leave itself).
+  /// The action (a pass, a play or a step of the deal), or the claim
+  /// that carried the removal, one of [removalKinds].
   final TableEvent event;
+
+  /// What a removal is carried by: a boot, an absence, the leave
+  /// itself, a held seat given to the escrow, or the game's end where
+  /// nobody left could move it.
+  static const removalKinds = {EventKind.boot, EventKind.absent, EventKind.leave, EventKind.escrow, EventKind.ended};
 
   /// Who backed it, the author included.
   final Set<PublicKey> witnesses;

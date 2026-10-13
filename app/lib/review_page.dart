@@ -33,6 +33,7 @@ import 'net/game_records.dart';
 import 'net/in_use.dart';
 import 'net/record_check.dart';
 import 'net/remote_config.dart' show waits;
+import 'net/report_error.dart';
 import 'net/watching.dart';
 import 'reaction_mute.dart';
 import 'subscribe_page.dart';
@@ -269,6 +270,13 @@ class _ReviewPageState extends State<ReviewPage> {
         case RecordChecked(:final ok, :final reason, :final winners):
           setState(() => _shown = ok ? _Game(kept, inOrder(), done: true, winners: winners) : _Failed(reason));
       }
+    }, onError: (Object error, StackTrace stack) {
+      // A check that stopped with an error is one that could not be
+      // made here, as on the web when its worker fails
+      // (record_check_web.dart); the error itself is reported, not
+      // left to stop the page.
+      reportError(error, stack, where: 'record check');
+      if (mounted) setState(() => _shown = const _Failed(null));
     });
   }
 

@@ -163,6 +163,31 @@ void main() {
     await checking.close();
   });
 
+  testWidgets('a check that stops with an error: the game could not be checked here, and none of it stays', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 1600)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final checking = StreamController<RecordCheck>();
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: ReviewPage(table: played.spec.id, load: (_) async => kept, check: (_) => checking.stream),
+    ));
+    await tester.pump();
+    await tester.pump();
+    checking.add(checked.whereType<HandChecked>().first);
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(rowsLater);
+    }
+    expect(find.text('Trick 1'), findsOneWidget);
+    checking.addError(StateError('the check fell over'));
+    await tester.pumpAndSettle();
+    expect(find.text('This device cannot check the deal, so it cannot show the game.'), findsOneWidget);
+    expect(find.text('Trick 1'), findsNothing);
+    expect(find.text('Checking the rest of the game…'), findsNothing, reason: 'not left checking');
+    await checking.close();
+  });
+
   testWidgets('a game still being played is watched: the scores and each card as it comes, no hand; over, the checked game takes its place', (tester) async {
     tester.view
       ..physicalSize = const Size(390, 1600)
