@@ -128,6 +128,13 @@ squashed from a pull request, the pull request's number.
 
 ### Security
 
+- A kept game's record carries, with each removal, the signed word of
+  everyone who backed it, and whoever opens the game counts the
+  removal's majority from those signatures. Before, a record named a
+  removal's backers by key alone, so one sent to be kept could claim a
+  majority nobody gave, such as for the game's end. The service keeps
+  records only in the new form; games kept before still open, checked
+  as they were. (2026-10-13, #27)
 - `?e2e`, which loosens the app for the browser suites, is honoured only
   on a page served from this machine. (2026-10-11, 6c10b57)
 - A backup juror's mark is checked in constant time, as an HMAC is.

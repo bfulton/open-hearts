@@ -576,6 +576,35 @@ class _RecordVerifier {
     }
   }
 
+  /// Who backed removal [d], by their own signed word: the claims at its
+  /// turn against its seat and the witnesses of one. Claims of one way
+  /// out back each other — a boot, a claim of silence or of the escrow;
+  /// the leave alone; a vote that the game ends there, where it says it
+  /// does — as they do at the table. A key the record names without its
+  /// word behind it is no backer. A record kept before removals carried
+  /// their backing names its backers by key alone, and those are all
+  /// there is ([Decision.backing]).
+  Set<PublicKey> backersOf(Decision d) {
+    final backing = d.backing;
+    if (backing == null) return {...d.witnesses};
+    final ways = switch (d.event.kind) {
+      EventKind.ended => const {EventKind.ended},
+      EventKind.leave => const {EventKind.leave},
+      _ => const {EventKind.boot, EventKind.absent, EventKind.escrow},
+    };
+    final claims = [
+      for (final e in [d.event, ...backing])
+        if (ways.contains(e.kind) && e.turn == d.turn && e.seat == d.event.seat) e,
+    ];
+    final ids = {for (final c in claims) c.id};
+    return {
+      for (final c in claims)
+        if (c.kind != EventKind.ended || c.body['vote'] == true) c.author,
+      for (final w in backing)
+        if (w.kind == EventKind.witness && w.turn == d.turn && ids.contains(w.witnessed)) w.author,
+    };
+  }
+
   /// Applies the departures recorded next, each checked against the
   /// participants at the turn it names.
   String? takeRemovals() {
@@ -590,8 +619,9 @@ class _RecordVerifier {
       if (e.kind == EventKind.ended) {
         if (!humans.contains(e.author)) return 'the game ended by someone not at the table';
         if (e.turn != d.turn) return 'the game ended at ${d.turn} by a claim made at ${e.turn}';
-        if (!carried(d.witnesses, d.turn, d.among)) {
-          return 'the game ended at ${d.turn} without a majority behind it (${d.witnesses.length} of ${d.among.length})';
+        final backers = backersOf(d);
+        if (!carried(backers, d.turn, d.among)) {
+          return 'the game ended at ${d.turn} without a majority behind it (${backers.length} of ${d.among.length})';
         }
         if (index < record.length) return 'the record goes on past the game\'s end at ${d.turn}';
         endedBy = d;
@@ -607,8 +637,9 @@ class _RecordVerifier {
         if (!heldAt(d.turn.hand).containsKey(seat)) return 'an escrow of seat $seat, which no juror held';
         if (escrowedAt[d.turn.hand]?.contains(seat) ?? false) return 'seat $seat given to the escrow twice in hand ${d.turn.hand}';
         if (!humans.contains(e.author)) return 'an escrow of seat $seat claimed by someone not at the table';
-        if (!carried(d.witnesses, d.turn, d.among) && !byVerdict(d)) {
-          return 'an escrow of seat $seat at ${d.turn} without a majority behind it (${d.witnesses.length} of ${d.among.length})';
+        final backers = backersOf(d);
+        if (!carried(backers, d.turn, d.among) && !byVerdict(d)) {
+          return 'an escrow of seat $seat at ${d.turn} without a majority behind it (${backers.length} of ${d.among.length})';
         }
         escrowedAt.putIfAbsent(d.turn.hand, () => {}).add(seat);
         if (d.turn.isDeal) escrowedInDeal.putIfAbsent(d.turn.hand, () => {}).add(seat);
@@ -622,11 +653,12 @@ class _RecordVerifier {
         // (_settleLeave in client.dart).
         if (e.author != holder.key) return 'a leave signed by someone else';
         if (e.turn != d.turn) return 'a leave recorded at ${d.turn}, said at ${e.turn}';
-        if (!carried(d.witnesses, d.turn, d.among)) {
-          return 'a leave of seat $seat at ${d.turn} without a majority behind it (${d.witnesses.length} of ${d.among.length})';
+        final backers = backersOf(d);
+        if (!carried(backers, d.turn, d.among)) {
+          return 'a leave of seat $seat at ${d.turn} without a majority behind it (${backers.length} of ${d.among.length})';
         }
       } else {
-        final backers = Set.of(d.witnesses)..remove(holder.key);
+        final backers = backersOf(d)..remove(holder.key);
         if (!carried(backers, d.turn, d.among) && !byVerdict(d)) {
           return 'a ${e.kind.name} of seat $seat at ${d.turn} without a majority behind it '
               '(${backers.length} of ${d.among.length})';

@@ -1417,7 +1417,7 @@ test('a game\'s record: sent by a player signed for its table, kept, and shown o
     { bot: 'Romeo' },
     { bot: 'Juliet' },
   ];
-  const recordOf = (seats) => JSON.stringify({ v: 1, spec: { id: table, seats }, record: [{ turn: [0, 4], event: play, witnesses: [] }] });
+  const recordOf = (seats) => JSON.stringify({ v: 2, spec: { id: table, seats }, record: [{ turn: [0, 4], event: play, witnesses: [] }] });
   const record = recordOf(seats);
   // Signed for another table: not this one's.
   const wrong = await worker.fetch(send('record', await asking(ADA, 'record', { what: 'f'.repeat(32), table, record })), env);

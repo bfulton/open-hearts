@@ -77,11 +77,28 @@ void main() {
   test('the escrow\'s game, played again today, is the same record to the byte', () {
     // Every key, shuffle, token, seal, share and proof in it made again
     // by this library from the same seeds, and the record they make the
-    // one the older library kept.
+    // one the older library kept — in the form it kept it. Today's
+    // carries beside each removal the signed word of its backers
+    // (GameRecord.version); the older form named them by key alone.
     final t = threeAndALeaver(crypto);
-    final again = jsonEncode(GameRecord.of(t.people.first.client, names: threeNames).toJson());
+    final today = GameRecord.of(t.people.first.client, names: threeNames).toJson();
     t.stop();
-    expect(again, utf8.decode(gzip.decode(File('test/fixtures/sealed_three_leave.json.gz').readAsBytesSync())));
+    final asKept = {
+      ...today,
+      'v': 1,
+      'record': [for (final d in today['record']! as List) Map<String, Object?>.of(d as Map<String, Object?>)..remove('backing')],
+    };
+    expect(jsonEncode(asKept), utf8.decode(gzip.decode(File('test/fixtures/sealed_three_leave.json.gz').readAsBytesSync())));
+
+    // And in today's form the leave travels with its backing — the
+    // leaver's own word and a witness's — and the game verifies by it.
+    final read = GameRecord.parse(jsonDecode(jsonEncode(today)))!;
+    final left = read.record.singleWhere((d) => d.removal);
+    expect(left.event.kind, EventKind.leave);
+    expect(left.backing!.map((e) => e.kind), containsAll([EventKind.leave, EventKind.witness]));
+    final v = verifyRecord(read.spec, read.record, juries: read.juries, crypto: crypto, releases: read.releases);
+    expect(v.ok, isTrue, reason: v.reason);
+    expect(v.complete, isTrue);
   });
 
   test('the escrow\'s game carries its jury and its released pieces', () {

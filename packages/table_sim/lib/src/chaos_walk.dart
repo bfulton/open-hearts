@@ -1,14 +1,16 @@
 /// One random walk through the simulator's faults, and the invariants
 /// that must hold whatever happens: survivors never hold conflicting
-/// decisions, every record verifies as far as it goes, every observed
-/// state change is one the model in the table's model.dart allows, and
-/// once the faults stop and the network heals no two sides still up
-/// hold a held seat's escrow differently, and the table finishes — or
-/// is paused for the one reason left, the jury gone and nobody online
-/// to draw another, or has ended for it once that went on long enough.
-/// The test walks forty seeds on every commit; the tool walks as many
-/// as asked, sealed too.
+/// decisions, every record verifies as far as it goes, and as kept once
+/// the walk is over, every observed state change is one the model in
+/// the table's model.dart allows, and once the faults stop and the
+/// network heals no two sides still up hold a held seat's escrow
+/// differently, and the table finishes — or is paused for the one
+/// reason left, the jury gone and nobody online to draw another, or has
+/// ended for it once that went on long enough. The test walks forty
+/// seeds on every commit; the tool walks as many as asked, sealed too.
 library;
+
+import 'dart:convert';
 
 import 'package:deal/deal.dart';
 import 'package:engine/engine.dart';
@@ -84,6 +86,10 @@ class _Observed {
   HandState? handState;
   final Map<int, HeldSeatState> held = {};
 }
+
+/// [c]'s record as a viewer reads it once kept: through its JSON
+/// ([GameRecord]), signatures checked. Null where it does not read back.
+GameRecord? keptOf(TableClient c) => GameRecord.parse(jsonDecode(jsonEncode(GameRecord.of(c).toJson())));
 
 bool _sameList(List<Object?> a, List<Object?> b) {
   if (a.length != b.length) return false;
@@ -428,6 +434,14 @@ String? walkChaos(int seed,
 
     final survivors = t.survivors.toList();
     final finished = survivors.every((c) => c.done);
+    for (final c in survivors) {
+      final kept = keptOf(c);
+      if (kept == null) return '${c.signer.publicKey.substring(0, 6)} holds a record that does not read back as kept';
+      final v = verifyRecord(t.spec, kept.record, allowPartial: !finished, juries: kept.juries, crypto: t.crypto, releases: kept.releases);
+      if (!(v.ok && (v.complete || !finished))) {
+        return '${c.signer.publicKey.substring(0, 6)} record as kept does not verify${finished ? ' complete' : ''}: ${v.reason}';
+      }
+    }
     if (survivors.isEmpty) {
       // The last player still running was replaced while cut off, and
       // then everyone else went: a dead table. Every client still

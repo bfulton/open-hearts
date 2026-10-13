@@ -106,6 +106,7 @@ class Decision {
     this.among = const {},
     this.jury = false,
     this.verdict,
+    this.backing = const [],
   });
 
   /// True for a jury proposal that carried: the hand's jurors, agreed
@@ -132,6 +133,15 @@ class Decision {
 
   /// Who backed it, the author included.
   final Set<PublicKey> witnesses;
+
+  /// For a removal, the signed word of everyone who backed it: the
+  /// claims made at its turn (a boot, a claim of silence, the leave, a
+  /// claim of the escrow, a vote that the game ends there) and the
+  /// witnesses of one. A key in [witnesses] without its word here is no
+  /// backer to the verifier (record.dart). Null only in a record kept
+  /// before removals carried their backing (GameRecord, version 1),
+  /// where the keys are all there is.
+  final List<TableEvent>? backing;
 
   /// True when this is a departure rather than an action.
   final bool removal;
@@ -2165,6 +2175,7 @@ class TableClient {
       removal: true,
       among: of,
       verdict: verdict,
+      backing: race.removalBacking,
     ));
     _trace('bot seat $seat to the escrow at $turn, carried there after its move had settled here');
     _escrowed.putIfAbsent(hand, () => {})[seat] = turn;
@@ -2504,6 +2515,7 @@ class TableClient {
       removal: true,
       among: of,
       verdict: verdict,
+      backing: race.removalBacking,
     ));
     _trace('booted seat $seat at $turn by ${race.forRemoval.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
     _remove(seat, at: turn, how: claim.kind);
@@ -2532,6 +2544,7 @@ class TableClient {
       removal: true,
       among: of,
       verdict: verdict,
+      backing: race.removalBacking,
     ));
     _trace('bot seat $seat to the escrow at $turn by ${race.forRemoval.intersection(of).length}${verdict != null ? ' and the jury' : ''}');
     _escrowed.putIfAbsent(hand, () => {})[seat] = turn;
@@ -3051,7 +3064,7 @@ class TableClient {
   /// does, on this side's record as on everyone's.
   void _carryEnded(TurnId turn, _Race race, TableEvent claim, Set<PublicKey> of) {
     race.settled = true;
-    _log(Decision(turn: turn, event: claim, witnesses: {...race.forEnd}, removal: true, among: of));
+    _log(Decision(turn: turn, event: claim, witnesses: {...race.forEnd}, removal: true, among: of, backing: race.endBacking));
     _endedAt = turn;
     _trace('the game ends at $turn, ${Failure.jurorQuorumLost.label}: carried by ${race.forEnd.intersection(of).length}');
     _failure = Failure.jurorQuorumLost;
@@ -3498,7 +3511,7 @@ class TableClient {
     final of = _participantsAt(turn);
     if (!of.contains(e.author) || claim.backers.intersection(of).length < _majority(of)) return;
     claim.carried = true;
-    _log(Decision(turn: turn, event: e, witnesses: {...claim.backers}, among: of, removal: true));
+    _log(Decision(turn: turn, event: e, witnesses: {...claim.backers}, among: of, removal: true, backing: [e, ...claim.witnessEvents]));
     _trace('left seat $seat at $turn by ${claim.backers.intersection(of).length} of ${of.length}');
     _remove(seat, at: turn, how: EventKind.leave);
     final open = _openTurnOf(seat);
@@ -4439,6 +4452,14 @@ class _Race implements TurnVotes {
   final List<TableEvent> ends = [];
   @override
   final Set<PublicKey> forEnd = {};
+
+  /// The signed word behind a removal at this turn ([Decision.backing]):
+  /// the claims against the seat, and the witnesses of one.
+  List<TableEvent> get removalBacking => [...boots, ...witnessEvents.where((w) => boots.any((b) => b.id == w.witnessed))];
+
+  /// And behind the game's end here: the claims that it ends, and the
+  /// witnesses of one.
+  List<TableEvent> get endBacking => [...ends, ...witnessEvents.where((w) => ends.any((c) => c.id == w.witnessed))];
   @override
   bool settled = false;
   bool split = false;

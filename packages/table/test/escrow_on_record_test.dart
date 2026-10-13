@@ -92,8 +92,8 @@ void main() {
 
     int escrowAt() => record.indexWhere((d) => d.removal && d.event.kind == EventKind.escrow);
 
-    Decision withEvent(Decision d, TableEvent e, {Set<PublicKey>? witnesses}) =>
-        Decision(turn: d.turn, event: e, witnesses: witnesses ?? d.witnesses, removal: d.removal, among: d.among, verdict: d.verdict);
+    Decision withEvent(Decision d, TableEvent e, {Set<PublicKey>? witnesses, List<TableEvent>? backing}) => Decision(
+        turn: d.turn, event: e, witnesses: witnesses ?? d.witnesses, removal: d.removal, among: d.among, verdict: d.verdict, backing: backing ?? d.backing);
 
     test('the verifier turns down another juror playing the seat with no escrow on the record', () {
       final v = check([...record]..removeAt(escrowAt()));
@@ -114,7 +114,7 @@ void main() {
     test('the verifier turns down an escrow without a majority behind it', () {
       final i = escrowAt();
       final d = record[i];
-      final v = check([...record]..[i] = withEvent(d, d.event, witnesses: {d.event.author}));
+      final v = check([...record]..[i] = withEvent(d, d.event, witnesses: {d.event.author}, backing: [d.event]));
       expect(v.ok, isFalse);
       expect(v.reason, contains('without a majority'));
     });
