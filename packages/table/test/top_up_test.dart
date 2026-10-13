@@ -71,13 +71,13 @@ void main() {
     // little after the table has moved on.
     final ours = [for (final j in t.jurors) if (brought.contains(j.signer.publicKey)) j];
     final holding = t.clock.runUntil(
-      () => ours.every((j) => j.client?.holdsEscrowPiece(hand) ?? false),
+      () => ours.every((j) => j.client?.escrow.holdsPiece(hand) ?? false),
       limitMs: 5 * 60 * 1000,
     );
     expect(holding, isTrue,
         reason: 'every juror brought on holds a piece of the hand it was brought on to:\n'
             '${[for (final j in ours) '${j.signer.publicKey.substring(0, 4)}: '
-                '${j.client?.holdsEscrowPiece(hand)}'].join('\n')}');
+                '${j.client?.escrow.holdsPiece(hand)}'].join('\n')}');
     // And carries the hand to its end, which says the share is a
     // working one rather than a keepsake: the seat whose holder went
     // is opened from the escrow, and the audit at the end of the hand
@@ -179,12 +179,12 @@ void main() {
     final later = client.juries.where((d) => d.event.hand == hand).expand((d) => d.event.jurors).toSet().difference(before);
     expect(later, isNotEmpty, reason: 'the jury was topped up again');
     final ours = [for (final j in t.jurors) if (later.contains(j.signer.publicKey)) j];
-    expect(t.clock.runUntil(() => ours.every((j) => j.client?.holdsEscrowPiece(hand) ?? false), limitMs: 5 * 60 * 1000), isTrue,
+    expect(t.clock.runUntil(() => ours.every((j) => j.client?.escrow.holdsPiece(hand) ?? false), limitMs: 5 * 60 * 1000), isTrue,
         reason: 'every juror brought on the second time holds a piece');
     // Of every bot seat, as the table counts it: a whole set of parts
     // for each, the seats' own jurors among the custodians making them.
     for (final s in client.botHolders(hand).keys) {
-      expect(client.pieceHoldersOf(hand, s), containsAll(later), reason: 'seat $s\'s pieces reached every juror brought on');
+      expect(client.escrow.pieceHolders(hand, s), containsAll(later), reason: 'seat $s\'s pieces reached every juror brought on');
     }
     final seat = client.escrowedAt(hand).keys.first;
     final open = [for (final r in client.releases) if (r.hand == hand && r.about == seat && r.body['share'] != null) r];
@@ -331,7 +331,7 @@ void main() {
     // every side has them at the same places.
     final brought = {...first.jurors, ...second.jurors};
     final seats = a.botHolders(hand).keys.toList();
-    bool grown(TableClient c) => seats.every((s) => brought.every(c.escrowOrderOf(hand, s).contains));
+    bool grown(TableClient c) => seats.every((s) => brought.every(c.escrow.order(hand, s).contains));
     expect(t.clock.runUntil(() => grown(a) && grown(b), limitMs: 5 * 60 * 1000), isTrue, reason: 'the escrow grew by both draws');
     final naming = [
       for (final d in a.record)
@@ -341,12 +341,12 @@ void main() {
         reason: 'the record names both draws, in people\'s plays');
     expect(naming.every((e) => t.spec.seats[e.seat] is HumanSeat && (t.spec.seats[e.seat] as HumanSeat).key == e.author), isTrue);
     for (final s in seats) {
-      final order = a.escrowOrderOf(hand, s);
-      expect(b.escrowOrderOf(hand, s), order, reason: 'seat $s: one order at both people');
+      final order = a.escrow.order(hand, s);
+      expect(b.escrow.order(hand, s), order, reason: 'seat $s: one order at both people');
       for (final j in t.jurors) {
         final c = j.client;
-        if (c == null || !c.escrowOrderOf(hand, s).toSet().containsAll(brought)) continue;
-        expect(c.escrowOrderOf(hand, s), order, reason: 'seat $s: and at juror ${j.signer.publicKey.substring(0, 4)}');
+        if (c == null || !c.escrow.order(hand, s).toSet().containsAll(brought)) continue;
+        expect(c.escrow.order(hand, s), order, reason: 'seat $s: and at juror ${j.signer.publicKey.substring(0, 4)}');
       }
     }
 
@@ -356,7 +356,7 @@ void main() {
     // the seat's own order says its moves, and it is the one the
     // others seal their pieces to.
     final ours = [for (final j in t.jurors) if (brought.contains(j.signer.publicKey)) j];
-    expect(t.clock.runUntil(() => ours.every((j) => j.client?.holdsEscrowPiece(hand) ?? false), limitMs: 5 * 60 * 1000), isTrue,
+    expect(t.clock.runUntil(() => ours.every((j) => j.client?.escrow.holdsPiece(hand) ?? false), limitMs: 5 * 60 * 1000), isTrue,
         reason: 'every newcomer holds a piece');
     // The pieces said in the open at the hand's end reach the people
     // after they have audited, so no audit carries either seat's secret
@@ -417,7 +417,7 @@ void main() {
     final seat = holders.keys.first;
     // The custodian that will be left: one the seat's first pieces are
     // not sealed to, the three ahead of it saying its moves between them.
-    final order = [for (final k in a.escrowOrderOf(hand, seat)) if (!holders.values.contains(k)) k];
+    final order = [for (final k in a.escrow.order(hand, seat)) if (!holders.values.contains(k)) k];
     final left = order[3];
     // The seat to the escrow, and its moves said again.
     t.net.goOffline(holders[seat]!);
@@ -455,10 +455,10 @@ void main() {
     relay.broadcast(backed.toJson());
     final brought = proposal.jurors.toSet();
     final ours = [for (final j in t.jurors) if (brought.contains(j.signer.publicKey)) j];
-    expect(t.clock.runUntil(() => ours.every((j) => j.client?.holdsEscrowPiece(hand) ?? false), limitMs: 5 * 60 * 1000), isTrue,
+    expect(t.clock.runUntil(() => ours.every((j) => j.client?.escrow.holdsPiece(hand) ?? false), limitMs: 5 * 60 * 1000), isTrue,
         reason: 'the newcomers hold their pieces');
     final behind = t.jurors.firstWhere((j) => j.signer.publicKey == left).client!;
-    expect(behind.escrowOrderOf(hand, seat).any(brought.contains), isFalse, reason: 'the one to be left is behind the play that named them');
+    expect(behind.escrow.order(hand, seat).any(brought.contains), isFalse, reason: 'the one to be left is behind the play that named them');
     // Every other custodian of the jury the deal was sealed to goes.
     for (final k in sealed.jurors) {
       if (k != left) t.net.goOffline(k);

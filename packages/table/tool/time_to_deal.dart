@@ -59,7 +59,7 @@ Future<void> main(List<String> args) async {
     // the moment the first card falls, which is when a holder can
     // first go.
     final hand = t.clients.first.game.handNumber;
-    holding += t.jurors.where((j) => j.client?.holdsEscrowPiece(hand) ?? false).length;
+    holding += t.jurors.where((j) => j.client?.escrow.holdsPiece(hand) ?? false).length;
     sworn += t.jurors.length;
     t.stop();
   }
