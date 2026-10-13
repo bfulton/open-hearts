@@ -139,7 +139,7 @@
     "header": {
       "title": "Privacy",
       "tagline": "What Open Hearts does with what you give it, in plain words.",
-      "updated": "Last updated 12 October 2026"
+      "updated": "Last updated 13 October 2026"
     },
     "short": {
       "title": "The short version",
@@ -201,7 +201,7 @@
       "p2": "Subscribing makes an account: a random number, not your name or email. We give Stripe your device's public key so the payment can be matched to it. In return our service keeps a short record: which account the subscription pays for, which device keys are in the account and when each was added, which one is in use now, and the dates the subscription runs to. It also keeps your account's profile — the name, icon, colour and picture you chose — so that every device in the account shows the same ones, and a change on one reaches the others. In Stripe we can see your email address, name, country, card brand, the last four digits of your card and your payments.",
       "p3": "That means we could connect a subscriber's email address with their account, and so with the names and results its devices have published. We do not publish that connection, and we use it only to run your subscription.",
       "p4": "If you add another device to your account, our service keeps a record of the one-use code you made and which devices made and used it. Any device in the account can see the others' keys, which one is in use, and remove them. Your account plays on one device at a time: opening the game on one makes it the one in use, and the device before it stops playing live until you take it back.",
-      "p5": "An account also has five backup codes, kept by our service with the account and shown on its devices, with a note of which have been used. If you subscribed on the web, we email them to the address you paid with when you subscribe, and again whenever a device in the account asks us to. To do that we read the address from Stripe at that moment and hand it to <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, which sends the email for us; we do not keep the address.",
+      "p5": "An account also has five backup codes, kept by our service with the account and shown on its devices, with a note of which have been used. If you subscribed on the web, we write to the address you paid with in three cases only: when you subscribe, with what you bought, how it renews, how to cancel, and the codes; with the codes again, whenever a device in the account asks for them; and before a change of price applies, to tell you of it. To do that we read the address from Stripe at that moment and hand it to <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, which sends the email for us; we do not keep the address. Stripe also writes to you itself about your payments, such as receipts and a reminder before each renewal, under its own privacy policy.",
       "p6": "If you sign in with Apple or Google, we keep a scrambled form of the number they give for your sign-in — not your name or email — linked to your account, so that signing in the same way on another device brings it into the account. Your device keeps only which of the two you used. Apple or Google does the signing in, under its own privacy policy; on the web, its sign-in code is fetched only while a sign-in button is on the screen.",
       "p7": "When a subscription is bought, our service emails us which store it was bought in, the first few characters of it, and the dates it runs to, so that we can keep an eye on the service while it is small — never your name or email address."
     },
@@ -215,7 +215,7 @@
       "p2": "No advertising identifiers, and nothing that follows you from app to app or site to site.",
       "p3": "No cookies from our pages. Stripe sets its own, on its own site, when you buy.",
       "p4": "No location, no contacts, no microphone. The camera only while you scan a code to add a device; the picture stays on the device.",
-      "p5": "No email address held by us, no password, and no account unless you subscribe. Email is sent only with backup codes, as above.",
+      "p5": "No email address held by us, no password, and no account unless you subscribe. We write to you only about a subscription, as above: nothing else, and no marketing.",
       "p6": "No chat."
     },
     "kept": {
@@ -238,7 +238,7 @@
     },
     "children": {
       "title": "Children",
-      "p1": "Open Hearts is not made for children under 13, and they should not play live, since it shows a name and picture to strangers. If you think a child has published something through it, tell us and we will do what we can to remove it."
+      "p1": "Open Hearts is not made for children under 13, and the <a href=\"{{base}}/terms#age\">terms</a> do not let them play live, since it shows a name and picture to strangers. If you think a child has published something through it, tell us and we will do what we can to remove it."
     },
     "changes": {
       "title": "Changes",
@@ -257,7 +257,7 @@
     "header": {
       "title": "Terms of Use",
       "tagline": "The agreement between you and Open Hearts, in plain words.",
-      "updated": "Last updated 11 October 2026"
+      "updated": "Last updated 13 October 2026"
     },
     "short": {
       "title": "The short version",
@@ -272,8 +272,12 @@
     },
     "who": {
       "title": "Who these terms are with",
-      "p1": "These terms are an agreement between you and Open Hearts (\"we\", \"us\"), which is run by Bright Fulton and whose address is under <a href=\"#contact\">Contact</a>. They cover this site, the game at <a href=\"{{play}}\">play.openhearts.game</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
+      "p1": "These terms are an agreement between you and Bright Fulton, who runs Open Hearts as a sole proprietor and whose address is under <a href=\"#contact\">Contact</a> (\"Open Hearts\", \"we\", \"us\"). They cover this site, the game at <a href=\"{{play}}\">play.openhearts.game</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
       "p2": "How we handle information about you is in the <a href=\"{{base}}/privacy\">privacy policy</a>, which is part of these terms."
+    },
+    "age": {
+      "title": "Age",
+      "p1": "Anyone may play alone. You must be at least 13 years old to play live. If you are under 18, you may subscribe only with the agreement of a parent or guardian, who accepts these terms on your behalf and is responsible for the subscription."
     },
     "appStore": {
       "title": "If you got the app from the App Store",
@@ -299,7 +303,7 @@
       "p11": "<b>A subscription renews automatically every year</b>, at the price then in force, and is charged to the same payment method, until you cancel it. If the price changes, the new price applies only from your next renewal, and the store, or for the web we, will tell you before it does.",
       "p12": "<b>App Store:</b> payment is charged to your Apple Account when you confirm the purchase. The subscription renews unless it is cancelled at least 24 hours before the end of the current year, and your account is charged for the renewal within the 24 hours before that.",
       "p13": "<b>Google Play:</b> renewal and charging follow Google Play's rules, shown when you buy.",
-      "p14": "<b>Web:</b> the purchase is made through Stripe, and Stripe charges the card you gave it each year on the date you first subscribed.",
+      "p14": "<b>Web:</b> the purchase is made through Stripe, and Stripe charges the card you gave it each year on the date you first subscribed. Before you pay, Stripe's checkout asks you to agree to these terms and to the yearly renewal. We then email you what you bought, how it renews and how to cancel, and Stripe emails you a reminder before each renewal.",
       "p15": "Cancelling",
       "p16": "You can cancel at any time. Cancelling stops the next renewal; live play keeps working until the end of the year you have paid for.",
       "p17": "How to cancel — in the app, in each store, and when you no longer have any of your devices — is on the <a href=\"{{base}}/support#cancel\">support page</a>.",
@@ -308,7 +312,9 @@
       "p22": "<b>Web:</b> contact us. Where the law where you live gives you a right to withdraw from the purchase or to a refund, you have it, and we will look fairly at any other request.",
       "p23": "A refunded subscription stops being renewed, and live play on its devices ends when their current licence runs out, within about a month.",
       "p24": "Your devices",
-      "p25": "Subscribing makes an account, and the subscription and its devices belong to it. There is no password, and the account plays live on one device at a time: opening the game on another of its devices moves live play there, and a game left on the first counts as one you left. If you clear the game's data or delete the app on your only device in the account, bring the new one in with a backup code, or by signing in with Apple or Google as before. Or contact us with the email address you paid with on the web, and we will help where we can."
+      "p25": "Subscribing makes an account, and the subscription and its devices belong to it. There is no password, and the account plays live on one device at a time: opening the game on another of its devices moves live play there, and a game left on the first counts as one you left. If you clear the game's data or delete the app on your only device in the account, bring the new one in with a backup code, or by signing in with Apple or Google as before. Or contact us with the email address you paid with on the web, and we will help where we can.",
+      "p26": "Your device as a juror",
+      "p27": "While the game is open on the device your account plays live on, that device may be drawn as a juror at other subscribers' tables, a hand at a time: it helps deal the cards, plays the seats the bots hold, and settles turns the players cannot. That is how live tables work with no server of ours seeing a hand, and every subscriber's device does its part. It uses some of the device's data, battery and processing while the game is open, and the device is not drawn while the game is in the background or once it is closed. What it shares, and with whom, is in the <a href=\"{{base}}/privacy\">privacy policy</a>."
     },
     "table": {
       "title": "At a live table",
@@ -320,7 +326,30 @@
       "p6": "cheat: share cards with another player, play several seats at one table, or alter the game to gain an advantage;",
       "p7": "attack, overload or try to break the service, the relays, or other players' devices, or use them for anything but playing.",
       "p8": "A player who stops playing can be booted by the table, and a bot takes the seat. A player who leaves a rated game finishes it last. You can hide another player's picture on your own device at any time.",
-      "p9": "To report a player or a picture, contact us (below). We may stop renewing live play for a device that breaks these rules, and if we do so without a good reason we will refund the unused part of a web subscription."
+      "p9": "To report a player or a picture, contact us (below). If a device or an account breaks these rules, we may remove its name or picture, suspend it from live play at once, and stop issuing its devices the licences live play needs. If we do that without a good reason, we will refund the unused part of a web subscription."
+    },
+    "content": {
+      "title": "What you publish",
+      "p1": "Your name, icon, colour and picture, and the records and results of the games you play, are yours. So that live play can work, you give us a worldwide, non-exclusive, royalty-free licence to store, copy, publish and pass them on through our service and relay, and to show them to other players and to anyone who reads the relay, as the <a href=\"{{base}}/privacy\">privacy policy</a> describes, for as long as it says they are kept. You confirm that you have the right to use any picture you choose, and that what you publish breaks no one else's rights."
+    },
+    "copyright": {
+      "title": "Copyright",
+      "p1": "If you believe that something published through Open Hearts, such as a player's name or picture, infringes your copyright, send a notice to our copyright agent:",
+      "p2": "Under the US Digital Millennium Copyright Act, the notice must include:",
+      "p3": "your physical or electronic signature, as the copyright owner or someone authorized to act for them;",
+      "p4": "the copyrighted work you say is infringed;",
+      "p5": "the material you say infringes it, and enough for us to find it, such as the player's name and where you saw it;",
+      "p6": "your name, address, telephone number and email address;",
+      "p7": "a statement that you believe in good faith that the use is not authorized by the copyright owner, its agent or the law;",
+      "p8": "a statement that the information in the notice is accurate and, under penalty of perjury, that you are the owner or authorized to act for them.",
+      "p9": "When a notice is complete, we remove the material or disable access to it promptly, and tell the person who published it.",
+      "p10": "If something you published was removed and you believe that was a mistake or a misidentification, you may send a counter-notice to the same agent. It must include:",
+      "p11": "your physical or electronic signature;",
+      "p12": "the material that was removed, and where it appeared before it was;",
+      "p13": "a statement, under penalty of perjury, that you believe in good faith that it was removed by mistake or misidentification;",
+      "p14": "your name, address and telephone number, and a statement that you consent to the jurisdiction of the federal district court for the district where your address is (or, outside the United States, any district where we may be found), and that you will accept service of process from the person who sent the notice, or their agent.",
+      "p15": "We send a complete counter-notice to the person who sent the notice, and put the material back 10 to 14 business days after we receive it, unless they tell us first that they have filed a court action to stop the infringement.",
+      "p16": "We end live play for a device or account that repeatedly infringes copyright. A notice or counter-notice that knowingly misrepresents something can make its sender liable for damages."
     },
     "code": {
       "title": "The code, and the name",
@@ -328,7 +357,8 @@
     },
     "warranty": {
       "title": "No warranty",
-      "p1": "Open Hearts is provided \"as is\" and \"as available\". To the extent the law allows, we make no promises about it beyond those in these terms: not that it will be free of bugs or interruptions, not that it will suit a particular purpose, and not that servers run by other people will keep or delete anything."
+      "p1": "<b>OPEN HEARTS IS PROVIDED \"AS IS\" AND \"AS AVAILABLE\". TO THE EXTENT THE LAW ALLOWS, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.</b>",
+      "p2": "In plain words: beyond the promises in these terms, we do not promise that Open Hearts will be free of bugs or interruptions, that it will suit a particular purpose, or that servers run by other people will keep or delete anything."
     },
     "liability": {
       "title": "Limits on our liability",
@@ -350,7 +380,7 @@
     "contact": {
       "title": "Contact",
       "p1": "Email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, or write to:",
-      "p2": "Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
+      "p2": "Bright Fulton<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p3": "Bug reports are welcome as issues at <a href=\"https://github.com/bfulton/open-hearts/issues\">github.com/bfulton/open-hearts/issues</a>, which are public. More help is on the <a href=\"{{base}}/support\">support page</a>."
     }
   }

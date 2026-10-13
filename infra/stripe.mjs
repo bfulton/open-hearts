@@ -12,8 +12,11 @@
 // service's OH_STRIPE_SECRET — Products, Subscriptions and Customers
 // read; Checkout Sessions and Customer Portal write), the webhook's
 // signing secret (shown once, at creation; it is the Pages project's
-// OH_STRIPE_WEBHOOK_SECRET), Checkout's branding, receipt emails, and
-// the account's name and statement descriptor.
+// OH_STRIPE_WEBHOOK_SECRET), Checkout's branding, receipt emails, the
+// emails about upcoming renewals (on, 30 days before, with a link to
+// the portal: the terms promise a reminder), the terms of service URL
+// in Public details (Checkout's consent box will not open without
+// it), and the account's name and statement descriptor.
 
 export const stripe = {
   /// Which mode this describes. apply.mjs refuses a key of the other.

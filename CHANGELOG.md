@@ -10,6 +10,18 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- On the web, Stripe's checkout will not take payment until the buyer
+  ticks that they agree to the terms and to the yearly renewal, in the
+  app's language. The email that follows each purchase says what was
+  bought, how it renews and how to cancel, with the backup codes. Before,
+  only an account's first purchase was emailed. (2026-10-13, #28)
+- The terms name Bright Fulton, who runs Open Hearts as a sole
+  proprietor, as the party to them; set an age for live play (13, and a
+  parent's or guardian's agreement to subscribe under 18); say what a
+  device does as a juror; give the licence a player grants for the
+  name, picture and games they publish; let us suspend a device or
+  account that breaks the table's rules; and say how to send a
+  copyright notice or counter-notice, and to whom. (2026-10-13, #28)
 - `infra/apply.mjs` checks the Pages secret for Google Play's service
   account whenever `config/openhearts.json` names Play.
   (2026-10-11, #12)
@@ -27,6 +39,12 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- The subscribe page says beside the button what the subscription
+  costs, that it renews by itself until cancelled and where to cancel,
+  and that subscribing is agreeing to the terms. The terms' warranty
+  disclaimer names the implied warranties it disclaims, in bold, and
+  the privacy policy lists every email a web subscriber gets.
+  (2026-10-13, #28)
 - A game's record is kept only when each person's seat carries the
   service's licence for its key and no account sits twice, as the app
   checks before it shows one. (2026-10-12, #15)

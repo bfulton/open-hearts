@@ -554,8 +554,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Jouer seul est gratuit et le restera, tout comme les relevés, le moteur et chaque ligne de ce code. L\'argent paie ce qui nous coûte à faire tourner : vous mettre en relation, un relais quand deux appareils ne trouvent pas de chemin direct, et un juré quand une table est laissée seule.';
 
   @override
-  String get cancelWhenever =>
-      'Résiliez quand vous voulez ; l\'année payée s\'arrête d\'elle-même.';
+  String webRenewal(String price) {
+    return '$price par an, payé sur la page de Stripe. L\'abonnement se renouvelle tout seul chaque année jusqu\'à ce que vous le résiliiez, quand vous voulez, dans Gérer l\'abonnement ; l\'année payée s\'arrête d\'elle-même.';
+  }
+
+  @override
+  String get subscribeAgrees =>
+      'En vous abonnant, vous acceptez les Conditions d\'utilisation.';
 
   @override
   String get storeSubscriptionLater =>

@@ -37,7 +37,7 @@ Every handler is in `ROUTES` in `service/functions/worker.mjs`, and is reached a
 | `health` | GET, HEAD | No | Anyone; the monitors | `healthRoute`; `healthOf` in `service/functions/health.mjs` | `{ok, store, stripe}`: 200 when the store reads and Stripe knows the price, 503 otherwise. |
 | `licence` | POST | Yes, empty | Any device | `licenceRoute`; `licence` in `service/functions/licence.mjs` | The device's licence, or 402 when no subscription stands behind it. |
 | `activate` | POST | Yes, `<want> <seated>` | A device of an account | `activateRoute`; `activate` in `service/functions/household.mjs` | Makes the device its account's device in use, or confirms that it still is. `want` is `open`, `take` or `renew`. Answers an activation, or 409. |
-| `checkout` | POST | Yes, empty | Any device; `back` and `cancelled` must be on the same site (`sameSite` in `service/functions/stripe.mjs`) | `checkoutRoute`; `checkout` in `service/functions/stripe.mjs` | Opens a Stripe Checkout session, in subscription mode, for this device. |
+| `checkout` | POST | Yes, empty | Any device; `back` and `cancelled` must be on the same site (`sameSite` in `service/functions/stripe.mjs`) | `checkoutRoute`; `checkout` in `service/functions/stripe.mjs` | Opens a Stripe Checkout session, in subscription mode, for this device. The optional `lang` is the app's language, one of the site's; Stripe's page is in it, and links the terms in it (`checkoutTerms`). The buyer cannot pay without ticking that they agree to the terms and to the yearly renewal. |
 | `stripe` | POST | No; Stripe's `stripe-signature` header (`webhookSigned` in `service/functions/stripe.mjs`) | Stripe | `stripeRoute`; `record` in `service/functions/stripe.mjs` | Stripe's webhook: makes the account, binds the paying device, dates the subscription. |
 | `manage` | POST | Yes, empty | A device of an account with a Stripe subscription; 409 for a store subscription | `manageRoute`; `manage` in `service/functions/stripe.mjs` | Opens Stripe's billing portal. |
 | `store` | POST | Yes, the proof | Any device with an App Store signed transaction or a Play purchase token | `storeRoute`; `appleTransaction` in `service/functions/x509.mjs`, `playPurchase` in `service/functions/stores.mjs`, `bindPurchase` in `service/functions/subscriptions.mjs` | Binds the purchase and returns the device's licence. |
@@ -112,7 +112,7 @@ Everything the worker keeps is in the Workers KV namespace `OH_STORE`, one key p
 | `ACCOUNT#<account>` | `META` | `subscription`, `created_at` | Never |
 | `ACCOUNT#<account>` | `DEVICE#<key>` | `bound_at` | Never |
 | `ACCOUNT#<account>` | `TICKET` | The outstanding code: `code`, `expires_at`, `devices` | `TICKET_KEPT_S` in `service/functions/accounts.mjs` |
-| `ACCOUNT#<account>` | `BACKUP` | `codes` (each `code`, `used_at`), `made_at`, `emailed_at` | Never |
+| `ACCOUNT#<account>` | `BACKUP` | `codes` (each `code`, `used_at`), `made_at`, `emailed_at`, `acknowledged` (the last web subscription whose purchase was emailed) | Never |
 | `ACCOUNT#<account>` | `LOGIN` | `provider`, `login` (the key of its `LOGIN#` row), `at` | Never |
 | `ACCOUNT#<account>` | `ACTIVE` | The device in use: `key`, `epoch`, `at`, `seated`, `seated_at`, `tags` (the relay objects it was seen at). Only where `HOUSEHOLD` is not bound; otherwise the `Household` object keeps it in its own storage. | Never |
 | `ACCOUNT#<account>` | `PROFILE` | `name`, `icon`, `color`, `picture`, `version`, `updated_at` | Never |

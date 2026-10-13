@@ -139,7 +139,7 @@
     "header": {
       "title": "Confidentialité",
       "tagline": "Ce qu'Open Hearts fait de ce que vous lui confiez, en termes simples.",
-      "updated": "Dernière mise à jour : 12 octobre 2026"
+      "updated": "Dernière mise à jour : 13 octobre 2026"
     },
     "short": {
       "title": "En bref",
@@ -201,7 +201,7 @@
       "p2": "S'abonner crée un compte : un nombre aléatoire, pas votre nom ni votre e-mail. Nous donnons à Stripe la clé publique de votre appareil pour que le paiement puisse lui être associé. En retour, notre service garde un court relevé : le compte que l'abonnement paie, les clés d'appareil qui sont dans le compte et quand chacune a été ajoutée, celle qui est utilisée en ce moment, et jusqu'à quelles dates court l'abonnement. Il conserve aussi le profil de votre compte — le nom, l'icône, la couleur et l'image que vous avez choisis — pour que tous les appareils du compte affichent les mêmes, et qu'une modification sur l'un atteigne les autres. Dans Stripe, nous voyons votre adresse e-mail, votre nom, votre pays, la marque de votre carte, ses quatre derniers chiffres et vos paiements.",
       "p3": "Nous pourrions donc relier l'adresse e-mail d'un abonné à son compte, et ainsi aux noms et aux résultats publiés par ses appareils. Nous ne publions pas ce lien, et nous ne l'utilisons que pour gérer votre abonnement.",
       "p4": "Si vous ajoutez un autre appareil à votre compte, notre service garde une trace du code à usage unique que vous avez créé, et des appareils qui l'ont créé et utilisé. Tout appareil du compte peut voir les clés des autres, celui qui est utilisé, et les retirer. Votre compte joue sur un appareil à la fois : ouvrir le jeu sur l'un en fait celui qui est utilisé, et le précédent cesse de jouer en direct jusqu'à ce que vous le repreniez.",
-      "p5": "Un compte a aussi cinq codes de secours, conservés par notre service avec le compte et affichés sur ses appareils, avec une note indiquant lesquels ont servi. Si vous vous êtes abonné sur le web, nous les envoyons à l'adresse e-mail avec laquelle vous avez payé au moment de l'abonnement, puis chaque fois qu'un appareil du compte nous le demande. Pour cela, nous lisons l'adresse dans Stripe à ce moment-là et la transmettons à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, qui envoie l'e-mail pour nous ; nous ne conservons pas l'adresse.",
+      "p5": "Un compte a aussi cinq codes de secours, conservés par notre service avec le compte et affichés sur ses appareils, avec une note indiquant lesquels ont servi. Si vous vous êtes abonné sur le web, nous écrivons à l'adresse avec laquelle vous avez payé dans trois cas seulement : au moment de l'abonnement, avec ce que vous avez acheté, comment il se renouvelle, comment le résilier et les codes ; de nouveau avec les codes, chaque fois qu'un appareil du compte nous le demande ; et avant qu'un changement de prix s'applique, pour vous en informer. Pour cela, nous lisons l'adresse dans Stripe à ce moment-là et la transmettons à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, qui envoie l'e-mail pour nous ; nous ne conservons pas l'adresse. Stripe vous écrit aussi lui-même au sujet de vos paiements, par exemple les reçus et un rappel avant chaque renouvellement, selon sa propre politique de confidentialité.",
       "p6": "Si vous vous connectez avec Apple ou Google, nous gardons une forme brouillée du numéro qu'ils donnent à votre connexion — ni votre nom ni votre e-mail — reliée à votre compte, pour qu'une connexion faite de la même façon sur un autre appareil l'amène dans le compte. Votre appareil garde seulement lequel des deux vous avez utilisé. La connexion elle-même est faite par Apple ou Google, selon sa propre politique de confidentialité ; sur le web, son code de connexion n'est chargé que tant qu'un bouton de connexion est à l'écran.",
       "p7": "Quand un abonnement est acheté, notre service nous envoie un e-mail indiquant la boutique où il a été acheté, ses premiers caractères et les dates auxquelles il court, pour garder un œil sur le service tant qu'il est petit — jamais votre nom ni votre adresse e-mail."
     },
@@ -215,7 +215,7 @@
       "p2": "Pas d'identifiant publicitaire, et rien qui vous suive d'une application à l'autre ou d'un site à l'autre.",
       "p3": "Pas de cookies sur nos pages. Stripe dépose les siens, sur son propre site, quand vous achetez.",
       "p4": "Pas de localisation, pas de contacts, pas de micro. L'appareil photo seulement pendant que vous scannez un code pour ajouter un appareil ; l'image reste sur l'appareil.",
-      "p5": "Aucune adresse e-mail conservée par nous, pas de mot de passe, et pas de compte sauf si vous vous abonnez. Un e-mail n'est envoyé que pour les codes de secours, comme indiqué ci-dessus.",
+      "p5": "Aucune adresse e-mail conservée par nous, pas de mot de passe, et pas de compte sauf si vous vous abonnez. Nous ne vous écrivons qu'au sujet d'un abonnement, comme indiqué ci-dessus : rien d'autre, et aucune publicité.",
       "p6": "Pas de chat."
     },
     "kept": {
@@ -238,7 +238,7 @@
     },
     "children": {
       "title": "Enfants",
-      "p1": "Open Hearts n'est pas conçu pour les enfants de moins de 13 ans, et ils ne devraient pas jouer en direct, puisque cela montre un nom et une image à des inconnus. Si vous pensez qu'un enfant a publié quelque chose par ce biais, dites-le-nous et nous ferons notre possible pour le supprimer."
+      "p1": "Open Hearts n'est pas conçu pour les enfants de moins de 13 ans, et les <a href=\"{{base}}/terms#age\">conditions</a> ne les laissent pas jouer en direct, puisque cela montre un nom et une image à des inconnus. Si vous pensez qu'un enfant a publié quelque chose par ce biais, dites-le-nous et nous ferons notre possible pour le supprimer."
     },
     "changes": {
       "title": "Modifications",
@@ -257,7 +257,7 @@
     "header": {
       "title": "Conditions d'utilisation",
       "tagline": "L'accord entre vous et Open Hearts, en termes simples.",
-      "updated": "Dernière mise à jour : 11 octobre 2026"
+      "updated": "Dernière mise à jour : 13 octobre 2026"
     },
     "short": {
       "title": "En bref",
@@ -272,8 +272,12 @@
     },
     "who": {
       "title": "Avec qui ces conditions sont conclues",
-      "p1": "Ces conditions sont un accord entre vous et Open Hearts (« nous »), exploité par Bright Fulton, dont l'adresse figure sous <a href=\"#contact\">Contact</a>. Elles couvrent ce site, le jeu à l'adresse <a href=\"{{play}}\">play.openhearts.game</a>, les applications Open Hearts pour téléphone et le service de jeu en direct. En utilisant l'un d'eux, vous acceptez ces conditions. Si vous ne les acceptez pas, merci de ne pas les utiliser.",
+      "p1": "Ces conditions sont un accord entre vous et Bright Fulton (« Open Hearts », « nous »), qui exploite Open Hearts en nom propre et dont l'adresse figure sous <a href=\"#contact\">Contact</a>. Elles couvrent ce site, le jeu à l'adresse <a href=\"{{play}}\">play.openhearts.game</a>, les applications Open Hearts pour téléphone et le service de jeu en direct. En utilisant l'un d'eux, vous acceptez ces conditions. Si vous ne les acceptez pas, merci de ne pas les utiliser.",
       "p2": "La façon dont nous traitons les informations vous concernant est décrite dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>, qui fait partie de ces conditions."
+    },
+    "age": {
+      "title": "Âge",
+      "p1": "Tout le monde peut jouer seul. Pour jouer en direct, il faut avoir au moins 13 ans. Si vous avez moins de 18 ans, vous ne pouvez vous abonner qu'avec l'accord d'un parent ou tuteur, qui accepte ces conditions en votre nom et est responsable de l'abonnement."
     },
     "appStore": {
       "title": "Si vous avez obtenu l'application sur l'App Store",
@@ -299,7 +303,7 @@
       "p11": "<b>Un abonnement se renouvelle automatiquement chaque année</b>, au prix alors en vigueur, et est débité sur le même moyen de paiement, jusqu'à ce que vous le résiliiez. Si le prix change, le nouveau prix ne s'applique qu'à partir de votre prochain renouvellement, et la boutique, ou nous pour le web, vous en informera avant.",
       "p12": "<b>App Store :</b> le paiement est débité sur votre compte Apple à la confirmation de l'achat. L'abonnement se renouvelle sauf s'il est résilié au moins 24 heures avant la fin de l'année en cours, et votre compte est débité du renouvellement dans les 24 heures qui précèdent cette fin.",
       "p13": "<b>Google Play :</b> le renouvellement et le débit suivent les règles de Google Play, affichées lors de l'achat.",
-      "p14": "<b>Web :</b> l'achat se fait via Stripe, et Stripe débite chaque année la carte que vous lui avez donnée, à la date de votre premier abonnement.",
+      "p14": "<b>Web :</b> l'achat se fait via Stripe, et Stripe débite chaque année la carte que vous lui avez donnée, à la date de votre premier abonnement. Avant que vous payiez, la page de paiement de Stripe vous demande d'accepter ces conditions et le renouvellement annuel. Nous vous envoyons ensuite par e-mail ce que vous avez acheté, comment il se renouvelle et comment le résilier, et Stripe vous envoie un rappel avant chaque renouvellement.",
       "p15": "Résiliation",
       "p16": "Vous pouvez résilier à tout moment. La résiliation arrête le prochain renouvellement ; le jeu en direct continue de fonctionner jusqu'à la fin de l'année que vous avez payée.",
       "p17": "Comment résilier — dans l'application, dans chaque boutique, et quand vous n'avez plus aucun de vos appareils — est expliqué sur la <a href=\"{{base}}/support#cancel\">page d'aide</a>.",
@@ -308,7 +312,9 @@
       "p22": "<b>Web :</b> contactez-nous. Là où la loi de votre pays vous donne un droit de rétractation ou un droit au remboursement, vous en bénéficiez, et nous examinerons équitablement toute autre demande.",
       "p23": "Un abonnement remboursé n'est plus renouvelé, et le jeu en direct sur ses appareils prend fin à l'expiration de leur licence en cours, dans un délai d'environ un mois.",
       "p24": "Vos appareils",
-      "p25": "S'abonner crée un compte, auquel appartiennent l'abonnement et ses appareils. Il n'y a pas de mot de passe, et le compte joue en direct sur un appareil à la fois : ouvrir le jeu sur un autre de ses appareils y amène le jeu en direct, et une partie laissée sur le premier compte comme abandonnée par vous. Si vous effacez les données du jeu ou supprimez l'application sur votre seul appareil du compte, ramenez le nouveau avec un code de secours, ou en vous connectant avec Apple ou Google comme avant. Ou contactez-nous avec l'adresse e-mail avec laquelle vous avez payé sur le web, et nous vous aiderons dans la mesure du possible."
+      "p25": "S'abonner crée un compte, auquel appartiennent l'abonnement et ses appareils. Il n'y a pas de mot de passe, et le compte joue en direct sur un appareil à la fois : ouvrir le jeu sur un autre de ses appareils y amène le jeu en direct, et une partie laissée sur le premier compte comme abandonnée par vous. Si vous effacez les données du jeu ou supprimez l'application sur votre seul appareil du compte, ramenez le nouveau avec un code de secours, ou en vous connectant avec Apple ou Google comme avant. Ou contactez-nous avec l'adresse e-mail avec laquelle vous avez payé sur le web, et nous vous aiderons dans la mesure du possible.",
+      "p26": "Votre appareil comme juré",
+      "p27": "Tant que le jeu est ouvert sur l'appareil sur lequel votre compte joue en direct, cet appareil peut être tiré au sort comme juré aux tables d'autres abonnés, une donne à la fois : il aide à distribuer les cartes, joue à la place des bots et tranche les tours que les joueurs ne peuvent pas trancher. C'est ainsi que les tables en direct fonctionnent sans qu'aucun de nos serveurs ne voie une main, et l'appareil de chaque abonné fait sa part. Cela utilise un peu des données, de la batterie et du processeur de l'appareil tant que le jeu est ouvert, et l'appareil n'est pas tiré au sort tant que le jeu est en arrière-plan, ni une fois fermé. Ce qu'il partage, et avec qui, figure dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
     },
     "table": {
       "title": "À une table en direct",
@@ -320,7 +326,30 @@
       "p6": "tricher : partager des cartes avec un autre joueur, occuper plusieurs places à une même table, ou modifier le jeu pour en tirer un avantage ;",
       "p7": "attaquer, surcharger ou tenter de casser le service, les relais ou les appareils des autres joueurs, ou les utiliser à autre chose que jouer.",
       "p8": "Un joueur qui cesse de jouer peut être exclu par la table, et un bot prend sa place. Un joueur qui quitte une partie classée la termine dernier. Vous pouvez masquer l'image d'un autre joueur sur votre propre appareil à tout moment.",
-      "p9": "Pour signaler un joueur ou une image, contactez-nous (ci-dessous). Nous pouvons cesser de renouveler le jeu en direct pour un appareil qui enfreint ces règles, et si nous le faisons sans motif valable, nous rembourserons la partie non utilisée d'un abonnement web."
+      "p9": "Pour signaler un joueur ou une image, contactez-nous (ci-dessous). Si un appareil ou un compte enfreint ces règles, nous pouvons retirer son nom ou son image, le suspendre immédiatement du jeu en direct et cesser de délivrer à ses appareils les licences dont le jeu en direct a besoin. Si nous le faisons sans motif valable, nous rembourserons la partie non utilisée d'un abonnement web."
+    },
+    "content": {
+      "title": "Ce que vous publiez",
+      "p1": "Votre nom, votre icône, votre couleur et votre image, ainsi que les enregistrements et les résultats des parties que vous jouez, vous appartiennent. Pour que le jeu en direct fonctionne, vous nous accordez une licence mondiale, non exclusive et gratuite pour les conserver, les copier, les publier et les transmettre par notre service et notre relais, et pour les montrer aux autres joueurs et à quiconque lit le relais, comme le décrit la <a href=\"{{base}}/privacy\">politique de confidentialité</a>, aussi longtemps qu'elle indique qu'ils sont conservés. Vous confirmez avoir le droit d'utiliser toute image que vous choisissez, et que ce que vous publiez ne porte atteinte aux droits de personne."
+    },
+    "copyright": {
+      "title": "Droit d'auteur",
+      "p1": "Si vous pensez que quelque chose publié via Open Hearts, comme le nom ou l'image d'un joueur, porte atteinte à vos droits d'auteur, envoyez une notification à notre contact désigné pour le droit d'auteur :",
+      "p2": "Selon le Digital Millennium Copyright Act des États-Unis, la notification doit comporter :",
+      "p3": "votre signature manuscrite ou électronique, en tant que titulaire des droits ou personne autorisée à agir en son nom ;",
+      "p4": "l'œuvre protégée qui, selon vous, est contrefaite ;",
+      "p5": "le contenu qui, selon vous, la contrefait, avec de quoi le retrouver, comme le nom du joueur et l'endroit où vous l'avez vu ;",
+      "p6": "vos nom, adresse, numéro de téléphone et adresse e-mail ;",
+      "p7": "une déclaration selon laquelle vous estimez de bonne foi que l'utilisation n'est autorisée ni par le titulaire des droits, ni par son représentant, ni par la loi ;",
+      "p8": "une déclaration selon laquelle les informations de la notification sont exactes et, sous peine de parjure, que vous êtes le titulaire des droits ou autorisé à agir en son nom.",
+      "p9": "Lorsqu'une notification est complète, nous retirons le contenu ou en bloquons l'accès rapidement, et nous en informons la personne qui l'a publié.",
+      "p10": "Si un contenu que vous avez publié a été retiré et que vous pensez qu'il s'agit d'une erreur ou d'une méprise, vous pouvez envoyer une contre-notification au même contact. Elle doit comporter :",
+      "p11": "votre signature manuscrite ou électronique ;",
+      "p12": "le contenu retiré et l'endroit où il apparaissait avant son retrait ;",
+      "p13": "une déclaration, sous peine de parjure, selon laquelle vous estimez de bonne foi qu'il a été retiré par erreur ou par méprise ;",
+      "p14": "vos nom, adresse et numéro de téléphone, et une déclaration selon laquelle vous acceptez la compétence du tribunal fédéral de district du district de votre adresse (ou, hors des États-Unis, de tout district où nous pouvons être trouvés) et accepterez la signification des actes de la personne qui a envoyé la notification ou de son représentant.",
+      "p15": "Nous transmettons une contre-notification complète à la personne qui a envoyé la notification, et remettons le contenu en ligne 10 à 14 jours ouvrables après sa réception, sauf si cette personne nous informe d'abord qu'elle a engagé une action en justice pour faire cesser la contrefaçon.",
+      "p16": "Nous mettons fin au jeu en direct d'un appareil ou d'un compte qui porte atteinte aux droits d'auteur de façon répétée. Une notification ou une contre-notification contenant sciemment de fausses déclarations peut engager la responsabilité de son auteur."
     },
     "code": {
       "title": "Le code, et le nom",
@@ -328,7 +357,8 @@
     },
     "warranty": {
       "title": "Absence de garantie",
-      "p1": "Open Hearts est fourni « tel quel » et « selon disponibilité ». Dans la mesure permise par la loi, nous ne faisons aucune promesse à son sujet au-delà de celles de ces conditions : ni qu'il sera exempt de bugs ou d'interruptions, ni qu'il conviendra à un usage particulier, ni que des serveurs gérés par d'autres conserveront ou supprimeront quoi que ce soit."
+      "p1": "<b>Open Hearts est fourni « tel quel » et « selon disponibilité ». Dans la mesure permise par la loi, nous excluons toute garantie, expresse ou implicite, y compris les garanties implicites de qualité marchande, d'adéquation à un usage particulier et d'absence de contrefaçon.</b>",
+      "p2": "Autrement dit : au-delà des promesses de ces conditions, nous ne promettons pas qu'Open Hearts sera exempt de bugs ou d'interruptions, qu'il conviendra à un usage particulier, ni que des serveurs gérés par d'autres conserveront ou supprimeront quoi que ce soit."
     },
     "liability": {
       "title": "Limites de notre responsabilité",
@@ -350,7 +380,7 @@
     "contact": {
       "title": "Contact",
       "p1": "Écrivez à <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, ou par courrier à :",
-      "p2": "Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
+      "p2": "Bright Fulton<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p3": "Les signalements de bugs sont les bienvenus sous forme de tickets sur <a href=\"https://github.com/bfulton/open-hearts/issues\">github.com/bfulton/open-hearts/issues</a>, qui sont publics. Plus d'aide sur la <a href=\"{{base}}/support\">page d'aide</a>."
     }
   }

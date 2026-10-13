@@ -147,7 +147,12 @@ fee's fixed part would be most of a monthly price.
 metadata and the subscription's metadata, so renewals carry it too. The
 return address must be on the origin the checkout was asked of, which is
 the app's own ([above](#where-the-app-is)), and the app only
-leaves for Stripe's own hosts. The webhook binds the device once the
+leaves for Stripe's own hosts. Nothing is paid until the buyer ticks
+that they agree to the terms and to the yearly renewal, in the app's
+language (`checkoutTerms`), and the email that follows says what was
+bought, how it renews and how to cancel (`mailerOf` in
+`service/functions/household.mjs`): California's automatic renewal law
+asks for both. The webhook binds the device once the
 session is paid, and the subscription's own events carry its dates.
 `stripePrice` (in `config/openhearts.json`, or the
 [service settings](../reference/configuration.md#service-settings)) is a
@@ -199,7 +204,10 @@ in one of three ways:
   read and type (`backupCode`). They are the account's recovery secret:
   one entered on any device brings it into the same account. They are
   made when the account is paid for and emailed to the checkout's
-  address, which is read from Stripe and not kept. Any device of the
+  address, which is read from Stripe and not kept, in the email that
+  says what was bought (`backupsMade`). Each web purchase gets that
+  email once, a lapsed account's bought again included, even with
+  every code used. Any device of the
   account can show them, replace them all, or email them again. Email
   goes through Cloudflare Email Sending (`EMAIL`, from `OH_MAIL_FROM`,
   no reply-to). A store subscription has no address, so its codes are
@@ -599,7 +607,8 @@ read. Some things are checked but never changed from here:
 - **Keys' permissions**: neither Stripe nor Cloudflare lists them in a
   form worth pinning.
 - **Settings only a dashboard can change**, such as Email Sending's
-  onboarding and Stripe's branding, receipts and statement descriptor.
+  onboarding and Stripe's branding, receipts, emails about upcoming
+  renewals, terms of service URL and statement descriptor.
   Page Rules cannot be read with an account-owned token at all, and none
   are used: the redirects are rules.
 

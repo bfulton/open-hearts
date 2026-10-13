@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { BACKUP_CODES, backupCodeOf, backupsFor, backupsMade, devicesOn, entitlementOf, redeemBackup } from './accounts.mjs';
-import { backupMailHtml, backupMailText, mailerOf } from './household.mjs';
+import { backupMailHtml, backupMailText, mailerOf, moneyOf } from './household.mjs';
 import { memoryStore } from './rows.mjs';
 import { payerEmail, payerLookup, record } from './stripe.mjs';
 
@@ -24,7 +24,7 @@ const accountOf = async (store) => (await store.get(`KEY#${KEY}`, 'ENTITLEMENT')
 
 const mailbox = () => {
   const sent = [];
-  const mail = async (to, codes) => sent.push({ to, codes });
+  const mail = async (to, codes, purchase = null) => sent.push({ to, codes, purchase });
   return { sent, mail };
 };
 
@@ -41,15 +41,17 @@ test('a backup code is read the way a person types it', () => {
 test('made once when the subscription is paid for, and emailed once', async () => {
   const store = await household();
   const { sent, mail } = mailbox();
-  const first = await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now });
+  const charge = { amount: 599, currency: 'usd' };
+  const first = await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now, charge, subscription: 'sub_9' });
   assert.deepEqual(first.body.emailed, true);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].to, 'payer@example.com');
+  assert.deepEqual(sent[0].purchase, { charge }, 'the email that answers the payment says what was bought');
   assert.equal(sent[0].codes.length, BACKUP_CODES);
   for (const c of sent[0].codes) assert.match(c, /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/);
   assert.equal(new Set(sent[0].codes).size, BACKUP_CODES);
   // A webhook delivered again makes nothing new and sends nothing.
-  await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now });
+  await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now, charge, subscription: 'sub_9' });
   assert.equal(sent.length, 1);
   const shown = await backupsFor(KEY, store, mail, { now });
   assert.deepEqual(shown.body.codes.map((c) => c.code), sent[0].codes, 'the device shows the codes that were sent');
@@ -69,6 +71,47 @@ test('a send that failed is tried again by the next delivery', async () => {
   fail = false;
   assert.equal((await backupsMade(await accountOf(store), 'payer@example.com', store, mail, { now })).body.emailed, true);
   assert.equal(sent.length, 1);
+});
+
+test('each purchase is told of once: an account bought again hears of the new subscription', async () => {
+  const store = await household();
+  const account = await accountOf(store);
+  const { sent, mail } = mailbox();
+  const charge = { amount: 599, currency: 'usd' };
+  await backupsMade(account, 'payer@example.com', store, mail, { now, charge, subscription: 'sub_9' });
+  const later = now + 400 * 86_400_000;
+  await backupsMade(account, 'other@example.com', store, mail, { now: later, charge, subscription: 'sub_10' });
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].to, 'other@example.com', 'to whoever paid this time');
+  assert.deepEqual(sent[1].purchase, { charge });
+  assert.deepEqual(sent[1].codes, sent[0].codes, 'the codes still good, not new ones');
+  await backupsMade(account, 'other@example.com', store, mail, { now: later, charge, subscription: 'sub_10' });
+  assert.equal(sent.length, 2, 'and once only');
+  assert.equal((await store.get(`ACCOUNT#${account}`, 'BACKUP')).acknowledged, 'sub_10');
+});
+
+test('a purchase is told of even when every code has been used', async () => {
+  const store = await household();
+  const account = await accountOf(store);
+  await backupsFor(KEY, store, null, { now });
+  // Every code spent (a full account cannot spend the fifth, so as if
+  // a device had been dropped between).
+  const row = await store.get(`ACCOUNT#${account}`, 'BACKUP');
+  await store.put(`ACCOUNT#${account}`, 'BACKUP', { ...row, codes: row.codes.map((c) => ({ ...c, used_at: new Date(now).toISOString() })) });
+  const { sent, mail } = mailbox();
+  const told = await backupsMade(account, 'payer@example.com', store, mail, { now, charge: null, subscription: 'sub_10' });
+  assert.equal(told.body.emailed, true);
+  assert.deepEqual(sent[0].codes, []);
+  assert.deepEqual(sent[0].purchase, { charge: null });
+  // Asked for from a device, there is nothing to send.
+  assert.equal((await backupsFor(KEY, store, mail, { send: true, email: 'payer@example.com', now })).body.unsent, 'no codes');
+  // And the email says so where the codes would be.
+  const text = backupMailText([], { charge: null }).replace(/\s+/g, ' ');
+  assert.match(text, /^Thank you for subscribing/);
+  assert.match(text, /Every backup code of your account has been used\. Any device of the account can make new ones, under Subscription\./);
+  assert.doesNotMatch(text, /Your backup codes:|Keep them private/);
+  assert.ok(backupMailText([], { charge: null }).split('\n').every((line) => line.length <= 70));
+  assert.match(backupMailHtml([], { charge: null }), /<p>Every backup code of your account has been used\./);
 });
 
 test('a code brings one device in, once', async () => {
@@ -115,6 +158,7 @@ test('sent when a device asks: the codes still good, to the payer, and why not w
   assert.equal(asked.body.unsent, undefined);
   assert.equal(sent[0].to, 'payer@example.com');
   assert.deepEqual(sent[0].codes, asked.body.codes.map((c) => c.code));
+  assert.equal(sent[0].purchase, null, 'asked for again: the codes alone, not a payment answered');
   // A code spent is not sent again.
   await redeemBackup(device(1), asked.body.codes[0].code, store, { now });
   await backupsFor(KEY, store, mail, { send: true, email: 'payer@example.com', now });
@@ -169,4 +213,37 @@ test('the mailer: Cloudflare Email Sending from the address configured, or none'
   assert.match(got[0].html, /AAAA-BBBB-CCCC-DDDD/);
   assert.match(backupMailHtml(['<b>']), /&#60;b&#62;/, 'escaped');
   assert.match(backupMailText(['X']), /openhearts\.game\/support/);
+  // Asked for again from a device: the codes alone.
+  assert.equal(got[0].subject, 'Your Open Hearts backup codes');
+  assert.doesNotMatch(got[0].text, /renews/);
+});
+
+test('the email that answers a payment: what was bought, the renewal, how to cancel, then the codes', async () => {
+  const got = [];
+  const mail = mailerOf({ EMAIL: { send: async (m) => got.push(m) }, OH_MAIL_FROM: 'noreply@openhearts.game' });
+  await mail('payer@example.com', ['AAAA-BBBB-CCCC-DDDD'], { charge: { amount: 599, currency: 'usd' } });
+  const [m] = got;
+  assert.equal(m.subject, 'Your Open Hearts subscription');
+  const text = m.text.replace(/\s+/g, ' ');
+  assert.match(text, /^Thank you for subscribing to Open Hearts live play\. You paid \$5\.99 USD for a year of it\./);
+  assert.match(text, /renews automatically every year, on the date you subscribed, at the price then in force, until you cancel/);
+  assert.match(text, /Stripe emails you a reminder before each renewal/);
+  assert.match(text, /https:\/\/openhearts\.game\/support#cancel/);
+  assert.match(text, /The terms you agreed to: https:\/\/openhearts\.game\/terms/);
+  assert.ok(text.indexOf('until you cancel') < text.indexOf('AAAA-BBBB-CCCC-DDDD'), 'the terms first, then the codes');
+  assert.ok(m.text.split('\n').every((line) => line.length <= 70), 'lines a plain mail reader shows whole');
+  assert.match(m.html, /<a href="https:\/\/openhearts\.game\/support#cancel">/);
+  // No amount to say: the rest still is.
+  await mail('payer@example.com', ['X'], { charge: null });
+  assert.match(got[1].text, /^Thank you for subscribing/);
+  assert.doesNotMatch(got[1].text, /You paid/);
+});
+
+test('money, as Stripe gives it', () => {
+  assert.equal(moneyOf({ amount: 599, currency: 'usd' }), '$5.99 USD');
+  assert.equal(moneyOf({ amount: 500, currency: 'jpy' }), '¥500 JPY', 'a currency with no cents');
+  assert.equal(moneyOf({ amount: 599, currency: 'dollars' }), null, 'not a currency code');
+  assert.equal(moneyOf({ amount: 5.99, currency: 'usd' }), null);
+  assert.equal(moneyOf({ amount: -1, currency: 'usd' }), null);
+  assert.equal(moneyOf(null), null);
 });

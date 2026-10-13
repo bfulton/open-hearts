@@ -564,8 +564,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Allein spielen ist kostenlos und bleibt es, genau wie die Protokolle, die Engine und jede Zeile hiervon. Das Geld bezahlt den Teil, dessen Betrieb uns etwas kostet: euch miteinander zu verbinden, ein Relay, wenn zwei Geräte keinen direkten Weg finden, und einen Juror, wenn ein Tisch allein gelassen wird.';
 
   @override
-  String get cancelWhenever =>
-      'Kündige, wann du willst; das bezahlte Jahr läuft einfach aus.';
+  String webRenewal(String price) {
+    return '$price im Jahr, bezahlt auf der Seite von Stripe. Das Abo verlängert sich jedes Jahr von selbst, bis du kündigst – jederzeit, unter Abo verwalten; das bezahlte Jahr läuft einfach aus.';
+  }
+
+  @override
+  String get subscribeAgrees =>
+      'Mit dem Abo stimmst du den Nutzungsbedingungen zu.';
 
   @override
   String get storeSubscriptionLater =>

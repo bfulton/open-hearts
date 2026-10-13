@@ -582,6 +582,8 @@ async function applyStripe() {
   });
 
   note("the service's restricted key (OH_STRIPE_SECRET) cannot be read through the API: checked only as a secret set on the Pages project");
+  // The terms promise both, and neither can be read through the API.
+  note('emails about upcoming renewals (the dashboard\'s Billing settings) and the terms of service URL in Public details, which Checkout\'s consent box needs, cannot be read through the API: check them in the dashboard');
 }
 
 // ---- the run -------------------------------------------------------------------

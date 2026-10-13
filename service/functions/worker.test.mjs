@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
+import { languages, origin } from '../../site/build.mjs';
 import worker from './worker.mjs';
 import { claimWith, devicesOn, entitlementOf, ticketFor } from './accounts.mjs';
 import { activate, activeInStore, dropDevice, householdOp } from './household.mjs';
@@ -9,9 +10,9 @@ import { allowedOrigin, askedBy, requestStatement } from './http.mjs';
 import { licence, licenceFor, signerOn } from './licence.mjs';
 import { attest, loginRow } from './logins.mjs';
 import { dayAfter, dayOf, memoryStore } from './rows.mjs';
-import { forgetSettings, openHouse, useSettings } from './settings.mjs';
+import { SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
 import { forgetProviderKeys, supersede, whoSignedIn } from './signin.mjs';
-import { checkout, manage, record, sameSite, webhookSigned } from './stripe.mjs';
+import { CHECKOUT_WORDS, checkout, checkoutTerms, manage, record, sameSite, webhookSigned } from './stripe.mjs';
 import { mint, serversOf } from './turn.mjs';
 import { eventIdOf } from './records.mjs';
 import { keys } from '../do/sign.mjs';
@@ -410,6 +411,48 @@ test('checkout: a subscription session carrying the key three ways', async () =>
   assert.equal(form.get('branding_settings[icon][url]'), 'https://x/icon-512.png');
   assert.equal(form.get('branding_settings[background_color]'), '#06231A');
   assert.equal(form.get('branding_settings[button_color]'), '#E4B363');
+  // Nothing is paid until the buyer ticks that they agree to the terms
+  // and to the renewal, and the line under the button says how to stop
+  // it: in English when the app asked in no language.
+  assert.equal(form.get('consent_collection[terms_of_service]'), 'required');
+  assert.equal(form.get('locale'), 'en');
+  assert.match(form.get('custom_text[terms_of_service_acceptance][message]'), /^I agree to the \[Terms of Use\]\(https:\/\/openhearts\.game\/terms\), and that this subscription renews automatically every year/);
+  assert.match(form.get('custom_text[submit][message]'), /renews automatically every year until you cancel\. Cancel any time in the game: menu, Subscription, Manage subscription\.$/);
+});
+
+test('checkout: in the language the app asked in, the terms in that language too', async () => {
+  const forms = [];
+  const stripe = async (_, init) => {
+    forms.push(new URLSearchParams(init.body));
+    return new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' }), { status: 200 });
+  };
+  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1' };
+  for (const lang of ['pt', 'de', 'xx', { toString: () => 'es' }]) {
+    assert.equal((await checkout(KEY, 'https://x/', 'https://x/', shop, stripe, { lang })).status, 200);
+  }
+  const [pt, de, xx, notAString] = forms;
+  assert.equal(pt.get('locale'), 'pt-BR', "the site's Portuguese is Brazil's");
+  assert.match(pt.get('custom_text[terms_of_service_acceptance][message]'), /\(https:\/\/openhearts\.game\/pt\/terms\)/);
+  assert.equal(de.get('locale'), 'de');
+  assert.match(de.get('custom_text[terms_of_service_acceptance][message]'), /^Ich stimme den \[Nutzungsbedingungen\]\(https:\/\/openhearts\.game\/de\/terms\)/);
+  assert.match(de.get('custom_text[submit][message]'), /Menü, Abo, Abo verwalten\.$/);
+  for (const other of [xx, notAString]) {
+    assert.equal(other.get('locale'), 'en', 'a language the site has not got is English');
+    assert.equal(other.get('consent_collection[terms_of_service]'), 'required');
+  }
+});
+
+test('checkout: every language says the same things, within what Stripe takes', () => {
+  for (const [code, words] of Object.entries(CHECKOUT_WORDS)) {
+    const fields = checkoutTerms(code);
+    assert.equal((words.agree.match(/\{terms\}/g) ?? []).length, 1, `${code}: one link to the terms`);
+    assert.ok(fields['custom_text[terms_of_service_acceptance][message]'].length <= 1200, `${code}: Stripe takes 1200 characters`);
+    assert.ok(fields['custom_text[submit][message]'].length <= 1200, `${code}: Stripe takes 1200 characters`);
+  }
+  // The site's languages, each in the locale its pages are in, at the
+  // site's own address.
+  assert.equal(SITE, origin);
+  assert.deepEqual(Object.fromEntries(Object.entries(CHECKOUT_WORDS).map(([code, w]) => [code, w.locale])), Object.fromEntries(languages.map((l) => [l.code, l.lang])));
 });
 
 test('checkout: no keys is a shop that is not open, not a broken one', async () => {
@@ -553,6 +596,8 @@ test('the webhook route: a checkout paid for makes the backup codes and emails t
         customer: 'cus_1',
         customer_details: { email: 'payer@example.com' },
         metadata: { key: KEY },
+        amount_total: 599,
+        currency: 'usd',
       },
     },
   });
@@ -564,12 +609,34 @@ test('the webhook route: a checkout paid for makes the backup codes and emails t
   const account = await accountOfSub(store, 'sub_9');
   const row = await store.get(`ACCOUNT#${account}`, 'BACKUP');
   for (const c of row.codes) assert.match(got[0].text, new RegExp(c.code));
+  // With what was bought, that it renews and at what, and how to stop
+  // it, in a copy the payer keeps.
+  assert.equal(got[0].subject, 'Your Open Hearts subscription');
+  assert.match(got[0].text, /You paid \$5\.99 USD for a year of it\./);
+  assert.match(got[0].text.replace(/\s+/g, ' '), /renews automatically every year, on the date you subscribed, at the price then in force, until you cancel/);
+  assert.match(got[0].text.replace(/\s+/g, ' '), /menu, then Subscription, then Manage subscription/);
+  assert.match(got[0].html, /<a href="https:\/\/openhearts\.game\/terms">/);
   // Stripe delivers again: nothing new is made or sent, and the account
   // is the same one.
   assert.equal((await hook()).status, 200);
   assert.equal(got.length, 1);
   assert.equal(await accountOfSub(store, 'sub_9'), account);
   assert.deepEqual((await store.get(`ACCOUNT#${account}`, 'BACKUP')).codes, row.codes);
+
+  // The subscription ended a while ago, and the same device buys
+  // again: the same account, and the new purchase is told of as the
+  // first was.
+  const sub = await store.get('SUB#sub_9', 'META');
+  await store.put('SUB#sub_9', 'META', { ...sub, renews_at: '2026-01-01', cancelled_at: '2026-01-01', final: true });
+  const again = JSON.parse(raw);
+  again.data.object.subscription = 'sub_10';
+  const body = JSON.stringify(again);
+  const bought = await worker.fetch(new Request(at, { method: 'POST', headers: { 'stripe-signature': await signHook(body) }, body }), shop);
+  assert.equal(bought.status, 200);
+  assert.equal(await accountOfSub(store, 'sub_10'), account);
+  assert.equal(got.length, 2);
+  assert.equal(got[1].subject, 'Your Open Hearts subscription');
+  assert.match(got[1].text, /You paid \$5\.99 USD for a year of it\./);
 });
 
 test('the checkout route: the key, and somewhere on this site to come back to', async () => {
@@ -580,11 +647,16 @@ test('the checkout route: the key, and somewhere on this site to come back to', 
   const away = await worker.fetch(send(await asking(ADA, 'checkout', { back: 'https://evil.example/', cancelled: '/play/' })), shop);
   assert.equal(away.status, 400, 'a payment does not land where the caller says');
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 });
+  const sent = [];
+  globalThis.fetch = async (_, init) => {
+    sent.push(new URLSearchParams(init.body));
+    return new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 });
+  };
   try {
-    const res = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/' })), shop);
+    const res = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/', lang: 'fr' })), shop);
     assert.equal(res.status, 200);
     assert.equal((await res.json()).url, 'https://checkout.stripe.com/c/pay/cs_1');
+    assert.equal(sent.at(-1).get('locale'), 'fr', "in the app's language");
   } finally {
     globalThis.fetch = realFetch;
   }

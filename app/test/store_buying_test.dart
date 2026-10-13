@@ -256,6 +256,7 @@ void main() {
     expect(find.text('£4.99 a year'), findsOneWidget);
     expect(find.textContaining('£4.99 a year, charged to your Apple Account'), findsOneWidget);
     expect(find.textContaining('renews by itself every year until you cancel'), findsOneWidget);
+    expect(find.text('By subscribing, you agree to the Terms of use.'), findsOneWidget);
     expect(find.text('Restore purchases'), findsOneWidget);
     expect(find.text('Privacy policy'), findsOneWidget);
 
@@ -410,32 +411,61 @@ void main() {
   });
 
   testWidgets('with no store, or a store without the product, the page is the web\'s', (tester) async {
-    standUp();
+    final stand = standUp();
     await shopWith(FakeStore(open: false));
     expect(canBuyHere, isFalse);
     expect(priceShown, r'$5.99');
     await _pumpPage(tester);
     expect(find.text('Restore purchases'), findsNothing);
     expect(find.textContaining('renews by itself'), findsNothing);
+    expect(find.textContaining('By subscribing'), findsNothing, reason: 'nothing is bought here');
     expect(find.textContaining('Until the app is in the stores'), findsOneWidget);
 
     final productless = FakeStore(price: null);
     await shopWith(productless);
     expect(canBuyHere, isFalse);
 
-    // And the web goes to Stripe, not to a store: here, to a
-    // checkout handler the test binding answers 400 for.
+    // And the web goes to Stripe, not to a store: here, first to a
+    // checkout handler the stand-in service has no answer for.
     final wasCan = canLeaveForStripe;
+    final wasLeave = leaveFor;
+    final sentTo = <String>[];
     canLeaveForStripe = true;
-    addTearDown(() => canLeaveForStripe = wasCan);
+    leaveFor = sentTo.add;
+    addTearDown(() {
+      canLeaveForStripe = wasCan;
+      leaveFor = wasLeave;
+    });
     await tester.pumpWidget(const SizedBox());
     await _pumpPage(tester);
-    expect(find.text('Cancel whenever you like; the year you paid for runs out on its own.'), findsOneWidget);
+    // What California's automatic renewal law asks for beside the
+    // button: the price, the period, that it renews, how to cancel.
+    expect(
+      find.text(
+        r"$5.99 a year, paid on Stripe's page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.",
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('By subscribing, you agree to the Terms of use.'), findsOneWidget);
     expect(find.text('Restore purchases'), findsNothing);
     await tester.tap(find.text('Subscribe'));
     await tester.pumpAndSettle();
     expect(productless.bought, isEmpty);
     expect(find.text('The shop is not open yet.'), findsOneWidget);
+    expect(sentTo, isEmpty);
+    // Asked in the app's language, which Stripe's page and the terms it
+    // links are then in.
+    expect(lastAt(stand, 'checkout')['lang'], 'en');
+
+    // A checkout on Stripe's own host is gone to. (The page spins on
+    // until the browser has gone, so it never settles.)
+    stand.says('checkout', {'url': 'https://checkout.stripe.com/c/pay/cs_test_1'});
+    await tester.pumpWidget(const SizedBox());
+    await _pumpPage(tester);
+    await tester.tap(find.text('Subscribe'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(sentTo, ['https://checkout.stripe.com/c/pay/cs_test_1']);
+    await tester.pumpWidget(const SizedBox());
   });
 }
 
