@@ -184,6 +184,31 @@ test('the account\'s turn says it first: the relay closes the superseded device\
   assert.deepEqual(asked, [1, 1], 'asked at every answer');
 });
 
+test('the account\'s turn says the account is suspended: its sockets close saying so, and a device from before is turned away in the same words, for good', async () => {
+  const SUSPENDED = 'suspended: this account is suspended from live play';
+  const relay = gated({ seen: async () => null });
+  const a = socket();
+  relay.open(a);
+  const first = await activation(ADA, { epoch: 1 });
+  await relay.message(a, JSON.stringify(['AUTH', await showing(ADA, a, first)]));
+  relay.revoke(ACCOUNT, 2, SUSPENDED);
+  assert.deepEqual(a.closed, { code: 4001, why: SUSPENDED });
+  assert.deepEqual(a.of('NOTICE').at(-1), ['NOTICE', SUSPENDED]);
+  const late = socket();
+  relay.open(late);
+  await relay.message(late, JSON.stringify(['AUTH', await showing(ADA, late, first)]));
+  assert.equal(late.of('OK')[0][3], SUSPENDED);
+  assert.equal(late.closed?.code, 4001, 'for good, not to be asked again');
+  // A reason the relay does not know is not repeated: another device
+  // is in use, as ever.
+  const OTHER = '0b'.repeat(16);
+  const b = socket();
+  relay.open(b);
+  await relay.message(b, JSON.stringify(['AUTH', await showing(BAO, b, await activation(BAO, { account: OTHER }))]));
+  relay.revoke(OTHER, 2, 'whatever a caller makes up');
+  assert.match(b.closed?.why, /^superseded:/);
+});
+
 test('a backup juror by its mark, and nobody else by it', async () => {
   const relay = gated({ bench: 'the bench secret' });
   const j = socket();

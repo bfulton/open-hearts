@@ -11,6 +11,7 @@ import { licence, licenceFor, signerOn } from './licence.mjs';
 import { attest, loginRow } from './logins.mjs';
 import { dayAfter, dayOf, memoryStore } from './rows.mjs';
 import { SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
+import { SUSPENDED_WHY } from './suspension.mjs';
 import { forgetProviderKeys, supersede, whoSignedIn } from './signin.mjs';
 import { CHECKOUT_WORDS, checkout, checkoutTerms, manage, record, sameSite, webhookSigned } from './stripe.mjs';
 import { mint, serversOf } from './turn.mjs';
@@ -354,6 +355,14 @@ test('the licence: no subscription is 402, and a service half-configured is 503'
   }
 });
 
+test('the licence: a suspended account is told so, apart from having no subscription', async () => {
+  const now = Date.UTC(2026, 8, 16);
+  const store = subscribed(KEY, { renews_at: '2027-01-01' });
+  await store.put(`KEY#${KEY}`, 'ENTITLEMENT', { ...(await store.get(`KEY#${KEY}`, 'ENTITLEMENT')), suspended: true });
+  const out = await licence(KEY, { ...licensing(), OH_STORE: kvOf(store) }, { signer, now });
+  assert.deepEqual(out, { status: 403, body: { error: SUSPENDED_WHY, suspended: true } });
+});
+
 test('the licence route: a key is required, and what comes back verifies', async () => {
   const at = 'https://dev.open-hearts.pages.dev/api/licence';
   const withStore = { ...env, OH_SERVICE_SECRET: SERVICE_SECRET, OH_SERVICE_KEY: SERVICE_KEY, OH_STORE: kvOf(subscribed(ADA.public, { renews_at: '2027-01-01' })) };
@@ -657,6 +666,14 @@ test('the checkout route: the key, and somewhere on this site to come back to', 
     assert.equal(res.status, 200);
     assert.equal((await res.json()).url, 'https://checkout.stripe.com/c/pay/cs_1');
     assert.equal(sent.at(-1).get('locale'), 'fr', "in the app's language");
+    // A suspended account's device is sold nothing: Stripe is not asked.
+    const store = subscribed(ADA.public, { renews_at: '2027-01-01' });
+    await store.put(`KEY#${ADA.public}`, 'ENTITLEMENT', { ...(await store.get(`KEY#${ADA.public}`, 'ENTITLEMENT')), suspended: true });
+    const asked = sent.length;
+    const refused = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/' })), { ...shop, OH_STORE: kvOf(store) });
+    assert.equal(refused.status, 403);
+    assert.deepEqual(await refused.json(), { error: SUSPENDED_WHY, suspended: true });
+    assert.equal(sent.length, asked);
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -1541,12 +1558,12 @@ test('the newest device to take an account up is the one in use, at once; the on
   const active = activeInStore(store);
   const ask = (key, want, more = {}) => activate({ key, account, want, ...more }, store, active, { now });
 
-  assert.deepEqual((await ask(ADA.public, 'open')).body, { epoch: 1, licensed_until: '2027-09-16', took: false });
+  assert.deepEqual((await ask(ADA.public, 'open')).body, { epoch: 1, licensed_until: '2027-09-16', took: false, profile: 0 });
   assert.equal((await ask(ADA.public, 'renew')).body.epoch, 1, 'still hers');
   assert.equal((await ask(BAO.public, 'renew')).status, 409, 'a renewal takes nothing');
 
   const took = await ask(BAO.public, 'open');
-  assert.deepEqual(took.body, { epoch: 2, licensed_until: '2027-09-16', took: true });
+  assert.deepEqual(took.body, { epoch: 2, licensed_until: '2027-09-16', took: true, profile: 0 });
   const superseded = await ask(ADA.public, 'renew');
   assert.equal(superseded.status, 409);
   assert.equal(superseded.body.superseded, true);

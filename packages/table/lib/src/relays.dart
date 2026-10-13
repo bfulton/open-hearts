@@ -34,9 +34,10 @@ List<List<String>>? Function(PublicKey key)? relayCredentials;
 
 /// Told when a relay turns this device away for good, with the
 /// relay's reason: `superseded:` — another device of the account is the
-/// one in use now — or `restricted:` — not admitted at all. The relay
-/// has closed or will close the socket, and retrying will not change
-/// its mind (docs/explanation/service.md, "One device at a time").
+/// one in use now — `suspended:` — the account is suspended from live
+/// play — or `restricted:` — not admitted at all. The relay has closed
+/// or will close the socket, and retrying will not change its mind
+/// (docs/explanation/service.md, "One device at a time").
 void Function(String reason)? relayTurnedAway;
 
 /// How [signer] answers a relay's challenge: the AUTH event, or null
@@ -52,8 +53,10 @@ NostrEvent? Function(Uri relay, String challenge) relayAuthFor(Signer signer) =>
     };
 
 /// Whether a relay's reason is one it will not change its mind about
-/// for this device: a superseded device, or one not admitted.
-bool turnedAway(String reason) => reason.startsWith('superseded:') || reason.startsWith('restricted:');
+/// for this device: a superseded device, a suspended account's, or one
+/// not admitted.
+bool turnedAway(String reason) =>
+    reason.startsWith('superseded:') || reason.startsWith('suspended:') || reason.startsWith('restricted:');
 
 /// The list itself: parsed from text, turned by a key.
 abstract final class Relays {

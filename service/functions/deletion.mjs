@@ -50,18 +50,20 @@ export async function forgetAccount(store, account, { dry = false, keys = null }
   return gone;
 }
 
-/// The accounts whose profile is called [name], case and the spaces at
-/// its ends aside: for a deletion asked for by the name played under.
-/// [keys] lists the store's keys under a prefix, which the operator's
-/// tool can do (service/tool/kv.mjs) and the worker never does.
+/// The accounts whose profile is called [name], or was until the
+/// operator took the name off and held it (suspension.mjs), case and the
+/// spaces at its ends aside: for a deletion asked for by the name played
+/// under. [keys] lists the store's keys under a prefix, which the
+/// operator's tool can do (service/tool/kv.mjs) and the worker never
+/// does.
 export async function accountsNamed(store, keys, name) {
   const wanted = typeof name === 'string' ? name.trim().toLowerCase() : '';
   if (!wanted) return [];
   const found = [];
   for (const key of await keys('ACCOUNT#')) {
-    const account = /^ACCOUNT#([0-9a-f]{32})\|PROFILE$/.exec(key)?.[1];
-    if (!account) continue;
-    const called = (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.name;
+    const [, account, sk] = /^ACCOUNT#([0-9a-f]{32})\|(PROFILE|HELD)$/.exec(key) ?? [];
+    if (!account || found.includes(account)) continue;
+    const called = (await store.get(`ACCOUNT#${account}`, sk))?.name;
     if (typeof called === 'string' && called.trim().toLowerCase() === wanted) found.push(account);
   }
   return found;

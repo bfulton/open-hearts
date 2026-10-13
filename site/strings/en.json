@@ -223,7 +223,7 @@
       "p1": "<b>On your device:</b> until you remove them.",
       "p2": "<b>On our relay:</b> moves, presence and waiting for a game: not kept. Rooms, seatings and pictures: a day. Game results: for as long as the ratings are worked out from them.",
       "p3": "<b>Finished live games:</b> for good, in Cloudflare's storage. If you ask us to delete your account's data, your name comes off the games you played; the moves stay, for the other players.",
-      "p4": "<b>Our service's account and subscription records, your account's profile among them:</b> while the subscription runs, and afterwards until you ask us to delete them. A changed profile replaces the one before. The note of which device is in use is replaced each time another of your devices opens the game.",
+      "p4": "<b>Our service's account and subscription records, your account's profile among them:</b> while the subscription runs, and afterwards until you ask us to delete them. A changed profile replaces the one before. The note of which device is in use is replaced each time another of your devices opens the game. If we suspend your account from live play, or take its name or picture off, as the <a href=\"{{base}}/terms#table\">terms</a> allow, our service also keeps a note that it is suspended and since when, and the name or picture it took off, so that either can be undone. Each is kept until it is undone, or until you ask us to delete your account's records.",
       "p5": "<b>Stripe:</b> as long as Stripe's policy and the law on payment records require.",
       "p6": "<b>Cloudflare and Google:</b> under their own policies.",
       "p7": "<b>New Relic:</b> the errors and timings, eight days."

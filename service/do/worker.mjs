@@ -174,12 +174,13 @@ export class TagRelay {
   async fetch(request) {
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
       // The account's own object, telling this one that a device of the
-      // account has been superseded (Household, revokerOf). Only an
+      // account has been superseded, or that the account is suspended,
+      // and saying which (Household, revokerOf). Only an
       // object reaches here without a websocket: the worker below hands
       // an object nothing else.
       if (request.method === 'POST' && new URL(request.url).pathname === '/revoke') {
-        const { account, epoch } = await request.json();
-        if (typeof account === 'string' && Number.isSafeInteger(epoch)) (await this.ready()).revoke(account, epoch);
+        const { account, epoch, why } = await request.json();
+        if (typeof account === 'string' && Number.isSafeInteger(epoch)) (await this.ready()).revoke(account, epoch, why ?? undefined);
         return new Response('ok\n');
       }
       return new Response('this is a relay: open a websocket\n', { status: 426 });

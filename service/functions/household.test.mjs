@@ -10,6 +10,8 @@ import { Household, forgetHouseholds, inHousehold, sequencer } from './household
 import { memoryStore } from './rows.mjs';
 import { SERVICE_DEFAULTS } from './settings.mjs';
 import { record } from './stripe.mjs';
+import { SUSPENDED_WHY } from './suspension.mjs';
+import { carry } from '../tool/suspend.mjs';
 
 const KEY = 'ab'.repeat(32);
 const now = Date.now();
@@ -53,7 +55,12 @@ function householdNamespace(env) {
   return {
     idFromName: (name) => name,
     get(id) {
-      if (!objects.has(id)) objects.set(id, new Household({ storage: new Map() }, env));
+      if (!objects.has(id)) {
+        // An object's own storage, behind the two calls it makes.
+        const kept = new Map();
+        const storage = { get: async (k) => kept.get(k), put: async (k, v) => void kept.set(k, structuredClone(v)) };
+        objects.set(id, new Household({ storage }, env));
+      }
       const object = objects.get(id);
       return { fetch: (url, init) => object.fetch(new Request(url, init)) };
     },
@@ -93,6 +100,48 @@ for (const where of ['in this isolate', 'in a Durable Object']) {
     assert.equal((await devicesOn(store, account)).length, 5, 'five, not six');
   });
 }
+
+test("an operator's order, through the service to the account's own object: its device in use cut off at the relay, saying it is suspended", async () => {
+  forgetHouseholds();
+  const store = await household(2);
+  const account = await accountOf(store);
+  // The relay's objects, as the account's object tells them.
+  const told = [];
+  const TABLE = {
+    idFromName: (tag) => tag,
+    get: (tag) => ({ fetch: async (url, init) => (told.push({ tag, path: new URL(url).pathname, ...JSON.parse(init.body) }), new Response('ok\n')) }),
+  };
+  const env = { OH_STORE: kvOf(store) };
+  env.HOUSEHOLD = householdNamespace({ OH_STORE: env.OH_STORE, TABLE });
+  // In use, and seen at the relay's presence.
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'open' })).status, 200);
+  assert.equal((await inHousehold(env, account, { op: 'seen', key: KEY, account, epoch: 1, tag: 'online' })).status, 200);
+  // The tool, asking this worker.
+  const fetchImpl = (url, init) => worker.fetch(new Request(url, init), env);
+  const done = await carry(store, account, 'suspend', {}, { origin: 'https://dev.open-hearts.pages.dev', fetchImpl, wait: 0 });
+  assert.deepEqual(done, { status: 200, body: { act: 'suspend', suspended: true, flagged: 2, cutOff: true } });
+  assert.deepEqual(told, [{ tag: 'online', path: '/revoke', account, epoch: 2, why: SUSPENDED_WHY }]);
+  // Its devices take nothing up, told why, and an activation from
+  // before is turned away at the relay, saying why.
+  assert.deepEqual(await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'take' }), { status: 403, body: { error: SUSPENDED_WHY, suspended: true } });
+  assert.deepEqual(await inHousehold(env, account, { op: 'seen', key: KEY, account, epoch: 1, tag: 'pool' }), { status: 409, body: { error: SUSPENDED_WHY } });
+  // Let back: a device takes the account up again.
+  assert.equal((await carry(store, account, 'lift', {}, { origin: 'https://dev.open-hearts.pages.dev', fetchImpl, wait: 0 })).status, 200);
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'open' })).status, 200);
+});
+
+test('an order the store has not got wakes no account', async () => {
+  forgetHouseholds();
+  const store = await household(1);
+  let woken = 0;
+  const env = { OH_STORE: kvOf(store), HOUSEHOLD: { idFromName: (n) => n, get: () => (woken++, { fetch: async () => Response.json({}) }) } };
+  const ask = (body) => worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/order', { method: 'POST', body }), env);
+  assert.equal((await ask(JSON.stringify({ order: 'e'.repeat(32) }))).status, 404);
+  assert.equal((await ask(JSON.stringify({ order: 'not one' }))).status, 400);
+  assert.equal((await ask('not json')).status, 400);
+  assert.equal((await worker.fetch(new Request('https://dev.open-hearts.pages.dev/api/order'), env)).status, 405);
+  assert.equal(woken, 0);
+});
 
 test('asking for a code again is a read: the one outstanding, while it has time', async () => {
   const store = await household(1);

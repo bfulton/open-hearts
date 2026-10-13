@@ -382,6 +382,11 @@ it which account and version it last matched:
   Otherwise it reads the account's and takes it if its version is newer
   than the one it last matched, or if it last matched another account or
   none. A change made while a read was on its way wins: it is sent next.
+- Each activation's answer carries the profile's version, and the
+  device in use reads again when that moves. Only the operator changes a
+  profile from anywhere but the device in use
+  ([suspending an account](#suspending-an-account)), so this is how such
+  a change reaches it: at its next renewal, within 20 minutes.
 - **Joining** (a household code, a backup code, a sign-in, a store
   restore) ends in a licence for another account, which the app watches
   for: the account's profile replaces the device's, and an unsent change
@@ -406,12 +411,14 @@ before. The account is marked
 forgotten first, so a game kept later, such as one its last licence
 let it finish, is kept without its name. Every row kept for the
 account is deleted (`forgetAccount`): those under `ACCOUNT#` (its
-devices, code, backup codes, sign-in, device in use and profile), each
+devices, code, backup codes, sign-in, device in use, profile, and any
+suspension or name and picture held), each
 device's `ENTITLEMENT`, the rows its codes and sign-in are found by, and
 the `SUB#` rows of every subscription it has had. A subscription still paid up is
 cancelled first. Where the `Household` object runs, its note of the
 device in use (its key, the epoch, times, the table it said it sat at,
-and the relay objects it was seen at) is in the object's own storage and
+the relay objects it was seen at, and whether the account was suspended)
+is in the object's own storage and
 is not reached from outside. It is written over the next time the
 account is taken up, which after deletion is never, and it holds no name
 or picture. Its results stay on the relay, under its account number,
@@ -419,6 +426,66 @@ which nothing left in the service ties to the person; a result cannot be
 changed in any case, since every copy is signed by the device that
 published it
 ([delete an account's data](../how-to/delete-an-accounts-data.md)).
+
+### Suspending an account
+
+The terms let the operator suspend an account from live play, and take
+its name or picture off, in their sections "At a live table" and
+"Copyright". `service/tool/suspend.mjs` asks for it
+([suspend an account](../how-to/suspend-an-account.md)), and
+`service/functions/suspension.mjs` carries it out.
+
+**In the account's turn.** The account's device in use, and the relay
+objects it was seen at, are known only in the account's turn, where
+`Household` keeps them. So that is where a suspension is carried out,
+one after another with the devices' own requests, and where the device
+in use can be cut off at once. The tool reaches the store from outside,
+as `forget.mjs` does, but not the object. It writes an **order** into the
+store (`ORDER#<id>`, which KV deletes after `ORDER_KEPT_S`) and asks the
+service to carry it out (`order`). The handler reads the order before it
+wakes anything, so a request that names no order does nothing, and only
+someone who can write the store, the operator, can make one; no new
+secret is needed. A carried-out order is deleted. Each act can be
+carried out twice to the same end, since the tool asks again when an
+answer is lost or KV has not shown the order yet.
+
+**Suspended**, the account is marked (`SUSPENDED`), and each of its
+devices' `ENTITLEMENT` rows is flagged. Every handler that asks for a
+subscription then refuses the device at the one read it makes
+(`entitlementOf`): its licence, activation, profile, TURN credentials,
+game records and review. Checkout refuses to sell it one. A device
+brought into the account later is flagged as it joins, and a
+subscription that one of its devices buys stays with the suspended
+account rather than making a new one (`accountFor`). The device in use
+is cleared and the epoch goes up, as when another device takes the
+account; the relay objects it was seen at are told to close its sockets
+(`/revoke`), with the reason `suspended:` rather than `superseded:`, and
+the account's turn says the same whenever a relay asks about one of its
+activations (`seenAt`).
+
+**The app** hears it in one of three ways: the relay's reason, a 403
+with `suspended` when it next asks to be the device in use, or a 403
+with `suspended` at its licence check. Each does the same: live play
+shuts as on a superseded device (the table, the pool or room, any watch,
+and juror duty), the licence comes off the device, and where the app
+would sell live play it says that the account is suspended and where to
+ask why (`InUse`, `Entitlement.suspend`). Playing alone is untouched.
+
+**Lifted**, the mark and the flags go, and each device gets its licence
+again at its next licence check.
+
+**A name or picture taken off** is held beside the profile (`HELD`), so
+that a counter-notice can put it back, and the profile's version goes
+up, which the device in use hears at its next renewal
+([the account's profile](#the-accounts-profile)). A name taken off is
+also taken off the account's kept games (`anonymizeGames`), which
+putting it back doesn't undo. What the relay already holds stays for
+its usual day.
+
+**What it can't do.** An account is a number tied to device keys and
+payments, not to a person. A device with a new key, or one dropped from
+the account, can subscribe again as a new account. Only checking who
+people are would stop that, and the service checks nobody.
 
 ## TURN
 

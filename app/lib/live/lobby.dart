@@ -42,10 +42,11 @@ import 'live_controller.dart';
 
 /// Whether live play is open on this device: whether it holds a
 /// licence the service signed and the date on it has not passed
-/// (entitlement.dart, docs/explanation/service.md) — and it has not stepped back
-/// for another device of its account (net/in_use.dart). Solo play
-/// never asks.
-bool get liveOpen => Entitlement.current.live && !InUse.current.elsewhere;
+/// (entitlement.dart, docs/explanation/service.md) — and live play is
+/// not shut here: it has not stepped back for another device of its
+/// account, nor been told its account is suspended (net/in_use.dart).
+/// Solo play never asks.
+bool get liveOpen => Entitlement.current.live && !InUse.current.shut;
 
 /// Whether the operator has shut live play's doors for everyone, for
 /// now: the remote config's kill switch (net/remote_config.dart).
@@ -261,7 +262,7 @@ class Lobby extends ChangeNotifier {
     _signer = signer;
     _changed();
     if (InUse.current.standing != Use.here) await InUse.current.open(signer);
-    if (_disposed || InUse.current.elsewhere || Duty.current != null) return;
+    if (_disposed || InUse.current.shut || Duty.current != null) return;
     unawaited(_comeBack(signer));
     unawaited(_duty(signer).presence.ready.then((_) {
       if (_disposed) return;
@@ -384,7 +385,7 @@ class Lobby extends ChangeNotifier {
       // one, before anything is opened — unless the service has just
       // not answered, and then the relay says what it will.
       if (InUse.current.standing != Use.here && InUse.current.worthAsking) await InUse.current.open(signer);
-      if (_disposed || InUse.current.elsewhere) {
+      if (_disposed || InUse.current.shut) {
         _opening = null;
         _changed();
         return null;
@@ -606,7 +607,7 @@ class Lobby extends ChangeNotifier {
         // and the service is told now rather than once the page is left,
         // so the game — kept now — can be looked at from its end
         // (net/game_records.dart) while the page still shows it.
-        if (InUse.current.seatedTable == spec.id && !InUse.current.elsewhere) InUse.current.seatedAt(null);
+        if (InUse.current.seatedTable == spec.id && !InUse.current.shut) InUse.current.seatedAt(null);
         return;
       }
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -665,7 +666,7 @@ class Lobby extends ChangeNotifier {
     InUse.current.seatedAt(spec.id);
     unawaited(seat(controller).whenComplete(() {
       Duty.seated = false;
-      if (!InUse.current.elsewhere) InUse.current.seatedAt(null);
+      if (!InUse.current.shut) InUse.current.seatedAt(null);
       watch.close();
       // Off the table by choice: nothing to come back to.
       _seats?.clear();

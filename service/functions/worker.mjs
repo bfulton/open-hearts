@@ -33,6 +33,7 @@ import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, 
 import { playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
 import { checkout, manage, payerLookup, record, sameSite, webhookSigned } from './stripe.mjs';
 import { dateSubscription } from './subscriptions.mjs';
+import { SUSPENDED_WHY, isOrder, orderRow } from './suspension.mjs';
 import { LOCAL_TURN, mint } from './turn.mjs';
 import { appleSigned, appleTransaction } from './x509.mjs';
 
@@ -156,7 +157,7 @@ async function activateRoute(request, env) {
   const until = Math.floor(Math.min(now / 1000 + ACTIVATION_S, paidTo || now / 1000 + ACTIVATION_S));
   const activation = await activationFor(account, key, took.body.epoch, until, { signer, ...keys });
   if (!activation) return json(request, 503, { error: 'the service key does not match its secret' });
-  return json(request, 200, { activation, ...(took.body.took ? { took: true } : {}) });
+  return json(request, 200, { activation, profile: took.body.profile, ...(took.body.took ? { took: true } : {}) });
 }
 
 /// A finished game's record, sent by one of its players' devices to be
@@ -309,8 +310,33 @@ async function checkoutRoute(request, env) {
   const back = sameSite(body.back, request.url);
   const cancelled = sameSite(body.cancelled, request.url);
   if (!back || !cancelled) return json(request, 400, { error: 'somewhere on this site to come back to' });
+  // A suspended account's device is not sold a subscription it could
+  // not play on (suspension.mjs).
+  const store = storeOf(env);
+  if ((await store?.get(`KEY#${key}`, 'ENTITLEMENT'))?.suspended) return json(request, 403, { error: SUSPENDED_WHY, suspended: true });
   const { status, body: out } = await checkout(key, back, cancelled, env, fetch, { lang: body.lang });
   return json(request, status, out);
+}
+
+/// An operator's order, carried out in its account's turn
+/// (suspension.mjs): `{order}`, the id the operator's tool wrote it
+/// under. The order is read here first, so a request that names none
+/// wakes no account's object.
+async function orderRoute(request, env) {
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
+  let id = null;
+  try {
+    id = JSON.parse((await textOf(request, 256)) ?? 'null')?.order;
+  } catch {
+    // Not JSON: no order.
+  }
+  if (!isOrder(id)) return json(request, 400, { error: 'an order, 32 hex' });
+  const order = await store.get(...orderRow(id));
+  if (!order || !isAccount(order.account)) return json(request, 404, { error: 'no such order' });
+  const { status, body } = await inHousehold(env, order.account, { op: 'order', account: order.account, order: id });
+  return json(request, status, body);
 }
 
 async function manageRoute(request, env) {
@@ -592,6 +618,7 @@ const ROUTES = {
   activate: (request, env) => activateRoute(request, env),
   record: (request, env) => recordRoute(request, env),
   review: (request, env) => reviewRoute(request, env),
+  order: (request, env) => orderRoute(request, env),
 };
 
 export default {

@@ -410,6 +410,20 @@ void main() {
     expect(find.textContaining('No subscription to restore'), findsNothing);
   });
 
+  testWidgets('a suspended account is told so where live play would be sold, and sold nothing', (tester) async {
+    standUp();
+    await shopWith(FakeStore());
+    await Entitlement.current.suspend();
+    await _pumpPage(tester);
+    expect(find.text('Suspended from live play'), findsOneWidget);
+    expect(find.textContaining('This account is suspended from live play under the terms of use.'), findsOneWidget);
+    expect(find.textContaining('help@openhearts.game'), findsOneWidget);
+    expect(find.text('Subscribe'), findsNothing);
+    expect(find.text('Restore purchases'), findsNothing);
+    expect(find.textContaining('Have a code?'), findsNothing);
+    expect(find.text('Terms of use'), findsOneWidget, reason: 'what the suspension is under, a tap away');
+  });
+
   testWidgets('with no store, or a store without the product, the page is the web\'s', (tester) async {
     final stand = standUp();
     await shopWith(FakeStore(open: false));

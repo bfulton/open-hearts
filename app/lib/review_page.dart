@@ -169,14 +169,17 @@ class _ReviewPageState extends State<ReviewPage> {
     });
   }
 
-  /// Another device of the account took it up: watching stops, as all
-  /// live play here does (net/in_use.dart). A game already checked here
-  /// stays on the screen; it is this device's own copy.
+  /// Another device of the account took it up, or the account is
+  /// suspended: watching stops, as all live play here does
+  /// (net/in_use.dart). A game already checked here stays on the
+  /// screen; it is this device's own copy. A suspension is said where
+  /// a subscription would be sold.
   void _inUse() {
-    if (!mounted || !InUse.current.elsewhere || _watching == null) return;
+    if (!mounted || !InUse.current.shut || _watching == null) return;
     _watching?.cancel();
     _watching = null;
-    if (_shown is _Live || _shown is _Nothing || _shown is _Checking) setState(() => _shown = const _NotHere(NotShown.elsewhere));
+    final why = InUse.current.elsewhere ? NotShown.elsewhere : NotShown.noSubscription;
+    if (_shown is _Live || _shown is _Nothing || _shown is _Checking) setState(() => _shown = _NotHere(why));
   }
 
   /// The record, or why this device is not shown it (null for none).

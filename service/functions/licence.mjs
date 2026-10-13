@@ -13,7 +13,9 @@
 // sig}} — for the service's licenceDays, signed by the service key
 // (OH_SERVICE_SECRET, with OH_SERVICE_KEY beside it as the public half
 // the app has baked in), or 402 when no subscription stands behind the
-// key. What is read is one row, and the others only around a renewal.
+// key, or 403 with `suspended` when its account is suspended
+// (suspension.mjs). What is read is one row, and the others only
+// around a renewal or a refusal.
 //
 // The curve is the one the whole project signs on, so the signing is
 // the app's own wasm: on Cloudflare the module entry.mjs imports, and
@@ -23,6 +25,7 @@
 import { entitlementOf } from './accounts.mjs';
 import { dayAfter, digestOf, earlier, hex, storeOf } from './rows.mjs';
 import { S, notConfigured } from './settings.mjs';
+import { SUSPENDED_WHY } from './suspension.mjs';
 
 const STATEMENT = 'oh-licence/2';
 const PLAN = 'year';
@@ -117,7 +120,12 @@ export async function licence(key, env, { signer, now = Date.now(), open = false
   const store = storeOf(env);
   if (!store) return { status: 503, body: notConfigured('OH_STORE') };
   const held = await entitlementOf(store, key, { now, openHouse: open });
-  if (!held) return { status: 402, body: { error: 'no subscription' } };
+  if (!held) {
+    // Said apart from having no subscription, so that the app says why
+    // live play is shut rather than offering to sell it again.
+    if ((await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.suspended) return { status: 403, body: { error: SUSPENDED_WHY, suspended: true } };
+    return { status: 402, body: { error: 'no subscription' } };
+  }
   const until = earlier(dayAfter(now, S().licenceDays), held.licensed_until);
   const signed = await licenceFor(key, held.account, until, { signer, ...keys });
   if (!signed) return { status: 503, body: { error: 'the service key does not match its secret' } };

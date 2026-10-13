@@ -563,6 +563,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get subscribeAgrees => 'Ao assinar, você aceita os Termos de uso.';
 
   @override
+  String get accountSuspendedTitle => 'Suspensa do jogo ao vivo';
+
+  @override
+  String get accountSuspended =>
+      'Esta conta está suspensa do jogo ao vivo, conforme os termos de uso. Jogar sozinho continua disponível para você. Para saber por quê, ou para recorrer, escreva para help@openhearts.game.';
+
+  @override
   String get storeSubscriptionLater =>
       'No celular, será a assinatura da própria loja. Até o app chegar às lojas, o jogo ao vivo é comprado na web.';
 

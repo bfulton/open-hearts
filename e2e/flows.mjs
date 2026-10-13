@@ -23,6 +23,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 import { chromium } from './browser.mjs';
 import { act, appDir, click, dismiss, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor, waitGone, roomIn } from './drive.mjs';
 import { flowRelay, runFlows } from './pool.mjs';
+import { carry } from '../service/tool/suspend.mjs';
 
 /// A tool run while flows are running: never with execFileSync, which
 /// holds this whole process still — every flow's server with it — for
@@ -753,6 +754,45 @@ stillFlow('one device at a time: the newest opened wins, and the other takes it 
   await waitFor(first, /^Open Hearts is now open on another device$/, { what: 'the first device leaving its table', timeout: 40000 });
   await waitGone(second, /^You're in a game on another device$/, { what: 'the second device in use', timeout: 20000 });
   if (await has(first, /^1 of 1 here/)) throw new Error('the first device is still at its table');
+});
+
+stillFlow('suspended by the operator: live play shut, the subscribe page says why and sells nothing; let back, open again', async ({ open, app, relay }) => {
+  // The operator's tool orders it as it does in production
+  // (service/tool/suspend.mjs, carry): an order written into the store,
+  // and the service asked over HTTP to carry it out. The rig has no
+  // relay objects to cut the device off at (household.mjs, revokerOf),
+  // so the device hears it from the service, as one the relay's word
+  // missed does: here, at its next licence check.
+  await relay();
+  // The rig's store is its worker's, and the flows before this one left
+  // their devices in it: this device is the one it licenses now.
+  const devices = () => [...app.store.rows.keys()].filter((k) => /^KEY#[0-9a-f]{64}\|ENTITLEMENT$/.test(k));
+  const before = new Set(devices());
+  const device = await open();
+  await licensed(device);
+  const rows = devices().filter((k) => !before.has(k));
+  if (rows.length !== 1) throw new Error(`one device licensed, not ${rows.length}`);
+  const { account } = await app.store.get(...rows[0].split('|'));
+  const order = async (act) => {
+    const done = await carry(app.store, account, act, {}, { origin: app.preview, tries: 1, wait: 0 });
+    if (done.status !== 200) throw new Error(`${act}: the service said ${done.status} ${JSON.stringify(done.body)}`);
+  };
+
+  await order('suspend');
+  await device.reload();
+  await waitFor(device, /^Play solo$/, { what: 'the front door', timeout: 60000 });
+  await waitFor(device, /^Subscribe$/, { what: 'live play no longer open', timeout: 30000 });
+  if (await has(device, /^Play live/)) throw new Error('live play is still open on a suspended device');
+  await click(device, /^Subscribe$/);
+  await waitFor(device, /^Suspended from live play$/, { what: 'the subscribe page saying so', timeout: 20000 });
+  await waitFor(device, /^This account is suspended from live play under the terms of use\./, { what: 'and how to ask why' });
+  if (await has(device, /^By subscribing, you agree to the Terms of use\.$/)) throw new Error('a suspended account is offered a subscription');
+
+  // Let back: the page, reloaded where it was, holds a licence again.
+  await order('lift');
+  await device.reload();
+  await waitFor(device, /^Open on this device, to /, { what: 'the licence back', timeout: 60000 });
+  if (await has(device, /^Suspended from live play$/)) throw new Error('still said to be suspended');
 });
 
 /// What the profile page shows: the name in its field — which the

@@ -13,7 +13,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/entitlement.dart';
 import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/l10n/l10n.dart';
+import 'package:open_hearts/net/duty.dart';
 import 'package:open_hearts/net/in_use.dart';
+import 'package:open_hearts/net/relays.dart' show ourRelay;
 import 'package:open_hearts/ui/in_use_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
@@ -117,6 +119,43 @@ void main() {
     expect(InUse.current.standing, Use.elsewhere);
   });
 
+  test('suspended, as a relay says: live play shut here, the duty with it, and the licence; let back, open again', () async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    // As the app wires them (main.dart).
+    Entitlement.current.addListener(InUse.current.licenceChanged);
+    await licenceThisDevice();
+    expect(Entitlement.current.live, isTrue);
+    stand.says('activate', {'activation': activationFor(me.publicKey)});
+    expect(await InUse.current.open(me), Use.here);
+    final duty = Duty.on([Uri.parse(ourRelay)], me);
+    addTearDown(duty.close);
+
+    InUse.current.turnedAway('suspended: this account is suspended from live play');
+    await pumpEventQueue();
+    expect(InUse.current.standing, Use.suspended);
+    expect(InUse.current.shut, isTrue);
+    expect(InUse.current.elsewhere, isFalse, reason: 'not "in use on another device"');
+    expect(Duty.current, isNull, reason: 'no juror, and online to nobody');
+    expect(InUse.current.credentials(me.publicKey), isNull, reason: 'nothing to show a relay any more');
+    expect(Entitlement.current.suspended, isTrue);
+    expect(Entitlement.current.live, isFalse);
+
+    // Neither the service refusing it nor another device's word makes
+    // it anything else.
+    stand.says('activate', {'error': 'no subscription'}, status: 402);
+    expect(await InUse.current.open(me), Use.suspended);
+    InUse.current.stepBack();
+    expect(InUse.current.standing, Use.suspended);
+
+    // Let back: the next licence opens live play as before.
+    await licenceThisDevice();
+    expect(Entitlement.current.suspended, isFalse);
+    expect(InUse.current.standing, Use.unasked);
+    expect(InUse.current.shut, isFalse);
+    Entitlement.current.removeListener(InUse.current.licenceChanged);
+  });
+
   test('the account at a table on another device: asked first, and taken only on the person\'s word', () async {
     final stand = standUp();
     final me = await Identity.signer();
@@ -176,6 +215,36 @@ void main() {
     expect(tester.takeException(), isNull);
     // The renewal on the clock, stopped before the test's clock is.
     InUse.current.reset();
+  });
+
+  test('suspended, as the service says when the device asks to be the one in use: the same', () async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    await licenceThisDevice();
+    stand.says('activate', {'activation': activationFor(me.publicKey)});
+    expect(await InUse.current.open(me), Use.here);
+    stand.says('activate', {'error': 'suspended: this account is suspended from live play', 'suspended': true}, status: 403);
+    await InUse.current.renew();
+    await pumpEventQueue();
+    expect(InUse.current.standing, Use.suspended);
+    expect(InUse.current.activation, isNull);
+    expect(Entitlement.current.suspended, isTrue);
+    expect(Entitlement.current.live, isFalse);
+    // A refusal that does not say so is not a suspension.
+    InUse.current = InUse();
+    stand.says('activate', {'error': 'no'}, status: 403);
+    expect(await InUse.current.open(me), Use.unasked);
+  });
+
+  testWidgets('a suspended device is not told it is open on another device, nor offered to take it back', (tester) async {
+    await licenceThisDevice();
+    await pumpScreen(tester);
+    InUse.current.turnedAway('suspended: this account is suspended from live play');
+    await tester.pumpAndSettle();
+    expect(find.text('Open Hearts is now open on another device'), findsNothing);
+    expect(find.text('Use it here'), findsNothing);
+    expect(find.text('the app'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a game on the other device is asked about before it is lost, and Not now leaves it be', (tester) async {

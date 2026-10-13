@@ -51,6 +51,14 @@ class Entitlement extends ChangeNotifier {
   /// The last day live play is open, or null when it is not open.
   DateTime? get until => _licence?.until;
 
+  bool _suspended = false;
+
+  /// Whether the service has said this device's account is suspended
+  /// from live play (service/functions/suspension.mjs): what the page
+  /// that would sell live play says instead. Said again at every start
+  /// the service is asked, and not kept.
+  bool get suspended => _suspended;
+
   /// The licence off the device, if there is one and it is still good.
   /// Called before the first frame: nothing here touches the network.
   ///
@@ -76,6 +84,7 @@ class Entitlement extends ChangeNotifier {
   Future<bool> refresh(Signer signer, {Uri? endpoint}) {
     final asked = ask(signer, endpoint: endpoint, service: service).then((said) async {
       if (said.licence != null) await adopt(said.licence!);
+      if (said.suspended) await suspend();
       if (said.answered) _heard();
       return said.answered;
     });
@@ -150,6 +159,15 @@ class Entitlement extends ChangeNotifier {
     return true;
   }
 
+  /// The account suspended from live play, as the service or a relay
+  /// says: the licence off the device, as for one handed on — it is not
+  /// a licence the device may play on, whatever its date — and the
+  /// suspension said where live play would be sold.
+  Future<void> suspend() async {
+    _suspended = true;
+    await forget();
+  }
+
   /// Nothing held here any more: the licence off the device, and live
   /// play shut. For a device being handed on.
   Future<void> forget() async {
@@ -166,6 +184,9 @@ class Entitlement extends ChangeNotifier {
     final held = licence != null && device != null && licence.holdsFor(device, service: service) ? licence : null;
     final was = _licence;
     _licence = held;
+    // A licence held is live play open: whatever was said before, not
+    // a suspension now.
+    if (held != null) _suspended = false;
     if (was != held) notifyListeners();
     return held != null;
   }

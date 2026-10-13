@@ -15,6 +15,7 @@ import { PROFILE_COLOURS, PROFILE_ICONS, PROFILE_NAME_MOST, PROFILE_PICTURE_MOST
 import { memoryStore } from './rows.mjs';
 import { SERVICE_DEFAULTS } from './settings.mjs';
 import { record } from './stripe.mjs';
+import { carryOut, orderOf, orderRow } from './suspension.mjs';
 import { keys } from '../do/sign.mjs';
 
 const wasm = await readFile(new URL('../../app/web/schnorr.wasm', import.meta.url));
@@ -85,6 +86,21 @@ async function twoDevices() {
 
 /// A JPEG's first bytes and then [n] bytes in all, base64.
 const jpeg = (n) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(n - 4, 7)]).toString('base64');
+
+test("the device in use is told the profile's version with each activation, so the operator's change reaches it at its next renewal", async () => {
+  const { store, account, ask, write, open } = await twoDevices();
+  assert.equal((await open(ADA)).body.profile, 0, 'none yet');
+  await write(ADA, { name: 'Ada', icon: 'rocket', color: 3 });
+  const renew = () => ask(ADA, 'activate', { what: 'renew ', want: 'renew' });
+  assert.equal((await renew()).body.profile, 1, 'its own write');
+  // The operator takes the name off, in the account's turn.
+  const order = 'a'.repeat(32);
+  await store.put(...orderRow(order), orderOf(account, 'remove', { name: true }));
+  assert.equal((await carryOut({ op: 'order', account, order }, store, activeInStore(store))).status, 200);
+  const renewed = await renew();
+  assert.equal(renewed.status, 200);
+  assert.equal(renewed.body.profile, 2, 'a version this device has not got');
+});
 
 test('a profile is written by the device in use and read by every device of the account, each write the next version', async () => {
   const { read, write, open } = await twoDevices();

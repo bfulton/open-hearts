@@ -21,8 +21,8 @@
 // consulted counts what the relay actually consulted. And `--gate
 // <service key>` asks every socket who it is, as the deployed relay
 // does (relay.mjs, serviceGate), with the backup jurors' mark under
-// OH_JUROR_SECRET; `{"revoke": {account, epoch}}` on stdin is what the
-// account's own object tells the deployed one.
+// OH_JUROR_SECRET; `{"revoke": {account, epoch, why?}}` on stdin is what
+// the account's own object tells the deployed one.
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -118,8 +118,8 @@ export async function serve({ port = 0, host = '127.0.0.1', keep = 10000, log = 
     counts,
     relayFor,
     /// As the account's own object tells every relay it was seen at.
-    revoke: (account, epoch) => {
-      for (const relay of relays.values()) relay.revoke(account, epoch);
+    revoke: (account, epoch, why) => {
+      for (const relay of relays.values()) relay.revoke(account, epoch, why);
     },
     close: () => server.close(),
   };
@@ -180,7 +180,7 @@ async function main(argv) {
         return;
       }
       if (typeof message.refuse === 'boolean') policy = message.refuse;
-      if (message.revoke && typeof message.revoke.account === 'string') relay?.revoke(message.revoke.account, message.revoke.epoch);
+      if (message.revoke && typeof message.revoke.account === 'string') relay?.revoke(message.revoke.account, message.revoke.epoch, message.revoke.why ?? undefined);
       if (typeof message.answer === 'number') asked.get(message.answer)?.(message.reason ?? null);
       if (message.answer !== undefined) asked.delete(message.answer);
     });

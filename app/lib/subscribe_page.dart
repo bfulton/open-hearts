@@ -403,6 +403,9 @@ class _SubscribePageState extends State<SubscribePage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final licence = Entitlement.current.licence;
+    // An account suspended from live play is not sold it again: the page
+    // says so, and how to ask why, where it would sell it.
+    final suspended = licence == null && Entitlement.current.suspended;
     final shop = StoreShop.current;
     // A store build buys in its store, and a store's purchase is still
     // being made while the sheet is up or the service is being shown it.
@@ -429,11 +432,17 @@ class _SubscribePageState extends State<SubscribePage> {
                   Text(l10n.subscription, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Palette.mark)),
                   const SizedBox(height: 6),
                   Text(
-                    licence == null ? l10n.pricePerYear(priceShown) : l10n.openUntil(Licence.dayOf(licence.until)),
+                    suspended
+                        ? l10n.accountSuspendedTitle
+                        : licence == null
+                        ? l10n.pricePerYear(priceShown)
+                        : l10n.openUntil(Licence.dayOf(licence.until)),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Palette.chrome, letterSpacing: 0.2),
                   ),
                   const SizedBox(height: 22),
-                  if (licence == null) ...[
+                  if (suspended)
+                    Text(l10n.accountSuspended, style: const TextStyle(fontSize: 13.5, height: 1.5, color: Palette.chrome))
+                  else if (licence == null) ...[
                     _Point(icon: Icons.groups_outlined, text: l10n.seatsOrFriends),
                     _Point(icon: Icons.military_tech_outlined, text: l10n.pointRating),
                     _Point(icon: Icons.lock_outline, text: l10n.pointDeal),

@@ -8,9 +8,12 @@
 /// has a name — and the service's copy is the one every device of the
 /// account comes round to:
 ///
-/// - **Read** when the app starts, behind the licence, and each time this
-///   device becomes the one in use: a profile newer than the one this
-///   device last had is taken, over whatever is here.
+/// - **Read** when the app starts, behind the licence, each time this
+///   device becomes the one in use, and when an activation says the
+///   account's profile has a version this device has not seen — a change
+///   it did not make, which only the operator makes
+///   (service/functions/suspension.mjs): a profile newer than the one
+///   this device last had is taken, over whatever is here.
 /// - **Written** when the profile page is left changed: kept here at
 ///   once and sent. A device that cannot reach the service, or is not
 ///   the one in use, keeps it marked as unsent and sends it the next
@@ -58,13 +61,15 @@ class AccountProfile extends ChangeNotifier {
 
   String? _account;
   Use? _standing;
+  int? _version;
   Entitlement? _entitlement;
   InUse? _inUse;
 
   /// Follows the licence and the device's standing with its account
   /// from here on: a device brought into another account takes that
   /// account's profile, and one that becomes the device in use reads
-  /// the account's — or sends what it could not before.
+  /// the account's — or sends what it could not before — as does the
+  /// device in use told of a version it has not seen.
   void watch() {
     _entitlement?.removeListener(_licensed);
     _inUse?.removeListener(_used);
@@ -72,6 +77,7 @@ class AccountProfile extends ChangeNotifier {
     _inUse = InUse.current..addListener(_used);
     _account = Entitlement.current.licence?.account;
     _standing = InUse.current.standing;
+    _version = InUse.current.profileVersion;
   }
 
   void _licensed() {
@@ -84,8 +90,11 @@ class AccountProfile extends ChangeNotifier {
   void _used() {
     final standing = InUse.current.standing;
     final became = standing == Use.here && _standing != Use.here;
+    final version = InUse.current.profileVersion;
+    final moved = standing == Use.here && version != null && version != _version;
     _standing = standing;
-    if (became) unawaited(sync());
+    _version = version;
+    if (became || moved) unawaited(sync());
   }
 
   /// A change made on the profile page: kept on this device, and marked
@@ -229,6 +238,7 @@ class AccountProfile extends ChangeNotifier {
     _inUse = null;
     _account = null;
     _standing = null;
+    _version = null;
     _changes = 0;
     _again = false;
     _running = null;

@@ -573,6 +573,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Mit dem Abo stimmst du den Nutzungsbedingungen zu.';
 
   @override
+  String get accountSuspendedTitle => 'Vom Live-Spiel gesperrt';
+
+  @override
+  String get accountSuspended =>
+      'Dieses Konto ist nach den Nutzungsbedingungen vom Live-Spiel gesperrt. Allein spielen kannst du weiterhin. Um zu fragen, warum, oder um Einspruch einzulegen, schreib an help@openhearts.game.';
+
+  @override
   String get storeSubscriptionLater =>
       'Auf dem Handy wird es das Abo des jeweiligen Stores sein. Bis die App in den Stores ist, kauft man Live-Spiel im Web.';
 

@@ -361,6 +361,17 @@ const heldMost = 32;
 /// How old a device's answer to the challenge may be, in seconds.
 const answerFreshS = 600;
 
+/// What a device is told as its sockets close because another device
+/// of its account has taken the account up.
+const supersededWhy = 'superseded: another device of this account is in use';
+
+/// Whether [why] is a refusal the relay will not change its mind about
+/// for this device: superseded, its account suspended
+/// (service/functions/suspension.mjs), or not admitted at all. The app
+/// goes by the same first word (packages/table, relays.dart,
+/// turnedAway).
+const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|restricted): /.test(why);
+
 /// The relay itself. [verify] checks a signature, [refuse] is a policy
 /// that may turn an event away with a reason — an object that carries
 /// only the kinds its tag may hold — and [store] is where the kinds
@@ -397,8 +408,10 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
   /// socket -> {challenge, who, held, refused}: what the gate asked it,
   /// who answered, what it said meanwhile, and why it is refused.
   const auths = new Map();
-  /// account -> the newest epoch this relay has seen of it.
+  /// account -> the newest epoch this relay has seen of it, and why the
+  /// devices before it were cut off.
   const epochs = new Map();
+  const epochOf = (account) => epochs.get(account)?.epoch ?? -1;
 
   const sendText = (socket, text) => {
     try {
@@ -445,15 +458,16 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
   }
 
-  /// Every socket of [account] from before [epoch] closed, and [epoch]
-  /// kept as the newest of it.
-  function supersede(account, epoch) {
-    if ((epochs.get(account) ?? -1) < epoch) epochs.set(account, epoch);
+  /// Every socket of [account] from before [epoch] closed, saying
+  /// [why], and [epoch] kept as the newest of it, with [why] for any of
+  /// its devices from before that comes back.
+  function supersede(account, epoch, why = supersededWhy) {
+    if (epochOf(account) < epoch) epochs.set(account, { epoch, why });
     for (const [socket, a] of auths) {
       if (a.who?.account === account && a.who.epoch < epoch) {
         count?.('superseded');
         log?.(`superseded a device of ${account.slice(0, 6)}`);
-        cutOff(socket, 'superseded: another device of this account is in use');
+        cutOff(socket, why);
       }
     }
   }
@@ -473,7 +487,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     } else {
       const said = await gate.admit(event);
       if (said.refused) why = said.refused;
-      else if (said.account && said.epoch < (epochs.get(said.account) ?? -1)) why = 'superseded: another device of this account is in use';
+      else if (said.account && said.epoch < epochOf(said.account)) why = epochs.get(said.account).why;
       else who = said;
     }
     const held = a.held;
@@ -484,7 +498,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       a.refused = why;
       send(socket, ['OK', id, false, why]);
       for (const raw of held) await handle(socket, raw);
-      if (why.startsWith('superseded:') || why.startsWith('restricted:')) cutOff(socket, why);
+      if (finalWhy(why)) cutOff(socket, why);
       return;
     }
     if (who.account) supersede(who.account, who.epoch);
@@ -676,7 +690,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       }
       sockets.set(socket, subscriptions);
       if (gate) {
-        if (auth && auth.until > nowS() && !(auth.account && auth.epoch < (epochs.get(auth.account) ?? -1))) {
+        if (auth && auth.until > nowS() && !(auth.account && auth.epoch < epochOf(auth.account))) {
           auths.set(socket, { challenge: null, who: auth, held: [], refused: null });
         } else {
           challenge(socket);
@@ -705,10 +719,12 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     },
 
     /// [account]'s device in use is now the one of [epoch]: the sockets
-    /// of any device of it from before are closed, and none is opened
-    /// for one (the account's turn says so, service/functions/household.mjs).
-    revoke(account, epoch) {
-      supersede(account, epoch);
+    /// of any device of it from before are closed, saying [why] —
+    /// another device is in use, unless the account's turn says
+    /// otherwise — and none is opened for one
+    /// (service/functions/household.mjs).
+    revoke(account, epoch, why = supersededWhy) {
+      supersede(account, epoch, finalWhy(why) ? why : supersededWhy);
     },
 
     /// Who [socket] answered as, for it to carry through hibernation.

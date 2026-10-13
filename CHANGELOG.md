@@ -10,6 +10,17 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- The operator can suspend an account from live play and lift it, and
+  take its name or picture off and put them back, as the terms allow,
+  with `service/tool/suspend.mjs`. A suspended account's device in use
+  is cut off at the relay at once and leaves its table, its devices get
+  no licence, and where the app would sell live play it says the account
+  is suspended and where to ask why. A device brought into the account
+  later is suspended too, and a subscription one of its devices buys
+  stays with it. A name or picture taken off leaves the device in use
+  within 20 minutes, and a name leaves the account's kept games too. Both
+  tools' `--find` also finds an account by a name taken off. The privacy
+  policy says what is kept meanwhile, in every language. (2026-10-13, #29)
 - On the web, Stripe's checkout will not take payment until the buyer
   ticks that they agree to the terms and to the yearly renewal, in the
   app's language. The email that follows each purchase says what was

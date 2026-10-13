@@ -298,10 +298,8 @@ export async function startTurn({ tag = suite } = {}) {
   return { url: `turn:127.0.0.1:${port}`, stop: () => proc.kill() };
 }
 
-async function handlersFor(serve, turn, records, config) {
+async function handlersFor(serve, turn, records, store, config) {
   const { default: handler } = await import(new URL('../service/functions/worker.mjs', import.meta.url));
-  const { memoryStore } = await import(new URL('../service/functions/rows.mjs', import.meta.url));
-  const store = memoryStore();
   // The operator's remote config (docs/explanation/service.md), where a suite
   // sets one: the row the worker checks and serves at /api/config.
   if (config) await store.put('config', 'app', config);
@@ -392,7 +390,11 @@ export async function serveApp({ relayPort = null, tag = suite, pace = null, con
   };
   const turn = await startTurn({ tag });
   const records = recordsBucket();
-  const handlers = await handlersFor(asset, turn.url, records, config);
+  // The service's rows, which a flow can write as the operator's tools
+  // do (`app.store`).
+  const { memoryStore } = await import(new URL('../service/functions/rows.mjs', import.meta.url));
+  const store = memoryStore();
+  const handlers = await handlersFor(asset, turn.url, records, store, config);
   let legacy = false;
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
@@ -423,6 +425,7 @@ export async function serveApp({ relayPort = null, tag = suite, pace = null, con
     preview: `http://127.0.0.1:${port}`,
     legacy: (on) => void (legacy = on),
     records,
+    store,
     relayPort,
     /// An address of the rig's — a path under the app's host, or a whole
     /// address — with the rig's relay named in it, and its pace.

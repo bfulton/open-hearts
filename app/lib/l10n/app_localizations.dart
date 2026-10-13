@@ -746,6 +746,18 @@ abstract class AppLocalizations {
   /// **'By subscribing, you agree to the Terms of use.'**
   String get subscribeAgrees;
 
+  /// On the Subscription page, in place of the price, when the service says this device's account is suspended from live play.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended from live play'**
+  String get accountSuspendedTitle;
+
+  /// On the Subscription page, in place of the Subscribe button: the account is suspended under the terms; solo play still works; how to ask why or appeal.
+  ///
+  /// In en, this message translates to:
+  /// **'This account is suspended from live play under the terms of use. Playing alone is still open to you. To ask why, or to appeal, email help@openhearts.game.'**
+  String get accountSuspended;
+
   /// Under the Subscribe button, on a device that cannot buy yet.
   ///
   /// In en, this message translates to:

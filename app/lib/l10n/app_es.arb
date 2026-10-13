@@ -107,6 +107,8 @@
   "whatMoneyPaysFor": "Jugar solo es gratis y siempre lo será, igual que los registros, el motor y cada línea de esto. Lo que pagas cubre la parte que nos cuesta mantener: poner a los jugadores en contacto, un relé cuando dos dispositivos no encuentran un camino directo, y un jurado cuando una mesa se queda sola.",
   "webRenewal": "{price} al año, que pagas en la página de Stripe. Se renueva sola cada año hasta que la canceles, cuando quieras, en Gestionar suscripción; el año que pagaste termina por sí solo.",
   "subscribeAgrees": "Al suscribirte, aceptas las Condiciones de uso.",
+  "accountSuspendedTitle": "Suspendida del juego en vivo",
+  "accountSuspended": "Esta cuenta está suspendida del juego en vivo según las condiciones de uso. Jugar solo sigue a tu alcance. Para preguntar por qué, o para apelar, escribe a help@openhearts.game.",
   "storeSubscriptionLater": "En un teléfono será la suscripción de la propia tienda. Hasta que la app esté en las tiendas, el juego en vivo se compra en la web.",
   "subscriptionIsYours": "Una suscripción es tu cuenta, no la de un dispositivo, y se juega en un dispositivo a la vez. Añade otro mostrándole este código — solo necesita su cámara — y quita uno cuando quieras.",
   "yourDevices": "Tus dispositivos",
