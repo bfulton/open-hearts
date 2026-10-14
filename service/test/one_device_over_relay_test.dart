@@ -2,7 +2,8 @@
 /// object runs (service/do/relay.mjs, serviceGate; docs/explanation/service.md):
 /// a device the service has not given a current activation is carried
 /// nothing, a later device of the account cuts the earlier one off, and
-/// the earlier one hears that it was superseded and stops coming back.
+/// the earlier one hears that it was superseded and stops coming back;
+/// as does a device told by its account's turn that it is suspended.
 library;
 
 import 'dart:async';
@@ -118,6 +119,21 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
     expect(turnedAway, [startsWith('superseded:')]);
+    onPhone.close();
+  });
+
+  test('told it is suspended, by the account\'s turn, and stays away', () async {
+    final phone = SchnorrSigner.generate();
+    shown[phone.publicKey] = activationFor(phone.publicKey, _ada, 1);
+    final onPhone = RelayTransport(relays: [relay.url], signer: phone, table: 't4');
+    await onPhone.ready.timeout(const Duration(seconds: 5));
+    relay.revoke(_ada, 2, why: 'suspended: this account is suspended from live play');
+    for (var i = 0; i < 40 && turnedAway.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(turnedAway, ['suspended: this account is suspended from live play']);
+    await Future<void>.delayed(const Duration(seconds: 2));
+    expect(relay.connections, 0, reason: 'it does not come back on the activation it holds');
     onPhone.close();
   });
 }

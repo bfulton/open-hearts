@@ -25,8 +25,9 @@ import { pathToFileURL } from 'node:url';
 
 import { pages } from '../../infra/cloudflare.mjs';
 import { anonymizeGames, forgottenKey } from '../functions/records.mjs';
-import { accountsNamed, accountsPaidBy, forgetAccount } from '../functions/deletion.mjs';
+import { forgetAccount } from '../functions/deletion.mjs';
 import { dayOf, isAccount } from '../functions/rows.mjs';
+import { findAccounts } from './find.mjs';
 import { restStore } from './kv.mjs';
 import { restBucket } from './r2.mjs';
 
@@ -48,21 +49,13 @@ async function main(argv) {
   if (find >= 0) {
     const asked = argv[find + 1];
     if (!asked) fail('--find takes a name or an email address');
-    // A name, always: one can have an @ in it. An address too, when it
-    // could be one.
-    const found = new Set(await accountsNamed(store, store.list, asked));
-    if (asked.includes('@')) {
-      const key = process.env.STRIPE_API_KEY;
-      if (!key) {
-        console.error('forget: not looked for as an email address, which needs STRIPE_API_KEY');
-      } else {
-        const stripe = async (path) => {
-          const res = await fetch(`https://api.stripe.com/v1${path}`, { headers: { authorization: `Bearer ${key}` } });
-          if (!res.ok) fail(`Stripe said ${res.status}`, 1);
-          return res.json();
-        };
-        for (const a of await accountsPaidBy(store, stripe, asked)) found.add(a);
-      }
+    let found;
+    try {
+      const said = await findAccounts(store, asked, { stripeKey: process.env.STRIPE_API_KEY ?? null });
+      found = said.found;
+      for (const note of said.notes) console.error(`forget: ${note}`);
+    } catch (e) {
+      fail(e.message, 1);
     }
     for (const a of found) console.log(a);
     console.log(`${found.size} account(s)`);

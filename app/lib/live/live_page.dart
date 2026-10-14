@@ -54,13 +54,15 @@ class _LivePageState extends State<LivePage> {
     unawaited(ReactionMute.current.load());
   }
 
-  /// Another device of the account took it up, at this table's expense
-  /// (net/in_use.dart): this device leaves the seat — its own word, by
-  /// whatever path is still open to it; the relay has already cut it
-  /// off — and the table gives the seat to a bot, as for anyone who
-  /// leaves. The screen saying why is over everything.
+  /// Another device of the account took it up, at this table's expense,
+  /// or the account is suspended (net/in_use.dart): this device leaves
+  /// the seat — its own word, by whatever path is still open to it; the
+  /// relay has already cut it off — and the table gives the seat to a
+  /// bot, as for anyone who leaves. What is said of it is said where
+  /// the device lands: over everything for another device, on the
+  /// subscribe page for a suspension.
   void _steppedBack() {
-    if (!InUse.current.elsewhere || !mounted) return;
+    if (!InUse.current.shut || !mounted) return;
     InUse.current.removeListener(_steppedBack);
     _leave();
   }
@@ -108,7 +110,7 @@ class _LivePageState extends State<LivePage> {
   /// the account has been taken up from has already left its seat.
   Future<void> _pickReaction() async {
     final picked = await pickReaction(context);
-    if (picked != null && mounted && !InUse.current.elsewhere) _c.react(picked);
+    if (picked != null && mounted && !InUse.current.shut) _c.react(picked);
   }
 
   void _say(String message) {
@@ -360,7 +362,7 @@ class _LivePageState extends State<LivePage> {
                   onHold: _aboutPicture,
                   corner: _presence(context),
                   // Beside the player's own badge, while they sit here.
-                  react: _c.canReact && !InUse.current.elsewhere ? ReactionButton(onPressed: _pickReaction) : null,
+                  react: _c.canReact && !InUse.current.shut ? ReactionButton(onPressed: _pickReaction) : null,
                 ),
                 below: _debugState(),
                 action: ActionBar(controller: _c, onPass: _c.confirmPass, note: _liveNote()),

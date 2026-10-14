@@ -34,8 +34,8 @@ Licence _licenceFor(PublicKey device) {
   );
 }
 
-const LicenceAnswer _down = (answered: false, licence: null);
-const LicenceAnswer _none = (answered: true, licence: null);
+const LicenceAnswer _down = (answered: false, licence: null, suspended: false);
+const LicenceAnswer _none = (answered: true, licence: null, suspended: false);
 
 /// The service standing in: the nth ask answered by [answers]' nth
 /// entry — after its delay, or never when it is null, and like the
@@ -86,7 +86,7 @@ void main() {
 
   test('a start the service does not answer asks again, further apart each time, until it does', () {
     fakeAsync((clock) {
-      final licence = (after: Duration.zero, said: (answered: true, licence: _licenceFor(device.publicKey)) as LicenceAnswer);
+      final licence = (after: Duration.zero, said: (answered: true, licence: _licenceFor(device.publicKey), suspended: false) as LicenceAnswer);
       final (e, service) = start(clock, [
         null, // never answered: given up on after the few seconds
         (after: Duration.zero, said: _down), // a 503
@@ -121,7 +121,7 @@ void main() {
   test('an answer that comes after the wait for it is still taken, and ends the asking', () {
     fakeAsync((clock) {
       final (e, service) = start(clock, [
-        (after: const Duration(seconds: 10), said: (answered: true, licence: _licenceFor(device.publicKey))),
+        (after: const Duration(seconds: 10), said: (answered: true, licence: _licenceFor(device.publicKey), suspended: false)),
         null,
       ]);
       final first = e.keepAsking(device);
@@ -150,6 +150,32 @@ void main() {
       e.askAgain();
       clock.elapse(const Duration(minutes: 1));
       expect(service.at, hasLength(1));
+    });
+  });
+
+  test('a suspended account is an answer: the licence comes off the device, and the suspension is said until one is held again', () {
+    fakeAsync((clock) {
+      final suspended = (answered: true, licence: null, suspended: true) as LicenceAnswer;
+      final (e, service) = start(clock, [(after: Duration.zero, said: suspended)]);
+      e.adopt(_licenceFor(device.publicKey));
+      clock.flushMicrotasks();
+      expect(e.live, isTrue, reason: 'held from before, with a date to come');
+      var told = 0;
+      e.addListener(() => told++);
+      e.keepAsking(device);
+      clock.elapse(const Duration(minutes: 1));
+      expect(service.at, hasLength(1), reason: 'answered, so asked once');
+      expect(e.suspended, isTrue);
+      expect(e.live, isFalse, reason: 'whatever its date, not a licence to play on');
+      expect(told, greaterThan(0));
+      SharedPreferences.getInstance().then((prefs) => expect(prefs.getString('licence'), isNull));
+      clock.flushMicrotasks();
+      // Let back: a licence held again is live play open, and no
+      // suspension said.
+      e.adopt(_licenceFor(device.publicKey));
+      clock.flushMicrotasks();
+      expect(e.suspended, isFalse);
+      expect(e.live, isTrue);
     });
   });
 
@@ -208,6 +234,11 @@ void main() {
       expect(given.answered, isTrue);
       expect(given.licence?.encoded, licence.encoded);
       expect(await asked(402, '{"error":"no subscription"}'), _none);
+      expect(
+        await asked(403, '{"error":"suspended: this account is suspended from live play","suspended":true}'),
+        (answered: true, licence: null, suspended: true),
+      );
+      expect(await asked(403, '{"error":"not allowed"}'), _none, reason: 'only the service saying so is a suspension');
       expect(await asked(401, '{"error":"bad signature"}'), _none, reason: 'asked again, the same request is refused again');
       expect(await asked(503, '{"error":"service not configured: OH_STORE"}'), _down);
       expect(await asked(429, ''), _down);

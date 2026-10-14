@@ -8,7 +8,10 @@ import { S } from './settings.mjs';
 /// How far this key is paid up to, and the account it is a device of.
 /// One read of the device's own row; the account's and its
 /// subscription's only when that row says the device has run out,
-/// which is once a renewal.
+/// which is once a renewal. A device of a suspended account
+/// (suspension.mjs) holds nothing: its row says so, and the account's
+/// mark is read on the way to the subscription too, should a row have
+/// been written before the flag reached it.
 ///
 /// In local mode a key nobody has heard of is entitled on the spot for
 /// a month (docs/explanation/service.md), on an account of its own — one branch,
@@ -24,12 +27,13 @@ export async function entitlementOf(store, key, { now = Date.now(), openHouse = 
     await paidFor(store, subscription, key, { now });
     return store.get(`KEY#${key}`, 'ENTITLEMENT');
   }
-  if (!isAccount(row.account)) return null;
+  if (!isAccount(row.account) || row.suspended) return null;
   if (row.licensed_until && row.licensed_until >= today) return row;
   // Run out as this row has it, or never written: a checkout binds the
   // device before Stripe has told us when the subscription runs to.
   // The account's subscription is the authority, and a renewal moves
   // it on without touching the devices under it.
+  if (await isSuspended(store, row.account)) return null;
   const subscription = (await store.get(`ACCOUNT#${row.account}`, 'META'))?.subscription;
   const sub = subscription ? await store.get(`SUB#${subscription}`, 'META') : null;
   if (!sub || !sub.renews_at || sub.renews_at < today) return null;
@@ -37,6 +41,9 @@ export async function entitlementOf(store, key, { now = Date.now(), openHouse = 
   await store.put(`KEY#${key}`, 'ENTITLEMENT', caught);
   return caught;
 }
+
+/// Whether [account] is suspended from live play (suspension.mjs).
+export const isSuspended = async (store, account) => !!(await store.get(`ACCOUNT#${account}`, 'SUSPENDED'));
 
 // ---- accounts ----------------------------------------------------------
 // What a subscription buys is an account (docs/explanation/service.md): made
@@ -61,8 +68,10 @@ export async function accountFor(store, subscription, { buyer = null, make = fal
     const was = isAccount(theirs) ? await store.get(`ACCOUNT#${theirs}`, 'META') : null;
     // The buyer's own account takes the new subscription where it has
     // nothing else paid up: a lapsed subscriber buying again is the same
-    // person, with the same name, rating and devices.
-    if (was && !(await paidUp(store, was.subscription, today))) account = theirs;
+    // person, with the same name, rating and devices. A suspended one
+    // takes it whatever it has, so that paying again is not a way out
+    // of a suspension (the web's checkout refuses before anybody pays).
+    if (was && (!(await paidUp(store, was.subscription, today)) || (await isSuspended(store, theirs)))) account = theirs;
   }
   account ??= newAccount();
   const meta = await store.get(`ACCOUNT#${account}`, 'META');
@@ -353,10 +362,12 @@ export async function joinAccount(key, account, store, { now = Date.now(), movin
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   const sub = subscription ? await store.get(`SUB#${subscription}`, 'META') : null;
   if (!already) await store.put(`ACCOUNT#${account}`, `DEVICE#${key}`, { bound_at: today });
+  // A device brought into a suspended account is suspended with it.
   await store.put(`KEY#${key}`, 'ENTITLEMENT', {
     account,
     licensed_until: sub?.renews_at ?? null,
     at: today,
+    ...((await isSuspended(store, account)) ? { suspended: true } : {}),
   });
   return { status: 200, body: { account } };
 }

@@ -1,5 +1,5 @@
 // OH_STORE as the operator's tools reach it from outside the worker
-// (forget.mjs).
+// (forget.mjs, suspend.mjs).
 
 /// OH_STORE through Cloudflare's API, behind the calls the worker's
 /// store makes (service/functions/rows.mjs, storeOf).
@@ -27,8 +27,14 @@ export function restStore({ token, account, namespace }) {
       if (!res.ok) throw new Error(`reading said ${res.status}`);
       return res.json();
     },
-    async put(pk, sk, value) {
-      const res = await fetch(`${base}/values/${at(pk, sk)}`, { method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(value) });
+    /// [ttl], in seconds (at least 60, KV's least), is how long KV keeps
+    /// the row, as the worker's store takes it (rows.mjs).
+    async put(pk, sk, value, { ttl } = {}) {
+      const res = await fetch(`${base}/values/${at(pk, sk)}${ttl ? `?expiration_ttl=${ttl}` : ''}`, {
+        method: 'PUT',
+        headers: { ...auth, 'content-type': 'application/json' },
+        body: JSON.stringify(value),
+      });
       if (!res.ok) throw new Error(`writing said ${res.status}`);
     },
     async del(pk, sk) {

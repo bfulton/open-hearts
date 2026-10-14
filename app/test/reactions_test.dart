@@ -330,6 +330,17 @@ void main() {
     await live.advance(tester, 1000);
   });
 
+  testWidgets('a device whose account is suspended leaves its seat as well, and says nothing more', (tester) async {
+    final live = await pumpLive(tester);
+    expect(find.byType(ReactionButton), findsOneWidget);
+    InUse.current.turnedAway('suspended: this account is suspended from live play');
+    await tester.pumpAndSettle();
+    expect(find.byType(ReactionButton), findsNothing);
+    live.controller.react(Reaction.nice);
+    expect(live.reactions.said, isEmpty);
+    await live.advance(tester, 1000);
+  });
+
   testWidgets('alone, there is nothing to react with, and nothing reacts', (tester) async {
     tester.view
       ..physicalSize = const Size(390, 844)

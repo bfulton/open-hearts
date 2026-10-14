@@ -87,10 +87,11 @@ String requestDigest(String handler, PublicKey key, int at, [String what = '']) 
 /// `answered` when it said anything at all — a licence, or that there
 /// is none behind the key — and false when it could not be reached or
 /// could not answer just then; `licence` the licence, when it gave one
-/// signed for this device.
-typedef LicenceAnswer = ({bool answered, Licence? licence});
+/// signed for this device; `suspended` when the device's account is
+/// suspended from live play (service/functions/suspension.mjs).
+typedef LicenceAnswer = ({bool answered, Licence? licence, bool suspended});
 
-const LicenceAnswer _unanswered = (answered: false, licence: null);
+const LicenceAnswer _unanswered = (answered: false, licence: null, suspended: false);
 
 /// This device's licence as the service will give it, however long the
 /// service takes to say so: the caller decides how long to wait
@@ -107,7 +108,7 @@ const LicenceAnswer _unanswered = (answered: false, licence: null);
 /// already has.
 Future<LicenceAnswer> askLicence(Signer signer, {Uri? endpoint, String service = serviceKey}) async {
   final url = endpoint ?? handlerAt('licence');
-  if (url == null) return (answered: true, licence: null);
+  if (url == null) return (answered: true, licence: null, suspended: false);
   final ({int status, String body}) answer;
   try {
     answer = await http.post(url, jsonEncode(signedAsk(signer, 'licence')));
@@ -115,7 +116,7 @@ Future<LicenceAnswer> askLicence(Signer signer, {Uri? endpoint, String service =
     return _unanswered;
   }
   if (answer.status >= 500 || answer.status == 429) return _unanswered;
-  if (answer.status != 200) return (answered: true, licence: null);
+  if (answer.status != 200) return (answered: true, licence: null, suspended: answer.status == 403 && _saysSuspended(answer.body));
   // A page that is not the service's — a captive portal's, a proxy's —
   // is not its answer either.
   final Object? json;
@@ -126,5 +127,19 @@ Future<LicenceAnswer> askLicence(Signer signer, {Uri? endpoint, String service =
   }
   if (json is! Map) return _unanswered;
   final licence = Licence.parse(json['licence']);
-  return (answered: true, licence: licence != null && licence.holdsFor(signer.publicKey, service: service) ? licence : null);
+  return (
+    answered: true,
+    licence: licence != null && licence.holdsFor(signer.publicKey, service: service) ? licence : null,
+    suspended: false,
+  );
+}
+
+/// Whether a refusal says the account is suspended.
+bool _saysSuspended(String body) {
+  try {
+    final json = jsonDecode(body);
+    return json is Map && json['suspended'] == true;
+  } catch (_) {
+    return false;
+  }
 }

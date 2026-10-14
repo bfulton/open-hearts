@@ -47,6 +47,11 @@ test('an account is found by the name it plays under, case and edges aside, and 
   assert.deepEqual(await accountsNamed(store, keysOf(store), 'ADA'), [ADA, CY]);
   assert.deepEqual(await accountsNamed(store, keysOf(store), 'Grace'), []);
   assert.deepEqual(await accountsNamed(store, keysOf(store), '  '), [], 'no name finds nobody');
+  // A name the operator took off is held, and found as it was.
+  await store.put(`ACCOUNT#${BAO}`, 'HELD', { name: 'Grace', at: 'x' });
+  await store.put(`ACCOUNT#${CY}`, 'HELD', { name: 'Ada', at: 'x' });
+  assert.deepEqual(await accountsNamed(store, keysOf(store), 'grace'), [BAO]);
+  assert.deepEqual(await accountsNamed(store, keysOf(store), 'ada'), [ADA, CY], 'each account once');
 });
 
 test('an account is found by the address its web subscription was paid with, case aside', async () => {

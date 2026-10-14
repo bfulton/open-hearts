@@ -561,6 +561,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'By subscribing, you agree to the Terms of use.';
 
   @override
+  String get accountSuspendedTitle => 'Suspended from live play';
+
+  @override
+  String get accountSuspended =>
+      'This account is suspended from live play under the terms of use. Playing alone is still open to you. To ask why, or to appeal, email help@openhearts.game.';
+
+  @override
   String get storeSubscriptionLater =>
       'On a phone this will be the store\'s own subscription. Until the app is in the stores, live play is bought on the web.';
 

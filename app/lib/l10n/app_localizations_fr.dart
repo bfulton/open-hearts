@@ -563,6 +563,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'En vous abonnant, vous acceptez les Conditions d\'utilisation.';
 
   @override
+  String get accountSuspendedTitle => 'Suspendu du jeu en direct';
+
+  @override
+  String get accountSuspended =>
+      'Ce compte est suspendu du jeu en direct en application des conditions d\'utilisation. Jouer seul reste possible. Pour savoir pourquoi, ou pour faire appel, écrivez à help@openhearts.game.';
+
+  @override
   String get storeSubscriptionLater =>
       'Sur téléphone, ce sera l\'abonnement de la boutique d\'applications. En attendant que l\'application y soit, le jeu en direct s\'achète sur le web.';
 

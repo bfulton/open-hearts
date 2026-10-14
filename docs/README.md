@@ -33,6 +33,7 @@ Operating:
 - [Mint or rotate the service key](how-to/rotate-the-service-key.md)
 - [Register the payment and sign-in webhooks](how-to/set-up-webhooks.md)
 - [Delete an account's data on request](how-to/delete-an-accounts-data.md)
+- [Suspend an account, or take its name or picture off](how-to/suspend-an-account.md)
 
 ## Reference
 

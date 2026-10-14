@@ -9,11 +9,14 @@ import 'package:engine/engine.dart' show Card, Phase, twoOfClubs;
 import 'package:flutter/material.dart' hide Card;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_hearts/crypto/deal.dart';
+import 'package:open_hearts/entitlement.dart';
+import 'package:open_hearts/net/in_use.dart';
 import 'package:open_hearts/net/record_check.dart';
 import 'package:open_hearts/net/remote_config.dart' show waits;
 import 'package:open_hearts/net/watching.dart';
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 import 'package:table_sim/table_sim.dart';
 
@@ -251,5 +254,48 @@ void main() {
     // Let go by the page once the game was over: closed, not waited on.
     unawaited(views.close());
     await checking.close();
+  });
+
+  testWidgets('watching stops when the account is suspended, and the page says where live play would be sold', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    addTearDown(() {
+      Entitlement.current = Entitlement();
+      InUse.current = InUse();
+    });
+    tester.view
+      ..physicalSize = const Size(390, 1600)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    var cancelled = false;
+    final views = StreamController<Watched>(onCancel: () => cancelled = true);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: ReviewPage(table: played.spec.id, load: (_) async => null, watch: (_) => views.stream),
+    ));
+    await tester.pump();
+    views.add(Viewed(WatchedTable(
+      table: played.spec.id,
+      target: 50,
+      seq: 10,
+      hand: 0,
+      phase: Phase.playing,
+      names: const ['Ada', 'Bao', 'Cy', 'Dee'],
+      totals: const [0, 0, 0, 0],
+      taken: const [0, 0, 0, 0],
+      plays: const [],
+      toPlay: 0,
+    )));
+    await tester.pump();
+    expect(find.text('Live'), findsOneWidget);
+
+    InUse.current.turnedAway('suspended: this account is suspended from live play');
+    await tester.pump();
+    expect(cancelled, isTrue, reason: 'no longer watched');
+    expect(find.text('Live'), findsNothing);
+    expect(find.text('Watching a game, and looking at one played, is part of live play.'), findsOneWidget);
+    expect(find.text('Subscribe'), findsOneWidget, reason: 'which says the account is suspended');
+    expect(find.text('Your account is in use on another device.'), findsNothing);
+    await tester.pump(const Duration(seconds: 10));
+    unawaited(views.close());
   });
 }

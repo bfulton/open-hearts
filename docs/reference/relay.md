@@ -69,6 +69,7 @@ The reason in a refusal starts with one of these words:
 | `auth-required:` | The socket has not answered the challenge, or its answer is stale or carries no current activation. |
 | `restricted:` | Not a backup juror. The relay closes the socket. |
 | `superseded:` | Another device of this account is in use. The relay closes the socket. |
+| `suspended:` | This account is suspended from live play. The relay closes the socket. |
 | `too big:` | A `NOTICE`: a message or `REQ` over its limit. |
 
 ## Limits

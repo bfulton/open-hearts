@@ -85,10 +85,11 @@ class Duty {
     return duty;
   }
 
-  /// Another device of the account took it up: this one is no juror and
-  /// online to nobody from now on (net/in_use.dart).
+  /// Another device of the account took it up, or the account is
+  /// suspended: this one is no juror and online to nobody from now on
+  /// (net/in_use.dart).
   void _steppedBack() {
-    if (InUse.current.elsewhere) close();
+    if (InUse.current.shut) close();
   }
 
   static Duty? get current => _current;

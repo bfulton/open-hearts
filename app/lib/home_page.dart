@@ -285,14 +285,14 @@ class _HomePageState extends State<HomePage> {
     if (_goesOnline && Duty.current == null) _lobby.goOnline();
   }
 
-  /// Another device of the account took it up, or this one took it back
-  /// (net/in_use.dart). Stepped back, nothing live is left open here: the
-  /// pool or the room goes, and the duty and any table go with their own
-  /// listeners (net/duty.dart, live/live_page.dart). Taken back, this
-  /// device comes online again.
+  /// Another device of the account took it up, or this one took it back,
+  /// or the account is suspended (net/in_use.dart). Shut, nothing live is
+  /// left open here: the pool or the room goes, and the duty and any
+  /// table go with their own listeners (net/duty.dart,
+  /// live/live_page.dart). Taken back, this device comes online again.
   void _inUse() {
     if (!mounted) return;
-    if (InUse.current.elsewhere) {
+    if (InUse.current.shut) {
       _lobby.stepBack();
       return;
     }

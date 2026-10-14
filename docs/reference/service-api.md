@@ -35,9 +35,9 @@ Every handler is in `ROUTES` in `service/functions/worker.mjs`, and is reached a
 |---|---|---|---|---|---|
 | `config` | GET | No | Anyone | `configRoute`; `configOf` in `service/functions/config.mjs` | Serves the [remote config](configuration.md#remote-config). |
 | `health` | GET, HEAD | No | Anyone; the monitors | `healthRoute`; `healthOf` in `service/functions/health.mjs` | `{ok, store, stripe}`: 200 when the store reads and Stripe knows the price, 503 otherwise. |
-| `licence` | POST | Yes, empty | Any device | `licenceRoute`; `licence` in `service/functions/licence.mjs` | The device's licence, or 402 when no subscription stands behind it. |
-| `activate` | POST | Yes, `<want> <seated>` | A device of an account | `activateRoute`; `activate` in `service/functions/household.mjs` | Makes the device its account's device in use, or confirms that it still is. `want` is `open`, `take` or `renew`. Answers an activation, or 409. |
-| `checkout` | POST | Yes, empty | Any device; `back` and `cancelled` must be on the same site (`sameSite` in `service/functions/stripe.mjs`) | `checkoutRoute`; `checkout` in `service/functions/stripe.mjs` | Opens a Stripe Checkout session, in subscription mode, for this device. The optional `lang` is the app's language, one of the site's; Stripe's page is in it, and links the terms in it (`checkoutTerms`). The buyer cannot pay without ticking that they agree to the terms and to the yearly renewal. |
+| `licence` | POST | Yes, empty | Any device | `licenceRoute`; `licence` in `service/functions/licence.mjs` | The device's licence, or 402 when no subscription stands behind it, or 403 with `suspended: true` when its account is suspended. |
+| `activate` | POST | Yes, `<want> <seated>` | A device of an account | `activateRoute`; `activate` in `service/functions/household.mjs` | Makes the device its account's device in use, or confirms that it still is. `want` is `open`, `take` or `renew`. Answers an activation, with `profile`, the version of the account's profile; or 409; or 403 with `suspended: true` when the account is suspended. |
+| `checkout` | POST | Yes, empty | Any device; `back` and `cancelled` must be on the same site (`sameSite` in `service/functions/stripe.mjs`) | `checkoutRoute`; `checkout` in `service/functions/stripe.mjs` | Opens a Stripe Checkout session, in subscription mode, for this device. The optional `lang` is the app's language, one of the site's; Stripe's page is in it, and links the terms in it (`checkoutTerms`). The buyer cannot pay without ticking that they agree to the terms and to the yearly renewal. 403 with `suspended: true` for a device of a suspended account. |
 | `stripe` | POST | No; Stripe's `stripe-signature` header (`webhookSigned` in `service/functions/stripe.mjs`) | Stripe | `stripeRoute`; `record` in `service/functions/stripe.mjs` | Stripe's webhook: makes the account, binds the paying device, dates the subscription. |
 | `manage` | POST | Yes, empty | A device of an account with a Stripe subscription; 409 for a store subscription | `manageRoute`; `manage` in `service/functions/stripe.mjs` | Opens Stripe's billing portal. |
 | `store` | POST | Yes, the proof | Any device with an App Store signed transaction or a Play purchase token | `storeRoute`; `appleTransaction` in `service/functions/x509.mjs`, `playPurchase` in `service/functions/stores.mjs`, `bindPurchase` in `service/functions/subscriptions.mjs` | Binds the purchase and returns the device's licence. |
@@ -55,6 +55,7 @@ Every handler is in `ROUTES` in `service/functions/worker.mjs`, and is reached a
 | `turn` | POST | Yes, empty | A device whose subscription stands | `turn`; `mint` in `service/functions/turn.mjs` | Cloudflare Realtime TURN credentials. |
 | `record` | POST | Yes, the table ID | The device in use of an account whose subscription stands, seated at the table, with signed events of its own in the record; at most `recordsPerHour` an hour | `recordRoute`; `keepRecord` in `service/functions/records.mjs` | Keeps a finished game's record. The first copy is kept. A record in a form other than the one kept now (`recordVersion` in `service/functions/records.mjs`) is refused with 400. Where the service has its keys, a record whose person's seat has no licence the service signed for its key, or whose account sits twice, is refused with 403 (`licenceProblem`). |
 | `review` | POST | Yes, the table ID | The device in use of an account whose subscription stands, while the account is not seated at that table | `reviewRoute`; `recordResponse` in `service/functions/records.mjs` | Serves a kept game's record. |
+| `order` | POST | No; the body names an order, `{order}`, which must be in `OH_STORE`, where only the operator writes | The operator's `service/tool/suspend.mjs` | `orderRoute`; `carryOut` in `service/functions/suspension.mjs` | Carries out the operator's order for an account in its turn: `suspend`, `lift`, `remove` or `restore`. 404 until the store shows the order, and for an account that doesn't exist; 410 once the order is older than `ORDER_KEPT_S`. Not counted against the account's allowances. |
 
 Every handler with a signed request also answers an `OPTIONS` preflight, as does `config`.
 
@@ -108,20 +109,23 @@ Everything the worker keeps is in the Workers KV namespace `OH_STORE`, one key p
 
 | PK | SK | Holds | Expires after |
 |---|---|---|---|
-| `KEY#<key>` | `ENTITLEMENT` | `account`, `licensed_until`, `at` | Never |
+| `KEY#<key>` | `ENTITLEMENT` | `account`, `licensed_until`, `at`, and `suspended` while the account is | Never |
 | `ACCOUNT#<account>` | `META` | `subscription`, `created_at` | Never |
 | `ACCOUNT#<account>` | `DEVICE#<key>` | `bound_at` | Never |
 | `ACCOUNT#<account>` | `TICKET` | The outstanding code: `code`, `expires_at`, `devices` | `TICKET_KEPT_S` in `service/functions/accounts.mjs` |
 | `ACCOUNT#<account>` | `BACKUP` | `codes` (each `code`, `used_at`), `made_at`, `emailed_at`, `acknowledged` (the last web subscription whose purchase was emailed) | Never |
 | `ACCOUNT#<account>` | `LOGIN` | `provider`, `login` (the key of its `LOGIN#` row), `at` | Never |
-| `ACCOUNT#<account>` | `ACTIVE` | The device in use: `key`, `epoch`, `at`, `seated`, `seated_at`, `tags` (the relay objects it was seen at). Only where `HOUSEHOLD` is not bound; otherwise the `Household` object keeps it in its own storage. | Never |
+| `ACCOUNT#<account>` | `ACTIVE` | The device in use: `key`, `epoch`, `at`, `seated`, `seated_at`, `tags` (the relay objects it was seen at), and `suspended` while the account is. Only where `HOUSEHOLD` is not bound; otherwise the `Household` object keeps it in its own storage. | Never |
 | `ACCOUNT#<account>` | `PROFILE` | `name`, `icon`, `color`, `picture`, `version`, `updated_at` | Never |
+| `ACCOUNT#<account>` | `SUSPENDED` | `since`: the day the account was suspended | Never; deleted when the suspension is lifted |
+| `ACCOUNT#<account>` | `HELD` | What the operator took off the profile, to put back: `name`, `picture`, and `at` | Never; deleted when put back |
 | `SUB#<subscription>` | `META` | `source`, `txn_ref`, `renews_at`, `cancelled_at`, `event_at`, and `final` when set | Never |
 | `SUB#<subscription>` | `ACCOUNT` | `account` | Never |
 | `SUB#<subscription>` | `CUSTOMER` | The Stripe `customer`, for the billing portal | Never |
 | `TICKET#<code>` | `META` | `account`, `expires_at`, `used_at`, `made_by`, `used_by` | `TICKET_KEPT_S` in `service/functions/accounts.mjs` |
 | `BACKUP#<digest>` | `META` | `account` | Never |
 | `LOGIN#<provider>#<hmac>` | `IDENTITY` | `account`, `created_at` | Never |
+| `ORDER#<id>` | `META` | The operator's order: `account`, `act`, `at`, and for `remove`, `name` and `picture` | `ORDER_KEPT_S` in `service/functions/suspension.mjs`; deleted once carried out |
 | `ALERT#subscribed` | `<subscription>` | `at`: when the operator was told of the subscription | `SUBSCRIBED_DAYS` in `service/functions/alerts.mjs` |
 | `ALERT#waiting` | `<subscription>` | `at`: when the operator was told a subscriber was waiting | `WAITING_MINUTES` in `service/functions/alerts.mjs` |
 | `config` | `app` | The [remote config](configuration.md#remote-config) | Never |
@@ -130,7 +134,7 @@ Everything the worker keeps is in the Workers KV namespace `OH_STORE`, one key p
 
 A subscription's ID is `sub_…` for Stripe, `apple:<original transaction ID>` for the App Store, `google:<digest>` for Google Play, and `local-<16 hex>` in local mode.
 
-`service/tool/forget.mjs` deletes an account's rows (`forgetAccount` in `service/functions/deletion.mjs`), and takes its name off its kept games (`anonymizeGames` in `service/functions/records.mjs`).
+`service/tool/forget.mjs` deletes an account's rows (`forgetAccount` in `service/functions/deletion.mjs`), and takes its name off its kept games (`anonymizeGames` in `service/functions/records.mjs`). `service/tool/suspend.mjs` writes `ORDER#` rows, and takes a name off kept games the same way.
 
 The worker keeps finished games' records in the R2 bucket `OH_RECORDS`, as `tables/<table>.json`, gzipped, with the sender's key as the custom metadata `from` (`keepRecord` in `service/functions/records.mjs`). A record rewritten when an account is forgotten keeps its gzip and content type, and has no `from`. An account forgotten on request is marked as `forgotten/<account>` in the same bucket. A record sent later is kept without the names of seats whose licence names a marked account, and is refused with 422 if `JSON.stringify` would not give back the text as it was sent.
 

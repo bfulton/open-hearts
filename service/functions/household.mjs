@@ -21,6 +21,7 @@ import { profileRead, profileWritten } from './profile.mjs';
 import { storeOf } from './rows.mjs';
 import { S, SITE, notConfigured, settle } from './settings.mjs';
 import { bindPurchase } from './subscriptions.mjs';
+import { SUSPENDED_WHY, carryOut } from './suspension.mjs';
 
 // ---- one device at a time ------------------------------------------------
 // An account is a person, and a person plays on one device at a time
@@ -69,13 +70,17 @@ export async function activate(op, store, active, { now = Date.now(), revoke = n
   const { key, account } = op;
   const held = await entitlementOf(store, key, { now });
   if (!held || held.account !== account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${key}`))) {
+    // A suspended account's device is told so, as the licence handler
+    // tells it, so that one the relay's word missed shuts live play at
+    // its next renewal.
+    if ((await store.get(`KEY#${key}`, 'ENTITLEMENT'))?.suspended) return { status: 403, body: { error: SUSPENDED_WHY, suspended: true } };
     return { status: 402, body: { error: 'no subscription' } };
   }
   const seated = op.seated === undefined ? undefined : typeof op.seated === 'string' && /^[0-9a-f]{32}$/.test(op.seated) ? op.seated : null;
   const was = (await active.get(account)) ?? { key: null, epoch: 0, tags: [] };
   if (was.key === key) {
     await active.put(account, { ...was, at: now, ...(seated !== undefined ? { seated, seated_at: now } : {}) });
-    return { status: 200, body: { epoch: was.epoch, licensed_until: held.licensed_until } };
+    return { status: 200, body: { epoch: was.epoch, licensed_until: held.licensed_until, profile: await profileVersion(store, account) } };
   }
   if (op.want === 'renew') return { status: 409, body: { error: 'superseded: another device of this account is in use', superseded: true } };
   const inUse = was.key !== null && now - (was.at ?? 0) < IN_USE_MS;
@@ -84,14 +89,23 @@ export async function activate(op, store, active, { now = Date.now(), revoke = n
   const epoch = (was.epoch ?? 0) + 1;
   await active.put(account, { key, epoch, at: now, seated: seated ?? null, seated_at: now, tags: [] });
   if (was.tags?.length) await revoke?.(was.tags, account, epoch);
-  return { status: 200, body: { epoch, licensed_until: held.licensed_until, took: was.key !== null } };
+  return { status: 200, body: { epoch, licensed_until: held.licensed_until, took: was.key !== null, profile: await profileVersion(store, account) } };
 }
+
+/// The version of [account]'s profile, 0 for none: said with each
+/// activation, so that the device in use takes a change it did not make
+/// — the operator's (suspension.mjs, remove and restore) — at its next
+/// renewal rather than its next start (app/lib/net/account_profile.dart).
+const profileVersion = async (store, account) => (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.version ?? 0;
 
 /// The relay asking whether [op.key] is still the account's device in
 /// use at [op.epoch], as it opens a socket for it on [op.tag]: yes, and
-/// the tag is remembered, to be told when that ends; or no.
+/// the tag is remembered, to be told when that ends; or no, and why —
+/// a suspended account's device is told so, not that another of its
+/// devices is in use.
 export async function seenAt(op, active) {
   const was = await active.get(op.account);
+  if (was?.suspended) return { status: 409, body: { error: SUSPENDED_WHY } };
   if (!was || was.key !== op.key || was.epoch !== op.epoch) {
     return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
   }
@@ -170,8 +184,12 @@ export function sequencer({ now = Date.now } = {}) {
     const run = queue.then(async () => {
       const t = now();
       const recent = (done[kind] = (done[kind] ?? []).filter((at) => t - at < 3600000));
+      // An operator's order (suspension.mjs) is never held back by what
+      // the account's own devices have asked for this hour.
       const most =
-        kind === 'read'
+        kind === 'order'
+          ? Infinity
+          : kind === 'read'
           ? S().householdReadsPerHour
           : kind === 'active'
             ? S().activationsPerHour
@@ -241,6 +259,8 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       return inUse(op, active, { now });
     case 'profile':
       return op.profile ? profileWritten(op, store, active, { now }) : profileRead(op, store, { now });
+    case 'order':
+      return carryOut(op, store, active, { now, revoke });
     default:
       return { status: 400, body: { error: 'not a household operation' } };
   }
@@ -249,9 +269,11 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
 /// Which of the hour's allowances [op] is counted against. An unlink is
 /// Apple's word, not the person's, and has an allowance of its own (the
 /// size of the changes'), so the person's own changes never stand in
-/// its way.
+/// its way; an operator's order has no allowance at all.
 const kindOf = (op) =>
-  op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
+  op.op === 'order'
+    ? 'order'
+    : op.op === 'activate' || op.op === 'seen' || op.op === 'inUse'
     ? 'active'
     : op.op === 'record'
       ? 'record'
@@ -265,18 +287,19 @@ const kindOf = (op) =>
 
 /// Tells the relay's object for each of [tags] that [account]'s device
 /// in use is now the one of [epoch], so it closes the sockets of any
-/// device of the account before it (service/do/relay.mjs). Through
+/// device of the account before it (service/do/relay.mjs), saying
+/// [why] — that another device is in use, unless it is given. Through
 /// [env]'s TABLE, which the account's object has where it runs beside
 /// the relay; nothing where it does not.
 export function revokerOf(env) {
   if (!env.TABLE) return null;
-  return async (tags, account, epoch) => {
+  return async (tags, account, epoch, why = null) => {
     await Promise.all(
       tags.map(async (tag) => {
         try {
           await env.TABLE.get(env.TABLE.idFromName(tag)).fetch('https://relay/revoke', {
             method: 'POST',
-            body: JSON.stringify({ account, epoch }),
+            body: JSON.stringify({ account, epoch, ...(why ? { why } : {}) }),
           });
         } catch {
           // An object that cannot be reached closes nothing: its

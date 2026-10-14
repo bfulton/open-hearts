@@ -681,6 +681,14 @@
   "@subscribeAgrees": {
     "description": "Under the Subscribe button, on the web and in the stores: buying is agreeing to the terms, linked just below."
   },
+  "accountSuspendedTitle": "Suspended from live play",
+  "@accountSuspendedTitle": {
+    "description": "On the Subscription page, in place of the price, when the service says this device's account is suspended from live play."
+  },
+  "accountSuspended": "This account is suspended from live play under the terms of use. Playing alone is still open to you. To ask why, or to appeal, email help@openhearts.game.",
+  "@accountSuspended": {
+    "description": "On the Subscription page, in place of the Subscribe button: the account is suspended under the terms; solo play still works; how to ask why or appeal."
+  },
   "storeSubscriptionLater": "On a phone this will be the store's own subscription. Until the app is in the stores, live play is bought on the web.",
   "@storeSubscriptionLater": {
     "description": "Under the Subscribe button, on a device that cannot buy yet."

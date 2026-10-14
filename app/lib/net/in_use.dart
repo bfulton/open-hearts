@@ -41,6 +41,11 @@ enum Use {
 
   /// Another device of the account is in use; this one has stepped back.
   elsewhere,
+
+  /// The account is suspended from live play
+  /// (service/functions/suspension.mjs), as a relay said: live play is
+  /// shut here until a licence is held again.
+  suspended,
 }
 
 class InUse extends ChangeNotifier {
@@ -62,9 +67,21 @@ class InUse extends ChangeNotifier {
   /// The activation, while this device is the one in use.
   Activation? get activation => _standing == Use.here ? _activation : null;
 
+  int? _profileVersion;
+
+  /// The version of the account's profile, as the service last said with
+  /// an activation (null before one): a change this device did not make
+  /// is one it reads (net/account_profile.dart).
+  int? get profileVersion => _profileVersion;
+
   /// Whether this device has stepped back for another: live play is not
   /// open here until it takes the account back.
   bool get elsewhere => _standing == Use.elsewhere || _standing == Use.playingElsewhere;
+
+  /// Whether live play is shut here: this device stepped back for
+  /// another, or the account is suspended. Nothing live stays open
+  /// while it is: the pool or the room, the duty, a table or a watch.
+  bool get shut => elsewhere || _standing == Use.suspended;
 
   /// Whether the person has put the screen saying so aside for now; it
   /// comes back the next time this device is superseded.
@@ -139,6 +156,10 @@ class InUse extends ChangeNotifier {
       if (act == null || !act.holdsFor(signer.publicKey, service: service)) return _standing;
       _activation = act;
       dismissed = false;
+      final profile = json['profile'];
+      final moved = profile is int && profile != _profileVersion;
+      if (profile is int) _profileVersion = profile;
+      if (_standing == Use.here && moved) notifyListeners();
       _set(Use.here);
       _renewing ??= Timer.periodic(renewEvery, (_) => unawaited(renew()));
       return _standing;
@@ -151,20 +172,28 @@ class InUse extends ChangeNotifier {
       stepBack();
       return _standing;
     }
+    if (answer.status == 403 && json['suspended'] == true) {
+      _suspend();
+      return _standing;
+    }
     if (answer.status == 402) {
       _renewing?.cancel();
       _renewing = null;
       _activation = null;
-      _set(Use.unasked);
+      // A suspended account's devices are refused this way too: still
+      // suspended, as the relay said.
+      if (_standing != Use.suspended) _set(Use.unasked);
     }
     return _standing;
   }
 
   /// The licence here changed. A device brought into another account
   /// takes that account up, as opening the app would: what it held was
-  /// for the account it left.
+  /// for the account it left. A suspended one given a licence again has
+  /// been let back, and live play opens as for any licence come in.
   void licenceChanged() {
     final licence = Entitlement.current.licence;
+    if (licence != null && _standing == Use.suspended) _set(Use.unasked);
     final act = _activation;
     if (licence == null || act == null || _signer == null || act.account == licence.account) return;
     unawaited(open(_signer!));
@@ -174,7 +203,8 @@ class InUse extends ChangeNotifier {
   /// by the service, by the relay closing this device's sockets, or by
   /// the other device's presence; whoever says it first.
   void stepBack() {
-    if (_standing == Use.elsewhere) return;
+    // Suspended, there is no taking the account back here to offer.
+    if (_standing == Use.elsewhere || _standing == Use.suspended) return;
     _renewing?.cancel();
     _renewing = null;
     _activation = null;
@@ -203,9 +233,24 @@ class InUse extends ChangeNotifier {
     ];
   }
 
-  /// A relay turned this device away for good, with its reason.
+  /// A relay turned this device away for good, with its reason: another
+  /// device of the account took it up, or the account is suspended —
+  /// which shuts live play here as it does on every device of the
+  /// account, the licence with it.
   void turnedAway(String reason) {
     if (reason.startsWith('superseded:')) stepBack();
+    if (reason.startsWith('suspended:')) _suspend();
+  }
+
+  /// The account is suspended, as a relay or the service said: live
+  /// play shut here, and the licence off the device.
+  void _suspend() {
+    _renewing?.cancel();
+    _renewing = null;
+    _activation = null;
+    _seated = null;
+    _set(Use.suspended);
+    unawaited(Entitlement.current.suspend());
   }
 
   void _set(Use s) {
@@ -222,6 +267,7 @@ class InUse extends ChangeNotifier {
     _activation = null;
     _seated = null;
     _signer = null;
+    _profileVersion = null;
     dismissed = false;
     _standing = Use.unasked;
   }

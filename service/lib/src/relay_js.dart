@@ -40,9 +40,11 @@ class JsRelay implements Relay {
   final String? gate;
 
   /// Tells the relay that [account]'s device in use is now the one of
-  /// [epoch], as the account's own object tells the deployed one.
-  void revoke(String account, int epoch) => _tell({
-        'revoke': {'account': account, 'epoch': epoch},
+  /// [epoch], as the account's own object tells the deployed one, and
+  /// [why] the devices before it are cut off: another device is in use,
+  /// unless it says otherwise.
+  void revoke(String account, int epoch, {String? why}) => _tell({
+        'revoke': {'account': account, 'epoch': epoch, 'why': ?why},
       });
 
   /// How many stored events the host holds before the oldest go.

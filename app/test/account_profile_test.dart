@@ -55,7 +55,7 @@ class Kept {
     final json = jsonDecode(body) as Map;
     final key = json['key'] as String;
     if (url.path == '/api/activate') {
-      return (status: 200, body: jsonEncode({'activation': activationFor(key)}));
+      return (status: 200, body: jsonEncode({'activation': activationFor(key), 'profile': version}));
     }
     if (url.path != '/api/profile') return (status: 404, body: '{"error":"no such handler"}');
     final text = json['profile'];
@@ -179,6 +179,36 @@ void main() {
     kept.asked.clear();
     await AccountProfile.current.retry();
     expect(kept.asked, isEmpty, reason: 'nothing is waiting any more');
+  });
+
+  test('the device in use takes a change it did not make, the operator\'s, at its next renewal', () async {
+    final kept = standUp();
+    await licenceThisDevice();
+    AccountProfile.current.watch();
+    await AccountProfile.current.keep('Bad Name', const Avatar(icon: 'moon'));
+    await InUse.current.open(await Identity.signer());
+    await pumpEventQueue();
+    expect(kept.profile, {'name': 'Bad Name', 'icon': 'moon'}, reason: 'sent as it became the one in use');
+    // Its own write comes back as the next version: read once, and
+    // nothing taken.
+    await InUse.current.renew();
+    await pumpEventQueue();
+    kept.asked.clear();
+    await InUse.current.renew();
+    await pumpEventQueue();
+    expect(kept.asked, isEmpty, reason: 'nothing new: nothing asked');
+    // Nor for anything else the standing says meanwhile.
+    InUse.current.putAside();
+    await pumpEventQueue();
+    expect(kept.asked, isEmpty);
+    // The operator takes the name off (service/functions/suspension.mjs).
+    kept
+      ..profile = {'name': '', 'icon': 'moon'}
+      ..version += 1;
+    await InUse.current.renew();
+    await pumpEventQueue();
+    expect(kept.asked, ['read']);
+    expect(await here(), (name: '', avatar: const Avatar(icon: 'moon')));
   });
 
   test('a device brought into an account takes the account\'s profile over its own', () async {
