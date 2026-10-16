@@ -10,6 +10,8 @@ import { wasmPath } from './host.mjs';
 import { lobbyKind, objectRelay, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
 import { keys, signing } from './sign.mjs';
 import { KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
+import { pictureScreen } from './withheld.mjs';
+import { pictureDigest, withholding } from '../functions/pictures.mjs';
 
 const wasm = readFileSync(wasmPath);
 const verify = await schnorrVerifier(wasm);
@@ -65,11 +67,18 @@ const socket = () => ({
 const lobby = (key, tag, at) => sign.event(key, { kind: lobbyKind, content: `room ${at}`, tags: [['t', tag]], created_at: at });
 
 /// A relay for [tag] as TagRelay builds one, its stored events written
-/// to [st] once the writes have settled.
-async function built(st, tag) {
+/// to [st] once the writes have settled; [screen], the pictures it
+/// withholds (withheld.mjs).
+async function built(st, tag, { screen = null } = {}) {
   const kept = tagStore(st, tag);
   const writes = [];
-  const relay = objectRelay(verify, { tag, store: await kept.load(), kept: (e, gone) => writes.push(kept.keep(e, gone, { now: 0 })) });
+  const relay = objectRelay(verify, {
+    tag,
+    store: await kept.load(),
+    kept: (e, gone) => writes.push(kept.keep(e, gone, { now: 0 })),
+    withhold: screen ? (e) => screen.withheld(e) : null,
+    forget: (e) => writes.push(kept.forget(e)),
+  });
   return { relay, settled: () => Promise.all(writes) };
 }
 
@@ -102,6 +111,32 @@ test('a room told to the object is there for whoever asks later, and after the o
   again.relay.open(b);
   await again.relay.message(b, JSON.stringify(['REQ', 's', { kinds: [lobbyKind], '#t': ['ABCD'] }]));
   assert.deepEqual(b.of('EVENT').map((m) => m[2].id), [room.id]);
+});
+
+test('a picture taken down goes from storage as well, and an object woken from eviction serves it to nobody', async () => {
+  const st = storage();
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 5, 5, 5, 5]).toString('base64');
+  let row = null;
+  const screen = pictureScreen({ read: () => row, everyMs: 0 });
+  const first = await built(st, 'ABCD', { screen });
+  const a = socket();
+  first.relay.open(a);
+  const room = await lobby(keys[0], 'ABCD', 1000);
+  const picture = await sign.event(keys[1], { kind: lobbyKind, content: JSON.stringify({ kind: 'picture', jpeg }), tags: [['t', 'ABCD']], created_at: 1001 });
+  for (const e of [room, picture]) await first.relay.message(a, JSON.stringify(['EVENT', e]));
+  await first.settled();
+  assert.deepEqual([...st.rows.keys()], [keyOf(room), keyOf(picture)]);
+
+  // Taken down while the object was evicted: woken, it has the picture
+  // in storage, and lets go of it before serving anyone.
+  row = withholding(null, await pictureDigest(jpeg), Date.now());
+  const again = await built(st, 'ABCD', { screen });
+  const b = socket();
+  again.relay.open(b);
+  await again.relay.message(b, JSON.stringify(['REQ', 's', { kinds: [lobbyKind], '#t': ['ABCD'] }]));
+  assert.deepEqual(b.of('EVENT').map((m) => m[2].id), [room.id]);
+  await again.settled();
+  assert.deepEqual([...st.rows.keys()], [keyOf(room)]);
 });
 
 test('a day on, the sweep deletes what is a day old and leaves the rest', async () => {

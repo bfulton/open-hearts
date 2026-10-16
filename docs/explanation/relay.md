@@ -51,6 +51,33 @@ from all of them ([ratings](live-play.md#ratings)). They stay when an
 account's data is deleted on request
 ([what stays](../how-to/delete-an-accounts-data.md#what-stays)).
 
+### Withheld pictures
+
+A picture the operator takes off an account
+([suspending an account](service.md#suspending-an-account)) could
+otherwise stay a day in every pool and room it was put out in, from any
+of the account's devices, and the relay has no record of which those
+were. So the picture is named instead: the account's turn adds the
+SHA-256 of its JPEG to one list in the store (`config|pictures`,
+`service/functions/pictures.mjs`), for 30 days or until it is put back.
+Every tag's object that keeps a lobby reads the list when a picture
+comes its way, at most once a minute (`service/do/withheld.mjs`), so
+within a couple of minutes of the order every object has it:
+
+- **Put out**, a listed picture is taken and kept: the `OK` is `true`,
+  with the reason `withheld:`, and the event is neither stored nor
+  passed on. Refusing it would count against the device
+  (`refusalMs` in `packages/table/lib/src/relays.dart`) and hold up the
+  rest of its live play for a minute, while its owner may not even know
+  the picture was taken down: the device in use takes the change at
+  its next renewal.
+- **Already held**, it is let go of, from memory and from the object's
+  storage, before a subscription is served anything.
+
+Pictures are matched by their bytes, so the same picture put out by
+anyone is withheld. Copies that devices already received stay on those
+devices.
+
 ## Reactions
 
 A [reaction](live-play.md#reactions) is a code and the moment it was

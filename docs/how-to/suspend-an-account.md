@@ -94,7 +94,11 @@ The answer is `{"act":"lift","suspended":false,"unflagged":<devices>}`. Each dev
 
    The answer is `{"act":"remove","removed":["name"]}`. Then, for a name, the tool prints a `took the name off` line for each kept game, with its seats.
 
-The account's device in use takes the change at its next renewal, within 20 minutes, and its other devices take it when they next start: no name, and the icon in place of the picture. A name or picture the relay already holds stays there, with the room or seating it was published in, for up to a day; the tool can't take it off the relay sooner. For a copyright notice, the terms say the person who published it is told.
+The account's device in use takes the change at its next renewal, within 20 minutes, and its other devices take it when they next start: no name, and the icon in place of the picture.
+
+A picture taken off is also withheld at the relay, wherever it was put out, within a couple of minutes: no pool or room serves it again, and a device that puts it out again isn't carried. It stays withheld for 30 days, or until it is put back. A name the relay already holds stays there, with the room or seating it was published in, for up to a day. Copies that other players' devices already received stay on those devices.
+
+For a copyright notice, the terms say the person who published it is told.
 
 The player can choose a new name or picture. If it breaks the terms too, take it off again or suspend the account. What is held is what the latest removal took.
 
@@ -106,7 +110,7 @@ After a counter-notice, the terms' "Copyright" section says when the material go
 node service/tool/suspend.mjs "$account" --restore --apply
 ```
 
-The answer is `{"act":"restore","restored":["name","picture"]}`, naming what went back. It reaches the account's devices as a removal does.
+The answer is `{"act":"restore","restored":["name","picture"]}`, naming what went back. It reaches the account's devices as a removal does, and a picture put back is no longer withheld at the relay.
 
 ## What a suspension doesn't do
 

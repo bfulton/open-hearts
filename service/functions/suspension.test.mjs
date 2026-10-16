@@ -10,6 +10,8 @@ import { activeInStore, seenAt } from './household.mjs';
 import { dayOf, memoryStore } from './rows.mjs';
 import { record } from './stripe.mjs';
 import { ORDER_KEPT_S, SUSPENDED_WHY, carryOut, orderOf, orderRow } from './suspension.mjs';
+import { PICTURES_ROW, WITHHELD_FOR_MS, WITHHELD_WHY, pictureDigest } from './pictures.mjs';
+import { pictureScreen } from '../do/withheld.mjs';
 import { carry, standing, wouldDo } from '../tool/suspend.mjs';
 
 const KEY = 'ab'.repeat(32);
@@ -26,13 +28,14 @@ async function household() {
   return { store, account: (await store.get(`KEY#${KEY}`, 'ENTITLEMENT')).account };
 }
 
-/// [act] ordered for [account] as the tool orders it, and carried out
-/// as the account's turn carries it out: {status, body, revoked}.
-async function ordered(store, account, act, { active = activeInStore(store), at = now, ...options } = {}) {
+/// [act] ordered for [account] as the tool orders it, at [at], and
+/// carried out as the account's turn carries it out, at [carried]:
+/// {status, body, revoked}.
+async function ordered(store, account, act, { active = activeInStore(store), at = now, carried = now, ...options } = {}) {
   const id = `${act.length}`.padStart(2, '0').repeat(16);
   await store.put(...orderRow(id), orderOf(account, act, { ...options, now: at }));
   const revoked = [];
-  const out = await carryOut({ op: 'order', account, order: id }, store, active, { now, revoke: async (...args) => revoked.push(args) });
+  const out = await carryOut({ op: 'order', account, order: id }, store, active, { now: carried, revoke: async (...args) => revoked.push(args) });
   return { ...out, revoked, id };
 }
 
@@ -140,6 +143,37 @@ test('a name or picture chosen after one was taken off, and taken off in its tur
   await ordered(store, account, 'restore');
   const profile = await store.get(pk, 'PROFILE');
   assert.deepEqual([profile.name, profile.picture], ['Second', '/9j/BBBB']);
+});
+
+test('a picture taken off is withheld at the relay, as the relay sees it in a pool, until it is put back', async () => {
+  const { store, account } = await household();
+  const pk = `ACCOUNT#${account}`;
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 7, 7, 7, 7]).toString('base64');
+  await store.put(pk, 'PROFILE', { name: 'Ada', icon: null, color: null, picture: jpeg, version: 1 });
+  // A name taken off is nothing to the relay.
+  await ordered(store, account, 'remove', { name: true });
+  assert.equal(await store.get(...PICTURES_ROW), null);
+
+  await ordered(store, account, 'remove', { picture: true });
+  const row = await store.get(...PICTURES_ROW);
+  assert.deepEqual(row, { pictures: [{ sha256: await pictureDigest(jpeg), until: now + WITHHELD_FOR_MS }] });
+  // The picture a device of the account puts out in a pool, as it puts
+  // it out (packages/table, matching.dart): the one the relay withholds.
+  const inPool = { kind: 4244, id: 'e1', content: JSON.stringify({ kind: 'picture', jpeg }) };
+  assert.equal(await pictureScreen({ read: () => store.get(...PICTURES_ROW) }).withheld(inPool), WITHHELD_WHY);
+  // Carried out again, as after a lost answer: still one listing.
+  await ordered(store, account, 'remove', { picture: true });
+  assert.equal((await store.get(...PICTURES_ROW)).pictures.length, 1);
+  // The player puts the same picture up again, and it is taken off
+  // again a day later: still one listing, withheld from then.
+  await store.put(pk, 'PROFILE', { ...(await store.get(pk, 'PROFILE')), picture: jpeg, version: 9 });
+  await ordered(store, account, 'remove', { picture: true, at: now + 86400000, carried: now + 86400000 });
+  assert.deepEqual((await store.get(...PICTURES_ROW)).pictures, [{ sha256: await pictureDigest(jpeg), until: now + 86400000 + WITHHELD_FOR_MS }]);
+
+  // Put back, as after a counter-notice: no longer withheld.
+  await ordered(store, account, 'restore');
+  assert.deepEqual(await store.get(...PICTURES_ROW), { pictures: [] });
+  assert.equal(await pictureScreen({ read: () => store.get(...PICTURES_ROW) }).withheld(inPool), null);
 });
 
 test('an order is carried out once, for its own account, while it is fresh', async () => {

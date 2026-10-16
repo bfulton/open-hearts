@@ -131,6 +131,7 @@ Everything the worker keeps is in the Workers KV namespace `OH_STORE`, one key p
 | `config` | `app` | The [remote config](configuration.md#remote-config) | Never |
 | `config` | `service` | The [service settings](configuration.md#service-settings) | Never |
 | `config` | `relay` | The [relay settings](configuration.md#relay-settings) | Never |
+| `config` | `pictures` | The pictures the relay withholds: `pictures`, each `sha256` (of the JPEG's bytes) and `until` (milliseconds). Read by every tag's object that keeps a lobby ([withheld pictures](../explanation/relay.md#withheld-pictures)). | Each entry after `WITHHELD_FOR_MS` in `service/functions/pictures.mjs`, or when its picture is put back |
 
 A subscription's ID is `sub_…` for Stripe, `apple:<original transaction ID>` for the App Store, `google:<digest>` for Google Play, and `local-<16 hex>` in local mode.
 

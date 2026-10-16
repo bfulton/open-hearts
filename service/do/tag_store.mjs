@@ -37,6 +37,12 @@ export function tagStore(storage, tag) {
       if (tag !== resultsTag && (await storage.getAlarm()) === null) await storage.setAlarm(now + SWEEP_EVERY_MS);
     },
 
+    /// An event the relay let go of before its time, a withheld picture
+    /// (withheld.mjs), gone from storage too.
+    async forget(event) {
+      await storage.delete(keyOf(event));
+    },
+
     /// What is a day old goes. True when anything went, so the relay in
     /// memory is built again; another sweep while anything is left.
     async sweep({ now = Date.now() } = {}) {
