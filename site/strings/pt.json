@@ -257,7 +257,7 @@
     "header": {
       "title": "Termos de uso",
       "tagline": "O acordo entre você e o Open Hearts, em palavras simples.",
-      "updated": "Última atualização: 13 de outubro de 2026"
+      "updated": "Última atualização: 16 de outubro de 2026"
     },
     "short": {
       "title": "A versão curta",
@@ -312,7 +312,7 @@
       "p22": "<b>Web:</b> fale com a gente. Onde a lei do lugar em que você mora lhe der o direito de desistir da compra ou de receber um reembolso, você tem esse direito, e vamos analisar com justiça qualquer outro pedido.",
       "p23": "Uma assinatura reembolsada deixa de ser renovada, e o jogo ao vivo nos aparelhos dela acaba quando a licença atual deles vencer, em cerca de um mês.",
       "p24": "Seus aparelhos",
-      "p25": "Assinar cria uma conta, à qual pertencem a assinatura e os aparelhos dela. Não há senha, e a conta joga ao vivo em um aparelho por vez: abrir o jogo em outro aparelho dela leva o jogo ao vivo para lá, e uma partida deixada no primeiro conta como abandonada por você. Se você apagar os dados do jogo ou desinstalar o app no seu único aparelho da conta, traga o novo com um código de backup, ou entrando com Apple ou Google como antes. Ou fale com a gente usando o endereço de e-mail com que pagou na web, e ajudaremos no que pudermos.",
+      "p25": "Assinar cria uma conta, à qual pertencem a assinatura e os aparelhos dela. Não há senha, e a conta joga ao vivo em um aparelho por vez: abrir o jogo em outro aparelho dela leva o jogo ao vivo para lá, e uma partida deixada no primeiro conta como abandonada por você. Se você apagar os dados do jogo ou desinstalar o app no seu único aparelho da conta, traga o novo com um código de backup ou, se você entrou com Apple ou Google, entrando do mesmo jeito de novo. Ou fale com a gente usando o endereço de e-mail com que pagou na web, e ajudaremos no que pudermos.",
       "p26": "Seu aparelho como jurado",
       "p27": "Enquanto o jogo está aberto no aparelho em que a sua conta joga ao vivo, esse aparelho pode ser sorteado como jurado nas mesas de outros assinantes, uma mão de cada vez: ajuda a distribuir as cartas, joga nos lugares dos bots e resolve as vezes que os jogadores não conseguem resolver. É assim que as mesas ao vivo funcionam sem que nenhum servidor nosso veja uma mão, e o aparelho de cada assinante faz a sua parte. Isso usa um pouco dos dados, da bateria e do processamento do aparelho enquanto o jogo está aberto, e o aparelho não é sorteado enquanto o jogo está em segundo plano nem depois de fechado. O que ele compartilha, e com quem, está na <a href=\"{{base}}/privacy\">política de privacidade</a>."
     },
@@ -335,6 +335,7 @@
     "copyright": {
       "title": "Direitos autorais",
       "p1": "Se você acredita que algo publicado por meio do Open Hearts, como o nome ou a imagem de um jogador, viola seus direitos autorais, envie uma notificação ao nosso contato para direitos autorais:",
+      "agent": "Contato para direitos autorais<br> Bright Fulton<br> 6650 Rivers Ave, Ste 105, PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p2": "Segundo a Digital Millennium Copyright Act dos Estados Unidos, a notificação deve incluir:",
       "p3": "sua assinatura física ou eletrônica, como titular dos direitos ou pessoa autorizada a agir em nome dele;",
       "p4": "a obra protegida que você diz ter sido violada;",
@@ -367,7 +368,7 @@
     },
     "ending": {
       "title": "Fim destes termos",
-      "p1": "Você pode parar de usar o Open Hearts a qualquer momento, e cancelar uma assinatura como descrito acima. Se um dia deixarmos de oferecer o jogo ao vivo, vamos interromper as renovações e avisar com antecedência, aqui e no app."
+      "p1": "Você pode parar de usar o Open Hearts a qualquer momento, e cancelar uma assinatura como descrito acima. Se um dia deixarmos de oferecer o jogo ao vivo, vamos interromper as renovações, avisar com antecedência, aqui e no app, e reembolsar a parte não usada de qualquer assinatura feita na web. Assinaturas compradas na App Store ou no Google Play são reembolsadas conforme as regras da loja."
     },
     "law": {
       "title": "Lei e disputas",

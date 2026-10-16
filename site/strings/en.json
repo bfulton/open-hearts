@@ -257,7 +257,7 @@
     "header": {
       "title": "Terms of Use",
       "tagline": "The agreement between you and Open Hearts, in plain words.",
-      "updated": "Last updated 13 October 2026"
+      "updated": "Last updated 16 October 2026"
     },
     "short": {
       "title": "The short version",
@@ -312,7 +312,7 @@
       "p22": "<b>Web:</b> contact us. Where the law where you live gives you a right to withdraw from the purchase or to a refund, you have it, and we will look fairly at any other request.",
       "p23": "A refunded subscription stops being renewed, and live play on its devices ends when their current licence runs out, within about a month.",
       "p24": "Your devices",
-      "p25": "Subscribing makes an account, and the subscription and its devices belong to it. There is no password, and the account plays live on one device at a time: opening the game on another of its devices moves live play there, and a game left on the first counts as one you left. If you clear the game's data or delete the app on your only device in the account, bring the new one in with a backup code, or by signing in with Apple or Google as before. Or contact us with the email address you paid with on the web, and we will help where we can.",
+      "p25": "Subscribing makes an account, and the subscription and its devices belong to it. There is no password, and the account plays live on one device at a time: opening the game on another of its devices moves live play there, and a game left on the first counts as one you left. If you clear the game's data or delete the app on your only device in the account, bring the new one in with a backup code, or, if you signed in with Apple or Google, by signing in the same way again. Or contact us with the email address you paid with on the web, and we will help where we can.",
       "p26": "Your device as a juror",
       "p27": "While the game is open on the device your account plays live on, that device may be drawn as a juror at other subscribers' tables, a hand at a time: it helps deal the cards, plays the seats the bots hold, and settles turns the players cannot. That is how live tables work with no server of ours seeing a hand, and every subscriber's device does its part. It uses some of the device's data, battery and processing while the game is open, and the device is not drawn while the game is in the background or once it is closed. What it shares, and with whom, is in the <a href=\"{{base}}/privacy\">privacy policy</a>."
     },
@@ -335,6 +335,7 @@
     "copyright": {
       "title": "Copyright",
       "p1": "If you believe that something published through Open Hearts, such as a player's name or picture, infringes your copyright, send a notice to our copyright agent:",
+      "agent": "Copyright Agent<br> Bright Fulton<br> 6650 Rivers Ave, Ste 105, PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p2": "Under the US Digital Millennium Copyright Act, the notice must include:",
       "p3": "your physical or electronic signature, as the copyright owner or someone authorized to act for them;",
       "p4": "the copyrighted work you say is infringed;",
@@ -367,7 +368,7 @@
     },
     "ending": {
       "title": "Ending these terms",
-      "p1": "You can stop using Open Hearts at any time, and cancel a subscription as described above. If we ever stop offering live play, we will stop renewals and say so here and in the app beforehand."
+      "p1": "You can stop using Open Hearts at any time, and cancel a subscription as described above. If we ever stop offering live play, we will stop renewals, say so here and in the app beforehand, and refund the unused part of any web subscription. Subscriptions bought in the App Store or Google Play are refunded under the store's rules."
     },
     "law": {
       "title": "Law and disputes",

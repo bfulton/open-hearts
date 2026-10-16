@@ -50,6 +50,12 @@ squashed from a pull request, the pull request's number.
 
 ### Changed
 
+- The terms name the copyright agent, with their own address, email and
+  telephone. If live play ever stops, they promise a refund of the
+  unused part of a web subscription, and say that the App Store and
+  Google Play refund under their own rules. They say that signing in
+  again brings a new device into an account only for a player who signed
+  in with Apple or Google. (2026-10-16, #30)
 - The subscribe page says beside the button what the subscription
   costs, that it renews by itself until cancelled and where to cancel,
   and that subscribing is agreeing to the terms. The terms' warranty

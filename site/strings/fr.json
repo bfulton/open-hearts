@@ -257,7 +257,7 @@
     "header": {
       "title": "Conditions d'utilisation",
       "tagline": "L'accord entre vous et Open Hearts, en termes simples.",
-      "updated": "Dernière mise à jour : 13 octobre 2026"
+      "updated": "Dernière mise à jour : 16 octobre 2026"
     },
     "short": {
       "title": "En bref",
@@ -312,7 +312,7 @@
       "p22": "<b>Web :</b> contactez-nous. Là où la loi de votre pays vous donne un droit de rétractation ou un droit au remboursement, vous en bénéficiez, et nous examinerons équitablement toute autre demande.",
       "p23": "Un abonnement remboursé n'est plus renouvelé, et le jeu en direct sur ses appareils prend fin à l'expiration de leur licence en cours, dans un délai d'environ un mois.",
       "p24": "Vos appareils",
-      "p25": "S'abonner crée un compte, auquel appartiennent l'abonnement et ses appareils. Il n'y a pas de mot de passe, et le compte joue en direct sur un appareil à la fois : ouvrir le jeu sur un autre de ses appareils y amène le jeu en direct, et une partie laissée sur le premier compte comme abandonnée par vous. Si vous effacez les données du jeu ou supprimez l'application sur votre seul appareil du compte, ramenez le nouveau avec un code de secours, ou en vous connectant avec Apple ou Google comme avant. Ou contactez-nous avec l'adresse e-mail avec laquelle vous avez payé sur le web, et nous vous aiderons dans la mesure du possible.",
+      "p25": "S'abonner crée un compte, auquel appartiennent l'abonnement et ses appareils. Il n'y a pas de mot de passe, et le compte joue en direct sur un appareil à la fois : ouvrir le jeu sur un autre de ses appareils y amène le jeu en direct, et une partie laissée sur le premier compte comme abandonnée par vous. Si vous effacez les données du jeu ou supprimez l'application sur votre seul appareil du compte, ramenez le nouveau avec un code de secours ou, si vous avez utilisé la connexion avec Apple ou Google, en vous connectant à nouveau de la même façon. Ou contactez-nous avec l'adresse e-mail avec laquelle vous avez payé sur le web, et nous vous aiderons dans la mesure du possible.",
       "p26": "Votre appareil comme juré",
       "p27": "Tant que le jeu est ouvert sur l'appareil sur lequel votre compte joue en direct, cet appareil peut être tiré au sort comme juré aux tables d'autres abonnés, une donne à la fois : il aide à distribuer les cartes, joue à la place des bots et tranche les tours que les joueurs ne peuvent pas trancher. C'est ainsi que les tables en direct fonctionnent sans qu'aucun de nos serveurs ne voie une main, et l'appareil de chaque abonné fait sa part. Cela utilise un peu des données, de la batterie et du processeur de l'appareil tant que le jeu est ouvert, et l'appareil n'est pas tiré au sort tant que le jeu est en arrière-plan, ni une fois fermé. Ce qu'il partage, et avec qui, figure dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>."
     },
@@ -335,6 +335,7 @@
     "copyright": {
       "title": "Droit d'auteur",
       "p1": "Si vous pensez que quelque chose publié via Open Hearts, comme le nom ou l'image d'un joueur, porte atteinte à vos droits d'auteur, envoyez une notification à notre contact désigné pour le droit d'auteur :",
+      "agent": "Contact désigné pour le droit d'auteur<br> Bright Fulton<br> 6650 Rivers Ave, Ste 105, PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p2": "Selon le Digital Millennium Copyright Act des États-Unis, la notification doit comporter :",
       "p3": "votre signature manuscrite ou électronique, en tant que titulaire des droits ou personne autorisée à agir en son nom ;",
       "p4": "l'œuvre protégée qui, selon vous, est contrefaite ;",
@@ -367,7 +368,7 @@
     },
     "ending": {
       "title": "Fin de ces conditions",
-      "p1": "Vous pouvez cesser d'utiliser Open Hearts à tout moment, et résilier un abonnement comme décrit ci-dessus. Si nous cessons un jour de proposer le jeu en direct, nous arrêterons les renouvellements et l'annoncerons à l'avance ici et dans l'application."
+      "p1": "Vous pouvez cesser d'utiliser Open Hearts à tout moment, et résilier un abonnement comme décrit ci-dessus. Si nous cessons un jour de proposer le jeu en direct, nous arrêterons les renouvellements, l'annoncerons à l'avance ici et dans l'application, et rembourserons la partie non utilisée de tout abonnement web. Les abonnements achetés sur l'App Store ou Google Play sont remboursés selon les règles de la boutique."
     },
     "law": {
       "title": "Droit applicable et litiges",
