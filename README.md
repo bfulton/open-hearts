@@ -44,6 +44,7 @@ What that guarantees, and where it rests on trusting us, is in
   takes a fresh clone to passing tests and the app running in Chrome.
 - **Everything else:** the [documentation](docs/README.md) has how-to
   guides, reference and the design explained.
+- **What's next:** the [roadmap](ROADMAP.md).
 - **Contribute:** [CONTRIBUTING.md](CONTRIBUTING.md). To report a
   vulnerability, see [SECURITY.md](SECURITY.md).
 
