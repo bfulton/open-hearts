@@ -64,14 +64,19 @@ export function wouldDo(act, stands, { name = false, picture = false } = {}) {
 }
 
 /// [act] carried out for [account] in its turn: the order written, with
-/// KV's expiry, and the service asked until it has carried it out.
-/// {status, body} as the service last answered, or the error the asking
-/// ended on. [tries] asks, [wait] apart: a 404 or an unreachable
-/// service is asked again, since KV takes a while to show a new row
-/// everywhere; anything else is the answer.
-export async function carry(store, account, act, options, { origin, fetchImpl = fetch, tries = 24, wait = 5000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now() } = {}) {
+/// KV's expiry, and the service asked until it has carried it out
+/// ([placeOrder]).
+export const carry = (store, account, act, options, asking = {}) => placeOrder(store, orderOf(account, act, { ...options, now: asking.now ?? Date.now() }), asking);
+
+/// [order] written into the store, with KV's expiry, and the service
+/// asked to carry it out until it has (POST /api/order). {status, body}
+/// as the service last answered, or the error the asking ended on.
+/// [tries] asks, [wait] apart: a 404 or an unreachable service is asked
+/// again, since KV takes a while to show a new row everywhere; anything
+/// else is the answer.
+export async function placeOrder(store, order, { origin, fetchImpl = fetch, tries = 24, wait = 5000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   const id = hex(crypto.getRandomValues(new Uint8Array(16)));
-  await store.put(...orderRow(id), orderOf(account, act, { ...options, now }), { ttl: ORDER_KEPT_S });
+  await store.put(...orderRow(id), order, { ttl: ORDER_KEPT_S });
   let last = null;
   for (let i = 0; i < tries; i++) {
     if (i) await sleep(wait);

@@ -34,7 +34,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `service_object` | The `service` tests with `OH_RELAY=object`: against that relay under the object's own rules |
 | `relay_js` | `node --test service/do/*.test.mjs` |
 | `functions` | `node --test service/functions/*.test.mjs` |
-| `site` | `node --test site/build.test.mjs` |
+| `site` | `node --test site/*.test.mjs`: every page in every language, and the terms and the privacy policy against `site/ledger.json` and main's copy of it |
 | `infra` | `node --test infra/*.test.mjs` |
 | `ops` | `node --test ops/*.test.mjs`: [the oh command](oh.md), its reference against its table, and each command against fakes of the store, Stripe and the programs it starts |
 | `workers` | `node --test` on `e2e/deal_worker.test.mjs`, `e2e/deal_golden.test.mjs`, `e2e/offline_worker.test.mjs`, `e2e/carry.test.mjs` and `crypto/schnorr_wasm/vectors.test.mjs`: the page's workers, against the committed wasm |
@@ -57,16 +57,18 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 
 | Changed path | Suites added |
 |---|---|
-| `app/lib/`, `app/test/`, `app/web/`, `app/worker/`, `app/pubspec.yaml`, `app/analysis_options.yaml`, `app/l10n.yaml` | `app_analyze`, `app`; and `workers` for `app/web/` and `app/worker/` |
+| `app/lib/`, `app/test/`, `app/web/`, `app/worker/`, `app/pubspec.yaml`, `app/analysis_options.yaml`, `app/l10n.yaml` | `app_analyze`, `app`; `workers` for `app/web/` and `app/worker/`; and `site` for `app/lib/net/buying.dart`, whose price the site's tests hold to the config |
 | `packages/engine/` | `engine` |
 | `packages/deal/` | `deal` |
 | `packages/table/`, `packages/table_sim/` | `table` |
 | `service/do/` | `relay_js`, `service_js`, `service_object` |
-| `service/functions/` | `functions` |
-| `service/tool/*.mjs` | `functions` |
+| `service/functions/` | `functions`, `ops` |
+| `service/tool/*.mjs` | `functions`, `ops` |
 | Any other path under `service/` | `service` |
-| `site/` | `site`, `e2e_site` |
-| `infra/` | `infra` |
+| `site/` | `site`, `e2e_site`, `ops` |
+| `config/` | `site`, `functions`, `infra`, `ops` |
+| `infra/` | `infra`, `ops` |
+| `ops/`, `oh` | `ops` |
 | `e2e/*.test.mjs` | `workers` |
 | Any other path under `e2e/`, any other `*.sh` file, `.github/` | `scripts` |
 | Any other path under `crypto/` | `crypto`, `deal`, `workers` |

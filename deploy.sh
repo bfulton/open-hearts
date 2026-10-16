@@ -184,9 +184,13 @@ node site/build.mjs "$STAGE"
 # compile wasm from bytes while running (service/functions/entry.mjs).
 mkdir -p "$STAGE/_worker.js"
 cp service/functions/entry.mjs "$STAGE/_worker.js/index.js"
-# The committed configuration, as a module the entry imports.
+# The committed configuration, as a module the entry imports; and the
+# ledger of the terms and the privacy policy this site is built with,
+# which the service tells subscribers of (service/functions/notices.mjs).
 node -e "process.stdout.write('export default ' + JSON.stringify(require('./config/openhearts.json')) + ';\n')" \
   > "$STAGE/_worker.js/openhearts.config.mjs"
+node -e "process.stdout.write('export default ' + JSON.stringify(require('./site/ledger.json')) + ';\n')" \
+  > "$STAGE/_worker.js/ledger.config.mjs"
 # Every module the handlers import, not a list of them kept by hand:
 # one left off is a worker Cloudflare refuses at upload. Not the tests,
 # nor their fixtures.
@@ -256,4 +260,16 @@ echo "site  https://$LABEL.$PROJECT.pages.dev/"
 echo "app   https://$LABEL.$PROJECT.pages.dev/play/"
 if [ "$LABEL" = main ]; then
   echo "      https://play.openhearts.game/ (production, and its /api/)"
+fi
+
+# A change to the terms or the privacy policy that matters to
+# subscribers, now published, is emailed to each web subscriber here, in
+# the same deploy (ops/terms.mjs, docs/how-to/change-the-terms.md); the
+# app shows it from the ledger the service was just given. Nothing to
+# tell is said so and is no failure. Run again, it tells only those it
+# has not.
+if [ "$LABEL" = main ]; then
+  echo "==> telling subscribers of published changes to the terms"
+  node ops/oh.mjs terms notify --after-deploy --apply ||
+    { echo "deploy: published, but not every subscriber was told: run ./oh terms notify --apply" >&2; exit 1; }
 fi

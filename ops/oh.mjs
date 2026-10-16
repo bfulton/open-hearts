@@ -66,7 +66,7 @@ export function helpOf(c) {
   const rows = [
     ...(c.args ?? []).map((a) => [`<${a}>`, ARGUMENTS[a]]),
     ...(c.flags?.includes('apply') ? [['--apply', 'do it; without it, say what it would do and change nothing']] : []),
-    ['needs', c.needs.join(', ')],
+    ['needs', c.needs.join(', ') || 'nothing but this checkout'],
     ['how-to', c.howto],
     ['e.g.', c.example],
   ];
@@ -127,7 +127,7 @@ export function markdown() {
     for (const c of COMMANDS.filter((x) => x.group === group)) {
       out.push(`### ${['oh', ...c.words].join(' ')}`, '', '```bash', usageOf(c), '```', '', [c.summary, c.more].filter(Boolean).join(' '), '');
       const [path, hash] = c.howto.split('#');
-      out.push(`- **Needs:** ${c.needs.map((n) => (CREDENTIALS[n] ? `\`${n}\`` : n)).join(', ')}`);
+      out.push(`- **Needs:** ${c.needs.map((n) => (CREDENTIALS[n] ? `\`${n}\`` : n)).join(', ') || 'nothing but this checkout'}`);
       out.push(`- **How-to:** [${path.split('/').pop()}](../${path.replace(/^docs\//, '')}${hash ? `#${hash}` : ''})`);
       out.push(`- **Example:** \`${c.example}\``, '');
     }

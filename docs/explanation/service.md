@@ -138,10 +138,11 @@ the licence's date. The worker checks its own signature against
 
 ## Payment
 
-Live play is a yearly subscription, paid up front (the price is
-`infra/stripe.mjs`'s). The rest is free: solo play, the records, the
-verifiable deal and the engine. The price is yearly because a card
-fee's fixed part would be most of a monthly price.
+Live play is a yearly subscription, paid up front, at the price in
+`config/openhearts.json` ([changing the terms](#changing-the-terms)).
+The rest is free: solo play, the records, the verifiable deal and the
+engine. The price is yearly because a card fee's fixed part would be
+most of a monthly price.
 
 **Web: Stripe.** `checkout` writes the device's key into the session's
 metadata and the subscription's metadata, so renewals carry it too. The
@@ -154,10 +155,10 @@ bought, how it renews and how to cancel (`mailerOf` in
 `service/functions/household.mjs`): California's automatic renewal law
 asks for both. The webhook binds the device once the
 session is paid, and the subscription's own events carry its dates.
-`stripePrice` (in `config/openhearts.json`, or the
-[service settings](../reference/configuration.md#service-settings)) is a
-price id or a lookup key; the active price for a lookup key is cached
-briefly (`PRICE_KEPT_MS`).
+`stripePrice` in `config/openhearts.json` names the Stripe price, by id
+or lookup key. A checkout sells it only when it is the price the terms
+state, a year at `price` (`shopPrice` in `service/functions/stripe.mjs`);
+the answer is cached briefly (`PRICE_KEPT_MS`).
 
 **Phones: the store.** The phone buys in its own store and sends the
 proof to `store`: an App Store signed transaction, or a Google Play
@@ -526,13 +527,42 @@ HMAC, and nothing on the device's side leads back to a provider.
 Entitlement is copied to each device so that a licence is one read.
 Cards, plays, game state, ratings and email addresses are not stored.
 
+## Changing the terms
+
+The terms of use, the privacy policy and the price change only through
+one process ([change the terms](../how-to/change-the-terms.md)), and
+each step of it is checked by something that runs whether or not
+anyone remembers it:
+
+| Check | Where | What it stops |
+|---|---|---|
+| The text is what the newest entry in `site/ledger.json` fingerprints. | CI (`site/ledger.test.mjs`) and the deploy (`ops/gate.mjs`) | A change to either document, or to the price they state, without its entry: its day, its kind and what it says to subscribers. |
+| An entry on `main` is never changed or taken out. | CI | A change slipped into an entry already reviewed. |
+| The terms' price, the front page's, Stripe's definition and the app's are `price` in `config/openhearts.json`. | The site's build, `infra/stripe.mjs`, CI | One of them saying another price. |
+| The site serves a version the ledger has, and the newest to go live is dated today. | The deploy | Publishing outside the process, and a stale "Last updated". |
+| A material change goes out only once the stores were told, while an app is in its store. | The deploy | Texas's notice to the stores being missed. |
+| Subscribers are emailed, and every device shown, a material change as it is published. | The deploy (`./oh terms notify`) and `/api/config` | A change nobody was told of. |
+| A checkout sells only at the price the terms state. | The service (`shopPrice`), and `/api/health` | A price edited in Stripe's dashboard being charged. |
+
+Which version is live is read off the site itself, every page in every
+language, so a deploy that skipped all this is found by the next. What
+stays outside: someone with Stripe's dashboard can still move an
+existing subscription to another price, and store prices are set in
+App Store Connect and the Play Console, where Apple and Google run their
+own notices.
+
+The remote config has no say in any of it: the price, and where the
+terms and the privacy policy are, are not remote-config fields.
+
 ## Remote config
 
 Some things have to change for every device at once, faster than a
 release: closing live play, a banner, the relays, the table's clocks,
 how long the app waits on the network. `config` serves one row the
 operator writes ([remote config](../reference/configuration.md#remote-config);
-[change remote config](../how-to/change-remote-config.md)).
+[change remote config](../how-to/change-remote-config.md)), and beside
+it the notices of a change to the terms
+([above](#changing-the-terms)).
 
 The worker validates every field (`configOf`), and the app validates
 them again (`app/lib/net/remote_config.dart`). An invalid field is

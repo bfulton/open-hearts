@@ -33,7 +33,7 @@
     },
     "others": {
       "title": "Oder mit anderen",
-      "price": "5,99 US$ pro Jahr",
+      "price": "{{price}} pro Jahr",
       "rating": "Gegner nach Wertung",
       "friends": "Oder Freunde einladen"
     },
@@ -139,7 +139,7 @@
     "header": {
       "title": "Datenschutz",
       "tagline": "Was Open Hearts mit dem macht, was du ihm gibst, in einfachen Worten.",
-      "updated": "Zuletzt aktualisiert am 13. Oktober 2026"
+      "updated": "Zuletzt aktualisiert am {{updated.privacy}}"
     },
     "short": {
       "title": "Kurz gesagt",
@@ -257,7 +257,7 @@
     "header": {
       "title": "Nutzungs&shy;bedingungen",
       "tagline": "Die Vereinbarung zwischen dir und Open Hearts, in einfachen Worten.",
-      "updated": "Zuletzt aktualisiert am 16. Oktober 2026"
+      "updated": "Zuletzt aktualisiert am {{updated.terms}}"
     },
     "short": {
       "title": "Kurz gesagt",
@@ -298,7 +298,7 @@
       "p6": "Bis zu fünf deiner Geräte mit einem Abo, von dir hinzugefügt und entfernt.",
       "p7": "Alle an einem Live-Tisch haben ein Abo. Live-Spiel braucht eine Internetverbindung; was es teilt und mit wem, steht in der <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>. Wir tun unser Bestes, damit es funktioniert, können aber nicht versprechen, dass es das immer tut oder dass ein bestimmtes Spiel zu Ende gespielt wird.",
       "p8": "Preis und Laufzeit",
-      "p9": "Ein Abo läuft ein Jahr und kostet im Web 5,99 US-Dollar pro Jahr, im Voraus bezahlt, zuzüglich der beim Bezahlen angezeigten Steuern. Im App Store oder bei Google Play gilt der Preis, den dir der Store vor dem Kauf in deiner Währung anzeigt.",
+      "p9": "Ein Abo läuft ein Jahr und kostet im Web {{price}} pro Jahr, im Voraus bezahlt, zuzüglich der beim Bezahlen angezeigten Steuern. Im App Store oder bei Google Play gilt der Preis, den dir der Store vor dem Kauf in deiner Währung anzeigt.",
       "p10": "Automatische Verlängerung",
       "p11": "<b>Ein Abo verlängert sich jedes Jahr automatisch</b>, zum dann geltenden Preis, und wird über dieselbe Zahlungsmethode abgerechnet, bis du es kündigst. Ändert sich der Preis, gilt der neue Preis erst ab deiner nächsten Verlängerung, und der Store, im Web wir, sagt dir vorher Bescheid.",
       "p12": "<b>App Store:</b> Die Zahlung wird deinem Apple Account belastet, wenn du den Kauf bestätigst. Das Abo verlängert sich, wenn es nicht mindestens 24 Stunden vor Ende des laufenden Jahres gekündigt wird, und die Verlängerung wird deinem Account innerhalb der 24 Stunden davor belastet.",

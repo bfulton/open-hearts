@@ -40,24 +40,47 @@ export function sameSite(candidate, requestUrl) {
   return at.origin === new URL(requestUrl).origin ? at.toString() : null;
 }
 
-/// Lookup keys already asked of Stripe, kept a few minutes: a key moved
-/// to a new price reaches checkouts within that.
-const priceIds = new Map();
+/// Prices already asked of Stripe, kept a few minutes: a key moved to a
+/// new price reaches checkouts within that.
+const shopPrices = new Map();
 const PRICE_KEPT_MS = 5 * 60 * 1000;
 
 /// For a test: ask Stripe again.
-export const forgetPriceIds = () => priceIds.clear();
+export const forgetPriceIds = () => shopPrices.clear();
 
-/// The price id [named] stands for — itself, when it is one; the active
-/// price holding it as its lookup key, when it is not; null when Stripe
-/// has no such price.
-export async function priceIdOf(named, secret, fetchImpl = fetch, { now = Date.now() } = {}) {
-  if (named.startsWith('price_')) return named;
-  const kept = priceIds.get(named);
-  if (kept && kept.until > now) return kept.id;
-  const id = await priceLookup(named, secret, fetchImpl);
-  if (id) priceIds.set(named, { id, until: now + PRICE_KEPT_MS });
-  return id;
+/// The price the terms state, and so the only one a checkout sells at:
+/// config/openhearts.json's `price`, laid over the project's settings
+/// where none of them can change it (deployment.mjs, OH_PRICE, "599
+/// usd"). {amount, currency}, or null when there is none.
+export function statedPrice(env) {
+  const m = /^([1-9]\d{0,6}) ([a-z]{3})$/.exec(env.OH_PRICE ?? '');
+  return m ? { amount: Number(m[1]), currency: m[2] } : null;
+}
+
+/// How [price], as Stripe has it, is not the one [stated]: that amount
+/// in that currency, once a year. Null when it is.
+export function priceDiffers(price, stated) {
+  const found = [];
+  if (price.unit_amount !== stated.amount) found.push(`unit_amount ${price.unit_amount}`);
+  if (price.currency !== stated.currency) found.push(`currency ${price.currency}`);
+  if (price.recurring?.interval !== 'year' || price.recurring?.interval_count !== 1) {
+    found.push(`every ${price.recurring?.interval_count ?? '?'} ${price.recurring?.interval ?? 'once'}`);
+  }
+  return found.length ? found.join(', ') : null;
+}
+
+/// What a checkout sells: the active price [named] — the price itself,
+/// or the one holding it as its lookup key — when it is the one the
+/// terms state ([stated]), kept a few minutes. {id}, or {error} saying
+/// why there is none to sell. Throws as [priceLookup] does.
+export async function shopPrice(named, secret, stated, fetchImpl = fetch, { now = Date.now() } = {}) {
+  const kept = shopPrices.get(named);
+  if (kept && kept.until > now) return kept.said;
+  const price = await priceLookup(named, secret, fetchImpl);
+  const differs = price ? priceDiffers(price, stated) : null;
+  const said = !price ? { error: 'no such price' } : differs ? { error: `not the price the terms state: ${differs}` } : { id: price.id };
+  if (said.id) shopPrices.set(named, { said, until: now + PRICE_KEPT_MS });
+  return said;
 }
 
 /// Stripe refusing to say: its status.
@@ -68,15 +91,21 @@ export class StripeRefused extends Error {
   }
 }
 
-/// The price Stripe has under the lookup key [named], asked now: its
-/// id, or null for none. Throws [StripeRefused] when Stripe says no,
-/// and whatever the fetch throws when it does not answer.
+/// The active price [named] stands for, as Stripe has it, asked now:
+/// the price [named] is, or the one holding it as its lookup key; null
+/// for none. Throws [StripeRefused] when Stripe says no, and whatever
+/// the fetch throws when it does not answer.
 export async function priceLookup(named, secret, fetchImpl) {
-  const url = `${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
+  const one = named.startsWith('price_');
+  const url = one
+    ? `${STRIPE}/prices/${encodeURIComponent(named)}`
+    : `${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
   const res = await fetchImpl(url, { headers: { authorization: `Bearer ${secret}` } });
+  if (one && res.status === 404) return null;
   if (!res.ok) throw new StripeRefused(res.status);
-  const id = (await res.json())?.data?.[0]?.id;
-  return typeof id === 'string' && id.startsWith('price_') ? id : null;
+  const body = await res.json();
+  const price = one ? body : body?.data?.[0];
+  return typeof price?.id === 'string' && price.id.startsWith('price_') && price.active !== false ? price : null;
 }
 
 /// How Stripe's checkout page looks: the app's, not the account's — the
@@ -133,12 +162,16 @@ export const CHECKOUT_WORDS = Object.freeze({
 
 /// [CHECKOUT_WORDS] as a checkout's fields: Stripe's page in the same
 /// language, the box to tick, linking the terms in that language, and
-/// the line under the button.
+/// the line under the button; and the language, kept on the
+/// subscription.
 export function checkoutTerms(lang) {
   const code = typeof lang === 'string' && Object.hasOwn(CHECKOUT_WORDS, lang) ? lang : 'en';
   const words = CHECKOUT_WORDS[code];
   return {
     locale: words.locale,
+    // And on the subscription, the language a change to the terms is
+    // told in (notices.mjs).
+    'subscription_data[metadata][lang]': code,
     'consent_collection[terms_of_service]': 'required',
     'custom_text[terms_of_service_acceptance][message]': words.agree.replace('{terms}', `${SITE}${code === 'en' ? '' : `/${code}`}/terms`),
     'custom_text[submit][message]': words.submit,
@@ -149,15 +182,19 @@ export function checkoutTerms(lang) {
 /// the app's language [lang] ([checkoutTerms]).
 export async function checkout(key, back, cancelled, env, fetchImpl = fetch, { lang = 'en' } = {}) {
   const secret = env.OH_STRIPE_SECRET;
-  const named = S().stripePrice ?? env.OH_STRIPE_PRICE;
-  if (!secret || typeof named !== 'string' || !STRIPE_PRICE.test(named)) return { status: 503, body: { error: 'the shop is not open yet' } };
-  let price;
+  const named = env.OH_STRIPE_PRICE;
+  const stated = statedPrice(env);
+  if (!secret || !stated || typeof named !== 'string' || !STRIPE_PRICE.test(named)) return { status: 503, body: { error: 'the shop is not open yet' } };
+  let sells;
   try {
-    price = await priceIdOf(named, secret, fetchImpl);
+    sells = await shopPrice(named, secret, stated, fetchImpl);
   } catch {
     return { status: 502, body: { error: 'the shop is not answering' } };
   }
-  if (!price) return { status: 503, body: { error: 'the shop is not open yet' } };
+  // A price that is not the terms' is not sold at: /api/health says
+  // which (health.mjs), for the operator to put right.
+  if (!sells.id) return { status: 503, body: { error: 'the shop is not open yet' } };
+  const price = sells.id;
   const form = new URLSearchParams({
     mode: 'subscription',
     'line_items[0][price]': price,

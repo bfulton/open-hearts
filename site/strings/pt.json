@@ -33,7 +33,7 @@
     },
     "others": {
       "title": "Ou com outras pessoas",
-      "price": "US$ 5,99 por ano",
+      "price": "{{price}} por ano",
       "rating": "Adversários pelo rating",
       "friends": "Ou convide amigos"
     },
@@ -139,7 +139,7 @@
     "header": {
       "title": "Privacidade",
       "tagline": "O que o Open Hearts faz com o que você dá a ele, em palavras simples.",
-      "updated": "Última atualização: 13 de outubro de 2026"
+      "updated": "Última atualização: {{updated.privacy}}"
     },
     "short": {
       "title": "A versão curta",
@@ -257,7 +257,7 @@
     "header": {
       "title": "Termos de uso",
       "tagline": "O acordo entre você e o Open Hearts, em palavras simples.",
-      "updated": "Última atualização: 16 de outubro de 2026"
+      "updated": "Última atualização: {{updated.terms}}"
     },
     "short": {
       "title": "A versão curta",
@@ -298,7 +298,7 @@
       "p6": "Até cinco aparelhos seus numa só assinatura, adicionados e removidos por você.",
       "p7": "Todos numa mesa ao vivo são assinantes. O jogo ao vivo precisa de conexão com a internet; o que ele compartilha, e com quem, está na <a href=\"{{base}}/privacy\">política de privacidade</a>. Fazemos o possível para mantê-lo funcionando, mas não podemos prometer que vai funcionar sempre, nem que uma partida específica vai terminar.",
       "p8": "Preço e duração",
-      "p9": "Uma assinatura dura um ano e custa US$ 5,99 por ano, em dólares americanos, na web, paga adiantado, mais qualquer imposto mostrado no pagamento. Na App Store ou no Google Play, o preço é o que a loja mostra a você, na sua moeda, antes da compra.",
+      "p9": "Uma assinatura dura um ano e custa {{price}} por ano, em dólares americanos, na web, paga adiantado, mais qualquer imposto mostrado no pagamento. Na App Store ou no Google Play, o preço é o que a loja mostra a você, na sua moeda, antes da compra.",
       "p10": "Renovação automática",
       "p11": "<b>A assinatura renova automaticamente todo ano</b>, pelo preço em vigor na época, e é cobrada no mesmo meio de pagamento, até você cancelar. Se o preço mudar, o novo preço só vale a partir da sua próxima renovação, e a loja, ou nós, no caso da web, vai avisar você antes disso.",
       "p12": "<b>App Store:</b> o pagamento é cobrado na sua Conta Apple quando você confirma a compra. A assinatura renova a não ser que seja cancelada pelo menos 24 horas antes do fim do ano em curso, e a renovação é cobrada na sua conta nas 24 horas anteriores a isso.",

@@ -25,6 +25,7 @@ import { MOST_BODY, MOST_EVENT, cors, json, preflight, signedFor, textOf } from 
 import { ACTIVATION_S, activationFor, licence, serviceKeys } from './licence.mjs';
 import { loginRow } from './logins.mjs';
 import { measure } from './metrics.mjs';
+import { carryOutNotice, noticesOf } from './notices.mjs';
 import { MOST_PROFILE_BODY } from './profile.mjs';
 import { keepRecord, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { isAccount, storeOf } from './rows.mjs';
@@ -319,9 +320,10 @@ async function checkoutRoute(request, env) {
 }
 
 /// An operator's order, carried out in its account's turn
-/// (suspension.mjs): `{order}`, the id the operator's tool wrote it
-/// under. The order is read here first, so a request that names none
-/// wakes no account's object.
+/// (suspension.mjs), or, for a notice of a change to the terms, here
+/// (notices.mjs): `{order}`, the id the operator's tool wrote it under.
+/// The order is read here first, so a request that names none wakes no
+/// account's object.
 async function orderRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
   const store = storeOf(env);
@@ -334,6 +336,10 @@ async function orderRoute(request, env) {
   }
   if (!isOrder(id)) return json(request, 400, { error: 'an order, 32 hex' });
   const order = await store.get(...orderRow(id));
+  if (order?.act === 'notice') {
+    const { status, body } = await carryOutNotice(order, store, env);
+    return json(request, status, body);
+  }
   if (!order || !isAccount(order.account)) return json(request, 404, { error: 'no such order' });
   const { status, body } = await inHousehold(env, order.account, { op: 'order', account: order.account, order: id });
   return json(request, status, body);
@@ -459,8 +465,10 @@ async function configRoute(request, env) {
     // Unreadable is the same as absent: the defaults.
   }
   // A minute in the browser's cache: a kill switch thrown reaches every
-  // device opening the app within one.
-  return json(request, 200, configOf(raw), { 'cache-control': 'public, max-age=60' });
+  // device opening the app within one. With the operator's row, the
+  // changes to the terms and the privacy policy every device is told of
+  // (notices.mjs), from the ledger this deploy published.
+  return json(request, 200, { ...configOf(raw), notices: noticesOf(env.OH_LEDGER) }, { 'cache-control': 'public, max-age=60' });
 }
 
 async function storeRoute(request, env, ctx) {

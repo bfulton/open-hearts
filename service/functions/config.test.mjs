@@ -20,10 +20,10 @@ test('no row, or no store, is the defaults: everything open, nothing said', asyn
   for (const env of [{}, { OH_STORE: kvWith({}) }]) {
     const answer = await ask(env);
     assert.equal(answer.status, 200);
-    assert.deepEqual(await answer.json(), CONFIG_DEFAULTS);
+    assert.deepEqual(await answer.json(), { ...CONFIG_DEFAULTS, notices: [] });
     assert.equal(answer.headers.get('cache-control'), 'public, max-age=60');
   }
-  assert.deepEqual(CONFIG_DEFAULTS, { v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null, price: null });
+  assert.deepEqual(CONFIG_DEFAULTS, { v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null });
 });
 
 test('the row is served, checked', async () => {
@@ -44,9 +44,7 @@ test('the row is served, checked', async () => {
     banner: row.banner,
     update: row.update,
     feedback: 'mailto:help@openhearts.example',
-    privacy: null,
-    terms: null,
-    price: null,
+    notices: [],
   });
 });
 
@@ -88,16 +86,15 @@ test('a field that does not check out is left at its default, and the rest still
   assert.equal(configOf({ feedback: 'http://plain.example' }).feedback, null);
   assert.equal(configOf({ feedback: 'mailto:not-an-address' }).feedback, null);
   assert.equal(configOf({ feedback: 42 }).feedback, null);
-  assert.equal(configOf({ terms: 'https://legal.example/terms' }).terms, 'https://legal.example/terms');
-  assert.equal(configOf({ privacy: 'javascript:alert(1)' }).privacy, null);
-  assert.equal(configOf({ price: '€6,49' }).price, '€6,49');
-  for (const bad of ['', 'free', '<b>$1</b>', '$ 5.99', 'a price far too long 9']) assert.equal(configOf({ price: bad }).price, null, bad);
+  // Not the price, nor where the terms are: the site publishes them, and
+  // they change only with it (site/ledger.mjs).
+  for (const name of ['price', 'terms', 'privacy']) assert.ok(!(name in configOf({ [name]: 'https://legal.example/t' })), name);
 });
 
 test('a store that throws is a store with nothing in it', async () => {
   const answer = await ask({ OH_STORE: { get: async () => { throw new Error('KV down'); } } });
   assert.equal(answer.status, 200);
-  assert.deepEqual(await answer.json(), CONFIG_DEFAULTS);
+  assert.deepEqual(await answer.json(), { ...CONFIG_DEFAULTS, notices: [] });
 });
 
 test('read with GET, from the site and a dev machine', async () => {

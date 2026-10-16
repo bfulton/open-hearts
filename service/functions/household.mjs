@@ -17,6 +17,7 @@ import {
 } from './accounts.mjs';
 import { sendAlert } from './alerts.mjs';
 import { attest, unlinkSignIn } from './logins.mjs';
+import { sendNotice } from './notices.mjs';
 import { profileRead, profileWritten } from './profile.mjs';
 import { storeOf } from './rows.mjs';
 import { S, SITE, notConfigured, settle } from './settings.mjs';
@@ -463,8 +464,10 @@ export class Household {
 
   async fetch(request) {
     const op = await request.json();
-    // The operator's alerts (alerts.mjs) only borrow the binding.
+    // The operator's alerts (alerts.mjs) and notices of a change to the
+    // terms (notices.mjs) only borrow the binding.
     if (op?.op === 'alert') return Response.json(await sendAlert(op, this.env));
+    if (op?.op === 'notice') return Response.json(await sendNotice(op, this.env));
     await settle(this.env);
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: notConfigured('OH_STORE') });

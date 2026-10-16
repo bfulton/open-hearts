@@ -24,6 +24,7 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 | `<file>` | a JSON file holding the whole row |
 | `<name>` | a secret's name, as `infra/cloudflare.mjs` lists it |
 | `<platform>` | `ios` or `android` |
+| `<document>` | `terms` (the terms of use) or `privacy` (the privacy policy) |
 
 ## Credentials
 
@@ -150,6 +151,58 @@ Deletes an account's data on its owner's request: its name off its kept games, a
 - **How-to:** [delete-an-accounts-data.md](../how-to/delete-an-accounts-data.md)
 - **Example:** `oh account delete 0123456789abcdef0123456789abcdef --apply`
 
+## Terms and price
+
+Changing the terms of use, the privacy policy or the price, as site/ledger.json records them, and telling subscribers.
+
+### oh terms status
+
+```bash
+oh terms status
+```
+
+Says, for the terms and the privacy policy, the newest entry in the ledger, whether this checkout matches it, which version the site serves, what a deploy would publish, and how many web subscribers were told of each change. Without Cloudflare credentials, how many were told is left out.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#check-where-a-change-stands)
+- **Example:** `oh terms status`
+
+### oh terms record
+
+```bash
+oh terms record <document> [--apply] [--change <change>] [--date <date>]
+```
+
+Writes the ledger entry for a change this checkout makes to the terms or the privacy policy: its day, its fingerprint, the kind of change and, for the terms, the price. --change is `minor` (nobody's rights or duties change), `material` or `price`; --date is the day it is to go live, today unless given. While the branch's own newest entry is not on main yet, it is brought up to date instead. The summary in each language is written by hand afterwards.
+
+- **Needs:** nothing but this checkout
+- **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#record-the-change)
+- **Example:** `oh terms record terms --change material --apply`
+
+### oh terms notified
+
+```bash
+oh terms notified <document> [--apply] [--on <on>]
+```
+
+Records the day the App Store and Google Play were told of the document's newest material change. --on is that day, today unless given. A production deploy refuses a material change the stores were not told of while either app is in its store.
+
+- **Needs:** nothing but this checkout
+- **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#tell-the-app-stores)
+- **Example:** `oh terms notified terms --on 2026-11-02 --apply`
+
+### oh terms notify
+
+```bash
+oh terms notify [--apply] [--after-deploy]
+```
+
+Emails every web subscriber a published change that matters to them, once: each material or price change of the last 60 days, to the subscriptions begun before it. A production deploy runs it with --after-deploy, which waits until the site serves what was just published. Run it again when a notice did not go; it tells only those it has not.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STRIPE_API_KEY`
+- **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#tell-subscribers)
+- **Example:** `oh terms notify --apply`
+
 ## Releasing
 
 Putting the relay worker and the site into production, and checking production afterwards.
@@ -172,9 +225,9 @@ Deploys the relay worker, and the backup jurors' container with it, from main. N
 oh deploy site [--apply] [--label <label>]
 ```
 
-Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted.
+Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted, and unless the terms and the privacy policy are as the ledger says, with what a change needs done (oh terms status); a change that matters to subscribers is emailed to them as part of it.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, STRIPE_API_KEY (to publish a change subscribers are told of)
 - **How-to:** [deploy.md](../how-to/deploy.md)
 - **Example:** `oh deploy site --label my-change --apply`
 
@@ -186,7 +239,7 @@ oh deploy all [--apply]
 
 Deploys production in the order that keeps devices playing: the relay, then the site.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, STRIPE_API_KEY (to publish a change subscribers are told of)
 - **How-to:** [deploy.md](../how-to/deploy.md)
 - **Example:** `oh deploy all --apply`
 

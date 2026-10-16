@@ -1,11 +1,12 @@
 // What an outside monitor asks (health.mjs): the store read
-// and Stripe asked for the price with the service's key, kept for half a
-// minute. node --test service/functions
+// and Stripe asked for the price with the service's key, and that price
+// the one the terms state, kept for half a minute. node --test service/functions
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import worker from './worker.mjs';
 import { forgetHealth, healthOf } from './health.mjs';
 import { memoryStore } from './rows.mjs';
+import { STATED, stripePrice } from './stripe.fixtures.mjs';
 
 const kv = (store) => ({
   get: async (at) => (store.rows.has(at) ? JSON.parse(store.rows.get(at)) : null),
@@ -13,7 +14,7 @@ const kv = (store) => ({
   delete: async () => {},
   list: async () => ({ keys: [], list_complete: true }),
 });
-const stripe = (status, data = [{ id: 'price_1' }]) => {
+const stripe = (status, data = [stripePrice()]) => {
   const asked = [];
   const f = async (url, init) => {
     asked.push({ url: String(url), auth: init.headers.authorization });
@@ -22,7 +23,7 @@ const stripe = (status, data = [{ id: 'price_1' }]) => {
   f.asked = asked;
   return f;
 };
-const env = (more = {}) => ({ OH_STORE: kv(memoryStore()), OH_STRIPE_SECRET: 'rk_live_x', OH_STRIPE_PRICE: 'openhearts_annual', ...more });
+const env = (more = {}) => ({ OH_STORE: kv(memoryStore()), OH_STRIPE_SECRET: 'rk_live_x', OH_STRIPE_PRICE: 'openhearts_annual', OH_PRICE: STATED, ...more });
 
 test('up: the store reads and Stripe finds the price with the key the service holds', async () => {
   forgetHealth();
@@ -38,6 +39,10 @@ test('down: an expired or refused key, a missing price, Stripe away, no key, no 
     [stripe(401), {}, { stripe: 'stripe said 401' }],
     [stripe(403), {}, { stripe: 'stripe said 403' }],
     [stripe(200, []), {}, { stripe: 'no such price' }],
+    // A price other than the terms' is one the shop will not sell at.
+    [stripe(200, [stripePrice({ unit_amount: 699 })]), {}, { stripe: 'not the price the terms state: unit_amount 699' }],
+    [stripe(200, [stripePrice({ recurring: { interval: 'month', interval_count: 1 } })]), {}, { stripe: 'not the price the terms state: every 1 month' }],
+    [stripe(200), { OH_PRICE: undefined }, { stripe: 'not configured' }],
     [async () => { throw new Error('down'); }, {}, { stripe: 'not answering' }],
     [stripe(200), { OH_STRIPE_SECRET: undefined }, { stripe: 'not configured' }],
     [stripe(200), { OH_STORE: undefined }, { store: 'not bound' }],

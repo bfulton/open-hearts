@@ -33,7 +33,7 @@
     },
     "others": {
       "title": "Or with others",
-      "price": "$5.99 a year",
+      "price": "{{price}} a year",
       "rating": "Match by rating",
       "friends": "Or invite friends"
     },
@@ -139,7 +139,7 @@
     "header": {
       "title": "Privacy",
       "tagline": "What Open Hearts does with what you give it, in plain words.",
-      "updated": "Last updated 13 October 2026"
+      "updated": "Last updated {{updated.privacy}}"
     },
     "short": {
       "title": "The short version",
@@ -257,7 +257,7 @@
     "header": {
       "title": "Terms of Use",
       "tagline": "The agreement between you and Open Hearts, in plain words.",
-      "updated": "Last updated 16 October 2026"
+      "updated": "Last updated {{updated.terms}}"
     },
     "short": {
       "title": "The short version",
@@ -298,7 +298,7 @@
       "p6": "Up to five of your devices on one subscription, added and dropped by you.",
       "p7": "Everyone at a live table has subscribed. Live play needs an internet connection; what it shares, and with whom, is in the <a href=\"{{base}}/privacy\">privacy policy</a>. We do our best to keep it working, but we cannot promise that it always will, or that a particular game will finish.",
       "p8": "Price and length",
-      "p9": "A subscription lasts one year and costs $5.99 a year in US dollars on the web, paid up front, plus any tax shown at checkout. In the App Store or Google Play the price is the one the store shows you, in your currency, before you buy.",
+      "p9": "A subscription lasts one year and costs {{price}} a year in US dollars on the web, paid up front, plus any tax shown at checkout. In the App Store or Google Play the price is the one the store shows you, in your currency, before you buy.",
       "p10": "Automatic renewal",
       "p11": "<b>A subscription renews automatically every year</b>, at the price then in force, and is charged to the same payment method, until you cancel it. If the price changes, the new price applies only from your next renewal, and the store, or for the web we, will tell you before it does.",
       "p12": "<b>App Store:</b> payment is charged to your Apple Account when you confirm the purchase. The subscription renews unless it is cancelled at least 24 hours before the end of the current year, and your account is charged for the renewal within the 24 hours before that.",

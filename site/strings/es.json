@@ -33,7 +33,7 @@
     },
     "others": {
       "title": "O con otras personas",
-      "price": "5,99 US$ al año",
+      "price": "{{price}} al año",
       "rating": "Emparejamiento por clasificación",
       "friends": "O invita a tus amigos"
     },
@@ -139,7 +139,7 @@
     "header": {
       "title": "Privacidad",
       "tagline": "Qué hace Open Hearts con lo que le das, en palabras sencillas.",
-      "updated": "Última actualización: 13 de octubre de 2026"
+      "updated": "Última actualización: {{updated.privacy}}"
     },
     "short": {
       "title": "En resumen",
@@ -257,7 +257,7 @@
     "header": {
       "title": "Condiciones de uso",
       "tagline": "El acuerdo entre tú y Open Hearts, en palabras sencillas.",
-      "updated": "Última actualización: 16 de octubre de 2026"
+      "updated": "Última actualización: {{updated.terms}}"
     },
     "short": {
       "title": "En resumen",
@@ -298,7 +298,7 @@
       "p6": "Hasta cinco de tus dispositivos en una misma suscripción, que añades y quitas tú.",
       "p7": "Todos los de una mesa en vivo están suscritos. El juego en vivo necesita conexión a internet; qué comparte, y con quién, se explica en la <a href=\"{{base}}/privacy\">política de privacidad</a>. Hacemos todo lo posible para que siga funcionando, pero no podemos prometer que siempre lo haga, ni que una partida concreta vaya a terminar.",
       "p8": "Precio y duración",
-      "p9": "Una suscripción dura un año y en la web cuesta 5,99 US$ al año, en dólares estadounidenses, pagados por adelantado, más los impuestos que se muestren al pagar. En el App Store o en Google Play, el precio es el que te muestra la tienda, en tu moneda, antes de comprar.",
+      "p9": "Una suscripción dura un año y en la web cuesta {{price}} al año, en dólares estadounidenses, pagados por adelantado, más los impuestos que se muestren al pagar. En el App Store o en Google Play, el precio es el que te muestra la tienda, en tu moneda, antes de comprar.",
       "p10": "Renovación automática",
       "p11": "<b>La suscripción se renueva automáticamente cada año</b>, al precio vigente en ese momento, y se cobra al mismo método de pago, hasta que la canceles. Si el precio cambia, el nuevo precio solo se aplica a partir de tu siguiente renovación, y la tienda, o nosotros en el caso de la web, te avisará antes.",
       "p12": "<b>App Store:</b> el pago se carga a tu cuenta de Apple al confirmar la compra. La suscripción se renueva salvo que se cancele al menos 24 horas antes del final del año en curso, y la renovación se carga a tu cuenta en las 24 horas anteriores a ese final.",

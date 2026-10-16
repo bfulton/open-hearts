@@ -1,6 +1,7 @@
 // `oh deploy …` and `oh verify`: the relay worker and the site put into
 // production, relay first, and production checked afterwards
-// (docs/how-to/deploy.md). What has to hold before anything reaches
+// (docs/how-to/deploy.md). Publishing a change to the terms is a deploy
+// of the site too (docs/how-to/change-the-terms.md). What has to hold before anything reaches
 // production is in gate.mjs, which deploy.sh and the relay's build step
 // run themselves, so that deploying without oh is held to it too.
 
@@ -9,6 +10,8 @@ import { join } from 'node:path';
 
 import { Failed, Usage, root, wranglerVersion } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
+import { termsProblems } from './terms.mjs';
+import { told } from '../site/ledger.mjs';
 
 /// The programs a relay deploy builds with: its custom build
 /// (service/bench/build.sh) compiles the juror and the native libraries,
@@ -54,6 +57,12 @@ export async function relay(ctx, { flags }) {
 export async function site(ctx, { flags }) {
   const label = flags.label ?? ((await branch(ctx)) === 'main' ? 'main' : 'dev');
   ctx.log(`the site, the app and the service's handlers from ${await head(ctx)}, to ${label === 'main' ? 'production' : `the preview ${label}`}`);
+  if (label === 'main') {
+    for (const { document, entry } of (await termsProblems(ctx)).publishing) {
+      ctx.log(`  publishes the ${document} of ${entry.date}, a ${entry.change} change${told(entry) ? ': web subscribers are emailed it once it is live, and every device shown it' : ''}`);
+      if (entry.change === 'price') ctx.log(`  then make Stripe's price match the terms (./oh infra --only stripe --apply): until it does, the shop does not sell`);
+    }
+  }
   const ready = label !== 'main' || (await cleared(ctx, 'site', flags.apply));
   if (!flags.apply) {
     ctx.log(ready ? 'nothing deployed; --apply deploys it' : 'nothing deployed');

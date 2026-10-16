@@ -25,10 +25,11 @@ export const openHouse = (env, request) => !!env.OH_OPEN_HOUSE && isLocal(reques
 // ---- The service's own settings ---------------------------------------
 //
 // The numbers the service runs by — how long a licence lasts, how many
-// devices a subscription carries, how long a code is good for, which
-// Stripe price a checkout sells — read from one row the operator
-// writes, `config|service` in OH_STORE (docs/explanation/service.md). Not the
-// app's row: nothing here is served to anybody.
+// devices a subscription carries, how long a code is good for — read
+// from one row the operator writes, `config|service` in OH_STORE
+// (docs/explanation/service.md). Not the app's row: nothing here is
+// served to anybody. Not the price either: the terms state it, and it
+// changes only with them (stripe.mjs, statedPrice).
 // Each is checked against bounds before it is taken, and one that does
 // not check out is left at its default, so a typo in the row is never
 // worse than no row.
@@ -70,7 +71,6 @@ export const SERVICE_DEFAULTS = Object.freeze({
   // hour: a game is ten minutes at the quickest, and a device that
   // misses the answer sends again.
   recordsPerHour: 12,
-  stripePrice: null,
 });
 
 /// Least and most for each number, whole numbers only. The edges are
@@ -104,7 +104,6 @@ export function serviceSettingsOf(raw) {
   }
   // A code handed back again has to have the time left to be used.
   if (c.ticketReuseMinutes >= c.ticketMinutes) c.ticketReuseMinutes = Math.min(SERVICE_DEFAULTS.ticketReuseMinutes, c.ticketMinutes - 1);
-  if (typeof raw.stripePrice === 'string' && STRIPE_PRICE.test(raw.stripePrice)) c.stripePrice = raw.stripePrice;
   return c;
 }
 

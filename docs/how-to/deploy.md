@@ -7,6 +7,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 ## Before you begin
 
 - Production is built from `main` as it was reviewed: `HEAD` must be `origin/main`, with nothing uncommitted. `deploy.sh` and the relay's build step check this themselves (`ops/gate.mjs`), so it holds whether or not you deploy through `oh`. A preview can be deployed from any branch.
+- A production deploy of the site also holds the terms and the privacy policy to `site/ledger.json`, and tells subscribers of a change that matters to them. See [Change the terms](change-the-terms.md#publish-it).
 - Make sure the commit passes CI, or run `./check.sh full`.
 - Install Node, git, Python 3 (for pruning) and Flutter. CI pins the Flutter version in `.github/workflows/ci.yml`. The web build needs no Rust: the wasm is committed.
 - To deploy the relay, you also need a linux/amd64 machine with Dart, Cargo (CI pins the Rust version in `.github/workflows/ci.yml`) and Docker running. Wrangler builds the backup jurors' image from `service/bench/Dockerfile` with binaries built on your machine (`service/bench/build.sh`). Run `dart pub get` in `service/` once. `./oh deploy relay` says which of these is missing.

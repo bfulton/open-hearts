@@ -210,8 +210,12 @@ jobs:
           node-version: 22
       - name: Handlers (the Pages worker, in node's test runner)
         run: node --test service/functions/*.test.mjs
-      - name: The site (every page in every language, every string accounted for)
-        run: node --test site/build.test.mjs
+      # The ledger's test compares it with main's (site/ledger.test.mjs),
+      # which a pull request's checkout does not have.
+      - name: Main, for the ledger to be compared with
+        run: git fetch --no-tags --depth=1 origin main
+      - name: The site (every page in every language, every string accounted for; the terms and privacy policy as the ledger has them)
+        run: node --test site/*.test.mjs
       - name: Infrastructure definitions (what infra/apply.mjs compares; no network)
         run: node --test infra/*.test.mjs
       - name: The operator's command, its reference and each command (./check.sh ops)

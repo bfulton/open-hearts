@@ -14,6 +14,7 @@ import { SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
 import { forgetProviderKeys, supersede, whoSignedIn } from './signin.mjs';
 import { CHECKOUT_WORDS, checkout, checkoutTerms, manage, record, sameSite, webhookSigned } from './stripe.mjs';
+import { STATED, withPrice } from './stripe.fixtures.mjs';
 import { mint, serversOf } from './turn.mjs';
 import { eventIdOf } from './records.mjs';
 import { keys } from '../do/sign.mjs';
@@ -403,8 +404,8 @@ test('checkout: a subscription session carrying the key three ways', async () =>
     calls.push({ url, init });
     return new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' }), { status: 200 });
   };
-  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1' };
-  const out = await checkout(KEY, 'https://x/play/?bought=1', 'https://x/play/', shop, stripe);
+  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
+  const out = await checkout(KEY, 'https://x/play/?bought=1', 'https://x/play/', shop, withPrice(stripe));
   assert.deepEqual(out, { status: 200, body: { url: 'https://checkout.stripe.com/c/pay/cs_test_1' } });
   assert.equal(calls[0].url, 'https://api.stripe.com/v1/checkout/sessions');
   assert.equal(calls[0].init.headers.authorization, 'Bearer sk_test');
@@ -415,6 +416,7 @@ test('checkout: a subscription session carrying the key three ways', async () =>
   assert.equal(form.get('metadata[key]'), KEY);
   assert.equal(form.get('client_reference_id'), KEY);
   assert.equal(form.get('subscription_data[metadata][key]'), KEY, 'so a renewal a year from now still names the device');
+  assert.equal(form.get('subscription_data[metadata][lang]'), 'en', 'and the language a change to the terms is told in');
   // Dressed as the app, with the site's own icon.
   assert.equal(form.get('branding_settings[display_name]'), 'Open Hearts');
   assert.equal(form.get('branding_settings[icon][url]'), 'https://x/icon-512.png');
@@ -435,12 +437,14 @@ test('checkout: in the language the app asked in, the terms in that language too
     forms.push(new URLSearchParams(init.body));
     return new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' }), { status: 200 });
   };
-  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1' };
+  const shop = { OH_STRIPE_SECRET: 'sk_test', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
   for (const lang of ['pt', 'de', 'xx', { toString: () => 'es' }]) {
-    assert.equal((await checkout(KEY, 'https://x/', 'https://x/', shop, stripe, { lang })).status, 200);
+    assert.equal((await checkout(KEY, 'https://x/', 'https://x/', shop, withPrice(stripe), { lang })).status, 200);
   }
   const [pt, de, xx, notAString] = forms;
   assert.equal(pt.get('locale'), 'pt-BR', "the site's Portuguese is Brazil's");
+  assert.equal(pt.get('subscription_data[metadata][lang]'), 'pt');
+  assert.equal(xx.get('subscription_data[metadata][lang]'), 'en');
   assert.match(pt.get('custom_text[terms_of_service_acceptance][message]'), /\(https:\/\/openhearts\.game\/pt\/terms\)/);
   assert.equal(de.get('locale'), 'de');
   assert.match(de.get('custom_text[terms_of_service_acceptance][message]'), /^Ich stimme den \[Nutzungsbedingungen\]\(https:\/\/openhearts\.game\/de\/terms\)/);
@@ -466,7 +470,7 @@ test('checkout: every language says the same things, within what Stripe takes', 
 
 test('checkout: no keys is a shop that is not open, not a broken one', async () => {
   assert.deepEqual(await checkout(KEY, 'https://x/', 'https://x/', {}), { status: 503, body: { error: 'the shop is not open yet' } });
-  const refused = await checkout(KEY, 'https://x/', 'https://x/', { OH_STRIPE_SECRET: 's', OH_STRIPE_PRICE: 'p' }, async () => new Response('no', { status: 401 }));
+  const refused = await checkout(KEY, 'https://x/', 'https://x/', { OH_STRIPE_SECRET: 's', OH_STRIPE_PRICE: 'p', OH_PRICE: STATED }, async () => new Response('no', { status: 401 }));
   assert.equal(refused.status, 502);
 });
 
@@ -650,17 +654,17 @@ test('the webhook route: a checkout paid for makes the backup codes and emails t
 
 test('the checkout route: the key, and somewhere on this site to come back to', async () => {
   const at = 'https://dev.open-hearts.pages.dev/api/checkout';
-  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1' };
+  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
   const send = (body) => new Request(at, { method: 'POST', body: JSON.stringify(body) });
   assert.equal((await worker.fetch(send({ key: 'short', back: '/play/', cancelled: '/play/' }), shop)).status, 400);
   const away = await worker.fetch(send(await asking(ADA, 'checkout', { back: 'https://evil.example/', cancelled: '/play/' })), shop);
   assert.equal(away.status, 400, 'a payment does not land where the caller says');
   const realFetch = globalThis.fetch;
   const sent = [];
-  globalThis.fetch = async (_, init) => {
+  globalThis.fetch = withPrice(async (_, init) => {
     sent.push(new URLSearchParams(init.body));
     return new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 });
-  };
+  });
   try {
     const res = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/', lang: 'fr' })), shop);
     assert.equal(res.status, 200);
@@ -1000,10 +1004,10 @@ test('TURN is for a device that holds a licence, and asks for it itself', async 
 test('a checkout is opened only by the device it is for', async () => {
   // Paying for somebody else's key would move their device onto a
   // subscription the payer can end.
-  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1' };
+  const shop = { ...env, OH_STRIPE_SECRET: 'sk', OH_STRIPE_PRICE: 'price_1', OH_PRICE: STATED };
   const send = (body) => new Request('https://dev.open-hearts.pages.dev/api/checkout', { method: 'POST', body: JSON.stringify(body) });
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 });
+  globalThis.fetch = withPrice(async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/cs_1' }), { status: 200 }));
   try {
     assert.equal((await worker.fetch(send({ key: ADA.public, back: '/play/?bought=1', cancelled: '/play/' }), shop)).status, 401);
     const ok = await worker.fetch(send(await asking(ADA, 'checkout', { back: '/play/?bought=1', cancelled: '/play/' })), shop);

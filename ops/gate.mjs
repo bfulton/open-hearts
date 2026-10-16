@@ -1,7 +1,9 @@
-// What has to hold before anything reaches production. `oh deploy` asks
-// first, to say what stands in the way; deploy.sh (for production) and
-// the relay's build step (service/bench/build.sh) ask again themselves,
-// so a deploy that skips oh is held to the same:
+// What has to hold before anything reaches production: what main is,
+// and, for the site, the terms and the privacy policy as the ledger has
+// them (terms.mjs). `oh deploy` asks first, to say what stands in the
+// way; deploy.sh (for production) and the relay's build step
+// (service/bench/build.sh) ask again themselves, so a deploy that skips
+// oh is held to the same:
 //
 //   node ops/gate.mjs site     problems with releasing the site, or none
 //   node ops/gate.mjs relay    the same for the relay worker
@@ -11,6 +13,7 @@
 import { pathToFileURL } from 'node:url';
 
 import { context } from './env.mjs';
+import { termsProblems } from './terms.mjs';
 
 /// Production is built from what main is, and nothing else: no
 /// uncommitted change and no commit that main does not have, so that
@@ -31,7 +34,9 @@ async function sourceProblems(ctx) {
 /// production, in words; empty when nothing does.
 export async function releaseProblems(ctx, target) {
   if (target !== 'site' && target !== 'relay') throw new Error(`no release target ${target}`);
-  return sourceProblems(ctx);
+  const problems = await sourceProblems(ctx);
+  if (target === 'site') problems.push(...(await termsProblems(ctx)).problems);
+  return problems;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

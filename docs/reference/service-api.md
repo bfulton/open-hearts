@@ -33,7 +33,7 @@ Every handler is in `ROUTES` in `service/functions/worker.mjs`, and is reached a
 
 | Handler | Method | Signed | Who may call it | Implemented by | What it does |
 |---|---|---|---|---|---|
-| `config` | GET | No | Anyone | `configRoute`; `configOf` in `service/functions/config.mjs` | Serves the [remote config](configuration.md#remote-config). |
+| `config` | GET | No | Anyone | `configRoute`; `configOf` in `service/functions/config.mjs`, `noticesOf` in `service/functions/notices.mjs` | Serves the [remote config](configuration.md#remote-config), with the `notices` of changes to the terms and the privacy policy. |
 | `health` | GET, HEAD | No | Anyone; the monitors | `healthRoute`; `healthOf` in `service/functions/health.mjs` | `{ok, store, stripe}`: 200 when the store reads and Stripe knows the price, 503 otherwise. |
 | `licence` | POST | Yes, empty | Any device | `licenceRoute`; `licence` in `service/functions/licence.mjs` | The device's licence, or 402 when no subscription stands behind it, or 403 with `suspended: true` when its account is suspended. |
 | `activate` | POST | Yes, `<want> <seated>` | A device of an account | `activateRoute`; `activate` in `service/functions/household.mjs` | Makes the device its account's device in use, or confirms that it still is. `want` is `open`, `take` or `renew`. Answers an activation, with `profile`, the version of the account's profile; or 409; or 403 with `suspended: true` when the account is suspended. |
@@ -55,7 +55,7 @@ Every handler is in `ROUTES` in `service/functions/worker.mjs`, and is reached a
 | `turn` | POST | Yes, empty | A device whose subscription stands | `turn`; `mint` in `service/functions/turn.mjs` | Cloudflare Realtime TURN credentials. |
 | `record` | POST | Yes, the table ID | The device in use of an account whose subscription stands, seated at the table, with signed events of its own in the record; at most `recordsPerHour` an hour | `recordRoute`; `keepRecord` in `service/functions/records.mjs` | Keeps a finished game's record. The first copy is kept. A record in a form other than the one kept now (`recordVersion` in `service/functions/records.mjs`) is refused with 400. Where the service has its keys, a record whose person's seat has no licence the service signed for its key, or whose account sits twice, is refused with 403 (`licenceProblem`). |
 | `review` | POST | Yes, the table ID | The device in use of an account whose subscription stands, while the account is not seated at that table | `reviewRoute`; `recordResponse` in `service/functions/records.mjs` | Serves a kept game's record. |
-| `order` | POST | No; the body names an order, `{order}`, which must be in `OH_STORE`, where only the operator writes | The operator's `./oh account` | `orderRoute`; `carryOut` in `service/functions/suspension.mjs` | Carries out the operator's order for an account in its turn: `suspend`, `terminate`, `lift`, `remove` or `restore`. A `lift` of a terminated account is answered 409. 404 until the store shows the order, and for an account that doesn't exist; 410 once the order is older than `ORDER_KEPT_S`. Not counted against the account's allowances. |
+| `order` | POST | No; the body names an order, `{order}`, which must be in `OH_STORE`, where only the operator writes | The operator's `./oh account` and `./oh terms notify` | `orderRoute`; `carryOut` in `service/functions/suspension.mjs`, `carryOutNotice` in `service/functions/notices.mjs` | Carries out the operator's order for an account in its turn: `suspend`, `terminate`, `lift`, `remove` or `restore`. A `lift` of a terminated account is answered 409. Or a `notice`: emails each of up to `NOTICES_PER_ORDER` web subscriptions a change in `OH_LEDGER` that subscribers are told of, at the address Stripe has, once, and answers how many were told, told already, not told and why, or not sent. 404 until the store shows the order, and for an account that doesn't exist; 410 once the order is older than `ORDER_KEPT_S`. Not counted against the account's allowances. |
 
 Every handler with a signed request also answers an `OPTIONS` preflight, as does `config`.
 
@@ -117,7 +117,7 @@ Everything the worker keeps is in the Workers KV namespace `OH_STORE`, one key p
 | `ACCOUNT#<account>` | `LOGIN` | `provider`, `login` (the key of its `LOGIN#` row), `at` | Never |
 | `ACCOUNT#<account>` | `ACTIVE` | The device in use: `key`, `epoch`, `at`, `seated`, `seated_at`, `tags` (the relay objects it was seen at), and `suspended` while the account is. Only where `HOUSEHOLD` is not bound; otherwise the `Household` object keeps it in its own storage. | Never |
 | `ACCOUNT#<account>` | `PROFILE` | `name`, `icon`, `color`, `picture`, `version`, `updated_at` | Never |
-| `ACCOUNT#<account>` | `SUSPENDED` | `since`: the day the account was suspended | Never; deleted when the suspension is lifted |
+| `ACCOUNT#<account>` | `SUSPENDED` | `since`: the day the account was suspended; `terminated`: the day it was ended, for a terminated account | Never; deleted when the suspension is lifted, which a terminated account never is |
 | `ACCOUNT#<account>` | `HELD` | What the operator took off the profile, to put back: `name`, `picture`, and `at` | Never; deleted when put back |
 | `SUB#<subscription>` | `META` | `source`, `txn_ref`, `renews_at`, `cancelled_at`, `event_at`, and `final` when set | Never |
 | `SUB#<subscription>` | `ACCOUNT` | `account` | Never |
@@ -125,7 +125,8 @@ Everything the worker keeps is in the Workers KV namespace `OH_STORE`, one key p
 | `TICKET#<code>` | `META` | `account`, `expires_at`, `used_at`, `made_by`, `used_by` | `TICKET_KEPT_S` in `service/functions/accounts.mjs` |
 | `BACKUP#<digest>` | `META` | `account` | Never |
 | `LOGIN#<provider>#<hmac>` | `IDENTITY` | `account`, `created_at` | Never |
-| `ORDER#<id>` | `META` | The operator's order: `account`, `act`, `at`, and for `remove`, `name` and `picture` | `ORDER_KEPT_S` in `service/functions/suspension.mjs`; deleted once carried out |
+| `ORDER#<id>` | `META` | The operator's order: `account`, `act`, `at`, and for `remove`, `name` and `picture`; or, for a notice, `act` (`notice`), `document`, `date`, `subscriptions` and `at` | `ORDER_KEPT_S` in `service/functions/suspension.mjs`; an account's order is deleted once carried out |
+| `NOTICE#<document>@<date>` | `SUB#<subscription>` | That the web subscription was told of the change: `at`, and `lang` it was told in, or `unsent` and why (`no address`, `no such subscription`). No address is kept. | Never |
 | `ALERT#subscribed` | `<subscription>` | `at`: when the operator was told of the subscription | `SUBSCRIBED_DAYS` in `service/functions/alerts.mjs` |
 | `ALERT#waiting` | `<subscription>` | `at`: when the operator was told a subscriber was waiting | `WAITING_MINUTES` in `service/functions/alerts.mjs` |
 | `config` | `app` | The [remote config](configuration.md#remote-config) | Never |

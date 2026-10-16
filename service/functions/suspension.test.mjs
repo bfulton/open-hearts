@@ -228,7 +228,7 @@ test("the operator's tool: says how the account stands, and asks the service unt
   const { store, account } = await household();
   await store.put(`ACCOUNT#${account}`, 'PROFILE', { name: 'N', icon: null, color: null, picture: null, version: 1 });
   const stands = await standing(store, account);
-  assert.deepEqual(stands, { exists: true, suspended: null, devices: 2, name: true, picture: false, held: { name: false, picture: false } });
+  assert.deepEqual(stands, { exists: true, suspended: null, terminated: null, devices: 2, name: true, picture: false, held: { name: false, picture: false } });
   assert.equal((await standing(store, '9'.repeat(32))).exists, false);
   assert.match(wouldDo('suspend', stands), /would refuse its 2 device\(s\) licences and activations, and cut the one in use off/);
   assert.equal(wouldDo('remove', stands, { picture: true }), 'nothing of that on its profile');

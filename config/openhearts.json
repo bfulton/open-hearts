@@ -3,6 +3,7 @@
   "serviceKey": "8031cb2192987148c1af19ebe8338a15ffec1745e3974508932e1e403323a46b",
   "turnKeyId": "d681af4e315018c9dc90b898de5f24be",
   "stripePrice": "openhearts_annual",
+  "price": { "amount": 599, "currency": "usd" },
   "apple": {
     "bundleId": "game.openhearts",
     "product": "openhearts_annual",

@@ -18,21 +18,28 @@
 // in Public details (Checkout's consent box will not open without
 // it), and the account's name and statement descriptor.
 
+import { readFileSync } from 'node:fs';
+
+/// The price the terms state (config/openhearts.json), which the price
+/// below is made at and the service sells at and no other.
+const { price } = JSON.parse(readFileSync(new URL('../config/openhearts.json', import.meta.url), 'utf8'));
+
 export const stripe = {
   /// Which mode this describes. apply.mjs refuses a key of the other.
   mode: 'live',
   /// Hosts a webhook of ours points at; one elsewhere is not ours.
   hosts: ['openhearts.game', 'open-hearts.pages.dev'],
 
-  /// $5.99 a year, paid up front (docs/explanation/service.md). Found by its
-  /// lookup key, which is what the service is given
-  /// (OH_STRIPE_PRICE): a new price takes the key over and nothing else
-  /// changes. A price's amount cannot be edited, so a change to it here
-  /// is a new price.
+  /// A year, paid up front, at the price in config/openhearts.json
+  /// (docs/explanation/service.md). Found by its lookup key, which is
+  /// what the service is given (OH_STRIPE_PRICE): a new price takes the
+  /// key over and nothing else changes. A price's amount cannot be
+  /// edited, so a change to it is a new price
+  /// (docs/how-to/change-the-terms.md, "Change the price").
   price: {
     lookupKey: 'openhearts_annual',
-    currency: 'usd',
-    unitAmount: 599,
+    currency: price.currency,
+    unitAmount: price.amount,
     interval: 'year',
     intervalCount: 1,
     taxBehavior: 'unspecified',

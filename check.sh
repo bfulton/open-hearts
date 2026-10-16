@@ -46,7 +46,7 @@ suite_service_js() { cd service && OH_RELAY=js dart test -j "$cores"; }
 suite_service_object() { cd service && OH_RELAY=object dart test -j "$cores"; }
 suite_relay_js() { node --test service/do/*.test.mjs; }
 suite_functions() { node --test service/functions/*.test.mjs; }
-suite_site() { node --test site/build.test.mjs; }
+suite_site() { node --test site/*.test.mjs; }
 suite_infra() { node --test infra/*.test.mjs; }
 # The operator's command: its reference is its table, and each command
 # does what it says (docs/reference/oh.md).
@@ -225,15 +225,16 @@ quick() {
     case $f in
       app/lib/*|app/test/*|app/web/*|app/worker/*|app/pubspec.yaml|app/analysis_options.yaml|app/l10n.yaml)
         add app_analyze app; app_files+=("$f")
-        case $f in app/web/*|app/worker/*) add workers ;; esac ;;
+        case $f in app/web/*|app/worker/*) add workers ;; app/lib/net/buying.dart) add site ;; esac ;;
       packages/engine/*) add engine ;;
       packages/deal/*) add deal ;;
       packages/table/*|packages/table_sim/*) add table ;;
       service/do/*) add relay_js service_js service_object ;;
-      service/functions/*) add functions ;;
+      service/functions/*) add functions ops ;;
       service/tool/*.mjs) add functions ops ;;
       service/*) add service ;;
-      site/*) add site e2e_site ;;
+      site/*) add site e2e_site ops ;;
+      config/*) add site functions infra ops ;;
       infra/*) add infra ops ;;
       ops/*|oh) add ops ;;
       e2e/*.test.mjs) add workers ;;

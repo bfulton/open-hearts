@@ -22,6 +22,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table/table.dart';
 
 import 'activate_page.dart';
@@ -849,14 +850,42 @@ class _LivePaused extends StatelessWidget {
 
 /// What the operator has to say across the top of the front door
 /// (net/remote_config.dart): a notice — an outage, a maintenance
-/// window — and, to a build older than the one asked for, that it is.
-/// Nothing at all when there is nothing to say.
-class OperatorNotes extends StatelessWidget {
+/// window — and, to a build older than the one asked for, that it is;
+/// and a change to the terms or the privacy policy that matters to
+/// subscribers, with a link to it, until it is dismissed. Nothing at
+/// all when there is nothing to say.
+class OperatorNotes extends StatefulWidget {
   const OperatorNotes({super.key, this.published = buildDate});
 
   /// The day this build was published: the build's own, unless a test
   /// says.
   final String published;
+
+  @override
+  State<OperatorNotes> createState() => _OperatorNotesState();
+}
+
+class _OperatorNotesState extends State<OperatorNotes> {
+  /// Where the changes this device dismissed are kept, by id.
+  static const _dismissedKey = 'notices_dismissed';
+
+  /// The changes dismissed here (LegalNotice.id); null until read, and
+  /// none is shown till then, so one dismissed does not flash back.
+  Set<String>? _dismissed;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(SharedPreferences.getInstance().then((prefs) {
+      if (mounted) setState(() => _dismissed = {...?prefs.getStringList(_dismissedKey)});
+    }));
+  }
+
+  Future<void> _dismiss(LegalNotice notice) async {
+    final dismissed = {...?_dismissed, notice.id};
+    setState(() => _dismissed = dismissed);
+    await (await SharedPreferences.getInstance()).setStringList(_dismissedKey, dismissed.toList());
+  }
 
   // Listening for itself: it is a const widget in the door's tree, which
   // a rebuild of the door passes over as unchanged.
@@ -867,11 +896,30 @@ class OperatorNotes extends StatelessWidget {
     final l10n = context.l10n;
     final config = RemoteSettings.current.config;
     final notice = config.banner;
+    final dismissed = _dismissed;
     final lines = <Widget>[
       if (notice != null) _line(notice.text.inLanguage(l10n.localeName), notice.warning ? Palette.danger : Palette.gold),
-      if (config.updateDue(published))
+      if (config.updateDue(widget.published))
         _line(config.updateText?.inLanguage(l10n.localeName) ?? (kIsWeb ? l10n.updateDueWeb : l10n.updateDueApp), Palette.gold,
             action: kIsWeb ? TextButton(onPressed: reloadPage, child: Text(l10n.reload)) : null),
+      if (dismissed != null)
+        for (final change in config.notices.where((n) => !dismissed.contains(n.id)))
+          _line(
+            change.summary.inLanguage(l10n.localeName),
+            Palette.gold,
+            action: Row(mainAxisSize: MainAxisSize.min, children: [
+              TextButton(
+                onPressed: () => openLink(legalPage(change.document)),
+                child: Text(change.document == 'terms' ? l10n.termsOfUse : l10n.privacyPolicy),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 16),
+                color: Palette.chromeDim,
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => _dismiss(change),
+              ),
+            ]),
+          ),
     ];
     if (lines.isEmpty) return const SizedBox.shrink();
     return Column(children: lines);

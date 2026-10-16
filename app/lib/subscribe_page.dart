@@ -25,7 +25,6 @@ import 'net/buying.dart';
 import 'net/copy.dart';
 import 'net/household.dart';
 import 'net/provider_tokens.dart';
-import 'net/remote_config.dart';
 import 'net/share.dart';
 import 'net/sign_in.dart';
 import 'net/store_buying.dart';
@@ -871,15 +870,13 @@ class _Point extends StatelessWidget {
   }
 }
 
-/// The site's page [name] — `privacy` or `terms` — or where the remote
-/// config says it is. On the web the site is the app's own host without
-/// its `play.` (play.openhearts.game's site is openhearts.game), or the
-/// app's own origin on a preview, which serves the app beside the site
-/// at /play/; a phone's build has no origin and goes to the site's home.
+/// The site's page [name] — `privacy` or `terms` — which is where they
+/// are published, and nowhere else (site/ledger.mjs). On the web the
+/// site is the app's own host without its `play.` (play.openhearts.game's
+/// site is openhearts.game), or the app's own origin on a preview, which
+/// serves the app beside the site at /play/; a phone's build has no
+/// origin and goes to the site's home.
 Uri legalPage(String name, {Uri? base}) {
-  final config = RemoteSettings.current.config;
-  final set = name == 'privacy' ? config.privacy : config.terms;
-  if (set != null) return set;
   final at = base ?? Uri.base;
   if ((at.scheme == 'https' || at.scheme == 'http') && at.host.isNotEmpty) {
     final host = at.host.startsWith('play.') ? at.host.substring('play.'.length) : at.host;

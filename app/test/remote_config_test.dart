@@ -179,13 +179,10 @@ void main() {
     expect(ended, isA<TimeoutException>());
   });
 
-  test('the price shown beside Subscribe: the operator\'s, with a new Stripe price, or the build\'s', () {
+  test('the price shown beside Subscribe is the build\'s: the one the terms state, which no row changes', () {
     expect(priceShown, r'$5.99');
     RemoteSettings.current.adopt(RemoteConfig.parse({'price': '€6,49'}));
-    expect(priceShown, '€6,49');
-    for (final bad in ['', 'free', '<b>1</b>', r'$ 5.99', 42]) {
-      expect(RemoteConfig.parse({'price': bad}).price, isNull, reason: '$bad');
-    }
+    expect(priceShown, r'$5.99');
   });
 
   test('please update: a build older than the day asked for, and never a local one', () {
@@ -277,6 +274,57 @@ void main() {
     await licenceThisDevice();
     await tester.pumpAndSettle();
     expect(find.text('Play live'), findsOneWidget, reason: 'what was bought stays bought');
+  });
+
+  test('a change to the terms: a document the site has, a day, and what changed in English at least; two at most', () {
+    final notice = LegalNotice.parse({
+      'document': 'terms',
+      'date': '2026-11-02',
+      'summary': {'en': 'Refunds end the subscription.', 'de': 'Eine Erstattung beendet das Abo.'},
+    })!;
+    expect(notice.id, 'terms@2026-11-02');
+    expect(notice.summary.inLanguage('de'), 'Eine Erstattung beendet das Abo.');
+    expect(notice.summary.inLanguage('fr'), 'Refunds end the subscription.');
+    for (final bad in [
+      {'document': 'cookies', 'date': '2026-11-02', 'summary': {'en': 'x'}},
+      {'document': 'terms', 'date': '2 November', 'summary': {'en': 'x'}},
+      {'document': 'terms', 'date': '2026-11-02', 'summary': {'de': 'nur Deutsch'}},
+      'terms',
+    ]) {
+      expect(LegalNotice.parse(bad), isNull, reason: '$bad');
+    }
+    final n = {'document': 'privacy', 'date': '2026-11-02', 'summary': {'en': 'x'}};
+    expect(RemoteConfig.parse({'notices': [n, 'junk', n, n]}).notices.length, 2);
+    expect(RemoteConfig.parse({'notices': 'all'}).notices, isEmpty);
+  });
+
+  testWidgets('a change to the terms: said at the front door with a link to them, until dismissed, and dismissed for good', (tester) async {
+    final terms = {'document': 'terms', 'date': '2026-11-02', 'summary': {'en': 'Refunds end the subscription.'}};
+    RemoteSettings.current.adopt(RemoteConfig.parse({
+      'notices': [terms, {'document': 'privacy', 'date': '2026-11-01', 'summary': {'en': 'Reports are kept a year.'}}],
+    }));
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: OperatorNotes())));
+    await tester.pumpAndSettle();
+    expect(find.text('Refunds end the subscription.'), findsOneWidget);
+    expect(find.text('Terms of use'), findsOneWidget);
+    expect(find.text('Reports are kept a year.'), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Close').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Refunds end the subscription.'), findsNothing);
+    expect(find.text('Reports are kept a year.'), findsOneWidget, reason: 'only the one dismissed');
+
+    // Opened again, it stays dismissed; a later change is news.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: OperatorNotes())));
+    await tester.pumpAndSettle();
+    expect(find.text('Refunds end the subscription.'), findsNothing);
+    RemoteSettings.current.adopt(RemoteConfig.parse({
+      'notices': [{...terms, 'date': '2026-12-01', 'summary': {'en': 'Disputes go to Charleston.'}}],
+    }));
+    await tester.pumpAndSettle();
+    expect(find.text('Disputes go to Charleston.'), findsOneWidget);
   });
 
   testWidgets('please update: said to a build older than the day asked for, and only to one', (tester) async {

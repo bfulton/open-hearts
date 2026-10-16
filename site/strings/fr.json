@@ -33,7 +33,7 @@
     },
     "others": {
       "title": "Ou avec d'autres",
-      "price": "5,99 $ US par an",
+      "price": "{{price}} par an",
       "rating": "Adversaires selon le classement",
       "friends": "Ou invitez des amis"
     },
@@ -139,7 +139,7 @@
     "header": {
       "title": "Confidentialité",
       "tagline": "Ce qu'Open Hearts fait de ce que vous lui confiez, en termes simples.",
-      "updated": "Dernière mise à jour : 13 octobre 2026"
+      "updated": "Dernière mise à jour : {{updated.privacy}}"
     },
     "short": {
       "title": "En bref",
@@ -257,7 +257,7 @@
     "header": {
       "title": "Conditions d'utilisation",
       "tagline": "L'accord entre vous et Open Hearts, en termes simples.",
-      "updated": "Dernière mise à jour : 16 octobre 2026"
+      "updated": "Dernière mise à jour : {{updated.terms}}"
     },
     "short": {
       "title": "En bref",
@@ -298,7 +298,7 @@
       "p6": "Jusqu'à cinq de vos appareils sur un même abonnement, que vous ajoutez et retirez vous-même.",
       "p7": "Tout le monde à une table en direct est abonné. Le jeu en direct nécessite une connexion internet ; ce qu'il partage, et avec qui, est décrit dans la <a href=\"{{base}}/privacy\">politique de confidentialité</a>. Nous faisons de notre mieux pour qu'il fonctionne, mais nous ne pouvons pas promettre qu'il fonctionnera toujours, ni qu'une partie donnée ira jusqu'au bout.",
       "p8": "Prix et durée",
-      "p9": "Un abonnement dure un an et coûte 5,99 $ US par an sur le web, payés d'avance, plus les éventuelles taxes indiquées au paiement. Sur l'App Store ou Google Play, le prix est celui que la boutique vous affiche, dans votre devise, avant l'achat.",
+      "p9": "Un abonnement dure un an et coûte {{price}} par an sur le web, payés d'avance, plus les éventuelles taxes indiquées au paiement. Sur l'App Store ou Google Play, le prix est celui que la boutique vous affiche, dans votre devise, avant l'achat.",
       "p10": "Renouvellement automatique",
       "p11": "<b>Un abonnement se renouvelle automatiquement chaque année</b>, au prix alors en vigueur, et est débité sur le même moyen de paiement, jusqu'à ce que vous le résiliiez. Si le prix change, le nouveau prix ne s'applique qu'à partir de votre prochain renouvellement, et la boutique, ou nous pour le web, vous en informera avant.",
       "p12": "<b>App Store :</b> le paiement est débité sur votre compte Apple à la confirmation de l'achat. L'abonnement se renouvelle sauf s'il est résilié au moins 24 heures avant la fin de l'année en cours, et votre compte est débité du renouvellement dans les 24 heures qui précèdent cette fin.",

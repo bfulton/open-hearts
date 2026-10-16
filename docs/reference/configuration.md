@@ -8,7 +8,7 @@ For why the service is set up this way, see [the service](../explanation/service
 
 The non-secret configuration, committed and the same for every deployment.
 
-- The Pages worker reads it beneath its own settings: `service/functions/entry.mjs` passes the file to `withConfig` in `service/functions/deployment.mjs`, which maps each field to an `OH_` name (`configEnv`). A variable of the same name that is set on the project or by a test wins.
+- The Pages worker reads it beneath its own settings: `service/functions/entry.mjs` passes the file to `withConfig` in `service/functions/deployment.mjs`, which maps each field to an `OH_` name (`configEnv`). A variable of the same name that is set on the project or by a test wins, except `OH_PRICE`: the price is the file's alone. The entry also hands the worker `site/ledger.json` as `OH_LEDGER` (see [Change the terms](../how-to/change-the-terms.md)).
 - The relay worker reads it the same way (`service/do/worker.mjs`).
 - `deploy.sh` compiles `serviceKey`, `google.webClientId` and `apple.servicesId` into the web build.
 - `app/tool/defines.mjs` writes the phone build's `--dart-define-from-file` from it (`appDefines`).
@@ -19,7 +19,8 @@ The non-secret configuration, committed and the same for every deployment.
 | `appOrigin` | none | `OH_APP_ORIGIN` | The app's origin. A phone build calls the service there and builds shared links on it (`app/lib/net/address_io.dart`). `app/tool/defines.mjs` refuses a file without it. |
 | `serviceKey` | `OH_SERVICE_KEY` | `OH_SERVICE_KEY` | The service's public key, 64 hex characters. Licences and activations are checked against it. A production deploy and a phone build refuse to run without it. |
 | `turnKeyId` | `OH_TURN_KEY_ID` | none | The Cloudflare Realtime TURN key that the worker mints credentials with. `infra/cloudflare.mjs` (`turnKeys`) defines the same key. |
-| `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. The `stripePrice` field of [service settings](#service-settings) overrides it. |
+| `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. A checkout sells it only when it is a year at `price`. |
+| `price` | `OH_PRICE` (`"599 usd"`), which no project setting overrides | none | What a year costs on the web: `{"amount": <cents>, "currency": "usd"}`. The terms and the front page state it (`{{price}}`, `site/build.mjs`), Stripe's price is made at it (`infra/stripe.mjs`), and a checkout sells at it and no other. `priceAmount` in `app/lib/net/buying.dart` is held to it by `site/ledger.test.mjs`. Changed only as [Change the terms](../how-to/change-the-terms.md#change-the-price) says. |
 | `apple.bundleId` | `OH_APPLE_BUNDLE_ID`, and part of `OH_APPLE_AUDIENCE` | none | The iOS bundle ID. App Store notifications for another bundle are ignored. |
 | `apple.product` | `OH_APPLE_PRODUCT` | `OH_APPLE_PRODUCT` | The App Store subscription product. |
 | `apple.servicesId` | part of `OH_APPLE_AUDIENCE` | `OH_APPLE_SERVICE_ID` | The Sign in with Apple Services ID that the web uses. |
@@ -49,7 +50,7 @@ Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `./oh infra` 
 | `OH_TURN_API_TOKEN` | Yes | Yes | `mint` | `turn` answers 503, and the app plays over the relay. |
 | `OH_PLAY_SERVICE_ACCOUNT` | When the config names Play (`playSecrets`) | No | `playToken`: the Google service account's JSON key for the Play Developer API | `store` answers 503 for a Play purchase. `play` answers a subscription notification with 200 and records nothing. |
 
-The worker calls these Stripe endpoints, so `OH_STRIPE_SECRET` needs access to each: `GET /v1/prices`, `POST /v1/checkout/sessions`, `GET /v1/subscriptions/{id}`, `POST /v1/billing_portal/sessions` and `GET /v1/customers/{id}`.
+The worker calls these Stripe endpoints, so `OH_STRIPE_SECRET` needs access to each: `GET /v1/prices` and `GET /v1/prices/{id}`, `POST /v1/checkout/sessions`, `GET /v1/subscriptions/{id}` (with its customer expanded, for a notice of a change to the terms), `POST /v1/billing_portal/sessions` and `GET /v1/customers/{id}`.
 
 ### Relay worker secret and variables
 
@@ -161,10 +162,12 @@ The row `config|app` in `OH_STORE`, which the `config` handler serves to every d
 | `banner` | `id` matching `^[\w.-]{1,64}$`; `level` `warn` (anything else is `info`); `text` by two-letter language code, English required, each up to `LONGEST_SAY` characters | None | A line on the front door. |
 | `update` | `before` as `YYYY-MM-DD`; optional `text` as for `banner` | None | Asks builds published before that day to update. |
 | `feedback` | An `https:` URL or a `mailto:` address | The project's issues | Where "Tell us what's broken" sends a report. |
-| `privacy`, `terms` | `https:` URLs | The site's own pages | The links shown under Subscribe. |
-| `price` | 1 to 12 characters, at least one digit, no whitespace or `<>{}` | The build's | The yearly price shown on the web beside Subscribe. Change it with `stripePrice`. |
 | `table` | See [Table clocks](#table-clocks). All fields pass, or none is served. | The standard table | The clocks of tables this device starts. |
 | `waits` | See the next table. | The app's own | How long the app waits on the network. |
+
+Beside the row's fields, the `config` handler serves `notices`: each document's newest material or price change in `site/ledger.json`, for 60 days from the day it was published, as `[{document, date, summary}]` with the summary in each language (`noticesOf` in `service/functions/notices.mjs`). The row can't set it.
+
+The price, and where the terms and the privacy policy are, are not fields: the site publishes them, and they change only with it.
 
 The `config` handler answers with `cache-control: public, max-age=60`. The app keeps the last answer for its next start, and asks again every `configEveryMin`.
 
@@ -204,7 +207,6 @@ Defaults and bounds: `SERVICE_DEFAULTS` and `SERVICE_BOUNDS` in `service/functio
 
 | Field | What it sets |
 |---|---|
-| `stripePrice` | The Stripe price a checkout sells, as a price ID or lookup key (`STRIPE_PRICE`). Overrides `stripePrice` in `config/openhearts.json`. |
 | `licenceDays` | How long a licence lasts. A licence never runs past the day the subscription is paid to. |
 | `mostDevices` | How many devices one account may have. |
 | `ticketMinutes` | How long a household code is good for. |

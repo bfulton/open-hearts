@@ -81,16 +81,18 @@ Map<String, Object?> signedFor(PublicKey device, {int days = 30}) {
 }
 
 void main() {
-  test('the privacy policy and the terms are the site\'s, beside the app, unless the config says', () {
+  test('the privacy policy and the terms are the site\'s, beside the app, whatever the config says', () {
     expect(legalPage('privacy', base: Uri.parse('https://open-hearts.pages.dev/play/?e2e')).toString(), 'https://open-hearts.pages.dev/privacy');
     expect(legalPage('terms', base: Uri.parse('http://127.0.0.1:8123/')).toString(), 'http://127.0.0.1:8123/terms');
     expect(legalPage('terms', base: Uri()).toString(), 'https://openhearts.game/terms', reason: 'a phone build');
     // The app at its own host: the site is the host without play.
     expect(legalPage('privacy', base: Uri.parse('https://play.openhearts.game/subscription')).toString(), 'https://openhearts.game/privacy');
     expect(legalPage('terms', base: Uri.parse('http://play.openhearts.localhost:8123/')).toString(), 'http://openhearts.localhost:8123/terms');
+    // Published there and nowhere else (site/ledger.mjs): no row points
+    // them at another document.
     RemoteSettings.current.adopt(RemoteConfig.parse({'terms': 'https://legal.example/t'}));
     addTearDown(() => RemoteSettings.current = RemoteSettings());
-    expect(legalPage('terms', base: Uri.parse('https://open-hearts.pages.dev/play/')).toString(), 'https://legal.example/t');
+    expect(legalPage('terms', base: Uri.parse('https://open-hearts.pages.dev/play/')).toString(), 'https://open-hearts.pages.dev/terms');
   });
 
   setUp(() {

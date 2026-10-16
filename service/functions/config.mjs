@@ -6,7 +6,7 @@
 /// reads at its start. What is here when there is no row — or a
 /// row this worker cannot read — is what the app does with no config at
 /// all, so a bad row is never worse than none.
-export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null, privacy: null, terms: null, price: null });
+export const CONFIG_DEFAULTS = Object.freeze({ v: 1, live: true, offer: true, relays: null, banner: null, update: null, feedback: null });
 
 /// Where the row lives: `config|app` in OH_STORE.
 export const CONFIG_ROW = ['config', 'app'];
@@ -68,14 +68,6 @@ export function configOf(raw) {
     const page = feedback.protocol === 'https:' && !feedback.username && !feedback.password;
     const mail = feedback.protocol === 'mailto:' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(feedback.pathname);
     if (page || mail) c.feedback = feedback.toString();
-  }
-  // What a year costs, as the web shows it beside Subscribe: changed
-  // with the Stripe price (`config|service`, stripePrice) it describes.
-  if (typeof raw.price === 'string' && /^[^\s<>{}]{1,12}$/.test(raw.price) && /\d/.test(raw.price)) c.price = raw.price;
-  // Where the privacy policy and the terms are, when not on this site.
-  for (const name of ['privacy', 'terms']) {
-    const u = urlOf(raw[name]);
-    if (u && u.protocol === 'https:' && !u.username && !u.password) c[name] = u.toString();
   }
   // The clocks of the tables a device starts: served only where the
   // whole of it checks out, and left out otherwise, which the app

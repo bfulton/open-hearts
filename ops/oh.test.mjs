@@ -5,7 +5,8 @@
 //   node --test ops/*.test.mjs
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
@@ -16,6 +17,8 @@ import { commandOf, main, markdown, parse } from './oh.mjs';
 import { rejected, reshaped } from './setup.mjs';
 import { configOf } from '../service/functions/config.mjs';
 import { memoryStore } from '../service/functions/rows.mjs';
+import { config as committed, languages, origin, render, strings } from '../site/build.mjs';
+import { fingerprintOf, formatLedger } from '../site/ledger.mjs';
 
 /// A context that records what a command says and starts, with [store]
 /// for the production store and [capture] answering the programs it
@@ -50,6 +53,27 @@ function fake({ store = memoryStore(), capture = async () => ({ code: 0, out: ''
   };
 }
 
+/// The site as this checkout builds it, served, with a ledger whose
+/// newest entries are it: production with no change to the terms to
+/// publish (ops/terms.test.mjs holds the rest).
+function settled() {
+  const summary = Object.fromEntries(languages.map((l) => [l.code, 'Where it begins.']));
+  const ledger = {
+    terms: [{ date: '2026-10-16', fingerprint: fingerprintOf('terms'), change: 'first', price: committed().price, storesNotified: null, summary }],
+    privacy: [{ date: '2026-10-13', fingerprint: fingerprintOf('privacy'), change: 'first', storesNotified: null, summary }],
+  };
+  const ledgerFile = join(mkdtempSync(join(tmpdir(), 'ledger-')), 'ledger.json');
+  writeFileSync(ledgerFile, formatLedger(ledger));
+  return {
+    ledgerFile,
+    config: { ...committed(), appOrigin: 'https://play.example' },
+    fetch: async (url) => {
+      const [, code = 'en', doc] = new RegExp(`^${origin}(?:/(es|pt|de|fr))?/(terms|privacy)$`).exec(String(url)) ?? [];
+      return doc ? new Response(render(doc, languages.find((l) => l.code === code), strings(code))) : new Response('no', { status: 404 });
+    },
+  };
+}
+
 const account = '0123456789abcdef0123456789abcdef';
 
 test('the reference is the table, as ./oh help --markdown writes it', () => {
@@ -63,7 +87,7 @@ test('every command says what it is, what it needs and where its how-to is, and 
     const name = c.words.join(' ');
     assert.ok(!seen.has(name), `${name} twice`);
     seen.add(name);
-    assert.ok(c.summary && c.needs?.length && c.example, name);
+    assert.ok(c.summary && Array.isArray(c.needs) && c.example, name);
     const [path, hash] = c.howto.split('#');
     assert.ok(existsSync(join(root, path)), `${name}: ${path}`);
     if (hash) assert.match(readFileSync(join(root, path), 'utf8'), new RegExp(`^#+ ${hash.replace(/-/g, '[ -]')}$`, 'im'), `${name}: #${hash}`);
@@ -118,14 +142,14 @@ test('an act on an account says what it would do and changes nothing without --a
 test('production is released only from main as it was reviewed', async () => {
   const git = (answers) => async (command, args) => ({ code: 0, out: answers[args.join(' ')] ?? '' });
   const clean = { 'rev-parse HEAD': 'abc1234\n', 'rev-parse origin/main': 'abc1234\n', 'status --porcelain --untracked-files=no': '' };
-  assert.deepEqual(await releaseProblems(fake({ capture: git(clean) }), 'site'), []);
+  assert.deepEqual(await releaseProblems(fake({ capture: git(clean), ...settled() }), 'site'), []);
   const ahead = await releaseProblems(fake({ capture: git({ ...clean, 'rev-parse HEAD': 'def5678\n' }) }), 'relay');
   assert.match(ahead.join('\n'), /HEAD \(def5678\) is not origin\/main \(abc1234\)/);
-  const dirty = await releaseProblems(fake({ capture: git({ ...clean, 'status --porcelain --untracked-files=no': ' M deploy.sh\n M oh\n' }) }), 'site');
-  assert.match(dirty.join('\n'), /uncommitted changes: 2 file\(s\)/);
+  const dirty = await releaseProblems(fake({ capture: git({ ...clean, 'status --porcelain --untracked-files=no': ' M deploy.sh\n M oh\n' }), ...settled() }), 'site');
+  assert.deepEqual(dirty, ['uncommitted changes: 2 file(s)']);
 
   // oh deploy says so and, asked to deploy, starts nothing.
-  const ctx = fake({ capture: git({ ...clean, 'rev-parse HEAD': 'def5678\n', 'rev-parse --abbrev-ref HEAD': 'main\n' }) });
+  const ctx = fake({ capture: git({ ...clean, 'rev-parse HEAD': 'def5678\n', 'rev-parse --abbrev-ref HEAD': 'main\n' }), ...settled() });
   assert.equal(await main(['deploy', 'site', '--apply'], ctx), 1);
   assert.equal(ctx.started.length, 0);
   // A preview is for looking at, and is not held to it.
