@@ -256,6 +256,12 @@ export function memoryStore(keep = 10000) {
     ids() {
       return events.map((e) => e.id);
     },
+    /// The event with [id] let go of, if it was held: what it was, or
+    /// null.
+    drop(id) {
+      const at = events.findIndex((e) => e.id === id);
+      return at < 0 ? null : events.splice(at, 1)[0];
+    },
   };
 }
 
@@ -392,7 +398,15 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// [gate], when given, is who may use it ([serviceGate]): every socket
 /// is asked, and carried nothing until it has answered. A socket may
 /// then also have `close()`, for the relay to end it.
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null }) {
+///
+/// [withhold], when given, says of an event (or a promise of saying)
+/// why the relay keeps it to itself, or null: one the operator took
+/// down (service/do/withheld.mjs). Published, such an event is answered
+/// as taken — `OK true` with the reason, so that the device is not
+/// counted as refused — and neither stored nor passed on; already held,
+/// it is let go of before a subscription is served, and [forget] tells
+/// the host to let go of its copy too.
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, forget = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -567,6 +581,12 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       log?.(`refused ${event.id.slice(0, 6)}: ${why}`);
       return send(from, ['OK', event.id, false, why]);
     }
+    const held = await withhold?.(event);
+    if (held) {
+      count?.('withheld');
+      log?.(`withheld ${event.id.slice(0, 6)}: ${held}`);
+      return send(from, ['OK', event.id, true, held]);
+    }
     if (seen.has(event.id)) {
       count?.('duplicate');
       return send(from, ['OK', event.id, true, 'duplicate: already have this event']);
@@ -607,13 +627,28 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     if (delivered) count?.('delivered', delivered);
   }
 
-  function request(socket, message) {
+  async function request(socket, message) {
     const id = message[1];
     const filters = [];
     for (const raw of message.slice(2)) {
       const parsed = parseFilter(raw);
       if (!parsed) return send(socket, ['NOTICE', 'bad filter']);
       filters.push(parsed);
+    }
+    // What is withheld goes from what is held before any of it is
+    // served. Everything after this is said in one go, the history
+    // ahead of anything published meanwhile, which the history then
+    // has.
+    if (withhold && store) {
+      for (const event of store.matching(filters, null)) {
+        if (!(await withhold(event))) continue;
+        // Another socket's subscription, screened meanwhile, may have
+        // let it go already.
+        if (!store.drop(event.id)) continue;
+        seen.delete(event.id);
+        count?.('withheld');
+        forget?.(event);
+      }
     }
     const subscriptions = sockets.get(socket);
     if (!subscriptions) return;
@@ -753,10 +788,13 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// tests build is that relay and not one set up to look like it:
 /// presence keeps nothing and takes only the ephemeral kinds, a table's
 /// or a lobby's tag also keeps its lobby kind, and every socket is held
-/// to [objectLimits] or [tableLimits].
-export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null, gate = null } = {}) {
+/// to [objectLimits] or [tableLimits]. [withhold] and [forget] are asked
+/// only where pictures are put out: a lobby's tag, never presence or the
+/// results.
+export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null, gate = null, withhold = null, forget = null } = {}) {
   const presence = tag === presenceTag;
   const own = refusalFor(tag);
+  const lobby = !presence && tag !== resultsTag;
   return createRelay({
     heard,
     verify,
@@ -764,6 +802,8 @@ export function objectRelay(verify, { tag = presenceTag, now = Date.now, count =
     // Presence keeps nothing; a table's tag keeps its lobby.
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
     kept: presence ? null : kept,
+    withhold: lobby ? withhold : null,
+    forget: lobby ? forget : null,
     // [also]: a test's own policy on top, asked only of what the object
     // itself takes (host.mjs, --object --control).
     refuse: also ? (event) => own(event) ?? also(event) : own,

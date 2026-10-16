@@ -18,6 +18,7 @@
 // first can be lost and the tool asks again.
 
 import { isSuspended } from './accounts.mjs';
+import { PICTURES_ROW, pictureDigest, releasing, withholding } from './pictures.mjs';
 import { dayOf, isAccount } from './rows.mjs';
 
 /// How long an order is kept, in seconds, for the tool to have it
@@ -141,7 +142,10 @@ async function lift(account, store, active) {
 /// made on another device (app/lib/net/account_profile.dart). A name
 /// taken off is an empty one; a picture, none, and the icon shows. What
 /// is held is what the latest removal took, so that a name the player
-/// chose after an earlier one was taken off is the one put back.
+/// chose after an earlier one was taken off is the one put back. A
+/// picture taken off is withheld at the relay as well (pictures.mjs),
+/// written first, so that an order carried out again after a failure
+/// part way finds it withheld whatever else it finds.
 async function remove(account, store, { name, picture, now }) {
   const pk = `ACCOUNT#${account}`;
   const profile = await store.get(pk, 'PROFILE');
@@ -158,6 +162,8 @@ async function remove(account, store, { name, picture, now }) {
     held.picture = profile.picture;
     next.picture = null;
     removed.push('picture');
+    const digest = await pictureDigest(profile.picture);
+    if (digest) await store.put(...PICTURES_ROW, withholding(await store.get(...PICTURES_ROW), digest, now));
   }
   if (!removed.length) return { removed };
   await store.put(pk, 'HELD', { ...held, at: new Date(now).toISOString() });
@@ -166,7 +172,7 @@ async function remove(account, store, { name, picture, now }) {
 }
 
 /// What [remove] held, put back on [account]'s profile, and no longer
-/// held.
+/// held; a picture no longer withheld at the relay.
 async function restore(account, store, { now }) {
   const pk = `ACCOUNT#${account}`;
   const held = await store.get(pk, 'HELD');
@@ -181,6 +187,8 @@ async function restore(account, store, { now }) {
   if (typeof held.picture === 'string') {
     next.picture = held.picture;
     restored.push('picture');
+    const digest = await pictureDigest(held.picture);
+    if (digest) await store.put(...PICTURES_ROW, releasing(await store.get(...PICTURES_ROW), digest, now));
   }
   if (restored.length) {
     await store.put(pk, 'PROFILE', { ...next, version: (profile.version ?? 0) + 1, updated_at: new Date(now).toISOString() });

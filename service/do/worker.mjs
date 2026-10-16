@@ -36,6 +36,8 @@ import wasm from '../../app/web/schnorr.wasm';
 
 import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tagOf, tally } from './relay.mjs';
 import { tagStore } from './tag_store.mjs';
+import { pictureScreen } from './withheld.mjs';
+import { PICTURES_ROW } from '../functions/pictures.mjs';
 import { Bench as BenchObject, callIn } from './bench.mjs';
 import { withConfig } from '../functions/deployment.mjs';
 // The service's settings that are not secret, as the Pages worker reads
@@ -71,6 +73,9 @@ export class TagRelay {
     // socket goes, nothing about anyone.
     this.tally = tally(env.OH_METRICS ?? null);
     this.wokeAt = 0;
+    // The pictures the operator took down (withheld.mjs), read from the
+    // store at most once a minute while pictures come this way.
+    this.pictures = pictureScreen({ read: () => this.env.OH_STORE?.get(PICTURES_ROW.join('|'), 'json') ?? null });
   }
 
   /// A call for a juror heard here, passed to the backup jurors where
@@ -120,6 +125,8 @@ export class TagRelay {
       heard: (event) => this.heard(event),
       store: await kept.load(),
       kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
+      withhold: (event) => this.pictures.withheld(event),
+      forget: (event) => this.state.waitUntil(kept.forget(event)),
       gate: this.gate(verify, tag),
     });
     for (const socket of this.state.getWebSockets()) {

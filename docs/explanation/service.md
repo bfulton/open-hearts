@@ -479,8 +479,9 @@ that a counter-notice can put it back, and the profile's version goes
 up, which the device in use hears at its next renewal
 ([the account's profile](#the-accounts-profile)). A name taken off is
 also taken off the account's kept games (`anonymizeGames`), which
-putting it back doesn't undo. What the relay already holds stays for
-its usual day.
+putting it back doesn't undo. A picture taken off is withheld at the
+relay too ([withheld pictures](relay.md#withheld-pictures)); a name the
+relay already holds stays for its usual day.
 
 **What it can't do.** An account is a number tied to device keys and
 payments, not to a person. A device with a new key, or one dropped from

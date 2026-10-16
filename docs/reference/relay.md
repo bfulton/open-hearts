@@ -66,6 +66,7 @@ The reason in a refusal starts with one of these words:
 | `invalid:` | A bad ID or signature, or a reaction of the wrong size or shape. |
 | `blocked:` | This tag's object does not carry this kind, or a reaction is on the wrong tag. |
 | `duplicate:` | The relay already has this event. The `OK` is `true`. |
+| `withheld:` | A picture the operator took down ([withheld pictures](../explanation/relay.md#withheld-pictures)). The `OK` is `true`, and the event is neither stored nor passed on. |
 | `auth-required:` | The socket has not answered the challenge, or its answer is stale or carries no current activation. |
 | `restricted:` | Not a backup juror. The relay closes the socket. |
 | `superseded:` | Another device of this account is in use. The relay closes the socket. |

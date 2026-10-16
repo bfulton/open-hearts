@@ -10,6 +10,11 @@ squashed from a pull request, the pull request's number.
 
 ### Added
 
+- A picture the operator takes off an account is withheld at the relay
+  within a couple of minutes, for 30 days or until it is put back. No
+  pool or room serves it again, even if a device of the account puts it
+  out again. Before, it stayed for a day wherever it had been put out.
+  (2026-10-16, #31)
 - The operator can suspend an account from live play and lift it, and
   take its name or picture off and put them back, as the terms allow,
   with `service/tool/suspend.mjs`. A suspended account's device in use
