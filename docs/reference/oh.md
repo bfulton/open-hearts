@@ -151,6 +151,30 @@ Deletes an account's data on its owner's request: its name off its kept games, a
 - **How-to:** [delete-an-accounts-data.md](../how-to/delete-an-accounts-data.md)
 - **Example:** `oh account delete 0123456789abcdef0123456789abcdef --apply`
 
+### oh account hold
+
+```bash
+oh account hold <account> [--apply] [--ref <ref>]
+```
+
+Holds an account's data as it is after a report the law requires, such as one of child sexual abuse material to NCMEC: a year at the least, during which nothing deletes it or puts back what was taken off it. --ref is the report's number. A deletion its owner asks for meanwhile is noted, and done once the hold is released.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#take-it-down-and-hold-the-account)
+- **Example:** `oh account hold 0123456789abcdef0123456789abcdef --ref 123456789 --apply`
+
+### oh account release
+
+```bash
+oh account release <account> [--apply]
+```
+
+Releases a legal hold once its year is out, and says whether the account's owner asked meanwhile for its data to be deleted.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#release-the-hold)
+- **Example:** `oh account release 0123456789abcdef0123456789abcdef --apply`
+
 ## Terms and price
 
 Changing the terms of use, the privacy policy or the price, as site/ledger.json records them, and telling subscribers.

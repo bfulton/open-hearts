@@ -118,7 +118,8 @@ Everything the worker keeps is in the Workers KV namespace `OH_STORE`, one key p
 | `ACCOUNT#<account>` | `ACTIVE` | The device in use: `key`, `epoch`, `at`, `seated`, `seated_at`, `tags` (the relay objects it was seen at), and `suspended` while the account is. Only where `HOUSEHOLD` is not bound; otherwise the `Household` object keeps it in its own storage. | Never |
 | `ACCOUNT#<account>` | `PROFILE` | `name`, `icon`, `color`, `picture`, `version`, `updated_at` | Never |
 | `ACCOUNT#<account>` | `SUSPENDED` | `since`: the day the account was suspended; `terminated`: the day it was ended, for a terminated account | Never; deleted when the suspension is lifted, which a terminated account never is |
-| `ACCOUNT#<account>` | `HELD` | What the operator took off the profile, to put back: `name`, `picture`, and `at` | Never; deleted when put back |
+| `ACCOUNT#<account>` | `HELD` | What the operator took off the profile, to put back: `name`, `picture`, and `at`; under a legal hold, what later removals took, in `later` | Never; deleted when put back |
+| `ACCOUNT#<account>` | `HOLD` | A legal hold (`service/functions/holds.mjs`): `since`, `until` (a year on), `ref` (the report's number), and `deleteAsked`, the day a deletion was asked for while held. While it is there, the account's rows are not deleted and nothing held is put back. | Never; deleted when released, a year on at the least |
 | `SUB#<subscription>` | `META` | `source`, `txn_ref`, `renews_at`, `cancelled_at`, `event_at`, and `final` when set | Never |
 | `SUB#<subscription>` | `ACCOUNT` | `account` | Never |
 | `SUB#<subscription>` | `CUSTOMER` | The Stripe `customer`, for the billing portal | Never |

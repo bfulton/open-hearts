@@ -18,6 +18,7 @@
 // can be carried out twice to the same end, since the answer to the
 // first can be lost and the tool asks again.
 
+import { holdOf } from './holds.mjs';
 import { PICTURES_ROW, pictureDigest, releasing, withholding } from './pictures.mjs';
 import { dayOf, isAccount } from './rows.mjs';
 
@@ -78,9 +79,16 @@ export async function carryOut(op, store, active, { now = Date.now(), revoke = n
     case 'remove':
       body = await remove(op.account, store, { name: order.name === true, picture: order.picture === true, now });
       break;
-    case 'restore':
+    case 'restore': {
+      // What a hold keeps is kept as it was taken off (holds.mjs).
+      const held = await holdOf(store, op.account);
+      if (held) {
+        await store.del(...orderRow(op.order));
+        return { status: 409, body: { error: `held since ${held.since}: nothing taken off it is put back` } };
+      }
       body = await restore(op.account, store, { now });
       break;
+    }
     default:
       return { status: 400, body: { error: `not one of ${ACTS.join(', ')}` } };
   }
@@ -155,24 +163,32 @@ async function lift(account, store, active) {
 /// made on another device (app/lib/net/account_profile.dart). A name
 /// taken off is an empty one; a picture, none, and the icon shows. What
 /// is held is what the latest removal took, so that a name the player
-/// chose after an earlier one was taken off is the one put back. A
-/// picture taken off is withheld at the relay as well (pictures.mjs),
-/// written first, so that an order carried out again after a failure
-/// part way finds it withheld whatever else it finds.
+/// chose after an earlier one was taken off is the one put back — but
+/// under a legal hold (holds.mjs), what was held first stays, and what
+/// a later removal takes is kept beside it, in `later`. A picture taken
+/// off is withheld at the relay as well (pictures.mjs), written first,
+/// so that an order carried out again after a failure part way finds it
+/// withheld whatever else it finds.
 async function remove(account, store, { name, picture, now }) {
   const pk = `ACCOUNT#${account}`;
   const profile = await store.get(pk, 'PROFILE');
   const removed = [];
   if (!profile) return { removed };
   const held = (await store.get(pk, 'HELD')) ?? {};
+  const kept = !!(await holdOf(store, account));
+  const keep = (part, value) => {
+    if (kept && typeof held[part] === 'string' && held[part] !== value) {
+      held.later = [...(held.later ?? []), { [part]: value, at: new Date(now).toISOString() }];
+    } else held[part] = value;
+  };
   const next = { ...profile };
   if (name && profile.name) {
-    held.name = profile.name;
+    keep('name', profile.name);
     next.name = '';
     removed.push('name');
   }
   if (picture && profile.picture) {
-    held.picture = profile.picture;
+    keep('picture', profile.picture);
     next.picture = null;
     removed.push('picture');
     const digest = await pictureDigest(profile.picture);

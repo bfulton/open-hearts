@@ -6,6 +6,7 @@
 // nothing left in the service ties to it.
 
 import { backupRow } from './accounts.mjs';
+import { Held, holdOf } from './holds.mjs';
 import { isAccount } from './rows.mjs';
 
 /// Deletes [account]'s rows: the account's own (its devices, its code,
@@ -15,8 +16,12 @@ import { isAccount } from './rows.mjs';
 /// `PK|SK`. With [dry], deletes nothing and says what it would. [keys]
 /// lists the store's keys under a prefix, as accountsNamed takes it:
 /// without it, only the subscription the account has now is found.
+/// Throws [Held], deleting nothing, while the account is under a legal
+/// hold (holds.mjs).
 export async function forgetAccount(store, account, { dry = false, keys = null } = {}) {
   if (!isAccount(account)) return [];
+  const held = await holdOf(store, account);
+  if (held) throw new Held(held);
   const gone = [];
   const del = async (pk, sk) => {
     gone.push(`${pk}|${sk}`);

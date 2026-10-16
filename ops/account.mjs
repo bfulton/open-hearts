@@ -10,7 +10,9 @@ import { endNow, inStripe, inTheStore, money, refund as refundIn, refundFor, res
 import { accountOf, findAccounts } from '../service/tool/find.mjs';
 import { forget } from '../service/tool/forget.mjs';
 import { carry, standing, wouldDo } from '../service/tool/suspend.mjs';
+import { HOLD_DAYS, Held, hold, holdRow, isReportRef } from '../service/functions/holds.mjs';
 import { anonymizeGames } from '../service/functions/records.mjs';
+import { dayAfter, dayOf } from '../service/functions/rows.mjs';
 
 /// The account [target] names (an account, or one of its devices' keys),
 /// with how it stands; Failed when there is none.
@@ -29,6 +31,7 @@ function describe(ctx, account, target, stands) {
   ctx.log(`  ${state}; ${stands.devices} device(s)`);
   const held = Object.entries(stands.held).filter(([, h]) => h).map(([k]) => k);
   ctx.log(`  profile: ${stands.name ? 'a name' : 'no name'}, ${stands.picture ? 'a picture' : 'no picture'}; held to put back: ${held.join(' and ') || 'nothing'}`);
+  if (stands.hold) ctx.log(`  under a legal hold: ${new Held(stands.hold).message}${stands.hold.deleteAsked ? `; its deletion was asked for on ${stands.hold.deleteAsked}` : ''}`);
 }
 
 /// The account's web subscription as Stripe has it, said; or what to do
@@ -138,6 +141,7 @@ async function profileAct(ctx, name, { args, flags }, parts = {}) {
   const store = await ctx.store();
   const { account, stands } = await theAccount(ctx, store, args.account);
   describe(ctx, account, args.account, stands);
+  if (name === 'restore' && stands.hold) throw new Failed('under a legal hold: nothing taken off it is put back');
   ctx.log(`  ${wouldDo(name, stands, parts)}`);
   const bucket = name === 'remove' && parts.name ? ctx.bucket() : null;
   if (bucket) ctx.log(`  and would take its name off ${(await anonymizeGames(bucket, account, { dry: true })).length} kept game(s)`);
@@ -166,4 +170,36 @@ export async function del(ctx, { args, flags }) {
   } catch (e) {
     throw new Failed(e.message);
   }
+}
+
+/// The account's data held as it is, after a report the law requires
+/// (service/functions/holds.mjs, docs/how-to/handle-abuse-material.md):
+/// a year at the least, with the report's number.
+export async function holdAccount(ctx, { args, flags }) {
+  const store = await ctx.store();
+  const { account, stands } = await theAccount(ctx, store, args.account);
+  describe(ctx, account, args.account, stands);
+  const ref = flags.ref ?? null;
+  if (ref !== null && !isReportRef(ref)) throw new Usage('--ref is the report\'s number: letters, digits and dashes');
+  if (stands.hold) ctx.log(`  already held${ref && !stands.hold.ref ? `; would add report ${ref}` : ''}`);
+  else ctx.log(`  would hold its data until at least ${dayAfter(ctx.now(), HOLD_DAYS)}: nothing deletes it, or puts back what was taken off it, until it is released`);
+  if (!flags.apply) return ctx.log('nothing changed; --apply does it');
+  const row = await hold(store, account, { ref, now: ctx.now() });
+  ctx.log(`held: ${new Held(row).message}`);
+}
+
+/// A hold released, once its year is out; what it kept is then the
+/// privacy policy's to keep or delete again.
+export async function release(ctx, { args, flags }) {
+  const store = await ctx.store();
+  const { account, stands } = await theAccount(ctx, store, args.account);
+  describe(ctx, account, args.account, stands);
+  const was = stands.hold;
+  if (!was) return ctx.log('  not held: nothing to release');
+  if (dayOf(ctx.now()) < was.until) throw new Failed(`held until at least ${was.until}: a report's contents are kept a year (18 U.S.C. §2258A(h))`);
+  ctx.log(`  would release the hold of ${was.since}`);
+  if (!flags.apply) return ctx.log('nothing changed; --apply does it');
+  await store.del(...holdRow(account));
+  ctx.log('released');
+  if (was.deleteAsked) ctx.log(`its owner asked on ${was.deleteAsked} for its data to be deleted: ./oh account delete ${account} --apply`);
 }

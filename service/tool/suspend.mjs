@@ -9,11 +9,13 @@
 // carry it out (POST /api/order), asked again while the store has not
 // shown the order to the service yet.
 
+import { holdOf } from '../functions/holds.mjs';
 import { hex } from '../functions/rows.mjs';
 import { ORDER_KEPT_S, orderOf, orderRow } from '../functions/suspension.mjs';
 
 /// How the account stands, as the store has it: {exists, suspended (the
-/// day, or null), terminated (the day, or null), devices, name, picture,
+/// day, or null), terminated (the day, or null), hold (its legal hold,
+/// {since, until, ref, deleteAsked}, or null), devices, name, picture,
 /// held: {name, picture}}, the last three saying only whether there is
 /// one.
 export async function standing(store, account) {
@@ -25,6 +27,7 @@ export async function standing(store, account) {
     exists: !!(await store.get(pk, 'META')),
     suspended: mark?.since ?? null,
     terminated: mark?.terminated ?? null,
+    hold: await holdOf(store, account),
     devices: (await store.under(pk, 'DEVICE#')).length,
     name: !!profile?.name,
     picture: !!profile?.picture,

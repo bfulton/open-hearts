@@ -173,3 +173,41 @@ test('a terminated account is not lifted, and a store subscription is left to th
   assert.match(apple.said.join('\n'), /bought in the App Store: we cannot cancel or refund it/);
   assert.deepEqual(apple.orders, ['terminate'], 'the account is still ended');
 });
+
+test('a legal hold: placed with its report, shown, and not released before its year; deletion and restore refused meanwhile', async () => {
+  const store = await webSubscriber();
+  await store.put(`ACCOUNT#${account}`, 'META', { subscription: 'sub_9' });
+  const ctx = context(store, fakeStripe());
+  ctx.bucket = () => ({ list: async () => [], get: async () => null, put: async () => {} });
+  assert.equal(await main(['account', 'hold', account], ctx), 0);
+  assert.equal(await store.get(`ACCOUNT#${account}`, 'HOLD'), null, 'a dry run holds nothing');
+  assert.match(ctx.said.join('\n'), /would hold its data until at least 2027-10-16/);
+  assert.equal(await main(['account', 'hold', account, '--ref', 'not a ref'], ctx), 2);
+  assert.equal(await main(['account', 'hold', account, '--ref', '123456789', '--apply'], ctx), 0);
+  assert.deepEqual(await store.get(`ACCOUNT#${account}`, 'HOLD'), { since: '2026-10-16', until: '2027-10-16', ref: '123456789', deleteAsked: null });
+
+  const shown = context(store, fakeStripe());
+  await main(['account', 'show', account], shown);
+  assert.match(shown.said.join('\n'), /under a legal hold: held since 2026-10-16, until at least 2027-10-16, for report 123456789/);
+
+  // Nothing deletes it, or puts back what was taken off it.
+  const del = context(store, fakeStripe());
+  del.bucket = ctx.bucket;
+  assert.equal(await main(['account', 'delete', account, '--apply'], del), 1);
+  assert.ok(await store.get(`ACCOUNT#${account}`, 'META'), 'not deleted');
+  const back = context(store, fakeStripe());
+  assert.equal(await main(['account', 'restore', account, '--apply'], back), 1);
+  assert.deepEqual(back.orders, [], 'no order written');
+
+  // Its year out, it is released, and says what its owner asked for.
+  assert.equal(await main(['account', 'release', account, '--apply'], ctx), 1, 'not before its year');
+  assert.ok(await store.get(`ACCOUNT#${account}`, 'HOLD'));
+  await store.put(`ACCOUNT#${account}`, 'HOLD', { ...(await store.get(`ACCOUNT#${account}`, 'HOLD')), deleteAsked: '2026-12-01' });
+  const later = context(store, fakeStripe());
+  later.now = () => Date.parse('2027-10-16T00:00:00Z');
+  assert.equal(await main(['account', 'release', account], later), 0);
+  assert.ok(await store.get(`ACCOUNT#${account}`, 'HOLD'), 'a dry run releases nothing');
+  assert.equal(await main(['account', 'release', account, '--apply'], later), 0);
+  assert.equal(await store.get(`ACCOUNT#${account}`, 'HOLD'), null);
+  assert.match(later.said.join('\n'), /its owner asked on 2026-12-01 for its data to be deleted: \.\/oh account delete/);
+});

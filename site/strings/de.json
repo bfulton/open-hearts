@@ -226,7 +226,8 @@
       "p4": "<b>Die Konto- und Abo-Einträge unseres Dienstes, einschließlich des Profils deines Kontos:</b> solange das Abo läuft, und danach, bis du uns bittest, sie zu löschen. Ein geändertes Profil ersetzt das vorige. Der Vermerk, welches Gerät gerade genutzt wird, wird jedes Mal ersetzt, wenn ein anderes deiner Geräte das Spiel öffnet. Sperren wir dein Konto vom Live-Spiel oder entfernen wir seinen Namen oder sein Bild, wie es die <a href=\"{{base}}/terms#table\">Nutzungsbedingungen</a> erlauben, speichert unser Dienst außerdem einen Vermerk, dass es gesperrt ist und seit wann, und den entfernten Namen oder das entfernte Bild, damit sich beides rückgängig machen lässt. Beides bleibt gespeichert, bis es rückgängig gemacht wird oder bis du uns bittest, die Einträge deines Kontos zu löschen.",
       "p5": "<b>Stripe:</b> so lange, wie die Richtlinien von Stripe und das Gesetz für Zahlungsbelege es verlangen.",
       "p6": "<b>Cloudflare und Google:</b> nach ihren eigenen Richtlinien.",
-      "p7": "<b>New Relic:</b> die Fehler und Ladezeiten acht Tage."
+      "p7": "<b>New Relic:</b> die Fehler und Ladezeiten acht Tage.",
+      "p8": "<b>Was wir nach dem Gesetz melden müssen:</b> Muss etwas, das über Open Hearts veröffentlicht wurde, den Behörden gemeldet werden, wie es US-Recht für Darstellungen sexuellen Kindesmissbrauchs verlangt, bewahren wir das Gemeldete und die Daten des Kontos so lange auf, wie das Gesetz es verlangt, mindestens ein Jahr, auch wenn du uns bittest, sie zu löschen, und löschen sie, wenn diese Frist vorbei ist."
     },
     "choices": {
       "title": "Deine Möglichkeiten",

@@ -37,6 +37,7 @@ Operating:
 - [Suspend an account, or take its name or picture off](how-to/suspend-an-account.md)
 - [End an account, or refund a subscription](how-to/end-an-account.md)
 - [Change the terms, the privacy policy or the price](how-to/change-the-terms.md)
+- [Handle a report of child sexual abuse material](how-to/handle-abuse-material.md)
 
 ## Reference
 

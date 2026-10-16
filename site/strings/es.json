@@ -226,7 +226,8 @@
       "p4": "<b>Los registros de cuenta y suscripción de nuestro servicio, incluido el perfil de tu cuenta:</b> mientras dure la suscripción, y después hasta que nos pidas borrarlos. Un perfil cambiado sustituye al anterior. La nota de qué dispositivo está en uso se sustituye cada vez que otro de tus dispositivos abre el juego. Si suspendemos tu cuenta del juego en vivo, o le retiramos el nombre o la imagen, como permiten los <a href=\"{{base}}/terms#table\">términos</a>, nuestro servicio guarda además una nota de que está suspendida y desde cuándo, y el nombre o la imagen que retiró, para poder deshacer cualquiera de las dos cosas. Cada una se guarda hasta que se deshace, o hasta que nos pidas borrar los registros de tu cuenta.",
       "p5": "<b>Stripe:</b> el tiempo que exijan la política de Stripe y la ley sobre registros de pagos.",
       "p6": "<b>Cloudflare y Google:</b> según sus propias políticas.",
-      "p7": "<b>New Relic:</b> los errores y los tiempos, ocho días."
+      "p7": "<b>New Relic:</b> los errores y los tiempos, ocho días.",
+      "p8": "<b>Lo que la ley nos obliga a denunciar:</b> si algo publicado a través de Open Hearts tiene que denunciarse a las autoridades, como exige la ley de los Estados Unidos con el material de abuso sexual infantil, guardamos lo que denunciamos y los registros de la cuenta durante el tiempo que exija la ley, un año como mínimo, aunque nos pidas que los borremos, y los borramos cuando termina ese plazo."
     },
     "choices": {
       "title": "Tus opciones",

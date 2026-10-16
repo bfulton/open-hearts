@@ -226,7 +226,8 @@
       "p4": "<b>Relevés de compte et d'abonnement de notre service, profil de votre compte compris :</b> tant que l'abonnement court, puis jusqu'à ce que vous nous demandiez de les supprimer. Un profil modifié remplace le précédent. La note indiquant l'appareil utilisé est remplacée chaque fois qu'un autre de vos appareils ouvre le jeu. Si nous suspendons votre compte du jeu en direct, ou retirons son nom ou son image, comme les <a href=\"{{base}}/terms#table\">conditions</a> le permettent, notre service conserve aussi une note indiquant qu'il est suspendu et depuis quand, ainsi que le nom ou l'image retirés, pour que l'un comme l'autre puisse être annulé. Chacun est conservé jusqu'à son annulation, ou jusqu'à ce que vous nous demandiez de supprimer les relevés de votre compte.",
       "p5": "<b>Stripe :</b> aussi longtemps que l'exigent la politique de Stripe et la loi sur les relevés de paiement.",
       "p6": "<b>Cloudflare et Google :</b> selon leurs propres politiques.",
-      "p7": "<b>New Relic :</b> les erreurs et les temps de chargement, huit jours."
+      "p7": "<b>New Relic :</b> les erreurs et les temps de chargement, huit jours.",
+      "p8": "<b>Ce que la loi nous oblige à signaler :</b> si quelque chose publié via Open Hearts doit être signalé aux autorités, comme la loi des États-Unis l'exige pour les contenus d'abus sexuels sur mineurs, nous conservons ce que nous avons signalé et les données du compte aussi longtemps que la loi l'exige, un an au moins, même si vous nous demandez de les supprimer, et nous les supprimons une fois ce délai écoulé."
     },
     "choices": {
       "title": "Vos choix",
