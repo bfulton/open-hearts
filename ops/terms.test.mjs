@@ -1,7 +1,8 @@
 // oh terms, and what a production deploy is held to by the ledger
 // (ops/terms.mjs): which version the site serves, read off the site; a
 // change recorded, and the stores' notice; and web subscribers told of
-// a published change, once each.
+// a published change, once each, when the operator says so and never
+// by a deploy.
 //
 //   node --test ops/*.test.mjs
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ import { test } from 'node:test';
 
 import { main } from './oh.mjs';
 import { releaseProblems } from './gate.mjs';
-import { plainTextOf, termsProblems } from './terms.mjs';
+import { plainTextOf, termsProblems, untold } from './terms.mjs';
 import { config, languages, origin, render, stores, strings } from '../site/build.mjs';
 import { fingerprintOf, fingerprintOfTexts, formatLedger, textOf } from '../site/ledger.mjs';
 import { memoryStore } from '../service/functions/rows.mjs';
@@ -48,13 +49,12 @@ const ledgerFile = (ledger) => {
   return file;
 };
 
-/// The site, serving the terms as old ([old], until [switchAfter]
-/// reads of them) and the privacy policy as this checkout has it; the
-/// service, answering notice orders with [answer]; Stripe, with [subs].
-function context({ ledger, old = true, switchAfter = Infinity, subs = [], answer = null, env = { STRIPE_API_KEY: 'rk', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_ACCOUNT_ID: 'a' }, mainLedger = null, store = memoryStore() }) {
+/// The site, serving the terms as old ([old]) and the privacy policy as
+/// this checkout has it; the service, answering notice orders with
+/// [answer]; Stripe, with [subs].
+function context({ ledger, old = true, subs = [], answer = null, env = { STRIPE_API_KEY: 'rk', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_ACCOUNT_ID: 'a' }, mainLedger = null, store = memoryStore() }) {
   const said = [];
   const orders = [];
-  let reads = 0;
   const file = ledgerFile(ledger);
   return {
     said,
@@ -86,8 +86,7 @@ function context({ ledger, old = true, switchAfter = Infinity, subs = [], answer
       const m = new RegExp(`^${origin}(?:/(es|pt|de|fr))?/(terms|privacy)$`).exec(String(url));
       if (!m) return new Response('no', { status: 404 });
       const [, code = 'en', doc] = m;
-      if (doc === 'terms' && code === 'en') reads++;
-      return new Response(page(doc, code, doc === 'terms' && old && reads <= switchAfter));
+      return new Response(page(doc, code, doc === 'terms' && old));
     },
   };
 }
@@ -106,11 +105,12 @@ test('the site serves the version it serves: a deploy publishes what comes after
   assert.deepEqual(nothing, { problems: [], publishing: [] }, 'what is live is the newest: nothing to publish, and no date to hold to');
 });
 
-test('a change subscribers are told of is published only where the deploy can tell them', async () => {
+test('no deploy emails anyone: a change subscribers are told of is published without Stripe, and no deploy script tells them', async () => {
   const ctx = context({ ledger: ledgerWith(), env: {} });
-  assert.match((await termsProblems(ctx)).problems.join('\n'), /the terms of 2026-11-02 are a material change, which the deploy emails web subscribers: it needs STRIPE_API_KEY/);
-  const minor = context({ ledger: ledgerWith({ change: 'minor' }), env: {} });
-  assert.deepEqual((await termsProblems(minor)).problems, [], 'a minor change is told to nobody');
+  assert.deepEqual((await termsProblems(ctx)).problems, []);
+  for (const script of ['deploy.sh', 'service/bench/build.sh']) {
+    assert.doesNotMatch(readFileSync(new URL(`../${script}`, import.meta.url), 'utf8'), /terms\s+notify/, script);
+  }
 });
 
 test('while an app is in its store, a material change goes out only once the stores were told of it', async () => {
@@ -263,14 +263,37 @@ test('notify: nothing published to tell of is no failure; a notice that did not 
   assert.match(bounced.said.join('\n'), /1 notice\(s\) did not go: run \.\/oh terms notify --apply again/);
 });
 
-test('notify after a deploy waits for the site to serve what was published, and fails if it never does', async () => {
-  const ctx = context({ ledger: ledgerWith(), switchAfter: 2, subs: subscriptions(['sub_1', 'active', 3]) });
-  assert.equal(await main(['terms', 'notify', '--after-deploy', '--apply'], ctx), 0);
-  assert.equal(ctx.orders.length, 1, 'told once the site served it');
-  const never = context({ ledger: ledgerWith(), subs: subscriptions(['sub_1', 'active', 3]) });
-  assert.equal(await main(['terms', 'notify', '--after-deploy', '--apply'], never), 1);
-  assert.match(never.said.join('\n'), /the site does not serve what was just published \(terms: serves 2026-10-16\)/);
-  assert.deepEqual(never.orders, []);
+test('what is left to tell: each published change\'s web subscriptions, and those not told yet', async () => {
+  const store = memoryStore();
+  await store.put('NOTICE#terms@2026-11-02', 'SUB#sub_1', { at: 'before' });
+  const subs = subscriptions(['sub_1', 'active', 3], ['sub_2', 'active', 3], ['sub_new', 'active', -1]);
+  const [terms, ...rest] = await untold(context({ ledger: ledgerWith(), old: false, subs, store }));
+  assert.deepEqual(rest, [], 'the privacy policy has no change to tell');
+  assert.deepEqual([terms.document, terms.entry.date, terms.subscriptions, terms.left], ['terms', '2026-11-02', ['sub_1', 'sub_2'], ['sub_2']]);
+  assert.deepEqual(await untold(context({ ledger: ledgerWith(), subs, store })), [], 'not published yet: nothing to tell');
+  const unknown = context({ ledger: ledgerWith(), subs, store });
+  unknown.fetch = async () => new Response('down', { status: 503 });
+  await assert.rejects(untold(unknown), /which terms are live cannot be told: .*answered 503/);
+});
+
+test('oh verify fails while a published change has a web subscriber it was not emailed to', async () => {
+  const store = memoryStore();
+  await store.put('NOTICE#terms@2026-11-02', 'SUB#sub_1', { at: 'before' });
+  const ctx = context({ ledger: ledgerWith(), old: false, subs: subscriptions(['sub_1', 'active', 3], ['sub_2', 'active', 3]), store });
+  const site = ctx.fetch;
+  // Production's other answers are no matter here.
+  ctx.fetch = async (url, init) => (/\/(terms|privacy)$/.test(String(url)) ? site(url, init) : new Response('{}'));
+  const line = () => ctx.said.find((l) => / the terms of 2026-11-02: /.test(l));
+  assert.equal(await main(['verify'], ctx), 1);
+  assert.equal(line(), 'FAILED the terms of 2026-11-02: 1 of 2 web subscription(s) told (./oh terms notify --apply)');
+  await store.put('NOTICE#terms@2026-11-02', 'SUB#sub_2', { at: 'now' });
+  ctx.said.length = 0;
+  await main(['verify'], ctx);
+  assert.equal(line(), 'ok     the terms of 2026-11-02: 2 of 2 web subscription(s) told');
+  const without = context({ ledger: ledgerWith(), old: false, env: {} });
+  without.fetch = ctx.fetch;
+  await main(['verify'], without);
+  assert.ok(without.said.includes('skipped the notices of changes to the terms: needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID and STRIPE_API_KEY'));
 });
 
 test('the licence agreement for the App Store: the terms as plain text, every word and every address', async () => {

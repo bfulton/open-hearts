@@ -7,7 +7,7 @@ Use this guide to publish the site, the web app and the service's handlers to Cl
 ## Before you begin
 
 - Production is built from `main` as it was reviewed: `HEAD` must be `origin/main`, with nothing uncommitted. `deploy.sh` and the relay's build step check this themselves (`ops/gate.mjs`), so it holds whether or not you deploy through `oh`. A preview can be deployed from any branch.
-- A production deploy of the site also holds the terms and the privacy policy to `site/ledger.json`, and tells subscribers of a change that matters to them. See [Change the terms](change-the-terms.md#publish-it).
+- A production deploy of the site also holds the terms and the privacy policy to `site/ledger.json`. It emails nobody: after publishing a change that matters to subscribers, [tell them](change-the-terms.md#tell-subscribers) yourself. See [Change the terms](change-the-terms.md#publish-it).
 - Make sure the commit passes CI, or run `./check.sh full`.
 - Install Node, git, Python 3 (for pruning) and Flutter. CI pins the Flutter version in `.github/workflows/ci.yml`. The web build needs no Rust: the wasm is committed.
 - To deploy the relay, you also need a linux/amd64 machine with Dart, Cargo (CI pins the Rust version in `.github/workflows/ci.yml`) and Docker running. Wrangler builds the backup jurors' image from `service/bench/Dockerfile` with binaries built on your machine (`service/bench/build.sh`). Run `dart pub get` in `service/` once. `./oh deploy relay` says which of these is missing.
@@ -77,7 +77,7 @@ Production always keeps its live deployment and the two before it.
    ./oh verify
    ```
 
-   It checks that the live build is `origin/main`, that the service can sell (its health is `ok` when the store and Stripe both answer), that the relay and the order route answer, and that Cloudflare, Stripe and New Relic match their definitions. Each check prints `ok` or `FAILED` with what it found; a definition whose credentials aren't set is skipped and said so.
+   It checks that the live build is `origin/main`, that the service can sell (its health is `ok` when the store and Stripe both answer), that the relay and the order route answer, that every web subscriber was emailed each published change that matters to them ([tell subscribers](change-the-terms.md#tell-subscribers)), and that Cloudflare, Stripe and New Relic match their definitions. Each check prints `ok` or `FAILED` with what it found; a check whose credentials aren't set is skipped and said so.
 
    For a preview, ask `https://<label>.open-hearts.pages.dev/play/build-info.json`. The app's About page shows the same commit and date.
 

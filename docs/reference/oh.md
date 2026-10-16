@@ -230,10 +230,10 @@ Prints the terms, in English, as plain text: the licence agreement App Store Con
 ### oh terms notify
 
 ```bash
-oh terms notify [--apply] [--after-deploy]
+oh terms notify [--apply]
 ```
 
-Emails every web subscriber a published change that matters to them, once: each material or price change of the last 60 days, to the subscriptions begun before it. A production deploy runs it with --after-deploy, which waits until the site serves what was just published. Run it again when a notice did not go; it tells only those it has not.
+Emails every web subscriber a published change that matters to them, once: each material or price change of the last 60 days, to the subscriptions begun before it. No deploy runs it: run it once the change is live, and again when a notice did not go; it tells only those it has not. A change to the terms applies to a subscription from its first renewal at least 30 days after its email.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STRIPE_API_KEY`
 - **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#tell-subscribers)
@@ -261,7 +261,7 @@ Deploys the relay worker, and the backup jurors' container with it, from main. N
 oh deploy site [--apply] [--label <label>]
 ```
 
-Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted, and unless the terms and the privacy policy are as the ledger says, with what a change needs done (oh terms status); a change that matters to subscribers is emailed to them as part of it.
+Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted, and unless the terms and the privacy policy are as the ledger says, with what a change needs done (oh terms status). It emails nobody: a change that matters to subscribers is emailed to them by oh terms notify.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, STRIPE_API_KEY (to publish a change subscribers are told of)
 - **How-to:** [deploy.md](../how-to/deploy.md)
@@ -297,7 +297,7 @@ Deletes old preview deployments, keeping the newest few (5 unless --keep says) a
 oh verify
 ```
 
-Checks production: the live build is origin/main, the service is healthy, the relay and the order route answer, and Cloudflare, Stripe and New Relic match their definitions. A definition whose credentials are not set is skipped and said so.
+Checks production: the live build is origin/main, the service is healthy, the relay and the order route answer, every web subscriber was emailed each published change that matters to them, and Cloudflare, Stripe and New Relic match their definitions. A check whose credentials are not set is skipped and said so.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STRIPE_API_KEY`, `NEW_RELIC_API_KEY`, `NEW_RELIC_ACCOUNT_ID`, `NEW_RELIC_REGION`
 - **How-to:** [deploy.md](../how-to/deploy.md#check-it-worked)

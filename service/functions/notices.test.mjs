@@ -1,14 +1,16 @@
 // A change to the terms or the privacy policy that subscribers are told
 // of (notices.mjs): shown at the front door for a while after it is
-// published, and emailed to each web subscriber once, in their
-// language, at the address Stripe has.
+// published, and emailed to each web subscriber once, when the operator
+// says so, in their language, at the address Stripe has, with the
+// renewal it first applies at.
 // node --test service/functions
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import worker from './worker.mjs';
 import { Household } from './household.mjs';
-import { NOTICES_OBJECT, NOTICES_PER_ORDER, carryOutNotice, languageOf, noticeMail, noticeRow, noticesOf, sendNotice } from './notices.mjs';
+import { APPLIES_AFTER_DAYS, NOTICES_OBJECT, NOTICES_PER_ORDER, applyingRenewal, carryOutNotice, languageOf, noticeMail, noticeRow, noticesOf, sendNotice } from './notices.mjs';
 import { memoryStore } from './rows.mjs';
 import { orderRow } from './suspension.mjs';
 
@@ -45,18 +47,44 @@ test('the email: what changed, where to read it, and when it applies, in the sub
   const en = noticeMail('en', 'terms', told, { renews: '2027-03-04' });
   assert.equal(en.subject, 'Changes to the Open Hearts terms of use');
   assert.match(en.text, /^We have changed the Open Hearts terms of use, on 2026-11-01\.\n\nRefunds end the subscription\.\n\nRead them in full: https:\/\/openhearts\.game\/terms\n\n/);
-  assert.match(en.text, /from its next renewal, on 2027-03-04, except where they say a change applies sooner/);
+  assert.match(en.text, /from its first renewal at least 30 days from today, except where they say a change applies sooner\. For yours, that is the renewal on 2027-03-04\. If you do not want/);
   assert.match(en.text, /You are getting this email because you subscribe to Open Hearts on the web\.$/);
-  assert.match(noticeMail('en', 'terms', told).text, /from its next renewal, except/, 'one that does not renew');
+  assert.match(noticeMail('en', 'terms', told).text, /from today, except where they say a change applies sooner\. If you do not want/, 'one that does not renew');
   const de = noticeMail('de', 'terms', told, { renews: '2027-03-04' });
   assert.match(de.text, /Refunds end the subscription \(de\)\./);
   assert.match(de.text, /https:\/\/openhearts\.game\/de\/terms/);
-  assert.match(de.text, /Verlängerung am 2027-03-04,/);
+  assert.match(de.text, /mindestens 30 Tage nach heute liegt, außer wo sie sagen, dass eine Änderung früher gilt\. Bei deinem ist das die Verlängerung am 2027-03-04\. Wenn/);
+  for (const lang of ['en', 'es', 'pt', 'de', 'fr']) {
+    const text = noticeMail(lang, 'terms', told, { renews: '2027-03-04' }).text;
+    assert.doesNotMatch(text, /\{\w+\}/, `${lang}: every blank filled`);
+    assert.match(text, / 30 .* 2027-03-04/, `${lang}: the days, then the renewal`);
+  }
   const privacy = noticeMail('fr', 'privacy', { ...told, summary: summary('Reports are kept') });
   assert.equal(privacy.subject, "Modifications de la politique de confidentialité d'Open Hearts");
   assert.match(privacy.text, /https:\/\/openhearts\.game\/fr\/privacy/);
   assert.doesNotMatch(privacy.text, /renouvellement/, 'a privacy policy is not renewed into');
   assert.equal(noticeMail('xx', 'terms', told).subject, en.subject, 'an unknown language is English');
+});
+
+test('the terms say a change applies from the first renewal as many days after a subscriber is told as the email counts', () => {
+  for (const lang of ['en', 'es', 'pt', 'de', 'fr']) {
+    const said = JSON.parse(readFileSync(new URL(`../../site/strings/${lang}.json`, import.meta.url), 'utf8')).terms.changes.p1;
+    assert.deepEqual(said.match(/\d+/g), [String(APPLIES_AFTER_DAYS)], `${lang}: terms.changes.p1`);
+  }
+});
+
+test('the renewal a change first applies at: the first at least thirty days after the subscriber is told, on Stripe\'s day', () => {
+  const s = (iso) => Date.parse(iso) / 1000;
+  const told = Date.parse('2026-11-20T12:00:00Z');
+  assert.equal(applyingRenewal(s('2027-02-01T09:00:00Z'), s('2026-02-01T09:00:00Z'), told), '2027-02-01', 'more than thirty days off: this one');
+  assert.equal(applyingRenewal(s('2026-12-20T12:00:00Z'), s('2025-12-20T12:00:00Z'), told), '2026-12-20', 'thirty days to the second: this one');
+  assert.equal(applyingRenewal(s('2026-12-20T11:59:59Z'), s('2025-12-20T11:59:59Z'), told), '2027-12-20', 'a second short of thirty days: the one after');
+  assert.equal(applyingRenewal(s('2026-12-01T00:00:00Z'), null, told), '2027-12-01', 'no anchor: a year on from this one');
+  // A year bought on 29 February renews on the 28th, and on the 29th in
+  // a leap year again.
+  const leap = s('2028-02-29T08:00:00Z');
+  assert.equal(applyingRenewal(leap, leap, Date.parse('2028-02-10T00:00:00Z')), '2029-02-28');
+  assert.equal(applyingRenewal(s('2031-02-28T08:00:00Z'), leap, Date.parse('2031-02-10T00:00:00Z')), '2032-02-29');
 });
 
 test('the language: the one the subscription was bought in, else Stripe\'s for the customer, else English', () => {
@@ -89,18 +117,20 @@ test('an order tells each subscription once; one with no address is noted, and o
   const subs = {
     sub_told: { customer: { email: 'a@example.com' } },
     sub_fr: { metadata: { lang: 'fr' }, customer: { email: 'b@example.com' }, items: { data: [{ current_period_end: Date.parse('2027-02-01T00:00:00Z') / 1000 }] } },
+    sub_soon: { billing_cycle_anchor: Date.parse('2025-12-05T00:00:00Z') / 1000, customer: { email: 'd@example.com' }, items: { data: [{ current_period_end: Date.parse('2026-12-05T00:00:00Z') / 1000 }] } },
     sub_none: { customer: { email: null } },
     sub_bounce: { customer: { email: 'c@example.com' } },
   };
   const fetchImpl = stripeWith(subs);
   const sent = [];
   const send = async (mail) => (mail.to === 'c@example.com' ? false : (sent.push(mail), true));
-  const said = await carryOutNotice(order(['sub_told', 'sub_fr', 'sub_none', 'sub_bounce', 'sub_gone']), store, env, { fetchImpl, send, now });
-  assert.deepEqual(said, { status: 200, body: { act: 'notice', document: 'terms', date: '2026-11-01', told: 1, already: 1, unsent: { 'no address': 1, 'no such subscription': 1 }, failed: 1 } });
-  assert.equal(sent.length, 1);
+  const said = await carryOutNotice(order(['sub_told', 'sub_fr', 'sub_soon', 'sub_none', 'sub_bounce', 'sub_gone']), store, env, { fetchImpl, send, now });
+  assert.deepEqual(said, { status: 200, body: { act: 'notice', document: 'terms', date: '2026-11-01', told: 2, already: 1, unsent: { 'no address': 1, 'no such subscription': 1 }, failed: 1 } });
+  assert.equal(sent.length, 2);
   assert.equal(sent[0].to, 'b@example.com');
   assert.equal(sent[0].subject, "Modifications des conditions d'utilisation d'Open Hearts");
-  assert.match(sent[0].text, /renouvellement, le 2027-02-01,/);
+  assert.match(sent[0].text, /Pour le vôtre, c'est le renouvellement du 2027-02-01\./);
+  assert.match(sent[1].text, /For yours, that is the renewal on 2027-12-05\./, 'renewing in fifteen days: the renewal after');
   assert.ok(fetchImpl.asked.every((a) => a.auth === 'Bearer rk_live_x'), 'with the service\'s own key');
   assert.ok(!fetchImpl.asked.some((a) => a.url.includes('sub_told')), 'one told already is not asked about');
   assert.deepEqual(await store.get(...noticeRow('terms', '2026-11-01', 'sub_fr')), { at: new Date(now).toISOString(), lang: 'fr' });

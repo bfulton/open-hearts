@@ -1,9 +1,10 @@
 // `oh terms …`: the terms of use and the privacy policy as the ledger
 // has them (site/ledger.json), as this checkout builds them, and as the
 // site serves them; a change written into the ledger; the stores'
-// notice recorded; and web subscribers told of a change that matters to
-// them (docs/how-to/change-the-terms.md). What a production deploy is
-// held to is here too (termsProblems), for the gate (gate.mjs).
+// notice recorded; and web subscribers told of a published change that
+// matters to them, when the operator says so, never by a deploy
+// (docs/how-to/change-the-terms.md). What a production deploy is held
+// to is here too (termsProblems), for the gate (gate.mjs).
 //
 // Which version is live is read off the site itself: each document in
 // every language, fingerprinted as the ledger fingerprints it. Nothing
@@ -72,10 +73,11 @@ export async function liveVersions(ctx, ledger) {
 /// privacy policy to production, and what it would publish:
 /// {problems, publishing: [{document, entry}]}. The ledger has to be
 /// whole and the text what its newest entry says; the newest version
-/// to go live is dated today, which "Last updated" shows; a material
-/// change goes out only once the stores were told of it, while the apps
-/// are in them; and one subscribers are told of only where the deploy
-/// can tell them (STRIPE_API_KEY).
+/// to go live is dated today, which "Last updated" shows; and a
+/// material change goes out only once the stores were told of it, while
+/// the apps are in them. Subscribers are told of it after it is
+/// published, by `oh terms notify`: the terms apply it to a subscription
+/// only from a renewal well after that (notices.mjs, APPLIES_AFTER_DAYS).
 export async function termsProblems(ctx, { now = ctx.now() } = {}) {
   const ledger = await readLedger(ctx);
   const problems = ledgerProblems(ledger).map((p) => `site/ledger.json: ${p}`);
@@ -102,7 +104,6 @@ export async function termsProblems(ctx, { now = ctx.now() } = {}) {
     }
     for (const e of newer.filter(told)) {
       if (listed() && !e.storesNotified) problems.push(`the ${doc} of ${e.date} are a ${e.change} change: tell the App Store and Google Play first, and record the day (./oh terms notified ${doc})`);
-      if (!ctx.env.STRIPE_API_KEY) problems.push(`the ${doc} of ${e.date} are a ${e.change} change, which the deploy emails web subscribers: it needs STRIPE_API_KEY`);
     }
     publishing.push(...newer.map((entry) => ({ document: doc, entry })));
   }
@@ -212,46 +213,43 @@ async function subscribersBefore(stripe, date) {
   return found;
 }
 
-/// Which entries are live, once the site serves the newest of each
-/// document — what a deploy just published, which can take a moment to
-/// be what every request is answered with — asked [tries] times, [wait]
-/// apart; Failed if it never does.
-async function servingNewest(ctx, ledger) {
-  const { tries = 12, wait = 10000 } = ctx.carryOptions ?? {};
-  let live = null;
-  for (let i = 0; i < tries; i++) {
-    if (i) await new Promise((r) => setTimeout(r, wait));
-    live = await liveVersions(ctx, ledger);
-    if (DOCUMENTS.every((doc) => live[doc].index === ledger[doc].length - 1)) return live;
+/// Each published change that matters to subscribers, of the last
+/// [NOTICE_DAYS] days, with the web subscriptions it is told to and
+/// those of them not told yet: [{document, entry, subscriptions, left}].
+/// Failed when which version is live cannot be told.
+export async function untold(ctx, ledger = null) {
+  ledger ??= await readLedger(ctx);
+  const live = await liveVersions(ctx, ledger);
+  const since = dayOf(ctx.now() - NOTICE_DAYS * DAY_MS);
+  const due = [];
+  for (const doc of DOCUMENTS) {
+    if (live[doc].error) throw new Failed(`which ${doc} are live cannot be told: ${live[doc].error}`);
+    for (const e of ledger[doc].slice(0, live[doc].index + 1)) if (told(e) && e.date > since) due.push({ document: doc, entry: e });
   }
-  const behind = DOCUMENTS.filter((doc) => live[doc].index !== ledger[doc].length - 1).map((doc) => `${doc}: ${live[doc].error ?? `serves ${live[doc].entry.date}`}`);
-  throw new Failed(`the site does not serve what was just published (${behind.join('; ')})`);
+  if (!due.length) return [];
+  const store = await ctx.store();
+  const stripe = ctx.stripe();
+  for (const d of due) {
+    d.subscriptions = await subscribersBefore(stripe, d.entry.date);
+    const done = new Set((await store.under(`NOTICE#${d.document}@${d.entry.date}`, 'SUB#')).map((sk) => sk.slice('SUB#'.length)));
+    d.left = d.subscriptions.filter((id) => !done.has(id));
+  }
+  return due;
 }
 
 /// Every web subscriber told, by email, of each published change that
 /// matters to them in the last [NOTICE_DAYS] days, once: the
 /// subscriptions are Stripe's, each order names a few of them, and the
-/// service writes to each (service/functions/notices.mjs). Run by
-/// deploy.sh after it publishes to production, and again whenever a
-/// notice did not go.
+/// service writes to each (service/functions/notices.mjs). The operator
+/// runs it once a change is published, and again whenever a notice did
+/// not go; a deploy never does, so that no deploy emails anyone.
 export async function notify(ctx, { flags }) {
-  const ledger = await readLedger(ctx);
-  const live = flags['after-deploy'] ? await servingNewest(ctx, ledger) : await liveVersions(ctx, ledger);
-  const since = dayOf(ctx.now() - NOTICE_DAYS * DAY_MS);
-  const due = [];
-  for (const doc of DOCUMENTS) {
-    if (live[doc].error) throw new Failed(`which ${doc} are live cannot be told: ${live[doc].error}`);
-    for (const e of ledger[doc].slice(0, live[doc].index + 1)) if (told(e) && e.date > since) due.push({ doc, entry: e });
-  }
+  const due = await untold(ctx);
   if (!due.length) return ctx.log('no published change to tell subscribers of');
   const store = await ctx.store();
-  const stripe = ctx.stripe();
   const config = await ctx.config();
   let failed = 0;
-  for (const { doc, entry } of due) {
-    const subs = await subscribersBefore(stripe, entry.date);
-    const done = new Set((await store.under(`NOTICE#${doc}@${entry.date}`, 'SUB#')).map((sk) => sk.slice('SUB#'.length)));
-    const left = subs.filter((id) => !done.has(id));
+  for (const { document: doc, entry, subscriptions: subs, left } of due) {
     ctx.log(`the ${doc} of ${entry.date} (${entry.change}): ${subs.length} web subscription(s) to tell, ${subs.length - left.length} told already`);
     if (!flags.apply || !left.length) continue;
     for (let i = 0; i < left.length; i += NOTICES_PER_ORDER) {

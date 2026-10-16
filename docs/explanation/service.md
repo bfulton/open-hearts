@@ -541,7 +541,8 @@ anyone remembers it:
 | The terms' price, the front page's, Stripe's definition and the app's are `price` in `config/openhearts.json`. | The site's build, `infra/stripe.mjs`, CI | One of them saying another price. |
 | The site serves a version the ledger has, and the newest to go live is dated today. | The deploy | Publishing outside the process, and a stale "Last updated". |
 | A material change goes out only once the stores were told, while an app is in its store. | The deploy | Texas's notice to the stores being missed. |
-| Subscribers are emailed, and every device shown, a material change as it is published. | The deploy (`./oh terms notify`) and `/api/config` | A change nobody was told of. |
+| Every device is shown a material change from the day it is published, and each web subscriber is emailed it. | `/api/config`; `./oh terms notify`, which no deploy runs, and `./oh verify`, which fails until every web subscriber was told | A change nobody was told of, and a deploy emailing everyone as a side effect. |
+| The terms apply a material change to a subscription only from its first renewal at least 30 days after its subscriber was told. | The terms, and the email, which names that renewal (`APPLIES_AFTER_DAYS`) | A change applied to someone with no time to read it or cancel. |
 | A checkout sells only at the price the terms state. | The service (`shopPrice`), and `/api/health` | A price edited in Stripe's dashboard being charged. |
 
 Which version is live is read off the site itself, every page in every

@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import { Failed, Usage, root, wranglerVersion } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
-import { termsProblems } from './terms.mjs';
+import { termsProblems, untold } from './terms.mjs';
 import { told } from '../site/ledger.mjs';
 
 /// The programs a relay deploy builds with: its custom build
@@ -57,11 +57,10 @@ export async function relay(ctx, { flags }) {
 export async function site(ctx, { flags }) {
   const label = flags.label ?? ((await branch(ctx)) === 'main' ? 'main' : 'dev');
   ctx.log(`the site, the app and the service's handlers from ${await head(ctx)}, to ${label === 'main' ? 'production' : `the preview ${label}`}`);
-  if (label === 'main') {
-    for (const { document, entry } of (await termsProblems(ctx)).publishing) {
-      ctx.log(`  publishes the ${document} of ${entry.date}, a ${entry.change} change${told(entry) ? ': web subscribers are emailed it once it is live, and every device shown it' : ''}`);
-      if (entry.change === 'price') ctx.log(`  then make Stripe's price match the terms (./oh infra --only stripe --apply): until it does, the shop does not sell`);
-    }
+  const publishing = label === 'main' ? (await termsProblems(ctx)).publishing : [];
+  for (const { document, entry } of publishing) {
+    ctx.log(`  publishes the ${document} of ${entry.date}, a ${entry.change} change${told(entry) ? ': every device is shown it, and no one is emailed it until you say (./oh terms notify --apply)' : ''}`);
+    if (entry.change === 'price') ctx.log(`  then make Stripe's price match the terms (./oh infra --only stripe --apply): until it does, the shop does not sell`);
   }
   const ready = label !== 'main' || (await cleared(ctx, 'site', flags.apply));
   if (!flags.apply) {
@@ -70,6 +69,7 @@ export async function site(ctx, { flags }) {
   }
   const code = await ctx.run(join(root, 'deploy.sh'), [label]);
   if (code !== 0) throw new Failed(`site: deploy.sh exited ${code}`);
+  if (publishing.some(({ entry }) => told(entry))) ctx.log('published: now email web subscribers what changed (./oh terms notify --apply)');
 }
 
 /// Production, in the order that keeps devices playing: the relay, then
@@ -107,9 +107,10 @@ async function branch(ctx) {
 }
 
 /// Production, checked as a deploy is checked: the build that is live,
-/// the service's health, the relay, the order route, and the accounts
-/// against their definitions. Every check says ok or why not; Failed if
-/// any did not pass.
+/// the service's health, the relay, the order route, every web
+/// subscriber told of a published change that matters to them, and the
+/// accounts against their definitions. Every check says ok or why not;
+/// Failed if any did not pass.
 export async function verify(ctx) {
   const config = await ctx.config();
   const origin = config.appOrigin;
@@ -142,6 +143,17 @@ export async function verify(ctx) {
   check(relayRoot.status === 200, `the relay answers: ${relayRoot.status}`);
   const order = await get(`${origin}/api/order`);
   check(order.status === 405, `the order route turns a GET away: ${order.status}`);
+  const tellers = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'STRIPE_API_KEY'].filter((n) => !ctx.env[n]);
+  if (tellers.length) ctx.log(`skipped the notices of changes to the terms: needs ${tellers.join(' and ')}`);
+  else {
+    try {
+      for (const { document, entry, subscriptions, left } of await untold(ctx)) {
+        check(!left.length, `the ${document} of ${entry.date}: ${subscriptions.length - left.length} of ${subscriptions.length} web subscription(s) told${left.length ? ' (./oh terms notify --apply)' : ''}`);
+      }
+    } catch (e) {
+      check(false, `the notices of changes to the terms: ${e?.message ?? e}`);
+    }
+  }
   for (const [script, needs] of [
     ['infra/apply.mjs', ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'STRIPE_API_KEY']],
     ['observability/apply.mjs', ['NEW_RELIC_API_KEY', 'NEW_RELIC_ACCOUNT_ID', 'NEW_RELIC_REGION']],

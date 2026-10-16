@@ -7,7 +7,7 @@ Use this guide to change the terms of use or the privacy policy on the site, or 
 | `./oh terms status` | Says where each document stands: its newest entry, whether this checkout matches it, the version the site serves, what a deploy would publish, and how many web subscribers were told of each change. |
 | `./oh terms record` | Writes the ledger entry for a change this checkout makes. |
 | `./oh terms notified` | Records the day the App Store and Google Play were told of a material change. |
-| `./oh terms notify` | Emails web subscribers a published change that matters to them. A production deploy runs it. |
+| `./oh terms notify` | Emails web subscribers a published change that matters to them. Nothing else sends it: no deploy emails anyone. |
 | `./oh terms eula` | Prints the terms as plain text, for the App Store's licence agreement. |
 
 Each says what it would do and changes nothing without `--apply` ([the oh command](../reference/oh.md)).
@@ -19,7 +19,7 @@ Each says what it would do and changes nothing without `--apply` ([the oh comman
   | Kind | What it is | Who is told |
   |---|---|---|
   | `minor` | Wording that changes nobody's rights or duties: a typo, a clearer sentence, a link that moved. | Nobody. |
-  | `material` | Anything else: what a subscriber pays or gets, what anyone may do, what we may do, what is collected or kept, refunds, ending, disputes. | Every web subscriber by email, every device at the front door, and, while either app is in its store, Apple and Google. |
+  | `material` | Anything else: what a subscriber pays or gets, what anyone may do, what we may do, what is collected or kept, refunds, ending, disputes. | Every device at the front door, every web subscriber by email, and, while either app is in its store, Apple and Google. |
   | `price` | A new price. | As a material change. |
 
   If you're not sure, it's `material`.
@@ -102,25 +102,43 @@ It says which versions it publishes. It refuses, and says why, if:
 
 - the site serves a version that isn't in the ledger;
 - the newest version would go live dated another day than today (in UTC; yesterday is allowed, for time zones west of it);
-- a material change wasn't told to the stores while an app is in its store;
-- a material change is to be published without `STRIPE_API_KEY`, which emailing subscribers needs.
+- a material change wasn't told to the stores while an app is in its store.
+
+It emails nobody.
 
 If the day has passed, date the entry again in a new pull request: `./oh terms record terms --date <today> --apply`.
 
 ## Tell subscribers
 
-The production deploy does this itself, after it publishes. It waits until the site serves the new version, then:
+For a material or price change only. Once it's published, every device shows the summary at the front door for 60 days, with a link to the document, until it's dismissed. Subscribers who bought in the App Store or Google Play are told this way, since we have no address for them.
 
-- **By email**, each web subscription that is active, on trial or overdue, and that began on or before the day of the change, is sent the summary in the language it was bought in, with a link to the document. For the terms, the email says they apply from the subscription's next renewal, except where they say a change applies sooner. Each subscription is told once.
-- **In the app**, every device shows the summary at the front door for 60 days, with a link to the document, until it's dismissed. Subscribers who bought in the App Store or Google Play are told this way, since we have no address for them.
+Web subscribers are emailed only when you send it, on the day you publish:
 
-If a notice didn't go, the deploy fails after publishing and says so. Send the rest:
+1. Once `./oh deploy all --apply` has finished, see who would be told:
 
-```bash
-./oh terms notify --apply
-```
+   ```bash
+   ./oh terms notify
+   ```
 
-It tells only the subscriptions it hasn't told. A subscription with no email address in Stripe is noted and not tried again.
+   It names each published change of the last 60 days that matters to subscribers, with how many web subscriptions are to be told and how many were told already.
+
+1. Send it:
+
+   ```bash
+   ./oh terms notify --apply
+   ```
+
+   Each web subscription that is active, on trial or overdue, and that began on or before the day of the change, is sent the summary in the language it was bought in, with a link to the document. For the terms, the email names the renewal they first apply at. Each subscription is told once: run it again after a notice didn't go, and it tells only those it hasn't. A subscription with no email address in Stripe is noted and not tried again.
+
+1. Check that everyone was told:
+
+   ```bash
+   ./oh verify
+   ```
+
+   It fails while a published change has a web subscription that wasn't told.
+
+The terms apply a change to a subscription only from its first renewal at least 30 days after its subscriber was told, so an email sent late moves that renewal later; it never lets a change apply to someone who wasn't told. The 30 days are `APPLIES_AFTER_DAYS` in `service/functions/notices.mjs`, which a test holds to the terms' "Changes to these terms" in every language.
 
 ## Change the price
 

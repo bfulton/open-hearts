@@ -261,15 +261,3 @@ echo "app   https://$LABEL.$PROJECT.pages.dev/play/"
 if [ "$LABEL" = main ]; then
   echo "      https://play.openhearts.game/ (production, and its /api/)"
 fi
-
-# A change to the terms or the privacy policy that matters to
-# subscribers, now published, is emailed to each web subscriber here, in
-# the same deploy (ops/terms.mjs, docs/how-to/change-the-terms.md); the
-# app shows it from the ledger the service was just given. Nothing to
-# tell is said so and is no failure. Run again, it tells only those it
-# has not.
-if [ "$LABEL" = main ]; then
-  echo "==> telling subscribers of published changes to the terms"
-  node ops/oh.mjs terms notify --after-deploy --apply ||
-    { echo "deploy: published, but not every subscriber was told: run ./oh terms notify --apply" >&2; exit 1; }
-fi
