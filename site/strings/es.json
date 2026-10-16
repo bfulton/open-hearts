@@ -257,7 +257,7 @@
     "header": {
       "title": "Condiciones de uso",
       "tagline": "El acuerdo entre tú y Open Hearts, en palabras sencillas.",
-      "updated": "Última actualización: 13 de octubre de 2026"
+      "updated": "Última actualización: 16 de octubre de 2026"
     },
     "short": {
       "title": "En resumen",
@@ -312,7 +312,7 @@
       "p22": "<b>Web:</b> contacta con nosotros. Si la ley del lugar donde vives te da derecho a desistir de la compra o a un reembolso, lo tienes, y estudiaremos con justicia cualquier otra solicitud.",
       "p23": "Una suscripción reembolsada deja de renovarse, y el juego en vivo en sus dispositivos termina cuando caduque su licencia actual, en un plazo aproximado de un mes.",
       "p24": "Tus dispositivos",
-      "p25": "Suscribirte crea una cuenta, a la que pertenecen la suscripción y sus dispositivos. No hay contraseña, y la cuenta juega en vivo en un dispositivo a la vez: abrir el juego en otro de sus dispositivos lleva allí el juego en vivo, y una partida que quede en el primero cuenta como abandonada por ti. Si borras los datos del juego o eliminas la app en tu único dispositivo de la cuenta, trae el nuevo con un código de respaldo, o iniciando sesión con Apple o Google como antes. O contacta con nosotros desde el correo con el que pagaste en la web, y te ayudaremos en lo que podamos.",
+      "p25": "Suscribirte crea una cuenta, a la que pertenecen la suscripción y sus dispositivos. No hay contraseña, y la cuenta juega en vivo en un dispositivo a la vez: abrir el juego en otro de sus dispositivos lleva allí el juego en vivo, y una partida que quede en el primero cuenta como abandonada por ti. Si borras los datos del juego o eliminas la app en tu único dispositivo de la cuenta, trae el nuevo con un código de respaldo o, si iniciaste sesión con Apple o Google, volviendo a iniciar sesión de la misma forma. O contacta con nosotros desde el correo con el que pagaste en la web, y te ayudaremos en lo que podamos.",
       "p26": "Tu dispositivo como jurado",
       "p27": "Mientras el juego está abierto en el dispositivo en el que tu cuenta juega en vivo, ese dispositivo puede ser elegido como jurado en las mesas de otros suscriptores, una mano cada vez: ayuda a repartir las cartas, juega los asientos de los bots y resuelve los turnos que los jugadores no pueden resolver. Así funcionan las mesas en vivo sin que ningún servidor nuestro vea una mano, y el dispositivo de cada suscriptor hace su parte. Usa algo de los datos, la batería y el procesador del dispositivo mientras el juego está abierto, y el dispositivo no es elegido mientras el juego está en segundo plano ni una vez cerrado. Qué comparte, y con quién, está en la <a href=\"{{base}}/privacy\">política de privacidad</a>."
     },
@@ -335,6 +335,7 @@
     "copyright": {
       "title": "Derechos de autor",
       "p1": "Si crees que algo publicado a través de Open Hearts, como el nombre o la imagen de un jugador, infringe tus derechos de autor, envía una notificación a nuestro contacto para derechos de autor:",
+      "agent": "Contacto para derechos de autor<br> Bright Fulton<br> 6650 Rivers Ave, Ste 105, PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p2": "Según la Digital Millennium Copyright Act de Estados Unidos, la notificación debe incluir:",
       "p3": "tu firma física o electrónica, como titular de los derechos o persona autorizada para actuar en su nombre;",
       "p4": "la obra protegida que consideras infringida;",
@@ -367,7 +368,7 @@
     },
     "ending": {
       "title": "Fin de estas condiciones",
-      "p1": "Puedes dejar de usar Open Hearts en cualquier momento, y cancelar una suscripción como se describe arriba. Si algún día dejamos de ofrecer el juego en vivo, detendremos las renovaciones y lo anunciaremos aquí y en la app con antelación."
+      "p1": "Puedes dejar de usar Open Hearts en cualquier momento, y cancelar una suscripción como se describe arriba. Si algún día dejamos de ofrecer el juego en vivo de forma definitiva, detendremos las renovaciones, lo anunciaremos aquí y en la app con antelación, y te reembolsaremos la parte no usada de cualquier suscripción web. Las suscripciones compradas en el App Store o en Google Play se reembolsan según las normas de la tienda. Las interrupciones, las caídas del servicio y el mantenimiento no suponen dejar de ofrecer el juego en vivo, y no dan derecho a reembolso."
     },
     "law": {
       "title": "Ley aplicable y disputas",

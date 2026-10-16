@@ -3,7 +3,8 @@
 The documentation is in four kinds, after [Diátaxis](https://diataxis.fr/):
 a tutorial to learn by doing, how-to guides for a task at hand,
 reference to look things up, and explanation of how and why it works.
-What changed, and when, is in the [changelog](../CHANGELOG.md).
+What changed, and when, is in the [changelog](../CHANGELOG.md), and
+what is planned in the [roadmap](../ROADMAP.md).
 
 ## Tutorial
 

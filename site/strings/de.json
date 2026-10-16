@@ -257,7 +257,7 @@
     "header": {
       "title": "Nutzungs&shy;bedingungen",
       "tagline": "Die Vereinbarung zwischen dir und Open Hearts, in einfachen Worten.",
-      "updated": "Zuletzt aktualisiert am 13. Oktober 2026"
+      "updated": "Zuletzt aktualisiert am 16. Oktober 2026"
     },
     "short": {
       "title": "Kurz gesagt",
@@ -312,7 +312,7 @@
       "p22": "<b>Web:</b> Schreib uns. Wo dir das Recht deines Wohnorts ein Recht auf Widerruf des Kaufs oder auf Erstattung gibt, hast du es, und jede andere Anfrage prüfen wir fair.",
       "p23": "Ein erstattetes Abo wird nicht mehr verlängert, und Live-Spiel auf seinen Geräten endet, wenn ihre aktuelle Lizenz ausläuft, innerhalb von etwa einem Monat.",
       "p24": "Deine Geräte",
-      "p25": "Ein Abo legt ein Konto an, und das Abo und seine Geräte gehören zu diesem Konto. Es gibt kein Passwort, und das Konto spielt live auf einem Gerät zur Zeit: Wer das Spiel auf einem anderen seiner Geräte öffnet, holt das Live-Spiel dorthin, und eine auf dem ersten zurückgelassene Partie zählt als von dir verlassen. Wenn du die Daten des Spiels löschst oder die App auf deinem einzigen Gerät im Konto löschst, bring das neue mit einem Backup-Code hinein oder indem du dich wie zuvor mit Apple oder Google anmeldest. Oder schreib uns mit der E-Mail-Adresse, mit der du im Web bezahlt hast, und wir helfen, wo wir können.",
+      "p25": "Ein Abo legt ein Konto an, und das Abo und seine Geräte gehören zu diesem Konto. Es gibt kein Passwort, und das Konto spielt live auf einem Gerät zur Zeit: Wer das Spiel auf einem anderen seiner Geräte öffnet, holt das Live-Spiel dorthin, und eine auf dem ersten zurückgelassene Partie zählt als von dir verlassen. Wenn du die Daten des Spiels löschst oder die App auf deinem einzigen Gerät im Konto löschst, bring das neue mit einem Backup-Code hinein oder, wenn du dich mit Apple oder Google angemeldet hast, indem du dich wieder genauso anmeldest. Oder schreib uns mit der E-Mail-Adresse, mit der du im Web bezahlt hast, und wir helfen, wo wir können.",
       "p26": "Dein Gerät als Juror",
       "p27": "Solange das Spiel auf dem Gerät geöffnet ist, auf dem dein Konto live spielt, kann dieses Gerät an den Tischen anderer Abonnenten als Juror ausgelost werden, jeweils für ein Blatt: Es hilft beim Geben, spielt die Plätze der Bots und regelt Züge, die die Spieler nicht regeln können. So funktionieren Live-Tische, ohne dass ein Server von uns ein Blatt sieht, und das Gerät jedes Abonnenten leistet seinen Teil. Das braucht etwas von den Daten, dem Akku und der Rechenleistung des Geräts, solange das Spiel offen ist, und das Gerät wird nicht ausgelost, solange das Spiel im Hintergrund ist oder nachdem es geschlossen wurde. Was es teilt und mit wem, steht in der <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>."
     },
@@ -335,6 +335,7 @@
     "copyright": {
       "title": "Urheberrecht",
       "p1": "Wenn du glaubst, dass etwas, das über Open Hearts veröffentlicht wurde, etwa der Name oder das Bild eines Spielers, dein Urheberrecht verletzt, schick eine Meldung an unsere Kontaktstelle für Urheberrechtsfragen:",
+      "agent": "Kontaktstelle für Urheberrechtsfragen<br> Bright Fulton<br> 6650 Rivers Ave, Ste 105, PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p2": "Nach dem US-amerikanischen Digital Millennium Copyright Act muss die Meldung enthalten:",
       "p3": "deine physische oder elektronische Unterschrift, als Rechteinhaber oder als jemand, der befugt ist, für ihn zu handeln;",
       "p4": "das geschützte Werk, das deiner Ansicht nach verletzt wird;",
@@ -367,7 +368,7 @@
     },
     "ending": {
       "title": "Ende dieser Bedingungen",
-      "p1": "Du kannst jederzeit aufhören, Open Hearts zu nutzen, und ein Abo wie oben beschrieben kündigen. Sollten wir Live-Spiel einmal nicht mehr anbieten, stoppen wir die Verlängerungen und sagen es vorher hier und in der App."
+      "p1": "Du kannst jederzeit aufhören, Open Hearts zu nutzen, und ein Abo wie oben beschrieben kündigen. Sollten wir Live-Spiel einmal endgültig nicht mehr anbieten, stoppen wir die Verlängerungen, sagen es vorher hier und in der App und erstatten den ungenutzten Teil jedes Web-Abos. Im App Store oder bei Google Play gekaufte Abos werden nach den Regeln des jeweiligen Stores erstattet. Unterbrechungen, Ausfälle und Wartungsarbeiten bedeuten nicht, dass wir Live-Spiel nicht mehr anbieten, und begründen keine Erstattung."
     },
     "law": {
       "title": "Recht und Streitigkeiten",
