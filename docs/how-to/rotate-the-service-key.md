@@ -26,25 +26,24 @@ Every part above checks against exactly one key, so there is no overlap between 
 ## Before you begin
 
 - Install Dart and Node, and run `dart pub get` in `service/`.
-- Export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and set `WRANGLER_VERSION` as [Deploy the site, app and service](deploy.md#before-you-begin) shows.
+- Export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 - Be ready to deploy both workers ([Deploy the site, app and service](deploy.md)) and to build both phone releases ([Build a phone release](cut-a-phone-release.md)).
 - To rotate, start with nothing else waiting to deploy, so that the order below is the only one that matters.
 - Run the commands from the repository root.
 
 ## Mint the first key pair
 
-1. Mint a pair. The tool prints both halves once and keeps neither:
+1. Mint a pair. It prints both halves once and keeps neither:
 
    ```bash
-   (cd service && dart run bin/service_key.dart)
+   ./oh key mint
    ```
 
 1. Put the `OH_SERVICE_KEY` value in `config/openhearts.json` as `serviceKey`, and commit the change to `main`.
-1. Set the `OH_SERVICE_SECRET` value as a secret on both of the Pages project's environments. Wrangler prompts for the value: paste the secret.
+1. Set the `OH_SERVICE_SECRET` value as a secret on both of the Pages project's environments. It asks for the value, which isn't shown as you paste it, and sets it on each environment that `infra/cloudflare.mjs` lists it in:
 
    ```bash
-   npx wrangler@"$WRANGLER_VERSION" pages secret put OH_SERVICE_SECRET --project-name open-hearts
-   npx wrangler@"$WRANGLER_VERSION" pages secret put OH_SERVICE_SECRET --project-name open-hearts --env preview
+   ./oh secret set OH_SERVICE_SECRET --apply
    ```
 
    Do not save the secret anywhere else.
@@ -57,16 +56,15 @@ Every part above checks against exactly one key, so there is no overlap between 
 1. Mint a new pair:
 
    ```bash
-   (cd service && dart run bin/service_key.dart)
+   ./oh key mint
    ```
 
 1. Put the new `OH_SERVICE_KEY` value in `config/openhearts.json` as `serviceKey`, and commit the change to `main`. Do not deploy yet.
 1. Build both phone releases from this commit and submit them to the stores, but hold their release until the last step. A phone build with the new key can get no licence while the service still signs with the old secret.
-1. Set the new `OH_SERVICE_SECRET` value on both of the Pages project's environments. Wrangler prompts for the value: paste the secret.
+1. Set the new `OH_SERVICE_SECRET` value on both of the Pages project's environments. It asks for the value, which isn't shown as you paste it:
 
    ```bash
-   npx wrangler@"$WRANGLER_VERSION" pages secret put OH_SERVICE_SECRET --project-name open-hearts
-   npx wrangler@"$WRANGLER_VERSION" pages secret put OH_SERVICE_SECRET --project-name open-hearts --env preview
+   ./oh secret set OH_SERVICE_SECRET --apply
    ```
 
    A Pages secret reaches only deployments made after it is set, so the live deployment goes on signing with the old pair until the next step.
@@ -74,7 +72,7 @@ Every part above checks against exactly one key, so there is no overlap between 
 1. At once, deploy the site from `main`:
 
    ```bash
-   ./deploy.sh
+   ./oh deploy site --apply
    ```
 
    From this deployment on, the worker signs licences and activations with the new pair, and the web app checks them with the new key. Devices already connected keep playing on their current activation, which the relay still accepts until it runs out or the relay is deployed.
@@ -82,7 +80,7 @@ Every part above checks against exactly one key, so there is no overlap between 
 1. At once, deploy the relay worker:
 
    ```bash
-   (cd service/do && npx wrangler@"$WRANGLER_VERSION" deploy)
+   ./oh deploy relay --apply
    ```
 
    From this deployment on, the relay carries only devices with an activation signed by the new key. Until it is live, a device that starts afresh gets an activation that the relay refuses, so deploy the relay as soon as the site is live.
@@ -95,17 +93,16 @@ Every part above checks against exactly one key, so there is no overlap between 
 
 ## Check it worked
 
-1. Check that both environments have the secret (names only, never values):
+1. Check that both environments have the secret (names only, never values). It prints an `ok` line for each environment's secrets, or a `by hand:` line for one that is missing:
 
    ```bash
-   npx wrangler@"$WRANGLER_VERSION" pages secret list --project-name open-hearts
-   npx wrangler@"$WRANGLER_VERSION" pages secret list --project-name open-hearts --env preview
+   ./oh infra --only cloudflare
    ```
 
-1. Check that the published web build is the commit with the new key:
+1. Check that the published web build is the commit with the new key, and that production answers:
 
    ```bash
-   curl -s https://play.openhearts.game/build-info.json
+   ./oh verify
    ```
 
 1. On a subscribed device with the new build, reload or restart the app. Live play is open on the front door, which means the device holds a licence that the new key signed. Join a live table, which means the relay accepted the device's new activation.

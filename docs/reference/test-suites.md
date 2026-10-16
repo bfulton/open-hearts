@@ -36,9 +36,10 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `functions` | `node --test service/functions/*.test.mjs` |
 | `site` | `node --test site/build.test.mjs` |
 | `infra` | `node --test infra/*.test.mjs` |
+| `ops` | `node --test ops/*.test.mjs`: [the oh command](oh.md), its reference against its table, and each command against fakes of the store, Stripe and the programs it starts |
 | `workers` | `node --test` on `e2e/deal_worker.test.mjs`, `e2e/deal_golden.test.mjs`, `e2e/offline_worker.test.mjs`, `e2e/carry.test.mjs` and `crypto/schnorr_wasm/vectors.test.mjs`: the page's workers, against the committed wasm |
 | `crypto` | `cargo clippy` with warnings as errors, and `cargo test`, in `crypto/deal` and `crypto/schnorr`; `cargo test` in `crypto/vendor`; `cargo clippy` for the wasm target in `crypto/schnorr_wasm` |
-| `scripts` | `bash -n` on `check.sh`, `deploy.sh`, `build_phone.sh`, `e2e/*.sh`, `crypto/*.sh` and `app/ios/*.sh`; `node --check` on `e2e/*.mjs` and `app/tool/*.mjs`; and, when Python has `yaml`, a parse of `.github/workflows/*.yml` |
+| `scripts` | `bash -n` on `check.sh`, `deploy.sh`, `build_phone.sh`, `oh`, `e2e/*.sh`, `crypto/*.sh`, `app/ios/*.sh` and `service/bench/build.sh`; `node --check` on `e2e/*.mjs` and `app/tool/*.mjs`; and, when Python has `yaml`, a parse of `.github/workflows/*.yml` |
 | `docs` | `node --test docs/links.test.mjs`, then `node docs/links.mjs` |
 | `app_analyze` | `flutter analyze` in `app` |
 | `app` | `flutter test -j <cores>` in `app`, then `flutter test --platform chrome test/web`. Chrome is `CHROME_EXECUTABLE`, else one on the `PATH`, else one in macOS's Applications, else Playwright's Chromium. |

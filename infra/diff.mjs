@@ -133,10 +133,9 @@ export function rulesPlan(want, have) {
 /// Returns { patch, lines, owner }: `patch` is the deployment_configs
 /// entry a PATCH of the project takes (null deletes), `lines` say what
 /// it changes, and `owner` what only the operator can do — a secret
-/// missing, which this has no value for, with the command that sets it
-/// in [env] (`<project>` for the caller to fill in). Secret values are
-/// never read: a secret is present or it is not.
-export function pagesEnvPlan(want, have, ids, env = 'production') {
+/// missing, which this has no value for, with the oh command that sets
+/// it. Secret values are never read: a secret is present or it is not.
+export function pagesEnvPlan(want, have, ids) {
   const patch = {};
   const lines = [];
   const owner = [];
@@ -148,9 +147,9 @@ export function pagesEnvPlan(want, have, ids, env = 'production') {
     envPatch[name] = { type: 'plain_text', value };
     lines.push(h ? (h.type === 'plain_text' ? `set ${name}: ${JSON.stringify(h.value)} -> ${JSON.stringify(value)}` : `set ${name} as plain text (it is ${h.type})`) : `add ${name} = ${JSON.stringify(value)}`);
   }
-  // Without --env, Wrangler sets production's: a preview secret named
-  // without it would be set in the wrong place.
-  const put = (name) => `\`npx wrangler pages secret put ${name} --project-name <project>${env === 'production' ? '' : ` --env ${env}`}\``;
+  // oh sets a secret in every environment that lists it, so one command
+  // puts right a secret missing from either (docs/reference/oh.md).
+  const put = (name) => `\`./oh secret set ${name} --apply\``;
   for (const name of want.secrets) {
     const h = vars[name];
     if (h?.type === 'secret_text') continue;
@@ -394,7 +393,7 @@ export function relayProblems(toml, relay, live) {
     if (!wranglerBindings(toml).some((w) => w.name === b.name)) out.push(`binding ${b.name} (${b.type}) is on the worker but not in wrangler.toml`);
   }
   for (const secret of relay.secrets) {
-    if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`npx wrangler secret put ${secret}\` in service/do`);
+    if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`./oh secret set ${secret} --apply\``);
   }
   for (const secret of live.secrets) {
     if (!relay.secrets.includes(secret)) out.push(`secret ${secret} is set but not defined (infra/cloudflare.mjs, relay.secrets)`);

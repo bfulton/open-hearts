@@ -52,7 +52,7 @@ export const pages = {
       vars: {},
       /// Encrypted: names only. apply.mjs checks each is set, and cannot
       /// set one (it has no value to set), so a missing one is set by
-      /// hand: `npx wrangler pages secret put NAME --project-name open-hearts`.
+      /// hand: `./oh secret set NAME --apply`.
       secrets: ['OH_ID_HMAC', 'OH_SERVICE_SECRET', 'OH_STRIPE_SECRET', 'OH_STRIPE_WEBHOOK_SECRET', 'OH_TURN_API_TOKEN', ...playSecrets],
       kv: { OH_STORE: 'open-hearts-store' },
       r2: { OH_RECORDS: 'open-hearts-records' },

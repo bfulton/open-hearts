@@ -1,7 +1,7 @@
 // An account's data, deleted on request (the privacy policy's
 // choices): everything the service keeps for an account, its profile
 // included, and its name off the games it played (records.mjs,
-// withoutNames), by `node service/tool/forget.mjs <account>`. What
+// withoutNames), by `./oh account delete <account>` (service/tool/forget.mjs). What
 // stays, its results on the relay, names its account number, which
 // nothing left in the service ties to it.
 

@@ -1,12 +1,12 @@
 // OH_RECORDS as the operator's tools reach it from outside the worker
-// (forget.mjs): kept games through Cloudflare's API.
+// (the oh command, ops/): kept games through Cloudflare's API.
 
 import { gzipSync } from 'node:zlib';
 
 /// A records bucket through Cloudflare's API, behind the calls
 /// anonymizeGames makes (service/functions/records.mjs): its keys, and
 /// a record read and written as its JSON.
-export function restBucket({ token, account, bucket }) {
+export function restBucket({ token, account, bucket, fetchImpl = fetch }) {
   const base = `https://api.cloudflare.com/client/v4/accounts/${account}/r2/buckets/${bucket}/objects`;
   const auth = { authorization: `Bearer ${token}` };
   const at = (key) => `${base}/${encodeURIComponent(key)}`;
@@ -15,7 +15,7 @@ export function restBucket({ token, account, bucket }) {
       const keys = [];
       let cursor = '';
       do {
-        const res = await fetch(`${base}?prefix=${encodeURIComponent(prefix)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { headers: auth });
+        const res = await fetchImpl(`${base}?prefix=${encodeURIComponent(prefix)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { headers: auth });
         const page = await res.json();
         if (!page.success) throw new Error(`listing said ${res.status}`);
         for (const { key } of page.result) keys.push(key);
@@ -29,7 +29,7 @@ export function restBucket({ token, account, bucket }) {
     /// its reader parses it, and a number written another way can parse
     /// to another value (Dart reads 2.0 and 2 apart).
     async get(key) {
-      const res = await fetch(at(key), { headers: auth });
+      const res = await fetchImpl(at(key), { headers: auth });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`reading said ${res.status}`);
       const text = await res.text();
@@ -39,7 +39,7 @@ export function restBucket({ token, account, bucket }) {
     },
     /// A record, written as records.mjs keeps one: gzipped, and said so.
     async put(key, record) {
-      const res = await fetch(at(key), {
+      const res = await fetchImpl(at(key), {
         method: 'PUT',
         headers: { ...auth, 'content-type': 'application/json', 'content-encoding': 'gzip' },
         body: gzipSync(JSON.stringify(record)),

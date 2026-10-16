@@ -250,15 +250,15 @@ test('Pages: a missing secret is set by hand, and nothing is patched for it', ()
   assert.doesNotMatch(plan.owner.join(' '), /oops/);
 });
 
-test('Pages: the command for a missing secret sets it in its own environment', () => {
+test('Pages: a missing secret is put right with oh, which sets it in every environment that lists it', () => {
   const production = liveProduction();
   delete production.env_vars.OH_ID_HMAC;
-  const [prod] = pagesEnvPlan(pages.environments.production, production, ids, 'production').owner;
-  assert.match(prod, /secret put OH_ID_HMAC --project-name <project>`$/);
+  const [prod] = pagesEnvPlan(pages.environments.production, production, ids).owner;
+  assert.match(prod, /`\.\/oh secret set OH_ID_HMAC --apply`$/);
   const preview = liveProduction();
   delete preview.env_vars.OH_ID_HMAC;
-  const [prev] = pagesEnvPlan(pages.environments.production, preview, ids, 'preview').owner;
-  assert.match(prev, /secret put OH_ID_HMAC --project-name <project> --env preview`$/);
+  const [prev] = pagesEnvPlan(pages.environments.production, preview, ids).owner;
+  assert.match(prev, /`\.\/oh secret set OH_ID_HMAC --apply`$/);
 });
 
 test("Pages: production wants Play's service account when the config names Play, as the worker does", () => {

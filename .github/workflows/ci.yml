@@ -214,6 +214,8 @@ jobs:
         run: node --test site/build.test.mjs
       - name: Infrastructure definitions (what infra/apply.mjs compares; no network)
         run: node --test infra/*.test.mjs
+      - name: The operator's command, its reference and each command (./check.sh ops)
+        run: node --test ops/*.test.mjs
       - name: The page's workers (in node's test runner, against the committed wasm)
         run: node --test e2e/deal_worker.test.mjs e2e/deal_golden.test.mjs e2e/offline_worker.test.mjs e2e/carry.test.mjs
       - name: The scripts no suite runs, each still parsing (./check.sh scripts)

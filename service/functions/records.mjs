@@ -36,7 +36,7 @@ export const recordVersion = 2;
 const keyIn = (table) => `tables/${table}.json`;
 
 /// Where an account forgotten on request is marked in the bucket
-/// (service/tool/forget.mjs writes it): a game kept after the mark is
+/// (`oh account delete`, service/tool/forget.mjs, writes it): a game kept after the mark is
 /// kept without the account's name. R2 reads what was last written, so
 /// a record checked after the mark is in sees it.
 export const forgottenKey = (account) => `forgotten/${account}`;

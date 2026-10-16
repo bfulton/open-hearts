@@ -1,8 +1,9 @@
-// An account suspended from live play, or a name or picture taken off
-// it, on the operator's word (the terms, "At a live table" and
-// "Copyright"; docs/how-to/suspend-an-account.md). The operator's tool
-// (service/tool/suspend.mjs) reaches the store from outside, as
-// forget.mjs does, but what it asks for is carried out here, in the
+// An account suspended from live play or ended, or a name or picture
+// taken off it, on the operator's word (the terms, "At a live table",
+// "Ending these terms" and "Copyright"; docs/how-to/suspend-an-account.md,
+// docs/how-to/end-an-account.md). The operator's command (`oh account`,
+// ops/account.mjs) reaches the store from outside, as `oh account
+// delete` does, but what it asks for is carried out here, in the
 // account's own turn (household.mjs): that is where the account's
 // device in use is kept, and so where its sockets at the relay are
 // closed at once, and where the devices' own changes to the account
@@ -17,7 +18,6 @@
 // can be carried out twice to the same end, since the answer to the
 // first can be lost and the tool asks again.
 
-import { isSuspended } from './accounts.mjs';
 import { PICTURES_ROW, pictureDigest, releasing, withholding } from './pictures.mjs';
 import { dayOf, isAccount } from './rows.mjs';
 
@@ -38,8 +38,10 @@ export const orderRow = (id) => [`ORDER#${id}`, 'META'];
 /// relays.dart, turnedAway).
 export const SUSPENDED_WHY = 'suspended: this account is suspended from live play';
 
-/// The acts an order may ask for.
-export const ACTS = Object.freeze(['suspend', 'lift', 'remove', 'restore']);
+/// The acts an order may ask for. `terminate` is a suspension that ends
+/// the account under the terms ("Ending these terms"): marked so, and
+/// never lifted.
+export const ACTS = Object.freeze(['suspend', 'terminate', 'lift', 'remove', 'restore']);
 
 /// [act] for [account], as the tool writes it down.
 export function orderOf(account, act, { name = false, picture = false, now = Date.now() } = {}) {
@@ -61,11 +63,18 @@ export async function carryOut(op, store, active, { now = Date.now(), revoke = n
   let body;
   switch (order.act) {
     case 'suspend':
-      body = await suspend(op.account, store, active, { now, revoke });
+    case 'terminate':
+      body = await suspend(op.account, store, active, { now, revoke, ending: order.act === 'terminate' });
       break;
-    case 'lift':
+    case 'lift': {
+      const ended = (await store.get(`ACCOUNT#${op.account}`, 'SUSPENDED'))?.terminated;
+      if (ended) {
+        await store.del(...orderRow(op.order));
+        return { status: 409, body: { error: `ended on ${ended}: a terminated account is not let back` } };
+      }
       body = await lift(op.account, store, active);
       break;
+    }
     case 'remove':
       body = await remove(op.account, store, { name: order.name === true, picture: order.picture === true, now });
       break;
@@ -96,9 +105,13 @@ async function devicesWithRows(store, account) {
 /// flagged, so that a licence, an activation and everything else that
 /// asks for one is refused at the one read it makes (entitlementOf);
 /// and its device in use cleared, its sockets at the relay closed now
-/// rather than at the end of their activation's hour.
-async function suspend(account, store, active, { now, revoke }) {
-  if (!(await isSuspended(store, account))) await store.put(`ACCOUNT#${account}`, 'SUSPENDED', { since: dayOf(now) });
+/// rather than at the end of their activation's hour. [ending] marks it
+/// terminated too, from the day it is asked, whether or not it was
+/// suspended before.
+async function suspend(account, store, active, { now, revoke, ending = false }) {
+  const mark = await store.get(`ACCOUNT#${account}`, 'SUSPENDED');
+  const terminated = mark?.terminated ?? (ending ? dayOf(now) : null);
+  if (!mark || (terminated && !mark.terminated)) await store.put(`ACCOUNT#${account}`, 'SUSPENDED', { since: mark?.since ?? dayOf(now), ...(terminated ? { terminated } : {}) });
   let flagged = 0;
   for (const { key, row } of await devicesWithRows(store, account)) {
     if (row.suspended) continue;
@@ -112,7 +125,7 @@ async function suspend(account, store, active, { now, revoke }) {
     await active.put(account, { key: null, epoch, at: null, seated: null, tags: [], suspended: true });
     if (was.tags?.length) await revoke?.(was.tags, account, epoch, SUSPENDED_WHY);
   }
-  return { suspended: true, flagged, cutOff };
+  return { suspended: true, ...(terminated ? { terminated } : {}), flagged, cutOff };
 }
 
 /// [account]'s suspension lifted: the mark gone, its devices' rows as

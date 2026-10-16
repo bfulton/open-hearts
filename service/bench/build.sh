@@ -12,6 +12,14 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
+# Wrangler runs this before every deploy of the relay worker, which is
+# always production: from main as it was reviewed, and only when nothing
+# else stands in the way (ops/gate.mjs), whether or not oh started it.
+# A `wrangler deploy --dry-run`, which publishes nothing, may set
+# OH_RELAY_DRY_RUN=1 to build from anywhere.
+if [ "${OH_RELAY_DRY_RUN:-}" != 1 ]; then
+  node "$root/ops/gate.mjs" relay
+fi
 out="$here/stage"
 rm -rf "$out"
 mkdir -p "$out/crypto/deal/target/release" "$out/crypto/schnorr/target/release"

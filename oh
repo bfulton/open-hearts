@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# The operator's one command: ./oh help, or docs/reference/oh.md.
+exec node "$(cd "$(dirname "$0")" && pwd)/ops/oh.mjs" "$@"

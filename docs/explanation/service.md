@@ -429,24 +429,27 @@ published it
 
 ### Suspending an account
 
-The terms let the operator suspend an account from live play, and take
-its name or picture off, in their sections "At a live table" and
-"Copyright". `service/tool/suspend.mjs` asks for it
-([suspend an account](../how-to/suspend-an-account.md)), and
-`service/functions/suspension.mjs` carries it out.
+The terms let the operator suspend an account from live play, end it,
+and take its name or picture off, in their sections "At a live table",
+"Ending these terms" and "Copyright". `./oh account` asks for it
+([suspend an account](../how-to/suspend-an-account.md),
+[end an account](../how-to/end-an-account.md)), and
+`service/functions/suspension.mjs` carries it out. What a suspension or
+an ending does in Stripe, the command does itself, with the operator's
+own key: the service's key can't cancel or refund.
 
 **In the account's turn.** The account's device in use, and the relay
 objects it was seen at, are known only in the account's turn, where
 `Household` keeps them. So that is where a suspension is carried out,
 one after another with the devices' own requests, and where the device
-in use can be cut off at once. The tool reaches the store from outside,
-as `forget.mjs` does, but not the object. It writes an **order** into the
+in use can be cut off at once. The command reaches the store from
+outside, as `./oh account delete` does, but not the object. It writes an **order** into the
 store (`ORDER#<id>`, which KV deletes after `ORDER_KEPT_S`) and asks the
 service to carry it out (`order`). The handler reads the order before it
 wakes anything, so a request that names no order does nothing, and only
 someone who can write the store, the operator, can make one; no new
 secret is needed. A carried-out order is deleted. Each act can be
-carried out twice to the same end, since the tool asks again when an
+carried out twice to the same end, since the command asks again when an
 answer is lost or KV has not shown the order yet.
 
 **Suspended**, the account is marked (`SUSPENDED`), and each of its

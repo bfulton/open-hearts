@@ -1,6 +1,9 @@
 // Makes the Cloudflare and Stripe accounts match cloudflare.mjs and
 // stripe.mjs, for this app and nothing else in them.
 //
+// Run by `./oh infra` (docs/reference/oh.md), which also runs
+// observability/apply.mjs:
+//
 //   node infra/apply.mjs                        what would change, and stop
 //   node infra/apply.mjs --apply                change it
 //   node infra/apply.mjs --only cloudflare      one account (or: stripe)
@@ -166,8 +169,8 @@ async function applyPages() {
   const summary = [];
   for (const [env, want] of Object.entries(pages.environments)) {
     const have = project.deployment_configs?.[env] ?? {};
-    const { patch, lines, owner: theirs } = pagesEnvPlan(want, have, ids, env);
-    for (const line of theirs) owner(`${p} ${env}: ${line.replace('<project>', p)}`);
+    const { patch, lines, owner: theirs } = pagesEnvPlan(want, have, ids);
+    for (const line of theirs) owner(`${p} ${env}: ${line}`);
     for (const line of lines) say(`${p} ${env}: ${line}`);
     if (write && Object.keys(patch).length) await cf('PATCH', `${acct}/pages/projects/${p}`, { deployment_configs: { [env]: patch } });
     const bindings = ['kv', 'r2', 'durableObjects', 'analyticsEngine'].reduce((n, k) => n + Object.keys(want[k] ?? {}).length, 0);

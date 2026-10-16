@@ -21,16 +21,16 @@ These four addresses are left out of the rate limit on `/api/` (`infra/cloudflar
 ## Register the Stripe webhook
 
 1. In the Stripe dashboard, in live mode, add a webhook endpoint at `https://play.openhearts.game/api/stripe`. Give it the API version and the events that `webhooks` in `infra/stripe.mjs` names. Stripe sets an endpoint's API version only when the endpoint is made.
-1. Copy the endpoint's signing secret, which Stripe shows once, and set it as a secret on the Pages project's production environment. Wrangler prompts for the value. Previews have no Stripe.
+1. Copy the endpoint's signing secret, which Stripe shows once, and set it as a secret on the Pages project's production environment. It asks for the value, which isn't shown as you paste it. Previews have no Stripe, so it is set on production only.
 
    ```bash
-   npx wrangler@"$WRANGLER_VERSION" pages secret put OH_STRIPE_WEBHOOK_SECRET --project-name open-hearts
+   ./oh secret set OH_STRIPE_WEBHOOK_SECRET --apply
    ```
 
 1. Deploy the site, so that the live deployment is one made after the secret was set. See [Deploy the site, app and service](deploy.md).
 1. If this endpoint replaces one on an older API version, delete the old endpoint in the dashboard.
 
-From here on, `node infra/apply.mjs --apply` keeps the endpoint's events and enabled state as `infra/stripe.mjs` defines them.
+From here on, `./oh infra --only stripe --apply` keeps the endpoint's events and enabled state as `infra/stripe.mjs` defines them.
 
 ## Register the Sign in with Apple notifications
 
@@ -66,7 +66,7 @@ From here on, `node infra/apply.mjs --apply` keeps the endpoint's events and ena
 1. For Stripe, check that the endpoint matches its definition. The line for the webhook starts with `ok`:
 
    ```bash
-   node infra/apply.mjs --only stripe
+   ./oh infra --only stripe
    ```
 
    In the Stripe dashboard, the endpoint's deliveries answer 200. A 400 with `not signed` means `OH_STRIPE_WEBHOOK_SECRET` is not this endpoint's signing secret.

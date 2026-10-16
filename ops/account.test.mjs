@@ -1,0 +1,175 @@
+// oh account's acts in Stripe: a suspension stops the renewal and a
+// lift starts only that one again; a termination or a refund ends the
+// subscription now and refunds the unused part of the year, once
+// (ops/account.mjs, ops/billing.mjs).
+//
+//   node --test ops/*.test.mjs
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { proRata, refundFor } from './billing.mjs';
+import { main } from './oh.mjs';
+import { memoryStore } from '../service/functions/rows.mjs';
+
+const account = '0123456789abcdef0123456789abcdef';
+const day = 86400000;
+const now = Date.parse('2026-10-16T12:00:00Z');
+const start = now - 100 * day;
+const end = start + 365 * day;
+
+/// A fake of the parts of Stripe's API the acts use: one subscription,
+/// its paid invoice and the refunds made against it. [calls] is what was
+/// asked of it, writes only.
+function fakeStripe({ status = 'active', cancelAtPeriodEnd = false, stopped = '', refunds = [] } = {}) {
+  const calls = [];
+  const sub = { status, cancel_at_period_end: cancelAtPeriodEnd, metadata: stopped ? { oh_stopped: stopped } : {} };
+  return {
+    calls,
+    sub,
+    refunds,
+    async get(path) {
+      if (path.startsWith('/subscriptions/sub_9')) {
+        return { ...sub, latest_invoice: 'in_1', items: { data: [{ current_period_start: start / 1000, current_period_end: end / 1000 }] } };
+      }
+      if (path.startsWith('/invoice_payments?invoice=in_1')) return { data: [{ amount_paid: 599, currency: 'usd', payment: { type: 'payment_intent', payment_intent: 'pi_1' } }] };
+      if (path.startsWith('/refunds?payment_intent=pi_1')) return { data: refunds.map((r) => ({ status: 'succeeded', amount: r.amount, metadata: { oh_act: r.act } })) };
+      throw new Error(`not faked: GET ${path}`);
+    },
+    async post(path, fields) {
+      calls.push(['POST', path, fields]);
+      if (path === '/refunds') refunds.push({ amount: Number(fields.amount), act: fields['metadata[oh_act]'] });
+      if (path === '/subscriptions/sub_9') {
+        sub.cancel_at_period_end = fields.cancel_at_period_end === 'true';
+        sub.metadata = { oh_stopped: fields['metadata[oh_stopped]'] };
+      }
+      return {};
+    },
+    async del(path, fields) {
+      calls.push(['DELETE', path, fields]);
+      sub.status = 'canceled';
+      return {};
+    },
+  };
+}
+
+async function webSubscriber(source = 'stripe', id = 'sub_9') {
+  const store = memoryStore();
+  await store.put(`ACCOUNT#${account}`, 'META', { subscription: id });
+  await store.put(`ACCOUNT#${account}`, 'DEVICE#aa', {});
+  await store.put(`SUB#${id}`, 'META', { source });
+  return store;
+}
+
+/// A context over [store] and [stripe] whose service answers every
+/// order with what the act reports.
+function context(store, stripe) {
+  const said = [];
+  const orders = [];
+  return {
+    said,
+    orders,
+    env: {},
+    log: (line) => said.push(line),
+    warn: (line) => said.push(`oh: ${line}`),
+    store: async () => Object.assign(store, { list: async (prefix) => [...store.rows.keys()].filter((k) => k.startsWith(prefix)) }),
+    bucket: () => ({ list: async () => [], get: async () => null, put: async () => {} }),
+    stripe: () => stripe,
+    config: async () => ({ appOrigin: 'https://play.example' }),
+    fetch: async (url, init) => {
+      const id = JSON.parse(init.body).order;
+      const order = await store.get(`ORDER#${id}`, 'META');
+      orders.push(order.act);
+      if (order.act === 'terminate') await store.put(`ACCOUNT#${account}`, 'SUSPENDED', { since: '2026-10-16', terminated: '2026-10-16' });
+      return new Response(JSON.stringify({ act: order.act }), { status: 200 });
+    },
+    carryOptions: { tries: 1, wait: 0 },
+    now: () => now,
+  };
+}
+
+test('the unused part of a year, to the cent, and never more than is left of the payment', () => {
+  assert.equal(proRata(599, start, end, now), Math.floor((599 * 265) / 365));
+  assert.equal(proRata(599, start, end, start), 599, 'nothing used yet');
+  assert.equal(proRata(599, start, end, end + day), 0, 'all used');
+  assert.equal(proRata(0, start, end, now), 0);
+  const stands = { payment: { paid: 599, intent: 'pi_1' }, start, end, refunds: [{ amount: 500, act: 'goodwill' }] };
+  assert.equal(refundFor(stands, 'terminate', { now }), 99, 'what is left of the payment caps it');
+  assert.equal(refundFor({ ...stands, refunds: [{ amount: 10, act: 'terminate' }] }, 'terminate', { now }), 0, 'once per act');
+  assert.equal(refundFor({ ...stands, refunds: [] }, 'refund', { full: true, now }), 599);
+});
+
+test('terminated: says first, then ends the subscription and refunds the unused part, once', async () => {
+  const store = await webSubscriber();
+  const stripe = fakeStripe();
+  const ctx = context(store, stripe);
+  assert.equal(await main(['account', 'terminate', account], ctx), 0);
+  assert.equal(stripe.calls.length, 0, 'a dry run writes nothing to Stripe');
+  assert.equal(ctx.orders.length, 0, 'nor asks the service');
+  const owed = Math.floor((599 * 265) / 365);
+  assert.match(ctx.said.join('\n'), new RegExp(`would refund ${(owed / 100).toFixed(2)} USD, the unused part of the year`));
+
+  assert.equal(await main(['account', 'terminate', account, '--apply'], ctx), 0);
+  assert.deepEqual(ctx.orders, ['terminate']);
+  assert.deepEqual(
+    stripe.calls.map(([method, path]) => `${method} ${path}`),
+    ['DELETE /subscriptions/sub_9', 'POST /refunds'],
+    'ended, then refunded',
+  );
+  assert.deepEqual(stripe.calls[1][2], { payment_intent: 'pi_1', amount: String(owed), 'metadata[oh_act]': 'terminate', 'metadata[oh_account]': account });
+
+  // Run again: the order again, which changes nothing, and nothing more
+  // from Stripe.
+  await main(['account', 'terminate', account, '--apply'], ctx);
+  assert.equal(stripe.calls.length, 2, 'not ended twice, not refunded twice');
+});
+
+test('terminated for a serious breach: ended, and nothing refunded', async () => {
+  const store = await webSubscriber();
+  const stripe = fakeStripe();
+  const ctx = context(store, stripe);
+  assert.equal(await main(['account', 'terminate', account, '--serious', '--apply'], ctx), 0);
+  assert.deepEqual(stripe.calls.map(([method, path]) => `${method} ${path}`), ['DELETE /subscriptions/sub_9']);
+  assert.match(ctx.said.join('\n'), /would refund nothing: a serious breach/);
+});
+
+test('refunded: ended now, and all of what is left with --full, not suspended', async () => {
+  const store = await webSubscriber();
+  const stripe = fakeStripe({ refunds: [{ amount: 100, act: 'goodwill' }] });
+  const ctx = context(store, stripe);
+  assert.equal(await main(['account', 'refund', account, '--full', '--apply'], ctx), 0);
+  assert.deepEqual(ctx.orders, [], 'the account is not suspended');
+  assert.deepEqual(stripe.calls.map(([method, path, fields]) => `${method} ${path}${fields?.amount ? ` ${fields.amount}` : ''}`), ['DELETE /subscriptions/sub_9', 'POST /refunds 499']);
+});
+
+test('suspended: the renewal stopped and marked; lifted: only that renewal started again', async () => {
+  const store = await webSubscriber();
+  const stripe = fakeStripe();
+  const ctx = context(store, stripe);
+  assert.equal(await main(['account', 'suspend', account, '--apply'], ctx), 0);
+  assert.deepEqual(stripe.calls, [['POST', '/subscriptions/sub_9', { cancel_at_period_end: 'true', 'metadata[oh_stopped]': 'suspended' }]]);
+  await store.put(`ACCOUNT#${account}`, 'SUSPENDED', { since: '2026-10-16' });
+  assert.equal(await main(['account', 'lift', account, '--apply'], ctx), 0);
+  assert.deepEqual(stripe.calls[1], ['POST', '/subscriptions/sub_9', { cancel_at_period_end: 'false', 'metadata[oh_stopped]': '' }]);
+
+  // One the subscriber cancelled is theirs: a suspension leaves it, and
+  // a lift does not start it again.
+  const theirs = fakeStripe({ cancelAtPeriodEnd: true });
+  const other = context(await webSubscriber(), theirs);
+  await main(['account', 'suspend', account, '--apply'], other);
+  await main(['account', 'lift', account, '--apply'], other);
+  assert.deepEqual(theirs.calls, []);
+});
+
+test('a terminated account is not lifted, and a store subscription is left to the store, said so', async () => {
+  const store = await webSubscriber();
+  await store.put(`ACCOUNT#${account}`, 'SUSPENDED', { since: '2026-10-01', terminated: '2026-10-02' });
+  const ctx = context(store, fakeStripe());
+  assert.equal(await main(['account', 'lift', account, '--apply'], ctx), 1);
+  assert.deepEqual(ctx.orders, []);
+
+  const apple = context(await webSubscriber('apple', 'apple:1000'), fakeStripe());
+  assert.equal(await main(['account', 'terminate', account, '--apply'], apple), 0);
+  assert.match(apple.said.join('\n'), /bought in the App Store: we cannot cancel or refund it/);
+  assert.deepEqual(apple.orders, ['terminate'], 'the account is still ended');
+});

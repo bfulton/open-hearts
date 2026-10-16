@@ -38,7 +38,7 @@ The app also reads `OH_PLAY_PACKAGE` as a build define (`app/lib/net/store_buyin
 
 ### Pages project secrets
 
-Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `node infra/apply.mjs` checks that each one is set, and never reads or sets a value.
+Defined by name in `pages.environments` in `infra/cloudflare.mjs`. `./oh infra` checks that each one is set, and never reads a value; `./oh secret set` sets one.
 
 | Secret | Production | Preview | Read by | Without it |
 |---|---|---|---|---|
@@ -97,9 +97,9 @@ From `service/do/wrangler.toml`.
 
 | Variable | Read by | What it is |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | `deploy.sh` (required), `infra/apply.mjs`, `service/tool/forget.mjs` (required), `service/tool/suspend.mjs` (required) | A Cloudflare API token. |
-| `CLOUDFLARE_ACCOUNT_ID` | `deploy.sh` (required), `infra/apply.mjs`, `service/tool/forget.mjs` (required), `service/tool/suspend.mjs` (required) | The Cloudflare account ID. |
-| `STRIPE_API_KEY` | `infra/apply.mjs`, `service/tool/forget.mjs`, `service/tool/suspend.mjs` | The Stripe key: for `infra/apply.mjs`'s Stripe part, and for `--find` with an email address. |
+| `CLOUDFLARE_API_TOKEN` | `./oh` (most commands), `deploy.sh` (required), `infra/apply.mjs` | A Cloudflare API token. |
+| `CLOUDFLARE_ACCOUNT_ID` | `./oh` (most commands), `deploy.sh` (required), `infra/apply.mjs` | The Cloudflare account ID. |
+| `STRIPE_API_KEY` | `./oh account`, `infra/apply.mjs` | The operator's live-mode Stripe key: for `./oh infra`'s Stripe part, for finding an account by email, and for what suspending, ending and refunding an account do in Stripe. What each needs it to allow is in [the oh command](oh.md#credentials). |
 | `OH_HELP_FORWARD` | `infra/apply.mjs` | Where `help@` and `alerts@` forward. When unset, the destination is only checked to be verified. |
 | `OH_ALERT_EMAIL` | `infra/apply.mjs`, `observability/apply.mjs` | Who the Cloudflare spend alerts and the New Relic alerts email. |
 | `NEW_RELIC_API_KEY` | `observability/apply.mjs` (required) | A New Relic User key. |
@@ -115,10 +115,10 @@ From `service/do/wrangler.toml`.
 What each script does with the Cloudflare API token, which is what the token needs to allow:
 
 - `deploy.sh` publishes to the Pages project and, with `--prune`, lists and deletes its deployments.
-- `service/tool/forget.mjs` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
-- `service/tool/suspend.mjs` reads rows and writes orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
+- `./oh account delete` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
+- The other `./oh account` acts read rows and write orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, read and rewrite kept games in `OH_RECORDS` (Workers R2 Storage: Edit). `./oh config` reads and writes rows in `OH_STORE`.
 - `infra/apply.mjs` reads every resource that `infra/cloudflare.mjs` defines, and with `--apply` changes them.
-- The relay's deploy (`npx wrangler deploy` in `service/do`) uploads the relay worker with its Durable Objects, its container image and its custom domain.
+- The relay's deploy (`./oh deploy relay`, which runs `npx wrangler deploy` in `service/do`) uploads the relay worker with its Durable Objects, its container image and its custom domain.
 
 No script checks the token's permissions first. A missing permission shows as Cloudflare's own error, or for `infra/apply.mjs` as an `unread:` line.
 

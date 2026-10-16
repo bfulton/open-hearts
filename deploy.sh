@@ -19,7 +19,8 @@
 #                                newest [keep] (5) and anything live
 #   ./deploy.sh --prune -n       says what it would delete and stops
 #
-# Usage:  ./deploy.sh [branch-label]
+# Usage:  ./deploy.sh [branch-label], or better, ./oh deploy site
+# (docs/reference/oh.md), which says first what stands in the way.
 #
 # The label names the Pages branch, and Cloudflare gives every branch a
 # stable alias URL. Default is "dev" on any working branch — a short,
@@ -135,6 +136,12 @@ OH_APPLE_SERVICE_ID=${OH_APPLE_SERVICE_ID:-$(config_of c.apple?.servicesId)}
 # Production without the service's key is a build with live play shut
 # for everyone, subscribers included (it trusts no licence), so it is
 # refused here.
+# Production only from main as it was reviewed, and only when nothing
+# else stands in the way (ops/gate.mjs), whether or not oh started this.
+if [ "$LABEL" = main ]; then
+  node ops/gate.mjs site || { echo "deploy: not deployed to production" >&2; exit 1; }
+fi
+
 if [ "$LABEL" = main ] && ! [[ "${OH_SERVICE_KEY:-}" =~ ^[0-9a-f]{64}$ ]]; then
   echo "deploy: production needs the service's public key (64 hex), serviceKey in config/openhearts.json" >&2
   exit 1

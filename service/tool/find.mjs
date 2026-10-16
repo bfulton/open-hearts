@@ -1,5 +1,4 @@
-// An account found as the operator's tools find one (forget.mjs,
-// suspend.mjs): by the name it plays under, by the address its web
+// An account found as `oh account` finds one (ops/account.mjs): by the name it plays under, by the address its web
 // subscription was paid with, or by one of its devices' keys.
 
 import { accountsNamed, accountsPaidBy } from '../functions/deletion.mjs';
