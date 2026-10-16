@@ -385,7 +385,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get subscribe => 'Suscribirse';
 
   @override
-  String get aloneIsFree => 'Jugar solo es gratis, y siempre lo será.';
+  String get aloneIsFree =>
+      'Jugar solo es gratis, y no tenemos planes de cambiarlo.';
 
   @override
   String get findingPlayers => 'Buscando jugadores';
@@ -554,11 +555,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Jugar solo es gratis y siempre lo será, igual que los registros, el motor y cada línea de esto. Lo que pagas cubre la parte que nos cuesta mantener: poner a los jugadores en contacto, un relé cuando dos dispositivos no encuentran un camino directo, y un jurado cuando una mesa se queda sola.';
+      'Jugar solo es gratis, igual que los registros, el motor y cada línea de esto, y no tenemos planes de cambiarlo. Lo que pagas cubre la parte que nos cuesta mantener: poner a los jugadores en contacto, un relé cuando dos dispositivos no encuentran un camino directo, y un jurado cuando una mesa se queda sola.';
 
   @override
   String webRenewal(String price) {
-    return '$price al año, que pagas en la página de Stripe. Se renueva sola cada año hasta que la canceles, cuando quieras, en Gestionar suscripción; el año que pagaste termina por sí solo.';
+    return '$price al año, que pagas en la página de Stripe. Se renueva automáticamente cada año hasta que la canceles, al precio vigente en ese momento: te avisamos por correo al menos 7 días antes de que se aplique un nuevo precio. Cancela cuando quieras en Gestionar suscripción, y el juego en vivo dura hasta el final del año que pagaste.';
   }
 
   @override
@@ -1086,10 +1087,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'other': 'cuenta de Google',
     });
     String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple',
+      'other': 'Google',
+    });
+    String _temp2 = intl.Intl.selectLogic(store, {
       'apple': 'App Store',
       'other': 'Google Play',
     });
-    return '$price al año, cobrado a tu $_temp0 al confirmar. Se renueva sola cada año hasta que la canceles, cuando quieras, en los ajustes de suscripciones de $_temp1, al menos un día antes de la renovación.';
+    return '$price al año, cobrado a tu $_temp0 al confirmar. Se renueva automáticamente cada año hasta que la canceles, al precio vigente en ese momento, y $_temp1 te avisa antes de que se aplique un nuevo precio. Cancela cuando quieras en los ajustes de suscripciones de $_temp2, al menos un día antes de la renovación.';
   }
 
   @override

@@ -8,6 +8,7 @@ Use this guide to change the terms of use or the privacy policy on the site, or 
 | `./oh terms record` | Writes the ledger entry for a change this checkout makes. |
 | `./oh terms notified` | Records the day the App Store and Google Play were told of a material change. |
 | `./oh terms notify` | Emails web subscribers a published change that matters to them. A production deploy runs it. |
+| `./oh terms eula` | Prints the terms as plain text, for the App Store's licence agreement. |
 
 Each says what it would do and changes nothing without `--apply` ([the oh command](../reference/oh.md)).
 
@@ -76,6 +77,18 @@ Only while either app is in its store (`stores` in `site/build.mjs` names a list
    Commit it with the change, or in its own pull request if the change is on `main` already.
 
 A production deploy refuses a material change the stores weren't told of.
+
+## Update the licence agreement in the App Store
+
+Only for the terms, and only while the app is in the App Store. The terms are the app's licence agreement there, in place of Apple's standard one, so App Store Connect has to hold the same text.
+
+1. Once the change is published, print the terms as plain text:
+
+   ```bash
+   ./oh terms eula
+   ```
+
+1. In App Store Connect, open the app's **App Information**, and under **License Agreement** paste the text in place of the one there.
 
 ## Publish it
 

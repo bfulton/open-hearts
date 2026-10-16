@@ -385,7 +385,8 @@ class AppLocalizationsPt extends AppLocalizations {
   String get subscribe => 'Assinar';
 
   @override
-  String get aloneIsFree => 'Jogar sozinho é grátis, e sempre vai ser.';
+  String get aloneIsFree =>
+      'Jogar sozinho é grátis, e não temos planos de mudar isso.';
 
   @override
   String get findingPlayers => 'Procurando jogadores';
@@ -552,11 +553,11 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Jogar sozinho é grátis e sempre vai ser, assim como os registros, o motor e cada linha disto. O que o dinheiro paga é a parte que custa para mantermos: colocar vocês em contato, um relay quando dois aparelhos não acham um caminho direto, e um júri quando uma mesa fica sozinha.';
+      'Jogar sozinho é grátis, assim como os registros, o motor e cada linha disto, e não temos planos de mudar isso. O que o dinheiro paga é a parte que custa para mantermos: colocar vocês em contato, um relay quando dois aparelhos não acham um caminho direto, e um júri quando uma mesa fica sozinha.';
 
   @override
   String webRenewal(String price) {
-    return '$price por ano, pagos na página da Stripe. Renova sozinha a cada ano até você cancelar, quando quiser, em Gerenciar assinatura; o ano que você pagou termina sozinho.';
+    return '$price por ano, pagos na página da Stripe. Renova automaticamente a cada ano até você cancelar, pelo preço em vigor na época: avisamos você por e-mail pelo menos 7 dias antes de um novo preço passar a valer. Cancele quando quiser em Gerenciar assinatura, e o jogo ao vivo dura até o fim do ano que você pagou.';
   }
 
   @override
@@ -1083,10 +1084,14 @@ class AppLocalizationsPt extends AppLocalizations {
       'other': 'conta Google',
     });
     String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'a Apple',
+      'other': 'o Google',
+    });
+    String _temp2 = intl.Intl.selectLogic(store, {
       'apple': 'da App Store',
       'other': 'do Google Play',
     });
-    return '$price por ano, cobrados na sua $_temp0 ao confirmar. Renova sozinha a cada ano até você cancelar, quando quiser, nas assinaturas $_temp1, pelo menos um dia antes da renovação.';
+    return '$price por ano, cobrados na sua $_temp0 ao confirmar. Renova automaticamente a cada ano até você cancelar, pelo preço em vigor na época, e $_temp1 avisa você antes de um novo preço passar a valer. Cancele quando quiser nas assinaturas $_temp2, pelo menos um dia antes da renovação.';
   }
 
   @override

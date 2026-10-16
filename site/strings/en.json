@@ -154,7 +154,7 @@
     },
     "who": {
       "title": "Who we are",
-      "p1": "This policy is part of the <a href=\"{{base}}/terms\">terms</a> and covers what they cover; \"we\" are <a href=\"{{base}}/terms#who\">who they say</a>. The code is <a href=\"https://github.com/bfulton/open-hearts\">public</a>, so everything on this page can be checked against what the app actually does."
+      "p1": "This policy describes what Open Hearts does with data. It is not part of the <a href=\"{{base}}/terms\">terms</a>, and it covers what they cover; \"we\" are <a href=\"{{base}}/terms#who\">who they say</a>. The code is <a href=\"https://github.com/bfulton/open-hearts\">public</a>, so everything on this page can be checked against what the app actually does."
     },
     "device": {
       "title": "On your device",
@@ -162,7 +162,7 @@
       "p2": "<b>A key your device makes for itself.</b> It is a long random number with a public half and a secret half. The public half is this device at a live table; if you subscribe, your licence ties it to your account. The secret half never leaves the device.",
       "p3": "<b>Your name and how you look</b>: an icon and a colour, or a picture of your own. The picture is cut down to 64 by 64 pixels on your device, and only that small copy is kept. The photo you picked it from is not stored or sent. If you subscribe, our service keeps a copy with your account, as below.",
       "p4": "<b>Your last thirty games against the bots</b>, which your profile counts up. They leave the device only if you tap <i>Copy record</i>.",
-      "p5": "<b>How quickly you play</b>, your game options, the language you chose, your licence and your account's number if you subscribe, and the players whose pictures you chose to hide.",
+      "p5": "<b>How quickly you play</b>, your game options, the language you chose, your licence and your account's number if you subscribe, the players whose pictures you chose to hide, and the notices of changes to the terms or this policy that you dismissed.",
       "p6": "<b>The live game you are in</b>, while you are in it: the table, every move and vote your device signed there, and the secrets it dealt your cards with, so that a page reloaded mid-game can come back to its seat. It is deleted when the game ends or you leave it. If the app closes mid-game, it is deleted the next time the app opens, unless that is within two minutes, when you go back to your seat.",
       "p7": "To remove all of it, clear the data of play.openhearts.game in your browser (and of openhearts.game, where a browser that played before the game moved to play.openhearts.game keeps its earlier copy), or delete the app. That also removes your key, so the device comes back as a new player, until a backup code or your sign-in brings it into your account again."
     },
@@ -191,7 +191,7 @@
       "p8": "Where it goes",
       "p9": "Only to our relay, which runs on Cloudflare. Every message is signed by the device that sent it, so anyone who keeps a copy can show it is genuine; we cannot delete a copy someone else made.",
       "p10": "What only your table sees",
-      "p11": "The cards are dealt between the devices at the table so that each player's hand can be read by that player alone, and no server of ours ever sees a hand. Plays go from device to device.",
+      "p11": "The cards are dealt between the devices at the table so that each player's hand can be read by that player alone. Opening a hand would take another player at the table and a juror of the hand together, so no server of ours can read one alone. Where our service's backup jurors are on the jury, we could open a hand only together with a player at the table, and we do not. A juror holds the hand of each bot seat it plays, and the hand of a player who leaves mid-hand is opened for the rest of that hand, so that the table can finish. Plays go from device to device.",
       "p12": "Those connections all go through Cloudflare's relay service (TURN), so the other devices at your table never learn your IP address — not the other players, and not the <b>jurors</b>: the apps of other players, drawn at random, that help settle a table and play the bots' seats (or, when too few are online, our service's backup jurors). Cloudflare sees your IP address, as any server you connect to does, and passes the traffic on encrypted, so that it cannot read it.",
       "p13": "If nobody else is waiting and you choose to wait for a person, our service emails us that someone is waiting: the pool, the time, and the first few characters of your device's key and of your subscription — never your name or email address. One of us may come and play."
     },
@@ -201,7 +201,7 @@
       "p2": "Subscribing makes an account: a random number, not your name or email. We give Stripe your device's public key so the payment can be matched to it. In return our service keeps a short record: which account the subscription pays for, which device keys are in the account and when each was added, which one is in use now, and the dates the subscription runs to. It also keeps your account's profile — the name, icon, colour and picture you chose — so that every device in the account shows the same ones, and a change on one reaches the others. In Stripe we can see your email address, name, country, card brand, the last four digits of your card and your payments.",
       "p3": "That means we could connect a subscriber's email address with their account, and so with the names and results its devices have published. We do not publish that connection, and we use it only to run your subscription.",
       "p4": "If you add another device to your account, our service keeps a record of the one-use code you made and which devices made and used it. Any device in the account can see the others' keys, which one is in use, and remove them. Your account plays on one device at a time: opening the game on one makes it the one in use, and the device before it stops playing live until you take it back.",
-      "p5": "An account also has five backup codes, kept by our service with the account and shown on its devices, with a note of which have been used. If you subscribed on the web, we write to the address you paid with in three cases only: when you subscribe, with what you bought, how it renews, how to cancel, and the codes; with the codes again, whenever a device in the account asks for them; and before a change of price applies, to tell you of it. To do that we read the address from Stripe at that moment and hand it to <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, which sends the email for us; we do not keep the address. Stripe also writes to you itself about your payments, such as receipts and a reminder before each renewal, under its own privacy policy.",
+      "p5": "An account also has five backup codes, kept by our service with the account and shown on its devices, with a note of which have been used. If you subscribed on the web, we write to the address you paid with in these cases only: when you subscribe, with what you bought, how it renews, how to cancel, and the codes; with the codes again, whenever a device in the account asks for them; before a change of price applies to your subscription; and when the terms or this policy change in a way that matters to subscribers, to tell you what changed. To do that we read the address from Stripe at that moment and hand it to <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, which sends the email for us; we do not keep the address, only a note of which changes your subscription was told of, and when. Stripe also writes to you itself about your payments, such as receipts and a reminder before each renewal, under its own privacy policy.",
       "p6": "If you sign in with Apple or Google, we keep a scrambled form of the number they give for your sign-in — not your name or email — linked to your account, so that signing in the same way on another device brings it into the account. Your device keeps only which of the two you used. Apple or Google does the signing in, under its own privacy policy; on the web, its sign-in code is fetched only while a sign-in button is on the screen.",
       "p7": "When a subscription is bought, our service emails us which store it was bought in, the first few characters of it, and the dates it runs to, so that we can keep an eye on the service while it is small — never your name or email address."
     },
@@ -242,7 +242,7 @@
     },
     "changes": {
       "title": "Changes",
-      "p1": "If what the app does with data changes, this page changes with it, and the date at the top moves. Its history, and the code's, is <a href=\"https://github.com/bfulton/open-hearts\">on GitHub</a>."
+      "p1": "If what the app does with data changes, this page changes with it, and the date at the top moves. A change that matters to subscribers is told to them by email and in the app, as the <a href=\"{{base}}/terms#changes\">terms</a> say. Its history, and the code's, is <a href=\"https://github.com/bfulton/open-hearts\">on GitHub</a>."
     },
     "contact": {
       "title": "Contact",
@@ -262,9 +262,9 @@
     "short": {
       "title": "The short version",
       "p1": "Playing alone is free",
-      "p2": "No account, no ads, nothing to buy, and it will stay that way.",
+      "p2": "No account, no ads, nothing to buy, and we have no plans to change that.",
       "p3": "Live play is a yearly subscription",
-      "p4": "It renews each year until you cancel. Cancel whenever you like, and the year you paid for runs out on its own.",
+      "p4": "It renews automatically every year until you cancel. Cancel whenever you like, and live play lasts to the end of the year you have paid for.",
       "p5": "Be decent at the table",
       "p6": "Choose a name and picture you would show anyone, and do not cheat or harass.",
       "p7": "The code is yours too",
@@ -273,7 +273,7 @@
     "who": {
       "title": "Who these terms are with",
       "p1": "These terms are an agreement between you and Bright Fulton, who runs Open Hearts as a sole proprietor and whose address is under <a href=\"#contact\">Contact</a> (\"Open Hearts\", \"we\", \"us\"). They cover this site, the game at <a href=\"{{play}}\">play.openhearts.game</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
-      "p2": "How we handle information about you is in the <a href=\"{{base}}/privacy\">privacy policy</a>, which is part of these terms."
+      "p2": "How we handle information about you is described in the <a href=\"{{base}}/privacy\">privacy policy</a>. It is a separate document, not part of these terms, and it changes when what the app does with data changes."
     },
     "age": {
       "title": "Age",
@@ -281,7 +281,18 @@
     },
     "appStore": {
       "title": "If you got the app from the App Store",
-      "p1": "If you downloaded Open Hearts from Apple's App Store, your licence to use the app is Apple's <a href=\"https://www.apple.com/legal/internet-services/itunes/dev/stdeula/\">Licensed Application End User License Agreement</a> (the \"Standard EULA\"), between you and us. These terms add to it; where they disagree about the app itself, the Standard EULA wins. Apple is not a party to these terms and is not responsible for the app or its support. Anything you buy in the App Store is billed, renewed, cancelled and refunded by Apple, under Apple's own terms.",
+      "p1": "If you got Open Hearts from Apple's App Store, these terms are its end user licence agreement, in place of Apple's standard one, and the following also applies:",
+      "l1": "These terms are between you and us, not Apple. We, not Apple, are solely responsible for the app and what is in it.",
+      "l2": "Your licence to the app is a non-transferable licence to use it on any Apple-branded product that you own or control, as the Usage Rules in Apple's Media Services Terms and Conditions allow, except that other accounts linked to the purchaser's through Family Sharing or volume purchasing may use it too.",
+      "l3": "We alone are responsible for maintaining and supporting the app. Apple has no obligation to provide any maintenance or support for it.",
+      "l4": "If the app fails to conform to a warranty that applies to it and is not effectively disclaimed, you may tell Apple, and Apple will refund what you paid for the app, if anything. To the extent the law allows, Apple has no other warranty obligation for the app, and any other claim, loss, liability, damage, cost or expense that comes from such a failure is ours alone to answer for.",
+      "l5": "We, not Apple, are responsible for answering any claim by you or anyone else about the app or your having or using it, including claims of product liability, claims that the app fails to meet a legal or regulatory requirement, and claims under consumer protection, privacy or similar laws.",
+      "l6": "If anyone claims that the app, or your having or using it, infringes their intellectual property rights, we, not Apple, are solely responsible for investigating, defending, settling and discharging the claim.",
+      "l7": "You confirm that you are not in a country that is subject to a US Government embargo or that the US Government has designated as a \"terrorist supporting\" country, and that you are not on any US Government list of prohibited or restricted parties.",
+      "l8": "Questions, complaints and claims about the app go to us, at the address under <a href=\"#contact\">Contact</a>.",
+      "l9": "When you use the app, you must keep to the terms of anyone else that apply, such as your wireless data service agreement.",
+      "l10": "Apple and its subsidiaries are third-party beneficiaries of these terms, and once you accept them, Apple has the right to enforce them against you as a third-party beneficiary.",
+      "p3": "Anything you buy in the App Store is billed, renewed, cancelled and refunded by Apple, under Apple's own terms.",
       "p2": "If you got it from Google Play, Google Play's terms apply to the download and to anything bought there in the same way."
     },
     "alone": {
@@ -300,21 +311,22 @@
       "p8": "Price and length",
       "p9": "A subscription lasts one year and costs {{price}} a year in US dollars on the web, paid up front, plus any tax shown at checkout. In the App Store or Google Play the price is the one the store shows you, in your currency, before you buy.",
       "p10": "Automatic renewal",
-      "p11": "<b>A subscription renews automatically every year</b>, at the price then in force, and is charged to the same payment method, until you cancel it. If the price changes, the new price applies only from your next renewal, and the store, or for the web we, will tell you before it does.",
+      "p11": "<b>A subscription renews automatically every year</b>, at the price then in force, and is charged to the same payment method, until you cancel it. If the price of a web subscription changes, the new price applies to yours only from a renewal we have told you of by email, at least 7 and at most 30 days before it. In the App Store or Google Play, the store tells you of a new price under its own rules.",
       "p12": "<b>App Store:</b> payment is charged to your Apple Account when you confirm the purchase. The subscription renews unless it is cancelled at least 24 hours before the end of the current year, and your account is charged for the renewal within the 24 hours before that.",
       "p13": "<b>Google Play:</b> renewal and charging follow Google Play's rules, shown when you buy.",
-      "p14": "<b>Web:</b> the purchase is made through Stripe, and Stripe charges the card you gave it each year on the date you first subscribed. Before you pay, Stripe's checkout asks you to agree to these terms and to the yearly renewal. We then email you what you bought, how it renews and how to cancel, and Stripe emails you a reminder before each renewal.",
+      "p14": "<b>Web:</b> the purchase is made through Stripe, and Stripe charges the payment method you gave it each year on the date you first subscribed. Before you pay, Stripe's checkout asks you to agree to these terms and to the yearly renewal. We then email you what you bought, how it renews and how to cancel, and Stripe emails you a reminder before each renewal.",
       "p15": "Cancelling",
       "p16": "You can cancel at any time. Cancelling stops the next renewal; live play keeps working until the end of the year you have paid for.",
       "p17": "How to cancel — in the app, in each store, and when you no longer have any of your devices — is on the <a href=\"{{base}}/support#cancel\">support page</a>.",
       "p20": "Refunds",
-      "p21": "<b>App Store and Google Play:</b> refunds are handled by Apple or Google under their own policies. For the App Store, request one at <a href=\"https://reportaproblem.apple.com/\">reportaproblem.apple.com</a>. We cannot refund a store purchase ourselves.",
+      "p21": "<b>App Store:</b> refunds are Apple's to give, under its own policies: ask for one at <a href=\"https://reportaproblem.apple.com/\">reportaproblem.apple.com</a>. We cannot refund an App Store purchase ourselves.",
+      "p28": "<b>Google Play:</b> ask Google, under its policies, or contact us: we can refund a Google Play purchase ourselves.",
       "p22": "<b>Web:</b> contact us. Where the law where you live gives you a right to withdraw from the purchase or to a refund, you have it, and we will look fairly at any other request.",
-      "p23": "A refunded subscription stops being renewed, and live play on its devices ends when their current licence runs out, within about a month.",
+      "p23": "A refund ends the subscription: it is not renewed again, and live play on its devices stops at the end of the day it ends (in UTC). For a purchase in a store, that is the day the store tells us of the refund.",
       "p24": "Your devices",
-      "p25": "Subscribing makes an account, and the subscription and its devices belong to it. There is no password, and the account plays live on one device at a time: opening the game on another of its devices moves live play there, and a game left on the first counts as one you left. If you clear the game's data or delete the app on your only device in the account, bring the new one in with a backup code, or, if you signed in with Apple or Google, by signing in the same way again. Or contact us with the email address you paid with on the web, and we will help where we can.",
+      "p25": "Subscribing makes an account, and the subscription and its devices belong to it. There is no password, and the account plays live on one device at a time: opening the game on another of its devices moves live play there, and a game left on the first counts as one you left. If you clear the game's data or delete the app on your only device in the account, bring the new one in with a backup code, or, if you signed in with Apple or Google, by signing in the same way again. Or contact us with the email address you paid with on the web, and we will help where we can. You are responsible for the devices you bring into your account and for what is done in live play from them, so bring in only your own, and drop one you no longer have.",
       "p26": "Your device as a juror",
-      "p27": "While the game is open on the device your account plays live on, that device may be drawn as a juror at other subscribers' tables, a hand at a time: it helps deal the cards, plays the seats the bots hold, and settles turns the players cannot. That is how live tables work with no server of ours seeing a hand, and every subscriber's device does its part. It uses some of the device's data, battery and processing while the game is open, and the device is not drawn while the game is in the background or once it is closed. What it shares, and with whom, is in the <a href=\"{{base}}/privacy\">privacy policy</a>."
+      "p27": "While the game is open on the device your account plays live on, that device may be drawn as a juror at other subscribers' tables, a hand at a time: it helps deal the cards, plays the seats the bots hold, and settles turns the players cannot. That is how live tables work without a server of ours dealing the cards, and every subscriber's device does its part. It uses some of the device's data, battery and processing while the game is open, and the device is not drawn while the game is in the background or once it is closed. What it shares, and with whom, is in the <a href=\"{{base}}/privacy\">privacy policy</a>."
     },
     "table": {
       "title": "At a live table",
@@ -324,9 +336,10 @@
       "p4": "pretend to be another person, or to be us;",
       "p5": "harass, threaten or abuse other players;",
       "p6": "cheat: share cards with another player, play several seats at one table, or alter the game to gain an advantage;",
-      "p7": "attack, overload or try to break the service, the relays, or other players' devices, or use them for anything but playing.",
+      "p7": "attack, overload or try to break the service, the relays or other players' devices, or abuse them, for example by flooding them or by using them to carry or store anything but the game's own traffic.",
+      "p10": "Reading what the relay publishes and working out ratings from it are welcome, and so is looking for security problems in good faith and reporting them as our <a href=\"https://github.com/bfulton/open-hearts/security/policy\">security policy</a> asks.",
       "p8": "A player who stops playing can be booted by the table, and a bot takes the seat. A player who leaves a rated game finishes it last. You can hide another player's picture on your own device at any time.",
-      "p9": "To report a player or a picture, contact us (below). If a device or an account breaks these rules, we may remove its name or picture, suspend it from live play at once, and stop issuing its devices the licences live play needs. If we do that without a good reason, we will refund the unused part of a web subscription."
+      "p9": "To report a player or a picture, contact us (below). If a device or an account breaks these rules, we may remove its name or picture, suspend it from live play at once, and stop issuing its devices the licences live play needs. A suspended account's web subscription does not renew while the suspension lasts. If we suspend an account without a good reason, we will refund the unused part of a web subscription. We may also end an account, as <a href=\"#ending\">Ending these terms</a> says."
     },
     "content": {
       "title": "What you publish",
@@ -364,11 +377,12 @@
     "liability": {
       "title": "Limits on our liability",
       "p1": "To the extent the law allows, we are not liable for indirect, incidental or consequential loss, or for lost data, arising from your use of Open Hearts, and our total liability to you for anything arising from it is limited to what you paid us for live play in the twelve months before the claim, or five US dollars if that is more.",
-      "p2": "Nothing in these terms takes away rights you have under consumer law that cannot be taken away by agreement."
+      "p2": "Nothing in these terms limits or excludes our liability for fraud, for intentional misconduct, or for death or personal injury caused by our negligence, or any other liability that the law does not let us limit or exclude, and nothing in them takes away rights you have under consumer law that cannot be taken away by agreement."
     },
     "ending": {
       "title": "Ending these terms",
-      "p1": "You can stop using Open Hearts at any time, and cancel a subscription as described above. If we ever stop offering live play for good, we will stop renewals, say so here and in the app beforehand, and refund the unused part of any web subscription. Subscriptions bought in the App Store or Google Play are refunded under the store's rules. Interruptions, outages and maintenance are not stopping live play, and do not earn a refund."
+      "p1": "You can stop using Open Hearts at any time, and cancel a subscription as described above. If we ever stop offering live play for good, we will stop renewals, say so here and in the app beforehand, and refund the unused part of any web subscription. Subscriptions bought in the App Store or Google Play are refunded under the store's rules. Interruptions, outages and maintenance are not stopping live play, and do not earn a refund.",
+      "p2": "We may end your account, stopping its live play for good and ending its subscription, if you seriously or repeatedly break these terms, or if the law requires us to. We then refund the unused part of a web subscription, unless we ended the account for a serious breach, such as cheating, harassment, illegal content or fraud. A subscription bought in Google Play is cancelled and refunded under Google's rules. One bought in the App Store can be cancelled only by you, in the App Store, and is refunded by Apple, under its rules."
     },
     "law": {
       "title": "Law and disputes",
@@ -376,7 +390,13 @@
     },
     "changes": {
       "title": "Changes to these terms",
-      "p1": "If we change these terms, we will update this page and the date at the top. A change that matters to a subscriber applies from their next renewal, not in the middle of a year they have paid for. Earlier versions of this page are kept in the project's history <a href=\"https://github.com/bfulton/open-hearts\">on GitHub</a>. These terms are also offered in other languages; where a translation differs from this English version, the English version applies."
+      "p1": "We may change these terms. Before a change that matters to subscribers applies, we tell them of it: by email, to the address a web subscription was paid with, and in the app. It applies to a subscription from its next renewal, not in the middle of a year already paid for, unless the law requires it to apply sooner or it is needed to keep the service or its players safe, and then we say so when we tell you. Any other change, such as clearer wording, applies once it is published here. The date at the top is the day this version was published, and earlier versions of this page are kept in the project's history <a href=\"https://github.com/bfulton/open-hearts\">on GitHub</a>. These terms are also offered in other languages; where a translation differs from this English version, the English version applies."
+    },
+    "general": {
+      "title": "General",
+      "p1": "If a court finds any part of these terms unenforceable, the rest of them still applies.",
+      "p2": "We may transfer these terms, with our rights and duties under them, to someone who takes over running Open Hearts; your rights under them stay the same. You may not transfer yours without our agreement.",
+      "p3": "We send you notices by email, to the address a web subscription was paid with, or in the app. Send yours to us at the email or postal address under <a href=\"#contact\">Contact</a>."
     },
     "contact": {
       "title": "Contact",

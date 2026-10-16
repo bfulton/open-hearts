@@ -191,6 +191,18 @@ Records the day the App Store and Google Play were told of the document's newest
 - **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#tell-the-app-stores)
 - **Example:** `oh terms notified terms --on 2026-11-02 --apply`
 
+### oh terms eula
+
+```bash
+oh terms eula
+```
+
+Prints the terms, in English, as plain text: the licence agreement App Store Connect takes for the app. Paste it into App Store Connect whenever the terms change while the app is in the App Store.
+
+- **Needs:** nothing but this checkout
+- **How-to:** [change-the-terms.md](../how-to/change-the-terms.md#update-the-licence-agreement-in-the-app-store)
+- **Example:** `oh terms eula`
+
 ### oh terms notify
 
 ```bash

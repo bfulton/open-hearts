@@ -154,7 +154,7 @@
     },
     "who": {
       "title": "Quem somos",
-      "p1": "Esta política faz parte dos <a href=\"{{base}}/terms\">termos</a> e cobre o que eles cobrem; \"nós\" somos <a href=\"{{base}}/terms#who\">quem eles dizem</a>. O código é <a href=\"https://github.com/bfulton/open-hearts\">público</a>, então tudo nesta página pode ser conferido com o que o app realmente faz."
+      "p1": "Esta política descreve o que o Open Hearts faz com os dados. Ela não faz parte dos <a href=\"{{base}}/terms\">termos</a>, e cobre o que eles cobrem; \"nós\" somos <a href=\"{{base}}/terms#who\">quem eles dizem</a>. O código é <a href=\"https://github.com/bfulton/open-hearts\">público</a>, então tudo nesta página pode ser conferido com o que o app realmente faz."
     },
     "device": {
       "title": "No seu aparelho",
@@ -162,7 +162,7 @@
       "p2": "<b>Uma chave que o seu aparelho cria para si mesmo.</b> É um número aleatório longo, com uma metade pública e uma metade secreta. A metade pública é este aparelho numa mesa ao vivo; se você assinar, a sua licença a liga à sua conta. A metade secreta nunca sai do aparelho.",
       "p3": "<b>Seu nome e sua aparência</b>: um ícone e uma cor, ou uma imagem sua. A imagem é reduzida para 64 por 64 pixels no seu aparelho, e só essa cópia pequena é guardada. A foto de onde você a tirou não é guardada nem enviada. Se você assinar, o nosso serviço guarda uma cópia com a sua conta, como explicado abaixo.",
       "p4": "<b>Suas últimas trinta partidas contra os bots</b>, que o seu perfil contabiliza. Elas só saem do aparelho se você tocar em <i>Copiar registro</i>.",
-      "p5": "<b>Com que rapidez você joga</b>, as opções da partida, o idioma que você escolheu, a sua licença e o número da sua conta se você assinar, e os jogadores cujas imagens você escolheu esconder.",
+      "p5": "<b>Com que rapidez você joga</b>, as opções da partida, o idioma que você escolheu, a sua licença e o número da sua conta se você assinar, os jogadores cujas imagens você escolheu esconder, e os avisos de mudanças nos termos ou nesta política que você dispensou.",
       "p6": "<b>A partida ao vivo em que você está</b>, enquanto estiver nela: a mesa, cada jogada e voto que o seu aparelho assinou ali, e os segredos com que ele distribuiu as suas cartas, para que uma página recarregada no meio da partida possa voltar ao seu lugar. Isso é apagado quando a partida termina ou você sai dela. Se o app fechar no meio da partida, é apagado na próxima vez que ele abrir, a menos que seja dentro de dois minutos: aí você volta ao seu lugar.",
       "p7": "Para remover tudo isso, apague os dados de play.openhearts.game no navegador (e os de openhearts.game, onde um navegador que jogou antes de o jogo mudar para play.openhearts.game guarda a sua cópia anterior), ou desinstale o app. Isso também remove a sua chave, então o aparelho volta como um jogador novo, até que um código de backup ou o seu login o traga de volta à sua conta."
     },
@@ -191,7 +191,7 @@
       "p8": "Para onde vai",
       "p9": "Só para o nosso relay, que roda na Cloudflare. Cada mensagem é assinada pelo aparelho que a enviou, então qualquer um que guarde uma cópia pode mostrar que ela é autêntica; não podemos apagar uma cópia feita por outra pessoa.",
       "p10": "O que só a sua mesa vê",
-      "p11": "As cartas são distribuídas entre os aparelhos da mesa de forma que a mão de cada jogador só possa ser lida por ele, e nenhum servidor nosso jamais vê uma mão. As jogadas vão de aparelho para aparelho.",
+      "p11": "As cartas são distribuídas entre os aparelhos da mesa de forma que a mão de cada jogador só possa ser lida por ele. Abrir uma mão exigiria outro jogador da mesa e um jurado da mão juntos, então nenhum servidor nosso consegue ler uma sozinho. Quando os jurados reserva do nosso serviço fazem parte do júri, só conseguiríamos abrir uma mão junto com um jogador da mesa, e não fazemos isso. Um jurado tem a mão de cada lugar de bot que joga, e a mão de um jogador que sai no meio de uma mão é aberta pelo resto dessa mão, para que a mesa possa terminar. As jogadas vão de aparelho para aparelho.",
       "p12": "Todas essas conexões passam pelo serviço de relay da Cloudflare (TURN), então os outros aparelhos da sua mesa nunca ficam sabendo o seu endereço IP — nem os outros jogadores, nem os <b>jurados</b>: os apps de outros jogadores, sorteados, que ajudam a resolver uma mesa e jogam nos lugares dos bots (ou, quando há poucos online, os jurados reserva do nosso serviço). A Cloudflare vê o seu endereço IP, como qualquer servidor a que você se conecta, e repassa o tráfego criptografado, de modo que não consegue lê-lo.",
       "p13": "Se não houver mais ninguém esperando e você escolher esperar por uma pessoa, o nosso serviço nos manda um e-mail dizendo que alguém está esperando: o grupo, a hora e os primeiros caracteres da chave do seu aparelho e da sua assinatura, nunca o seu nome nem o seu e-mail. Talvez um de nós venha jogar."
     },
@@ -201,7 +201,7 @@
       "p2": "Assinar cria uma conta: um número aleatório, não o seu nome nem o seu e-mail. Nós damos à Stripe a chave pública do seu aparelho para que o pagamento possa ser associado a ela. Em troca, o nosso serviço guarda um registro curto: qual conta a assinatura paga, quais chaves de aparelho estão na conta e quando cada uma foi adicionada, qual está em uso agora, e as datas até quando a assinatura vale. Ele também guarda o perfil da sua conta — o nome, o ícone, a cor e a imagem que você escolheu — para que todos os aparelhos da conta mostrem os mesmos, e uma mudança em um chegue aos outros. Na Stripe, podemos ver o seu endereço de e-mail, nome, país, bandeira do cartão, os quatro últimos dígitos do cartão e os seus pagamentos.",
       "p3": "Isso significa que poderíamos ligar o endereço de e-mail de um assinante à conta dele e, assim, aos nomes e aos resultados que os aparelhos dela publicaram. Nós não publicamos essa ligação, e só a usamos para manter a sua assinatura funcionando.",
       "p4": "Se você adicionar outro aparelho à sua conta, o nosso serviço guarda um registro do código de uso único que você criou e de quais aparelhos o criaram e o usaram. Qualquer aparelho da conta pode ver as chaves dos outros, qual está em uso, e removê-los. A sua conta joga em um aparelho por vez: abrir o jogo num aparelho faz dele o que está em uso, e o anterior para de jogar ao vivo até você retomá-lo.",
-      "p5": "Uma conta também tem cinco códigos de backup, guardados pelo nosso serviço junto com a conta e mostrados nos aparelhos dela, com uma anotação de quais já foram usados. Se você assinou na web, escrevemos para o endereço com que você pagou só em três casos: quando você assina, com o que comprou, como a assinatura é renovada, como cancelar e os códigos; de novo com os códigos, sempre que um aparelho da conta nos pedir; e antes que uma mudança de preço passe a valer, para avisar você. Para isso, lemos o endereço na Stripe naquele momento e o passamos à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, que envia o e-mail por nós; nós não guardamos o endereço. A Stripe também escreve para você sobre os seus pagamentos, como recibos e um lembrete antes de cada renovação, conforme a política de privacidade dela.",
+      "p5": "Uma conta também tem cinco códigos de backup, guardados pelo nosso serviço junto com a conta e mostrados nos aparelhos dela, com uma anotação de quais já foram usados. Se você assinou na web, escrevemos para o endereço com que você pagou só nestes casos: quando você assina, com o que comprou, como a assinatura é renovada, como cancelar e os códigos; de novo com os códigos, sempre que um aparelho da conta nos pedir; antes que uma mudança de preço passe a valer para a sua assinatura; e quando os termos ou esta política mudam de um jeito que importa para os assinantes, para contar o que mudou. Para isso, lemos o endereço na Stripe naquele momento e o passamos à <a href=\"https://www.cloudflare.com/privacypolicy/\">Cloudflare</a>, que envia o e-mail por nós; nós não guardamos o endereço, só uma anotação de quais mudanças foram avisadas à sua assinatura, e quando. A Stripe também escreve para você sobre os seus pagamentos, como recibos e um lembrete antes de cada renovação, conforme a política de privacidade dela.",
       "p6": "Se você entrar com Apple ou Google, guardamos uma forma embaralhada do número que eles dão ao seu login — não o seu nome nem o seu e-mail — ligada à sua conta, para que entrar do mesmo jeito em outro aparelho o traga para a conta. O seu aparelho guarda só qual dos dois você usou. O login é feito pela Apple ou pelo Google, sob a política de privacidade de cada um; na web, o código de login deles só é baixado enquanto há um botão de login na tela.",
       "p7": "Quando uma assinatura é comprada, o nosso serviço nos manda um e-mail com a loja em que foi comprada, os primeiros caracteres dela e as datas até quando vale, para podermos acompanhar o serviço enquanto ele é pequeno — nunca o seu nome nem o seu e-mail."
     },
@@ -242,7 +242,7 @@
     },
     "changes": {
       "title": "Mudanças",
-      "p1": "Se o que o app faz com os dados mudar, esta página muda junto, e a data no topo também. O histórico dela, e o do código, está <a href=\"https://github.com/bfulton/open-hearts\">no GitHub</a>."
+      "p1": "Se o que o app faz com os dados mudar, esta página muda junto, e a data no topo também. Uma mudança que importe para os assinantes é avisada a eles por e-mail e no app, como dizem os <a href=\"{{base}}/terms#changes\">termos</a>. O histórico dela, e o do código, está <a href=\"https://github.com/bfulton/open-hearts\">no GitHub</a>."
     },
     "contact": {
       "title": "Contato",
@@ -262,9 +262,9 @@
     "short": {
       "title": "A versão curta",
       "p1": "Jogar sozinho é grátis",
-      "p2": "Sem conta, sem anúncios, nada para comprar, e vai continuar assim.",
+      "p2": "Sem conta, sem anúncios, nada para comprar, e não temos planos de mudar isso.",
       "p3": "O jogo ao vivo é uma assinatura anual",
-      "p4": "Ela renova a cada ano até você cancelar. Cancele quando quiser, e o ano que você pagou termina sozinho.",
+      "p4": "Ela renova automaticamente todo ano até você cancelar. Cancele quando quiser, e o jogo ao vivo dura até o fim do ano que você pagou.",
       "p5": "Seja decente na mesa",
       "p6": "Escolha um nome e uma imagem que você mostraria a qualquer pessoa, e não trapaceie nem assedie ninguém.",
       "p7": "O código também é seu",
@@ -273,7 +273,7 @@
     "who": {
       "title": "Com quem é este acordo",
       "p1": "Estes termos são um acordo entre você e Bright Fulton, que mantém o Open Hearts como pessoa física e cujo endereço está em <a href=\"#contact\">Contato</a> (\"Open Hearts\", \"nós\"). Eles cobrem este site, o jogo em <a href=\"{{play}}\">play.openhearts.game</a>, os apps do Open Hearts para celular e o serviço de jogo ao vivo. Ao usar qualquer um deles, você concorda com estes termos. Se não concordar, por favor não os use.",
-      "p2": "Como tratamos informações sobre você está na <a href=\"{{base}}/privacy\">política de privacidade</a>, que faz parte destes termos."
+      "p2": "Como tratamos informações sobre você está descrito na <a href=\"{{base}}/privacy\">política de privacidade</a>. Ela é um documento à parte, que não faz parte destes termos, e muda quando muda o que o app faz com os dados."
     },
     "age": {
       "title": "Idade",
@@ -281,7 +281,18 @@
     },
     "appStore": {
       "title": "Se você baixou o app na App Store",
-      "p1": "Se você baixou o Open Hearts na App Store da Apple, a sua licença para usar o app é o <a href=\"https://www.apple.com/legal/internet-services/itunes/dev/stdeula/\">Contrato de Licença de Usuário Final de Aplicativo Licenciado</a> da Apple (a \"EULA Padrão\"), entre você e nós. Estes termos se somam a ela; onde discordarem sobre o próprio app, vale a EULA Padrão. A Apple não é parte destes termos e não é responsável pelo app nem pelo suporte a ele. Tudo o que você compra na App Store é cobrado, renovado, cancelado e reembolsado pela Apple, conforme os termos da própria Apple.",
+      "p1": "Se você obteve o Open Hearts na App Store da Apple, estes termos são o contrato de licença de usuário final dele, no lugar do padrão da Apple, e também vale o seguinte:",
+      "l1": "Estes termos são entre você e nós, não com a Apple. Nós, e não a Apple, somos os únicos responsáveis pelo app e pelo conteúdo dele.",
+      "l2": "A sua licença do app é uma licença intransferível para usá-lo em qualquer produto da marca Apple que você possua ou controle, conforme as Regras de Uso dos Termos e Condições dos Serviços de Mídia da Apple permitirem, exceto que outras contas ligadas à de quem comprou pelo Compartilhamento Familiar ou por compras por volume também podem usá-lo.",
+      "l3": "Só nós somos responsáveis pela manutenção e pelo suporte do app. A Apple não tem nenhuma obrigação de oferecer manutenção ou suporte para ele.",
+      "l4": "Se o app não cumprir uma garantia que se aplique a ele e que não tenha sido validamente excluída, você pode avisar a Apple, e a Apple reembolsará o que você pagou pelo app, se pagou algo. Na medida em que a lei permitir, a Apple não tem nenhuma outra obrigação de garantia sobre o app, e qualquer outra reclamação, perda, responsabilidade, dano, custo ou despesa decorrente desse descumprimento cabe somente a nós.",
+      "l5": "Nós, e não a Apple, somos responsáveis por responder a qualquer reclamação sua ou de outra pessoa sobre o app ou sobre você tê-lo ou usá-lo, incluindo reclamações de responsabilidade pelo produto, de que o app não cumpre um requisito legal ou regulatório e as baseadas em leis de proteção ao consumidor, de privacidade ou semelhantes.",
+      "l6": "Se alguém alegar que o app, ou você tê-lo ou usá-lo, viola os direitos de propriedade intelectual dessa pessoa, nós, e não a Apple, somos os únicos responsáveis por investigar, defender, fazer acordo e quitar essa reclamação.",
+      "l7": "Você confirma que não está em um país sujeito a embargo do Governo dos Estados Unidos ou designado por ele como país que \"apoia o terrorismo\", e que não está em nenhuma lista do Governo dos Estados Unidos de partes proibidas ou restritas.",
+      "l8": "Perguntas, reclamações e queixas sobre o app devem ser enviadas a nós, no endereço em <a href=\"#contact\">Contato</a>.",
+      "l9": "Ao usar o app, você deve cumprir os termos de terceiros que se apliquem, como o seu contrato de serviço de dados móveis.",
+      "l10": "A Apple e as subsidiárias dela são terceiras beneficiárias destes termos e, assim que você os aceitar, a Apple terá o direito de fazê-los valer contra você como terceira beneficiária.",
+      "p3": "Tudo o que você compra na App Store é cobrado, renovado, cancelado e reembolsado pela Apple, conforme os termos da própria Apple.",
       "p2": "Se você o baixou no Google Play, os termos do Google Play se aplicam da mesma forma ao download e a qualquer coisa comprada lá."
     },
     "alone": {
@@ -300,21 +311,22 @@
       "p8": "Preço e duração",
       "p9": "Uma assinatura dura um ano e custa {{price}} por ano, em dólares americanos, na web, paga adiantado, mais qualquer imposto mostrado no pagamento. Na App Store ou no Google Play, o preço é o que a loja mostra a você, na sua moeda, antes da compra.",
       "p10": "Renovação automática",
-      "p11": "<b>A assinatura renova automaticamente todo ano</b>, pelo preço em vigor na época, e é cobrada no mesmo meio de pagamento, até você cancelar. Se o preço mudar, o novo preço só vale a partir da sua próxima renovação, e a loja, ou nós, no caso da web, vai avisar você antes disso.",
+      "p11": "<b>A assinatura renova automaticamente todo ano</b>, pelo preço em vigor na época, e é cobrada no mesmo meio de pagamento, até você cancelar. Se o preço de uma assinatura feita na web mudar, o novo preço só vale para a sua a partir de uma renovação sobre a qual avisamos você por e-mail, com pelo menos 7 e no máximo 30 dias de antecedência. Na App Store ou no Google Play, a loja avisa você de um novo preço conforme as regras dela.",
       "p12": "<b>App Store:</b> o pagamento é cobrado na sua Conta Apple quando você confirma a compra. A assinatura renova a não ser que seja cancelada pelo menos 24 horas antes do fim do ano em curso, e a renovação é cobrada na sua conta nas 24 horas anteriores a isso.",
       "p13": "<b>Google Play:</b> a renovação e a cobrança seguem as regras do Google Play, mostradas quando você compra.",
-      "p14": "<b>Web:</b> a compra é feita pela Stripe, e a Stripe cobra no cartão que você informou a ela, todo ano, na data em que você assinou pela primeira vez. Antes de você pagar, a página de pagamento da Stripe pede que você aceite estes termos e a renovação anual. Depois, enviamos por e-mail o que você comprou, como a assinatura é renovada e como cancelar, e a Stripe envia um lembrete antes de cada renovação.",
+      "p14": "<b>Web:</b> a compra é feita pela Stripe, e a Stripe cobra no meio de pagamento que você informou a ela, todo ano, na data em que você assinou pela primeira vez. Antes de você pagar, a página de pagamento da Stripe pede que você aceite estes termos e a renovação anual. Depois, enviamos por e-mail o que você comprou, como a assinatura é renovada e como cancelar, e a Stripe envia um lembrete antes de cada renovação.",
       "p15": "Cancelamento",
       "p16": "Você pode cancelar a qualquer momento. Cancelar interrompe a próxima renovação; o jogo ao vivo continua funcionando até o fim do ano que você pagou.",
       "p17": "Como cancelar — no app, em cada loja e quando você não tem mais nenhum dos seus aparelhos — está na <a href=\"{{base}}/support#cancel\">página de suporte</a>.",
       "p20": "Reembolsos",
-      "p21": "<b>App Store e Google Play:</b> os reembolsos são tratados pela Apple ou pelo Google, conforme as políticas deles. Para a App Store, peça em <a href=\"https://reportaproblem.apple.com/\">reportaproblem.apple.com</a>. Não podemos reembolsar nós mesmos uma compra feita na loja.",
+      "p21": "<b>App Store:</b> os reembolsos são concedidos pela Apple, conforme as políticas dela: peça um em <a href=\"https://reportaproblem.apple.com/\">reportaproblem.apple.com</a>. Não podemos reembolsar nós mesmos uma compra feita na App Store.",
+      "p28": "<b>Google Play:</b> peça ao Google, conforme as políticas dele, ou fale com a gente: podemos reembolsar nós mesmos uma compra feita no Google Play.",
       "p22": "<b>Web:</b> fale com a gente. Onde a lei do lugar em que você mora lhe der o direito de desistir da compra ou de receber um reembolso, você tem esse direito, e vamos analisar com justiça qualquer outro pedido.",
-      "p23": "Uma assinatura reembolsada deixa de ser renovada, e o jogo ao vivo nos aparelhos dela acaba quando a licença atual deles vencer, em cerca de um mês.",
+      "p23": "Um reembolso encerra a assinatura: ela não é renovada de novo, e o jogo ao vivo nos aparelhos dela para no fim do dia em que ela termina (em UTC). Numa compra feita em uma loja, esse é o dia em que a loja nos informa o reembolso.",
       "p24": "Seus aparelhos",
-      "p25": "Assinar cria uma conta, à qual pertencem a assinatura e os aparelhos dela. Não há senha, e a conta joga ao vivo em um aparelho por vez: abrir o jogo em outro aparelho dela leva o jogo ao vivo para lá, e uma partida deixada no primeiro conta como abandonada por você. Se você apagar os dados do jogo ou desinstalar o app no seu único aparelho da conta, traga o novo com um código de backup ou, se você entrou com Apple ou Google, entrando do mesmo jeito de novo. Ou fale com a gente usando o endereço de e-mail com que pagou na web, e ajudaremos no que pudermos.",
+      "p25": "Assinar cria uma conta, à qual pertencem a assinatura e os aparelhos dela. Não há senha, e a conta joga ao vivo em um aparelho por vez: abrir o jogo em outro aparelho dela leva o jogo ao vivo para lá, e uma partida deixada no primeiro conta como abandonada por você. Se você apagar os dados do jogo ou desinstalar o app no seu único aparelho da conta, traga o novo com um código de backup ou, se você entrou com Apple ou Google, entrando do mesmo jeito de novo. Ou fale com a gente usando o endereço de e-mail com que pagou na web, e ajudaremos no que pudermos. Você é responsável pelos aparelhos que traz para a sua conta e pelo que é feito no jogo ao vivo a partir deles, então traga só os seus, e remova um que você não tenha mais.",
       "p26": "Seu aparelho como jurado",
-      "p27": "Enquanto o jogo está aberto no aparelho em que a sua conta joga ao vivo, esse aparelho pode ser sorteado como jurado nas mesas de outros assinantes, uma mão de cada vez: ajuda a distribuir as cartas, joga nos lugares dos bots e resolve as vezes que os jogadores não conseguem resolver. É assim que as mesas ao vivo funcionam sem que nenhum servidor nosso veja uma mão, e o aparelho de cada assinante faz a sua parte. Isso usa um pouco dos dados, da bateria e do processamento do aparelho enquanto o jogo está aberto, e o aparelho não é sorteado enquanto o jogo está em segundo plano nem depois de fechado. O que ele compartilha, e com quem, está na <a href=\"{{base}}/privacy\">política de privacidade</a>."
+      "p27": "Enquanto o jogo está aberto no aparelho em que a sua conta joga ao vivo, esse aparelho pode ser sorteado como jurado nas mesas de outros assinantes, uma mão de cada vez: ajuda a distribuir as cartas, joga nos lugares dos bots e resolve as vezes que os jogadores não conseguem resolver. É assim que as mesas ao vivo funcionam sem que um servidor nosso distribua as cartas, e o aparelho de cada assinante faz a sua parte. Isso usa um pouco dos dados, da bateria e do processamento do aparelho enquanto o jogo está aberto, e o aparelho não é sorteado enquanto o jogo está em segundo plano nem depois de fechado. O que ele compartilha, e com quem, está na <a href=\"{{base}}/privacy\">política de privacidade</a>."
     },
     "table": {
       "title": "Numa mesa ao vivo",
@@ -324,9 +336,10 @@
       "p4": "se passar por outra pessoa, ou por nós;",
       "p5": "assediar, ameaçar ou ofender outros jogadores;",
       "p6": "trapacear: mostrar cartas a outro jogador, jogar em vários lugares de uma mesma mesa, ou alterar o jogo para levar vantagem;",
-      "p7": "atacar, sobrecarregar ou tentar derrubar o serviço, os relays ou os aparelhos de outros jogadores, ou usá-los para qualquer coisa que não seja jogar.",
+      "p7": "atacar, sobrecarregar ou tentar derrubar o serviço, os relays ou os aparelhos de outros jogadores, ou abusar deles, por exemplo inundando-os ou usando-os para transmitir ou guardar qualquer coisa que não seja o tráfego do próprio jogo.",
+      "p10": "Ler o que o relay publica e calcular ratings a partir disso é bem-vindo, assim como procurar problemas de segurança de boa-fé e informá-los como a nossa <a href=\"https://github.com/bfulton/open-hearts/security/policy\">política de segurança</a> pede.",
       "p8": "Um jogador que para de jogar pode ser expulso pela mesa, e um bot fica com o lugar. Um jogador que sai de uma partida ranqueada termina em último. Você pode esconder a imagem de outro jogador no seu próprio aparelho a qualquer momento.",
-      "p9": "Para denunciar um jogador ou uma imagem, fale com a gente (abaixo). Se um aparelho ou uma conta desrespeitar estas regras, podemos remover o nome ou a imagem dele, suspendê-lo do jogo ao vivo na hora e deixar de emitir para os aparelhos dele as licenças de que o jogo ao vivo precisa. Se fizermos isso sem um bom motivo, reembolsaremos a parte não usada de uma assinatura feita na web."
+      "p9": "Para denunciar um jogador ou uma imagem, fale com a gente (abaixo). Se um aparelho ou uma conta desrespeitar estas regras, podemos remover o nome ou a imagem dele, suspendê-lo do jogo ao vivo na hora e deixar de emitir para os aparelhos dele as licenças de que o jogo ao vivo precisa. A assinatura web de uma conta suspensa não é renovada enquanto durar a suspensão. Se suspendermos uma conta sem um bom motivo, reembolsaremos a parte não usada de uma assinatura feita na web. Também podemos encerrar uma conta, como diz <a href=\"#ending\">Fim destes termos</a>."
     },
     "content": {
       "title": "O que você publica",
@@ -364,11 +377,12 @@
     "liability": {
       "title": "Limites da nossa responsabilidade",
       "p1": "Na medida em que a lei permitir, não somos responsáveis por perdas indiretas, incidentais ou consequentes, nem por perda de dados, decorrentes do seu uso do Open Hearts, e a nossa responsabilidade total perante você por qualquer coisa decorrente disso se limita ao que você nos pagou pelo jogo ao vivo nos doze meses anteriores à reclamação, ou a cinco dólares americanos, se isso for mais.",
-      "p2": "Nada nestes termos tira direitos que você tem pela lei do consumidor e que não podem ser retirados por acordo."
+      "p2": "Nada nestes termos limita ou exclui a nossa responsabilidade por fraude, por conduta dolosa ou por morte ou lesão corporal causada por nossa negligência, nem qualquer outra responsabilidade que a lei não nos permita limitar ou excluir, e nada neles tira direitos que você tem pela lei do consumidor e que não podem ser retirados por acordo."
     },
     "ending": {
       "title": "Fim destes termos",
-      "p1": "Você pode parar de usar o Open Hearts a qualquer momento, e cancelar uma assinatura como descrito acima. Se um dia deixarmos de oferecer o jogo ao vivo de forma definitiva, vamos interromper as renovações, avisar com antecedência, aqui e no app, e reembolsar a parte não usada de qualquer assinatura feita na web. Assinaturas compradas na App Store ou no Google Play são reembolsadas conforme as regras da loja. Interrupções, quedas e manutenções não significam deixar de oferecer o jogo ao vivo, e não dão direito a reembolso."
+      "p1": "Você pode parar de usar o Open Hearts a qualquer momento, e cancelar uma assinatura como descrito acima. Se um dia deixarmos de oferecer o jogo ao vivo de forma definitiva, vamos interromper as renovações, avisar com antecedência, aqui e no app, e reembolsar a parte não usada de qualquer assinatura feita na web. Assinaturas compradas na App Store ou no Google Play são reembolsadas conforme as regras da loja. Interrupções, quedas e manutenções não significam deixar de oferecer o jogo ao vivo, e não dão direito a reembolso.",
+      "p2": "Podemos encerrar a sua conta, acabando de vez com o jogo ao vivo dela e encerrando a assinatura dela, se você desrespeitar estes termos de forma grave ou repetida, ou se a lei nos obrigar. Nesse caso, reembolsamos a parte não usada de uma assinatura feita na web, a menos que tenhamos encerrado a conta por uma violação grave, como trapaça, assédio, conteúdo ilegal ou fraude. Uma assinatura comprada no Google Play é cancelada e reembolsada conforme as regras do Google. Uma comprada na App Store só pode ser cancelada por você, na App Store, e é reembolsada pela Apple, conforme as regras dela."
     },
     "law": {
       "title": "Lei e disputas",
@@ -376,7 +390,13 @@
     },
     "changes": {
       "title": "Mudanças nestes termos",
-      "p1": "Se mudarmos estes termos, vamos atualizar esta página e a data no topo. Uma mudança que importe para um assinante vale a partir da próxima renovação dele, não no meio de um ano que ele já pagou. As versões anteriores desta página ficam guardadas no histórico do projeto <a href=\"https://github.com/bfulton/open-hearts\">no GitHub</a>. Estes termos também são oferecidos em outros idiomas; onde uma tradução diferir desta versão em inglês, vale a versão em inglês."
+      "p1": "Podemos mudar estes termos. Antes que uma mudança que importe para os assinantes passe a valer, nós os avisamos: por e-mail, no endereço com que uma assinatura web foi paga, e no app. Ela vale para uma assinatura a partir da próxima renovação, não no meio de um ano já pago, a menos que a lei exija que valha antes ou que ela seja necessária para manter o serviço ou os jogadores seguros, e nesse caso dizemos isso ao avisar você. Qualquer outra mudança, como uma redação mais clara, vale assim que é publicada aqui. A data no topo é o dia em que esta versão foi publicada, e as versões anteriores desta página ficam guardadas no histórico do projeto <a href=\"https://github.com/bfulton/open-hearts\">no GitHub</a>. Estes termos também são oferecidos em outros idiomas; onde uma tradução diferir desta versão em inglês, vale a versão em inglês."
+    },
+    "general": {
+      "title": "Disposições gerais",
+      "p1": "Se um tribunal considerar alguma parte destes termos inexequível, o restante continua valendo.",
+      "p2": "Podemos transferir estes termos, com os nossos direitos e deveres por eles, a quem passar a administrar o Open Hearts; os seus direitos por eles continuam os mesmos. Você não pode transferir os seus sem o nosso acordo.",
+      "p3": "Enviamos avisos a você por e-mail, no endereço com que uma assinatura web foi paga, ou no app. Envie os seus para nós no endereço de e-mail ou postal em <a href=\"#contact\">Contato</a>."
     },
     "contact": {
       "title": "Contato",

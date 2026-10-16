@@ -12,7 +12,7 @@ import { test } from 'node:test';
 
 import { main } from './oh.mjs';
 import { releaseProblems } from './gate.mjs';
-import { termsProblems } from './terms.mjs';
+import { plainTextOf, termsProblems } from './terms.mjs';
 import { config, languages, origin, render, stores, strings } from '../site/build.mjs';
 import { fingerprintOf, fingerprintOfTexts, formatLedger, textOf } from '../site/ledger.mjs';
 import { memoryStore } from '../service/functions/rows.mjs';
@@ -271,4 +271,23 @@ test('notify after a deploy waits for the site to serve what was published, and 
   assert.equal(await main(['terms', 'notify', '--after-deploy', '--apply'], never), 1);
   assert.match(never.said.join('\n'), /the site does not serve what was just published \(terms: serves 2026-10-16\)/);
   assert.deepEqual(never.orders, []);
+});
+
+test('the licence agreement for the App Store: the terms as plain text, every word and every address', async () => {
+  const ctx = context({ ledger: ledgerWith() });
+  assert.equal(await main(['terms', 'eula'], ctx), 0);
+  const text = ctx.said.join('\n');
+  assert.doesNotMatch(text, /<[a-z/]|&amp;|\{\{/, 'no markup left');
+  assert.match(text, /^Open Hearts — Terms of Use\nLast updated /);
+  assert.match(text, /\n- Playing alone is free: No account,/);
+  assert.match(text, /Apple and its subsidiaries are third-party beneficiaries of these terms/);
+  assert.match(text, /the privacy policy \(https:\/\/openhearts\.game\/privacy\)/, 'a link on the site, written out');
+  assert.match(text, /\nEmail help@openhearts\.game, or write to:\n\nBright Fulton\nOpen Hearts\n/, 'an address as its words, lines as lines');
+  assert.match(text, /under Contact \("Open Hearts"/, 'a link within the page, as its words');
+  // Each of the page's words is in it, in order.
+  const page = render('terms', languages.find((l) => l.code === 'en'), strings('en'));
+  const words = (s) => s.replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').match(/[A-Za-z]{4,}/g);
+  const missing = words(textOf(page)).filter((w) => !text.includes(w));
+  assert.deepEqual(missing, [], 'nothing dropped');
+  assert.equal(plainTextOf('<h1>T</h1><p class="updated">U</p><main><p>A &amp; <a href="https://x.example/y">B</a></p></main>'), 'T\nU\n\nA & B (https://x.example/y)\n');
 });

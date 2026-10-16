@@ -13,7 +13,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Failed, Usage, root } from './env.mjs';
-import { languages, origin, stores } from '../site/build.mjs';
+import { languages, origin, render, stores, strings } from '../site/build.mjs';
 import { DOCUMENTS, fingerprintOf, fingerprintOfTexts, formatLedger, ledgerProblems, rewritten, textOf, told } from '../site/ledger.mjs';
 import { NOTICE_DAYS, NOTICES_PER_ORDER } from '../service/functions/notices.mjs';
 import { dayOf } from '../service/functions/rows.mjs';
@@ -270,4 +270,48 @@ export async function notify(ctx, { flags }) {
   }
   if (!flags.apply) return ctx.log('nothing sent; --apply sends it');
   if (failed) throw new Failed(`${failed} notice(s) did not go: run ./oh terms notify --apply again`);
+}
+
+/// [html], a page as built, as plain text a person reads: its title,
+/// its date, and its <main>, with headings set apart, list items
+/// marked, and each link's address written after it.
+export function plainTextOf(html) {
+  const part = (pattern) => pattern.exec(html)?.[1] ?? '';
+  const entities = (s) => s.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+  // White space in HTML is a space; lines come from the tags.
+  const flat = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/<svg\b[\s\S]*?<\/svg>/g, '').replace(/\s+/g, ' ');
+  // A link within the page, or to an address or a number it shows, is
+  // its words; any other, its words and where it goes.
+  const link = (_, href, label) => {
+    if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return label;
+    const url = href.startsWith('/') ? `${origin}${href}` : href;
+    return label.replace(/<[^>]*>/g, '').trim() === url.replace(/^https?:\/\//, '') ? url : `${label} (${url})`;
+  };
+  const text = (s) =>
+    entities(
+      flat(s)
+        .replace(/<\/b>\s*<span>/g, '</b>: <span>')
+        .replace(/<a\b[^>]*?\bhref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g, link)
+        .replace(/<br\s*\/?>/g, '\n')
+        .replace(/<h2\b[^>]*>/g, '\n\n\n')
+        .replace(/<h3\b[^>]*>/g, '\n\n')
+        .replace(/<li\b[^>]*>/g, '\n- ')
+        .replace(/<\/?(p|ul|ol|address|section|h2|h3)\b[^>]*>/g, '\n')
+        .replace(/<[^>]*>/g, ''),
+    )
+      .split('\n')
+      .map((line) => line.replace(/ +/g, ' ').trim())
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/\n\n- /g, '\n- ');
+  const title = entities(flat(part(/<h1[^>]*>([\s\S]*?)<\/h1>/)).replace(/<[^>]*>/g, '')).trim();
+  return `${title}\n${text(part(/<p class="updated">([\s\S]*?)<\/p>/)).trim()}\n\n${text(part(/<main\b[^>]*>([\s\S]*)<\/main>/)).trim()}\n`;
+}
+
+/// The terms, in English, as plain text: what App Store Connect takes as
+/// the app's licence agreement, which the terms are (their "If you got
+/// the app from the App Store").
+export async function eula(ctx) {
+  const english = languages.find((l) => l.code === 'en');
+  ctx.log(plainTextOf(render('terms', english, strings('en'))).trimEnd());
 }

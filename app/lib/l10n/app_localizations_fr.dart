@@ -385,7 +385,8 @@ class AppLocalizationsFr extends AppLocalizations {
   String get subscribe => 'S\'abonner';
 
   @override
-  String get aloneIsFree => 'Jouer seul est gratuit, et le restera.';
+  String get aloneIsFree =>
+      'Jouer seul est gratuit, et nous n\'avons pas l\'intention de changer cela.';
 
   @override
   String get findingPlayers => 'Recherche de joueurs';
@@ -551,11 +552,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Jouer seul est gratuit et le restera, tout comme les relevés, le moteur et chaque ligne de ce code. L\'argent paie ce qui nous coûte à faire tourner : vous mettre en relation, un relais quand deux appareils ne trouvent pas de chemin direct, et un juré quand une table est laissée seule.';
+      'Jouer seul est gratuit, tout comme les relevés, le moteur et chaque ligne de ce code, et nous n\'avons pas l\'intention de changer cela. L\'argent paie ce qui nous coûte à faire tourner : vous mettre en relation, un relais quand deux appareils ne trouvent pas de chemin direct, et un juré quand une table est laissée seule.';
 
   @override
   String webRenewal(String price) {
-    return '$price par an, payé sur la page de Stripe. L\'abonnement se renouvelle tout seul chaque année jusqu\'à ce que vous le résiliiez, quand vous voulez, dans Gérer l\'abonnement ; l\'année payée s\'arrête d\'elle-même.';
+    return '$price par an, payé sur la page de Stripe. L\'abonnement se renouvelle automatiquement chaque année jusqu\'à ce que vous le résiliiez, au prix alors en vigueur : nous vous écrivons au moins 7 jours avant qu\'un nouveau prix s\'applique. Résiliez quand vous voulez dans Gérer l\'abonnement ; le jeu en direct dure jusqu\'à la fin de l\'année payée.';
   }
 
   @override
@@ -1085,10 +1086,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'other': 'compte Google',
     });
     String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple',
+      'other': 'Google',
+    });
+    String _temp2 = intl.Intl.selectLogic(store, {
       'apple': 'de l\'App Store',
       'other': 'de Google Play',
     });
-    return '$price par an, débité sur votre $_temp0 à la confirmation. L\'abonnement se renouvelle tout seul chaque année jusqu\'à ce que vous le résiliiez, quand vous voulez, dans les réglages d\'abonnement $_temp1, au moins un jour avant le renouvellement.';
+    return '$price par an, débité sur votre $_temp0 à la confirmation. L\'abonnement se renouvelle automatiquement chaque année jusqu\'à ce que vous le résiliiez, au prix alors en vigueur, et $_temp1 vous prévient avant qu\'un nouveau prix s\'applique. Résiliez quand vous voulez dans les réglages d\'abonnement $_temp2, au moins un jour avant le renouvellement.';
   }
 
   @override

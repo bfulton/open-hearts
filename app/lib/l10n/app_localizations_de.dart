@@ -392,7 +392,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get subscribe => 'Abonnieren';
 
   @override
-  String get aloneIsFree => 'Allein spielen ist kostenlos und bleibt es.';
+  String get aloneIsFree =>
+      'Allein spielen ist kostenlos, und wir haben nicht vor, das zu ändern.';
 
   @override
   String get findingPlayers => 'Suche Mitspieler';
@@ -561,11 +562,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Allein spielen ist kostenlos und bleibt es, genau wie die Protokolle, die Engine und jede Zeile hiervon. Das Geld bezahlt den Teil, dessen Betrieb uns etwas kostet: euch miteinander zu verbinden, ein Relay, wenn zwei Geräte keinen direkten Weg finden, und einen Juror, wenn ein Tisch allein gelassen wird.';
+      'Allein spielen ist kostenlos, genau wie die Protokolle, die Engine und jede Zeile hiervon, und wir haben nicht vor, das zu ändern. Das Geld bezahlt den Teil, dessen Betrieb uns etwas kostet: euch miteinander zu verbinden, ein Relay, wenn zwei Geräte keinen direkten Weg finden, und einen Juror, wenn ein Tisch allein gelassen wird.';
 
   @override
   String webRenewal(String price) {
-    return '$price im Jahr, bezahlt auf der Seite von Stripe. Das Abo verlängert sich jedes Jahr von selbst, bis du kündigst – jederzeit, unter Abo verwalten; das bezahlte Jahr läuft einfach aus.';
+    return '$price im Jahr, bezahlt auf der Seite von Stripe. Das Abo verlängert sich jedes Jahr automatisch, bis du kündigst, zum dann geltenden Preis: Wir schreiben dir mindestens 7 Tage, bevor ein neuer Preis gelten würde. Kündige jederzeit unter Abo verwalten; Live-Spiel läuft bis zum Ende des bezahlten Jahres.';
   }
 
   @override
@@ -1095,10 +1096,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'other': 'Google-Konto',
     });
     String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple',
+      'other': 'Google',
+    });
+    String _temp2 = intl.Intl.selectLogic(store, {
       'apple': 'des App Store',
       'other': 'von Google Play',
     });
-    return '$price im Jahr, abgebucht über dein $_temp0, wenn du bestätigst. Das Abo verlängert sich jedes Jahr von selbst, bis du kündigst – jederzeit, in den Abo-Einstellungen $_temp1, spätestens einen Tag vor der Verlängerung.';
+    return '$price im Jahr, abgebucht über dein $_temp0, wenn du bestätigst. Das Abo verlängert sich jedes Jahr automatisch, bis du kündigst, zum dann geltenden Preis, und $_temp1 informiert dich, bevor ein neuer Preis gilt. Kündige jederzeit in den Abo-Einstellungen $_temp2, spätestens einen Tag vor der Verlängerung.';
   }
 
   @override

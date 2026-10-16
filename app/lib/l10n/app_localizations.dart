@@ -539,7 +539,7 @@ abstract class AppLocalizations {
   /// Under the Subscribe button on the front door.
   ///
   /// In en, this message translates to:
-  /// **'Playing alone is free, and always will be.'**
+  /// **'Playing alone is free, and we have no plans to change that.'**
   String get aloneIsFree;
 
   /// Heading while waiting to be seated at a live table.
@@ -731,13 +731,13 @@ abstract class AppLocalizations {
   /// On the Live play page, under the points.
   ///
   /// In en, this message translates to:
-  /// **'Playing alone is free and always will be, and so are the records, the engine and every line of this. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.'**
+  /// **'Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.'**
   String get whatMoneyPaysFor;
 
   /// Under the Subscribe button on the web, where Stripe takes the payment: the price, that it is a year, that it renews by itself until cancelled, and where to cancel (Manage subscription, on this page once subscribed). California's automatic renewal law asks for all of it beside the button.
   ///
   /// In en, this message translates to:
-  /// **'{price} a year, paid on Stripe\'s page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.'**
+  /// **'{price} a year, paid on Stripe\'s page. It renews automatically every year until you cancel, at the price then in force: we email you at least 7 days before a new price would apply. Cancel whenever you like under Manage subscription, and live play lasts to the end of the year you paid for.'**
   String webRenewal(String price);
 
   /// Under the Subscribe button, on the web and in the stores: buying is agreeing to the terms, linked just below.
@@ -1457,7 +1457,7 @@ abstract class AppLocalizations {
   /// Under the Subscribe button in the App Store and Google Play builds: the price, that it is a year, that it renews by itself, and how to cancel. The stores require all four. 'store' is apple or google.
   ///
   /// In en, this message translates to:
-  /// **'{price} a year, charged to your {store, select, apple{Apple Account} other{Google account}} when you confirm. It renews by itself every year until you cancel, which you can do whenever you like in {store, select, apple{the App Store\'s} other{Google Play\'s}} subscription settings, at least a day before it renews.'**
+  /// **'{price} a year, charged to your {store, select, apple{Apple Account} other{Google account}} when you confirm. It renews automatically every year until you cancel, at the price then in force, and {store, select, apple{Apple} other{Google}} tells you before a new price applies. Cancel whenever you like in {store, select, apple{the App Store\'s} other{Google Play\'s}} subscription settings, at least a day before it renews.'**
   String storeRenewal(String price, String store);
 
   /// Above the Manage subscription button for a subscription bought in the App Store or Google Play. 'store' is apple or google.

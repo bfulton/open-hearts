@@ -169,6 +169,16 @@ export const COMMANDS = [
     run: lazy('./terms.mjs', 'notified'),
   },
   {
+    words: ['terms', 'eula'],
+    group: 'terms',
+    summary: 'Prints the terms, in English, as plain text: the licence agreement App Store Connect takes for the app.',
+    more: 'Paste it into App Store Connect whenever the terms change while the app is in the App Store.',
+    needs: [],
+    howto: 'docs/how-to/change-the-terms.md#update-the-licence-agreement-in-the-app-store',
+    example: 'oh terms eula',
+    run: lazy('./terms.mjs', 'eula'),
+  },
+  {
     words: ['terms', 'notify'],
     group: 'terms',
     flags: ['apply', 'after-deploy'],

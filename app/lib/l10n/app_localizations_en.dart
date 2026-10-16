@@ -385,7 +385,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subscribe => 'Subscribe';
 
   @override
-  String get aloneIsFree => 'Playing alone is free, and always will be.';
+  String get aloneIsFree =>
+      'Playing alone is free, and we have no plans to change that.';
 
   @override
   String get findingPlayers => 'Finding players';
@@ -549,11 +550,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get whatMoneyPaysFor =>
-      'Playing alone is free and always will be, and so are the records, the engine and every line of this. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.';
+      'Playing alone is free, and so are the records, the engine and every line of this; we have no plans to change that. What the money pays for is the part that costs us to run: putting you in touch with each other, a relay when your two devices cannot find a way through, and a juror when a table is left alone.';
 
   @override
   String webRenewal(String price) {
-    return '$price a year, paid on Stripe\'s page. It renews by itself every year until you cancel, which you can do whenever you like under Manage subscription; the year you paid for runs out on its own.';
+    return '$price a year, paid on Stripe\'s page. It renews automatically every year until you cancel, at the price then in force: we email you at least 7 days before a new price would apply. Cancel whenever you like under Manage subscription, and live play lasts to the end of the year you paid for.';
   }
 
   @override
@@ -1079,10 +1080,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'other': 'Google account',
     });
     String _temp1 = intl.Intl.selectLogic(store, {
+      'apple': 'Apple',
+      'other': 'Google',
+    });
+    String _temp2 = intl.Intl.selectLogic(store, {
       'apple': 'the App Store\'s',
       'other': 'Google Play\'s',
     });
-    return '$price a year, charged to your $_temp0 when you confirm. It renews by itself every year until you cancel, which you can do whenever you like in $_temp1 subscription settings, at least a day before it renews.';
+    return '$price a year, charged to your $_temp0 when you confirm. It renews automatically every year until you cancel, at the price then in force, and $_temp1 tells you before a new price applies. Cancel whenever you like in $_temp2 subscription settings, at least a day before it renews.';
   }
 
   @override
