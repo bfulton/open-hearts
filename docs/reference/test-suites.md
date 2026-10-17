@@ -17,6 +17,7 @@ For why the checks are split this way, see [how Open Hearts is tested](../explan
 - With `CHECK_PLAN` set to any non-empty value, `check.sh` prints the lanes it would run, and runs nothing.
 - Each suite's output is in `build/check/<suite>.log`. A table of suites, results and times follows the run. The exit code is the verdict.
 - The suites `engine`, `deal`, `table`, `table_slow`, `app`, `app_analyze` and `crypto` run at the lowest priority (`patient` in `check.sh`).
+- Before any of `engine`, `deal`, `table`, `table_slow`, `service`, `service_js` or `service_object`, the step `deps` runs `dart pub get` in `packages/engine`, `packages/deal`, `packages/table_sim`, `packages/table` and `service`, as CI does: `dart analyze` doesn't fetch dependencies itself, and the three service suites, side by side in one package, would each fetch them at once. It has a row in the table and a log, `build/check/deps.log`.
 - `<cores>` below is the machine's core count.
 
 ## Suites
@@ -39,7 +40,7 @@ Each suite is a `suite_<name>` function in `check.sh`, run from the repository's
 | `ops` | `node --test ops/*.test.mjs`: [the oh command](oh.md), its reference against its table, and each command against fakes of the store, Stripe and the programs it starts |
 | `workers` | `node --test` on `e2e/deal_worker.test.mjs`, `e2e/deal_golden.test.mjs`, `e2e/offline_worker.test.mjs`, `e2e/carry.test.mjs` and `crypto/schnorr_wasm/vectors.test.mjs`: the page's workers, against the committed wasm |
 | `crypto` | `cargo clippy` with warnings as errors, and `cargo test`, in `crypto/deal` and `crypto/schnorr`; `cargo test` in `crypto/vendor`; `cargo clippy` for the wasm target in `crypto/schnorr_wasm` |
-| `scripts` | `bash -n` on `check.sh`, `deploy.sh`, `build_phone.sh`, `oh`, `e2e/*.sh`, `crypto/*.sh`, `app/ios/*.sh` and `service/bench/build.sh`; `node --check` on `e2e/*.mjs` and `app/tool/*.mjs`; and, when Python has `yaml`, a parse of `.github/workflows/*.yml` |
+| `scripts` | `bash -n` on `check.sh`, `deploy.sh`, `build_phone.sh`, `oh`, `e2e/*.sh`, `crypto/*.sh`, `app/ios/*.sh` and `service/bench/build.sh`; `node --check` on `e2e/*.mjs` and `app/tool/*.mjs`; `CHECK_PLAN=1 ./check.sh full`, which fails if a suite is in none of its lanes; and, when Python has `yaml`, a parse of `.github/workflows/*.yml` |
 | `docs` | `node --test docs/links.test.mjs`, then `node docs/links.mjs` |
 | `app_analyze` | `flutter analyze` in `app` |
 | `app` | `flutter test -j <cores>` in `app`, then `flutter test --platform chrome test/web`. Chrome is `CHROME_EXECUTABLE`, else one on the `PATH`, else one in macOS's Applications, else Playwright's Chromium. |
@@ -83,14 +84,14 @@ For the `app` suite, `quick` passes `-x slow`, and runs only the test files that
 
 ## What full runs
 
-`full` runs five lanes side by side. Within a lane, steps run one after another, and suites joined by a comma run together. A failed `e2e_build` ends its lane, and the suites after it are reported as skipped.
+`full` runs five lanes side by side. Within a lane, steps run one after another, and suites joined by a comma run together. A failed `e2e_build` ends its lane, and the suites after it are reported as skipped. `full` refuses to run, and exits with 2, if a suite that `list` prints is in no lane; the `scripts` suite checks this with `CHECK_PLAN`.
 
 | Lane | Steps |
 |---|---|
 | 1 | `table`, then `table_slow` |
 | 2 | `app_analyze`, then `app` (every tier) |
 | 3 | `engine` and `deal` |
-| 4 | `relay_js`, `functions`, `site`, `infra`, `workers`, `scripts` and `docs`; then `crypto`, only where `crypto/deal` has been built with cargo here and `cargo` is on the `PATH` |
+| 4 | `relay_js`, `functions`, `site`, `infra`, `ops`, `workers`, `scripts` and `docs`; then `crypto`, only where `crypto/deal` has been built with cargo here and `cargo` is on the `PATH`. Otherwise `full` says that `crypto` didn't run. |
 | 5 | `e2e_build`; then `e2e_move` and `e2e_site`; then `service`, `service_js`, `service_object` and `e2e_escrow`; then `e2e_run` and `e2e_offline`; then `e2e_flows` |
 
 
