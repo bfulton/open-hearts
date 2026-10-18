@@ -2,7 +2,9 @@
 // to hear about one at a time (config/openhearts.json, `alerts`): each
 // subscription as it is bought, and each subscriber who, finding the
 // pool empty, chose to wait for a person rather than play bots — so
-// that someone can come and play. Each is written down for a while
+// that someone can come and play. (And, once a day, the new pictures
+// subscribers put out, `pictures`, which the relay worker sends itself:
+// service/do/review.mjs.) Each is written down for a while
 // under its subscription, so a webhook delivered twice, or a wait
 // chosen twice in a few minutes, is told once.
 //
@@ -33,7 +35,7 @@ const WAITING_MINUTES = 10;
 export function alertsOf(env) {
   const to = env.OH_ALERTS_TO;
   if (!ours(to)) return null;
-  return { to, subscribed: env.OH_ALERT_SUBSCRIBED === 'on', waiting: env.OH_ALERT_WAITING === 'on' };
+  return { to, subscribed: env.OH_ALERT_SUBSCRIBED === 'on', waiting: env.OH_ALERT_WAITING === 'on', pictures: env.OH_ALERT_PICTURES === 'on' };
 }
 
 const short = (s) => String(s ?? '').slice(0, 8);

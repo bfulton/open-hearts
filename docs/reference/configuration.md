@@ -32,6 +32,7 @@ The non-secret configuration, committed and the same for every deployment.
 | `alerts.to` | `OH_ALERTS_TO` | none | Where the operator's alerts go. Only an `@openhearts.game` address is taken (`alertsOf` in `service/functions/alerts.mjs`). |
 | `alerts.subscribed` | `OH_ALERT_SUBSCRIBED` (`on` when `true`) | none | Email the operator about each new subscription. |
 | `alerts.waiting` | `OH_ALERT_WAITING` (`on` when `true`) | none | Email the operator when a subscriber waits for a person (the `waiting` handler). |
+| `alerts.pictures` | `OH_ALERT_PICTURES` (`on` when `true`) | none | Email the operator once a day the new pictures subscribers put out at live tables (`reviewRun` in `service/do/review.mjs`; [Look at the day's new pictures](../how-to/look-at-new-pictures.md)). |
 
 The app also reads `OH_PLAY_PACKAGE` as a build define (`app/lib/net/store_buying.dart`). `appDefines` does not set it, so the default in that file applies.
 
@@ -89,8 +90,11 @@ From `service/do/wrangler.toml`.
 | `HOUSEHOLD` | Durable Object, class `Household` | Each account's object. The Pages project binds the same class. |
 | `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The backup jurors (`service/do/bench.mjs`). |
 | `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it, and each relay object reads [relay settings](#relay-settings) from it. |
-| `EMAIL` | Email Sending (`send_email`) | Backup-code emails and the operator's alerts. |
+| `OH_PICTURES` | R2 bucket `open-hearts-pictures` | A copy of each new picture a subscriber puts out, for the operator to look at, served at `pictures.openhearts.game` (`service/do/review.mjs`). |
+| `EMAIL` | Email Sending (`send_email`) | Backup-code emails, the operator's alerts, and the day's new pictures. |
 | `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
+
+Its schedule (`triggers.crons`) runs once a day at 13:00 UTC: it deletes the copies in `OH_PICTURES` that nobody has put out for 30 days, and emails the operator the new ones when `alerts.pictures` is on.
 
 ## Environment variables
 

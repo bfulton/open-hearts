@@ -34,6 +34,7 @@ Operating:
 - [Mint or rotate the service key](how-to/rotate-the-service-key.md)
 - [Register the payment and sign-in webhooks](how-to/set-up-webhooks.md)
 - [Delete an account's data on request](how-to/delete-an-accounts-data.md)
+- [Look at the day's new pictures](how-to/look-at-new-pictures.md)
 - [Suspend an account, or take its name or picture off](how-to/suspend-an-account.md)
 - [End an account, or refund a subscription](how-to/end-an-account.md)
 - [Change the terms, the privacy policy or the price](how-to/change-the-terms.md)

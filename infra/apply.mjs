@@ -196,6 +196,9 @@ async function applyStores() {
     if (!bucket) {
       say(`create R2 bucket ${b.name} (${b.location})`);
       if (write) await cf('POST', `${acct}/r2/buckets`, { name: b.name, locationHint: b.location.toLowerCase(), storageClass: b.storageClass });
+      // A new bucket has no address but what is defined: its custom
+      // domains, attached in the same run.
+      for (const d of b.customDomains) await attachDomain(b, base, d);
       continue;
     }
     const before = counts.change + counts.owner;
@@ -211,9 +214,7 @@ async function applyStores() {
       say(`detach custom domain ${d.domain} from R2 bucket ${b.name}`);
       if (write) await cf('DELETE', `${base}/domains/custom/${d.domain}`);
     }
-    for (const d of b.customDomains.filter((x) => !custom.some((c) => c.domain === x))) {
-      owner(`attach custom domain ${d} to R2 bucket ${b.name} (the dashboard's Settings, Custom Domains)`);
-    }
+    for (const d of b.customDomains.filter((x) => !custom.some((c) => c.domain === x))) await attachDomain(b, base, d);
     // No CORS rules: a page elsewhere has no business reading it.
     const cors = await maybe(`${base}/cors`).catch((e) => {
       // 404 and "does not exist" (10059) both mean none.
@@ -256,6 +257,19 @@ async function applyRelay() {
     const routes = (toml.routes ?? []).map((r) => r.pattern).join(', ');
     ok(`relay worker ${name} matches ${relay.wrangler}: ${routes} only, ${settings.bindings.length} bindings, secrets ${relay.secrets.join(', ')}`);
   }
+}
+
+/// Custom domain [d] attached to R2 bucket [b], at [base], in the
+/// defined zone the name ends with.
+async function attachDomain(b, base, d) {
+  const zone = Object.keys(zones).find((z) => d === z || d.endsWith(`.${z}`));
+  const id = zone ? await zoneId(zone) : null;
+  if (!id) {
+    owner(`attach custom domain ${d} to R2 bucket ${b.name}: no zone of the account holds it`);
+    return;
+  }
+  say(`attach custom domain ${d} to R2 bucket ${b.name}`);
+  if (write) await cf('POST', `${base}/domains/custom`, { domain: d, zoneId: id, enabled: true, minTLS: '1.2' });
 }
 
 async function zoneId(name) {

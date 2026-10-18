@@ -37,7 +37,10 @@ import wasm from '../../app/web/schnorr.wasm';
 import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tagOf, tally } from './relay.mjs';
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
+import { pictureKeeper, reviewRun } from './review.mjs';
 import { PICTURES_ROW } from '../functions/pictures.mjs';
+import { alertsOf } from '../functions/alerts.mjs';
+import { storeOf } from '../functions/rows.mjs';
 import { Bench as BenchObject, callIn } from './bench.mjs';
 import { withConfig } from '../functions/deployment.mjs';
 // The service's settings that are not secret, as the Pages worker reads
@@ -76,12 +79,17 @@ export class TagRelay {
     // The pictures the operator took down (withheld.mjs), read from the
     // store at most once a minute while pictures come this way.
     this.pictures = pictureScreen({ read: () => this.env.OH_STORE?.get(PICTURES_ROW.join('|'), 'json') ?? null });
+    // Each new picture a subscriber puts out, copied for the operator
+    // to look at (review.mjs), where the bucket is bound (OH_PICTURES).
+    this.keepPicture = pictureKeeper({ bucket: this.env.OH_PICTURES ?? null });
   }
 
-  /// A call for a juror heard here, passed to the backup jurors where
-  /// they are bound (wrangler.toml, BENCH). Not awaited by the relay:
-  /// the caller has its OK already, and they take a while to start.
-  heard(event) {
+  /// An event the relay took, from [who]: a picture copied for the
+  /// operator to look at, and a call for a juror passed to the backup
+  /// jurors where they are bound (wrangler.toml, BENCH). Neither is
+  /// awaited by the relay: the caller has its OK already.
+  heard(event, who) {
+    this.state.waitUntil(this.keepPicture(event, who).catch((e) => console.log(`picture not kept for review: ${e}`)));
     const table = callIn(event);
     if (!table || !this.env.BENCH) return;
     const now = Date.now();
@@ -122,7 +130,7 @@ export class TagRelay {
       count: (what, n) => this.tally.count(what, n),
       // The operator's limits are presence's; a table's are the relay's own.
       limits: presence ? limits : null,
-      heard: (event) => this.heard(event),
+      heard: (event, who) => this.heard(event, who),
       store: await kept.load(),
       kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
       withhold: (event) => this.pictures.withheld(event),
@@ -234,6 +242,23 @@ export class TagRelay {
 }
 
 export default {
+  /// Once a day (wrangler.toml, crons): the pictures kept since the last
+  /// run emailed to the operator, if the config asks for it, and the
+  /// copies nobody has put out for 30 days deleted (review.mjs).
+  async scheduled(controller, env, ctx) {
+    const e = withConfig(env, config);
+    const alerts = alertsOf(e);
+    const store = storeOf(e);
+    if (!alerts?.pictures || !e.OH_PICTURES || !e.EMAIL || !store) return;
+    const from = { email: e.OH_MAIL_FROM, name: 'Open Hearts' };
+    ctx.waitUntil(
+      reviewRun({ bucket: e.OH_PICTURES, store, send: (mail) => e.EMAIL.send({ to: alerts.to, from, ...mail }) }).then(
+        (r) => console.log(`pictures to look at: ${r.sent} emailed, ${r.more} for later, ${r.deleted} copies deleted`),
+        (err) => console.log(`pictures to look at: not done: ${err}`),
+      ),
+    );
+  },
+
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
     // The root answers, for the monitor that asks whether the relay is

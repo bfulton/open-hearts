@@ -16,5 +16,5 @@
     "playPushAudience": null,
     "playPushEmail": null
   },
-  "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "waiting": true }
+  "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "waiting": true, "pictures": true }
 }

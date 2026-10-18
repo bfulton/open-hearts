@@ -402,6 +402,10 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// is asked, and carried nothing until it has answered. A socket may
 /// then also have `close()`, for the relay to end it.
 ///
+/// [heard], when given, is told of each event the relay took, after its
+/// OK, with who the gate let in to say it ({account, key, …}), or null
+/// where there is no gate.
+///
 /// [withhold], when given, says of an event (or a promise of saying)
 /// why the relay keeps it to itself, or null: one the operator took
 /// down (service/do/withheld.mjs). Published, such an event is answered
@@ -611,9 +615,10 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       for (const id of stored) seen.add(id);
     }
     send(from, ['OK', event.id, true, '']);
-    // Whatever the host wants to know of an event it took: a call for a
-    // juror, for one (worker.mjs).
-    heard?.(event);
+    // Whatever the host wants to know of an event it took, and from
+    // whom: a call for a juror, a picture to keep for the operator to
+    // look at (worker.mjs).
+    heard?.(event, auths.get(from)?.who ?? null);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);
     let delivered = 0;

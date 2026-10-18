@@ -31,6 +31,7 @@ export function configEnv(config) {
     OH_ALERTS_TO: alerts.to,
     OH_ALERT_SUBSCRIBED: on(alerts.subscribed),
     OH_ALERT_WAITING: on(alerts.waiting),
+    OH_ALERT_PICTURES: on(alerts.pictures),
   };
   return Object.fromEntries(Object.entries(named).filter(([, v]) => typeof v === 'string' && v));
 }

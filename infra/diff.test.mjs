@@ -400,7 +400,7 @@ test("toml: the relay's own wrangler.toml reads", () => {
   assert.deepEqual(wrangler.routes, [{ pattern: 'relay.openhearts.game', custom_domain: true }]);
   assert.deepEqual(
     wranglerBindings(wrangler).map((b) => `${b.type}:${b.name}`).sort(),
-    ['analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
+    ['analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'r2_bucket:OH_PICTURES', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
   );
 });
 
@@ -417,6 +417,7 @@ const liveRelay = () => ({
       { name: 'OH_JUROR_SECRET', type: 'secret_text' },
       { dataset: 'open_hearts_relay', name: 'OH_METRICS', type: 'analytics_engine' },
       { name: 'OH_MAIL_FROM', text: 'noreply@openhearts.game', type: 'plain_text' },
+      { bucket_name: 'open-hearts-pictures', name: 'OH_PICTURES', type: 'r2_bucket' },
       { name: 'OH_STORE', namespace_id: '5b65151de63341dc9f7a9d417c9b6a4e', type: 'kv_namespace' },
       { class_name: 'TagRelay', name: 'TABLE', namespace_id: '744b', type: 'durable_object_namespace' },
     ],

@@ -40,8 +40,8 @@ async function subscriber(store, now = Date.now()) {
 }
 
 test('the config file turns alerts on, and its address is ours or nobody', () => {
-  const config = JSON.parse('{"alerts":{"to":"alerts@openhearts.game","subscribed":true,"waiting":false}}');
-  assert.deepEqual(alertsOf(configEnv(config)), { to: 'alerts@openhearts.game', subscribed: true, waiting: false });
+  const config = JSON.parse('{"alerts":{"to":"alerts@openhearts.game","subscribed":true,"waiting":false,"pictures":true}}');
+  assert.deepEqual(alertsOf(configEnv(config)), { to: 'alerts@openhearts.game', subscribed: true, waiting: false, pictures: true });
   assert.equal(alertsOf(configEnv({})), null);
   assert.equal(alertsOf({ ...on, OH_ALERTS_TO: 'someone@example.com' }), null);
 });
@@ -51,6 +51,7 @@ test('the committed config tells the operator of both', async () => {
   const alerts = alertsOf(configEnv(config));
   assert.equal(alerts.subscribed, true);
   assert.equal(alerts.waiting, true);
+  assert.equal(alerts.pictures, true);
 });
 
 /// The account the subscriber's device is on.

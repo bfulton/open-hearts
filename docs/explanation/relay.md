@@ -92,6 +92,14 @@ nor passed on. Unlike a withheld picture, this counts against the
 device, since the app never sends such a name: only a device made to
 send one meets it.
 
+### Pictures to look at
+
+The operator looks at every new picture after it is shown, rather than holding pictures until someone has looked. When a tag's object first carries a picture, it copies it to an R2 bucket (`OH_PICTURES`, `service/do/review.mjs`), named by its SHA-256, with the account of the device that put it out. Only a subscriber's device is carried, so only subscribers' pictures are copied. A picture the operator took down is withheld before it is copied.
+
+Once a day the relay worker's schedule emails the operator every picture copied since the last email, at most 100 at a time, with each picture's account and the command that takes it down ([Look at the day's new pictures](../how-to/look-at-new-pictures.md)). It also deletes each copy nobody has put out for 30 days: a copy still put out is written again every week or so, keeping what it first said, so it stays.
+
+The copies are served at `pictures.openhearts.game`, through Cloudflare's cache, so the email can show them, and so that Cloudflare's CSAM Scanning Tool checks each against the lists of known child sexual abuse images when it first enters the cache. The tool blocks a match at that address and emails the operator. The copy at the relay is a different thing: it stops when the operator takes the picture down ([Handle a report of child sexual abuse material](../how-to/handle-abuse-material.md)).
+
 ## Reactions
 
 A [reaction](live-play.md#reactions) is a code and the moment it was

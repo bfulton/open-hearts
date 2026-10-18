@@ -81,9 +81,21 @@ export const pages = {
 /// KV namespaces, by title.
 export const kv = ['open-hearts-store', 'open-hearts-store-preview'];
 
-/// R2 buckets: game records, private. No r2.dev address, no custom
-/// domain, no CORS: the worker is the only way in.
+/// R2 buckets. The game records are private: no r2.dev address, no
+/// custom domain, no CORS, so the worker is the only way in. The
+/// pictures subscribers put out at live tables, kept for the operator
+/// to look at (service/do/review.mjs), are served at their own domain
+/// through Cloudflare's cache, where the CSAM Scanning Tool checks
+/// them; each is named by its SHA-256, so nobody finds one without the
+/// picture or the operator's email.
 export const r2 = [
+  {
+    name: 'open-hearts-pictures',
+    location: 'ENAM',
+    storageClass: 'Standard',
+    publicDevUrl: false,
+    customDomains: ['pictures.openhearts.game'],
+  },
   {
     name: 'open-hearts-records',
     location: 'ENAM',

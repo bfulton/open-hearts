@@ -95,6 +95,17 @@ new_sqlite_classes = ["Bench"]
 binding = "OH_STORE"
 id = "5b65151de63341dc9f7a9d417c9b6a4e"
 
+# The pictures subscribers put out at live tables, copied for the
+# operator to look at (review.mjs), and the daily email of the new ones,
+# at 13:00 UTC (9 in the morning in South Carolina in summer, 8 in
+# winter).
+[[r2_buckets]]
+binding = "OH_PICTURES"
+bucket_name = "open-hearts-pictures"
+
+[triggers]
+crons = ["0 13 * * *"]
+
 # Backup codes are emailed from the Household (docs/explanation/service.md) by
 # Cloudflare's Email Sending, which needs the Workers Paid plan and the
 # sending domain onboarded to Email Service. Without them the codes are
