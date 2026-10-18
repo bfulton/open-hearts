@@ -148,10 +148,7 @@ export const CHECKOUT_LOCALES = Object.freeze({ en: 'en', es: 'es', pt: 'pt-BR',
 /// The app's language [lang] (as the site names it, or English) as a
 /// checkout's fields: Stripe's page in it, and the subscription marked
 /// with it, the language a change to the terms is told in
-/// (notices.mjs). What the page says about the terms and the renewal is
-/// Link's, under Managed Payments, which takes no custom text and no
-/// terms box of ours (docs/explanation/service.md, "Payment"); the
-/// app's subscribe screen says it beside its own button.
+/// (notices.mjs).
 export function checkoutLanguage(lang) {
   const code = typeof lang === 'string' && Object.hasOwn(CHECKOUT_LOCALES, lang) ? lang : 'en';
   return { locale: CHECKOUT_LOCALES[code], 'subscription_data[metadata][lang]': code };
@@ -180,6 +177,14 @@ export function checkoutFields(key, price, back, cancelled, lang) {
     // ("Price and length"), and a checkout Stripe will not sell this way
     // is not sold at all, rather than sold by us.
     'managed_payments[enabled]': 'true',
+    // Nothing is paid until the buyer ticks Stripe's own box, "I agree
+    // to Open Hearts's Terms of Service and Privacy Policy", linking the
+    // two in the account's public details. Link's line under the button
+    // says subscribing authorizes it to charge them until they cancel.
+    // Managed Payments takes no custom text, so the box's words are
+    // Stripe's, and it takes the box itself only while Checkout's Legal
+    // policies setting is on (docs/how-to/apply-infrastructure.md).
+    'consent_collection[terms_of_service]': 'required',
     ...checkoutBranding(back),
     ...checkoutLanguage(lang),
   };

@@ -10,7 +10,9 @@
 // Not here, because they are not readable or not settable through the
 // API with the keys this uses: Managed Payments itself (turned on, and
 // its terms accepted, in the Dashboard once Stripe has approved the
-// account; `oh verify` proves a checkout can be sold through it), the
+// account) and Checkout's Legal policies setting, without which a
+// Managed Payments checkout refuses the terms box (`oh verify` proves
+// both, with a checkout through Link), the
 // restricted keys themselves (the service's OH_STRIPE_SECRET —
 // Products, Customers and Invoices read; Subscriptions, Checkout
 // Sessions and Customer Portal write), the webhook's

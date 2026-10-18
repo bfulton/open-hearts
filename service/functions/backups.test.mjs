@@ -229,7 +229,7 @@ test('the email that answers a payment: what was bought, the renewal, how to can
   assert.match(text, /renews automatically every year, on the date you subscribed, at the price then in force, until you cancel/);
   assert.match(text, /Link, which sold it to you for us, sends your receipts and a reminder before each renewal/);
   assert.match(text, /https:\/\/openhearts\.game\/support#cancel/);
-  assert.match(text, /The terms it is provided under: https:\/\/openhearts\.game\/terms/);
+  assert.match(text, /The terms you agreed to: https:\/\/openhearts\.game\/terms/);
   assert.ok(text.indexOf('until you cancel') < text.indexOf('AAAA-BBBB-CCCC-DDDD'), 'the terms first, then the codes');
   assert.ok(m.text.split('\n').every((line) => line.length <= 70), 'lines a plain mail reader shows whole');
   assert.match(m.html, /<a href="https:\/\/openhearts\.game\/support#cancel">/);

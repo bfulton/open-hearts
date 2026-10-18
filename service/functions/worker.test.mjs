@@ -428,13 +428,13 @@ test('checkout: a subscription session carrying the key three ways', async () =>
   assert.equal(form.get('branding_settings[icon][url]'), 'https://x/icon-512.png');
   assert.equal(form.get('branding_settings[background_color]'), '#06231A');
   assert.equal(form.get('branding_settings[button_color]'), '#E4B363');
-  // In English when the app asked in no language. What the page says of
-  // the terms and the renewal is Link's: Stripe refuses a Managed
-  // Payments checkout with custom text or a terms box of ours.
+  // In English when the app asked in no language. Nothing is paid until
+  // the buyer ticks Stripe's box agreeing to the terms; its words are
+  // Stripe's, since Stripe refuses a Managed Payments checkout with
+  // custom text.
   assert.equal(form.get('locale'), 'en');
-  for (const field of [...form.keys()]) {
-    assert.ok(!field.startsWith('custom_text') && !field.startsWith('consent_collection'), `${field}: Stripe refuses it with Managed Payments`);
-  }
+  assert.equal(form.get('consent_collection[terms_of_service]'), 'required');
+  for (const field of [...form.keys()]) assert.ok(!field.startsWith('custom_text'), `${field}: Stripe refuses it with Managed Payments`);
 });
 
 test('the service calls Stripe in the API version its webhook is read in', () => {
