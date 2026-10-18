@@ -78,6 +78,20 @@ Pictures are matched by their bytes, so the same picture put out by
 anyone is withheld. Copies that devices already received stay on those
 devices.
 
+### Refused names
+
+A name others would see goes through one filter in three places: the
+app before it keeps or sends one, the service before it keeps one with
+an account or a kept game, and the relay before it carries one
+([names](service.md#names-the-others-see)). At the relay, the lobby,
+waiting in a pool or a room, and a watched table are read for the names
+they carry (`namesIn` in `service/do/relay.mjs`), and an event with a
+refused name in it is refused: the `OK` is `false`, with the reason
+`blocked: a name that is not allowed`, and the event is neither stored
+nor passed on. Unlike a withheld picture, this counts against the
+device, since the app never sends such a name: only a device made to
+send one meets it.
+
 ## Reactions
 
 A [reaction](live-play.md#reactions) is a code and the moment it was

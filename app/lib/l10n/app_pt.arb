@@ -125,6 +125,7 @@
   "couldNotOpen": "Não foi possível abrir: {error}",
   "done": "Pronto",
   "yourName": "Seu nome",
+  "nameNotAllowed": "Esse nome não é permitido. Escolha outro.",
   "howYouLook": "Sua aparência",
   "colourNumber": "Cor {number}",
   "useAPhoto": "Usar uma foto",

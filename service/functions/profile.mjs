@@ -16,9 +16,11 @@
 // most 12,000 bytes, base64 (app/lib/avatar.dart; a test holds the two
 // sides equal). The picture is published at tables anyway; here it is
 // kept with the account, for its devices, until the account's data is
-// deleted.
+// deleted. A name the filter refuses (names.mjs) is not kept: the
+// others would see it.
 
 import { entitlementOf } from './accounts.mjs';
+import { nameRefused } from './names.mjs';
 import { isAccount } from './rows.mjs';
 
 /// The icons the app offers, by their keys (AvatarIcons.all).
@@ -32,6 +34,11 @@ export const PROFILE_COLOURS = 10;
 
 /// The longest name, in characters.
 export const PROFILE_NAME_MOST = 60;
+
+/// What the service says of a name the filter refuses (names.mjs),
+/// which the app knows (net/account_profile.dart) and does not send
+/// again.
+export const NAME_REFUSED = 'not an allowed name';
 
 /// The most a picture may be, in bytes (Avatar.maxPictureBytes).
 export const PROFILE_PICTURE_MOST = 12000;
@@ -63,6 +70,7 @@ export function profileOf(text) {
   if (typeof name !== 'string' || name !== name.trim() || [...name].length > PROFILE_NAME_MOST || /\p{Cc}/u.test(name)) {
     return { error: 'not a name' };
   }
+  if (nameRefused(name)) return { error: NAME_REFUSED };
   if (icon !== null && !PROFILE_ICONS.includes(icon)) return { error: 'not one of the icons' };
   if (color !== null && !(Number.isInteger(color) && color >= 0 && color < PROFILE_COLOURS)) return { error: 'not one of the colours' };
   if (picture !== null && !isPicture(picture)) return { error: 'not a picture' };

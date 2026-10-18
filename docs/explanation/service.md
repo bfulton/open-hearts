@@ -427,6 +427,33 @@ it which account and version it last matched:
 What is published at tables is read from the device's copy
 ([live play](live-play.md)).
 
+### Names the others see
+
+A name the others would see is refused if it has a word on the lists of
+obscene and offensive words in `third_party/ldnoobw/`, in English,
+Spanish, Portuguese, German or French, or one of a few words refused
+even inside another word. Words are compared in lower case, with
+accents folded and with digits and signs written for letters read as
+letters, so `5h1t` is read as *shit*. Words are matched whole, so
+*Cassandra* and *Scunthorpe* stay names. Entries that would refuse
+real names are left out, and the folder's README says which and why.
+What the lists miss, a report catches.
+
+The filter is one set of steps written twice and held to the same
+answers by one file of cases (`service/functions/names.vectors.json`):
+
+- **In the app** (`app/lib/names.dart`), the profile page says under
+  the name, as it is typed, that the name is not allowed, and keeps the
+  last allowed name when the page is left. A refused name kept on a
+  device from before the filter is played as no name, so live play asks
+  for another, and it goes to the account as none.
+- **In the service** (`service/functions/names.mjs`), a profile with a
+  refused name is not kept: the write is refused with
+  `not an allowed name`, which the app does not send again. A kept
+  game is kept without a refused name beside it.
+- **At the relay**, an event naming somebody with a refused name is not
+  carried ([refused names](relay.md#refused-names)).
+
 ### Deleting an account's data
 
 On request (the privacy policy's choices), the account is forgotten.

@@ -628,6 +628,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get yourName => 'Seu nome';
 
   @override
+  String get nameNotAllowed => 'Esse nome não é permitido. Escolha outro.';
+
+  @override
   String get howYouLook => 'Sua aparência';
 
   @override

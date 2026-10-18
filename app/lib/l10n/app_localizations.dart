@@ -854,6 +854,12 @@ abstract class AppLocalizations {
   /// **'Your name'**
   String get yourName;
 
+  /// Under the name field, when the name is one the filter refuses (names.dart): the others would not see it, and the last allowed name stays.
+  ///
+  /// In en, this message translates to:
+  /// **'This name isn\'t allowed. Choose another.'**
+  String get nameNotAllowed;
+
   /// Heading above the icons and colours the player can choose.
   ///
   /// In en, this message translates to:

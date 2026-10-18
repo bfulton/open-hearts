@@ -205,3 +205,21 @@ test('a game sent after an account was forgotten is kept without its name', asyn
   assert.equal((await keep(b5, ADA, TABLE, spaced)).status, 422);
   assert.equal(b5.kept.has(`tables/${TABLE}.json`), false);
 });
+
+test('a game is kept without a name the filter refuses, the rest as it was sent', async () => {
+  const named = (names) => (r) => ({ ...r, names });
+  const b = bucket();
+  assert.deepEqual(await keep(b, ADA, TABLE, record(named({ 0: 'Ada', 1: 'Sh1t Head' }))), { status: 200, body: { kept: true } });
+  const kept = JSON.parse(gunzipSync(b.kept.get(`tables/${TABLE}.json`).body).toString());
+  assert.deepEqual(kept.names, { 0: 'Ada' });
+  assert.deepEqual({ ...kept, names: undefined }, { ...JSON.parse(record(named({}))), names: undefined });
+  // None left: no names at all.
+  const b2 = bucket();
+  await keep(b2, ADA, TABLE, record(named({ 1: 'f u c k' })));
+  assert.equal('names' in JSON.parse(gunzipSync(b2.kept.get(`tables/${TABLE}.json`).body).toString()), false);
+  // Every name one the others may see: kept byte for byte.
+  const b3 = bucket();
+  const fine = record(named({ 0: 'Ada', 1: 'Cassandra' }));
+  await keep(b3, ADA, TABLE, fine);
+  assert.equal(gunzipSync(b3.kept.get(`tables/${TABLE}.json`).body).toString(), fine);
+});

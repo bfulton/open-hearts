@@ -125,6 +125,7 @@
   "couldNotOpen": "Impossible d'ouvrir ce fichier : {error}",
   "done": "OK",
   "yourName": "Votre nom",
+  "nameNotAllowed": "Ce nom n'est pas autorisé. Choisissez-en un autre.",
   "howYouLook": "Votre apparence",
   "colourNumber": "Couleur {number}",
   "useAPhoto": "Utiliser une photo",

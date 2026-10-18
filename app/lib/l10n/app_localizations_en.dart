@@ -626,6 +626,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get yourName => 'Your name';
 
   @override
+  String get nameNotAllowed => 'This name isn\'t allowed. Choose another.';
+
+  @override
   String get howYouLook => 'How you look';
 
   @override

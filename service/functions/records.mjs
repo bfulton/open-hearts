@@ -19,6 +19,8 @@
 // service's licence for its key (licenceProblem), which is what ties a
 // name beside the record to an account, for forgetting one.
 
+import { nameRefused } from './names.mjs';
+
 /// A table's id (packages/table, spec.dart, newTableId).
 export const tableIdShape = /^[0-9a-f]{32}$/;
 
@@ -103,7 +105,8 @@ async function signedInto(record, key, table, verify) {
 }
 
 /// Keeps [text], a record [key] sent for [table], without the name of
-/// any account forgotten on request (withoutForgotten): {status, body}.
+/// any account forgotten on request, or any the filter refuses
+/// (asKept): {status, body}.
 /// [verify] checks a signature: (key, digest, signature) => bool.
 /// [service] is the service's public key where it signs licences
 /// (licence.mjs, serviceKeys), and then every person's seat must carry
@@ -131,8 +134,8 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
   const unlicensed = service ? await licenceProblem(spec.seats, service, verify) : null;
   if (unlicensed) return { status: 403, body: { error: unlicensed } };
   if (await bucket.head(keyIn(table))) return { status: 200, body: { kept: true, already: true } };
-  const kept = await withoutForgotten(bucket, record, text);
-  if (kept === null) return { status: 422, body: { error: 'a record that cannot be kept without a forgotten name' } };
+  const kept = await asKept(bucket, record, text);
+  if (kept === null) return { status: 422, body: { error: 'a record that cannot be kept without the names taken out of it' } };
   const packed = await new Response(new Blob([kept]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
   await bucket.put(keyIn(table), packed, {
     httpMetadata: { contentType: 'application/json', contentEncoding: 'gzip' },
@@ -142,13 +145,15 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
 }
 
 /// [text], the record sent, as it is to be kept: without the names of
-/// the seats whose licence names an account forgotten on request. Such
-/// a game was played while the account's last licence ran, or ended
-/// while forget.mjs went through the kept games. Rewritten only if
+/// the seats whose licence names an account forgotten on request — a
+/// game played while the account's last licence ran, or ended while
+/// forget.mjs went through the kept games — nor any name the filter
+/// refuses (names.mjs), which a device the relay would not have carried
+/// it from could still put beside its game. Rewritten only if
 /// JSON.stringify gives back [text] as it was sent, since an event's id
 /// is a digest of its body as its reader parses it; null when it would
 /// not.
-async function withoutForgotten(bucket, record, text) {
+async function asKept(bucket, record, text) {
   const accounts = new Set(record.spec.seats.map((s) => s?.licence?.account).filter((a) => typeof a === 'string' && accountShape.test(a)));
   let without = record;
   let named = 0;
@@ -158,6 +163,14 @@ async function withoutForgotten(bucket, record, text) {
     if (!w?.named.length) continue;
     without = w.record;
     named += w.named.length;
+  }
+  const refused = Object.entries(without.names ?? {}).filter(([, name]) => nameRefused(name));
+  if (refused.length) {
+    const { names: was, ...rest } = without;
+    const names = { ...was };
+    for (const [seat] of refused) delete names[seat];
+    without = Object.keys(names).length ? { ...rest, names } : rest;
+    named += refused.length;
   }
   if (!named) return text;
   return JSON.stringify(record) === text ? JSON.stringify(without) : null;

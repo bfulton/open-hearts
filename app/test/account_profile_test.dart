@@ -250,6 +250,15 @@ void main() {
     expect(kept.asked, ['read', 'read', 'write', 'read']);
   });
 
+  test('a name kept here from before the filter goes to the account as none, the look with it', () async {
+    final kept = standUp();
+    await licenceThisDevice();
+    await Identity.setName('Sh1t Head');
+    await Identity.setAvatar(const Avatar(color: 4));
+    await AccountProfile.current.sync();
+    expect(kept.profile, {'name': '', 'color': 4}, reason: 'never the name the service and the relay refuse');
+  });
+
   test('a profile the service will never take is not sent again and again', () async {
     final kept = standUp();
     await licenceThisDevice();

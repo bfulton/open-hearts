@@ -638,6 +638,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get yourName => 'Dein Name';
 
   @override
+  String get nameNotAllowed =>
+      'Dieser Name ist nicht erlaubt. Wähl einen anderen.';
+
+  @override
   String get howYouLook => 'Dein Aussehen';
 
   @override

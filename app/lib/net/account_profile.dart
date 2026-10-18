@@ -181,7 +181,8 @@ class AccountProfile extends ChangeNotifier {
   /// This device's profile, sent as the account's.
   Future<void> _send(String account) async {
     final changes = _changes;
-    final name = Identity.nameOf(await Identity.name() ?? '');
+    // A name the others may not see goes as none (Identity.playable).
+    final name = Identity.playable(Identity.nameOf(await Identity.name() ?? ''));
     final text = jsonEncode({'name': name, ...(await Identity.avatar()).toJson()});
     final signer = await Identity.signer();
     // The text is what is signed: nobody else's request writes it.
@@ -207,7 +208,7 @@ class AccountProfile extends ChangeNotifier {
   /// What the service says of a profile it will never take
   /// (profile.mjs, `profileOf`). Any other refusal — a service part way
   /// through a deploy among them — is asked again.
-  static const _malformed = {'not a profile', 'not a name', 'not one of the icons', 'not one of the colours', 'not a picture'};
+  static const _malformed = {'not a profile', 'not a name', 'not an allowed name', 'not one of the icons', 'not one of the colours', 'not a picture'};
 
   static String? _errorOf(String body) {
     try {

@@ -5,11 +5,14 @@
 // so what the app meets on Cloudflare is what the Dart suites — the
 // same ones that run against the Dart relay — run against here.
 //
-// Nothing is imported: no node, no Cloudflare. Signatures are checked
-// by the wasm the app already carries (app/web/schnorr.wasm, built
-// from crypto/schnorr_wasm), handed in already compiled, because a
-// Worker may not compile wasm at runtime and because BIP-340 is not
-// worth a second implementation in a third language.
+// Nothing is imported but the service's name filter, plain functions
+// too: no node, no Cloudflare. Signatures are checked by the wasm the
+// app already carries (app/web/schnorr.wasm, built from
+// crypto/schnorr_wasm), handed in already compiled, because a Worker
+// may not compile wasm at runtime and because BIP-340 is not worth a
+// second implementation in a third language.
+
+import { nameRefused } from '../functions/names.mjs';
 
 /// Kinds 20000–29999 are ephemeral: forwarded to whoever is listening
 /// and then forgotten. Every kind presence uses is one of these, which
@@ -881,20 +884,51 @@ export function reactionRefusal(tag, event) {
   return shaped ? null : 'invalid: a reaction is a code and the moment it was said at';
 }
 
+/// The kinds whose content names players (packages/table, nostr.dart,
+/// TableKinds): the lobby, waiting in a pool or a room, and a watched
+/// table.
+const namingKinds = new Set([lobbyKind, 24245, 24247]);
+
+/// The names [event] shows the others: its content's `name` (waiting),
+/// each of its seats' (a table started or seated) and a watched table's
+/// `names`.
+export function namesIn(event) {
+  if (!namingKinds.has(event.kind)) return [];
+  let said = null;
+  try {
+    said = JSON.parse(event.content);
+  } catch {
+    // Not JSON: no names in it.
+  }
+  if (!said || typeof said !== 'object') return [];
+  const names = [];
+  if (typeof said.name === 'string') names.push(said.name);
+  for (const seat of Array.isArray(said.seats) ? said.seats : []) if (typeof seat?.name === 'string') names.push(seat.name);
+  for (const name of Array.isArray(said.names) ? said.names : []) if (typeof name === 'string') names.push(name);
+  return names;
+}
+
+/// Why an event naming somebody as the filter refuses is not carried
+/// (service/functions/names.mjs): the app never sends one.
+export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
+
 /// What a tag's object refuses. Presence: anything but the ephemeral
 /// kinds. A table's or a lobby's tag: anything but the ephemeral kinds
 /// and the lobby kind tagged for this very tag — an object stores what
 /// belongs to it, and nobody writes into one tag's store through
-/// another's. And a reaction anywhere but a table's own tag, or in any
-/// shape but a reaction's ([reactionRefusal]).
+/// another's. A reaction anywhere but a table's own tag, or in any
+/// shape but a reaction's ([reactionRefusal]). And anything that shows
+/// the others a name the filter refuses ([namesIn]).
 export function refusalFor(tag) {
   return (event) => {
     if (event.kind === reactionKind) return reactionRefusal(tag, event);
-    if (ephemeral(event.kind)) return null;
-    if (tag !== presenceTag && event.kind === lobbyKind && event.tags?.some((t) => t[0] === 't' && t[1] === tag)) return null;
-    return tag === presenceTag
-      ? 'blocked: presence carries ephemeral kinds only'
-      : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
+    const carried = ephemeral(event.kind) || (tag !== presenceTag && event.kind === lobbyKind && event.tags?.some((t) => t[0] === 't' && t[1] === tag));
+    if (!carried) {
+      return tag === presenceTag
+        ? 'blocked: presence carries ephemeral kinds only'
+        : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
+    }
+    return namesIn(event).some(nameRefused) ? NAME_REFUSED_WHY : null;
   };
 }
 

@@ -152,4 +152,4 @@ The `profile` handler takes the profile as JSON text and checks it with `profile
 | `color` | `null`, or a whole number from 0 up to, but not including, `PROFILE_COLOURS` | `PROFILE_COLOURS` | `AvatarIcons.paletteSize` in `app/lib/avatar.dart` |
 | `picture` | `null`, or base64 of a JPEG | `PROFILE_PICTURE_MOST` bytes | `Avatar.maxPictureBytes` in `app/lib/avatar.dart` |
 
-A profile with any other field is refused, and so is one whose text is longer than `PROFILE_TEXT_MOST`. A refused profile answers 400. A write from a device that is not the account's device in use answers 409.
+A profile with any other field is refused, and so is one whose text is longer than `PROFILE_TEXT_MOST`. A refused profile answers 400. A name the filter refuses (`nameRefused` in `service/functions/names.mjs`; [names the others see](../explanation/service.md#names-the-others-see)) answers 400 with `not an allowed name`, `NAME_REFUSED` in `service/functions/profile.mjs`. A write from a device that is not the account's device in use answers 409.

@@ -225,6 +225,14 @@ void main() {
         reason: 'the room needs a name, and the profile is where a name is given');
   });
 
+  testWidgets('a link to a room, on a device whose name is one the others may not see, asks for another', (tester) async {
+    // Kept from before the filter (names.dart): played as no name.
+    SharedPreferences.setMockInitialValues({'identity_name': 'Sh1t Head'});
+    await pumpHome(tester, openRoom: 'KP4T9MXR');
+    expect(find.widgetWithText(TextField, 'Your name'), findsOneWidget, reason: 'asked for a name, as with none');
+    expect(find.text("This name isn't allowed. Choose another."), findsOneWidget, reason: 'and told why');
+  });
+
   testWidgets('the options line says what the next game is; the sheet changes it and the device keeps it', (tester) async {
     await pumpHome(tester);
     expect(find.text('50 points · rated'), findsOneWidget);

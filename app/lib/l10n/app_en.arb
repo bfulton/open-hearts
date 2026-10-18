@@ -771,6 +771,10 @@
   "@yourName": {
     "description": "The field for the player's name, which the others see."
   },
+  "nameNotAllowed": "This name isn't allowed. Choose another.",
+  "@nameNotAllowed": {
+    "description": "Under the name field, when the name is one the filter refuses (names.dart): the others would not see it, and the last allowed name stays."
+  },
   "howYouLook": "How you look",
   "@howYouLook": {
     "description": "Heading above the icons and colours the player can choose."

@@ -244,6 +244,11 @@ quick() {
       packages/deal/*) add deal ;;
       packages/table/*|packages/table_sim/*) add table ;;
       service/do/*) add relay_js service_js service_object ;;
+      # The name filter: the relay reads it too, and the app is held to
+      # its cases.
+      service/functions/names.vectors.json) add functions ops relay_js app_analyze app; app_files+=(app/lib/names.dart) ;;
+      service/functions/names.mjs|service/functions/name_fold.mjs|service/functions/blocked_names.mjs) add functions ops relay_js ;;
+      third_party/ldnoobw/*) add functions ops ;;
       service/functions/*) add functions ops ;;
       service/tool/*.mjs) add functions ops ;;
       service/*) add service ;;

@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { wasmPath } from './host.mjs';
-import { lobbyKind, objectRelay, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
+import { NAME_REFUSED_WHY, lobbyKind, namesIn, objectRelay, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
 import { keys, signing } from './sign.mjs';
 import { KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
@@ -91,6 +91,49 @@ test('the lobby kind is stored under its own tag, and only there', async () => {
   assert.match(room({ kind: 1, tags: [['t', 'ABCD']] }), /^blocked: /);
   // Presence stores nothing, the lobby kind included.
   assert.match(refusalFor('online')({ kind: lobbyKind, tags: [['t', 'online']] }), /^blocked: /);
+});
+
+test('nothing that shows the others a name the filter refuses is carried, wherever it names them', () => {
+  const room = refusalFor('ABCD');
+  const table = refusalFor('a'.repeat(32));
+  const said = (kind, content) => ({ kind, tags: [['t', 'ABCD']], content: JSON.stringify(content) });
+  const watched = (names) => ({ kind: 24247, tags: [['t', 'a'.repeat(32)]], content: JSON.stringify({ phase: 'play', names }) });
+  // Waiting in a room or a pool, a table started or seated, a table watched.
+  assert.equal(room(said(24245, { kind: 'here', name: 'Ada' })), null);
+  assert.equal(room(said(24245, { kind: 'here', name: 'Sh1t Head' })), NAME_REFUSED_WHY);
+  assert.equal(room(said(24245, { kind: 'wait', name: 'f u c k', rating: 1500 })), NAME_REFUSED_WHY);
+  assert.equal(room(said(lobbyKind, { kind: 'start', seats: [{ key: 'k', name: 'Ada' }, { bot: 'sam' }] })), null);
+  assert.equal(room(said(lobbyKind, { kind: 'start', seats: [{ key: 'k', name: 'Ada' }, { key: 'j', name: 'Fuckface' }] })), NAME_REFUSED_WHY);
+  assert.equal(table(watched(['Ada', 'Bao', 'Sam', 'Cy'])), null);
+  assert.equal(table(watched(['Ada', 'Bao', 'nazi', 'Cy'])), NAME_REFUSED_WHY);
+  // A kind that names nobody is not read for names: a table's own events.
+  assert.equal(room(said(24242, { name: 'fuck' })), null);
+  // Content that is not JSON, or names nobody, is carried as before.
+  assert.equal(room({ kind: 24245, tags: [['t', 'ABCD']], content: 'not json' }), null);
+  assert.deepEqual(namesIn(said(lobbyKind, { kind: 'picture', jpeg: 'AAAA' })), []);
+  assert.deepEqual(namesIn(said(lobbyKind, { name: 7, seats: [null, { name: 'Ada' }], names: ['Bao', 3] })), ['Ada', 'Bao']);
+});
+
+test('a name the filter refuses is answered not OK at the object, and neither kept nor passed on', async () => {
+  const st = storage();
+  const { relay, settled } = await built(st, 'ABCD');
+  const a = socket();
+  const b = socket();
+  relay.open(a);
+  relay.open(b);
+  await relay.message(b, JSON.stringify(['REQ', 's', { kinds: [lobbyKind], '#t': ['ABCD'] }]));
+  const started = (name, at) =>
+    sign.event(keys[0], { kind: lobbyKind, content: JSON.stringify({ kind: 'start', seats: [{ key: keys[0].public, name }] }), tags: [['t', 'ABCD']], created_at: at });
+  const bad = await started('Sh1t Head', 1000);
+  await relay.message(a, JSON.stringify(['EVENT', bad]));
+  assert.deepEqual(a.of('OK')[0], ['OK', bad.id, false, NAME_REFUSED_WHY]);
+  // The same, named as the others may see: carried and kept.
+  const good = await started('Ada', 1001);
+  await relay.message(a, JSON.stringify(['EVENT', good]));
+  assert.equal(a.of('OK')[1][2], true);
+  await settled();
+  assert.deepEqual(b.of('EVENT').map((m) => m[2].id), [good.id], 'only the one named as the others may see passed on');
+  assert.deepEqual([...st.rows.keys()], [keyOf(good)]);
 });
 
 test('a room told to the object is there for whoever asks later, and after the object is evicted', async () => {

@@ -11,7 +11,7 @@ import { claimWith, ticketFor } from './accounts.mjs';
 import { forgetAccount } from './deletion.mjs';
 import { activeInStore, forgetHouseholds, householdOp } from './household.mjs';
 import { signerOn } from './licence.mjs';
-import { PROFILE_COLOURS, PROFILE_ICONS, PROFILE_NAME_MOST, PROFILE_PICTURE_MOST, profileOf } from './profile.mjs';
+import { NAME_REFUSED, PROFILE_COLOURS, PROFILE_ICONS, PROFILE_NAME_MOST, PROFILE_PICTURE_MOST, profileOf } from './profile.mjs';
 import { memoryStore } from './rows.mjs';
 import { SERVICE_DEFAULTS } from './settings.mjs';
 import { record } from './stripe.mjs';
@@ -161,6 +161,7 @@ test('the shape is the app\'s and nothing else: a name, one of the icons, one of
     ['a name untrimmed', JSON.stringify({ name: ' Ada' })],
     ['a name with a control in it', JSON.stringify({ name: 'A\nda' })],
     ['a name that is not text', JSON.stringify({ name: 7 })],
+    ['a name the others may not see', JSON.stringify({ name: 'f u c k' })],
     ['an icon the app has not got', JSON.stringify({ name: 'A', icon: 'skull' })],
     ['a colour past the palette', JSON.stringify({ name: 'A', color: PROFILE_COLOURS })],
     ['a colour that is not whole', JSON.stringify({ name: 'A', color: 1.5 })],
@@ -178,13 +179,17 @@ test('the shape is the app\'s and nothing else: a name, one of the icons, one of
   const refused = await write(ADA, { name: 'A', icon: 'skull' });
   assert.deepEqual([refused.status, refused.body.error], [400, 'not one of the icons']);
   assert.equal((await read(ADA)).body.version, 0);
+  // A name the filter refuses (names.mjs) is not kept either.
+  const named = await write(ADA, { name: 'Sh1t Head', icon: 'rocket' });
+  assert.deepEqual([named.status, named.body.error], [400, NAME_REFUSED]);
+  assert.equal((await read(ADA)).body.version, 0);
   // The biggest picture the app makes goes through the route whole.
   const whole = await write(ADA, { name: 'A', picture: big });
   assert.equal(whole.status, 200);
   assert.equal((await read(BAO)).body.profile.picture, big);
 });
 
-test('the app and the service agree on the icons, the colours and the picture\'s size', async () => {
+test('the app and the service agree on the icons, the colours, the picture\'s size and a refused name', async () => {
   const avatar = await readFile(new URL('../../app/lib/avatar.dart', import.meta.url), 'utf8');
   const icons = [...avatar.slice(avatar.indexOf('static const all')).matchAll(/^\s+'([a-z]+)': Icons\./gm)].map((m) => m[1]);
   assert.deepEqual(icons, [...PROFILE_ICONS]);
@@ -192,6 +197,9 @@ test('the app and the service agree on the icons, the colours and the picture\'s
   assert.equal(Number(/static const maxPictureBytes = (\d+);/.exec(avatar)[1]), PROFILE_PICTURE_MOST);
   const identity = await readFile(new URL('../../app/lib/identity.dart', import.meta.url), 'utf8');
   assert.equal(Number(/static const longestName = (\d+);/.exec(identity)[1]), PROFILE_NAME_MOST);
+  // A refused name is one the app does not send again.
+  const profile = await readFile(new URL('../../app/lib/net/account_profile.dart', import.meta.url), 'utf8');
+  assert.ok(/static const _malformed = \{[^}]*'not an allowed name'/.test(profile) && NAME_REFUSED === 'not an allowed name');
 });
 
 test('an account\'s profile writes are held to their own allowance an hour, and leave the account\'s changes alone', async () => {

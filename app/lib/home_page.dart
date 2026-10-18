@@ -192,7 +192,7 @@ class _HomePageState extends State<HomePage> {
     final avatar = await Identity.avatar();
     if (!mounted) return;
     setState(() {
-      _name = name ?? '';
+      _name = Identity.playable(name);
       _avatar = avatar;
     });
     _showAddress();
@@ -205,7 +205,7 @@ class _HomePageState extends State<HomePage> {
     final avatar = await Identity.avatar();
     if (!mounted) return;
     setState(() {
-      _name = name ?? '';
+      _name = Identity.playable(name);
       _avatar = avatar;
     });
   }
@@ -343,7 +343,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _options = options;
       _avatar = avatar;
-      _name = name ?? '';
+      _name = Identity.playable(name);
       _lobby.pace = pace;
     });
     // Here by a link: straight into the room — unless live play is
