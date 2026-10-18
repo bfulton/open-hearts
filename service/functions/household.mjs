@@ -367,7 +367,7 @@ function subscribedParagraphs(purchase) {
       [`${SITE}/support#cancel`, `${SITE}/support#cancel`],
       ['. Cancelling stops the next renewal, and live play keeps working until the end of the year you paid for.'],
     ],
-    [['The terms you agreed to: '], [`${SITE}/terms`, `${SITE}/terms`]],
+    [['The terms it is provided under: '], [`${SITE}/terms`, `${SITE}/terms`]],
   ];
 }
 

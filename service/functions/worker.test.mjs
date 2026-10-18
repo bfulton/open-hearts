@@ -13,7 +13,7 @@ import { dayAfter, dayOf, memoryStore } from './rows.mjs';
 import { SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
 import { forgetProviderKeys, supersede, whoSignedIn } from './signin.mjs';
-import { CHECKOUT_WORDS, STRIPE_VERSION, checkout, checkoutTerms, endRefunded, manage, record, sameSite, webhookSigned } from './stripe.mjs';
+import { CHECKOUT_LOCALES, STRIPE_VERSION, checkout, checkoutLanguage, endRefunded, manage, record, sameSite, webhookSigned } from './stripe.mjs';
 import { stripe as stripeDefinition } from '../../infra/stripe.mjs';
 import { STATED, withPrice } from './stripe.fixtures.mjs';
 import { mint, serversOf } from './turn.mjs';
@@ -428,13 +428,13 @@ test('checkout: a subscription session carrying the key three ways', async () =>
   assert.equal(form.get('branding_settings[icon][url]'), 'https://x/icon-512.png');
   assert.equal(form.get('branding_settings[background_color]'), '#06231A');
   assert.equal(form.get('branding_settings[button_color]'), '#E4B363');
-  // Nothing is paid until the buyer ticks that they agree to the terms
-  // and to the renewal, and the line under the button says how to stop
-  // it: in English when the app asked in no language.
-  assert.equal(form.get('consent_collection[terms_of_service]'), 'required');
+  // In English when the app asked in no language. What the page says of
+  // the terms and the renewal is Link's: Stripe refuses a Managed
+  // Payments checkout with custom text or a terms box of ours.
   assert.equal(form.get('locale'), 'en');
-  assert.match(form.get('custom_text[terms_of_service_acceptance][message]'), /^I agree to the \[Terms of Use\]\(https:\/\/openhearts\.game\/terms\), and that this subscription renews automatically every year/);
-  assert.match(form.get('custom_text[submit][message]'), /renews automatically every year until you cancel\. Cancel any time in the game: menu, Subscription, Manage subscription\.$/);
+  for (const field of [...form.keys()]) {
+    assert.ok(!field.startsWith('custom_text') && !field.startsWith('consent_collection'), `${field}: Stripe refuses it with Managed Payments`);
+  }
 });
 
 test('the service calls Stripe in the API version its webhook is read in', () => {
@@ -523,7 +523,7 @@ test('the webhook route: a refund ends the subscription, and is sent again when 
   }
 });
 
-test('checkout: in the language the app asked in, the terms in that language too', async () => {
+test('checkout: in the language the app asked in, and the subscription marked with it', async () => {
   const forms = [];
   const stripe = async (_, init) => {
     forms.push(new URLSearchParams(init.body));
@@ -537,27 +537,15 @@ test('checkout: in the language the app asked in, the terms in that language too
   assert.equal(pt.get('locale'), 'pt-BR', "the site's Portuguese is Brazil's");
   assert.equal(pt.get('subscription_data[metadata][lang]'), 'pt');
   assert.equal(xx.get('subscription_data[metadata][lang]'), 'en');
-  assert.match(pt.get('custom_text[terms_of_service_acceptance][message]'), /\(https:\/\/openhearts\.game\/pt\/terms\)/);
   assert.equal(de.get('locale'), 'de');
-  assert.match(de.get('custom_text[terms_of_service_acceptance][message]'), /^Ich stimme den \[Nutzungsbedingungen\]\(https:\/\/openhearts\.game\/de\/terms\)/);
-  assert.match(de.get('custom_text[submit][message]'), /Menü, Abo, Abo verwalten\.$/);
-  for (const other of [xx, notAString]) {
-    assert.equal(other.get('locale'), 'en', 'a language the site has not got is English');
-    assert.equal(other.get('consent_collection[terms_of_service]'), 'required');
-  }
+  assert.equal(de.get('subscription_data[metadata][lang]'), 'de');
+  for (const other of [xx, notAString]) assert.equal(other.get('locale'), 'en', 'a language the site has not got is English');
 });
 
-test('checkout: every language says the same things, within what Stripe takes', () => {
-  for (const [code, words] of Object.entries(CHECKOUT_WORDS)) {
-    const fields = checkoutTerms(code);
-    assert.equal((words.agree.match(/\{terms\}/g) ?? []).length, 1, `${code}: one link to the terms`);
-    assert.ok(fields['custom_text[terms_of_service_acceptance][message]'].length <= 1200, `${code}: Stripe takes 1200 characters`);
-    assert.ok(fields['custom_text[submit][message]'].length <= 1200, `${code}: Stripe takes 1200 characters`);
-  }
-  // The site's languages, each in the locale its pages are in, at the
-  // site's own address.
+test("checkout: the site's languages, each in the locale its pages are in", () => {
   assert.equal(SITE, origin);
-  assert.deepEqual(Object.fromEntries(Object.entries(CHECKOUT_WORDS).map(([code, w]) => [code, w.locale])), Object.fromEntries(languages.map((l) => [l.code, l.lang])));
+  assert.deepEqual(CHECKOUT_LOCALES, Object.fromEntries(languages.map((l) => [l.code, l.lang])));
+  for (const l of languages) assert.deepEqual(checkoutLanguage(l.code), { locale: l.lang, 'subscription_data[metadata][lang]': l.code });
 });
 
 test('checkout: no keys is a shop that is not open, not a broken one', async () => {

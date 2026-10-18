@@ -165,12 +165,15 @@ which proves it. The service calls Stripe in the webhook's API version
 metadata and the subscription's metadata, so renewals carry it too. The
 return address must be on the origin the checkout was asked of, which is
 the app's own ([above](#where-the-app-is)), and the app only
-leaves for Stripe's own hosts. Nothing is paid until the buyer ticks
-that they agree to the terms and to the yearly renewal, in the app's
-language (`checkoutTerms`), and the email that follows says what was
-bought, how it renews and how to cancel (`mailerOf` in
-`service/functions/household.mjs`): California's automatic renewal law
-asks for both. The webhook binds the device once the
+leaves for Stripe's own hosts. The app's subscribe screen states the
+price, the yearly renewal and how to cancel beside its button, Link's
+checkout, in the app's language (`checkoutLanguage`), says that
+subscribing authorizes Link to charge until the buyer cancels, and the
+email that follows says what was bought, how it renews and how to
+cancel (`mailerOf` in `service/functions/household.mjs`): California's
+automatic renewal law asks for all three. A Managed Payments checkout
+takes no custom text and no terms box of ours; Stripe refuses one with
+either, which `./oh verify` would show. The webhook binds the device once the
 session is paid, and the subscription's own events carry its dates.
 `stripePrice` in `config/openhearts.json` names the Stripe price, by id
 or lookup key. A checkout sells it only when it is the price the terms
