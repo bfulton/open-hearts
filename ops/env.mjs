@@ -28,7 +28,7 @@ export class Failed extends Error {}
 export const CREDENTIALS = {
   CLOUDFLARE_API_TOKEN: 'A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to take a name off kept games. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists.',
   CLOUDFLARE_ACCOUNT_ID: 'The Cloudflare account the project is in.',
-  STRIPE_API_KEY: 'A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. Infrastructure: what docs/how-to/apply-infrastructure.md lists.',
+  STRIPE_API_KEY: 'A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. oh verify: Prices read and Checkout Sessions write, to make a checkout through Link and expire it. Infrastructure: what docs/how-to/apply-infrastructure.md lists.',
   NEW_RELIC_API_KEY: 'A New Relic User key, for the monitors (oh infra).',
   NEW_RELIC_ACCOUNT_ID: 'The New Relic account the monitors are in.',
   NEW_RELIC_REGION: 'US or EU.',

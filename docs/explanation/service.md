@@ -144,7 +144,24 @@ The rest is free: solo play, the records, the verifiable deal and the
 engine. The price is yearly because a card fee's fixed part would be
 most of a monthly price.
 
-**Web: Stripe.** `checkout` writes the device's key into the session's
+**Web: Stripe, sold through Link.** Every checkout is a Managed
+Payments one (`managed_payments[enabled]`): the buyer buys from Link
+(Sold through Link, LLC), Stripe's merchant of record, which charges
+and pays over the tax of wherever the buyer is, keeps to their
+country's rules for buying online, such as the EU's and the UK's 14
+days to cancel, and answers their questions about the payment. So Open
+Hearts registers for no sales tax or VAT anywhere, and can sell
+anywhere Link does. Link's support may refund a payment within 60 days
+of it without asking us, and the terms say a refund ends the
+subscription, so a refund of any payment for one of our subscriptions,
+whoever makes it, ends that subscription (`endRefunded` in
+`service/functions/stripe.mjs`, from the webhook's `charge.refunded`).
+Whether Stripe sells this way is a setting in Stripe's Dashboard that no
+API reports; `./oh verify` makes a checkout through Link and expires it,
+which proves it. The service calls Stripe in the webhook's API version
+(`STRIPE_VERSION`), not the account's default.
+
+`checkout` writes the device's key into the session's
 metadata and the subscription's metadata, so renewals carry it too. The
 return address must be on the origin the checkout was asked of, which is
 the app's own ([above](#where-the-app-is)), and the app only
@@ -158,7 +175,9 @@ session is paid, and the subscription's own events carry its dates.
 `stripePrice` in `config/openhearts.json` names the Stripe price, by id
 or lookup key. A checkout sells it only when it is the price the terms
 state, a year at `price` (`shopPrice` in `service/functions/stripe.mjs`);
-the answer is cached briefly (`PRICE_KEPT_MS`).
+the answer is cached briefly (`PRICE_KEPT_MS`). Tax is added on top
+of that price (`taxBehavior` in `infra/stripe.mjs`), as the terms say,
+and Link shows it in the buyer's own currency.
 
 **Phones: the store.** The phone buys in its own store and sends the
 proof to `store`: an App Store signed transaction, or a Google Play

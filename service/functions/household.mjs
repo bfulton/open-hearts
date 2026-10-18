@@ -359,7 +359,7 @@ function subscribedParagraphs(purchase) {
       [
         `${paid ? `You paid ${paid} for a year of it. ` : ''}The subscription renews automatically every year, on the ` +
           'date you subscribed, at the price then in force, until you cancel. We will tell you before a price change ' +
-          'applies, and Stripe emails you a reminder before each renewal.',
+          'applies. Link, which sold it to you for us, sends your receipts and a reminder before each renewal.',
       ],
     ],
     [

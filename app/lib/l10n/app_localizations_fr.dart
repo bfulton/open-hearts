@@ -556,7 +556,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String webRenewal(String price) {
-    return '$price par an, payé sur la page de Stripe. L\'abonnement se renouvelle automatiquement chaque année jusqu\'à ce que vous le résiliiez, au prix alors en vigueur : nous vous écrivons au moins 7 jours avant qu\'un nouveau prix s\'applique. Résiliez quand vous voulez dans Gérer l\'abonnement ; le jeu en direct dure jusqu\'à la fin de l\'année payée.';
+    return '$price par an plus les taxes applicables, vendu par Link, société affiliée à Stripe, sur la page de Stripe. L\'abonnement se renouvelle automatiquement chaque année jusqu\'à ce que vous le résiliiez, au prix alors en vigueur : nous vous écrivons au moins 7 jours avant qu\'un nouveau prix s\'applique. Résiliez quand vous voulez dans Gérer l\'abonnement ; le jeu en direct dure jusqu\'à la fin de l\'année payée.';
   }
 
   @override

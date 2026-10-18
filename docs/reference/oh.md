@@ -34,7 +34,7 @@ Each command reads what it needs from the environment, and says which are missin
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to take a name off kept games. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account the project is in. |
-| `STRIPE_API_KEY` | A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. Infrastructure: what docs/how-to/apply-infrastructure.md lists. |
+| `STRIPE_API_KEY` | A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. oh verify: Prices read and Checkout Sessions write, to make a checkout through Link and expire it. Infrastructure: what docs/how-to/apply-infrastructure.md lists. |
 | `NEW_RELIC_API_KEY` | A New Relic User key, for the monitors (oh infra). |
 | `NEW_RELIC_ACCOUNT_ID` | The New Relic account the monitors are in. |
 | `NEW_RELIC_REGION` | US or EU. |
@@ -263,7 +263,7 @@ oh deploy site [--apply] [--label <label>]
 
 Builds and publishes the site, the web app and the service's handlers: to production from main, or to a preview. The label names the preview; it is `main` (production) on main and `dev` elsewhere unless given. Production is refused unless HEAD is origin/main with nothing uncommitted, and unless the terms and the privacy policy are as the ledger says, with what a change needs done (oh terms status). It emails nobody: a change that matters to subscribers is emailed to them by oh terms notify.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, STRIPE_API_KEY (to publish a change subscribers are told of)
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md)
 - **Example:** `oh deploy site --label my-change --apply`
 
@@ -275,7 +275,7 @@ oh deploy all [--apply]
 
 Deploys production in the order that keeps devices playing: the relay, then the site.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, STRIPE_API_KEY (to publish a change subscribers are told of)
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [deploy.md](../how-to/deploy.md)
 - **Example:** `oh deploy all --apply`
 
@@ -297,7 +297,7 @@ Deletes old preview deployments, keeping the newest few (5 unless --keep says) a
 oh verify
 ```
 
-Checks production: the live build is origin/main, the service is healthy, the relay and the order route answer, every web subscriber was emailed each published change that matters to them, and Cloudflare, Stripe and New Relic match their definitions. A check whose credentials are not set is skipped and said so.
+Checks production: the live build is origin/main, the service is healthy, the relay and the order route answer, Link sells a checkout (made and expired at once), every web subscriber was emailed each published change that matters to them, and Cloudflare, Stripe and New Relic match their definitions. A check whose credentials are not set is skipped and said so.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STRIPE_API_KEY`, `NEW_RELIC_API_KEY`, `NEW_RELIC_ACCOUNT_ID`, `NEW_RELIC_REGION`
 - **How-to:** [deploy.md](../how-to/deploy.md#check-it-worked)

@@ -457,7 +457,7 @@ void main() {
     // and how to cancel.
     expect(
       find.text(
-        r"$5.99 a year, paid on Stripe's page. It renews automatically every year until you cancel, at the price then in force: we email you at least 7 days before a new price would apply. Cancel whenever you like under Manage subscription, and live play lasts to the end of the year you paid for.",
+        r"$5.99 a year plus any tax, sold by Link, Stripe's affiliate, on Stripe's page. It renews automatically every year until you cancel, at the price then in force: we email you at least 7 days before a new price would apply. Cancel whenever you like under Manage subscription, and live play lasts to the end of the year you paid for.",
       ),
       findsOneWidget,
     );

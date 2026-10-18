@@ -32,7 +32,7 @@ import { isAccount, storeOf } from './rows.mjs';
 import { S, notConfigured, openHouse, settle } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
 import { playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
-import { checkout, manage, payerLookup, record, sameSite, webhookSigned } from './stripe.mjs';
+import { checkout, endRefunded, manage, payerLookup, record, sameSite, webhookSigned } from './stripe.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 import { SUSPENDED_WHY, isOrder, orderRow } from './suspension.mjs';
 import { LOCAL_TURN, mint } from './turn.mjs';
@@ -374,6 +374,13 @@ async function stripeRoute(request, env, ctx) {
     event = JSON.parse(raw);
   } catch {
     return json(request, 400, { error: 'not json' });
+  }
+  // A refund, by anyone, ends the subscription it was for: answered
+  // with an error when Stripe could not be asked, so Stripe sends it
+  // again.
+  if (event?.type === 'charge.refunded') {
+    const ended = await endRefunded(event.data?.object, store, env);
+    return json(request, ended.status, ended.status === 200 ? { ok: true } : ended.body);
   }
   const done = await record(event, store);
   if (done?.bound) await after(ctx, alertSubscribed(env, store, { subscription: done.subscription, source: 'stripe', key: done.bound }));

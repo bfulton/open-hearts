@@ -13,7 +13,8 @@ import { dayAfter, dayOf, memoryStore } from './rows.mjs';
 import { SITE, forgetSettings, openHouse, useSettings } from './settings.mjs';
 import { SUSPENDED_WHY } from './suspension.mjs';
 import { forgetProviderKeys, supersede, whoSignedIn } from './signin.mjs';
-import { CHECKOUT_WORDS, checkout, checkoutTerms, manage, record, sameSite, webhookSigned } from './stripe.mjs';
+import { CHECKOUT_WORDS, STRIPE_VERSION, checkout, checkoutTerms, endRefunded, manage, record, sameSite, webhookSigned } from './stripe.mjs';
+import { stripe as stripeDefinition } from '../../infra/stripe.mjs';
 import { STATED, withPrice } from './stripe.fixtures.mjs';
 import { mint, serversOf } from './turn.mjs';
 import { eventIdOf } from './records.mjs';
@@ -409,8 +410,13 @@ test('checkout: a subscription session carrying the key three ways', async () =>
   assert.deepEqual(out, { status: 200, body: { url: 'https://checkout.stripe.com/c/pay/cs_test_1' } });
   assert.equal(calls[0].url, 'https://api.stripe.com/v1/checkout/sessions');
   assert.equal(calls[0].init.headers.authorization, 'Bearer sk_test');
+  assert.equal(calls[0].init.headers['stripe-version'], STRIPE_VERSION, "in the webhook's API version, not the account's");
   const form = new URLSearchParams(calls[0].init.body);
   assert.equal(form.get('mode'), 'subscription');
+  assert.equal(form.get('managed_payments[enabled]'), 'true', 'sold by Link, Stripe\'s merchant of record');
+  for (const field of ['automatic_tax[enabled]', 'tax_id_collection[enabled]', 'payment_method_types[0]', 'customer_update[address]', 'invoice_creation[enabled]']) {
+    assert.equal(form.get(field), null, `${field} is Stripe's to set in a Managed Payments checkout`);
+  }
   assert.equal(form.get('line_items[0][price]'), 'price_1');
   assert.equal(form.get('success_url'), 'https://x/play/?bought=1');
   assert.equal(form.get('metadata[key]'), KEY);
@@ -429,6 +435,92 @@ test('checkout: a subscription session carrying the key three ways', async () =>
   assert.equal(form.get('locale'), 'en');
   assert.match(form.get('custom_text[terms_of_service_acceptance][message]'), /^I agree to the \[Terms of Use\]\(https:\/\/openhearts\.game\/terms\), and that this subscription renews automatically every year/);
   assert.match(form.get('custom_text[submit][message]'), /renews automatically every year until you cancel\. Cancel any time in the game: menu, Subscription, Manage subscription\.$/);
+});
+
+test('the service calls Stripe in the API version its webhook is read in', () => {
+  assert.equal(STRIPE_VERSION, stripeDefinition.webhooks[0].apiVersion);
+  assert.ok(STRIPE_VERSION >= '2025-03-31.basil', 'which Managed Payments needs');
+});
+
+/// Stripe, for a refund: the payment's invoice, the invoice's
+/// subscription and the subscription's status, as [had] says; each call
+/// noted in [calls].
+function refundStripe({ invoice = 'in_1', subscription = 'sub_9', status = 'active', down = false } = {}) {
+  const calls = [];
+  const fake = async (url, init = {}) => {
+    const at = new URL(String(url));
+    calls.push({ method: init.method ?? 'GET', path: at.pathname, query: Object.fromEntries(at.searchParams), version: init.headers?.['stripe-version'] });
+    if (down) return Response.json({ error: {} }, { status: 500 });
+    if (at.pathname === '/v1/invoice_payments') return Response.json({ data: invoice ? [{ invoice, payment: { type: 'payment_intent', payment_intent: at.searchParams.get('payment[payment_intent]') } }] : [] });
+    if (at.pathname === `/v1/invoices/${invoice}`) return Response.json({ id: invoice, parent: subscription ? { type: 'subscription_details', subscription_details: { subscription } } : null });
+    if (at.pathname === `/v1/subscriptions/${subscription}`) return Response.json({ id: subscription, status: init.method === 'DELETE' ? 'canceled' : status });
+    return Response.json({ error: {} }, { status: 404 });
+  };
+  fake.calls = calls;
+  return fake;
+}
+
+const refunded = (more = {}) => ({ id: 'ch_1', object: 'charge', payment_intent: 'pi_1', amount: 599, amount_refunded: 599, ...more });
+
+test('a refund of a payment for a subscription of ours ends it at once', async () => {
+  const store = memoryStore();
+  await store.put('SUB#sub_9', 'META', { source: 'stripe' });
+  const shop = { OH_STRIPE_SECRET: 'rk_test' };
+  const stripe = refundStripe();
+  assert.deepEqual(await endRefunded(refunded(), store, shop, stripe), { status: 200, body: { ended: true, subscription: 'sub_9' } });
+  assert.deepEqual(
+    stripe.calls.map((c) => `${c.method} ${c.path}`),
+    ['GET /v1/invoice_payments', 'GET /v1/invoices/in_1', 'GET /v1/subscriptions/sub_9', 'DELETE /v1/subscriptions/sub_9'],
+  );
+  assert.deepEqual(stripe.calls[0].query, { 'payment[type]': 'payment_intent', 'payment[payment_intent]': 'pi_1', limit: '10' });
+  assert.equal(stripe.calls[3].query['cancellation_details[comment]'], 'refunded');
+  assert.ok(stripe.calls.every((c) => c.version === STRIPE_VERSION));
+  const part = refundStripe();
+  assert.equal((await endRefunded(refunded({ amount_refunded: 100 }), store, shop, part)).body.ended, true, 'a part refunded is a refund too, as the terms say');
+});
+
+test('a refund ends nothing twice, and nothing that is not ours', async () => {
+  const store = memoryStore();
+  await store.put('SUB#sub_9', 'META', { source: 'stripe' });
+  const shop = { OH_STRIPE_SECRET: 'rk_test' };
+  const ended = refundStripe({ status: 'canceled' });
+  assert.deepEqual(await endRefunded(refunded(), store, shop, ended), { status: 200, body: { ended: false, subscription: 'sub_9' } });
+  assert.ok(!ended.calls.some((c) => c.method === 'DELETE'), 'ended already, by the refund that ended it first');
+  for (const [why, stripe, charge] of [
+    ['a subscription this service did not sell', refundStripe({ subscription: 'sub_other' }), refunded()],
+    ['a payment no invoice was for', refundStripe({ invoice: null }), refunded()],
+    ['an invoice no subscription made', refundStripe({ subscription: null }), refunded()],
+    ['nothing refunded', refundStripe(), refunded({ amount_refunded: 0 })],
+    ['no payment intent', refundStripe(), refunded({ payment_intent: null })],
+  ]) {
+    assert.deepEqual(await endRefunded(charge, store, shop, stripe), { status: 200, body: { ended: null } }, why);
+    assert.ok(!stripe.calls.some((c) => c.method === 'DELETE'), why);
+  }
+  assert.equal((await endRefunded(refunded(), store, shop, refundStripe({ down: true }))).status, 502, 'Stripe not saying is asked again');
+  assert.equal((await endRefunded(refunded(), store, {}, refundStripe())).status, 503);
+});
+
+test('the webhook route: a refund ends the subscription, and is sent again when Stripe could not be asked', async () => {
+  const store = memoryStore();
+  await store.put('SUB#sub_9', 'META', { source: 'stripe' });
+  const shop = { ...env, OH_STRIPE_WEBHOOK_SECRET: SIGNING, OH_STORE: kvOf(store), OH_STRIPE_SECRET: 'rk_test' };
+  const at = 'https://dev.open-hearts.pages.dev/api/stripe';
+  const raw = JSON.stringify({ type: 'charge.refunded', data: { object: refunded() } });
+  const send = () => worker.fetch(new Request(at, { method: 'POST', headers: { 'stripe-signature': 'x' }, body: raw }), shop);
+  const realFetch = globalThis.fetch;
+  try {
+    const stripe = refundStripe();
+    globalThis.fetch = stripe;
+    const signed = async () => worker.fetch(new Request(at, { method: 'POST', headers: { 'stripe-signature': await signHook(raw) }, body: raw }), shop);
+    assert.equal((await send()).status, 400, 'unsigned, nothing is asked of Stripe');
+    assert.equal(stripe.calls.length, 0);
+    assert.equal((await signed()).status, 200);
+    assert.ok(stripe.calls.some((c) => c.method === 'DELETE' && c.path === '/v1/subscriptions/sub_9'));
+    globalThis.fetch = refundStripe({ down: true });
+    assert.equal((await signed()).status, 502);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test('checkout: in the language the app asked in, the terms in that language too', async () => {

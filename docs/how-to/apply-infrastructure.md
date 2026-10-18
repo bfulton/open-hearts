@@ -56,6 +56,8 @@ The definitions are `infra/cloudflare.mjs`, `infra/stripe.mjs` and `observabilit
    - **A DNS record that a Cloudflare feature makes is missing**, such as Email Routing's. Turn that feature on again in the dashboard.
    - **A setting only the dashboard can change**, such as Email Sending's onboarding or the customer portal's first save. Change it in the dashboard, where the line points.
 
+1. Once, before the first deploy that sells through Link: in Stripe's Dashboard, under **Settings** > **Managed Payments**, apply for Managed Payments, accept its terms, and turn it on once Stripe approves the account. No API reports it, so `./oh infra` can't; `./oh verify` proves it by making a checkout through Link and expiring it. Until it's on, every web checkout fails, because the service sells only through Link.
+
 1. Run the dry run again until it has no `would` and no `by hand:` lines.
 
 ## Apply the New Relic definition

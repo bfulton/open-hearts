@@ -77,7 +77,7 @@ Production always keeps its live deployment and the two before it.
    ./oh verify
    ```
 
-   It checks that the live build is `origin/main`, that the service can sell (its health is `ok` when the store and Stripe both answer), that the relay and the order route answer, that every web subscriber was emailed each published change that matters to them ([tell subscribers](change-the-terms.md#tell-subscribers)), and that Cloudflare, Stripe and New Relic match their definitions. Each check prints `ok` or `FAILED` with what it found; a check whose credentials aren't set is skipped and said so.
+   It checks that the live build is `origin/main`, that the service can sell (its health is `ok` when the store and Stripe both answer), that the relay and the order route answer, that Link sells a checkout (it makes one and expires it at once), that every web subscriber was emailed each published change that matters to them ([tell subscribers](change-the-terms.md#tell-subscribers)), and that Cloudflare, Stripe and New Relic match their definitions. Each check prints `ok` or `FAILED` with what it found; a check whose credentials aren't set is skipped and said so.
 
    For a preview, ask `https://<label>.open-hearts.pages.dev/play/build-info.json`. The app's About page shows the same commit and date.
 

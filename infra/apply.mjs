@@ -528,20 +528,24 @@ async function applyStripe() {
           tax_behavior: stripe.price.taxBehavior,
           lookup_key: stripe.price.lookupKey,
           transfer_lookup_key: true,
-          ...(product ? { product: product.id } : { product_data: { name: stripe.product.name } }),
+          ...(product ? { product: product.id } : { product_data: { name: stripe.product.name, tax_code: stripe.product.tax_code } }),
         });
         await st('POST', `/products/${made.product}`, { default_price: made.id, description: stripe.product.description });
       }
     }
+    if (plan.update) {
+      say(`update price ${price.id}: ${plan.why}`);
+      if (write) await st('POST', `/prices/${price.id}`, plan.update);
+    }
     if (productDiffs.length) {
       say(`update product ${product.id}: ${productDiffs.map(describe).join(', ')}`);
-      if (write) await st('POST', `/products/${product.id}`, { name: stripe.product.name, description: stripe.product.description, active: true });
+      if (write) await st('POST', `/products/${product.id}`, { name: stripe.product.name, description: stripe.product.description, tax_code: stripe.product.tax_code, active: true });
     }
     if (product && !plan.create && product.default_price !== price.id) {
       say(`make ${price.id} product ${product.id}'s default price`);
       if (write) await st('POST', `/products/${product.id}`, { default_price: price.id });
     }
-    if (!plan.create && !productDiffs.length && product.default_price === price.id) {
+    if (!plan.create && !plan.update && !productDiffs.length && product.default_price === price.id) {
       ok(`price ${stripe.price.lookupKey} (${price.id}): $${(price.unit_amount / 100).toFixed(2)} ${price.currency} every ${price.recurring.interval_count} ${price.recurring.interval}, active, the default of "${product.name}" (${product.id})`);
     }
   });

@@ -19,6 +19,7 @@
 // as long as the subscription's record is kept.
 
 import { SITE } from './settings.mjs';
+import { stripeAuth } from './stripe.mjs';
 import { ORDER_KEPT_S } from './suspension.mjs';
 
 /// How long a device shows a change at the front door, in days.
@@ -176,9 +177,7 @@ async function viaRelay(env, mail) {
 /// The subscription [id] as Stripe has it, with its customer: null for
 /// none. Throws when Stripe does not say.
 async function subscriptionOf(id, secret, fetchImpl) {
-  const res = await fetchImpl(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(id)}?expand[]=customer`, {
-    headers: { authorization: `Bearer ${secret}` },
-  });
+  const res = await fetchImpl(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(id)}?expand[]=customer`, { headers: stripeAuth(secret) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`stripe said ${res.status}`);
   return res.json();

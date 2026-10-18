@@ -1,6 +1,12 @@
 // Buying on the web with Stripe: the checkout, what Stripe's webhook
-// says, the billing portal, and the payer's email address for backup
-// codes.
+// says, a refund ending the subscription it was for, the billing
+// portal, and the payer's email address for backup codes.
+//
+// Stripe sells it, not us: every checkout is a Managed Payments one, so
+// the buyer buys from Link, Stripe's merchant of record, which charges
+// and pays over the tax of wherever they are, keeps to their country's
+// rules for buying online, and answers their questions about the
+// payment (docs/explanation/service.md, "Payment").
 
 import { paidFor } from './accounts.mjs';
 import { dayOf, isAccount } from './rows.mjs';
@@ -8,13 +14,23 @@ import { S, SITE, STRIPE_PRICE } from './settings.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 
 // ---- buying, on the web ------------------------------------------------
-// Stripe Checkout in subscription mode, with the device's key in the
-// session. Nobody is asked for an email or a password: the account is
+// Stripe Checkout in subscription mode, sold through Link (Managed
+// Payments), with the device's key in the session. Nobody is asked for
+// an email or a password: the account is
 // made when the subscription is paid for, with the paying device on it
 // ([paidFor]), and the licence follows. A phone buys through its own
 // store instead (stores.mjs, "buying in a store").
 
 const STRIPE = 'https://api.stripe.com/v1';
+
+/// The API version every call here is made in: the one the webhook is
+/// read in (infra/stripe.mjs; worker.test.mjs holds the two together),
+/// not whichever the account defaults to. Managed Payments needs
+/// 2025-03-31.basil or later.
+export const STRIPE_VERSION = '2025-11-17.clover';
+
+/// The headers a call to Stripe with [secret] carries.
+export const stripeAuth = (secret) => ({ authorization: `Bearer ${secret}`, 'stripe-version': STRIPE_VERSION });
 
 /// The states a subscription does not come back from. Not `canceled`
 /// alone: dunning that gives up leaves `unpaid`, and a checkout that
@@ -100,7 +116,7 @@ export async function priceLookup(named, secret, fetchImpl) {
   const url = one
     ? `${STRIPE}/prices/${encodeURIComponent(named)}`
     : `${STRIPE}/prices?${new URLSearchParams({ 'lookup_keys[]': named, active: 'true', limit: '1' })}`;
-  const res = await fetchImpl(url, { headers: { authorization: `Bearer ${secret}` } });
+  const res = await fetchImpl(url, { headers: stripeAuth(secret) });
   if (one && res.status === 404) return null;
   if (!res.ok) throw new StripeRefused(res.status);
   const body = await res.json();
@@ -178,6 +194,34 @@ export function checkoutTerms(lang) {
   };
 }
 
+/// What a checkout session for the device [key] asks Stripe for: a year
+/// of [price], coming back to [back], or to [cancelled], in the app's
+/// language [lang]. `oh verify` asks for the same, to prove Link sells
+/// it (ops/release.mjs).
+export function checkoutFields(key, price, back, cancelled, lang) {
+  return {
+    mode: 'subscription',
+    'line_items[0][price]': price,
+    'line_items[0][quantity]': '1',
+    success_url: back,
+    cancel_url: cancelled,
+    // Three places, because three different events carry it back: the
+    // session's own metadata, the reference on the session, and the
+    // subscription's metadata, which is what a renewal a year from now
+    // will have.
+    'metadata[key]': key,
+    client_reference_id: key,
+    'subscription_data[metadata][key]': key,
+    // Sold by Link, Stripe's merchant of record, in the buyer's own
+    // currency and with their own country's tax: the terms say so
+    // ("Price and length"), and a checkout Stripe will not sell this way
+    // is not sold at all, rather than sold by us.
+    'managed_payments[enabled]': 'true',
+    ...checkoutBranding(back),
+    ...checkoutTerms(lang),
+  };
+}
+
 /// A checkout session for [key], as Stripe answers: {status, body}, in
 /// the app's language [lang] ([checkoutTerms]).
 export async function checkout(key, back, cancelled, env, fetchImpl = fetch, { lang = 'en' } = {}) {
@@ -194,28 +238,12 @@ export async function checkout(key, back, cancelled, env, fetchImpl = fetch, { l
   // A price that is not the terms' is not sold at: /api/health says
   // which (health.mjs), for the operator to put right.
   if (!sells.id) return { status: 503, body: { error: 'the shop is not open yet' } };
-  const price = sells.id;
-  const form = new URLSearchParams({
-    mode: 'subscription',
-    'line_items[0][price]': price,
-    'line_items[0][quantity]': '1',
-    success_url: back,
-    cancel_url: cancelled,
-    // Three places, because three different events carry it back: the
-    // session's own metadata, the reference on the session, and the
-    // subscription's metadata, which is what a renewal a year from now
-    // will have.
-    'metadata[key]': key,
-    client_reference_id: key,
-    'subscription_data[metadata][key]': key,
-    ...checkoutBranding(back),
-    ...checkoutTerms(lang),
-  });
+  const form = new URLSearchParams(checkoutFields(key, sells.id, back, cancelled, lang));
   let res;
   try {
     res = await fetchImpl(`${STRIPE}/checkout/sessions`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { ...stripeAuth(secret), 'content-type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
     });
   } catch {
@@ -316,6 +344,47 @@ export async function record(event, store, { now = Date.now() } = {}) {
   return null;
 }
 
+// ---- a refund ---------------------------------------------------------
+// The terms: a refund ends the subscription. The operator's refund ends
+// it first (`oh account refund`, ops/billing.mjs), but Link's support
+// can refund a payment within 60 days of it without asking us, and
+// anyone with the Dashboard can refund one. So a refund of any payment
+// for a subscription of ours ends that subscription here, in Stripe and
+// at once; its deletion, which Stripe sends next, cuts its devices'
+// licences to the day (subscriptions.mjs).
+
+/// The subscription [charge] was a payment for, ended now that some of
+/// it was refunded: when it is one this service sold and has not ended
+/// already. {status, body: {ended: true | false | null, subscription}},
+/// null being no subscription of ours; 502 when Stripe did not say, so
+/// that Stripe sends the event again.
+export async function endRefunded(charge, store, env, fetchImpl = fetch) {
+  const intent = typeof charge?.payment_intent === 'string' ? charge.payment_intent : charge?.payment_intent?.id;
+  if (!(charge?.amount_refunded > 0) || typeof intent !== 'string' || !/^pi_[A-Za-z0-9]{1,64}$/.test(intent)) return { status: 200, body: { ended: null } };
+  const secret = env.OH_STRIPE_SECRET;
+  if (!secret) return { status: 503, body: { error: 'service not configured: OH_STRIPE_SECRET' } };
+  const ask = async (path, method = 'GET') => {
+    const res = await fetchImpl(`${STRIPE}${path}`, { method, headers: stripeAuth(secret) });
+    if (!res.ok) throw new StripeRefused(res.status);
+    return res.json();
+  };
+  try {
+    // A payment is an invoice's, and an invoice its subscription's, in
+    // this API version: neither the charge nor its payment names either.
+    const paid = await ask(`/invoice_payments?${new URLSearchParams({ 'payment[type]': 'payment_intent', 'payment[payment_intent]': intent, limit: '10' })}`);
+    const invoice = (paid.data ?? []).find((p) => typeof p.invoice === 'string')?.invoice;
+    if (!invoice) return { status: 200, body: { ended: null } };
+    const named = (await ask(`/invoices/${encodeURIComponent(invoice)}`)).parent?.subscription_details?.subscription;
+    const subscription = typeof named === 'string' ? named : named?.id;
+    if (typeof subscription !== 'string' || !(await store.get(`SUB#${subscription}`, 'META'))) return { status: 200, body: { ended: null } };
+    if (FINAL.has((await ask(`/subscriptions/${encodeURIComponent(subscription)}`)).status)) return { status: 200, body: { ended: false, subscription } };
+    await ask(`/subscriptions/${encodeURIComponent(subscription)}?${new URLSearchParams({ 'cancellation_details[comment]': 'refunded' })}`, 'DELETE');
+    return { status: 200, body: { ended: true, subscription } };
+  } catch {
+    return { status: 502, body: { error: 'the shop is not answering' } };
+  }
+}
+
 /// The Stripe customer behind [subscription], kept so a device on it can
 /// open the billing portal. A row of its own, since the subscription's
 /// META is written whole by every subscription event.
@@ -346,7 +415,7 @@ export async function manage(key, back, store, env, fetchImpl = fetch) {
   const subscription = (await store.get(`ACCOUNT#${account}`, 'META'))?.subscription;
   if (!subscription) return { status: 402, body: { error: 'no subscription' } };
   if (!subscription.startsWith('sub_')) return { status: 409, body: { error: 'not a web subscription' } };
-  const auth = { authorization: `Bearer ${secret}` };
+  const auth = stripeAuth(secret);
   let customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
   if (!customer) {
     // No customer row for this subscription: Stripe knows.
@@ -399,7 +468,7 @@ export async function payerLookup(store, subscription, env, fetchImpl = fetch) {
   const customer = (await store.get(`SUB#${subscription}`, 'CUSTOMER'))?.customer;
   if (!customer) return { email: null, why: 'no customer on record' };
   try {
-    const res = await fetchImpl(`${STRIPE}/customers/${encodeURIComponent(customer)}`, { headers: { authorization: `Bearer ${secret}` } });
+    const res = await fetchImpl(`${STRIPE}/customers/${encodeURIComponent(customer)}`, { headers: stripeAuth(secret) });
     if (!res.ok) {
       const code = (await res.json().catch(() => null))?.error?.code;
       return { email: null, why: `Stripe said ${res.status}${code ? ` (${code})` : ''}` };

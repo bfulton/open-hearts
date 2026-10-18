@@ -536,13 +536,17 @@ export const formBody = (obj) => new URLSearchParams(form(obj)).toString();
 
 /// The price holding the lookup key against the definition. A price's
 /// amount, currency and interval cannot change, so a difference in them
-/// means a new price that takes the lookup key over.
+/// means a new price that takes the lookup key over; its tax behaviour
+/// can be set once, from unspecified, which is an update of it instead
+/// ({update: {tax_behavior}}).
 export function pricePlan(want, price) {
   if (!price) return { create: true, why: 'no active price holds the lookup key', diffs: [] };
   const diffs = drift(
     { currency: want.currency, unit_amount: want.unitAmount, type: 'recurring', recurring: { interval: want.interval, interval_count: want.intervalCount }, tax_behavior: want.taxBehavior, active: true },
     price,
   );
+  const settable = diffs.length === 1 && diffs[0].path === 'tax_behavior' && price.tax_behavior === 'unspecified';
+  if (settable) return { create: false, update: { tax_behavior: want.taxBehavior }, why: describe(diffs[0]), diffs };
   return { create: diffs.length > 0, why: diffs.map(describe).join(', '), diffs };
 }
 

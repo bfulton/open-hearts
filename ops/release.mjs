@@ -12,6 +12,8 @@ import { Failed, Usage, root, wranglerVersion } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
 import { termsProblems, untold } from './terms.mjs';
 import { told } from '../site/ledger.mjs';
+import { stripe as stripeDefinition } from '../infra/stripe.mjs';
+import { checkoutFields } from '../service/functions/stripe.mjs';
 
 /// The programs a relay deploy builds with: its custom build
 /// (service/bench/build.sh) compiles the juror and the native libraries,
@@ -106,11 +108,28 @@ async function branch(ctx) {
   return (await ctx.capture('git', ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim();
 }
 
+/// The device key a proving checkout is made for: no device's, so that
+/// nothing could be bound to it even if it were paid.
+export const NO_DEVICE = '0'.repeat(64);
+
+/// Whether [stripe] makes a Managed Payments checkout for the price the
+/// service sells, with every field the service asks for
+/// (service/functions/stripe.mjs, checkoutFields): made, and expired at
+/// once. Throws with Stripe's words when it does not.
+export async function sellsThroughLink(stripe, origin) {
+  const lookup = stripeDefinition.price.lookupKey;
+  const price = (await stripe.get(`/prices?${new URLSearchParams({ 'lookup_keys[]': lookup, active: 'true', limit: '1' })}`)).data?.[0];
+  if (!price?.id) throw new Failed(`no active price holds the lookup key ${lookup}`);
+  const session = await stripe.post('/checkout/sessions', checkoutFields(NO_DEVICE, price.id, `${origin}/play/`, `${origin}/play/`, 'en'));
+  await stripe.post(`/checkout/sessions/${encodeURIComponent(session.id)}/expire`);
+  return true;
+}
+
 /// Production, checked as a deploy is checked: the build that is live,
-/// the service's health, the relay, the order route, every web
-/// subscriber told of a published change that matters to them, and the
-/// accounts against their definitions. Every check says ok or why not;
-/// Failed if any did not pass.
+/// the service's health, the relay, the order route, a checkout Link
+/// will sell, every web subscriber told of a published change that
+/// matters to them, and the accounts against their definitions. Every
+/// check says ok or why not; Failed if any did not pass.
 export async function verify(ctx) {
   const config = await ctx.config();
   const origin = config.appOrigin;
@@ -143,6 +162,18 @@ export async function verify(ctx) {
   check(relayRoot.status === 200, `the relay answers: ${relayRoot.status}`);
   const order = await get(`${origin}/api/order`);
   check(order.status === 405, `the order route turns a GET away: ${order.status}`);
+  // Every web subscription is sold by Link (Managed Payments), which
+  // Stripe has to have approved and the Dashboard to have turned on, and
+  // which no API reports: so a checkout is made as the service makes
+  // one, and expired at once, before anybody could pay with it.
+  if (!ctx.env.STRIPE_API_KEY) ctx.log('skipped a checkout through Link: needs STRIPE_API_KEY');
+  else {
+    try {
+      check(await sellsThroughLink(ctx.stripe(), origin), 'a checkout is sold through Link (Managed Payments), and expired unpaid');
+    } catch (e) {
+      check(false, `a checkout through Link (Managed Payments): ${e?.message ?? e}`);
+    }
+  }
   const tellers = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'STRIPE_API_KEY'].filter((n) => !ctx.env[n]);
   if (tellers.length) ctx.log(`skipped the notices of changes to the terms: needs ${tellers.join(' and ')}`);
   else {

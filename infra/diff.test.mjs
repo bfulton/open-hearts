@@ -561,17 +561,31 @@ const livePrice = () => ({
   currency: 'usd',
   lookup_key: 'openhearts_annual',
   recurring: { interval: 'year', interval_count: 1, usage_type: 'licensed' },
-  tax_behavior: 'unspecified',
+  tax_behavior: 'exclusive',
   type: 'recurring',
   unit_amount: 599,
 });
 
 test('price: as it is; another amount is a new price', () => {
-  assert.equal(pricePlan(stripe.price, livePrice()).create, false);
+  assert.deepEqual(pricePlan(stripe.price, livePrice()), { create: false, why: '', diffs: [] });
   assert.equal(pricePlan(stripe.price, null).create, true);
   const dearer = { ...livePrice(), unit_amount: 699 };
   assert.deepEqual(pricePlan(stripe.price, dearer), { create: true, why: 'unit_amount: 699 -> 599', diffs: [{ path: 'unit_amount', want: 599, have: 699 }] });
   assert.equal(pricePlan(stripe.price, { ...livePrice(), recurring: { interval: 'month', interval_count: 1 } }).create, true);
+});
+
+test('price: its tax behaviour is set where it was never set, and is a new price where it was', () => {
+  assert.equal(stripe.price.taxBehavior, 'exclusive', 'tax on top, as the terms say');
+  const unset = pricePlan(stripe.price, { ...livePrice(), tax_behavior: 'unspecified' });
+  assert.deepEqual([unset.create, unset.update, unset.why], [false, { tax_behavior: 'exclusive' }, 'tax_behavior: "unspecified" -> "exclusive"']);
+  assert.equal(pricePlan(stripe.price, { ...livePrice(), tax_behavior: 'inclusive' }).create, true, 'Stripe sets it once');
+  const both = pricePlan(stripe.price, { ...livePrice(), tax_behavior: 'unspecified', unit_amount: 699 });
+  assert.deepEqual([both.create, both.update], [true, undefined], 'a new amount is a new price anyway, made with it');
+});
+
+test('product: Managed Payments needs a tax code of a digital product it sells', () => {
+  assert.equal(stripe.product.tax_code, 'txcd_10201002');
+  assert.ok(stripe.webhooks[0].events.includes('charge.refunded'), 'a refund ends the subscription it was for');
 });
 
 const liveWebhooks = () => [

@@ -72,7 +72,7 @@ A refund always ends the subscription: the terms say so, so that no device goes 
 
    It ends the subscription in Stripe now, then refunds, marked in Stripe as `oh_act: refund`. Live play on the account's devices stops at the end of that day (UTC).
 
-Refund through `./oh`, not in Stripe's dashboard: a refund made in the dashboard leaves the subscription running and renewing.
+Refund through `./oh`, which refunds the unused part of the year and marks the refund with what made it. A refund made anywhere else, in Stripe's dashboard or by Link's support, ends the subscription too, when the service hears of it (`endRefunded` in `service/functions/stripe.mjs`), but refunds what whoever made it chose.
 
 ## Check it worked
 

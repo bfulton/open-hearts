@@ -559,7 +559,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String webRenewal(String price) {
-    return '$price al año, que pagas en la página de Stripe. Se renueva automáticamente cada año hasta que la canceles, al precio vigente en ese momento: te avisamos por correo al menos 7 días antes de que se aplique un nuevo precio. Cancela cuando quieras en Gestionar suscripción, y el juego en vivo dura hasta el final del año que pagaste.';
+    return '$price al año más los impuestos que correspondan, que te vende Link, filial de Stripe, en la página de Stripe. Se renueva automáticamente cada año hasta que la canceles, al precio vigente en ese momento: te avisamos por correo al menos 7 días antes de que se aplique un nuevo precio. Cancela cuando quieras en Gestionar suscripción, y el juego en vivo dura hasta el final del año que pagaste.';
   }
 
   @override

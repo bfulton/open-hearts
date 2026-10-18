@@ -8,9 +8,12 @@
 // the webhooks pointed at this app's hosts.
 //
 // Not here, because they are not readable or not settable through the
-// API with the keys this uses: the restricted keys themselves (the
-// service's OH_STRIPE_SECRET — Products, Subscriptions and Customers
-// read; Checkout Sessions and Customer Portal write), the webhook's
+// API with the keys this uses: Managed Payments itself (turned on, and
+// its terms accepted, in the Dashboard once Stripe has approved the
+// account; `oh verify` proves a checkout can be sold through it), the
+// restricted keys themselves (the service's OH_STRIPE_SECRET —
+// Products, Customers and Invoices read; Subscriptions, Checkout
+// Sessions and Customer Portal write), the webhook's
 // signing secret (shown once, at creation; it is the Pages project's
 // OH_STRIPE_WEBHOOK_SECRET), Checkout's branding, receipt emails, the
 // emails about upcoming renewals (on, 30 days before, with a link to
@@ -42,11 +45,19 @@ export const stripe = {
     unitAmount: price.amount,
     interval: 'year',
     intervalCount: 1,
-    taxBehavior: 'unspecified',
+    /// Tax on top of the price, as the terms say ("plus any tax shown
+    /// at checkout"), whatever the Dashboard's default: Link, which
+    /// sells it (Managed Payments), adds the buyer's own.
+    taxBehavior: 'exclusive',
   },
   product: {
     name: 'Open Hearts Annual Subscription',
     description: 'All features including multi-player play, paid yearly.',
+    /// What it is for tax, which Managed Payments needs of every product
+    /// it sells: a game, on the device, whose live play lasts as long as
+    /// it is paid for ("Video Games - downloaded - subscription - with
+    /// conditional rights").
+    tax_code: 'txcd_10201002',
   },
 
   /// The default configuration, which is what the service's portal
@@ -77,9 +88,10 @@ export const stripe = {
   },
 
   /// Entitlement (`/api/stripe`, service/functions/stripe.mjs). It reads
-  /// checkout.session.completed and .async_payment_succeeded and the
-  /// subscription's changes; the other checkout and subscription events
-  /// are received, answered and ignored.
+  /// checkout.session.completed and .async_payment_succeeded, the
+  /// subscription's changes, and a refund, which ends the subscription
+  /// it was for; the other checkout and subscription events are
+  /// received, answered and ignored.
   webhooks: [
     {
       url: 'https://play.openhearts.game/api/stripe',
@@ -87,6 +99,7 @@ export const stripe = {
       // endpoint is made.
       apiVersion: '2025-11-17.clover',
       events: [
+        'charge.refunded',
         'checkout.session.async_payment_failed',
         'checkout.session.async_payment_succeeded',
         'checkout.session.completed',

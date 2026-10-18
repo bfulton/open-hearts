@@ -566,7 +566,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String webRenewal(String price) {
-    return '$price im Jahr, bezahlt auf der Seite von Stripe. Das Abo verlängert sich jedes Jahr automatisch, bis du kündigst, zum dann geltenden Preis: Wir schreiben dir mindestens 7 Tage, bevor ein neuer Preis gelten würde. Kündige jederzeit unter Abo verwalten; Live-Spiel läuft bis zum Ende des bezahlten Jahres.';
+    return '$price im Jahr zuzüglich Steuern, verkauft von Link, einem verbundenen Unternehmen von Stripe, auf der Seite von Stripe. Das Abo verlängert sich jedes Jahr automatisch, bis du kündigst, zum dann geltenden Preis: Wir schreiben dir mindestens 7 Tage, bevor ein neuer Preis gelten würde. Kündige jederzeit unter Abo verwalten; Live-Spiel läuft bis zum Ende des bezahlten Jahres.';
   }
 
   @override
