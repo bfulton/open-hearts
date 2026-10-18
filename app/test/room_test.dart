@@ -491,6 +491,26 @@ void main() {
     });
   });
 
+  test('a picture inside another player\'s avatar is no picture: only one sent on its own is shown', () {
+    fakeAsync((async) {
+      final bus = Bus();
+      int now() => async.elapsed.inMilliseconds;
+      final hidden = base64Encode(Uint8List.fromList(List.generate(200, (i) => (i * 3) % 256)));
+      final b = Room(canDeal: true, channel: bus.attach(FakeSigner('b')), code: 'ROOM', myName: 'Bao', nowMs: now);
+      final changed = FakeSigner('changed');
+      async.elapse(const Duration(seconds: 1));
+      // A changed app's beat, with a picture where the app never puts one.
+      bus.attach(changed).announce({
+        'kind': 'here', 'name': 'Mallory', 'seed': 1, 'since': now(), 'policy': botPolicyVersion,
+        'avatar': {'icon': 'rocket', 'picture': hidden},
+      }, ephemeral: true);
+      async.elapse(const Duration(seconds: 1));
+      final mallory = b.members.firstWhere((m) => m.name == 'Mallory');
+      expect(mallory.avatar, const Avatar(icon: 'rocket'), reason: 'the icon, and no picture');
+      b.dispose();
+    });
+  });
+
   test('every table a room starts is sealed, and a start that is not is not sat at', () {
     fakeAsync((async) {
       int now() => async.elapsed.inMilliseconds;

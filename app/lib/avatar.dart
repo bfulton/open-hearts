@@ -53,11 +53,16 @@ class Avatar {
         if (withPicture && picture != null) 'picture': base64Encode(picture!),
       };
 
-  static Avatar fromJson(Object? raw) {
+  /// [raw] as an avatar. Another player's, from the relay, is read
+  /// without a picture ([withPicture] false): a picture travels as an
+  /// event of its own, which the operator can take down, and one inside
+  /// an avatar is no picture anybody may show (the relay refuses it
+  /// too, service/do/relay.mjs, pictureInAvatar).
+  static Avatar fromJson(Object? raw, {bool withPicture = true}) {
     if (raw is! Map) return none;
     final icon = raw['icon'];
     final color = raw['color'];
-    final picture = raw['picture'];
+    final picture = withPicture ? raw['picture'] : null;
     Uint8List? bytes;
     if (picture is String && picture.isNotEmpty) {
       try {

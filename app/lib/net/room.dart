@@ -361,7 +361,7 @@ class Room extends ChangeNotifier {
         if (licence != null && licence.account == this.licence?.account) return;
         final p = _others[e.pubkey];
         final member = RoomMember(e.pubkey, c['name'] as String? ?? 'Someone',
-            since: c['since'] as int? ?? now, avatar: Avatar.fromJson(c['avatar']), licence: licence);
+            since: c['since'] as int? ?? now, avatar: Avatar.fromJson(c['avatar'], withPicture: false), licence: licence);
         if (p == null || now - p.lastHeard > staleMs) {
           // New, or back after going quiet: an arrival either way, and
           // the countdown starts over.
@@ -485,7 +485,7 @@ class Room extends ChangeNotifier {
           final key = m['key'] as String;
           seats.add(HumanSeat(key, licence: m['licence'] == null ? null : Licence.parse(m['licence']) ?? (throw const FormatException('licence'))));
           names[s] = m['name'] as String? ?? 'Someone';
-          final chosen = key == me ? myAvatar : Avatar.fromJson(m['avatar']);
+          final chosen = key == me ? myAvatar : Avatar.fromJson(m['avatar'], withPicture: false);
           final picture = key == me ? myAvatar.picture : _pictures[key];
           avatars[s] = picture == null ? chosen : chosen.copyWith(picture: picture);
         }

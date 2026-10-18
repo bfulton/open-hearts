@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { wasmPath } from './host.mjs';
-import { NAME_REFUSED_WHY, lobbyKind, namesIn, objectRelay, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
+import { NAME_REFUSED_WHY, PICTURE_IN_AVATAR_WHY, lobbyKind, namesIn, objectRelay, pictureInAvatar, refusalFor, resultsTag, schnorrVerifier, storedKeep } from './relay.mjs';
 import { keys, signing } from './sign.mjs';
 import { KEPT_MS, SWEEP_EVERY_MS, keyOf, tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
@@ -112,6 +112,19 @@ test('nothing that shows the others a name the filter refuses is carried, wherev
   assert.equal(room({ kind: 24245, tags: [['t', 'ABCD']], content: 'not json' }), null);
   assert.deepEqual(namesIn(said(lobbyKind, { kind: 'picture', jpeg: 'AAAA' })), []);
   assert.deepEqual(namesIn(said(lobbyKind, { name: 7, seats: [null, { name: 'Ada' }], names: ['Bao', 3] })), ['Ada', 'Bao']);
+});
+
+test('a picture travels only as its own event: one inside an avatar, its own or a seat\'s, is not carried', () => {
+  const room = refusalFor('ABCD');
+  const said = (kind, content) => ({ kind, tags: [['t', 'ABCD']], content: JSON.stringify(content) });
+  assert.equal(room(said(24245, { kind: 'here', name: 'Ada', avatar: { icon: 'rocket', color: 2 } })), null);
+  assert.equal(room(said(24245, { kind: 'here', name: 'Ada', avatar: { picture: '/9j/4AAQ' } })), PICTURE_IN_AVATAR_WHY);
+  assert.equal(room(said(24245, { kind: 'wait', name: 'Ada', avatar: { color: 1, picture: '' } })), PICTURE_IN_AVATAR_WHY);
+  assert.equal(room(said(lobbyKind, { kind: 'start', seats: [{ key: 'k', name: 'Ada', avatar: { icon: 'rocket' } }, { bot: 'sam' }] })), null);
+  assert.equal(room(said(lobbyKind, { kind: 'match', seats: [{ key: 'k', name: 'Ada', avatar: { picture: '/9j/4AAQ' } }] })), PICTURE_IN_AVATAR_WHY);
+  // The one way: a picture of its own.
+  assert.equal(room(said(lobbyKind, { kind: 'picture', jpeg: '/9j/4AAQ' })), null);
+  assert.equal(pictureInAvatar(said(24242, { avatar: { picture: 'x' } })), false, 'a table\'s own events are not read');
 });
 
 test('a name the filter refuses is answered not OK at the object, and neither kept nor passed on', async () => {

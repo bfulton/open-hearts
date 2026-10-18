@@ -501,7 +501,7 @@ class Lobby extends ChangeNotifier {
           avatars[s] = who().avatar;
           continue;
         }
-        final chosen = Avatar.fromJson(queue.seatAvatars[s]);
+        final chosen = Avatar.fromJson(queue.seatAvatars[s], withPicture: false);
         final picture = queue.pictures[h.key];
         avatars[s] = picture == null ? chosen : chosen.copyWith(picture: Avatar.fromJson({'picture': picture}).picture);
       }

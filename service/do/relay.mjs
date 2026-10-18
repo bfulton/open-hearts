@@ -894,24 +894,44 @@ export function reactionRefusal(tag, event) {
 /// table.
 const namingKinds = new Set([lobbyKind, 24245, 24247]);
 
+/// [event]'s content as an object, for a kind that names players, or
+/// null.
+function namingContent(event) {
+  if (!namingKinds.has(event.kind)) return null;
+  try {
+    const said = JSON.parse(event.content);
+    return said && typeof said === 'object' ? said : null;
+  } catch {
+    return null;
+  }
+}
+
 /// The names [event] shows the others: its content's `name` (waiting),
 /// each of its seats' (a table started or seated) and a watched table's
 /// `names`.
 export function namesIn(event) {
-  if (!namingKinds.has(event.kind)) return [];
-  let said = null;
-  try {
-    said = JSON.parse(event.content);
-  } catch {
-    // Not JSON: no names in it.
-  }
-  if (!said || typeof said !== 'object') return [];
+  const said = namingContent(event);
+  if (!said) return [];
   const names = [];
   if (typeof said.name === 'string') names.push(said.name);
   for (const seat of Array.isArray(said.seats) ? said.seats : []) if (typeof seat?.name === 'string') names.push(seat.name);
   for (const name of Array.isArray(said.names) ? said.names : []) if (typeof name === 'string') names.push(name);
   return names;
 }
+
+/// Whether [event] carries a picture inside an avatar — its own, or a
+/// seat's — rather than as a picture of its own (`{"kind":"picture"}`),
+/// the one way the app sends one, where the operator's take-downs
+/// (withheld.mjs) and copies (review.mjs) see it.
+export function pictureInAvatar(event) {
+  const said = namingContent(event);
+  if (!said) return false;
+  const carries = (avatar) => !!avatar && typeof avatar === 'object' && 'picture' in avatar;
+  return carries(said.avatar) || (Array.isArray(said.seats) && said.seats.some((seat) => carries(seat?.avatar)));
+}
+
+/// Why an event with a picture inside an avatar is not carried.
+export const PICTURE_IN_AVATAR_WHY = 'blocked: a picture travels as its own event';
 
 /// Why an event naming somebody as the filter refuses is not carried
 /// (service/functions/names.mjs): the app never sends one.
@@ -923,7 +943,8 @@ export const NAME_REFUSED_WHY = 'blocked: a name that is not allowed';
 /// belongs to it, and nobody writes into one tag's store through
 /// another's. A reaction anywhere but a table's own tag, or in any
 /// shape but a reaction's ([reactionRefusal]). And anything that shows
-/// the others a name the filter refuses ([namesIn]).
+/// the others a name the filter refuses ([namesIn]), or a picture
+/// anywhere but in a picture of its own ([pictureInAvatar]).
 export function refusalFor(tag) {
   return (event) => {
     if (event.kind === reactionKind) return reactionRefusal(tag, event);
@@ -933,6 +954,7 @@ export function refusalFor(tag) {
         ? 'blocked: presence carries ephemeral kinds only'
         : `blocked: this tag stores only kind ${lobbyKind}, tagged ${tag}`;
     }
+    if (pictureInAvatar(event)) return PICTURE_IN_AVATAR_WHY;
     return namesIn(event).some(nameRefused) ? NAME_REFUSED_WHY : null;
   };
 }

@@ -7,11 +7,14 @@
 // The first time a tag's object carries a picture, it writes a copy to
 // a bucket served at pictures.openhearts.game, through Cloudflare's
 // cache, where Cloudflare's CSAM Scanning Tool checks it against the
-// lists of known child sexual abuse images. Once a day the worker's
-// schedule emails the operator every picture kept since the last email,
-// whose it is, and how to take it down; and deletes the copies nobody
-// has put out for 30 days. Apart from worker.mjs so it can be tested
-// without the runtime.
+// lists of known child sexual abuse images; and the first time it
+// carries a picture from an account, it notes that the account put it
+// out. Once a day the worker's schedule emails the operator, account by
+// account, every picture each put out since the last email — the ones
+// it has since replaced too, so that swapping a picture back before the
+// email hides nothing — and how to take it down; and deletes what
+// nobody has put out for 30 days. Apart from worker.mjs so it can be
+// tested without the runtime.
 
 import { pictureDigest, pictureIn } from '../functions/pictures.mjs';
 import { lobbyKind } from './relay.mjs';
@@ -20,31 +23,48 @@ import { lobbyKind } from './relay.mjs';
 /// (infra/cloudflare.mjs, a test holding the two equal).
 export const PICTURES_ORIGIN = 'https://pictures.openhearts.game';
 
-/// Where in the bucket the copies are.
+/// Where in the bucket the copies are, by digest.
 export const REVIEW_PREFIX = 'review/';
 
-/// How long a copy is kept after the picture was last put out.
+/// Where in the bucket each account's use of a picture is noted:
+/// `seen/<account>/<digest>`, empty, saying when the account first put
+/// it out and whether the operator has been told.
+export const SEEN_PREFIX = 'seen/';
+
+/// How long a copy, or a note, is kept after the picture was last put
+/// out.
 export const REVIEW_KEPT_DAYS = 30;
 
-/// How often a copy still put out is written again, so that it is
+/// How often what is still put out is written again, so that it is
 /// kept [REVIEW_KEPT_DAYS] from its last use rather than its first.
 const REFRESH_DAYS = 7;
 
-/// The row that says up to when the operator has been emailed.
-export const REVIEW_ROW = ['config', 'pictures-reviewed'];
-
-/// The most pictures one email shows; the rest go in the next.
+/// The most pictures one email shows, in whole accounts; the rest go in
+/// the next.
 export const REVIEW_MOST = 100;
 
-/// The most digests an object remembers having kept.
-const rememberedDigests = 2000;
+/// The most uses an object remembers having noted.
+const remembered = 2000;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const keyOf = (digest) => `${REVIEW_PREFIX}${digest}.jpg`;
+const copyKey = (digest) => `${REVIEW_PREFIX}${digest}.jpg`;
+const seenKey = (account, digest) => `${SEEN_PREFIX}${account}/${digest}`;
+
+/// [key] in [bucket] written as [body] with [meta], unless it is there
+/// and was written lately; written again, with what it first said,
+/// when it was written a while ago, so that it stays. Resolves true
+/// when it was not there.
+async function noted(bucket, key, now, body, meta, httpMetadata) {
+  const had = await bucket.head(key);
+  if (had && now - new Date(had.uploaded).getTime() < REFRESH_DAYS * DAY_MS) return false;
+  await bucket.put(key, body(), { ...(httpMetadata ? { httpMetadata } : {}), customMetadata: had?.customMetadata ?? meta });
+  return !had;
+}
 
 /// What an object calls with each event it took, and who said it
 /// (relay.mjs, `heard`): a picture from an account is copied to
-/// [bucket], once. Resolves true when it wrote a copy.
+/// [bucket], and the account's use of it noted, once. Resolves true
+/// when the account's use was new.
 export function pictureKeeper({ bucket, now = Date.now }) {
   const known = new Set();
   return async (event, who) => {
@@ -52,32 +72,28 @@ export function pictureKeeper({ bucket, now = Date.now }) {
     const jpeg = pictureIn(event.content);
     if (!jpeg) return false;
     const digest = await pictureDigest(jpeg);
-    if (!digest || known.has(digest)) return false;
-    if (known.size >= rememberedDigests) known.clear();
-    known.add(digest);
-    const key = keyOf(digest);
-    const had = await bucket.head(key);
-    // Kept already, and lately written: nothing to do. Kept a while
-    // ago: written again with what it first said, so it stays.
-    if (had && now() - new Date(had.uploaded).getTime() < REFRESH_DAYS * DAY_MS) return false;
-    const first = had?.customMetadata ?? { account: who.account, at: new Date(now()).toISOString() };
-    await bucket.put(key, Uint8Array.from(atob(jpeg), (c) => c.charCodeAt(0)), {
-      httpMetadata: { contentType: 'image/jpeg', cacheControl: 'public, max-age=86400' },
-      customMetadata: { account: first.account, at: first.at },
+    if (!digest) return false;
+    const use = `${who.account}/${digest}`;
+    if (known.has(use)) return false;
+    if (known.size >= remembered) known.clear();
+    known.add(use);
+    const at = new Date(now()).toISOString();
+    await noted(bucket, copyKey(digest), now(), () => Uint8Array.from(atob(jpeg), (c) => c.charCodeAt(0)), { at }, {
+      contentType: 'image/jpeg',
+      cacheControl: 'public, max-age=86400',
     });
-    return !had;
+    return noted(bucket, seenKey(who.account, digest), now(), () => '', { at });
   };
 }
 
-/// Every copy in [bucket]: {key, digest, account, at, uploaded}.
-async function copiesIn(bucket) {
+/// Everything in [bucket] under [prefix]: {key, at, told, uploaded}.
+async function listed(bucket, prefix) {
   const found = [];
   let cursor;
   do {
-    const page = await bucket.list({ prefix: REVIEW_PREFIX, cursor, include: ['customMetadata'] });
+    const page = await bucket.list({ prefix, cursor, include: ['customMetadata'] });
     for (const o of page.objects) {
-      const digest = o.key.slice(REVIEW_PREFIX.length).replace(/\.jpg$/, '');
-      found.push({ key: o.key, digest, account: o.customMetadata?.account ?? '', at: o.customMetadata?.at ?? '', uploaded: new Date(o.uploaded).getTime() });
+      found.push({ key: o.key, at: o.customMetadata?.at ?? '', told: o.customMetadata?.told ?? null, uploaded: new Date(o.uploaded).getTime() });
     }
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
@@ -86,62 +102,98 @@ async function copiesIn(bucket) {
 
 const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-/// The email for [pictures], each {digest, account, at, current}: the
-/// picture, whose it is, when it was first put out, and the command
-/// that takes it down — the account's picture off its profile, or, for
-/// one that is not its profile's picture (a changed app's), the account
-/// suspended. [more] is how many wait for the next email.
-export function reviewEmail(pictures, more = 0) {
-  const command = (p) => (p.current ? `./oh account remove ${p.account} picture --apply` : `./oh account suspend ${p.account} --apply`);
-  const note = (p) => (p.current ? 'its profile picture' : 'not its profile picture now');
-  const subject = `Open Hearts: ${pictures.length} new picture${pictures.length === 1 ? '' : 's'} to look at`;
+/// The email for [accounts], each {account, pictures: [{digest, at,
+/// current}]}: account by account, every picture it put out, in order,
+/// which is its profile's now, and the commands that take them down —
+/// its profile's picture off, or the account suspended, for a picture
+/// it has since replaced or that was never its profile's (a changed
+/// app's). [more] is how many pictures wait for the next email.
+export function reviewEmail(accounts, more = 0) {
+  const count = accounts.reduce((n, a) => n + a.pictures.length, 0);
+  const subject = `Open Hearts: ${count} new picture${count === 1 ? '' : 's'} to look at, from ${accounts.length} account${accounts.length === 1 ? '' : 's'}`;
   const intro =
-    'Each picture a subscriber put out at a live table since the last email. Every one is already shown. ' +
-    'To take one down, run the command under it. If one may show the sexual abuse of a child, follow ' +
-    'docs/how-to/handle-abuse-material.md instead, which takes it down, keeps what the law has you keep, and reports it.';
+    'Every picture each account put out at a live table since the last email, in the order it put them out, ' +
+    'including any it has since replaced. Every one was shown. To take one down, run a command under its account. ' +
+    'If one may show the sexual abuse of a child, follow docs/how-to/handle-abuse-material.md instead, which takes it ' +
+    'down, keeps what the law has you keep, and reports it.';
   const tail = more ? `${more} more will come in the next email.` : '';
+  const url = (p) => `${PICTURES_ORIGIN}/${copyKey(p.digest)}`;
+  const note = (p) => (p.current ? 'its profile picture now' : 'no longer its profile picture');
+  const commands = (a) => [
+    ...(a.pictures.some((p) => p.current) ? [`./oh account remove ${a.account} picture --apply   (its profile picture now)`] : []),
+    `./oh account suspend ${a.account} --apply   (any of them)`,
+  ];
   const text = [
     intro,
     '',
-    ...pictures.flatMap((p) => [`${PICTURES_ORIGIN}/${keyOf(p.digest)}`, `  account ${p.account}, ${note(p)}, first put out ${p.at}`, `  ${command(p)}`, '']),
+    ...accounts.flatMap((a) => [
+      `Account ${a.account}: ${a.pictures.length} picture${a.pictures.length === 1 ? '' : 's'}`,
+      ...a.pictures.map((p) => `  ${p.at}  ${url(p)}  ${note(p)}`),
+      ...commands(a).map((c) => `  ${c}`),
+      '',
+    ]),
     tail,
   ].join('\n');
   const html = [
     `<p>${escape(intro)}</p>`,
-    ...pictures.map(
-      (p) =>
-        `<div style="margin:16px 0"><a href="${PICTURES_ORIGIN}/${keyOf(p.digest)}"><img src="${PICTURES_ORIGIN}/${keyOf(p.digest)}" width="128" height="128" alt="picture ${escape(p.digest.slice(0, 8))}" style="object-fit:cover"></a>` +
-        `<div>account <code>${escape(p.account)}</code>, ${escape(note(p))}, first put out ${escape(p.at)}</div>` +
-        `<div><code>${escape(command(p))}</code></div></div>`,
+    ...accounts.map(
+      (a) =>
+        `<div style="margin:20px 0"><div><b>Account <code>${escape(a.account)}</code></b>: ${a.pictures.length} picture${a.pictures.length === 1 ? '' : 's'}</div>` +
+        `<div>${a.pictures
+          .map(
+            (p) =>
+              `<span style="display:inline-block;margin:4px;text-align:center"><a href="${url(p)}"><img src="${url(p)}" width="128" height="128" alt="picture ${escape(p.digest.slice(0, 8))}" style="object-fit:cover"></a>` +
+              `<br><small>${escape(p.at)}<br>${escape(note(p))}</small></span>`,
+          )
+          .join('')}</div>` +
+        commands(a)
+          .map((c) => `<div><code>${escape(c)}</code></div>`)
+          .join('') +
+        `</div>`,
     ),
     tail ? `<p>${escape(tail)}</p>` : '',
   ].join('\n');
   return { subject, text, html };
 }
 
-/// The day's run: the copies nobody has put out for [REVIEW_KEPT_DAYS]
-/// deleted, and the operator emailed the pictures kept since the last
-/// email, [REVIEW_MOST] at a time, oldest first. [send] takes
-/// {subject, text, html}; [store] holds [REVIEW_ROW] and the accounts'
-/// profiles. The row moves on only once the email has gone, and only
-/// as far as what it showed. Returns {deleted, sent, more}.
+/// The day's run: the copies and notes nobody has put out for
+/// [REVIEW_KEPT_DAYS] deleted, and the operator emailed every use not
+/// yet told of, account by account, oldest account first, whole
+/// accounts up to [REVIEW_MOST] pictures. [send] takes {subject, text,
+/// html}; [store] holds the accounts' profiles. The uses are marked told
+/// only once the email has gone. Returns {deleted, sent, more}.
 export async function reviewRun({ bucket, store, send, now = Date.now }) {
-  const copies = await copiesIn(bucket);
-  const stale = copies.filter((c) => now() - c.uploaded > REVIEW_KEPT_DAYS * DAY_MS);
-  for (let i = 0; i < stale.length; i += 1000) await bucket.delete(stale.slice(i, i + 1000).map((c) => c.key));
-  const through = (await store.get(...REVIEW_ROW))?.through ?? '';
-  const fresh = copies
-    .filter((c) => !stale.includes(c) && c.at > through)
-    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-  if (!fresh.length) return { deleted: stale.length, sent: 0, more: 0 };
-  const shown = fresh.slice(0, REVIEW_MOST);
-  const pictures = [];
-  for (const c of shown) {
-    const profile = /^[0-9a-f]{32}$/.test(c.account) ? await store.get(`ACCOUNT#${c.account}`, 'PROFILE') : null;
-    const current = !!profile?.picture && (await pictureDigest(profile.picture)) === c.digest;
-    pictures.push({ digest: c.digest, account: c.account, at: c.at, current });
+  const [copies, seen] = await Promise.all([listed(bucket, REVIEW_PREFIX), listed(bucket, SEEN_PREFIX)]);
+  const stale = [...copies, ...seen].filter((o) => now() - o.uploaded > REVIEW_KEPT_DAYS * DAY_MS);
+  for (let i = 0; i < stale.length; i += 1000) await bucket.delete(stale.slice(i, i + 1000).map((o) => o.key));
+  const byAccount = new Map();
+  for (const o of seen) {
+    if (o.told || stale.includes(o)) continue;
+    const [account, digest] = o.key.slice(SEEN_PREFIX.length).split('/');
+    if (!byAccount.has(account)) byAccount.set(account, []);
+    byAccount.get(account).push({ key: o.key, digest, at: o.at });
   }
-  await send(reviewEmail(pictures, fresh.length - shown.length));
-  await store.put(...REVIEW_ROW, { through: shown.at(-1).at });
-  return { deleted: stale.length, sent: shown.length, more: fresh.length - shown.length };
+  const waiting = [...byAccount.entries()]
+    .map(([account, uses]) => ({ account, uses: uses.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)) }))
+    .sort((a, b) => (a.uses[0].at < b.uses[0].at ? -1 : a.uses[0].at > b.uses[0].at ? 1 : 0));
+  const total = waiting.reduce((n, a) => n + a.uses.length, 0);
+  if (!total) return { deleted: stale.length, sent: 0, more: 0 };
+  // Whole accounts: one is never split across two emails.
+  const shown = [];
+  let count = 0;
+  for (const a of waiting) {
+    if (shown.length && count + a.uses.length > REVIEW_MOST) break;
+    shown.push(a);
+    count += a.uses.length;
+  }
+  const accounts = [];
+  for (const a of shown) {
+    const profile = /^[0-9a-f]{32}$/.test(a.account) ? await store.get(`ACCOUNT#${a.account}`, 'PROFILE') : null;
+    const current = profile?.picture ? await pictureDigest(profile.picture) : null;
+    accounts.push({ account: a.account, pictures: a.uses.map((u) => ({ digest: u.digest, at: u.at, current: u.digest === current })) });
+  }
+  await send(reviewEmail(accounts, total - count));
+  const told = new Date(now()).toISOString();
+  for (const a of shown) for (const u of a.uses) await bucket.put(u.key, '', { customMetadata: { at: u.at, told } });
+  return { deleted: stale.length, sent: count, more: total - count };
 }
