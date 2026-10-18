@@ -273,7 +273,7 @@
     },
     "who": {
       "title": "Who these terms are with",
-      "p1": "These terms are an agreement between you and Bright Fulton, who runs Open Hearts as a sole proprietor and whose address is under <a href=\"#contact\">Contact</a> (\"Open Hearts\", \"we\", \"us\"). They cover this site, the game at <a href=\"{{play}}\">play.openhearts.game</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
+      "p1": "These terms are an agreement between you and Bright Fulton LLC, the South Carolina limited liability company that runs Open Hearts and whose address is under <a href=\"#contact\">Contact</a> (\"Open Hearts\", \"we\", \"us\"). They cover this site, the game at <a href=\"{{play}}\">play.openhearts.game</a>, the Open Hearts apps for phones, and the live-play service. By using any of them you agree to these terms. If you do not agree, please do not use them.",
       "p2": "How we handle information about you is described in the <a href=\"{{base}}/privacy\">privacy policy</a>. It is a separate document, not part of these terms, and it changes when what the app does with data changes."
     },
     "age": {
@@ -387,7 +387,10 @@
     },
     "law": {
       "title": "Law and disputes",
-      "p1": "These terms are governed by the laws of the State of South Carolina, USA, without regard to its conflict-of-law rules. If you live in a country whose consumer law protects you more, that protection still applies. Please contact us first with any problem; most can be put right with an email."
+      "p1": "Before either of us takes a dispute to court, we try for 30 days to settle it by email: please write to us first. Most problems can be put right that way.",
+      "p2": "These terms are governed by the laws of the State of South Carolina, USA, without regard to its conflict-of-law rules. A dispute we cannot settle between us is heard only in the state courts of Charleston County, South Carolina, including its magistrates' courts for small claims, or in the federal court in Charleston, and you and we both agree that those courts may hear it.",
+      "p3": "<b>Claims are brought only individually.</b> You and we may each bring a claim against the other only on our own behalf, not as part of a class action or any other representative action, and a court may not join your claim with anyone else's unless we both agree. There is no arbitration: a dispute goes to the courts named above.",
+      "p4": "If you live where the law gives you the right to bring a claim in your own courts, or protects you more than these terms do, as consumer law does in the European Union and the United Kingdom, that right and that protection still apply."
     },
     "changes": {
       "title": "Changes to these terms",
@@ -402,7 +405,7 @@
     "contact": {
       "title": "Contact",
       "p1": "Email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, or write to:",
-      "p2": "Bright Fulton<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
+      "p2": "Bright Fulton LLC<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p3": "Bug reports are welcome as issues at <a href=\"https://github.com/bfulton/open-hearts/issues\">github.com/bfulton/open-hearts/issues</a>, which are public. More help is on the <a href=\"{{base}}/support\">support page</a>."
     }
   }

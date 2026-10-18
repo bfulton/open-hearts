@@ -305,7 +305,7 @@ test('the licence agreement for the App Store: the terms as plain text, every wo
   assert.match(text, /\n- Playing alone is free: No account,/);
   assert.match(text, /Apple and its subsidiaries are third-party beneficiaries of these terms/);
   assert.match(text, /the privacy policy \(https:\/\/openhearts\.game\/privacy\)/, 'a link on the site, written out');
-  assert.match(text, /\nEmail help@openhearts\.game, or write to:\n\nBright Fulton\nOpen Hearts\n/, 'an address as its words, lines as lines');
+  assert.match(text, /\nEmail help@openhearts\.game, or write to:\n\nBright Fulton LLC\nOpen Hearts\n/, 'an address as its words, lines as lines');
   assert.match(text, /under Contact \("Open Hearts"/, 'a link within the page, as its words');
   // Each of the page's words is in it, in order.
   const page = render('terms', languages.find((l) => l.code === 'en'), strings('en'));

@@ -273,7 +273,7 @@
     },
     "who": {
       "title": "Con quién son estas condiciones",
-      "p1": "Estas condiciones son un acuerdo entre tú y Bright Fulton, que gestiona Open Hearts como persona física y cuya dirección figura en <a href=\"#contact\">Contacto</a> («Open Hearts», «nosotros»). Cubren este sitio, el juego en <a href=\"{{play}}\">play.openhearts.game</a>, las apps de Open Hearts para teléfonos y el servicio de juego en vivo. Al usar cualquiera de ellos, aceptas estas condiciones. Si no las aceptas, no los uses.",
+      "p1": "Estas condiciones son un acuerdo entre tú y Bright Fulton LLC, la sociedad de responsabilidad limitada de Carolina del Sur que gestiona Open Hearts y cuya dirección figura en <a href=\"#contact\">Contacto</a> («Open Hearts», «nosotros»). Cubren este sitio, el juego en <a href=\"{{play}}\">play.openhearts.game</a>, las apps de Open Hearts para teléfonos y el servicio de juego en vivo. Al usar cualquiera de ellos, aceptas estas condiciones. Si no las aceptas, no los uses.",
       "p2": "Cómo tratamos la información sobre ti se describe en la <a href=\"{{base}}/privacy\">política de privacidad</a>. Es un documento aparte, que no forma parte de estas condiciones, y cambia cuando cambia lo que la app hace con los datos."
     },
     "age": {
@@ -387,7 +387,10 @@
     },
     "law": {
       "title": "Ley aplicable y disputas",
-      "p1": "Estas condiciones se rigen por las leyes del estado de Carolina del Sur (EE. UU.), sin tener en cuenta sus normas sobre conflicto de leyes. Si vives en un país cuya ley de consumo te protege más, esa protección sigue aplicándose. Antes de nada, contacta con nosotros ante cualquier problema; la mayoría se pueden resolver con un correo."
+      "p1": "Antes de que cualquiera de los dos lleve una disputa a los tribunales, intentamos resolverla por correo electrónico durante 30 días: escríbenos primero. La mayoría de los problemas se resuelven así.",
+      "p2": "Estas condiciones se rigen por las leyes del estado de Carolina del Sur (EE. UU.), sin tener en cuenta sus normas sobre conflicto de leyes. Una disputa que no podamos resolver entre nosotros solo se verá ante los tribunales estatales del condado de Charleston, Carolina del Sur, incluidos sus juzgados de magistrados para reclamaciones menores, o ante el tribunal federal de Charleston, y tanto tú como nosotros aceptamos que esos tribunales la conozcan.",
+      "p3": "<b>Las reclamaciones solo se presentan a título individual.</b> Tú y nosotros solo podemos presentar una reclamación contra el otro en nombre propio, no dentro de una demanda colectiva ni de ninguna otra acción representativa, y un tribunal no puede acumular tu reclamación con la de otras personas salvo que ambos lo aceptemos. No hay arbitraje: una disputa va a los tribunales indicados arriba.",
+      "p4": "Si vives en un lugar cuya ley te da derecho a presentar una reclamación ante tus propios tribunales, o te protege más que estas condiciones, como hace la legislación de consumo en la Unión Europea y el Reino Unido, ese derecho y esa protección se mantienen."
     },
     "changes": {
       "title": "Cambios en estas condiciones",
@@ -402,7 +405,7 @@
     "contact": {
       "title": "Contacto",
       "p1": "Escribe a <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a>, o envía una carta a:",
-      "p2": "Bright Fulton<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
+      "p2": "Bright Fulton LLC<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p3": "Los informes de errores son bienvenidos como incidencias en <a href=\"https://github.com/bfulton/open-hearts/issues\">github.com/bfulton/open-hearts/issues</a>, que son públicas. Hay más ayuda en la <a href=\"{{base}}/support\">página de ayuda</a>."
     }
   }

@@ -273,7 +273,7 @@
     },
     "who": {
       "title": "Mit wem diese Bedingungen gelten",
-      "p1": "Diese Bedingungen sind eine Vereinbarung zwischen dir und Bright Fulton („Open Hearts“, „wir“, „uns“): Bright Fulton betreibt Open Hearts als Einzelunternehmen, und die Adresse steht unter <a href=\"#contact\">Kontakt</a>. Sie gelten für diese Website, das Spiel unter <a href=\"{{play}}\">play.openhearts.game</a>, die Open-Hearts-Apps für Handys und den Dienst für Live-Spiel. Wenn du eines davon nutzt, stimmst du diesen Bedingungen zu. Wenn du nicht zustimmst, nutze sie bitte nicht.",
+      "p1": "Diese Bedingungen sind eine Vereinbarung zwischen dir und der Bright Fulton LLC („Open Hearts“, „wir“, „uns“): Die Bright Fulton LLC ist eine Limited Liability Company nach dem Recht von South Carolina, die Open Hearts betreibt, und ihre Adresse steht unter <a href=\"#contact\">Kontakt</a>. Sie gelten für diese Website, das Spiel unter <a href=\"{{play}}\">play.openhearts.game</a>, die Open-Hearts-Apps für Handys und den Dienst für Live-Spiel. Wenn du eines davon nutzt, stimmst du diesen Bedingungen zu. Wenn du nicht zustimmst, nutze sie bitte nicht.",
       "p2": "Wie wir mit Informationen über dich umgehen, beschreibt die <a href=\"{{base}}/privacy\">Datenschutzerklärung</a>. Sie ist ein eigenes Dokument, nicht Teil dieser Bedingungen, und ändert sich, wenn sich ändert, was die App mit Daten macht."
     },
     "age": {
@@ -387,7 +387,10 @@
     },
     "law": {
       "title": "Recht und Streitigkeiten",
-      "p1": "Für diese Bedingungen gilt das Recht des Bundesstaats South Carolina, USA, ohne seine Kollisionsnormen. Wenn du in einem Land lebst, dessen Verbraucherrecht dich stärker schützt, gilt dieser Schutz weiterhin. Bitte wende dich bei einem Problem zuerst an uns; das meiste lässt sich mit einer E-Mail klären."
+      "p1": "Bevor eine von beiden Seiten mit einem Streit vor Gericht geht, versuchen wir 30 Tage lang, ihn per E-Mail beizulegen: Schreib uns bitte zuerst. Die meisten Probleme lassen sich so lösen.",
+      "p2": "Für diese Bedingungen gilt das Recht des Bundesstaats South Carolina, USA, ohne seine Kollisionsnormen. Ein Streit, den wir nicht untereinander beilegen können, wird ausschließlich vor den staatlichen Gerichten des Charleston County, South Carolina, einschließlich seiner Magistrates' Courts für geringfügige Forderungen, oder vor dem Bundesgericht in Charleston verhandelt, und du und wir sind beide damit einverstanden, dass diese Gerichte zuständig sind.",
+      "p3": "<b>Ansprüche werden nur einzeln geltend gemacht.</b> Du und wir können Ansprüche gegeneinander nur im eigenen Namen geltend machen, nicht im Rahmen einer Sammelklage oder einer anderen Klage im Namen einer Gruppe, und ein Gericht darf deinen Anspruch nur mit unser beider Zustimmung mit denen anderer verbinden. Es gibt kein Schiedsverfahren: Ein Streit geht an die oben genannten Gerichte.",
+      "p4": "Wenn du an einem Ort lebst, dessen Recht dir erlaubt, vor den Gerichten deines Wohnorts zu klagen, oder dich stärker schützt als diese Bedingungen, wie das Verbraucherrecht in der Europäischen Union und im Vereinigten Königreich, gelten dieses Recht und dieser Schutz weiterhin."
     },
     "changes": {
       "title": "Änderungen dieser Bedingungen",
@@ -402,7 +405,7 @@
     "contact": {
       "title": "Kontakt",
       "p1": "Schreib an <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> oder per Post an:",
-      "p2": "Bright Fulton<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
+      "p2": "Bright Fulton LLC<br> Open Hearts<br> 6650 Rivers Ave, Ste 105<br>PMB #804106<br> North Charleston, SC 29406<br> USA",
       "p3": "Fehlerberichte sind als Issues unter <a href=\"https://github.com/bfulton/open-hearts/issues\">github.com/bfulton/open-hearts/issues</a> willkommen; diese sind öffentlich. Mehr Hilfe gibt es auf der <a href=\"{{base}}/support\">Hilfeseite</a>."
     }
   }
