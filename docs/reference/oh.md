@@ -18,7 +18,7 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 | Argument | What it is |
 |---|---|
 | `<account>` | an account (32 hex characters) or one of its devices' keys (64 hex characters) |
-| `<query>` | a name the account plays under (or had taken off), the email address its web subscription was paid with, or a picture it put out: its SHA-256, or the address of its copy |
+| `<query>` | a name the account plays under (or had taken off), the email address its web subscription was paid with, or a picture it set: its SHA-256, or the address of its copy |
 | `<what>` | `name`, `picture`, or `name,picture` |
 | `<row>` | `app` (remote config), `service` (service settings) or `relay` (relay settings) |
 | `<file>` | a JSON file holding the whole row |
@@ -50,7 +50,7 @@ Acting on an account, as the terms and the privacy policy allow.
 oh account find <query>
 ```
 
-Prints the accounts a name, an email address or a picture belongs to. A name is looked for among the names accounts play under and the names taken off and held; an email address, among web subscriptions, which needs `STRIPE_API_KEY`; a picture, among the accounts that put it out in the last 30 days, each said with whether it is its profile picture now.
+Prints the accounts a name, an email address or a picture belongs to. A name is looked for among the names accounts play under and the names taken off and held; an email address, among web subscriptions, which needs `STRIPE_API_KEY`; a picture, among the accounts that set it in the last year, each said with whether it is its profile picture now.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, STRIPE_API_KEY (for an email address), (Workers R2 Storage Edit, for a picture)
 - **How-to:** [suspend-an-account.md](../how-to/suspend-an-account.md#find-the-account)
@@ -158,7 +158,7 @@ Deletes an account's data on its owner's request: its name off its kept games, a
 oh account hold <account> [--apply] [--ref <ref>]
 ```
 
-Holds an account's data as it is after a report the law requires, such as one of child sexual abuse material to NCMEC: a year at the least, during which nothing deletes it or puts back what was taken off it. --ref is the report's number. A deletion its owner asks for meanwhile is noted, and done once the hold is released. It also keeps a copy of each picture the account put out in the last 30 days, in the bucket of kept games, which only you reach; run it again to keep any it has put out since.
+Holds an account's data as it is after a report the law requires, such as one of child sexual abuse material to NCMEC: a year at the least, during which nothing deletes it or puts back what was taken off it. --ref is the report's number. A deletion its owner asks for meanwhile is noted, and done once the hold is released. It also keeps a copy of each picture the account set in the last year, in the bucket of kept games, which only you reach; run it again to keep any it has set since.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
 - **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#take-it-down-and-hold-the-account-by-hand)
@@ -210,7 +210,7 @@ Withholds a picture at the relay for 30 days, wherever it was put out, as one ta
 oh picture report <picture> [--apply] [--account <account>] [--how <how>]
 ```
 
-Reports a picture you found and looked at as child sexual abuse material: the relay handles it as it does a PhotoDNA match. The relay withholds it wherever it was put out, holds and terminates each account that put it out in the last 30 days (and --account, one it was taken off), their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and --how you came to, and emails you what it did. It needs a copy: the relay's, a hold's, or the picture taken off --account.
+Reports a picture you found and looked at as child sexual abuse material: the relay handles it as it does a PhotoDNA match. The relay withholds it wherever it was put out, holds and terminates each account that set it in the last year (and --account, one it was taken off), their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and --how you came to, and emails you what it did. It needs a copy: the one kept of each picture an account sets, a hold's, or the picture taken off --account.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
 - **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#report-a-picture-you-found)

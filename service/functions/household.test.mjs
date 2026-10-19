@@ -50,7 +50,7 @@ async function household(n = 1) {
 
 /// A Durable Object namespace that keeps one Household a name, in this
 /// process, as Cloudflare keeps one in the world.
-function householdNamespace(env) {
+function householdNamespace(env, options = {}) {
   const objects = new Map();
   return {
     idFromName: (name) => name,
@@ -59,7 +59,7 @@ function householdNamespace(env) {
         // An object's own storage, behind the two calls it makes.
         const kept = new Map();
         const storage = { get: async (k) => kept.get(k), put: async (k, v) => void kept.set(k, structuredClone(v)) };
-        objects.set(id, new Household({ storage }, env));
+        objects.set(id, new Household({ storage }, env, options));
       }
       const object = objects.get(id);
       return { fetch: (url, init) => object.fetch(new Request(url, init)) };
@@ -128,6 +128,21 @@ test("an operator's order, through the service to the account's own object: its 
   // Let back: a device takes the account up again.
   assert.equal((await carry(store, account, 'lift', {}, { origin: 'https://dev.open-hearts.pages.dev', fetchImpl, wait: 0 })).status, 200);
   assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'open' })).status, 200);
+});
+
+test("in a Durable Object, the account's turn keeps the account's pictures with what it is given", async () => {
+  forgetHouseholds();
+  const store = await household(1);
+  const calls = [];
+  const env = { OH_STORE: kvOf(store) };
+  env.HOUSEHOLD = householdNamespace({ OH_STORE: env.OH_STORE }, { pictures: { set: async (c) => (calls.push(c), null) } });
+  const account = await accountOf(store);
+  assert.equal((await inHousehold(env, account, { op: 'activate', key: KEY, account, want: 'open' })).status, 200);
+  const picture = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2]).toString('base64');
+  const said = await inHousehold(env, account, { op: 'profile', key: KEY, profile: JSON.stringify({ name: 'Ada', picture }) });
+  assert.equal(said.status, 200);
+  assert.deepEqual(calls, [{ account, key: KEY, picture, prev: null }]);
+  assert.equal(said.body.profile.picture, undefined, 'the profile keeps what it was given back');
 });
 
 test('an order the store has not got wakes no account', async () => {

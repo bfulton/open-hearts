@@ -1,8 +1,8 @@
 // An account found as `oh account` finds one (ops/account.mjs): by the name it plays under, by the address its web
-// subscription was paid with, by a picture it put out, or by one of its devices' keys.
+// subscription was paid with, by a picture it set, or by one of its devices' keys.
 
 import { accountsNamed, accountsPaidBy } from '../functions/deletion.mjs';
-import { SEEN_PREFIX, pictureDigest, pictureNamed } from '../functions/pictures.mjs';
+import { ACCOUNT_PICTURES_PREFIX, pictureDigest, pictureNamed } from '../functions/pictures.mjs';
 import { isAccount } from '../functions/rows.mjs';
 
 /// The accounts [asked] names: as a name always, since one can have an
@@ -14,16 +14,16 @@ import { isAccount } from '../functions/rows.mjs';
 export async function findAccounts(store, asked, { stripeKey = null, fetchImpl = fetch, pictures = null } = {}) {
   const found = new Set(await accountsNamed(store, store.list, asked));
   const notes = [];
-  const putOut = new Map();
+  const theirs = new Map();
   const digest = pictureNamed(asked);
   if (digest) {
     if (!pictures) {
       notes.push('not looked for as a picture, which needs the pictures bucket');
     } else {
-      for (const account of await accountsThatPutOut(pictures, digest)) {
+      for (const account of await accountsWith(pictures, digest)) {
         found.add(account);
         const profile = await store.get(`ACCOUNT#${account}`, 'PROFILE');
-        putOut.set(account, (await pictureDigest(profile?.picture)) === digest);
+        theirs.set(account, (await pictureDigest(profile?.picture)) === digest);
       }
     }
   }
@@ -39,15 +39,16 @@ export async function findAccounts(store, asked, { stripeKey = null, fetchImpl =
       for (const a of await accountsPaidBy(store, stripe, asked)) found.add(a);
     }
   }
-  return { found, notes, pictures: putOut };
+  return { found, notes, pictures: theirs };
 }
 
-/// The accounts that put out the picture [digest], as the relay noted
-/// each in [pictures] (service/do/review.mjs): for 30 days from the
-/// account's last use of it.
-export async function accountsThatPutOut(pictures, digest) {
+/// The accounts that set the picture [digest], as each is noted in
+/// [pictures] (service/do/profile_pictures.mjs): its picture now, or one
+/// it had in the year before (service/do/review.mjs, PICTURE_KEPT_DAYS).
+export async function accountsWith(pictures, digest) {
   const ending = `/${digest}`;
-  return [...new Set((await pictures.list(SEEN_PREFIX)).filter((k) => k.endsWith(ending)).map((k) => k.slice(SEEN_PREFIX.length).split('/')[0]))].filter(isAccount);
+  const of = (key) => key.slice(ACCOUNT_PICTURES_PREFIX.length).split('/')[0];
+  return [...new Set((await pictures.list(ACCOUNT_PICTURES_PREFIX)).filter((k) => k.endsWith(ending)).map(of))].filter(isAccount);
 }
 
 /// The account [target] is: itself, when it is one (32 hex), or the

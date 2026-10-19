@@ -32,36 +32,46 @@ squashed from a pull request, the pull request's number.
   with both accounts, what the reporter saw and the commands to act on
   it; a subscriber can send ten a day, the same report once a day.
   (2026-10-19, #32)
-- Pictures are checked as the relay first carries them, by Cloudflare's
-  Workers AI, for nudity, gore and hate symbols. One the check flags is
-  withheld from everyone within a couple of minutes, and the daily email
-  shows it first; `./oh picture allow` puts one back. (2026-10-19, #32)
-- Each new picture is checked by Microsoft's PhotoDNA against known
-  images of child sexual abuse before the relay carries it, asked from
-  one object kept in the United States. A match is never shown: it is
-  withheld, each account that put it out is held and terminated, its web
-  subscription ended with nothing refunded, the match is reported to
-  NCMEC's CyberTipline, and the operator is emailed what was done, all
-  without waiting on the operator. Each step is tried again until it is
-  done, and any failure emails the operator. Off until PhotoDNA's key is
-  set; reports are filed once NCMEC's credentials are, and until then
-  the email says to file one by hand. (2026-10-19, #32)
-- Every new picture is copied to R2 and emailed to the operator once a
-  day, account by account, with the commands to take it down.
+- A picture is the account's: the account's turn checks it as the
+  account sets it, before anyone is shown it, and keeps a copy of each
+  picture the account sets, apart, for the operator, until a year after
+  it stops being the account's (replaced, taken off, or the account
+  deleted), as long as a hold keeps one reported. The relay carries only
+  an account's picture now. A room or a pool waits for a profile save on
+  its way, so a picture just changed goes once the service has it.
   (2026-10-19, #32)
+- Pictures are checked as an account sets them, by Cloudflare's Workers
+  AI, for nudity, gore and hate symbols. One the check flags is withheld
+  from everyone within a couple of minutes, and the daily email shows it
+  first; `./oh picture allow` puts one back. (2026-10-19, #32)
+- Each new picture is checked by Microsoft's PhotoDNA against known
+  images of child sexual abuse as an account sets it, asked from one
+  object kept in the United States. A match is never shown or kept: the
+  profile is saved without it, each account that set it is held and
+  terminated, its web subscription ended with nothing refunded, the
+  match is reported to NCMEC's CyberTipline, and the operator is emailed
+  what was done, all without waiting on the operator. Each step is tried
+  again until it is done, and any failure emails the operator. Off until
+  PhotoDNA's key is set; reports are filed once NCMEC's credentials are,
+  and until then the email says to file one by hand. (2026-10-19, #32)
+- Every new picture is emailed to the operator once a day, account by
+  account, with the commands to take it down. The daily run keeps what
+  is kept for as long as the privacy policy says whether or not the
+  email is on, asks PhotoDNA again about any picture it has not cleared,
+  and emails the operator if it fails. (2026-10-19, #32)
 - Names that are obscene or slurs, in five languages, are refused by the
   app, the service and the relay, matched as whole words so real names
   stay. (2026-10-19, #32)
 - A legal hold keeps an account's data for a year at the least after a
-  report the law requires, with a copy of each picture the account put
-  out in its last 30 days, kept where only the operator reaches it.
+  report the law requires, with a copy of each picture the account set
+  in its last year, kept where only the operator reaches it.
   `docs/how-to/handle-abuse-material.md` is the procedure for child
   sexual abuse material that PhotoDNA doesn't catch. `./oh picture
   report` has the relay handle a picture the operator found as it does a
   match, with a report saying the operator looked at it. For what is
   done by hand, `./oh account find` takes a picture's SHA-256 or address
-  to the accounts that put it out, and `./oh picture hide` withholds one
-  an account no longer uses. (2026-10-19, #32)
+  to the accounts that set it, and `./oh picture hide` withholds one an
+  account no longer uses. (2026-10-19, #32)
 - `./oh`, one command for every operator task, each saying what it would
   do and changing nothing without `--apply`; `docs/reference/oh.md` is
   made from it. (2026-10-19, #32)

@@ -11,7 +11,7 @@ import { Failed, Usage } from './env.mjs';
 import { HOW_MOST, REPORT_KEPT_S, reportRow } from '../service/do/known.mjs';
 import { PICTURES_ROW, allowedOf, allowing, copyKey, pictureNamed, withheldOf, withholding } from '../service/functions/pictures.mjs';
 import { hex, isAccount } from '../service/functions/rows.mjs';
-import { accountsThatPutOut } from '../service/tool/find.mjs';
+import { accountsWith } from '../service/tool/find.mjs';
 
 /// The picture [args] names, the row of what is withheld and allowed,
 /// and how the picture stands in it, said.
@@ -44,10 +44,10 @@ export async function hide(ctx, { args, flags }) {
 }
 
 /// A picture the operator found and looked at, reported: the relay
-/// withholds it, holds and terminates each account that put it out (and
+/// withholds it, holds and terminates each account that set it (and
 /// [--account], one the picture was taken off), reports it to NCMEC and
 /// emails what it did, as for a PhotoDNA match. The picture's bytes never
-/// come here: only whether the relay still has a copy.
+/// come here: only whether a copy of it is kept.
 export async function report(ctx, { args, flags }) {
   const digest = pictureNamed(args.picture);
   if (!digest) throw new Usage('name the picture by its SHA-256 (64 hex) or the address of its copy, as the emails give it');
@@ -57,9 +57,9 @@ export async function report(ctx, { args, flags }) {
   if (how !== null && (typeof how !== 'string' || !how.trim() || how.length > HOW_MOST)) throw new Usage(`--how is a few words, ${HOW_MOST} characters at the most`);
   const store = await ctx.store();
   const pictures = await ctx.pictures();
-  const accounts = [...new Set([...(await accountsThatPutOut(pictures, digest)), ...(named ? [named] : [])])];
+  const accounts = [...new Set([...(await accountsWith(pictures, digest)), ...(named ? [named] : [])])];
   const copy = (await pictures.list(copyKey(digest))).includes(copyKey(digest));
-  ctx.log(`${digest}: ${copy ? 'the relay has its copy' : 'the relay has no copy of it'}; put out by ${accounts.length} account(s)`);
+  ctx.log(`${digest}: ${copy ? 'its copy is kept' : 'no copy of it is kept'}; set by ${accounts.length} account(s)`);
   for (const a of accounts) ctx.log(`  ${a}`);
   ctx.log(
     `would have the relay withhold it wherever it was put out, hold and terminate ${accounts.length ? 'each account' : 'nobody (no account is known)'}, their web subscriptions ended with nothing refunded, report it to NCMEC as a picture you looked at${how ? ` (${how.trim()})` : ''}, and email you what it did`,

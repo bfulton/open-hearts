@@ -1,6 +1,6 @@
 // Microsoft's PhotoDNA Cloud Service: whether a picture matches a known
-// image of child sexual abuse, asked once for each new picture as it is
-// first put out (service/do/known.mjs). Microsoft gives its API
+// image of child sexual abuse, asked once for each new picture as an
+// account first sets it (service/do/known.mjs). Microsoft gives its API
 // reference to the services it has approved; the request here is the
 // Match call as its users describe it — the picture's bytes, the
 // subscription key in a header, an answer with `IsMatch` and a

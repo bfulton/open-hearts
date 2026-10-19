@@ -208,7 +208,7 @@ test('presence and the results are never screened: no picture is put out there',
   }
 });
 
-test("a picture PhotoDNA matches is screened as it is published, with who said it, and kept back as a take-down is; what is held is never screened again", async () => {
+test("a picture the screen keeps back — one that is not its account's picture now — is screened as it is published, with who said it, and kept to the relay as a take-down is; what is held is never screened again", async () => {
   const screened = [];
   const relay = objectRelay(verify, {
     tag: pool,

@@ -37,10 +37,12 @@ import wasm from '../../app/web/schnorr.wasm';
 import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tagOf, tally } from './relay.mjs';
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
-import { hidePictures, pictureKeeper, reviewRun } from './review.mjs';
-import { KNOWN_OBJECT, KnownPictures as KnownObject, knownAsker, knownReport, knownScreen } from './known.mjs';
+import { reviewRun } from './review.mjs';
+import { KNOWN_OBJECT, KnownPictures as KnownObject, knownAsker, knownReport } from './known.mjs';
+import { accountPictures, ownedScreen } from './profile_pictures.mjs';
 import { PICTURES_ROW } from '../functions/pictures.mjs';
-import { alertKnownProblem, alertsOf } from '../functions/alerts.mjs';
+import { alertKnownProblem, alertPicturesProblem, alertsOf } from '../functions/alerts.mjs';
+import { Household as HouseholdObject } from '../functions/household.mjs';
 import { storeOf } from '../functions/rows.mjs';
 import { Bench as BenchObject, callIn } from './bench.mjs';
 import { withConfig } from '../functions/deployment.mjs';
@@ -49,11 +51,19 @@ import { withConfig } from '../functions/deployment.mjs';
 // key, which an activation has to be signed by.
 import config from '../../config/openhearts.json';
 
-// One object per account, through which its codes, claims, drops and
-// device in use run one at a time (service/functions/household.mjs, "one
-// account at a time"). It lives here because a Pages project cannot
-// define a Durable Object of its own, only bind one.
-export { Household } from '../functions/household.mjs';
+// One object per account, through which its codes, claims, drops,
+// device in use and profile run one at a time (service/functions/
+// household.mjs, "one account at a time"). It lives here because a Pages
+// project cannot define a Durable Object of its own, only bind one; and
+// here it reaches what checks and keeps each picture the account sets
+// (profile_pictures.mjs): the pictures bucket, Workers AI, and PhotoDNA
+// through KnownPictures.
+export class Household extends HouseholdObject {
+  constructor(state, env = {}) {
+    const e = withConfig(env, config);
+    super(state, env, { pictures: accountPictures(e) });
+  }
+}
 
 // The backup jurors, a Cloudflare Container started when a table
 // calls for a juror and nobody is there (bench.mjs).
@@ -88,36 +98,16 @@ export class TagRelay {
     // The pictures the operator took down (withheld.mjs), read from the
     // store at most once a minute while pictures come this way.
     this.pictures = pictureScreen({ read: () => this.env.OH_STORE?.get(PICTURES_ROW.join('|'), 'json') ?? null });
-    // Each new picture a subscriber puts out, copied for the operator
-    // to look at (review.mjs), where the bucket is bound (OH_PICTURES);
-    // looked at by Workers AI (AI) as it is copied, and hidden on the
-    // store's list if it should be.
-    const store = storeOf(this.env);
-    this.keepPicture = pictureKeeper({
-      bucket: this.env.OH_PICTURES ?? null,
-      ai: this.env.AI ?? null,
-      hide: store ? (digest) => hidePictures(store, [digest]) : null,
-      log: (line) => console.log(line),
-    });
-    // Each new picture checked against known images of child sexual
-    // abuse before it is carried, where the deployment has PhotoDNA's
-    // key (known.mjs).
-    const ask = knownAsker(this.env);
-    this.known = ask
-      ? knownScreen({
-          ask,
-          log: (line) => console.log(line),
-          failed: (error) => this.state.waitUntil(alertKnownProblem(this.env, store, { what: 'unreachable', error })),
-        })
-      : null;
+    // A picture is carried only as its account's picture now, checked
+    // as the account set it (profile_pictures.mjs): its note in the
+    // pictures bucket says so.
+    this.owned = ownedScreen({ bucket: this.env.OH_PICTURES ?? null, log: (line) => console.log(line) });
   }
 
-  /// An event the relay took, from [who]: a picture copied for the
-  /// operator to look at, and checked, and a call for a juror passed to the backup
-  /// jurors where they are bound (wrangler.toml, BENCH). Neither is
-  /// awaited by the relay: the caller has its OK already.
-  heard(event, who) {
-    this.state.waitUntil(this.keepPicture(event, who).catch((e) => console.log(`picture not kept for review: ${e}`)));
+  /// An event the relay took: a call for a juror passed to the backup
+  /// jurors where they are bound (wrangler.toml, BENCH), not awaited by
+  /// the relay: the caller has its OK already.
+  heard(event) {
     const table = callIn(event);
     if (!table || !this.env.BENCH) return;
     const now = Date.now();
@@ -158,11 +148,11 @@ export class TagRelay {
       count: (what, n) => this.tally.count(what, n),
       // The operator's limits are presence's; a table's are the relay's own.
       limits: presence ? limits : null,
-      heard: (event, who) => this.heard(event, who),
+      heard: (event) => this.heard(event),
       store: await kept.load(),
       kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
       withhold: (event) => this.pictures.withheld(event),
-      screen: this.known,
+      screen: this.owned,
       forget: (event) => this.state.waitUntil(kept.forget(event)),
       gate: this.gate(verify, tag),
     });
@@ -272,9 +262,11 @@ export class TagRelay {
 
 export default {
   /// Once a day (wrangler.toml, crons): anything left to do after a
-  /// PhotoDNA match tried again (known.mjs); and the pictures kept since
-  /// the last run emailed to the operator, if the config asks for it,
-  /// and the copies nobody has put out for 30 days deleted (review.mjs).
+  /// PhotoDNA match tried again (known.mjs); and the pictures accounts
+  /// set kept as long as the privacy policy says and no longer, asked
+  /// about again where PhotoDNA has not cleared them, and emailed to the
+  /// operator since the last run, if the config asks for it
+  /// (review.mjs).
   async scheduled(controller, env, ctx) {
     const e = withConfig(env, config);
     if (knownAsker(e)) {
@@ -294,12 +286,16 @@ export default {
     }
     const alerts = alertsOf(e);
     const store = storeOf(e);
-    if (!alerts?.pictures || !e.OH_PICTURES || !e.EMAIL || !store) return;
+    if (!e.OH_PICTURES || !store) return;
     const from = { email: e.OH_MAIL_FROM, name: 'Open Hearts' };
+    const send = alerts?.pictures && e.EMAIL ? (mail) => e.EMAIL.send({ to: alerts.to, from, ...mail }) : null;
     ctx.waitUntil(
-      reviewRun({ bucket: e.OH_PICTURES, store, send: (mail) => e.EMAIL.send({ to: alerts.to, from, ...mail }) }).then(
-        (r) => console.log(`pictures to look at: ${r.sent} emailed, ${r.more} for later, ${r.deleted} copies deleted`),
-        (err) => console.log(`pictures to look at: not done: ${err}`),
+      reviewRun({ bucket: e.OH_PICTURES, store, send, ask: knownAsker(e) }).then(
+        (r) => console.log(`pictures: ${r.deleted} deleted, ${r.asked} asked about again, ${r.sent} emailed, ${r.more} for later`),
+        (err) => {
+          console.log(`pictures: the daily run failed: ${err}`);
+          return alertPicturesProblem(e, store, { error: `${err?.message ?? err}` });
+        },
       ),
     );
   },

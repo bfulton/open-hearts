@@ -103,12 +103,12 @@ function reporting(store, keys, answers) {
 const A = '0123456789abcdef0123456789abcdef';
 const C = 'abcdefabcdefabcdefabcdefabcdefab';
 
-test('picture report: says who put it out and what the relay would do; with --apply hands it to the relay, asked again while the store has not shown it', async () => {
+test('picture report: says who set it and what the relay would do; with --apply hands it to the relay, asked again while the store has not shown it', async () => {
   const store = memoryStore();
-  const keys = [`review/${digest}.jpg`, `seen/${A}/${digest}`, `seen/${A}/${other}`];
+  const keys = [`review/${digest}.jpg`, `account/${A}/${digest}`, `account/${A}/${other}`];
   const dry = reporting(store, keys, []);
   assert.equal(await main(['picture', 'report', digest, '--account', C, '--how', 'a player reported it'], dry), 0);
-  assert.equal(dry.said[0], `${digest}: the relay has its copy; put out by 2 account(s)`);
+  assert.equal(dry.said[0], `${digest}: its copy is kept; set by 2 account(s)`);
   assert.deepEqual(dry.said.slice(1, 3), [`  ${A}`, `  ${C}`]);
   assert.match(dry.said[3], /hold and terminate each account.*report it to NCMEC as a picture you looked at \(a player reported it\)/);
   assert.equal(dry.said.at(-1), 'nothing changed; --apply does it');

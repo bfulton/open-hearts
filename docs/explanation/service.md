@@ -387,6 +387,15 @@ JSON text, which is also the request's signed *what*, so nobody else's
 request writes it. The text is taken only in the shape the app makes,
 and a test holds the worker's limits equal to the app's.
 
+**A new picture is checked and kept as it is written.** The account's
+turn, which runs in the relay worker, asks PhotoDNA about it and has a
+model look at it before the profile keeps it, and keeps a copy of each
+picture the account sets apart, for the operator, until a year after it
+stops being the account's. A picture that matches a known image of
+child sexual abuse is not kept, and the profile is saved without it. The
+relay carries only the account's picture now ([an account's
+pictures](relay.md#an-accounts-pictures)).
+
 **The last write wins.** Each write is the next version, whatever
 version the writing device had last seen. There is nothing to merge in a
 name, writes come only from the device in use, which is the one in the

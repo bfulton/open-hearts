@@ -3,7 +3,7 @@
 // subscription as it is bought, and each subscriber who, finding the
 // pool empty, chose to wait for a person rather than play bots — so
 // that someone can come and play. (And, once a day, the new pictures
-// subscribers put out, `pictures`, which the relay worker sends itself:
+// subscribers set, `pictures`, which the relay worker sends itself:
 // service/do/review.mjs.) Each is written down for a while
 // under its subscription, so a webhook delivered twice, or a wait
 // chosen twice in a few minutes, is told once. And, whatever the
@@ -125,24 +125,48 @@ export async function alertUnwritten(env, { account, keys, now = Date.now() }) {
 /// not one a picture.
 export const KNOWN_PROBLEM_HOURS = 6;
 
-/// Something in the automatic handling of known images of child sexual
-/// abuse that did not work (service/do/known.mjs): [what] failed, and
-/// the [error]. Told whatever the switches say, as a legal duty may
-/// hang on it, at most once in KNOWN_PROBLEM_HOURS for each [what].
-/// Never throws.
-export async function alertKnownProblem(env, store, { what, error, now = Date.now() }) {
+/// [what] in an automatic duty failed, with [error], told under
+/// [subject], [about] saying what the duty is: whatever the switches
+/// say, as a legal duty may hang on it, at most once in
+/// KNOWN_PROBLEM_HOURS for each [kind] and [what]. Never throws.
+async function alertDuty(env, store, { kind, what, subject, about, error, now }) {
   const alerts = alertsOf(env);
   if (!alerts) return false;
   try {
-    if (store && !(await fresh(store, 'known', what, KNOWN_PROBLEM_HOURS * 3600))) return false;
+    if (store && !(await fresh(store, kind, what, KNOWN_PROBLEM_HOURS * 3600))) return false;
   } catch {
     // The store not answering: told all the same.
   }
-  return tell(env, alerts, `Open Hearts: the automatic handling of abuse images failed (${what})`, [
-    `At ${new Date(now).toISOString()}: ${error}`,
-    '',
-    `Each new picture is checked against known images of child sexual abuse, and a match withheld, held, terminated and reported to NCMEC, by itself (docs/how-to/handle-abuse-material.md). This failure is tried again by itself, and told again in ${KNOWN_PROBLEM_HOURS} hours if it goes on. The relay worker's logs say more.`,
-  ].join('\n'));
+  return tell(env, alerts, subject, [`At ${new Date(now).toISOString()}: ${error}`, '', about].join('\n'));
+}
+
+/// Something in the automatic handling of known images of child sexual
+/// abuse that did not work (service/do/known.mjs): [what] failed, and
+/// the [error].
+export function alertKnownProblem(env, store, { what, error, now = Date.now() }) {
+  return alertDuty(env, store, {
+    kind: 'known',
+    what,
+    subject: `Open Hearts: the automatic handling of abuse images failed (${what})`,
+    about: `Each new picture is checked against known images of child sexual abuse, and a match withheld, held, terminated and reported to NCMEC, by itself (docs/how-to/handle-abuse-material.md). This failure is tried again by itself, and told again in ${KNOWN_PROBLEM_HOURS} hours if it goes on. The relay worker's logs say more.`,
+    error,
+    now,
+  });
+}
+
+/// The daily run over the pictures accounts set (service/do/review.mjs)
+/// failing, with [error]: what keeps each for as long as the privacy
+/// policy says, and no longer.
+export function alertPicturesProblem(env, store, { error, now = Date.now() }) {
+  return alertDuty(env, store, {
+    kind: 'pictures',
+    what: 'run',
+    subject: 'Open Hearts: the daily run over the pictures failed',
+    about:
+      "Each picture an account sets is kept apart for a year after it stops being the account's, then deleted, as the privacy policy says. The daily run deletes it, asks PhotoDNA again about any it has not cleared, hides any the check found should be hidden, and emails you the new ones. It runs again tomorrow; the relay worker's logs say more.",
+    error,
+    now,
+  });
 }
 
 /// The object's side: the mail sent, where the relay binds EMAIL and

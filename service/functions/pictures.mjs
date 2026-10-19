@@ -18,20 +18,23 @@
 /// `allowed` only when something is.
 export const PICTURES_ROW = ['config', 'pictures'];
 
-/// Where the relay keeps a copy of each new picture for the operator to
-/// look at (service/do/review.mjs), named by its digest, and serves it:
-/// the bucket's custom domain (infra/cloudflare.mjs; a test holds the
-/// two equal).
+/// Where a copy of each picture an account sets is kept, for the
+/// operator to look at and act on (service/do/profile_pictures.mjs),
+/// named by its digest, and served for the daily email: the bucket's
+/// custom domain (infra/cloudflare.mjs; a test holds the two equal).
 export const PICTURES_ORIGIN = 'https://pictures.openhearts.game';
 export const REVIEW_PREFIX = 'review/';
 export const copyKey = (digest) => `${REVIEW_PREFIX}${digest}.jpg`;
 export const copyUrl = (digest) => `${PICTURES_ORIGIN}/${copyKey(digest)}`;
 
-/// Where in the same bucket each account's use of a picture is noted:
-/// `seen/<account>/<digest>`, empty, saying when the account first put
-/// it out and whether the operator has been told.
-export const SEEN_PREFIX = 'seen/';
-export const seenKey = (account, digest) => `${SEEN_PREFIX}${account}/${digest}`;
+/// Where in the same bucket each picture an account set is noted:
+/// `account/<account>/<digest>`, empty, saying when the account set it
+/// (`at`), whether the operator has been told (`told`), and, once it is
+/// no longer the account's picture, since when (`replaced`). The one
+/// without `replaced` is the account's picture now, the only one the
+/// relay carries for it.
+export const ACCOUNT_PICTURES_PREFIX = 'account/';
+export const accountPictureKey = (account, digest) => `${ACCOUNT_PICTURES_PREFIX}${account}/${digest}`;
 
 /// The SHA-256 [said] names a picture by, as the operator is given one:
 /// the digest itself, as the daily email gives it, or the address or
@@ -52,6 +55,11 @@ export const WITHHELD_FOR_MS = 30 * 24 * 60 * 60 * 1000;
 /// itself: taken, so that a device is not counted as refused for it
 /// (packages/table, relays.dart), and said why for whoever reads it.
 export const WITHHELD_WHY = 'withheld: this picture was taken down';
+
+/// What a publisher is told of a picture that is not its account's
+/// picture now, taken and kept the same way: one the account has not
+/// set, or not yet (service/do/profile_pictures.mjs, ownedScreen).
+export const NOT_THEIRS_WHY = "withheld: not this account's picture";
 
 const toHex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 

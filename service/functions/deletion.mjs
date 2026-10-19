@@ -19,10 +19,12 @@ export const DELETED_WHY = 'deleted: this account was deleted';
 /// route has not already done outside the store (worker.mjs,
 /// deleteRoute). Its rows go ([forgetAccount]), and its device in use
 /// is cut off at the relay now, the account's object keeping only the
-/// count that orders its devices in use. Under a legal hold
-/// (holds.mjs), nothing goes: the asking is noted, for when the hold
-/// is released, and the answer is the same. {status, body}.
-export async function deleteAccount(op, store, active, { now = Date.now(), revoke = null } = {}) {
+/// count that orders its devices in use. Its picture is no longer its
+/// own, and is kept as long as one replaced ([pictures],
+/// profile_pictures.mjs). Under a legal hold (holds.mjs), nothing goes:
+/// the asking is noted, for when the hold is released, and the answer
+/// is the same. {status, body}.
+export async function deleteAccount(op, store, active, { now = Date.now(), revoke = null, pictures = null } = {}) {
   const account = await accountOfKey(store, op.key);
   if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${op.key}`))) return { status: 404, body: { error: 'no account' } };
   const held = await holdOf(store, account);
@@ -30,7 +32,9 @@ export async function deleteAccount(op, store, active, { now = Date.now(), revok
     if (!held.deleteAsked) await store.put(...holdRow(account), { ...held, deleteAsked: dayOf(now) });
     return { status: 200, body: { deleted: true } };
   }
+  const picture = (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.picture ?? null;
   await forgetAccount(store, account);
+  if (picture) await pictures?.set({ account, picture: null, prev: picture });
   const was = await active.get(account);
   if (was) {
     const epoch = (was.epoch ?? 0) + 1;

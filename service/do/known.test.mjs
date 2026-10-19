@@ -1,5 +1,5 @@
 // Known images of child sexual abuse (known.mjs): each new picture asked
-// about once, from the United States, before it is carried; and a match
+// about once, from the United States, as an account sets it; and a match
 // acted on with nobody waiting on the operator — withheld, held,
 // terminated, reported to NCMEC, and the operator told — each step tried
 // again until it is done.
@@ -9,9 +9,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { KNOWN_OBJECT, KnownPictures, REPORT_KEPT_S, knownAsker, knownReport, knownScreen, retryAfter } from './known.mjs';
-import { lobbyKind } from './relay.mjs';
-import { PICTURES_ROW, WITHHELD_WHY, allowedOf, allowing, pictureDigest, withheldOf } from '../functions/pictures.mjs';
+import { KNOWN_OBJECT, KnownPictures, REPORT_KEPT_S, knownAsker, knownReport, retryAfter } from './known.mjs';
+import { PICTURES_ROW, allowedOf, allowing, pictureDigest, withheldOf } from '../functions/pictures.mjs';
 
 const A = '0123456789abcdef0123456789abcdef';
 const B = 'fedcba9876543210fedcba9876543210';
@@ -23,7 +22,6 @@ const NCMEC = 'https://report.cybertip.org/ispws';
 
 const bytes = (n) => Uint8Array.from([0xff, 0xd8, 0xff, n]);
 const b64 = (u8) => Buffer.from(u8).toString('base64');
-const pictureEvent = (jpeg, id = 'e1') => ({ id, kind: lobbyKind, content: JSON.stringify({ kind: 'picture', jpeg }) });
 
 /// Cloudflare KV, as storeOf reads it (rows.mjs).
 function kv() {
@@ -146,7 +144,7 @@ async function setUp({ ncmec = true, endpoint = NCMEC, known = new Set(), key = 
   store.m.set(`ACCOUNT#${A}|PROFILE`, JSON.stringify({ name: 'Ada' }));
   const earlier = bytes(9);
   const earlierDigest = await pictureDigest(b64(earlier));
-  const pictures = r2({ [`seen/${A}/${earlierDigest}`]: new Uint8Array(), [`review/${earlierDigest}.jpg`]: earlier });
+  const pictures = r2({ [`account/${A}/${earlierDigest}`]: new Uint8Array(), [`review/${earlierDigest}.jpg`]: earlier });
   const records = r2();
   const sent = [];
   const w = world({ known });
@@ -186,35 +184,42 @@ async function setUp({ ncmec = true, endpoint = NCMEC, known = new Set(), key = 
   return { obj, state, env, store, pictures, records, sent, alerts, w, clock, ring, earlierDigest, now: () => now };
 }
 
-test('the screen: a picture asked about until it is cleared, a match withheld as a take-down is, and a failure let through', async () => {
-  const asked = [];
-  let said = 'clear';
-  const screen = knownScreen({ ask: async (a) => (asked.push(a), typeof said === 'function' ? said() : said) });
-  const jpeg = b64(bytes(1));
-  assert.equal(await screen(pictureEvent(jpeg), { account: A, key: KEY }), null);
-  assert.equal(await screen(pictureEvent(jpeg, 'e2'), { account: A, key: KEY }), null);
-  assert.deepEqual(asked, [{ jpeg, account: A, key: KEY }], 'once cleared, not asked again');
+test('asked as each picture is set: a match opens a case for the account that set it, shown as it says, from when it was set', async () => {
+  const jpeg = bytes(5);
+  const digest = await pictureDigest(b64(jpeg));
+  const t = await setUp({ known: new Set([digest]) });
+  const caseOf = async (account) => t.state.storage.get(`case:${digest}:${account}`);
+  // Set from a device: never shown, from now.
+  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'match');
+  assert.deepEqual([(await caseOf(A)).shown, (await caseOf(A)).at, (await caseOf(A)).key], [false, new Date(t.now()).toISOString(), KEY]);
+  // The daily run asking again of a picture another account had kept
+  // meanwhile: shown, from when it was set; PhotoDNA not asked again.
+  const earlier = new Date(t.now() - 3 * 60 * 60 * 1000).toISOString();
+  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: null, shown: true, at: earlier }), 'match');
+  assert.deepEqual([(await caseOf(B)).shown, (await caseOf(B)).at], [true, earlier]);
+  assert.equal(t.w.photoDnaAsked, 1);
+  // A time yet to come, or none that reads as one, is now.
+  for (const at of [new Date(t.now() + 60 * 1000).toISOString(), 'soon']) {
+    const account = at === 'soon' ? 'dd'.repeat(16) : C;
+    await t.obj.check({ jpeg: b64(jpeg), account, key: null, shown: true, at });
+    assert.equal((await caseOf(account)).at, new Date(t.now()).toISOString(), at);
+  }
 
-  said = 'match';
-  const other = b64(bytes(2));
-  assert.equal(await screen(pictureEvent(other), { account: B, key: KEY }), WITHHELD_WHY);
-  assert.equal(await screen(pictureEvent(other, 'e3'), { account: 'not an account', key: null }), WITHHELD_WHY, 'asked again: each account that puts it out');
-  assert.deepEqual(asked.at(-1), { jpeg: other, account: null, key: null });
-
-  said = () => {
-    throw new Error('down');
-  };
-  const third = b64(bytes(3));
-  assert.equal(await screen(pictureEvent(third), { account: A, key: KEY }), null, 'let through');
-  said = 'failed';
-  assert.equal(await screen(pictureEvent(third), { account: A, key: KEY }), null);
-  said = 'match';
-  assert.equal(await screen(pictureEvent(third), { account: A, key: KEY }), WITHHELD_WHY, 'and asked about again');
-
-  const before = asked.length;
-  assert.equal(await screen({ id: 'x', kind: lobbyKind, content: '{"kind":"seat"}' }, { account: A }), null);
-  assert.equal(await screen({ id: 'y', kind: 1, content: JSON.stringify({ kind: 'picture', jpeg: b64(bytes(7)) }) }, { account: A }), null);
-  assert.equal(asked.length, before, 'only a picture, of the lobby kind');
+  // Let through while PhotoDNA did not answer: the case, when it
+  // matches, is from when it was first let through.
+  const other = bytes(6);
+  const late = await pictureDigest(b64(other));
+  const u = await setUp({ known: new Set([late]) });
+  u.w.photoDnaDown = true;
+  const first = new Date(u.now()).toISOString();
+  assert.equal(await u.obj.check({ jpeg: b64(other), account: A, key: KEY }), 'failed');
+  u.clock.tick(60 * 1000);
+  assert.equal(await u.obj.check({ jpeg: b64(other), account: B, key: KEY }), 'failed');
+  assert.equal((await u.state.storage.get(`retry:${late}`)).at, first, 'the first time kept');
+  u.w.photoDnaDown = false;
+  u.clock.tick(retryAfter(2));
+  await u.ring();
+  for (const account of [A, B]) assert.equal((await u.state.storage.get(`case:${late}:${account}`)).at, first, account);
 });
 
 test('asked of one object, in the "us" jurisdiction, and only with the key', async () => {
@@ -290,7 +295,7 @@ test("PhotoDNA not answering lets a picture through, asks again, and a match the
   assert.equal(t.state.alarm, t.now() + retryAfter(1));
   // Carried meanwhile: the relay copied it, and C put it out too.
   t.pictures.m.set(`review/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
-  t.pictures.m.set(`seen/${C}/${digest}`, { bytes: new Uint8Array(), type: '' });
+  t.pictures.m.set(`account/${C}/${digest}`, { bytes: new Uint8Array(), type: '' });
 
   t.clock.tick(retryAfter(1));
   await t.ring();
@@ -314,7 +319,7 @@ test('a match found as another account puts out a picture let through earlier: a
   const jpeg = bytes(1);
   const t = await setUp({ known: new Set([await pictureDigest(b64(jpeg))]) });
   t.w.photoDnaDown = true;
-  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: null, key: null }), 'failed', 'put out by a device the relay did not know');
+  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: null, key: null }), 'failed', 'set by no account the object knows');
   t.w.photoDnaDown = false;
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'match');
   await t.ring();
@@ -467,11 +472,6 @@ test('every failure of the automatic handling emails the operator, once in a whi
   assert.match(broken.alerts.at(-1).text, /list down/);
   assert.equal(broken.state.alarm, broken.now() + retryAfter(4));
 
-  // A relay that cannot reach the object says so.
-  const told = [];
-  const screen = knownScreen({ ask: async () => { throw new Error('said 503'); }, failed: (why) => told.push(why) });
-  assert.equal(await screen(pictureEvent(b64(jpeg)), { account: A }), null);
-  assert.deepEqual(told, ['a relay could not ask whether a picture is a known image: said 503']);
 });
 
 /// The relay worker's `POST /known` (knownReport) over [t]'s object,
@@ -505,7 +505,7 @@ test('a picture the operator reports is handled as a match: each account that pu
   const digest = await pictureDigest(b64(jpeg));
   const t = await setUp();
   t.pictures.m.set(`review/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
-  t.pictures.m.set(`seen/${A}/${digest}`, { bytes: new Uint8Array(), type: '' });
+  t.pictures.m.set(`account/${A}/${digest}`, { bytes: new Uint8Array(), type: '' });
   const said = await reportIt(t, { digest, accounts: [C], how: '  a player reported it  ' });
   assert.deepEqual(said, { status: 200, body: { reported: digest, accounts: [C, A] } });
   assert.equal(t.w.photoDnaAsked, 0, 'PhotoDNA not asked');
@@ -522,7 +522,7 @@ test('a picture the operator reports is handled as a match: each account that pu
   assert.ok(submits.every((c) => /Found by the operator, who looked at it: a player reported it\./.test(c.body)));
   assert.ok(t.w.ncmec.filter((c) => c.path === '/fileinfo').every((c) => /<fileViewedByEsp>true<\/fileViewedByEsp>/.test(c.body)));
   assert.equal(t.sent[0].subject, 'Open Hearts: a picture you reported was taken down');
-  assert.match(t.sent[0].text, /^You reported a picture account .* put out as child sexual abuse material \(a player reported it\)/);
+  assert.match(t.sent[0].text, /^You reported a picture account .* set as child sexual abuse material \(a player reported it\)/);
 
   // Known from then on: whoever puts it out again is acted on too.
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'match');

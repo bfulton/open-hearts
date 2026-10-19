@@ -53,7 +53,7 @@ export function orderOf(account, act, { name = false, picture = false, now = Dat
 /// turn: {status, body}. [active] is where the account's device in use
 /// is kept, and [revoke] closes its sockets at the relay
 /// (household.mjs, revokerOf).
-export async function carryOut(op, store, active, { now = Date.now(), revoke = null } = {}) {
+export async function carryOut(op, store, active, { now = Date.now(), revoke = null, pictures = null } = {}) {
   if (!isOrder(op.order) || !isAccount(op.account)) return { status: 400, body: { error: 'an order and its account' } };
   const order = await store.get(...orderRow(op.order));
   if (!order || order.account !== op.account) return { status: 404, body: { error: 'no such order' } };
@@ -77,7 +77,7 @@ export async function carryOut(op, store, active, { now = Date.now(), revoke = n
       break;
     }
     case 'remove':
-      body = await remove(op.account, store, { name: order.name === true, picture: order.picture === true, now });
+      body = await remove(op.account, store, { name: order.name === true, picture: order.picture === true, now, pictures });
       break;
     case 'restore': {
       // What a hold keeps is kept as it was taken off (holds.mjs).
@@ -86,7 +86,7 @@ export async function carryOut(op, store, active, { now = Date.now(), revoke = n
         await store.del(...orderRow(op.order));
         return { status: 409, body: { error: `held since ${held.since}: nothing taken off it is put back` } };
       }
-      body = await restore(op.account, store, { now });
+      body = await restore(op.account, store, { now, pictures });
       break;
     }
     default:
@@ -169,7 +169,7 @@ async function lift(account, store, active) {
 /// off is withheld at the relay as well (pictures.mjs), written first,
 /// so that an order carried out again after a failure part way finds it
 /// withheld whatever else it finds.
-async function remove(account, store, { name, picture, now }) {
+async function remove(account, store, { name, picture, now, pictures = null }) {
   const pk = `ACCOUNT#${account}`;
   const profile = await store.get(pk, 'PROFILE');
   const removed = [];
@@ -193,6 +193,8 @@ async function remove(account, store, { name, picture, now }) {
     removed.push('picture');
     const digest = await pictureDigest(profile.picture);
     if (digest) await store.put(...PICTURES_ROW, withholding(await store.get(...PICTURES_ROW), digest, now));
+    // No longer the account's picture, and kept as long as one replaced.
+    await pictures?.set({ account, picture: null, prev: profile.picture });
   }
   if (!removed.length) return { removed };
   await store.put(pk, 'HELD', { ...held, at: new Date(now).toISOString() });
@@ -202,7 +204,7 @@ async function remove(account, store, { name, picture, now }) {
 
 /// What [remove] held, put back on [account]'s profile, and no longer
 /// held; a picture no longer withheld at the relay.
-async function restore(account, store, { now }) {
+async function restore(account, store, { now, pictures = null }) {
   const pk = `ACCOUNT#${account}`;
   const held = await store.get(pk, 'HELD');
   const restored = [];
@@ -213,10 +215,14 @@ async function restore(account, store, { now }) {
     next.name = held.name;
     restored.push('name');
   }
-  if (typeof held.picture === 'string') {
-    next.picture = held.picture;
+  // The account's picture again, checked again as it is set: one since
+  // found to match a known image of child sexual abuse is not, and stays
+  // withheld.
+  const picture = typeof held.picture === 'string' && (pictures ? await pictures.set({ account, picture: held.picture, prev: profile.picture }) : held.picture);
+  if (picture) {
+    next.picture = picture;
     restored.push('picture');
-    const digest = await pictureDigest(held.picture);
+    const digest = await pictureDigest(picture);
     if (digest) await store.put(...PICTURES_ROW, releasing(await store.get(...PICTURES_ROW), digest, now));
   }
   if (restored.length) {

@@ -12,6 +12,7 @@ import { forgetAccount } from './deletion.mjs';
 import { activeInStore, forgetHouseholds, householdOp } from './household.mjs';
 import { signerOn } from './licence.mjs';
 import { NAME_REFUSED, PROFILE_COLOURS, PROFILE_ICONS, PROFILE_NAME_MOST, PROFILE_PICTURE_MOST, profileOf } from './profile.mjs';
+import { PICTURES_ROW, pictureDigest, withheldOf } from './pictures.mjs';
 import { memoryStore } from './rows.mjs';
 import { SERVICE_DEFAULTS } from './settings.mjs';
 import { record } from './stripe.mjs';
@@ -225,6 +226,56 @@ test('in the account\'s turn: a device dropped from the account reads and writes
   assert.equal((await householdOp({ op: 'profile', key: BAO.public }, store, { now, active })).status, 402);
   assert.equal((await householdOp({ op: 'profile', key: BAO.public, profile: '{"name":"Bao"}' }, store, { now, active })).status, 402);
   assert.equal((await householdOp({ op: 'profile', key: ADA.public }, store, { now, active })).body.profile.name, 'Bao', 'what was written stays the account\'s');
+});
+
+test("in the account's turn, every change of its picture goes through what keeps the account's pictures: set from its device, taken off and put back by the operator, and gone with the account", async () => {
+  const { store, account } = await twoDevices();
+  const active = activeInStore(store);
+  const now = Date.now();
+  const calls = [];
+  const matched = new Set([jpeg(30)]);
+  const pictures = { set: async (c) => (calls.push({ ...c }), matched.has(c.picture) ? null : c.picture) };
+  const op = (o) => householdOp(o, store, { now, active, pictures });
+  const order = async (id, act, more = {}) => {
+    await store.put(...orderRow(id), orderOf(account, act, { ...more, now }));
+    return op({ op: 'order', account, order: id });
+  };
+  const write = (picture) => op({ op: 'profile', key: ADA.public, profile: JSON.stringify({ name: 'Ada', picture }) });
+  const kept = async () => (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.picture ?? null;
+  const withheld = async () => withheldOf(await store.get(...PICTURES_ROW), now);
+  const [one, two] = [jpeg(10), jpeg(20)];
+  await op({ op: 'activate', key: ADA.public, account, want: 'open' });
+
+  assert.equal((await write(one)).body.profile.picture, one);
+  assert.equal((await write(jpeg(30))).body.profile.picture, undefined, 'a match is not kept');
+  assert.equal(await kept(), null);
+  await write(two);
+  assert.equal((await order('a'.repeat(32), 'remove', { picture: true })).status, 200);
+  assert.equal(await kept(), null);
+  assert.equal((await order('b'.repeat(32), 'restore')).body.restored.includes('picture'), true);
+  assert.equal(await kept(), two);
+  assert.ok(!(await withheld()).has(await pictureDigest(two)));
+  // Taken off again, and since found to match: not put back, and still
+  // withheld.
+  await order('c'.repeat(32), 'remove', { picture: true });
+  matched.add(two);
+  assert.deepEqual((await order('d'.repeat(32), 'restore')).body.restored, []);
+  assert.equal(await kept(), null);
+  assert.ok((await withheld()).has(await pictureDigest(two)));
+  await write(one);
+  assert.equal((await op({ op: 'delete', key: ADA.public })).status, 200);
+
+  assert.deepEqual(calls, [
+    { account, key: ADA.public, picture: one, prev: null },
+    { account, key: ADA.public, picture: jpeg(30), prev: one },
+    { account, key: ADA.public, picture: two, prev: null },
+    { account, picture: null, prev: two },
+    { account, picture: two, prev: null },
+    { account, picture: null, prev: two },
+    { account, picture: two, prev: null },
+    { account, key: ADA.public, picture: one, prev: null },
+    { account, picture: null, prev: one },
+  ]);
 });
 
 test('an account\'s data deleted on request takes its profile with it, and nobody else\'s', async () => {

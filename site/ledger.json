@@ -51,15 +51,15 @@
     },
     {
       "date": "2026-10-19",
-      "fingerprint": "bceb94ffd608cf32d159b240e1b215b5aebcdb818fcd1e3bfef50d232241f1e3",
+      "fingerprint": "7f12279688bd4619ff9863fcd01ed9b502b80f6247d92c9ffa674b151123145d",
       "change": "material",
       "storesNotified": null,
       "summary": {
-        "en": "Pictures you show are copied, checked automatically and looked at by us, and one that seems to break the rules is hidden. Reports reach us by email. You can block players on your device and delete your account in the app. What the law has us report is kept a year.",
-        "es": "Las imágenes que muestras se copian, se revisan automáticamente y las miramos; si parece romper las reglas, se oculta. Las denuncias llegan por correo. Puedes bloquear jugadores en tu dispositivo y eliminar tu cuenta en la app. Lo que la ley obliga a denunciar se guarda un año.",
-        "pt": "As imagens que você mostra são copiadas, verificadas automaticamente e vistas por nós; uma que pareça violar as regras é ocultada. Denúncias chegam por e-mail. Você pode bloquear jogadores no seu aparelho e excluir a conta no app. O que a lei manda denunciar fica guardado um ano.",
-        "de": "Bilder, die du zeigst, werden kopiert, automatisch geprüft und von uns angesehen; eines, das gegen die Regeln zu verstoßen scheint, wird verborgen. Meldungen kommen per E-Mail. Du kannst Spieler auf deinem Gerät blockieren und dein Konto löschen. Meldepflichtiges bleibt ein Jahr.",
-        "fr": "Les images montrées sont copiées, vérifiées automatiquement et examinées par nous ; celle qui semble enfreindre les règles est masquée. Les signalements arrivent par e-mail. Vous pouvez bloquer des joueurs et supprimer votre compte. Ce que la loi oblige à signaler reste un an."
+        "en": "Each picture your account sets is checked, and a copy kept for us until a year after it stops being yours; one that seems to break the rules is hidden. Reports reach us by email. You can block players and delete your account in the app.",
+        "es": "Cada imagen que elige tu cuenta se revisa, y guardamos una copia hasta un año después de que deje de ser tuya; si parece romper las reglas, se oculta. Las denuncias llegan por correo. Puedes bloquear jugadores y eliminar tu cuenta en la app.",
+        "pt": "Cada imagem que a sua conta escolhe é verificada, e guardamos uma cópia até um ano depois de deixar de ser sua; a que pareça violar as regras é ocultada. Denúncias chegam por e-mail. Você pode bloquear jogadores e excluir a conta no app.",
+        "de": "Jedes Bild, das dein Konto wählt, wird geprüft, und wir bewahren eine Kopie bis ein Jahr, nachdem es nicht mehr deins ist; eines, das gegen die Regeln zu verstoßen scheint, wird verborgen. Meldungen kommen per E-Mail. Du kannst Spieler blockieren und dein Konto löschen.",
+        "fr": "Chaque image que choisit votre compte est vérifiée, et nous en gardons une copie jusqu'à un an après qu'elle n'est plus la vôtre ; celle qui semble enfreindre les règles est masquée. Les signalements arrivent par e-mail. Vous pouvez bloquer des joueurs et supprimer votre compte."
       }
     }
   ]

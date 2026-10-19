@@ -214,8 +214,10 @@ export function sequencer({ now = Date.now } = {}) {
 /// What an account's turn is asked: {op: 'ticket' | 'claim' | 'drop' |
 /// 'list' | 'activate' | …, ...}. [active] is where the account's device
 /// in use is written ([activeInStore]); [revoke] tells relay objects a
-/// device there is superseded.
-export async function householdOp(op, store, { now = Date.now(), mail = null, active = activeInStore(store), revoke = null } = {}) {
+/// device there is superseded; [pictures] keeps the pictures the account
+/// sets, where the object runs in the relay worker
+/// (service/do/profile_pictures.mjs).
+export async function householdOp(op, store, { now = Date.now(), mail = null, active = activeInStore(store), revoke = null, pictures = null } = {}) {
   switch (op.op) {
     case 'ticket':
       return ticketFor(op.key, store, { now });
@@ -260,11 +262,11 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
     case 'record':
       return inUse(op, active, { now });
     case 'profile':
-      return op.profile ? profileWritten(op, store, active, { now }) : profileRead(op, store, { now });
+      return op.profile ? profileWritten(op, store, active, { now, pictures }) : profileRead(op, store, { now });
     case 'order':
-      return carryOut(op, store, active, { now, revoke });
+      return carryOut(op, store, active, { now, revoke, pictures });
     case 'delete':
-      return deleteAccount(op, store, active, { now, revoke });
+      return deleteAccount(op, store, active, { now, revoke, pictures });
     default:
       return { status: 400, body: { error: 'not a household operation' } };
   }
@@ -454,10 +456,12 @@ export function backupMailHtml(codes, purchase = null) {
 /// as HOUSEHOLD; it reads and writes the same OH_STORE. The account's
 /// device in use is kept in the object's own storage, which is read
 /// back as it was written, and closes sockets at the relay through the
-/// relay worker's TABLE.
+/// relay worker's TABLE. [pictures] keeps the pictures the account sets
+/// (householdOp), which the relay worker gives it.
 export class Household {
-  constructor(state, env) {
+  constructor(state, env, { pictures = null } = {}) {
     this.env = env;
+    this.pictures = pictures;
     this.next = sequencer();
     this.active = {
       get: () => state.storage.get('active'),
@@ -475,7 +479,7 @@ export class Household {
     const store = storeOf(this.env);
     if (!store) return Response.json({ status: 503, body: notConfigured('OH_STORE') });
     return Response.json(
-      await this.next(kindOf(op), () => householdOp(op, store, { mail: mailerOf(this.env), active: this.active, revoke: revokerOf(this.env) })),
+      await this.next(kindOf(op), () => householdOp(op, store, { mail: mailerOf(this.env), active: this.active, revoke: revokerOf(this.env), pictures: this.pictures })),
     );
   }
 }

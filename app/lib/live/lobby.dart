@@ -23,6 +23,7 @@ import '../entitlement.dart';
 import '../game_options.dart';
 import '../identity.dart';
 import '../l10n/l10n.dart';
+import '../net/account_profile.dart';
 import '../net/address.dart';
 import '../net/duty.dart';
 import '../net/game_records.dart';
@@ -385,6 +386,10 @@ class Lobby extends ChangeNotifier {
       // one, before anything is opened — unless the service has just
       // not answered, and then the relay says what it will.
       if (InUse.current.standing != Use.here && InUse.current.worthAsking) await InUse.current.open(signer);
+      // And the account's picture now, and no other
+      // (service/do/profile_pictures.mjs): a change made a moment ago goes
+      // first, so that the picture this device puts out is the service's.
+      await AccountProfile.current.settled();
       if (_disposed || InUse.current.shut) {
         _opening = null;
         _changed();

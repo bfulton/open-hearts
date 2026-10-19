@@ -32,7 +32,7 @@ The non-secret configuration, committed and the same for every deployment.
 | `alerts.to` | `OH_ALERTS_TO` | none | Where the operator's alerts go. Only an `@openhearts.game` address is taken (`alertsOf` in `service/functions/alerts.mjs`). |
 | `alerts.subscribed` | `OH_ALERT_SUBSCRIBED` (`on` when `true`) | none | Email the operator about each new subscription. |
 | `alerts.waiting` | `OH_ALERT_WAITING` (`on` when `true`) | none | Email the operator when a subscriber waits for a person (the `waiting` handler). |
-| `alerts.pictures` | `OH_ALERT_PICTURES` (`on` when `true`) | none | Email the operator once a day the new pictures subscribers put out at live tables (`reviewRun` in `service/do/review.mjs`; [Look at the day's new pictures](../how-to/look-at-new-pictures.md)). |
+| `alerts.pictures` | `OH_ALERT_PICTURES` (`on` when `true`) | none | Email the operator once a day the new pictures subscribers set (`reviewRun` in `service/do/review.mjs`; [Look at the day's new pictures](../how-to/look-at-new-pictures.md)). |
 | `photodna.endpoint` | `OH_PHOTODNA_ENDPOINT` | none | The address of PhotoDNA's Match call, which checks each new picture against known images of child sexual abuse (`photoDnaMatch` in `service/functions/photodna.mjs`). `null` until it is taken from the API reference Microsoft gives with the key, and the request checked against that reference; with the key set and no address, nothing is checked and the operator is emailed. |
 | `ncmec.endpoint` | `OH_NCMEC_ENDPOINT` | none | NCMEC's CyberTipline reporting service: `https://exttest.cybertip.org/ispws`, its test service, until a test report has gone through, then `https://report.cybertip.org/ispws` (`fileReport` in `service/functions/ncmec.mjs`). A report to the test service reaches nobody, and the operator is emailed to report the match by hand. |
 | `ncmec.reporter` | `OH_NCMEC_FIRST_NAME`, `OH_NCMEC_LAST_NAME`, `OH_NCMEC_EMAIL` | none | Who a report names as reporting it. The email address is required to file one. |
@@ -83,7 +83,7 @@ From `pages.environments` in `infra/cloudflare.mjs`. Pages also provides `ASSETS
 | `HOUSEHOLD` | Durable Object (script `open-hearts-relay`, class `Household`) | Bound | Not bound | Runs each account's operations one at a time, and sends the operator's alerts. |
 | `OH_METRICS` | Workers Analytics Engine | Dataset `open_hearts_api` | Not bound | One line per request, sampled for `config` and `health` (`measure` and `SAMPLED` in `service/functions/metrics.mjs`). |
 
-Without `HOUSEHOLD`, the worker runs each account's operations in a queue in its own isolate (`inHousehold`), and sends no alerts.
+Without `HOUSEHOLD`, the worker runs each account's operations in a queue in its own isolate (`inHousehold`), sends no alerts, and neither checks nor keeps the pictures accounts set.
 
 ### Relay worker
 
@@ -92,17 +92,17 @@ From `service/do/wrangler.toml`.
 | Binding | Kind | Used for |
 |---|---|---|
 | `TABLE` | Durable Object, class `TagRelay` | One object per tag. See [Relay tags, kinds and limits](relay.md). |
-| `HOUSEHOLD` | Durable Object, class `Household` | Each account's object. The Pages project binds the same class. |
+| `HOUSEHOLD` | Durable Object, class `Household` | Each account's object, which checks and keeps each picture the account sets with `OH_PICTURES`, `AI` and `KNOWN`. The Pages project binds the same class. |
 | `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The backup jurors (`service/do/bench.mjs`). |
-| `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it. Each relay object reads [relay settings](#relay-settings) and the pictures withheld from it, and adds a picture the automatic check hides. |
-| `OH_PICTURES` | R2 bucket `open-hearts-pictures` | A copy of each new picture a subscriber puts out, for the operator to look at, served at `pictures.openhearts.game` (`service/do/review.mjs`). |
-| `KNOWN` | Durable Object, class `KnownPictures`, made in the `us` jurisdiction | Asks PhotoDNA about each new picture before it is carried, and acts on a match (`service/do/known.mjs`). One object, named `photodna`. |
+| `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it. Each relay object reads [relay settings](#relay-settings) and the pictures withheld from it; an account's object adds a picture the automatic check hides. |
+| `OH_PICTURES` | R2 bucket `open-hearts-pictures` | A copy of each picture an account sets, and a note of which account set it and whether it is its picture now, kept for the operator until a year after it stops being the account's; the copies served at `pictures.openhearts.game` for the daily email (`service/do/profile_pictures.mjs`, `service/do/review.mjs`). The relay carries a picture only when its note says it is its account's now. |
+| `KNOWN` | Durable Object, class `KnownPictures`, made in the `us` jurisdiction | Asks PhotoDNA about each new picture as an account sets it, and acts on a match (`service/do/known.mjs`). One object, named `photodna`. |
 | `OH_RECORDS` | R2 bucket `open-hearts-records` | Where a hold the `KnownPictures` object places keeps the account's pictures (`heldPictureKey` in `service/functions/holds.mjs`). |
-| `AI` | Workers AI | The automatic check of each new picture, by `@cf/cloudflare/clef-flash` (`checkPicture` in `service/do/review.mjs`). Without it, pictures are copied and not checked. |
+| `AI` | Workers AI | The automatic check of each new picture as an account sets it, by `@cf/cloudflare/clef-flash` (`checkPicture` in `service/do/review.mjs`). Without it, pictures are kept and not checked. |
 | `EMAIL` | Email Sending (`send_email`) | Backup-code emails, the operator's alerts, and the day's new pictures. |
 | `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
 
-Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With PhotoDNA's key set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. When `alerts.pictures` is on, it deletes the copies in `OH_PICTURES` that nobody has put out for 30 days, hides any new picture the check found should be hidden that isn't yet, and emails the operator the new ones.
+Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With PhotoDNA's key set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. It deletes from `OH_PICTURES` each picture a year after it stopped being an account's, asks PhotoDNA again about each picture an account has now that it hasn't cleared, and hides any the check found should be hidden that isn't; when `alerts.pictures` is on, it also emails the operator the new ones.
 
 ## Environment variables
 
@@ -129,7 +129,7 @@ What each script does with the Cloudflare API token, which is what the token nee
 
 - `deploy.sh` publishes to the Pages project and, with `--prune`, lists and deletes its deployments.
 - `./oh account delete` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
-- The other `./oh account` acts read rows and write orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, read and rewrite kept games in `OH_RECORDS` (Workers R2 Storage: Edit). `./oh account find` reads the notes of who put out a picture in `OH_PICTURES`, and `./oh account hold` and `./oh account release` copy pictures from it into `OH_RECORDS` and delete them there (Workers R2 Storage: Edit). `./oh config` and `./oh picture` read and write rows in `OH_STORE`.
+- The other `./oh account` acts read rows and write orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, read and rewrite kept games in `OH_RECORDS` (Workers R2 Storage: Edit). `./oh account find` reads the notes of which accounts set a picture in `OH_PICTURES`, and `./oh account hold` and `./oh account release` copy pictures from it into `OH_RECORDS` and delete them there (Workers R2 Storage: Edit). `./oh config` and `./oh picture` read and write rows in `OH_STORE`.
 - `infra/apply.mjs` reads every resource that `infra/cloudflare.mjs` defines, and with `--apply` changes them.
 - The relay's deploy (`./oh deploy relay`, which runs `npx wrangler deploy` in `service/do`) uploads the relay worker with its Durable Objects, its container image and its custom domain.
 

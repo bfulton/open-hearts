@@ -3,7 +3,7 @@
 // with what happened and who did it, the picture uploaded and described,
 // and the report finished, after which nothing can be added to it or
 // taken back. Filed by service/do/known.mjs when PhotoDNA matches a
-// picture an account put out (docs/how-to/handle-abuse-material.md).
+// picture an account set (docs/how-to/handle-abuse-material.md).
 //
 // The service's answers are XML, a few known elements deep, so they are
 // read by element name; Workers have no XML parser.
@@ -32,13 +32,13 @@ export const elementOf = (xml, name) => new RegExp(`<${name}>([^<]*)</${name}>`)
 
 const schema = 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://report.cybertip.org/ispws/xsd"';
 
-/// The report, as /submit takes it: the picture an account put out at
+/// The report, as /submit takes it: the picture an account set at
 /// [at] (ISO, in the past), the reporter as [reporter] names them
 /// ({firstName, lastName, email}), and the account by its number, the
 /// name it played under ([name], or none), the device that put the
 /// picture out ([device]), how it was found ([found], a sentence: by
 /// PhotoDNA unless said) and what was done ([done], a sentence).
-export function reportXml({ at, reporter, account, name = null, device = null, found = 'Matched by Microsoft PhotoDNA against known images as it was put out.', done }) {
+export function reportXml({ at, reporter, account, name = null, device = null, found = 'Matched by Microsoft PhotoDNA against known images as it was set as a profile picture.', done }) {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<report ${schema}>`,
@@ -60,13 +60,13 @@ export function reportXml({ at, reporter, account, name = null, device = null, f
     el('espIdentifier', account),
     el('espService', GAME),
     el('screenName', name),
-    el('additionalInfo', device ? `The picture was put out by the device whose public key is ${device}, signed with it.` : null),
+    el('additionalInfo', device ? `The picture was set by the device whose public key is ${device}, in a request signed with it.` : null),
     '</personOrUserReported>',
     '</report>',
   ].join('');
 }
 
-/// The picture's details, as /fileinfo takes them: [fileName], put out
+/// The picture's details, as /fileinfo takes them: [fileName], set
 /// at [at], its SHA-256 [digest], whether players were shown it
 /// ([shown]), and whether anybody at Open Hearts looked at it
 /// ([viewed]: the operator, for a picture they reported).

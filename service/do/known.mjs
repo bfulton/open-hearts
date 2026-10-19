@@ -1,16 +1,17 @@
 // Known images of child sexual abuse, kept from being shown at all.
-// Each new picture an account puts out is asked about once, before the
-// relay carries it, of Microsoft's PhotoDNA (service/functions/
-// photodna.mjs), from one object in Cloudflare's "us" jurisdiction, so
-// that every request PhotoDNA gets comes from the United States. A
-// picture that matches is withheld, and everything that follows is done
-// here, with nothing waiting on the operator
+// Each picture an account sets is asked about as it is set, before
+// anyone is shown it (profile_pictures.mjs), of Microsoft's PhotoDNA
+// (service/functions/photodna.mjs), from one object in Cloudflare's
+// "us" jurisdiction, so that every request PhotoDNA gets comes from the
+// United States; PhotoDNA is asked about each picture once. A picture
+// that matches is never the account's, and everything that follows is
+// done here, with nothing waiting on the operator
 // (docs/how-to/handle-abuse-material.md):
 //
-//   1. the picture withheld wherever it was put out (pictures.mjs);
-//   2. each account that put it out held (holds.mjs), a copy of the
-//      picture and of every other it put out kept where only the
-//      operator reaches them, and any public copy of it deleted;
+//   1. the picture withheld wherever it turns up (pictures.mjs);
+//   2. each account that set it held (holds.mjs), a copy of the picture
+//      and of every other it set kept where only the operator reaches
+//      them, and any copy of it served for the daily email deleted;
 //   3. each such account terminated, its web subscriptions ended in
 //      Stripe with nothing refunded (an order the service carries out,
 //      suspension.mjs);
@@ -20,9 +21,9 @@
 //
 // Each step is written down as it is done, and the object's alarm tries
 // the rest again until all are: Stripe or NCMEC not answering delays a
-// step, and loses none. PhotoDNA not answering lets the picture through,
-// so the game goes on, and asks again; a match found then is acted on
-// as any other, and the copy shown meanwhile taken down with it.
+// step, and loses none. PhotoDNA not answering lets the picture be
+// set, so the game goes on, and asks again; a match found then is acted
+// on as any other, and the picture taken down with it.
 //
 // Off until the deployment has PhotoDNA's key (OH_PHOTODNA_KEY); a
 // report is filed once it has NCMEC's credentials too, and until then
@@ -32,13 +33,12 @@ import { heldPictureKey, hold, keepHeldPictures } from '../functions/holds.mjs';
 import { bodyOf } from '../functions/http.mjs';
 import { NcmecRefused, fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
 import { photoDnaMatch } from '../functions/photodna.mjs';
-import { PICTURES_ROW, WITHHELD_WHY, copyKey, pictureDigest, pictureIn, withheldOf, withholding } from '../functions/pictures.mjs';
+import { PICTURES_ROW, copyKey, pictureDigest, withheldOf, withholding } from '../functions/pictures.mjs';
 import { isAccount, storeOf } from '../functions/rows.mjs';
 import { orderOf } from '../functions/suspension.mjs';
-import { accountsThatPutOut } from '../tool/find.mjs';
+import { accountsWith } from '../tool/find.mjs';
 import { placeOrder } from '../tool/suspend.mjs';
 import { alertKnownProblem, alertsOf } from '../functions/alerts.mjs';
-import { lobbyKind } from './relay.mjs';
 
 /// The one object every check goes through.
 export const KNOWN_OBJECT = 'photodna';
@@ -55,10 +55,6 @@ const isReportId = (id) => typeof id === 'string' && /^[0-9a-f]{32}$/.test(id);
 /// At most this much of how the operator came to know is kept and
 /// reported.
 export const HOW_MOST = 300;
-
-/// How many pictures a relay object remembers PhotoDNA cleared, so
-/// that it asks about each once while it is awake.
-const remembered = 2000;
 
 /// How long before a step that failed is tried again: a minute, then
 /// doubling, to six hours at the most.
@@ -120,38 +116,6 @@ export async function knownReport(request, env) {
   return us.get(us.idFromName(KNOWN_OBJECT)).fetch('https://known/report', { method: 'POST', body: JSON.stringify({ ...asked, id }) });
 }
 
-/// What a relay object says of each picture published to it, and who
-/// said it (relay.mjs, `screen`): WITHHELD_WHY for one PhotoDNA matched,
-/// as for one the operator took down, so that nothing tells the device
-/// why; otherwise null. A picture is asked about until PhotoDNA has
-/// cleared it, then remembered as clear; [ask] failing lets it through,
-/// to be asked about again, and is told to [failed].
-export function knownScreen({ ask, log = null, failed = null }) {
-  const clear = new Set();
-  return async (event, who) => {
-    if (event?.kind !== lobbyKind) return null;
-    const jpeg = pictureIn(event.content);
-    if (!jpeg) return null;
-    const digest = await pictureDigest(jpeg);
-    if (!digest || clear.has(digest)) return null;
-    let said;
-    try {
-      said = await ask({ jpeg, account: isAccount(who?.account) ? who.account : null, key: who?.key ?? null });
-    } catch (e) {
-      const why = `a relay could not ask whether a picture is a known image: ${e?.message ?? e}`;
-      log?.(why);
-      failed?.(why);
-      return null;
-    }
-    if (said === 'match') return WITHHELD_WHY;
-    if (said === 'clear') {
-      if (clear.size >= remembered) clear.clear();
-      clear.add(digest);
-    }
-    return null;
-  };
-}
-
 /// NCMEC's credentials and who the report names as reporting it, off
 /// env (deployment.mjs, `ncmec`), or null when a report cannot be filed.
 export function ncmecOf(env) {
@@ -174,9 +138,9 @@ export function caseLines(c, { ncmec }) {
   const todo = [];
   const step = (ok, did, failing) => (ok ? done.push(did) : todo.push(failing));
   const why = (s) => (c.failed?.[s] ? ` (${c.failed[s]}; tried again by itself)` : ' (tried again by itself)');
-  step(c.done.hidden, 'withheld wherever it was put out', `withhold it${why('hidden')}`);
+  step(c.done.hidden, 'withheld wherever it turns up', `withhold it${why('hidden')}`);
   if (c.account) {
-    step(c.done.held, `held for a year at the least, with a copy of each picture it put out in the last 30 days at ${heldPictureKey(c.account, '')}... in open-hearts-records`, `hold it${why('held')}: ./oh account hold ${c.account} --apply`);
+    step(c.done.held, `held for a year at the least, with a copy of each picture it set at ${heldPictureKey(c.account, '')}... in open-hearts-records`, `hold it${why('held')}: ./oh account hold ${c.account} --apply`);
     step(c.done.ended, 'terminated, its web subscription ended in Stripe, nothing refunded', `terminate it${why('ended')}: ./oh account terminate ${c.account} --serious --apply`);
   }
   if (c.done.reported) {
@@ -194,8 +158,8 @@ export function caseEmail(c, lines) {
   const who = c.account ? `account ${c.account}` : 'a device the relay did not know';
   const text = [
     c.viewed
-      ? `You reported a picture ${who} put out as child sexual abuse material${c.how ? ` (${c.how})` : ''}, at ${c.at}.`
-      : `Microsoft's PhotoDNA matched a picture ${who} put out at ${c.at} against known images of child sexual abuse.`,
+      ? `You reported a picture ${who} set as child sexual abuse material${c.how ? ` (${c.how})` : ''}, at ${c.at}.`
+      : `Microsoft's PhotoDNA matched a picture ${who} set at ${c.at} against known images of child sexual abuse.`,
     c.viewed ? 'It had been shown to other players; it is withheld now.' : c.shown ? 'It was shown to other players before the match was known; it is withheld now.' : 'It was withheld before any other player was shown it.',
     '',
     'Done:',
@@ -211,7 +175,8 @@ export function caseEmail(c, lines) {
 /// The object, where PhotoDNA is asked and every match acted on. Its
 /// storage: `pic:<digest>`, what PhotoDNA said of a picture ({said:
 /// 'clear' or 'match', at}); `retry:<digest>`, a picture PhotoDNA has
-/// not answered for yet ({jpeg, accounts, keys, tries, next});
+/// not answered for yet ({jpeg, seen: [{account, key}], tries, next,
+/// at}, `at` when it was first let through);
 /// `case:<digest>:<account>`, a match being acted on ({digest, account,
 /// key, name, jpeg, at, shown, done, failed, tries, told}), the picture
 /// dropped from it once it is held and reported; and `report:<id>`,
@@ -278,11 +243,13 @@ export class KnownPictures {
     }
   }
 
-  /// What PhotoDNA says of the picture [jpeg] (base64) an [account]'s
-  /// device [key] put out: 'clear', 'match', 'failed' or 'off'. Asked of
-  /// PhotoDNA once; a match is acted on for each account that puts it
-  /// out.
-  async check({ jpeg, account = null, key = null }) {
+  /// What PhotoDNA says of the picture [jpeg] (base64) an [account] set,
+  /// from its device [key] (null for the daily run's asking again):
+  /// 'clear', 'match', 'failed' or 'off'. Asked of PhotoDNA once; a match
+  /// is acted on for each account that sets it, [shown] when others may
+  /// have seen it, as when it was set before PhotoDNA had said, [at]
+  /// (ISO) then.
+  async check({ jpeg, account = null, key = null, shown = false, at = null }) {
     if (!this.photoDna) {
       if (this.env.OH_PHOTODNA_KEY) await this.problem('config', 'OH_PHOTODNA_KEY is set but photodna.endpoint in config/openhearts.json is not, so no picture is checked');
       return 'off';
@@ -292,7 +259,7 @@ export class KnownPictures {
     const known = await this.storage.get(`pic:${digest}`);
     if (known?.said === 'clear') return 'clear';
     if (known?.said === 'match') {
-      await this.open({ digest, jpeg, account, key, shown: false });
+      await this.open({ digest, jpeg, account, key, shown, at });
       return 'match';
     }
     let match;
@@ -300,7 +267,7 @@ export class KnownPictures {
       match = await photoDnaMatch(bytesOf(jpeg), this.photoDna);
     } catch (e) {
       await this.problem('photodna', `a picture was let through unchecked, to be asked about again: ${e.message}`);
-      await this.notAnswered(digest, jpeg, account, key);
+      await this.notAnswered(digest, jpeg, account, key, at);
       return 'failed';
     }
     await this.decided(digest, match);
@@ -309,16 +276,16 @@ export class KnownPictures {
       // shown: its accounts are acted on as the retry finds them.
       const waiting = await this.storage.get(`retry:${digest}`);
       if (waiting) await this.matchedLate(digest, waiting, account);
-      await this.open({ digest, jpeg, account, key, shown: false });
+      await this.open({ digest, jpeg, account, key, shown, at });
     }
     return match ? 'match' : 'clear';
   }
 
   /// The report the operator's tool wrote ([asked], its row and [id],
-  /// reportRow), acted on as a match is: for each account that put the
-  /// picture out, as the relay's copies note and as the operator named, a
+  /// reportRow), acted on as a match is: for each account that set the
+  /// picture, as their pictures are noted and as the operator named, a
   /// case that says the operator looked at it; and the picture known from
-  /// then on, so that whoever puts it out again is acted on too. Asked
+  /// then on, so that whoever sets it again is acted on too. Asked
   /// again, as the tool does when an answer is lost, it is answered as
   /// before, and nothing done twice. {status, body}.
   async reported(asked) {
@@ -333,7 +300,7 @@ export class KnownPictures {
     if (!jpeg) return { status: 404, body: { error: 'no copy of that picture is kept: report it by hand' } };
     const accounts = [...named];
     if (this.env.OH_PICTURES) {
-      for (const a of await accountsThatPutOut(r2Objects(this.env.OH_PICTURES), digest)) if (!accounts.includes(a)) accounts.push(a);
+      for (const a of await accountsWith(r2Objects(this.env.OH_PICTURES), digest)) if (!accounts.includes(a)) accounts.push(a);
     }
     const how = typeof asked.how === 'string' && asked.how.trim() ? asked.how.trim().slice(0, HOW_MOST) : null;
     await this.decided(digest, true);
@@ -370,45 +337,49 @@ export class KnownPictures {
   }
 
   /// [digest] let through unchecked: asked about again, with each
-  /// account that puts it out meanwhile noted.
-  async notAnswered(digest, jpeg, account, key) {
+  /// account that sets it meanwhile noted.
+  async notAnswered(digest, jpeg, account, key, at = null) {
     const was = await this.storage.get(`retry:${digest}`);
     const tries = (was?.tries ?? 0) + 1;
     const next = this.now() + retryAfter(tries);
     const seen = was?.seen ?? [];
     if (account && !seen.some((s) => s.account === account)) seen.push({ account, key });
-    await this.storage.put(`retry:${digest}`, { jpeg, seen, tries, next });
+    // When it was first let through: the time its report gives.
+    const first = was?.at ?? at ?? new Date(this.now()).toISOString();
+    await this.storage.put(`retry:${digest}`, { jpeg, seen, tries, next, at: first });
     await this.wakeBy(next);
   }
 
   /// A picture PhotoDNA matched after it was let through: every account
-  /// that put it out, as noted here and as the relay's copies note
-  /// (review.mjs), acted on, and the picture's public copy taken down.
-  /// [asking] is the account whose putting it out found the match, which
-  /// is acted on as it asks; when nobody is known at all, the match is
-  /// acted on without an account.
+  /// that set it, as noted here and as their pictures are noted
+  /// (profile_pictures.mjs), acted on, and the copy served for the email
+  /// taken down. [asking] is the account whose setting it found the
+  /// match, which is acted on as it asks; when nobody is known at all,
+  /// the match is acted on without an account.
   async matchedLate(digest, waiting, asking = null) {
     const seen = [...waiting.seen];
     if (this.env.OH_PICTURES) {
-      for (const account of await accountsThatPutOut(r2Objects(this.env.OH_PICTURES), digest)) {
+      for (const account of await accountsWith(r2Objects(this.env.OH_PICTURES), digest)) {
         if (!seen.some((s) => s.account === account)) seen.push({ account, key: null });
       }
     }
     if (!seen.length && !asking) seen.push({ account: null, key: null });
-    for (const { account, key } of seen) await this.open({ digest, jpeg: waiting.jpeg, account, key, shown: true });
+    for (const { account, key } of seen) await this.open({ digest, jpeg: waiting.jpeg, account, key, shown: true, at: waiting.at ?? null });
     await this.storage.delete(`retry:${digest}`);
   }
 
-  /// A case opened for [account]'s use of a matched picture, once:
-  /// [viewed] when the operator found it and looked at it, saying [how].
-  async open({ digest, jpeg, account, key, shown, viewed = false, how = null }) {
+  /// A case opened for [account]'s use of a matched picture, once, set
+  /// at [at] (ISO; now, unless it is known to be earlier): [viewed] when
+  /// the operator found it and looked at it, saying [how].
+  async open({ digest, jpeg, account, key, shown, at = null, viewed = false, how = null }) {
     const id = `case:${digest}:${account ?? 'none'}`;
     if (await this.storage.get(id)) return;
     const store = storeOf(this.env);
     // The name it played under, for the report, before anything here
     // changes the account.
     const name = account && store ? (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.name ?? null : null;
-    await this.storage.put(id, { digest, account, key, name, jpeg, at: new Date(this.now()).toISOString(), shown, ...(viewed ? { viewed, how } : {}), done: {}, failed: {}, tries: 0, told: '' });
+    const when = typeof at === 'string' && Date.parse(at) <= this.now() ? at : new Date(this.now()).toISOString();
+    await this.storage.put(id, { digest, account, key, name, jpeg, at: when, shown, ...(viewed ? { viewed, how } : {}), done: {}, failed: {}, tries: 0, told: '' });
     await this.wakeBy(this.now());
   }
 

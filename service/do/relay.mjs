@@ -416,9 +416,10 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// the host to let go of its copy too.
 ///
 /// [screen], when given, is asked first of each event published, with
-/// who said it, and answers as [withhold] does: a picture PhotoDNA
-/// matches (service/do/known.mjs). What is already held was screened
-/// as it came, so only [withhold] is asked of that.
+/// who said it, and answers as [withhold] does: a picture that is not
+/// its account's picture now (service/do/profile_pictures.mjs). What is
+/// already held was screened as it came, so only [withhold] is asked of
+/// that.
 export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
@@ -622,8 +623,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
     }
     send(from, ['OK', event.id, true, '']);
     // Whatever the host wants to know of an event it took, and from
-    // whom: a call for a juror, a picture to keep for the operator to
-    // look at (worker.mjs).
+    // whom: a call for a juror (worker.mjs).
     heard?.(event, auths.get(from)?.who ?? null);
     // Written out once, not once a listener: the same text either way.
     const wire = JSON.stringify(event);

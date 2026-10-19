@@ -7,7 +7,7 @@
 // (suspension.mjs); a deletion asked for meanwhile is noted, and done
 // once the hold is released (`oh account release`).
 
-import { copyKey, seenKey } from './pictures.mjs';
+import { accountPictureKey, copyKey } from './pictures.mjs';
 import { dayAfter, dayOf } from './rows.mjs';
 
 /// How long a hold lasts at the least, in days: the year the law has a
@@ -20,26 +20,28 @@ export const holdRow = (account) => [`ACCOUNT#${account}`, 'HOLD'];
 /// The account's hold, or null.
 export const holdOf = (store, account) => store.get(...holdRow(account));
 
-/// Where a hold keeps a copy of each picture the account put out, in
-/// the private bucket of kept games (OH_RECORDS), which has no address
-/// of its own: the copies the relay made (pictures.mjs) are served at
-/// one, and deleted 30 days after a picture was last put out. Placed
-/// and released by `oh account hold` and `oh account release`.
+/// Where a hold keeps a copy of each picture the account set, in the
+/// private bucket of kept games (OH_RECORDS), which has no address of
+/// its own: the copies kept of each picture an account sets
+/// (pictures.mjs) are served at one, for the daily email, and deleted a
+/// year after a picture stops being the account's, which a hold may
+/// outlast. Placed and released by `oh account hold` and `oh account
+/// release`.
 export const heldPicturesPrefix = (account) => `held/${account}/`;
 export const heldPictureKey = (account, digest) => `${heldPicturesPrefix(account)}${digest}.jpg`;
 
-/// Each picture [account] put out that [pictures] (OH_PICTURES) still
-/// has a copy of, copied into [records] where a hold keeps it. Both are
+/// Each picture [account] set that [pictures] (OH_PICTURES) still has a
+/// copy of, copied into [records] where a hold keeps it. Both are
 /// buckets as {list(prefix) -> keys, read(key) -> bytes or null,
 /// write(key, bytes, type)}: the operator's tool reaches them through
 /// Cloudflare's API, the relay through its bindings. Resolves {kept,
 /// gone}: the digests copied, and those whose copy was already deleted.
 export async function keepHeldPictures(pictures, records, account) {
-  const putOut = seenKey(account, '');
+  const theirs = accountPictureKey(account, '');
   const kept = [];
   const gone = [];
-  for (const key of await pictures.list(putOut)) {
-    const digest = key.slice(putOut.length);
+  for (const key of await pictures.list(theirs)) {
+    const digest = key.slice(theirs.length);
     const jpeg = await pictures.read(copyKey(digest));
     if (!jpeg) {
       gone.push(digest);

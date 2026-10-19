@@ -149,7 +149,7 @@
     "short": {
       "title": "The short version",
       "p1": "Playing alone stays on your device",
-      "p2": "Your games against the bots are kept on the device you play on, and not sent anywhere. So are your name and picture, until you subscribe: then our service keeps them with your account too, so that all its devices show the same ones.",
+      "p2": "Your games against the bots are kept on the device you play on, and not sent anywhere. So are your name and picture, until you subscribe: then our service keeps them with your account too, so that all its devices show the same ones. A copy of each picture your account sets is kept apart, to act on reports, until a year after it stops being your account's.",
       "p3": "Live play is public, on purpose",
       "p4": "To play people, your name, your picture, your account's number and your results go through our relay, where anyone who asks can read them. Rooms and pictures are kept there a day; results are kept for the ratings.",
       "p5": "Accounts, but no email or password",
@@ -227,20 +227,21 @@
     "kept": {
       "title": "How long things are kept",
       "p1": "<b>On your device:</b> until you remove them.",
-      "p2": "<b>On our relay:</b> moves, presence and waiting for a game: not kept. Rooms, seatings and pictures: a day. Game results: for as long as the ratings are worked out from them. A copy of each new picture, and which accounts put it out, is also kept apart for us to look at, until 30 days after it was last put out at a table. As a new picture is first put out, Microsoft's PhotoDNA checks it against known images of child sexual abuse, and keeps no copy of it. A program run by Cloudflare also looks at each new picture as it is copied, and hides one that seems to show nudity or sexual content, violence or a hate symbol; what it made of the picture is kept with the copy.",
+      "p2": "<b>On our relay:</b> moves, presence and waiting for a game: not kept. Rooms, seatings and pictures: a day. Game results: for as long as the ratings are worked out from them. The relay carries only the picture an account has now.",
       "p3": "<b>Finished live games:</b> for good, in Cloudflare's storage. If you ask us to delete your account's data, your name comes off the games you played; the moves stay, for the other players.",
       "p4": "<b>Our service's account and subscription records, your account's profile among them:</b> while the subscription runs, and afterwards until you delete your account or ask us to delete them. A changed profile replaces the one before. The note of which device is in use is replaced each time another of your devices opens the game. If we suspend your account from live play, or take its name or picture off, as the <a href=\"{{base}}/terms#table\">terms</a> allow, our service also keeps a note that it is suspended and since when, and the name or picture it took off, so that either can be undone. Each is kept until it is undone, or until your account's records are deleted.",
       "p5": "<b>Stripe and Link:</b> as long as Stripe's policy and the law on payment and tax records require.",
       "p6": "<b>Cloudflare, Google and Microsoft:</b> under their own policies.",
       "p7": "<b>New Relic:</b> the errors and timings, eight days.",
-      "p8": "<b>What the law has us report:</b> if something published through Open Hearts has to be reported to the authorities, as US law requires of child sexual abuse material, we keep what we reported and the account's records for as long as the law requires, a year at the least, even if you ask us to delete them, and delete them once that time is over."
+      "p8": "<b>What the law has us report:</b> if something published through Open Hearts has to be reported to the authorities, as US law requires of child sexual abuse material, we keep what we reported and the account's records for as long as the law requires, a year at the least, even if you ask us to delete them, and delete them once that time is over.",
+      "p9": "<b>The pictures your account sets:</b> each is checked as it is set. Microsoft's PhotoDNA compares it with known images of child sexual abuse, and keeps no copy of it; a program run by Cloudflare looks at it, and hides one that seems to show nudity or sexual content, violence or a hate symbol. We keep a copy of each picture apart, with what the program made of it, for us to look at and to act on a report; once it is no longer your account's picture, nobody else is shown it. A copy is kept until a year after the picture stops being your account's — when you replace it, we take it off, or your account is deleted — and then deleted."
     },
     "choices": {
       "title": "Your choices",
       "p1": "Play alone, and nothing about you leaves your device.",
       "p2": "Play live with a name that is not your real one, and with no picture.",
       "p3": "Change your name or picture at any time; if you subscribe, the change reaches all your account's devices. What was already published stays where it is.",
-      "p4": "Delete your account in the app (<a href=\"{{base}}/support#delete\">how</a>), or ask us to delete it, or to send you a copy of what our service keeps about your account, its profile and its devices. Once it is deleted, your name comes off the finished games you played, and the results your devices published stay on our relay, for the ratings, without your name: each still names your account's number and your device's public key. If you subscribed on the web, Stripe's payment records still hold your email address with your device's public key, which those results name, for as long as Stripe keeps them.",
+      "p4": "Delete your account in the app (<a href=\"{{base}}/support#delete\">how</a>), or ask us to delete it, or to send you a copy of what our service keeps about your account, its profile and its devices. Once it is deleted, your name comes off the finished games you played, and the results your devices published stay on our relay, for the ratings, without your name: each still names your account's number and your device's public key. The copies of the pictures your account set are deleted a year after it is. If you subscribed on the web, Stripe's payment records still hold your email address with your device's public key, which those results name, for as long as Stripe keeps them.",
       "p5": "Where data protection law gives you rights — to see, correct or delete what is held about you, to object, or to complain to your data protection authority — you have them here too."
     },
     "children": {

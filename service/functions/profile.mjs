@@ -16,8 +16,12 @@
 // most 12,000 bytes, base64 (app/lib/avatar.dart; a test holds the two
 // sides equal). The picture is published at tables anyway; here it is
 // kept with the account, for its devices, until the account's data is
-// deleted. A name the filter refuses (names.mjs) is not kept: the
-// others would see it.
+// deleted. Where the account's turn runs in the relay worker, each new
+// picture is checked as it is set, and kept apart as one of the
+// account's pictures (service/do/profile_pictures.mjs): one that
+// matches a known image of child sexual abuse is not kept, and the
+// profile is saved without it. A name the filter refuses (names.mjs) is
+// not kept: the others would see it.
 
 import { entitlementOf } from './accounts.mjs';
 import { nameRefused } from './names.mjs';
@@ -122,8 +126,10 @@ export async function profileRead(op, store, { now = Date.now() } = {}) {
 }
 
 /// The account's profile written by its device in use, in the account's
-/// turn: the next version, whatever was there.
-export async function profileWritten(op, store, active, { now = Date.now() } = {}) {
+/// turn: the next version, whatever was there, with its picture as
+/// [pictures] keeps it (profile_pictures.mjs, accountPictures), where it
+/// is given.
+export async function profileWritten(op, store, active, { now = Date.now(), pictures = null } = {}) {
   const account = await profileAccount(store, op.key, now);
   if (!account) return { status: 402, body: { error: 'no subscription' } };
   const checked = profileOf(op.profile);
@@ -134,7 +140,8 @@ export async function profileWritten(op, store, active, { now = Date.now() } = {
     return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
   }
   const was = await store.get(`ACCOUNT#${account}`, 'PROFILE');
-  const row = { ...checked.profile, version: (was?.version ?? 0) + 1, updated_at: new Date(now).toISOString() };
+  const picture = pictures ? await pictures.set({ account, key: op.key, picture: checked.profile.picture, prev: was?.picture ?? null }) : checked.profile.picture;
+  const row = { ...checked.profile, picture, version: (was?.version ?? 0) + 1, updated_at: new Date(now).toISOString() };
   await store.put(`ACCOUNT#${account}`, 'PROFILE', row);
   return { status: 200, body: profileShown(row) };
 }

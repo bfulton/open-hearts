@@ -83,7 +83,7 @@ export async function relayOrigin() {
   return `https://${host}`;
 }
 
-/// The bucket of the pictures subscribers put out, OH_PICTURES, as the
+/// The bucket of the pictures subscribers set, OH_PICTURES, as the
 /// relay worker's wrangler.toml binds it.
 export async function picturesBucket(env, fetchImpl = fetch) {
   const [token, account] = need(env, 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID');

@@ -206,13 +206,13 @@ test('a legal hold: placed with its report, shown, and not released before its y
   const store = await webSubscriber();
   await store.put(`ACCOUNT#${account}`, 'META', { subscription: 'sub_9' });
   const ctx = context(store, fakeStripe());
-  // The pictures the relay copied: two the account put out, one of
-  // whose copies is gone, and one only another account put out.
+  // The pictures kept as accounts set them: two the account set, one
+  // of whose copies is gone, and one only another account set.
   const [a, b, c] = await Promise.all([1, 2, 3].map((n) => pictureDigest(base64(jpeg(n)))));
   const pictures = objects({
-    [`seen/${account}/${a}`]: '',
-    [`seen/${account}/${b}`]: '',
-    [`seen/${other}/${c}`]: '',
+    [`account/${account}/${a}`]: '',
+    [`account/${account}/${b}`]: '',
+    [`account/${other}/${c}`]: '',
     [`review/${a}.jpg`]: jpeg(1),
     [`review/${c}.jpg`]: jpeg(3),
   });
@@ -223,7 +223,7 @@ test('a legal hold: placed with its report, shown, and not released before its y
   assert.equal(await store.get(`ACCOUNT#${account}`, 'HOLD'), null, 'a dry run holds nothing');
   assert.deepEqual(Object.keys(records.kept), ['tables/t1.json'], 'nor keeps a picture');
   assert.match(ctx.said.join('\n'), /would hold its data until at least 2027-10-16/);
-  assert.match(ctx.said.join('\n'), new RegExp(`would keep a copy of each picture it put out in the last 30 days, 2 now, at held/${account}/`));
+  assert.match(ctx.said.join('\n'), new RegExp(`would keep a copy of each picture it set in the last year, 2 now, at held/${account}/`));
   assert.equal(await main(['account', 'hold', account, '--ref', 'not a ref'], ctx), 2);
   assert.equal(await main(['account', 'hold', account, '--ref', '123456789', '--apply'], ctx), 0);
   assert.deepEqual(await store.get(`ACCOUNT#${account}`, 'HOLD'), { since: '2026-10-16', until: '2027-10-16', ref: '123456789', deleteAsked: null });
@@ -268,7 +268,7 @@ test('a legal hold: placed with its report, shown, and not released before its y
 test('a hold is placed before its pictures are copied, so one that fails to copy still holds, and running it again copies them', async () => {
   const store = await webSubscriber();
   const digest = await pictureDigest(base64(jpeg(1)));
-  const pictures = objects({ [`seen/${account}/${digest}`]: '', [`review/${digest}.jpg`]: jpeg(1) });
+  const pictures = objects({ [`account/${account}/${digest}`]: '', [`review/${digest}.jpg`]: jpeg(1) });
   const records = objects();
   const ctx = context(store, fakeStripe());
   ctx.pictures = async () => ({ ...pictures, read: async () => { throw new Error('reading said 500'); } });
@@ -297,14 +297,14 @@ test('a release that stops part way leaves the hold, so running it again finishe
   assert.deepEqual(records.kept, {});
 });
 
-test('found by a picture: by its SHA-256 or its copy\'s address, each account that put it out, with whether it is its profile picture now', async () => {
+test('found by a picture: by its SHA-256 or its copy\'s address, each account that set it, with whether it is its profile picture now', async () => {
   const store = memoryStore();
   const [a, b] = await Promise.all([1, 2].map((n) => pictureDigest(base64(jpeg(n)))));
   await store.put(`ACCOUNT#${account}`, 'PROFILE', { picture: base64(jpeg(1)) });
   await store.put(`ACCOUNT#${other}`, 'PROFILE', { picture: base64(jpeg(2)) });
   // And a note under something that is no account, which the daily
   // email passes over too.
-  const pictures = objects({ [`seen/${account}/${a}`]: '', [`seen/${other}/${a}`]: '', [`seen/${other}/${b}`]: '', [`seen/bench/${a}`]: '', [`review/${a}.jpg`]: jpeg(1) });
+  const pictures = objects({ [`account/${account}/${a}`]: '', [`account/${other}/${a}`]: '', [`account/${other}/${b}`]: '', [`account/bench/${a}`]: '', [`review/${a}.jpg`]: jpeg(1) });
   const found = async (query) => {
     const ctx = context(store, fakeStripe());
     ctx.pictures = async () => pictures;
@@ -317,7 +317,7 @@ test('found by a picture: by its SHA-256 or its copy\'s address, each account th
   assert.deepEqual(await found(`https://pictures.openhearts.game/review/${a}.jpg`), both, "by its copy's address");
   assert.deepEqual(await found(`/review/${a}.jpg`), both);
   assert.deepEqual(await found(b), [`${other}: put the picture out; its profile picture now`, '1 account(s)']);
-  assert.deepEqual(await found('cd'.repeat(32)), ['0 account(s)'], 'a picture nobody put out');
+  assert.deepEqual(await found('cd'.repeat(32)), ['0 account(s)'], 'a picture nobody set');
   // A name is not looked for in the pictures.
   const named = context(store, fakeStripe());
   named.pictures = async () => assert.fail('the pictures read for a name');
