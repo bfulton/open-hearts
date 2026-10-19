@@ -19,6 +19,14 @@ export const holdRow = (account) => [`ACCOUNT#${account}`, 'HOLD'];
 /// The account's hold, or null.
 export const holdOf = (store, account) => store.get(...holdRow(account));
 
+/// Where a hold keeps a copy of each picture the account put out, in
+/// the private bucket of kept games (OH_RECORDS), which has no address
+/// of its own: the copies the relay made (pictures.mjs) are served at
+/// one, and deleted 30 days after a picture was last put out. Placed
+/// and released by `oh account hold` and `oh account release`.
+export const heldPicturesPrefix = (account) => `held/${account}/`;
+export const heldPictureKey = (account, digest) => `${heldPicturesPrefix(account)}${digest}.jpg`;
+
 /// A report's number, as the CyberTipline gives one: letters, digits and
 /// dashes, short.
 export const isReportRef = (ref) => typeof ref === 'string' && /^[A-Za-z0-9-]{1,40}$/.test(ref);

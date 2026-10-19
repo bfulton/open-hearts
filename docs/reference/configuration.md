@@ -74,7 +74,7 @@ From `pages.environments` in `infra/cloudflare.mjs`. Pages also provides `ASSETS
 | Binding | Kind | Production | Preview | Used for |
 |---|---|---|---|---|
 | `OH_STORE` | Workers KV | `open-hearts-store` | `open-hearts-store-preview` | Every row the service keeps. See [Storage](service-api.md#storage). |
-| `OH_RECORDS` | R2 bucket | `open-hearts-records` | `open-hearts-records-preview` | Finished games' records (`service/functions/records.mjs`). |
+| `OH_RECORDS` | R2 bucket | `open-hearts-records` | `open-hearts-records-preview` | Finished games' records (`service/functions/records.mjs`), and the pictures a legal hold keeps (`service/functions/holds.mjs`). |
 | `HOUSEHOLD` | Durable Object (script `open-hearts-relay`, class `Household`) | Bound | Not bound | Runs each account's operations one at a time, and sends the operator's alerts. |
 | `OH_METRICS` | Workers Analytics Engine | Dataset `open_hearts_api` | Not bound | One line per request, sampled for `config` and `health` (`measure` and `SAMPLED` in `service/functions/metrics.mjs`). |
 
@@ -122,7 +122,7 @@ What each script does with the Cloudflare API token, which is what the token nee
 
 - `deploy.sh` publishes to the Pages project and, with `--prune`, lists and deletes its deployments.
 - `./oh account delete` reads and deletes rows in `OH_STORE` (Workers KV Storage: Edit), and reads and rewrites kept games in `OH_RECORDS` (Workers R2 Storage: Edit).
-- The other `./oh account` acts read rows and write orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, read and rewrite kept games in `OH_RECORDS` (Workers R2 Storage: Edit). `./oh config` reads and writes rows in `OH_STORE`.
+- The other `./oh account` acts read rows and write orders in `OH_STORE` (Workers KV Storage: Edit), and, to take a name off, read and rewrite kept games in `OH_RECORDS` (Workers R2 Storage: Edit). `./oh account find` reads the notes of who put out a picture in `OH_PICTURES`, and `./oh account hold` and `./oh account release` copy pictures from it into `OH_RECORDS` and delete them there (Workers R2 Storage: Edit). `./oh config` and `./oh picture` read and write rows in `OH_STORE`.
 - `infra/apply.mjs` reads every resource that `infra/cloudflare.mjs` defines, and with `--apply` changes them.
 - The relay's deploy (`./oh deploy relay`, which runs `npx wrangler deploy` in `service/do`) uploads the relay worker with its Durable Objects, its container image and its custom domain.
 

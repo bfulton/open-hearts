@@ -18,14 +18,14 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 | Argument | What it is |
 |---|---|
 | `<account>` | an account (32 hex characters) or one of its devices' keys (64 hex characters) |
-| `<query>` | a name the account plays under (or had taken off), or the email address its web subscription was paid with |
+| `<query>` | a name the account plays under (or had taken off), the email address its web subscription was paid with, or a picture it put out: its SHA-256, or the address of its copy |
 | `<what>` | `name`, `picture`, or `name,picture` |
 | `<row>` | `app` (remote config), `service` (service settings) or `relay` (relay settings) |
 | `<file>` | a JSON file holding the whole row |
 | `<name>` | a secret's name, as `infra/cloudflare.mjs` lists it |
 | `<platform>` | `ios` or `android` |
 | `<document>` | `terms` (the terms of use) or `privacy` (the privacy policy) |
-| `<picture>` | a picture's SHA-256 (64 hex characters), as the daily email of new pictures gives it |
+| `<picture>` | a picture's SHA-256 (64 hex characters), as the daily email of new pictures gives it, or the address of its copy, as Cloudflare's CSAM Scanning Tool gives it |
 
 ## Credentials
 
@@ -33,7 +33,7 @@ Each command reads what it needs from the environment, and says which are missin
 
 | Variable | What it is |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to take a name off kept games. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. |
+| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, and hold or release an account. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account the project is in. |
 | `STRIPE_API_KEY` | A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. oh verify: Prices read and Checkout Sessions write, to make a checkout through Link and expire it. Infrastructure: what docs/how-to/apply-infrastructure.md lists. |
 | `NEW_RELIC_API_KEY` | A New Relic User key, for the monitors (oh infra). |
@@ -50,9 +50,9 @@ Acting on an account, as the terms and the privacy policy allow.
 oh account find <query>
 ```
 
-Prints the accounts a name or an email address belongs to. A name is looked for among the names accounts play under and the names taken off and held; an email address, among web subscriptions, which needs `STRIPE_API_KEY`.
+Prints the accounts a name, an email address or a picture belongs to. A name is looked for among the names accounts play under and the names taken off and held; an email address, among web subscriptions, which needs `STRIPE_API_KEY`; a picture, among the accounts that put it out in the last 30 days, each said with whether it is its profile picture now.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, STRIPE_API_KEY (for an email address)
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, STRIPE_API_KEY (for an email address), (Workers R2 Storage Edit, for a picture)
 - **How-to:** [suspend-an-account.md](../how-to/suspend-an-account.md#find-the-account)
 - **Example:** `oh account find 'The Name They Play Under'`
 
@@ -158,9 +158,9 @@ Deletes an account's data on its owner's request: its name off its kept games, a
 oh account hold <account> [--apply] [--ref <ref>]
 ```
 
-Holds an account's data as it is after a report the law requires, such as one of child sexual abuse material to NCMEC: a year at the least, during which nothing deletes it or puts back what was taken off it. --ref is the report's number. A deletion its owner asks for meanwhile is noted, and done once the hold is released.
+Holds an account's data as it is after a report the law requires, such as one of child sexual abuse material to NCMEC: a year at the least, during which nothing deletes it or puts back what was taken off it. --ref is the report's number. A deletion its owner asks for meanwhile is noted, and done once the hold is released. It also keeps a copy of each picture the account put out in the last 30 days, in the bucket of kept games, which only you reach; run it again to keep any it has put out since.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
 - **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#take-it-down-and-hold-the-account)
 - **Example:** `oh account hold 0123456789abcdef0123456789abcdef --ref 123456789 --apply`
 
@@ -170,15 +170,15 @@ Holds an account's data as it is after a report the law requires, such as one of
 oh account release <account> [--apply]
 ```
 
-Releases a legal hold once its year is out, and says whether the account's owner asked meanwhile for its data to be deleted.
+Releases a legal hold once its year is out, deleting the pictures it kept, and says whether the account's owner asked meanwhile for its data to be deleted.
 
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
 - **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#release-the-hold)
 - **Example:** `oh account release 0123456789abcdef0123456789abcdef --apply`
 
 ## Pictures
 
-Pictures the automatic check hid.
+Pictures at the relay, wherever they were put out: one the automatic check hid, put back, or one withheld.
 
 ### oh picture allow
 
@@ -191,6 +191,18 @@ Puts back a picture the automatic check hid by mistake, and keeps the check from
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [look-at-new-pictures.md](../how-to/look-at-new-pictures.md#put-back-a-picture-hidden-by-mistake)
 - **Example:** `oh picture allow 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --apply`
+
+### oh picture hide
+
+```bash
+oh picture hide <picture> [--apply]
+```
+
+Withholds a picture at the relay for 30 days, wherever it was put out, as one taken off an account is. For a picture that is no longer an account's profile picture, which `oh account remove` does not reach. It overrides `oh picture allow`.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#take-it-down-and-hold-the-account)
+- **Example:** `oh picture hide 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --apply`
 
 ## Terms and price
 

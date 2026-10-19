@@ -38,14 +38,19 @@ squashed from a pull request, the pull request's number.
   shows it first; `./oh picture allow` puts one back. (2026-10-19, #32)
 - Every new picture is copied to R2 and emailed to the operator once a
   day, account by account, with the commands to take it down. The copies
-  are served through Cloudflare, whose CSAM Scanning Tool checks them.
-  (2026-10-19, #32)
+  are served through Cloudflare, whose CSAM Scanning Tool checks each as
+  the email first loads it. (2026-10-19, #32)
 - Names that are obscene or slurs, in five languages, are refused by the
   app, the service and the relay, matched as whole words so real names
   stay. (2026-10-19, #32)
 - A legal hold keeps an account's data for a year at the least after a
-  report the law requires, and `docs/how-to/handle-abuse-material.md` is
-  the procedure for child sexual abuse material. (2026-10-19, #32)
+  report the law requires, with a copy of each picture the account put
+  out in its last 30 days, kept where only the operator reaches it.
+  `docs/how-to/handle-abuse-material.md` is the procedure for child
+  sexual abuse material, from a report or from Cloudflare's CSAM
+  Scanning Tool: `./oh account find` takes the path the tool gives to
+  the accounts that put the picture out, and `./oh picture hide`
+  withholds one an account no longer uses. (2026-10-19, #32)
 - `./oh`, one command for every operator task, each saying what it would
   do and changing nothing without `--apply`; `docs/reference/oh.md` is
   made from it. (2026-10-19, #32)

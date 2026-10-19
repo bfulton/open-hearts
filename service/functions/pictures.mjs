@@ -27,6 +27,21 @@ export const REVIEW_PREFIX = 'review/';
 export const copyKey = (digest) => `${REVIEW_PREFIX}${digest}.jpg`;
 export const copyUrl = (digest) => `${PICTURES_ORIGIN}/${copyKey(digest)}`;
 
+/// Where in the same bucket each account's use of a picture is noted:
+/// `seen/<account>/<digest>`, empty, saying when the account first put
+/// it out and whether the operator has been told.
+export const SEEN_PREFIX = 'seen/';
+export const seenKey = (account, digest) => `${SEEN_PREFIX}${account}/${digest}`;
+
+/// The SHA-256 [said] names a picture by, as the operator is given one:
+/// the digest itself, as the daily email gives it, or the address or
+/// path of its copy, as Cloudflare's CSAM Scanning Tool does. Null for
+/// anything else.
+export function pictureNamed(said) {
+  const digest = /^(?:.*\/)?([0-9a-f]{64})(?:\.jpg)?$/i.exec(String(said ?? '').trim())?.[1];
+  return digest ? digest.toLowerCase() : null;
+}
+
 /// How long a picture taken off is withheld, unless it is put back
 /// first: longer than the relay keeps any lobby event (a day, and an
 /// hour for its sweep; service/do/tag_store.mjs), and long enough that

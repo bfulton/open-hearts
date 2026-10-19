@@ -20,17 +20,12 @@
 // what nobody has put out for 30 days. Apart from worker.mjs so it can
 // be tested without the runtime.
 
-import { PICTURES_ORIGIN, PICTURES_ROW, REVIEW_PREFIX, allowedOf, copyKey, copyUrl, pictureDigest, pictureIn, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
+import { PICTURES_ORIGIN, PICTURES_ROW, REVIEW_PREFIX, SEEN_PREFIX, allowedOf, copyKey, copyUrl, pictureDigest, pictureIn, seenKey, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
 import { lobbyKind } from './relay.mjs';
 
-/// Where the copies are served, and where in the bucket they are
-/// (service/functions/pictures.mjs).
-export { PICTURES_ORIGIN, REVIEW_PREFIX };
-
-/// Where in the bucket each account's use of a picture is noted:
-/// `seen/<account>/<digest>`, empty, saying when the account first put
-/// it out and whether the operator has been told.
-export const SEEN_PREFIX = 'seen/';
+/// Where the copies are served, and where in the bucket they and each
+/// account's use of them are (service/functions/pictures.mjs).
+export { PICTURES_ORIGIN, REVIEW_PREFIX, SEEN_PREFIX };
 
 /// How long a copy, or a note, is kept after the picture was last put
 /// out.
@@ -69,7 +64,6 @@ export const HIDE_AT = 0.5;
 const CHECK_SAYS = { sexual: 'nudity or sexual content', gore: 'violence or gore', hate: 'a hate symbol' };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const seenKey = (account, digest) => `${SEEN_PREFIX}${account}/${digest}`;
 
 /// [key] in [bucket] written as [body] with what [meta] resolves, unless
 /// it is there and was written lately; written again, with what it

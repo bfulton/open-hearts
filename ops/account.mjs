@@ -10,7 +10,8 @@ import { endNow, inStripe, inTheStore, money, refund as refundIn, refundFor, res
 import { accountOf, findAccounts } from '../service/tool/find.mjs';
 import { forget } from '../service/tool/forget.mjs';
 import { carry, standing, wouldDo } from '../service/tool/suspend.mjs';
-import { HOLD_DAYS, Held, hold, holdRow, isReportRef } from '../service/functions/holds.mjs';
+import { HOLD_DAYS, Held, heldPictureKey, heldPicturesPrefix, hold, holdRow, isReportRef } from '../service/functions/holds.mjs';
+import { copyKey, pictureNamed, seenKey } from '../service/functions/pictures.mjs';
 import { anonymizeGames } from '../service/functions/records.mjs';
 import { dayAfter, dayOf } from '../service/functions/rows.mjs';
 
@@ -18,7 +19,7 @@ import { dayAfter, dayOf } from '../service/functions/rows.mjs';
 /// with how it stands; Failed when there is none.
 async function theAccount(ctx, store, target) {
   const account = await accountOf(store, target);
-  if (!account) throw new Usage('name the account (32 hex) or one of its devices (64 hex); oh account find finds one by name or email');
+  if (!account) throw new Usage('name the account (32 hex) or one of its devices (64 hex); oh account find finds one by name, email or picture');
   const stands = await standing(store, account);
   if (!stands.exists) throw new Failed(`no account ${account}`);
   return { account, stands };
@@ -59,9 +60,13 @@ async function webSubscription(ctx, store, account) {
 
 export async function find(ctx, { args }) {
   const store = await ctx.store();
-  const said = await findAccounts(store, args.query, { stripeKey: ctx.env.STRIPE_API_KEY ?? null, fetchImpl: ctx.fetch });
+  const pictures = pictureNamed(args.query) ? await ctx.pictures() : null;
+  const said = await findAccounts(store, args.query, { stripeKey: ctx.env.STRIPE_API_KEY ?? null, fetchImpl: ctx.fetch, pictures });
   for (const note of said.notes) ctx.warn(note);
-  for (const a of said.found) ctx.log(a);
+  for (const a of said.found) {
+    const now = said.pictures.get(a);
+    ctx.log(now === undefined ? a : `${a}: put the picture out; ${now ? 'its profile picture now' : 'not its profile picture now'}`);
+  }
   ctx.log(`${said.found.size} account(s)`);
 }
 
@@ -164,7 +169,7 @@ export function remove(ctx, said) {
 export async function del(ctx, { args, flags }) {
   const store = await ctx.store();
   const account = await accountOf(store, args.account);
-  if (!account) throw new Usage('name the account (32 hex) or one of its devices (64 hex); oh account find finds one by name or email');
+  if (!account) throw new Usage('name the account (32 hex) or one of its devices (64 hex); oh account find finds one by name, email or picture');
   try {
     await forget(store, ctx.bucket(), account, { apply: !!flags.apply, log: ctx.log, now: ctx.now() });
   } catch (e) {
@@ -174,7 +179,10 @@ export async function del(ctx, { args, flags }) {
 
 /// The account's data held as it is, after a report the law requires
 /// (service/functions/holds.mjs, docs/how-to/handle-abuse-material.md):
-/// a year at the least, with the report's number.
+/// a year at the least, with the report's number. The pictures it put
+/// out that the relay still has a copy of are copied where only the
+/// operator reaches them, since the relay deletes its copies 30 days
+/// after a picture was last put out; run again, it copies any since.
 export async function holdAccount(ctx, { args, flags }) {
   const store = await ctx.store();
   const { account, stands } = await theAccount(ctx, store, args.account);
@@ -183,9 +191,26 @@ export async function holdAccount(ctx, { args, flags }) {
   if (ref !== null && !isReportRef(ref)) throw new Usage('--ref is the report\'s number: letters, digits and dashes');
   if (stands.hold) ctx.log(`  already held${ref && !stands.hold.ref ? `; would add report ${ref}` : ''}`);
   else ctx.log(`  would hold its data until at least ${dayAfter(ctx.now(), HOLD_DAYS)}: nothing deletes it, or puts back what was taken off it, until it is released`);
+  const pictures = await ctx.pictures();
+  const putOut = seenKey(account, '');
+  const digests = (await pictures.list(putOut)).map((k) => k.slice(putOut.length));
+  ctx.log(`  and would keep a copy of each picture it put out in the last 30 days, ${digests.length} now, at ${heldPicturesPrefix(account)} in the bucket of kept games, until the hold is released`);
   if (!flags.apply) return ctx.log('nothing changed; --apply does it');
   const row = await hold(store, account, { ref, now: ctx.now() });
   ctx.log(`held: ${new Held(row).message}`);
+  const records = ctx.bucket();
+  let kept = 0;
+  for (const digest of digests) {
+    const jpeg = await pictures.read(copyKey(digest));
+    if (!jpeg) {
+      ctx.warn(`no copy left of picture ${digest}`);
+      continue;
+    }
+    await records.write(heldPictureKey(account, digest), jpeg, 'image/jpeg');
+    ctx.log(`kept ${heldPictureKey(account, digest)}`);
+    kept++;
+  }
+  ctx.log(`kept ${kept} picture(s) at ${heldPicturesPrefix(account)}`);
 }
 
 /// A hold released, once its year is out; what it kept is then the
@@ -197,8 +222,13 @@ export async function release(ctx, { args, flags }) {
   const was = stands.hold;
   if (!was) return ctx.log('  not held: nothing to release');
   if (dayOf(ctx.now()) < was.until) throw new Failed(`held until at least ${was.until}: a report's contents are kept a year (18 U.S.C. §2258A(h))`);
-  ctx.log(`  would release the hold of ${was.since}`);
+  const records = ctx.bucket();
+  const kept = await records.list(heldPicturesPrefix(account));
+  ctx.log(`  would release the hold of ${was.since}, and delete the ${kept.length} picture(s) it kept`);
   if (!flags.apply) return ctx.log('nothing changed; --apply does it');
+  // The copies first: a release that stops part way is run again, and
+  // finds the hold still there.
+  for (const key of kept) await records.remove(key);
   await store.del(...holdRow(account));
   ctx.log('released');
   if (was.deleteAsked) ctx.log(`its owner asked on ${was.deleteAsked} for its data to be deleted: ./oh account delete ${account} --apply`);

@@ -8,7 +8,7 @@ Every picture a subscriber puts out at a live table is shown at once. An automat
 
 Do this once:
 
-1. Turn on Cloudflare's CSAM Scanning Tool for the `openhearts.game` zone: in the dashboard, open the zone, then **Caching**, then **Configuration**, and turn on **CSAM Scanning Tool**. Give it the address the alerts go to. It checks each picture against the lists of known child sexual abuse images as it is first served from `pictures.openhearts.game`, blocks a match there, and emails you.
+1. Turn on Cloudflare's CSAM Scanning Tool for the `openhearts.game` zone: in the dashboard, open the zone, then **Caching**, then **Configuration**, and turn on **CSAM Scanning Tool**. Give it the address the alerts go to. It checks each picture against the lists of known child sexual abuse images as it is first served from `pictures.openhearts.game` through Cloudflare's cache, which is when this email's pictures are first loaded: let your mail program load them. It blocks a match there, and once a day emails you the paths of what it matched ([Handle a report of child sexual abuse material](handle-abuse-material.md#find-the-account)).
 1. Check that `alerts.pictures` is `true` and `alerts.to` is your alerts address in `config/openhearts.json` ([Configuration](../reference/configuration.md#configopenheartsjson)).
 1. Export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, as [Suspend an account](suspend-an-account.md#before-you-begin) describes, for the commands the email gives.
 
