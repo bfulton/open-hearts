@@ -818,6 +818,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'The report didn\'t go. Try again, or write to help@openhearts.game.';
 
   @override
+  String blockPlayer(String name) {
+    return 'Block $name';
+  }
+
+  @override
+  String get unblockPlayer => 'Unblock';
+
+  @override
+  String get blockedPlayer => 'Blocked player';
+
+  @override
+  String get blockNote =>
+      'On this device only: you won\'t see their name, picture or reactions. They aren\'t told.';
+
+  @override
   String get waitingToReconnect => 'Waiting for the others to reconnect';
 
   @override

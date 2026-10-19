@@ -1088,6 +1088,30 @@ abstract class AppLocalizations {
   /// **'The report didn\'t go. Try again, or write to help@openhearts.game.'**
   String get reportFailed;
 
+  /// Button: block another player on this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Block {name}'**
+  String blockPlayer(String name);
+
+  /// Button, on a blocked player: show them again on this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get unblockPlayer;
+
+  /// Shown in place of the name of a player this device blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked player'**
+  String get blockedPlayer;
+
+  /// Under the block button: what blocking does.
+  ///
+  /// In en, this message translates to:
+  /// **'On this device only: you won\'t see their name, picture or reactions. They aren\'t told.'**
+  String get blockNote;
+
   /// Under the table while the game is paused.
   ///
   /// In en, this message translates to:

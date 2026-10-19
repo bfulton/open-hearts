@@ -29,10 +29,12 @@ void main() {
     expect(v.plays.first.card, twoOfClubs, reason: 'the hand opens on the two of clubs');
     expect(v.taken, c.game.taken);
     // Nothing hidden in it: no hand held, no pass, nothing of the deal.
-    expect(v.toJson().keys.toSet(), {'table', 'target', 'seq', 'hand', 'phase', 'names', 'totals', 'taken', 'plays', 'toPlay', 'keys'});
-    // The seats' keys, whose reactions a watcher shows (reactions.dart):
-    // public already, named by the start event and the record.
+    expect(v.toJson().keys.toSet(), {'table', 'target', 'seq', 'hand', 'phase', 'names', 'totals', 'taken', 'plays', 'toPlay', 'keys', 'accounts'});
+    // The seats' keys, whose reactions a watcher shows (reactions.dart),
+    // and accounts, whom a watcher may have blocked: public already,
+    // named by the start event and the record.
     expect(v.keys, [for (final h in c.holders) h is HumanSeat ? h.key : null]);
+    expect(v.accounts, [for (final h in c.holders) h is HumanSeat ? h.account : null]);
     final json = jsonEncode(v.toJson());
     final back = WatchedTable.parse(jsonDecode(json), table: c.spec.id)!;
     expect(back.toJson(), v.toJson());
@@ -60,6 +62,7 @@ void main() {
       toPlay: 1,
     ).toJson();
     expect(WatchedTable.parse(good, table: 'x'), isNotNull);
+    expect(WatchedTable.parse({...good, 'accounts': ['ab' * 16, null, 'cd' * 32, null]}, table: 'x')?.accounts, ['ab' * 16, null, 'cd' * 32, null]);
     for (final (what, change) in <(String, void Function(Map<String, Object?>))>[
       ('three names', (m) => m['names'] = ['a', 'b', 'c']),
       ('a card off the deck', (m) => m['plays'] = [[0, 52]]),
@@ -68,6 +71,8 @@ void main() {
       ('a phase nobody plays', (m) => m['phase'] = 'cheating'),
       ('a score that is not a number', (m) => m['totals'] = [0, 0, 'x', 0]),
       ('a name too long to be one', (m) => m['names'] = ['a' * 61, 'b', 'c', 'd']),
+      ('three accounts', (m) => m['accounts'] = ['ab' * 16, null, null]),
+      ('an account that is not one', (m) => m['accounts'] = ['AB' * 16, null, null, null]),
     ]) {
       final m = jsonDecode(jsonEncode(good)) as Map<String, Object?>;
       change(m);

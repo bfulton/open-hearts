@@ -454,6 +454,55 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('holding a badge blocks that player on this device: no name, no picture; a report still says who; and unblocks', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final picture = Uint8List.fromList(List.generate(64, (i) => i));
+    final pictures = await Pictures.load();
+    final reports = <Report>[];
+    final live = await pumpLive(tester, pictures: pictures, avatars: {1: Avatar(picture: picture)}, report: (r) async {
+      reports.add(r);
+      return ReportSent.sent;
+    });
+    await act(tester, live);
+    await live.advance(tester, 1000);
+    final bao = (live.spec.seats[1] as HumanSeat).account;
+
+    await tester.longPress(find.bySemanticsLabel(RegExp('^Bao: ')));
+    await tester.pumpAndSettle();
+    expect(find.text("On this device only: you won't see their name, picture or reactions. They aren't told."), findsOneWidget);
+    await tester.tap(find.text('Block Bao'));
+    await tester.pumpAndSettle();
+    expect(pictures.isBlocked(bao), isTrue);
+    expect(live.controller.avatarOf(1).picture, isNull);
+    expect(find.textContaining('Bao'), findsNothing, reason: 'their name nowhere on the table');
+    expect(find.textContaining('Blocked player'), findsWidgets);
+
+    // Held again: no picture to choose about, and no name; a report
+    // still tells the operator who.
+    await tester.longPress(find.bySemanticsLabel(RegExp('^Blocked player: ')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Bao'), findsNothing);
+    expect(find.text('Unblock'), findsOneWidget);
+    await tester.tap(find.text('Report Blocked player'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Bao'), findsNothing);
+    await tester.tap(find.text('Their name'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+    await tester.pumpAndSettle();
+    expect(reports.single.name, 'Bao');
+    expect(reports.single.about, bao);
+
+    await tester.longPress(find.bySemanticsLabel(RegExp('^Blocked player: ')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Unblock'));
+    await tester.pumpAndSettle();
+    expect(pictures.isBlocked(bao), isFalse);
+    expect(find.text('Bao'), findsWidgets);
+    expect(live.controller.avatarOf(1).picture, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a seat the others boot sees no table, only that a bot took it', (tester) async {
     final live = await pumpLive(tester);
     await act(tester, live);

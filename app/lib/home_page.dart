@@ -443,6 +443,7 @@ class _HomePageState extends State<HomePage> {
                                   : RoomView(
                                       room: room,
                                       ledger: _lobby.standing?.ledger,
+                                      pictures: _lobby.pictures,
                                       onLeave: _lobby.leave,
                                       onShare: () => _share(room.code),
                                     ),
@@ -1012,13 +1013,17 @@ class _WaitingView extends StatelessWidget {
 /// one who leads sees Start now, and that is the whole of the
 /// difference.
 class RoomView extends StatelessWidget {
-  const RoomView({super.key, required this.room, required this.ledger, required this.onLeave, required this.onShare});
+  const RoomView({super.key, required this.room, required this.ledger, this.pictures, required this.onLeave, required this.onShare});
 
   final Room room;
 
   /// Ratings for the people here, from the results everyone signs;
   /// null until this device has read them off the relays.
   final Ledger? ledger;
+
+  /// What this device does with the others' pictures, and who it
+  /// blocked (pictures.dart).
+  final Pictures? pictures;
 
   final VoidCallback onLeave;
   final VoidCallback onShare;
@@ -1028,6 +1033,18 @@ class RoomView extends StatelessWidget {
     final l10n = context.l10n;
     final seconds = room.secondsToStart;
     final members = room.members;
+    final pictures = this.pictures;
+    // A member is shown as this device would show them at the table: a
+    // blocked one by no name and no picture, a picture this device
+    // keeps off by its icon.
+    String idOf(RoomMember m) => m.licence?.account ?? m.key;
+    bool blocked(RoomMember m) => m.key != room.me && (pictures?.isBlocked(idOf(m)) ?? false);
+    Avatar avatarOf(RoomMember m) {
+      final picture = m.avatar.picture;
+      if (m.key == room.me || picture == null || pictures == null || pictures.allows(idOf(m), picture)) return m.avatar;
+      return m.avatar.copyWith(clearPicture: true);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1050,13 +1067,13 @@ class RoomView extends StatelessWidget {
             child: Row(
               children: [
                 i < members.length
-                    ? PlayerIcon(name: members[i].name, seed: members[i].licence?.account ?? members[i].key, avatar: members[i].avatar, size: 30)
+                    ? PlayerIcon(name: blocked(members[i]) ? l10n.blockedPlayer : members[i].name, seed: idOf(members[i]), avatar: avatarOf(members[i]), size: 30)
                     : const SizedBox(width: 30, height: 30, child: Icon(Icons.smart_toy_outlined, size: 20, color: Palette.chromeDim)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     i < members.length
-                        ? (members[i].key == room.me ? l10n.nameIsYou(members[i].name) : members[i].name)
+                        ? (members[i].key == room.me ? l10n.nameIsYou(members[i].name) : blocked(members[i]) ? l10n.blockedPlayer : members[i].name)
                         : l10n.emptySeat,
                     style: TextStyle(
                       fontSize: 15,

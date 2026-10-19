@@ -822,6 +822,21 @@ class AppLocalizationsFr extends AppLocalizations {
       'Le signalement n\'est pas parti. Réessayez ou écrivez à help@openhearts.game.';
 
   @override
+  String blockPlayer(String name) {
+    return 'Bloquer $name';
+  }
+
+  @override
+  String get unblockPlayer => 'Débloquer';
+
+  @override
+  String get blockedPlayer => 'Personne bloquée';
+
+  @override
+  String get blockNote =>
+      'Sur cet appareil seulement : vous ne verrez plus son nom, son image ni ses réactions. Cette personne n\'en est pas avertie.';
+
+  @override
   String get waitingToReconnect => 'En attente de la reconnexion des autres';
 
   @override

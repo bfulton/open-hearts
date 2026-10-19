@@ -124,8 +124,17 @@ class LiveController extends ChangeNotifier implements TableModel {
   final bool canPlayAgain;
 
   void _pictured() {
-    if (!_disposed) notifyListeners();
+    if (_disposed) return;
+    // A player blocked while their reaction shows: it goes now.
+    for (final (seat, holder) in _shownHolders.indexed) {
+      if (holder is HumanSeat && _blocked(holder.account)) _reacting.remove(seat)?.gone.cancel();
+    }
+    notifyListeners();
   }
+
+  /// Whether the viewer blocked [account] (pictures.dart): its name,
+  /// picture and reactions are not shown.
+  bool _blocked(String account) => pictures?.isBlocked(account) ?? false;
 
   bool _reported = false;
   StreamSubscription<void>? _sub;
@@ -632,6 +641,7 @@ class LiveController extends ChangeNotifier implements TableModel {
       ? words.you
       : switch (_shownHolders[s]) {
           BotSeat(:final persona) => persona.name,
+          HumanSeat(:final account) when _blocked(account) => words.blockedPlayer,
           _ => seatNames[s] ?? words.seatNumber(s + 1),
         };
 
@@ -751,18 +761,20 @@ class LiveController extends ChangeNotifier implements TableModel {
   }
 
   /// Who holds [seat], for the sheet holding their badge opens: their
-  /// account, their name and the picture they chose, and whether this
-  /// device hides it — by the viewer's choice, or the check's. Null for
-  /// a bot and for your own seat.
-  ({String key, String name, Uint8List? picture, bool hidden, bool flagged})? playerAt(int seat) {
+  /// account, their name and the picture they chose, as they chose
+  /// them, whether this device blocked them, and whether it hides their
+  /// picture — by the viewer's choice, or the check's. Null for a bot
+  /// and for your own seat.
+  ({String key, String name, Uint8List? picture, bool blocked, bool hidden, bool flagged})? playerAt(int seat) {
     final holder = _shownHolders[seat];
     if (holder is! HumanSeat || seat == mySeat) return null;
     final picture = (seatAvatars[seat] ?? Avatar.none).picture;
     final pictures = this.pictures;
     return (
       key: holder.account,
-      name: names[seat],
+      name: seatNames[seat] ?? words.seatNumber(seat + 1),
       picture: picture,
+      blocked: _blocked(holder.account),
       hidden: picture != null && pictures != null && pictures.isHidden(holder.account),
       flagged: picture != null && pictures != null && pictures.wasFlagged(holder.account, picture),
     );
@@ -858,9 +870,10 @@ class LiveController extends ChangeNotifier implements TableModel {
   /// last. A bot's seat has no key to say one with.
   void _heardReaction(HeardReaction heard) {
     if (_disposed) return;
+    // A blocked player's reactions are not heard.
     final seated = {
       for (final (seat, holder) in client.holders.indexed)
-        if (holder is HumanSeat && seat != client.mySeat) holder.key: seat,
+        if (holder is HumanSeat && seat != client.mySeat && !_blocked(holder.account)) holder.key: seat,
     };
     final shown = _reactionRules.hear(heard, seated: seated, hand: client.game.handNumber);
     if (shown != null) _showReaction(shown.seat, shown.reaction);

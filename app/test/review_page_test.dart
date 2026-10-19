@@ -14,6 +14,7 @@ import 'package:open_hearts/net/in_use.dart';
 import 'package:open_hearts/net/record_check.dart';
 import 'package:open_hearts/net/remote_config.dart' show waits;
 import 'package:open_hearts/net/watching.dart';
+import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/review_page.dart';
 import 'package:open_hearts/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,12 +41,13 @@ void main() {
     await checkRecord(kept).forEach(checked.add);
   });
 
-  Future<void> pumpReview(WidgetTester tester, KeptGame? record) async {
+  Future<void> pumpReview(WidgetTester tester, KeptGame? record, {Pictures? pictures}) async {
     tester.view
       ..physicalSize = const Size(390, 1600)
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: ReviewPage(table: played.spec.id, load: (_) async => record)));
+    await tester.pumpWidget(
+        MaterialApp(theme: buildTheme(), home: ReviewPage(table: played.spec.id, load: (_) async => record, pictures: pictures ?? Pictures())));
     await tester.pump();
     await tester.pump();
     await tester.pumpAndSettle();
@@ -61,6 +63,17 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Hand 4'));
     await tester.pumpAndSettle();
     expect(find.text('Hand 4  ·  No pass'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a player this device blocked is shown by no name, in every hand', (tester) async {
+    final bao = (played.spec.seats[1] as HumanSeat).account;
+    await pumpReview(tester, kept, pictures: Pictures(blocked: {bao}));
+    expect(find.textContaining('Bao'), findsNothing);
+    expect(find.text('Blocked player'), findsWidgets);
+    for (final name in ['Ada', 'Cy', 'Dee']) {
+      expect(find.text(name), findsWidgets, reason: name);
+    }
     expect(tester.takeException(), isNull);
   });
 

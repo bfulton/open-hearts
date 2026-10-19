@@ -824,6 +824,21 @@ class AppLocalizationsEs extends AppLocalizations {
       'La denuncia no se ha enviado. Inténtalo de nuevo o escribe a help@openhearts.game.';
 
   @override
+  String blockPlayer(String name) {
+    return 'Bloquear a $name';
+  }
+
+  @override
+  String get unblockPlayer => 'Desbloquear';
+
+  @override
+  String get blockedPlayer => 'Persona bloqueada';
+
+  @override
+  String get blockNote =>
+      'Solo en este dispositivo: no verás su nombre, su imagen ni sus reacciones. No se le avisa.';
+
+  @override
   String get waitingToReconnect => 'Esperando a que los demás se reconecten';
 
   @override

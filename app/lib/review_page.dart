@@ -35,6 +35,7 @@ import 'net/record_check.dart';
 import 'net/remote_config.dart' show waits;
 import 'net/report_error.dart';
 import 'net/watching.dart';
+import 'pictures.dart';
 import 'reaction_mute.dart';
 import 'subscribe_page.dart';
 import 'table_model.dart' show SeatReaction;
@@ -44,7 +45,7 @@ import 'ui/player_icon.dart';
 import 'ui/reactions.dart';
 
 class ReviewPage extends StatefulWidget {
-  const ReviewPage({super.key, required this.table, this.load = gameShownHere, this.check, this.watch});
+  const ReviewPage({super.key, required this.table, this.load = gameShownHere, this.check, this.watch, this.pictures});
 
   /// The table's id.
   final String table;
@@ -60,6 +61,10 @@ class ReviewPage extends StatefulWidget {
   /// How a game still being played is watched: [watchTable] unless a
   /// test says otherwise.
   final Stream<Watched> Function(String table)? watch;
+
+  /// Who this device blocked (pictures.dart): read from the device
+  /// unless a test gives it.
+  final Pictures? pictures;
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
@@ -121,6 +126,10 @@ class _ReviewPageState extends State<ReviewPage> {
   final Map<int, ({SeatReaction shown, Timer gone})> _reacting = {};
   int _reactions = 0;
 
+  /// Who this device blocked: shown by no name, and not heard.
+  Pictures? _pictures;
+  bool _blocked(String? account) => account != null && (_pictures?.isBlocked(account) ?? false);
+
   @override
   void dispose() {
     _checking?.cancel();
@@ -142,6 +151,12 @@ class _ReviewPageState extends State<ReviewPage> {
     InUse.current.addListener(_inUse);
     ReactionMute.current.addListener(_muted);
     unawaited(ReactionMute.current.load());
+    _pictures = widget.pictures;
+    if (_pictures == null) {
+      unawaited(Pictures.load().then((p) {
+        if (mounted) setState(() => _pictures = p);
+      }));
+    }
     _check();
   }
 
@@ -155,7 +170,13 @@ class _ReviewPageState extends State<ReviewPage> {
   void _heardReaction(HeardReaction heard) {
     final shown = _shown;
     if (shown is! _Live) return;
-    final r = _reactionRules.hear(heard, seated: shown.view.seated, hand: shown.view.hand);
+    // A blocked player's reactions are not heard.
+    final accounts = shown.view.accounts;
+    final seated = {
+      for (final MapEntry(key: key, value: seat) in shown.view.seated.entries)
+        if (!_blocked(accounts?[seat])) key: seat,
+    };
+    final r = _reactionRules.hear(heard, seated: seated, hand: shown.view.hand);
     if (r == null) return;
     _reacting.remove(r.seat)?.gone.cancel();
     final seat = r.seat;
@@ -327,7 +348,7 @@ class _ReviewPageState extends State<ReviewPage> {
   Widget _review(BuildContext context, _Game g) {
     final l10n = context.l10n;
     final spec = g.game.spec;
-    String nameOf(int seat) => _seatName(l10n, g.game, seat);
+    String nameOf(int seat) => _seatName(l10n, g.game, seat, _blocked);
     String seedOf(int seat) => switch (spec.seats[seat]) {
       BotSeat(:final persona) => persona.name,
       HumanSeat(:final account) => account,
@@ -413,7 +434,7 @@ class _ReviewPageState extends State<ReviewPage> {
             // The hand itself: made once for each hand as it is checked, so
             // the next hand's check arriving rebuilds the page around it and
             // not its hundred cards.
-            _handRows[hand] ??= _HandRows(key: ValueKey(hand.number), game: g.game, hand: hand),
+            _handRows[hand] ??= _HandRows(key: ValueKey(hand.number), game: g.game, hand: hand, blocked: _blocked),
           ],
         ],
       ),
@@ -425,11 +446,13 @@ class _ReviewPageState extends State<ReviewPage> {
   /// cards trick by trick. No hand is shown; nobody watching sees one.
   Widget _live(BuildContext context, WatchedTable v) {
     final l10n = context.l10n;
+    // A player this device blocked, by no name.
+    String nameAt(int seat) => _blocked(v.accounts?[seat]) ? l10n.blockedPlayer : v.names[seat];
     final tricks = [for (var i = 0; i < v.plays.length; i += seatCount) v.plays.sublist(i, min(i + seatCount, v.plays.length))];
     final what = switch (v.phase) {
       Phase.dealing => l10n.dealingNow,
       Phase.passing => l10n.passingNow,
-      _ => v.toPlay == null ? null : l10n.toPlayNow(v.names[v.toPlay!]),
+      _ => v.toPlay == null ? null : l10n.toPlayNow(nameAt(v.toPlay!)),
     };
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -458,11 +481,11 @@ class _ReviewPageState extends State<ReviewPage> {
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(
                 children: [
-                  PlayerIcon(name: v.names[s], seed: v.names[s], size: 26),
+                  PlayerIcon(name: nameAt(s), seed: nameAt(s), size: 26),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      v.names[s],
+                      nameAt(s),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -477,7 +500,7 @@ class _ReviewPageState extends State<ReviewPage> {
                       padding: const EdgeInsets.only(right: 10),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 150, maxHeight: 30),
-                        child: ReactionBubble(key: ValueKey(r.n), reaction: r.reaction, name: v.names[s], tail: AxisDirection.left),
+                        child: ReactionBubble(key: ValueKey(r.n), reaction: r.reaction, name: nameAt(s), tail: AxisDirection.left),
                       ),
                     ),
                   if (v.taken[s] > 0)
@@ -506,12 +529,12 @@ class _ReviewPageState extends State<ReviewPage> {
                   for (final p in trick)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: _Pip(card: p.card, by: v.names[p.seat], taken: trick.length == seatCount && p.seat == _takerOf(trick)),
+                      child: _Pip(card: p.card, by: nameAt(p.seat), taken: trick.length == seatCount && p.seat == _takerOf(trick)),
                     ),
                   if (trick.length == seatCount)
                     Expanded(
                       child: Text(
-                        v.names[_takerOf(trick)],
+                        nameAt(_takerOf(trick)),
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12.5, color: Palette.chromeDim),
                       ),
@@ -538,9 +561,11 @@ class _ReviewPageState extends State<ReviewPage> {
 }
 
 /// What a seat is called in [game]: a bot by its persona, a person by
-/// the name their device gave, or by the seat.
-String _seatName(AppLocalizations l10n, KeptGame game, int seat) => switch (game.spec.seats[seat]) {
+/// the name their device gave, or by the seat; a person this device
+/// [blocked], by no name.
+String _seatName(AppLocalizations l10n, KeptGame game, int seat, bool Function(String account) blocked) => switch (game.spec.seats[seat]) {
   BotSeat(:final persona) => persona.name,
+  HumanSeat(:final account) when blocked(account) => l10n.blockedPlayer,
   HumanSeat() => game.names[seat] ?? l10n.seatPlayer(seat + 1),
 };
 
@@ -554,10 +579,13 @@ String _seatName(AppLocalizations l10n, KeptGame game, int seat) => switch (game
 /// the page around them. Between two frames the page answers whatever
 /// has been waiting: a tap, the next hand's check.
 class _HandRows extends StatefulWidget {
-  const _HandRows({super.key, required this.game, required this.hand});
+  const _HandRows({super.key, required this.game, required this.hand, required this.blocked});
 
   final KeptGame game;
   final TableReplayHand hand;
+
+  /// Whether this device blocked an account (pictures.dart).
+  final bool Function(String account) blocked;
 
   /// About as many cards as one frame draws of the hand.
   static const cardsAFrame = 16;
@@ -597,7 +625,7 @@ class _HandRowsState extends State<_HandRows> {
   List<({Widget row, int cards})> _rows(BuildContext context) {
     final l10n = context.l10n;
     final hand = widget.hand;
-    String nameOf(int seat) => _seatName(l10n, widget.game, seat);
+    String nameOf(int seat) => _seatName(l10n, widget.game, seat, widget.blocked);
     return [
       // Each seat's thirteen as dealt; what it passed, marked.
       if (hand.dealt case final dealt?)

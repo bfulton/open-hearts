@@ -831,6 +831,21 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Meldung ist nicht angekommen. Versuch es noch einmal oder schreib an help@openhearts.game.';
 
   @override
+  String blockPlayer(String name) {
+    return '$name blockieren';
+  }
+
+  @override
+  String get unblockPlayer => 'Blockierung aufheben';
+
+  @override
+  String get blockedPlayer => 'Blockierte Person';
+
+  @override
+  String get blockNote =>
+      'Nur auf diesem Gerät: Du siehst Namen, Bild und Reaktionen dieser Person nicht mehr. Sie erfährt davon nichts.';
+
+  @override
   String get waitingToReconnect =>
       'Warte, bis die anderen wieder verbunden sind';
 

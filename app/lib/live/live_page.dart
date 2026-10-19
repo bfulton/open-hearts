@@ -128,15 +128,17 @@ class _LivePageState extends State<LivePage> {
   }
 
   /// Holding another player's badge: what this device does with their
-  /// picture, if they chose one (pictures.dart), and reporting them to
-  /// the people who run the game (report.dart). Nothing to offer for a
-  /// bot or for your own seat.
+  /// picture, if they chose one, blocking them (pictures.dart), and
+  /// reporting them to the people who run the game (report.dart).
+  /// Nothing to offer for a bot or for your own seat. A blocked
+  /// player's name is not shown here either.
   Future<void> _aboutPlayer(int seat) async {
     final about = _c.playerAt(seat);
     if (about == null) return;
     final pictures = _c.pictures;
     final picture = about.picture;
     final showIt = about.hidden || about.flagged;
+    final shown = about.blocked ? context.l10n.blockedPlayer : about.name;
     final chosen = await showModalBottomSheet<_AboutPlayer>(
       context: context,
       backgroundColor: Felt.mid,
@@ -148,7 +150,7 @@ class _LivePageState extends State<LivePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (picture != null && pictures != null) ...[
+              if (picture != null && pictures != null && !about.blocked) ...[
                 if (about.flagged)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -175,8 +177,24 @@ class _LivePageState extends State<LivePage> {
               TextButton(
                 onPressed: () => Navigator.of(sheet).pop(_AboutPlayer.report),
                 style: TextButton.styleFrom(foregroundColor: Palette.danger),
-                child: Text(sheet.l10n.reportPlayer(about.name), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                child: Text(sheet.l10n.reportPlayer(shown), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               ),
+              if (pictures != null) ...[
+                TextButton(
+                  onPressed: () => Navigator.of(sheet).pop(about.blocked ? _AboutPlayer.unblock : _AboutPlayer.block),
+                  style: TextButton.styleFrom(foregroundColor: about.blocked ? Palette.gold : Palette.danger),
+                  child: Text(
+                    about.blocked ? sheet.l10n.unblockPlayer : sheet.l10n.blockPlayer(about.name),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if (!about.blocked)
+                  Text(
+                    sheet.l10n.blockNote,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
+                  ),
+              ],
             ],
           ),
         ),
@@ -190,8 +208,13 @@ class _LivePageState extends State<LivePage> {
         await pictures?.show(about.key);
       case _AboutPlayer.hidePicture:
         await pictures?.hide(about.key);
+      case _AboutPlayer.block:
+        await pictures?.block(about.key);
+      case _AboutPlayer.unblock:
+        await pictures?.unblock(about.key);
       case _AboutPlayer.report:
-        await showReport(context, about: about.key, name: about.name, picture: picture, table: _c.client.spec.id, send: widget.report);
+        await showReport(context,
+            about: about.key, name: about.name, shown: shown, picture: picture, table: _c.client.spec.id, send: widget.report);
     }
   }
 
@@ -531,4 +554,4 @@ class _Replaced extends StatelessWidget {
 }
 
 /// What the sheet holding a player's badge opens can be asked to do.
-enum _AboutPlayer { showPicture, hidePicture, report }
+enum _AboutPlayer { showPicture, hidePicture, block, unblock, report }

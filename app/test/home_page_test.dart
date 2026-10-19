@@ -20,6 +20,7 @@ import 'package:open_hearts/identity.dart';
 import 'package:open_hearts/live/lobby.dart';
 import 'package:open_hearts/net/network.dart';
 import 'package:open_hearts/net/room.dart';
+import 'package:open_hearts/pictures.dart';
 import 'package:open_hearts/router.dart';
 import 'package:open_hearts/table_page.dart';
 import 'package:open_hearts/theme.dart';
@@ -282,6 +283,32 @@ void main() {
     expect(find.text('Ada (you)'), findsOneWidget);
     expect(find.text('Share the link'), findsOneWidget);
     expect(find.textContaining('KP4T9MXR'), findsNothing, reason: 'the link is the way in; the code is not for reading off a screen');
+    room.dispose();
+  });
+
+  testWidgets('in a room, a member this device blocked is shown by no name', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final bus = Bus();
+    final room = Room(channel: bus.attach(FakeSigner('a')), code: 'KP4T9MXR', myName: 'Ada');
+    final bao = Room(channel: bus.attach(FakeSigner('b')), code: 'KP4T9MXR', myName: 'Bao');
+    await tester.pumpWidget(still(Scaffold(
+      body: ListenableBuilder(
+        listenable: room,
+        builder: (_, _) =>
+            RoomView(room: room, ledger: null, pictures: Pictures(blocked: {FakeSigner('b').publicKey}), onLeave: () {}, onShare: () {}),
+      ),
+    )));
+    for (var i = 0; i < 10 && room.members.length < 2; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(room.members, hasLength(2), reason: 'Bao is in the room');
+    expect(find.text('Ada (you)'), findsOneWidget);
+    expect(find.text('Blocked player'), findsOneWidget);
+    expect(find.textContaining('Bao'), findsNothing);
+    bao.dispose();
     room.dispose();
   });
 

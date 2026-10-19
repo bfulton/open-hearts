@@ -71,9 +71,11 @@ String pictureDigest(Uint8List jpeg) => sha256Hex(jpeg);
 
 /// Asks what is wrong with [name]'s account [about], and sends it with
 /// [send]; says how it went. [picture] is theirs as this device shows
-/// it, if any: only then can it be what is reported.
+/// it, if any: only then can it be what is reported. [shown] is what
+/// the sheet calls them, where that is not their name: a player this
+/// device blocked.
 Future<void> showReport(BuildContext context,
-    {required String about, required String name, Uint8List? picture, String? table, ReportSender send = sendReport}) async {
+    {required String about, required String name, String? shown, Uint8List? picture, String? table, ReportSender send = sendReport}) async {
   final messenger = ScaffoldMessenger.of(context);
   final l10n = context.l10n;
   final report = await showModalBottomSheet<Report>(
@@ -81,7 +83,7 @@ Future<void> showReport(BuildContext context,
     isScrollControlled: true,
     backgroundColor: Felt.mid,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (sheet) => _ReportSheet(about: about, name: name, picture: picture, table: table),
+    builder: (sheet) => _ReportSheet(about: about, name: name, shown: shown ?? name, picture: picture, table: table),
   );
   if (report == null) return;
   final sent = await send(report);
@@ -101,10 +103,11 @@ Future<void> showReport(BuildContext context,
 }
 
 class _ReportSheet extends StatefulWidget {
-  const _ReportSheet({required this.about, required this.name, required this.picture, required this.table});
+  const _ReportSheet({required this.about, required this.name, required this.shown, required this.picture, required this.table});
 
   final String about;
   final String name;
+  final String shown;
   final Uint8List? picture;
   final String? table;
 
@@ -150,7 +153,7 @@ class _ReportSheetState extends State<_ReportSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(l10n.reportPlayer(widget.name), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              Text(l10n.reportPlayer(widget.shown), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               Text(l10n.reportWhat, style: const TextStyle(fontSize: 13, color: Palette.chromeDim)),
               RadioGroup<ReportWhat>(

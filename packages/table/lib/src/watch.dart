@@ -47,6 +47,7 @@ class WatchedTable {
     this.toPlay,
     this.winners = const [],
     this.keys,
+    this.accounts,
   });
 
   final String table;
@@ -82,6 +83,11 @@ class WatchedTable {
   /// which seat. Null from a player's device that does not say.
   final List<PublicKey?>? keys;
 
+  /// The account in each seat held in person, null for a bot's: whom a
+  /// watcher's device blocked, if anyone (app/lib/pictures.dart), is
+  /// matched by these. Null from a player's device that does not say.
+  final List<String?>? accounts;
+
   bool get over => phase == Phase.gameOver;
 
   /// What [client] shows anyone at its table now, with [names] by seat.
@@ -111,6 +117,10 @@ class WatchedTable {
         for (final h in client.holders)
           if (h is HumanSeat) h.key else null,
       ],
+      accounts: [
+        for (final h in client.holders)
+          if (h is HumanSeat) h.account else null,
+      ],
     );
   }
 
@@ -135,6 +145,7 @@ class WatchedTable {
     if (toPlay != null) 'toPlay': toPlay,
     if (winners.isNotEmpty) 'winners': winners,
     if (keys != null) 'keys': keys,
+    if (accounts != null) 'accounts': accounts,
   };
 
   /// [json] as a view of [table], or null for anything else.
@@ -165,6 +176,8 @@ class WatchedTable {
       if (winners.any((w) => w < 0 || w >= seatCount)) return null;
       final keys = m['keys'] == null ? null : [for (final k in m['keys'] as List) k as String?];
       if (keys != null && (keys.length != seatCount || keys.any((k) => k != null && !_key.hasMatch(k)))) return null;
+      final accounts = m['accounts'] == null ? null : [for (final a in m['accounts'] as List) a as String?];
+      if (accounts != null && (accounts.length != seatCount || accounts.any((a) => a != null && !_account.hasMatch(a)))) return null;
       return WatchedTable(
         table: table,
         target: m['target'] as int,
@@ -178,6 +191,7 @@ class WatchedTable {
         toPlay: toPlay,
         winners: winners,
         keys: keys,
+        accounts: accounts,
       );
     } catch (_) {
       return null;
@@ -185,6 +199,9 @@ class WatchedTable {
   }
 
   static final _key = RegExp(r'^[0-9a-f]{64}$');
+
+  /// An account, or a device's key where no account names one.
+  static final _account = RegExp(r'^[0-9a-f]{32}([0-9a-f]{32})?$');
 }
 
 /// A seated player's side of watching: answers whoever says they are

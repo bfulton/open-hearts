@@ -970,6 +970,27 @@
   "@reportFailed": {
     "description": "When a report could not be sent."
   },
+  "blockPlayer": "Block {name}",
+  "@blockPlayer": {
+    "description": "Button: block another player on this device.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "unblockPlayer": "Unblock",
+  "@unblockPlayer": {
+    "description": "Button, on a blocked player: show them again on this device."
+  },
+  "blockedPlayer": "Blocked player",
+  "@blockedPlayer": {
+    "description": "Shown in place of the name of a player this device blocked."
+  },
+  "blockNote": "On this device only: you won't see their name, picture or reactions. They aren't told.",
+  "@blockNote": {
+    "description": "Under the block button: what blocking does."
+  },
   "waitingToReconnect": "Waiting for the others to reconnect",
   "@waitingToReconnect": {
     "description": "Under the table while the game is paused."
