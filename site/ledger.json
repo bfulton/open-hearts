@@ -16,6 +16,23 @@
         "de": "Die Bedingungen, wie sie am 16. Oktober 2026 veröffentlicht wurden; hier beginnt diese Aufzeichnung.",
         "fr": "Les conditions telles que publiées le 16 octobre 2026, point de départ de ce registre."
       }
+    },
+    {
+      "date": "2026-10-19",
+      "fingerprint": "f8f04273fdb2501e1a88ccf3a98f52bffbbc4f01324868c33733d95ec8ca9303",
+      "change": "material",
+      "price": {
+        "amount": 599,
+        "currency": "usd"
+      },
+      "storesNotified": null,
+      "summary": {
+        "en": "Bright Fulton LLC now runs Open Hearts; Link, Stripe's affiliate, sells web subscriptions. A change applies from your renewal 30 days after we tell you. Disputes: talk first, then the courts in Charleston, SC. New: reporting, blocking and deleting your account in the app.",
+        "es": "Bright Fulton LLC gestiona ahora Open Hearts; Link, filial de Stripe, vende las suscripciones web. Un cambio se aplica desde tu renovación 30 días tras avisarte. Disputas: primero hablarlo, luego los tribunales de Charleston (SC). Nuevo: denunciar, bloquear y eliminar tu cuenta.",
+        "pt": "A Bright Fulton LLC agora opera o Open Hearts; a Link, afiliada da Stripe, vende as assinaturas web. Uma mudança vale a partir da renovação 30 dias após o aviso. Disputas: primeiro conversar, depois os tribunais de Charleston (SC). Novo: denunciar, bloquear e excluir a conta.",
+        "de": "Open Hearts betreibt jetzt die Bright Fulton LLC; Link, ein Stripe-Unternehmen, verkauft Web-Abos. Eine Änderung gilt ab der Verlängerung 30 Tage nach unserer Nachricht. Streit: erst reden, dann Gerichte in Charleston (SC). Neu: melden, blockieren, Konto in der App löschen.",
+        "fr": "Bright Fulton LLC exploite désormais Open Hearts ; Link, filiale de Stripe, vend les abonnements web. Un changement vaut au renouvellement 30 jours après notre avis. Litiges : d'abord à l'amiable, puis à Charleston (SC). Nouveau : signaler, bloquer, supprimer votre compte."
+      }
     }
   ],
   "privacy": [
@@ -30,6 +47,19 @@
         "pt": "A política de privacidade como publicada em 13 de outubro de 2026, onde este registro começa.",
         "de": "Die Datenschutzerklärung, wie sie am 13. Oktober 2026 veröffentlicht wurde; hier beginnt diese Aufzeichnung.",
         "fr": "La politique de confidentialité telle que publiée le 13 octobre 2026, point de départ de ce registre."
+      }
+    },
+    {
+      "date": "2026-10-19",
+      "fingerprint": "43eef086c3b08b162c3dece6d0a5a7d510c108d5b7a69c6020da90974c872aad",
+      "change": "material",
+      "storesNotified": null,
+      "summary": {
+        "en": "Pictures you show are copied, checked automatically and looked at by us, and one that seems to break the rules is hidden. Reports reach us by email. You can block players on your device and delete your account in the app. What the law has us report is kept a year.",
+        "es": "Las imágenes que muestras se copian, se revisan automáticamente y las miramos; si parece romper las reglas, se oculta. Las denuncias llegan por correo. Puedes bloquear jugadores en tu dispositivo y eliminar tu cuenta en la app. Lo que la ley obliga a denunciar se guarda un año.",
+        "pt": "As imagens que você mostra são copiadas, verificadas automaticamente e vistas por nós; uma que pareça violar as regras é ocultada. Denúncias chegam por e-mail. Você pode bloquear jogadores no seu aparelho e excluir a conta no app. O que a lei manda denunciar fica guardado um ano.",
+        "de": "Bilder, die du zeigst, werden kopiert, automatisch geprüft und von uns angesehen; eines, das gegen die Regeln zu verstoßen scheint, wird verborgen. Meldungen kommen per E-Mail. Du kannst Spieler auf deinem Gerät blockieren und dein Konto löschen. Meldepflichtiges bleibt ein Jahr.",
+        "fr": "Les images montrées sont copiées, vérifiées automatiquement et examinées par nous ; celle qui semble enfreindre les règles est masquée. Les signalements arrivent par e-mail. Vous pouvez bloquer des joueurs et supprimer votre compte. Ce que la loi oblige à signaler reste un an."
       }
     }
   ]
