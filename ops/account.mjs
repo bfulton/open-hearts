@@ -10,8 +10,8 @@ import { endNow, inStripe, inTheStore, money, refund as refundIn, refundFor, res
 import { accountOf, findAccounts } from '../service/tool/find.mjs';
 import { forget } from '../service/tool/forget.mjs';
 import { carry, standing, wouldDo } from '../service/tool/suspend.mjs';
-import { HOLD_DAYS, Held, heldPictureKey, heldPicturesPrefix, hold, holdRow, isReportRef } from '../service/functions/holds.mjs';
-import { copyKey, pictureNamed, seenKey } from '../service/functions/pictures.mjs';
+import { HOLD_DAYS, Held, heldPictureKey, heldPicturesPrefix, hold, holdRow, isReportRef, keepHeldPictures } from '../service/functions/holds.mjs';
+import { pictureNamed, seenKey } from '../service/functions/pictures.mjs';
 import { anonymizeGames } from '../service/functions/records.mjs';
 import { dayAfter, dayOf } from '../service/functions/rows.mjs';
 
@@ -192,25 +192,15 @@ export async function holdAccount(ctx, { args, flags }) {
   if (stands.hold) ctx.log(`  already held${ref && !stands.hold.ref ? `; would add report ${ref}` : ''}`);
   else ctx.log(`  would hold its data until at least ${dayAfter(ctx.now(), HOLD_DAYS)}: nothing deletes it, or puts back what was taken off it, until it is released`);
   const pictures = await ctx.pictures();
-  const putOut = seenKey(account, '');
-  const digests = (await pictures.list(putOut)).map((k) => k.slice(putOut.length));
-  ctx.log(`  and would keep a copy of each picture it put out in the last 30 days, ${digests.length} now, at ${heldPicturesPrefix(account)} in the bucket of kept games, until the hold is released`);
+  const putOut = (await pictures.list(seenKey(account, ''))).length;
+  ctx.log(`  and would keep a copy of each picture it put out in the last 30 days, ${putOut} now, at ${heldPicturesPrefix(account)} in the bucket of kept games, until the hold is released`);
   if (!flags.apply) return ctx.log('nothing changed; --apply does it');
   const row = await hold(store, account, { ref, now: ctx.now() });
   ctx.log(`held: ${new Held(row).message}`);
-  const records = ctx.bucket();
-  let kept = 0;
-  for (const digest of digests) {
-    const jpeg = await pictures.read(copyKey(digest));
-    if (!jpeg) {
-      ctx.warn(`no copy left of picture ${digest}`);
-      continue;
-    }
-    await records.write(heldPictureKey(account, digest), jpeg, 'image/jpeg');
-    ctx.log(`kept ${heldPictureKey(account, digest)}`);
-    kept++;
-  }
-  ctx.log(`kept ${kept} picture(s) at ${heldPicturesPrefix(account)}`);
+  const { kept, gone } = await keepHeldPictures(pictures, ctx.bucket(), account);
+  for (const digest of gone) ctx.warn(`no copy left of picture ${digest}`);
+  for (const digest of kept) ctx.log(`kept ${heldPictureKey(account, digest)}`);
+  ctx.log(`kept ${kept.length} picture(s) at ${heldPicturesPrefix(account)}`);
 }
 
 /// A hold released, once its year is out; what it kept is then the

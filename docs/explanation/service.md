@@ -717,6 +717,12 @@ While there are few subscribers, the operator is emailed about each one
   (`waiting`), so that someone can come and play. Told at most once per
   subscription in a while (`WAITING_MINUTES`).
 
+Whatever the flags say, a failure in the automatic handling of known
+images of child sexual abuse is told too (`alertKnownProblem`), at most
+once in six hours for each kind, since a legal duty may hang on it
+([relay](relay.md#known-images-of-child-sexual-abuse)); and each match
+that handling acts on is emailed with what it did.
+
 The mail says which store or pool, the first characters of the
 subscription and device, and dates. It never includes an email address
 or name. It goes to `alerts@openhearts.game`, which forwards to where

@@ -38,8 +38,9 @@ import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tag
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
 import { hidePictures, pictureKeeper, reviewRun } from './review.mjs';
+import { KNOWN_OBJECT, KnownPictures as KnownObject, knownAsker, knownScreen } from './known.mjs';
 import { PICTURES_ROW } from '../functions/pictures.mjs';
-import { alertsOf } from '../functions/alerts.mjs';
+import { alertKnownProblem, alertsOf } from '../functions/alerts.mjs';
 import { storeOf } from '../functions/rows.mjs';
 import { Bench as BenchObject, callIn } from './bench.mjs';
 import { withConfig } from '../functions/deployment.mjs';
@@ -57,6 +58,14 @@ export { Household } from '../functions/household.mjs';
 // The backup jurors, a Cloudflare Container started when a table
 // calls for a juror and nobody is there (bench.mjs).
 export class Bench extends BenchObject {
+  constructor(state, env = {}) {
+    super(state, withConfig(env, config));
+  }
+}
+
+/// Where PhotoDNA is asked about each new picture, and a match acted on
+/// (known.mjs): one object, kept in the United States.
+export class KnownPictures extends KnownObject {
   constructor(state, env = {}) {
     super(state, withConfig(env, config));
   }
@@ -90,6 +99,17 @@ export class TagRelay {
       hide: store ? (digest) => hidePictures(store, [digest]) : null,
       log: (line) => console.log(line),
     });
+    // Each new picture checked against known images of child sexual
+    // abuse before it is carried, where the deployment has PhotoDNA's
+    // key (known.mjs).
+    const ask = knownAsker(this.env);
+    this.known = ask
+      ? knownScreen({
+          ask,
+          log: (line) => console.log(line),
+          failed: (error) => this.state.waitUntil(alertKnownProblem(this.env, store, { what: 'unreachable', error })),
+        })
+      : null;
   }
 
   /// An event the relay took, from [who]: a picture copied for the
@@ -142,6 +162,7 @@ export class TagRelay {
       store: await kept.load(),
       kept: (event, gone) => this.state.waitUntil(kept.keep(event, gone)),
       withhold: (event) => this.pictures.withheld(event),
+      screen: this.known,
       forget: (event) => this.state.waitUntil(kept.forget(event)),
       gate: this.gate(verify, tag),
     });
@@ -250,11 +271,27 @@ export class TagRelay {
 }
 
 export default {
-  /// Once a day (wrangler.toml, crons): the pictures kept since the last
-  /// run emailed to the operator, if the config asks for it, and the
-  /// copies nobody has put out for 30 days deleted (review.mjs).
+  /// Once a day (wrangler.toml, crons): anything left to do after a
+  /// PhotoDNA match tried again (known.mjs); and the pictures kept since
+  /// the last run emailed to the operator, if the config asks for it,
+  /// and the copies nobody has put out for 30 days deleted (review.mjs).
   async scheduled(controller, env, ctx) {
     const e = withConfig(env, config);
+    if (knownAsker(e)) {
+      const us = e.KNOWN.jurisdiction('us');
+      ctx.waitUntil(
+        us
+          .get(us.idFromName(KNOWN_OBJECT))
+          .fetch('https://known/wake', { method: 'POST' })
+          .then((res) => {
+            if (!res.ok) throw new Error(`said ${res.status}`);
+          })
+          .catch((err) => {
+            console.log(`known pictures not woken: ${err}`);
+            return alertKnownProblem(e, storeOf(e), { what: 'wake', error: `the daily run could not reach the object that acts on matches: ${err?.message ?? err}` });
+          }),
+      );
+    }
     const alerts = alertsOf(e);
     const store = storeOf(e);
     if (!alerts?.pictures || !e.OH_PICTURES || !e.EMAIL || !store) return;

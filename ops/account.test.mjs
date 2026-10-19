@@ -314,7 +314,7 @@ test('found by a picture: by its SHA-256 or its copy\'s address, each account th
   const both = [`${account}: put the picture out; its profile picture now`, `${other}: put the picture out; not its profile picture now`, '2 account(s)'];
   assert.deepEqual(await found(a), both);
   assert.deepEqual(await found(a.toUpperCase()), both);
-  assert.deepEqual(await found(`https://pictures.openhearts.game/review/${a}.jpg`), both, 'as the CSAM Scanning Tool gives it');
+  assert.deepEqual(await found(`https://pictures.openhearts.game/review/${a}.jpg`), both, "by its copy's address");
   assert.deepEqual(await found(`/review/${a}.jpg`), both);
   assert.deepEqual(await found(b), [`${other}: put the picture out; its profile picture now`, '1 account(s)']);
   assert.deepEqual(await found('cd'.repeat(32)), ['0 account(s)'], 'a picture nobody put out');

@@ -5,11 +5,10 @@
 // at once, and taken down after if it has to be (`oh account remove`).
 //
 // The first time a tag's object carries a picture, it writes a copy to
-// a bucket served at pictures.openhearts.game, through Cloudflare's
-// cache, where Cloudflare's CSAM Scanning Tool checks it against the
-// lists of known child sexual abuse images; and the first time it
-// carries a picture from an account, it notes that the account put it
-// out. As the copy is made, a model looks at the picture, and one that
+// a bucket served at pictures.openhearts.game, for the email to show;
+// and the first time it carries a picture from an account, it notes
+// that the account put it out. (A picture that matches a known image
+// of child sexual abuse is never carried, so never copied: known.mjs.) As the copy is made, a model looks at the picture, and one that
 // shows nudity or sexual content, violence or gore, or a hate symbol is
 // hidden at once: withheld at the relay as a picture the operator took
 // down is (service/functions/pictures.mjs). Once a day the worker's

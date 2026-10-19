@@ -2,13 +2,12 @@
 
 Use this guide when the daily email of new pictures arrives, and once before the first one, to set it up.
 
-Every picture a subscriber puts out at a live table is shown at once. An automatic check looks at each new one, and hides one it takes for nudity or sexual content, violence or gore, or a hate symbol. Once a day, at 13:00 UTC, the relay worker emails you every picture each account put out since the last email, account by account, including any an account has since replaced, and what the check made of each ([how it works](../explanation/relay.md#pictures-to-look-at)). You look at them, take down any that break the terms' rules for a picture, and put back any the check hid by mistake.
+Every picture a subscriber puts out at a live table is shown at once. An automatic check looks at each new one, and hides one it takes for nudity or sexual content, violence or gore, or a hate symbol. Once a day, at 13:00 UTC, the relay worker emails you every picture each account put out since the last email, account by account, including any an account has since replaced, and what the check made of each ([how it works](../explanation/relay.md#pictures-to-look-at)). You look at them, take down any that break the terms' rules for a picture, and put back any the check hid by mistake. A picture that matches a known image of child sexual abuse is never in it: the relay withholds it before it is shown, and handles it without you ([Handle a report of child sexual abuse material](handle-abuse-material.md)).
 
 ## Before you begin
 
 Do this once:
 
-1. Turn on Cloudflare's CSAM Scanning Tool for the `openhearts.game` zone: in the dashboard, open the zone, then **Caching**, then **Configuration**, and turn on **CSAM Scanning Tool**. Give it the address the alerts go to. It checks each picture against the lists of known child sexual abuse images as it is first served from `pictures.openhearts.game` through Cloudflare's cache, which is when this email's pictures are first loaded: let your mail program load them. It blocks a match there, and once a day emails you the paths of what it matched ([Handle a report of child sexual abuse material](handle-abuse-material.md#find-the-account)).
 1. Check that `alerts.pictures` is `true` and `alerts.to` is your alerts address in `config/openhearts.json` ([Configuration](../reference/configuration.md#configopenheartsjson)).
 1. Export `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, as [Suspend an account](suspend-an-account.md#before-you-begin) describes, for the commands the email gives.
 

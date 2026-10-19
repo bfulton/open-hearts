@@ -400,7 +400,7 @@ test("toml: the relay's own wrangler.toml reads", () => {
   assert.deepEqual(wrangler.routes, [{ pattern: 'relay.openhearts.game', custom_domain: true }]);
   assert.deepEqual(
     wranglerBindings(wrangler).map((b) => `${b.type}:${b.name}`).sort(),
-    ['ai:AI', 'analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'r2_bucket:OH_PICTURES', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
+    ['ai:AI', 'analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:KNOWN', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'r2_bucket:OH_PICTURES', 'r2_bucket:OH_RECORDS', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
   );
 });
 
@@ -415,10 +415,12 @@ const liveRelay = () => ({
       { name: 'CF_VERSION_METADATA', type: 'version_metadata' },
       { name: 'EMAIL', type: 'send_email' },
       { class_name: 'Household', name: 'HOUSEHOLD', namespace_id: 'a1c3', type: 'durable_object_namespace' },
+      { class_name: 'KnownPictures', name: 'KNOWN', namespace_id: 'b2d4', type: 'durable_object_namespace' },
       { name: 'OH_JUROR_SECRET', type: 'secret_text' },
       { dataset: 'open_hearts_relay', name: 'OH_METRICS', type: 'analytics_engine' },
       { name: 'OH_MAIL_FROM', text: 'noreply@openhearts.game', type: 'plain_text' },
       { bucket_name: 'open-hearts-pictures', name: 'OH_PICTURES', type: 'r2_bucket' },
+      { bucket_name: 'open-hearts-records', name: 'OH_RECORDS', type: 'r2_bucket' },
       { name: 'OH_STORE', namespace_id: '5b65151de63341dc9f7a9d417c9b6a4e', type: 'kv_namespace' },
       { class_name: 'TagRelay', name: 'TABLE', namespace_id: '744b', type: 'durable_object_namespace' },
     ],
@@ -426,7 +428,7 @@ const liveRelay = () => ({
   secrets: ['OH_JUROR_SECRET'],
   domains: [{ hostname: 'relay.openhearts.game', service: 'open-hearts-relay', enabled: true }],
   subdomain: { enabled: false },
-  namespaces: ['TagRelay', 'Household', 'Bench'].map((c) => ({ script: 'open-hearts-relay', class: c })),
+  namespaces: ['TagRelay', 'Household', 'Bench', 'KnownPictures'].map((c) => ({ script: 'open-hearts-relay', class: c })),
   containers: [{ name: 'open-hearts-relay-bench', max_instances: 1 }],
 });
 
@@ -449,6 +451,14 @@ test('relay: each kind of drift is said', () => {
   for (const said of [/compatibility date/, /EMAIL .* not on the worker/, /CF_VERSION_METADATA .* not on the worker/, /OH_MAIL_FROM: text/, /EXTRA .* not in wrangler.toml/, /OH_JUROR_SECRET is not set/, /relay.openhearts.game is not attached/, /workers.dev address is on/, /namespace for Household/, /max_instances is 3/]) {
     assert.match(problems, said);
   }
+});
+
+test("relay: PhotoDNA's and NCMEC's secrets are nothing amiss, set or not; any other undefined one is", () => {
+  const live = liveRelay();
+  live.secrets = ['OH_JUROR_SECRET', 'OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'];
+  assert.deepEqual(relayProblems(wrangler, relay, live), []);
+  live.secrets.push('OH_OTHER');
+  assert.deepEqual(relayProblems(wrangler, relay, live), ['secret OH_OTHER is set but not defined (infra/cloudflare.mjs, relay.secrets)']);
 });
 
 test('relay: not deployed at all', () => {

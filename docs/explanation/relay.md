@@ -110,7 +110,25 @@ The line of 0.5 comes from trying the check on pictures the size the app sends, 
 
 Once a day the relay worker's schedule emails the operator every picture each account put out since the last email, account by account, in the order it put them out. A picture an account has since replaced is in it too, so putting a picture out and changing back before the email hides nothing. Each account's pictures come with what the check made of each and the commands that take them down or put back one hidden by mistake, and an email holds whole accounts, up to 100 pictures ([Look at the day's new pictures](../how-to/look-at-new-pictures.md)). The same run deletes the copies and notes nobody has put out for 30 days: what is still put out is written again every week or so, keeping what it first said, so it stays. It hides any picture in the email the check found should be hidden, in case hiding it as it was copied did not take, and keeps what the operator allowed allowed for as long as its copy is kept.
 
-The copies are served at `pictures.openhearts.game`, through Cloudflare's cache, so the email can show them, and so that Cloudflare's CSAM Scanning Tool checks each against the lists of known child sexual abuse images when it first enters the cache, which is when the email's pictures are first loaded. The tool blocks a match at that address and emails the operator once a day with the path of each match, whose file name is the picture's SHA-256; `oh account find` takes the path to the accounts that put the picture out, from the notes of each account's use. The picture at the relay is a different thing: it stops when the operator takes the picture down. A legal hold keeps a copy of each picture its account put out apart, in the bucket of kept games, which has no address, since the copies here go 30 days after a picture's last use ([Handle a report of child sexual abuse material](../how-to/handle-abuse-material.md)).
+The copies are served at `pictures.openhearts.game`, so the email can show them. A picture that matches a known image of child sexual abuse is never carried, so never copied ([known images](#known-images-of-child-sexual-abuse)).
+
+### Known images of child sexual abuse
+
+Before a tag's object carries a new picture, it asks Microsoft's PhotoDNA whether the picture matches a known image of child sexual abuse (`service/do/known.mjs`). Every object asks through one, `KnownPictures`, made in Cloudflare's `us` jurisdiction, so every request PhotoDNA gets comes from the United States. That object remembers what PhotoDNA said of each picture, and each tag's object remembers the pictures cleared, so a picture is asked about once. A match is answered as a picture the operator took down is, `withheld: this picture was taken down`, so the device is not told why, and it is neither stored, passed on, nor copied for the operator. What a tag already holds was asked about as it came, so it is not asked again.
+
+Everything after a match is done by the `KnownPictures` object, with nobody waiting on the operator:
+
+1. The picture is withheld wherever it turns up ([withheld pictures](#withheld-pictures)), even one the operator had put back.
+1. Each account that put it out is held for a year at the least ([Handle a report of child sexual abuse material](../how-to/handle-abuse-material.md)), with a copy of the picture and of every other picture it put out in the last 30 days in the records bucket, which no address serves.
+1. Each such account is terminated, by an order the service carries out in the account's turn, which also ends its web subscriptions in Stripe with nothing refunded (`orderRoute` in `service/functions/worker.mjs`).
+1. A report is filed to NCMEC's CyberTipline through its reporting API (`service/functions/ncmec.mjs`): the picture, when it was put out, the account's number, the name it played under, the key of the device that put it out, and that nobody at Open Hearts looked at it. The report's number is written on the hold.
+1. The operator is emailed what was done, and anything not done yet.
+
+Each step is written down as it is done, and the rest tried again by the object's alarm, a minute later and then twice as long each time, up to six hours, until all are. The operator is emailed again whenever what is done changes. If PhotoDNA does not answer, the picture is let through, so the game goes on, and asked about again on the same schedule; a match found then is acted on for every account that put it out, and the copy made meanwhile is deleted.
+
+Every failure emails the operator, at most once in six hours for each kind (`alertKnownProblem` in `service/functions/alerts.mjs`): PhotoDNA not answering, a tag's object unable to reach the `KnownPictures` object, a step that failed, the daily run unable to wake the object, the key set without PhotoDNA's address, and anything else that goes wrong in the object. Only a failure to send email is left to the logs.
+
+The check is off until the relay has the secret `OH_PHOTODNA_KEY` and the config's `photodna.endpoint` is set. Reports are filed once the relay also has `OH_NCMEC_USERNAME` and `OH_NCMEC_PASSWORD`, to the service `ncmec.endpoint` names ([Configuration](../reference/configuration.md#configopenheartsjson)). Until then, and while that is NCMEC's test service, the email says to report a match by hand.
 
 ## Reactions
 

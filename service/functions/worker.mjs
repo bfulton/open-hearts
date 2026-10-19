@@ -33,7 +33,7 @@ import { isAccount, storeOf } from './rows.mjs';
 import { S, notConfigured, openHouse, settle } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
 import { playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
-import { checkout, endAtStripe, endRefunded, manage, payerLookup, record, sameSite, webhookSigned } from './stripe.mjs';
+import { checkout, endAtStripe, endRefunded, manage, payerLookup, record, sameSite, webSubscriptionsOf, webhookSigned } from './stripe.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 import { SUSPENDED_WHY, isOrder, orderRow } from './suspension.mjs';
 import { LOCAL_TURN, mint } from './turn.mjs';
@@ -324,7 +324,11 @@ async function checkoutRoute(request, env) {
 /// (suspension.mjs), or, for a notice of a change to the terms, here
 /// (notices.mjs): `{order}`, the id the operator's tool wrote it under.
 /// The order is read here first, so a request that names none wakes no
-/// account's object.
+/// account's object. A termination the relay orders when PhotoDNA
+/// matches a picture (service/do/known.mjs) says `endWeb`: once the
+/// account is ended, so is each of its web subscriptions in Stripe,
+/// with nothing refunded, as for any serious breach. Stripe not
+/// answering is a 502, and the relay orders it again.
 async function orderRoute(request, env) {
   if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST' });
   const store = storeOf(env);
@@ -343,7 +347,15 @@ async function orderRoute(request, env) {
   }
   if (!order || !isAccount(order.account)) return json(request, 404, { error: 'no such order' });
   const { status, body } = await inHousehold(env, order.account, { op: 'order', account: order.account, order: id });
-  return json(request, status, body);
+  if (status !== 200 || order.act !== 'terminate' || order.endWeb !== true) return json(request, status, body);
+  const web = webSubscriptionsOf(await store.get(`ACCOUNT#${order.account}`, 'META'));
+  if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
+  try {
+    for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'terminated under the terms');
+  } catch {
+    return json(request, 502, { error: 'the shop is not answering' });
+  }
+  return json(request, 200, { ...body, endedWeb: web });
 }
 
 async function manageRoute(request, env) {
@@ -482,8 +494,7 @@ async function deleteRoute(request, env) {
   const account = await accountOfKey(store, asked.key);
   if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${asked.key}`))) return json(request, 404, { error: 'no account' });
   if (!(await holdOf(store, account))) {
-    const meta = await store.get(`ACCOUNT#${account}`, 'META');
-    const web = [meta?.subscription, ...(Array.isArray(meta?.before) ? meta.before : [])].filter((s) => typeof s === 'string' && s.startsWith('sub_'));
+    const web = webSubscriptionsOf(await store.get(`ACCOUNT#${account}`, 'META'));
     if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
     try {
       for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'account deleted');

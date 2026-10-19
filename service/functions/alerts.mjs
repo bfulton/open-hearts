@@ -120,6 +120,31 @@ export async function alertUnwritten(env, { account, keys, now = Date.now() }) {
   ].join('\n'));
 }
 
+/// How often one kind of failure in the automatic handling of known
+/// abuse images is told: once in six hours, so an outage is one email,
+/// not one a picture.
+export const KNOWN_PROBLEM_HOURS = 6;
+
+/// Something in the automatic handling of known images of child sexual
+/// abuse that did not work (service/do/known.mjs): [what] failed, and
+/// the [error]. Told whatever the switches say, as a legal duty may
+/// hang on it, at most once in KNOWN_PROBLEM_HOURS for each [what].
+/// Never throws.
+export async function alertKnownProblem(env, store, { what, error, now = Date.now() }) {
+  const alerts = alertsOf(env);
+  if (!alerts) return false;
+  try {
+    if (store && !(await fresh(store, 'known', what, KNOWN_PROBLEM_HOURS * 3600))) return false;
+  } catch {
+    // The store not answering: told all the same.
+  }
+  return tell(env, alerts, `Open Hearts: the automatic handling of abuse images failed (${what})`, [
+    `At ${new Date(now).toISOString()}: ${error}`,
+    '',
+    `Each new picture is checked against known images of child sexual abuse, and a match withheld, held, terminated and reported to NCMEC, by itself (docs/how-to/handle-abuse-material.md). This failure is tried again by itself, and told again in ${KNOWN_PROBLEM_HOURS} hours if it goes on. The relay worker's logs say more.`,
+  ].join('\n'));
+}
+
 /// The object's side: the mail sent, where the relay binds EMAIL and
 /// says who it is from (OH_MAIL_FROM). {status, body}.
 export async function sendAlert(op, env) {

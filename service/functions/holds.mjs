@@ -7,6 +7,7 @@
 // (suspension.mjs); a deletion asked for meanwhile is noted, and done
 // once the hold is released (`oh account release`).
 
+import { copyKey, seenKey } from './pictures.mjs';
 import { dayAfter, dayOf } from './rows.mjs';
 
 /// How long a hold lasts at the least, in days: the year the law has a
@@ -26,6 +27,29 @@ export const holdOf = (store, account) => store.get(...holdRow(account));
 /// and released by `oh account hold` and `oh account release`.
 export const heldPicturesPrefix = (account) => `held/${account}/`;
 export const heldPictureKey = (account, digest) => `${heldPicturesPrefix(account)}${digest}.jpg`;
+
+/// Each picture [account] put out that [pictures] (OH_PICTURES) still
+/// has a copy of, copied into [records] where a hold keeps it. Both are
+/// buckets as {list(prefix) -> keys, read(key) -> bytes or null,
+/// write(key, bytes, type)}: the operator's tool reaches them through
+/// Cloudflare's API, the relay through its bindings. Resolves {kept,
+/// gone}: the digests copied, and those whose copy was already deleted.
+export async function keepHeldPictures(pictures, records, account) {
+  const putOut = seenKey(account, '');
+  const kept = [];
+  const gone = [];
+  for (const key of await pictures.list(putOut)) {
+    const digest = key.slice(putOut.length);
+    const jpeg = await pictures.read(copyKey(digest));
+    if (!jpeg) {
+      gone.push(digest);
+      continue;
+    }
+    await records.write(heldPictureKey(account, digest), jpeg, 'image/jpeg');
+    kept.push(digest);
+  }
+  return { kept, gone };
+}
 
 /// A report's number, as the CyberTipline gives one: letters, digits and
 /// dashes, short.

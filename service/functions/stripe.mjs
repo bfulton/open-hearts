@@ -354,6 +354,11 @@ export async function endRefunded(charge, store, env, fetchImpl = fetch) {
   }
 }
 
+/// The web subscriptions an account's META row names, the one it has
+/// now and those it had before (accounts.mjs, accountFor), by their
+/// Stripe ids; one bought in a store is the store's to end.
+export const webSubscriptionsOf = (meta) => [meta?.subscription, ...(Array.isArray(meta?.before) ? meta.before : [])].filter((s) => typeof s === 'string' && s.startsWith('sub_'));
+
 /// [subscription] ended in Stripe now, with [comment] as the reason
 /// Stripe keeps, unless it has ended already or Stripe has none by that
 /// name, which renews nothing: true when it ended here. Throws

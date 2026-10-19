@@ -3,8 +3,7 @@
 // withheld at the relay wherever it was put out
 // (docs/how-to/handle-abuse-material.md). Says what it would do and
 // stops; with --apply it is done. A picture is named by its SHA-256, as
-// the daily email gives it, or by the address of its copy, as
-// Cloudflare's CSAM Scanning Tool does.
+// the daily email gives it, or by the address of its copy.
 
 import { Usage } from './env.mjs';
 import { PICTURES_ROW, allowedOf, allowing, pictureNamed, withheldOf, withholding } from '../service/functions/pictures.mjs';

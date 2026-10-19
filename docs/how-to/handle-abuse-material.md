@@ -1,6 +1,8 @@
 # Handle a report of child sexual abuse material
 
-Use this guide when a report, an email from Cloudflare's CSAM Scanning Tool, or anything else makes you aware that a picture or name published through Open Hearts may show the sexual abuse or exploitation of a child.
+Use this guide when the relay emails you about a known image it blocked, or when a report, or anything else, makes you aware that a picture or name published through Open Hearts may show the sexual abuse or exploitation of a child.
+
+A picture that matches a known image of child sexual abuse is handled without you: Microsoft's PhotoDNA checks each new picture before the relay carries it, and the relay withholds a match, holds and terminates the accounts that put it out, reports it to NCMEC and emails you what it did ([how it works](../explanation/relay.md#known-images-of-child-sexual-abuse)). The rest of this guide is for what that doesn't catch, and for finishing anything it emails you it couldn't do.
 
 US federal law requires a provider that gets actual knowledge of apparent child sexual abuse material to report it to the CyberTipline of the National Center for Missing & Exploited Children (NCMEC) as soon as reasonably possible, and to keep the report's contents for one year after it is made ([18 U.S.C. §2258A](https://www.law.cornell.edu/uscode/text/18/2258A); the year comes from the [REPORT Act of 2024](https://www.govinfo.gov/content/pkg/PLAW-118publ59/html/PLAW-118publ59.htm)). Act on the same day.
 
@@ -10,8 +12,31 @@ Do this once, before any report arrives:
 
 - Register Open Hearts with NCMEC as an electronic service provider, by email to [espteam@ncmec.org](mailto:espteam@ncmec.org) ([NCMEC](https://www.missingkids.org/csam)). The law requires a provider's registration to be kept current. Keep its details in your own records, not in this repository.
 - Until the registration is in place, report through the public CyberTipline at [report.cybertip.org](https://report.cybertip.org/) or on 1-800-843-5678.
-- Turn on Cloudflare's CSAM Scanning Tool, as [Look at the day's new pictures](look-at-new-pictures.md#before-you-begin) describes. Cloudflare's page on the tool says that the report, and keeping what it needs for a year, are likely still yours to make ([Cloudflare](https://developers.cloudflare.com/cache/reference/csam-scanning/)).
+- Set PhotoDNA's key, once Microsoft has approved the service and issued one, and its address in `config/openhearts.json` (`photodna.endpoint`), from the API reference that comes with the key ([Configuration](../reference/configuration.md#configopenheartsjson)):
+
+  ```bash
+  ./oh secret set OH_PHOTODNA_KEY --apply
+  ```
+
+- Ask NCMEC, once Open Hearts is registered, for credentials for its CyberTipline reporting API, and set them:
+
+  ```bash
+  ./oh secret set OH_NCMEC_USERNAME --apply
+  ./oh secret set OH_NCMEC_PASSWORD --apply
+  ```
+
+  The config sends reports to NCMEC's test service (`ncmec.endpoint`) until one has gone through there; then change it to `https://report.cybertip.org/ispws` and deploy the relay. Until both are done, the relay emails you to report each match by hand.
 - Export `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `STRIPE_API_KEY`, as [Suspend an account](suspend-an-account.md#before-you-begin) describes. The token needs Workers R2 Storage: Edit, to find an account by its picture and to hold it.
+
+## When the relay emails you about a known image
+
+The email says which account put the picture out, what was done, and what wasn't, with the command for each step left. It never holds the picture.
+
+- **Nothing needs you:** the email says so. Keep it.
+- **An automatic step failed:** the relay tries it again by itself, and emails you again when what is done changes. If one stays undone, run the command the email gives for it.
+- **Report it yourself:** the email says so while NCMEC's credentials aren't set, or while reports go to its test service. [Report it](#report-it) as below, with the copy the hold kept.
+
+Every other failure of the automatic handling, such as PhotoDNA not answering, also emails you, at most once in six hours for each kind. A picture PhotoDNA couldn't check is shown, and checked again until it can be.
 
 ## What not to do
 
@@ -22,15 +47,13 @@ Do this once, before any report arrives:
 ## Find the account
 
 - **From a report:** find the account by the name it plays under, or the report's account number, and set it in your shell, as [Suspend an account](suspend-an-account.md#find-the-account) shows.
-- **From Cloudflare's CSAM Scanning Tool:** its email comes once a day and lists the path of each picture it matched at `pictures.openhearts.game`, such as `/review/<sha256>.jpg`, and whether it blocked it there. Find the accounts that put the picture out:
+- **From a picture:** find the accounts that put it out, by its SHA-256 or the address of its copy:
 
   ```bash
   ./oh account find /review/<sha256>.jpg
   ```
 
-  It prints each account that put it out in the last 30 days, and whether it is the account's profile picture now. Set each in your shell in turn, as [Suspend an account](suspend-an-account.md#find-the-account) shows, and follow the rest of this guide for each one.
-
-The tool blocks only the copy at `pictures.openhearts.game`, not the picture at the relay, which goes on showing it to players until you take it down.
+  It prints each account that put it out in the last 30 days, and whether it is the account's profile picture now. Set each in your shell in turn, and follow the rest of this guide for each one.
 
 ## Take it down and hold the account
 
@@ -66,7 +89,7 @@ The tool blocks only the copy at `pictures.openhearts.game`, not the picture at 
    ./oh account terminate "$account" --serious --apply
    ```
 
-1. If Cloudflare's email says it couldn't block the picture, delete the copy at `pictures.openhearts.game`, now that the hold has kept one:
+1. Delete the copy at `pictures.openhearts.game`, now that the hold has kept one:
 
    ```bash
    npx wrangler r2 object delete "open-hearts-pictures/review/<sha256>.jpg" --remote
@@ -74,7 +97,7 @@ The tool blocks only the copy at `pictures.openhearts.game`, not the picture at 
 
 ## Report it
 
-1. Make the report to the CyberTipline. Give what you know: the picture or name, when you learned of it and how, the account's number, its devices' keys (`./oh account show` lists how many; the report can ask for them), and, for a web subscription, the email address in Stripe. The picture is the copy the hold kept, or, for a profile picture taken off, the base64 JPEG under `picture` in the account's `HELD` row. Download it only to attach it to the report, and delete the download as soon as it is attached:
+1. Make the report to the CyberTipline, unless the relay's email gives a report number already. Give what you know: the picture or name, when you learned of it and how, the account's number, its devices' keys (`./oh account show` lists how many; the report can ask for them), and, for a web subscription, the email address in Stripe. The picture is the copy the hold kept, or, for a profile picture taken off, the base64 JPEG under `picture` in the account's `HELD` row. Download it only to attach it to the report, and delete the download as soon as it is attached:
 
    ```bash
    npx wrangler r2 object get "open-hearts-records/held/$account/<sha256>.jpg" --remote --file picture.jpg

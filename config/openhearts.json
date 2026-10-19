@@ -16,5 +16,10 @@
     "playPushAudience": null,
     "playPushEmail": null
   },
-  "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "waiting": true, "pictures": true }
+  "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "waiting": true, "pictures": true },
+  "photodna": { "endpoint": null },
+  "ncmec": {
+    "endpoint": "https://exttest.cybertip.org/ispws",
+    "reporter": { "firstName": "Bright", "lastName": "Fulton", "email": "help@openhearts.game" }
+  }
 }

@@ -84,10 +84,11 @@ export const kv = ['open-hearts-store', 'open-hearts-store-preview'];
 /// R2 buckets. The game records are private: no r2.dev address, no
 /// custom domain, no CORS, so the worker is the only way in. The
 /// pictures subscribers put out at live tables, kept for the operator
-/// to look at (service/do/review.mjs), are served at their own domain
-/// through Cloudflare's cache, where the CSAM Scanning Tool checks
-/// them; each is named by its SHA-256, so nobody finds one without the
-/// picture or the operator's email.
+/// to look at (service/do/review.mjs), are served at their own domain,
+/// for the operator's daily email to show them; each is named by its
+/// SHA-256, so nobody finds one without the picture or the email. The
+/// records bucket also keeps what a legal hold keeps of an account's
+/// pictures (service/functions/holds.mjs), where no address serves it.
 export const r2 = [
   {
     name: 'open-hearts-pictures',
@@ -130,6 +131,11 @@ export const turnKeys = [{ name: 'open-hearts-turn', uid: config.turnKeyId }];
 export const relay = {
   wrangler: 'service/do/wrangler.toml',
   secrets: ['OH_JUROR_SECRET'],
+  /// Set once each is issued, and nothing is wrong until then: PhotoDNA's
+  /// key turns on the check of each new picture against known images of
+  /// child sexual abuse, and NCMEC's credentials the reports a match
+  /// files (service/do/known.mjs).
+  optionalSecrets: ['OH_PHOTODNA_KEY', 'OH_NCMEC_USERNAME', 'OH_NCMEC_PASSWORD'],
   /// workers.dev off: relay.openhearts.game is its only address.
   workersDev: false,
 };

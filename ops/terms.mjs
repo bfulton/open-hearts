@@ -166,7 +166,7 @@ export async function record(ctx, { args, flags }) {
     summary: own ? newest.summary : Object.fromEntries(languages.map((l) => [l.code, ''])),
   };
   const next = { ...ledger, [doc]: [...(own ? entries.slice(0, -1) : entries), entry] };
-  ctx.log(`${own ? 'would bring up to date' : 'would add'} the ${doc}' entry of ${date}: ${change}, ${fingerprint.slice(0, 12)}…${price ? `, ${price.amount} ${price.currency}` : ''}`);
+  ctx.log(`${own ? 'would bring up to date' : 'would add'} the ${doc === 'terms' ? "terms'" : "privacy policy's"} entry of ${date}: ${change}, ${fingerprint.slice(0, 12)}…${price ? `, ${price.amount} ${price.currency}` : ''}`);
   const problems = ledgerProblems(next).filter((p) => !/ no summary in /.test(p));
   for (const p of problems) ctx.warn(p);
   if (!flags.apply) return ctx.log('nothing changed; --apply writes it');

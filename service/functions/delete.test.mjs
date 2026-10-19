@@ -216,3 +216,42 @@ test('a kept game that would not be written back keeps the name, the operator is
   assert.ok(sent[0].text.includes(account) && sent[0].text.includes('tables/g2.json'));
   assert.equal(await store.get(`ACCOUNT#${account}`, 'META'), null, 'and the account is gone');
 });
+
+/// An order as the relay writes one when PhotoDNA matches a picture
+/// (service/do/known.mjs), asked of the service.
+async function ordered(t, order) {
+  const id = 'e'.repeat(32);
+  await t.store.put(`ORDER#${id}`, 'META', order);
+  return worker.fetch(new Request(`${origin}/api/order`, { method: 'POST', body: JSON.stringify({ order: id }) }), t.env);
+}
+
+test("a termination the relay orders on a PhotoDNA match ends the account, and its web subscription in Stripe with nothing refunded; one without the word leaves Stripe alone", async (t) => {
+  const s = await subscribed();
+  const stripe = stripeAt(t);
+  const res = await ordered(s, { account: s.account, act: 'terminate', at: new Date().toISOString(), endWeb: true });
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).endedWeb, ['sub_9']);
+  assert.deepEqual(stripe, [
+    'GET https://api.stripe.com/v1/subscriptions/sub_9',
+    'DELETE https://api.stripe.com/v1/subscriptions/sub_9?cancellation_details%5Bcomment%5D=terminated+under+the+terms',
+  ]);
+  assert.ok((await s.store.get(`ACCOUNT#${s.account}`, 'SUSPENDED')).terminated, 'terminated');
+  assert.ok(!stripe.some((a) => a.includes('refund')), 'nothing refunded');
+
+  const plain = await subscribed();
+  const quiet = stripeAt(t);
+  assert.equal((await ordered(plain, { account: plain.account, act: 'terminate', at: new Date().toISOString() })).status, 200);
+  assert.deepEqual(quiet, [], "an operator's own termination ends Stripe from the tool, not here");
+});
+
+test("Stripe not answering a relay's termination is a 502, to be ordered again; the account is ended all the same", async (t) => {
+  const s = await subscribed();
+  stripeAt(t, 'active', { failing: true });
+  const res = await ordered(s, { account: s.account, act: 'terminate', at: new Date().toISOString(), endWeb: true });
+  assert.equal(res.status, 502);
+  assert.ok((await s.store.get(`ACCOUNT#${s.account}`, 'SUSPENDED')).terminated);
+  t.mock.restoreAll();
+  const again = stripeAt(t);
+  assert.equal((await ordered(s, { account: s.account, act: 'terminate', at: new Date().toISOString(), endWeb: true })).status, 200);
+  assert.equal(again.filter((a) => a.startsWith('DELETE')).length, 1);
+});

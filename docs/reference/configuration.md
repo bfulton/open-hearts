@@ -16,7 +16,7 @@ The non-secret configuration, committed and the same for every deployment.
 
 | Field | Worker name (`configEnv`) | Build define (`appDefines`) | What it is |
 |---|---|---|---|
-| `appOrigin` | none | `OH_APP_ORIGIN` | The app's origin. A phone build calls the service there and builds shared links on it (`app/lib/net/address_io.dart`). `app/tool/defines.mjs` refuses a file without it. |
+| `appOrigin` | `OH_APP_ORIGIN`, which the relay orders a termination at (`service/do/known.mjs`) | `OH_APP_ORIGIN` | The app's origin. A phone build calls the service there and builds shared links on it (`app/lib/net/address_io.dart`). `app/tool/defines.mjs` refuses a file without it. |
 | `serviceKey` | `OH_SERVICE_KEY` | `OH_SERVICE_KEY` | The service's public key, 64 hex characters. Licences and activations are checked against it. A production deploy and a phone build refuse to run without it. |
 | `turnKeyId` | `OH_TURN_KEY_ID` | none | The Cloudflare Realtime TURN key that the worker mints credentials with. `infra/cloudflare.mjs` (`turnKeys`) defines the same key. |
 | `stripePrice` | `OH_STRIPE_PRICE` | none | The Stripe price, as a price ID or lookup key, that a checkout sells. A checkout sells it only when it is a year at `price`. |
@@ -33,6 +33,9 @@ The non-secret configuration, committed and the same for every deployment.
 | `alerts.subscribed` | `OH_ALERT_SUBSCRIBED` (`on` when `true`) | none | Email the operator about each new subscription. |
 | `alerts.waiting` | `OH_ALERT_WAITING` (`on` when `true`) | none | Email the operator when a subscriber waits for a person (the `waiting` handler). |
 | `alerts.pictures` | `OH_ALERT_PICTURES` (`on` when `true`) | none | Email the operator once a day the new pictures subscribers put out at live tables (`reviewRun` in `service/do/review.mjs`; [Look at the day's new pictures](../how-to/look-at-new-pictures.md)). |
+| `photodna.endpoint` | `OH_PHOTODNA_ENDPOINT` | none | The address of PhotoDNA's Match call, which checks each new picture against known images of child sexual abuse (`photoDnaMatch` in `service/functions/photodna.mjs`). `null` until it is taken from the API reference Microsoft gives with the key, and the request checked against that reference; with the key set and no address, nothing is checked and the operator is emailed. |
+| `ncmec.endpoint` | `OH_NCMEC_ENDPOINT` | none | NCMEC's CyberTipline reporting service: `https://exttest.cybertip.org/ispws`, its test service, until a test report has gone through, then `https://report.cybertip.org/ispws` (`fileReport` in `service/functions/ncmec.mjs`). A report to the test service reaches nobody, and the operator is emailed to report the match by hand. |
+| `ncmec.reporter` | `OH_NCMEC_FIRST_NAME`, `OH_NCMEC_LAST_NAME`, `OH_NCMEC_EMAIL` | none | Who a report names as reporting it. The email address is required to file one. |
 
 The app also reads `OH_PLAY_PACKAGE` as a build define (`app/lib/net/store_buying.dart`). `appDefines` does not set it, so the default in that file applies.
 
@@ -55,10 +58,12 @@ The worker calls these Stripe endpoints, in the API version `STRIPE_VERSION` in 
 
 ### Relay worker secret and variables
 
-The relay worker (`open-hearts-relay`) is defined by `service/do/wrangler.toml`. `infra/cloudflare.mjs` (`relay`) names its secret, and `infra/apply.mjs` checks the live worker against both files.
+The relay worker (`open-hearts-relay`) is defined by `service/do/wrangler.toml`. `infra/cloudflare.mjs` (`relay`) names its secrets, those it needs and those it can do without, and `infra/apply.mjs` checks the live worker against both files.
 
 | Name | Kind | Set in | What it is |
 |---|---|---|---|
+| `OH_PHOTODNA_KEY` | Optional secret | The relay worker's secrets (`relay.optionalSecrets`) | PhotoDNA's subscription key, which Microsoft issues once it has approved the service. Without it, no picture is checked against known images. |
+| `OH_NCMEC_USERNAME`, `OH_NCMEC_PASSWORD` | Optional secrets | The relay worker's secrets (`relay.optionalSecrets`) | The CyberTipline reporting service's credentials, which NCMEC issues to a registered provider. Without them, a match is acted on all the same and the operator is emailed to report it by hand. |
 | `OH_JUROR_SECRET` | Secret | The relay worker's secrets | 64 hex characters. The backup jurors derive their keys from it, and the relay checks each backup juror's mark against it (`benchMark` in `service/do/relay.mjs`). Without it, the relay admits no backup juror. |
 | `OH_MAIL_FROM` | Variable | `[vars]` in `service/do/wrangler.toml` | The sender of backup-code emails and the operator's alerts. |
 | `OH_SERVICE_KEY` | From the config file | `config/openhearts.json` (`serviceKey`) | The key every activation must be signed by. `wrangler.toml` does not set it. Without a valid key, the relay carries no device. |
@@ -91,11 +96,13 @@ From `service/do/wrangler.toml`.
 | `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The backup jurors (`service/do/bench.mjs`). |
 | `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it. Each relay object reads [relay settings](#relay-settings) and the pictures withheld from it, and adds a picture the automatic check hides. |
 | `OH_PICTURES` | R2 bucket `open-hearts-pictures` | A copy of each new picture a subscriber puts out, for the operator to look at, served at `pictures.openhearts.game` (`service/do/review.mjs`). |
+| `KNOWN` | Durable Object, class `KnownPictures`, made in the `us` jurisdiction | Asks PhotoDNA about each new picture before it is carried, and acts on a match (`service/do/known.mjs`). One object, named `photodna`. |
+| `OH_RECORDS` | R2 bucket `open-hearts-records` | Where a hold the `KnownPictures` object places keeps the account's pictures (`heldPictureKey` in `service/functions/holds.mjs`). |
 | `AI` | Workers AI | The automatic check of each new picture, by `@cf/cloudflare/clef-flash` (`checkPicture` in `service/do/review.mjs`). Without it, pictures are copied and not checked. |
 | `EMAIL` | Email Sending (`send_email`) | Backup-code emails, the operator's alerts, and the day's new pictures. |
 | `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
 
-Its schedule (`triggers.crons`) runs once a day at 13:00 UTC, when `alerts.pictures` is on: it deletes the copies in `OH_PICTURES` that nobody has put out for 30 days, hides any new picture the check found should be hidden that isn't yet, and emails the operator the new ones.
+Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With PhotoDNA's key set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. When `alerts.pictures` is on, it deletes the copies in `OH_PICTURES` that nobody has put out for 30 days, hides any new picture the check found should be hidden that isn't yet, and emails the operator the new ones.
 
 ## Environment variables
 

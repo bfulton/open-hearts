@@ -25,7 +25,7 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 | `<name>` | a secret's name, as `infra/cloudflare.mjs` lists it |
 | `<platform>` | `ios` or `android` |
 | `<document>` | `terms` (the terms of use) or `privacy` (the privacy policy) |
-| `<picture>` | a picture's SHA-256 (64 hex characters), as the daily email of new pictures gives it, or the address of its copy, as Cloudflare's CSAM Scanning Tool gives it |
+| `<picture>` | a picture's SHA-256 (64 hex characters), as the daily email of new pictures gives it, or the address of its copy |
 
 ## Credentials
 

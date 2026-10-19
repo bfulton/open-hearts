@@ -36,10 +36,19 @@ squashed from a pull request, the pull request's number.
   Workers AI, for nudity, gore and hate symbols. One the check flags is
   withheld from everyone within a couple of minutes, and the daily email
   shows it first; `./oh picture allow` puts one back. (2026-10-19, #32)
+- Each new picture is checked by Microsoft's PhotoDNA against known
+  images of child sexual abuse before the relay carries it, asked from
+  one object kept in the United States. A match is never shown: it is
+  withheld, each account that put it out is held and terminated, its web
+  subscription ended with nothing refunded, the match is reported to
+  NCMEC's CyberTipline, and the operator is emailed what was done, all
+  without waiting on the operator. Each step is tried again until it is
+  done, and any failure emails the operator. Off until PhotoDNA's key is
+  set; reports are filed once NCMEC's credentials are, and until then
+  the email says to file one by hand. (2026-10-19, #32)
 - Every new picture is copied to R2 and emailed to the operator once a
-  day, account by account, with the commands to take it down. The copies
-  are served through Cloudflare, whose CSAM Scanning Tool checks each as
-  the email first loads it. (2026-10-19, #32)
+  day, account by account, with the commands to take it down.
+  (2026-10-19, #32)
 - Names that are obscene or slurs, in five languages, are refused by the
   app, the service and the relay, matched as whole words so real names
   stay. (2026-10-19, #32)
@@ -47,10 +56,10 @@ squashed from a pull request, the pull request's number.
   report the law requires, with a copy of each picture the account put
   out in its last 30 days, kept where only the operator reaches it.
   `docs/how-to/handle-abuse-material.md` is the procedure for child
-  sexual abuse material, from a report or from Cloudflare's CSAM
-  Scanning Tool: `./oh account find` takes the path the tool gives to
-  the accounts that put the picture out, and `./oh picture hide`
-  withholds one an account no longer uses. (2026-10-19, #32)
+  sexual abuse material that PhotoDNA doesn't catch: `./oh account find`
+  takes a picture's SHA-256 or address to the accounts that put it out,
+  and `./oh picture hide` withholds one an account no longer uses.
+  (2026-10-19, #32)
 - `./oh`, one command for every operator task, each saying what it would
   do and changing nothing without `--apply`; `docs/reference/oh.md` is
   made from it. (2026-10-19, #32)

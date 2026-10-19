@@ -414,7 +414,12 @@ const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(sup
 /// counted as refused — and neither stored nor passed on; already held,
 /// it is let go of before a subscription is served, and [forget] tells
 /// the host to let go of its copy too.
-export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, forget = null }) {
+///
+/// [screen], when given, is asked first of each event published, with
+/// who said it, and answers as [withhold] does: a picture PhotoDNA
+/// matches (service/do/known.mjs). What is already held was screened
+/// as it came, so only [withhold] is asked of that.
+export function createRelay({ verify, store = memoryStore(), refuse = null, log = null, limits = null, now = Date.now, count = null, heard = null, kept = null, gate = null, withhold = null, screen = null, forget = null }) {
   /// socket -> subscription id -> {raw, filters}. The raw filters are
   /// kept beside the parsed ones because a hibernating socket has to
   /// carry them somewhere and JSON is what it can carry.
@@ -589,7 +594,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
       log?.(`refused ${event.id.slice(0, 6)}: ${why}`);
       return send(from, ['OK', event.id, false, why]);
     }
-    const held = await withhold?.(event);
+    const held = (await screen?.(event, auths.get(from)?.who ?? null)) ?? (await withhold?.(event));
     if (held) {
       count?.('withheld');
       log?.(`withheld ${event.id.slice(0, 6)}: ${held}`);
@@ -800,7 +805,7 @@ export function createRelay({ verify, store = memoryStore(), refuse = null, log 
 /// to [objectLimits] or [tableLimits]. [withhold] and [forget] are asked
 /// only where pictures are put out: a lobby's tag, never presence or the
 /// results.
-export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null, gate = null, withhold = null, forget = null } = {}) {
+export function objectRelay(verify, { tag = presenceTag, now = Date.now, count = null, limits = null, heard = null, store = null, kept = null, also = null, gate = null, withhold = null, screen = null, forget = null } = {}) {
   const presence = tag === presenceTag;
   const own = refusalFor(tag);
   const lobby = !presence && tag !== resultsTag;
@@ -812,6 +817,7 @@ export function objectRelay(verify, { tag = presenceTag, now = Date.now, count =
     store: presence ? null : (store ?? memoryStore(storedKeep(tag))),
     kept: presence ? null : kept,
     withhold: lobby ? withhold : null,
+    screen: lobby ? screen : null,
     forget: lobby ? forget : null,
     // [also]: a test's own policy on top, asked only of what the object
     // itself takes (host.mjs, --object --control).

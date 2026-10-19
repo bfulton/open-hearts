@@ -397,7 +397,7 @@ export function relayProblems(toml, relay, live) {
     if (!live.secrets.includes(secret)) out.push(`secret ${secret} is not set: \`./oh secret set ${secret} --apply\``);
   }
   for (const secret of live.secrets) {
-    if (!relay.secrets.includes(secret)) out.push(`secret ${secret} is set but not defined (infra/cloudflare.mjs, relay.secrets)`);
+    if (!relay.secrets.includes(secret) && !(relay.optionalSecrets ?? []).includes(secret)) out.push(`secret ${secret} is set but not defined (infra/cloudflare.mjs, relay.secrets)`);
   }
   // Its addresses: the routes wrangler.toml gives, as custom domains.
   const routes = (toml.routes ?? []).filter((r) => r.custom_domain);
