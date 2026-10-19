@@ -74,6 +74,15 @@ export function recordsBucket(env, fetchImpl = fetch) {
   return restBucket({ token, account, bucket: pages.environments.production.r2.OH_RECORDS, fetchImpl });
 }
 
+/// The relay worker's address, the custom domain its wrangler.toml
+/// routes to it.
+export async function relayOrigin() {
+  const toml = await readFile(join(root, 'service/do/wrangler.toml'), 'utf8');
+  const host = /routes = \[\{ pattern = "([^"]+)", custom_domain = true \}\]/.exec(toml)?.[1];
+  if (!host) throw new Failed('no custom domain in service/do/wrangler.toml routes');
+  return `https://${host}`;
+}
+
 /// The bucket of the pictures subscribers put out, OH_PICTURES, as the
 /// relay worker's wrangler.toml binds it.
 export async function picturesBucket(env, fetchImpl = fetch) {
@@ -146,6 +155,7 @@ export function context(overrides = {}) {
     store: () => productionStore(env, fetchImpl),
     bucket: () => recordsBucket(env, fetchImpl),
     pictures: () => picturesBucket(env, fetchImpl),
+    relay: relayOrigin,
     stripe: () => stripeApi(env, fetchImpl),
     config: readConfig,
     run,

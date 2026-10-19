@@ -56,10 +56,12 @@ squashed from a pull request, the pull request's number.
   report the law requires, with a copy of each picture the account put
   out in its last 30 days, kept where only the operator reaches it.
   `docs/how-to/handle-abuse-material.md` is the procedure for child
-  sexual abuse material that PhotoDNA doesn't catch: `./oh account find`
-  takes a picture's SHA-256 or address to the accounts that put it out,
-  and `./oh picture hide` withholds one an account no longer uses.
-  (2026-10-19, #32)
+  sexual abuse material that PhotoDNA doesn't catch. `./oh picture
+  report` has the relay handle a picture the operator found as it does a
+  match, with a report saying the operator looked at it. For what is
+  done by hand, `./oh account find` takes a picture's SHA-256 or address
+  to the accounts that put it out, and `./oh picture hide` withholds one
+  an account no longer uses. (2026-10-19, #32)
 - `./oh`, one command for every operator task, each saying what it would
   do and changing nothing without `--apply`; `docs/reference/oh.md` is
   made from it. (2026-10-19, #32)

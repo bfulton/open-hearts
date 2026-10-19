@@ -36,8 +36,9 @@ const schema = 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noName
 /// [at] (ISO, in the past), the reporter as [reporter] names them
 /// ({firstName, lastName, email}), and the account by its number, the
 /// name it played under ([name], or none), the device that put the
-/// picture out ([device]) and what was done ([done], a sentence).
-export function reportXml({ at, reporter, account, name = null, device = null, done }) {
+/// picture out ([device]), how it was found ([found], a sentence: by
+/// PhotoDNA unless said) and what was done ([done], a sentence).
+export function reportXml({ at, reporter, account, name = null, device = null, found = 'Matched by Microsoft PhotoDNA against known images as it was put out.', done }) {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<report ${schema}>`,
@@ -48,7 +49,7 @@ export function reportXml({ at, reporter, account, name = null, device = null, d
     '<internetDetails><onlineGamingIncident>',
     el('gameName', GAME),
     el('content', 'A profile picture, shown beside a player\'s name in pools, rooms and at tables in live play.'),
-    el('additionalInfo', `Matched by Microsoft PhotoDNA against known images as it was put out. ${done}`),
+    el('additionalInfo', `${found} ${done}`),
     '</onlineGamingIncident></internetDetails>',
     '<reporter><reportingPerson>',
     el('firstName', reporter.firstName),
@@ -67,8 +68,9 @@ export function reportXml({ at, reporter, account, name = null, device = null, d
 
 /// The picture's details, as /fileinfo takes them: [fileName], put out
 /// at [at], its SHA-256 [digest], whether players were shown it
-/// ([shown]), and that nobody at Open Hearts looked at it.
-export function fileDetailsXml({ reportId, fileId, fileName, at, digest, shown }) {
+/// ([shown]), and whether anybody at Open Hearts looked at it
+/// ([viewed]: the operator, for a picture they reported).
+export function fileDetailsXml({ reportId, fileId, fileName, at, digest, shown, viewed = false }) {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<fileDetails ${schema}>`,
@@ -76,7 +78,7 @@ export function fileDetailsXml({ reportId, fileId, fileName, at, digest, shown }
     el('fileId', fileId),
     el('originalFileName', fileName),
     el('uploadedToEspTimestamp', at),
-    el('fileViewedByEsp', 'false'),
+    el('fileViewedByEsp', viewed ? 'true' : 'false'),
     el('publiclyAvailable', shown ? 'true' : 'false'),
     `<details><nameValuePair type="HASH">${el('name', 'SHA-256')}${el('value', digest)}</nameValuePair></details>`,
     el('additionalInfo', shown ? 'Shown to other players before the match was known, then withheld.' : 'Withheld before any other player was shown it.'),

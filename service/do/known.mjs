@@ -29,6 +29,7 @@
 // the email says to file it by hand.
 
 import { heldPictureKey, hold, keepHeldPictures } from '../functions/holds.mjs';
+import { bodyOf } from '../functions/http.mjs';
 import { NcmecRefused, fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
 import { photoDnaMatch } from '../functions/photodna.mjs';
 import { PICTURES_ROW, WITHHELD_WHY, copyKey, pictureDigest, pictureIn, withheldOf, withholding } from '../functions/pictures.mjs';
@@ -41,6 +42,19 @@ import { lobbyKind } from './relay.mjs';
 
 /// The one object every check goes through.
 export const KNOWN_OBJECT = 'photodna';
+
+/// A picture the operator found and reports (`oh picture report`),
+/// written where only the operator's tool writes, and named to the relay
+/// by its id: {digest, accounts, how}. Kept long enough for KV to show
+/// it to the relay and for the tool to ask again, and what the object
+/// answered kept as long.
+export const reportRow = (id) => [`KNOWN#${id}`, 'META'];
+export const REPORT_KEPT_S = 10 * 60;
+const isReportId = (id) => typeof id === 'string' && /^[0-9a-f]{32}$/.test(id);
+
+/// At most this much of how the operator came to know is kept and
+/// reported.
+export const HOW_MOST = 300;
 
 /// How many pictures a relay object remembers PhotoDNA cleared, so
 /// that it asks about each once while it is awake.
@@ -86,6 +100,24 @@ export function knownAsker(env) {
     if (!res.ok) throw new Error(`said ${res.status}`);
     return (await res.json()).said;
   };
+}
+
+/// The relay worker's `POST /known`, from the operator's tool (`oh
+/// picture report`): [request] names a report the tool wrote in the
+/// store, which is the operator's word. It is read here, so that only a
+/// report the operator made reaches the one object every picture is
+/// checked through, and passed to it.
+export async function knownReport(request, env) {
+  const id = (await bodyOf(request, 256))?.report;
+  if (!isReportId(id)) return Response.json({ error: 'a report, 32 hex' }, { status: 400 });
+  const store = storeOf(env);
+  if (!store || typeof env.KNOWN?.jurisdiction !== 'function') return Response.json({ error: 'not configured: KNOWN or the store' }, { status: 503 });
+  const asked = await store.get(...reportRow(id));
+  // Not yet shown here, or never written: the tool asks again for a
+  // while.
+  if (!asked) return Response.json({ error: 'no such report' }, { status: 404 });
+  const us = env.KNOWN.jurisdiction('us');
+  return us.get(us.idFromName(KNOWN_OBJECT)).fetch('https://known/report', { method: 'POST', body: JSON.stringify({ ...asked, id }) });
 }
 
 /// What a relay object says of each picture published to it, and who
@@ -161,8 +193,10 @@ export function caseLines(c, { ncmec }) {
 export function caseEmail(c, lines) {
   const who = c.account ? `account ${c.account}` : 'a device the relay did not know';
   const text = [
-    `Microsoft's PhotoDNA matched a picture ${who} put out at ${c.at} against known images of child sexual abuse.`,
-    c.shown ? 'It was shown to other players before the match was known; it is withheld now.' : 'It was withheld before any other player was shown it.',
+    c.viewed
+      ? `You reported a picture ${who} put out as child sexual abuse material${c.how ? ` (${c.how})` : ''}, at ${c.at}.`
+      : `Microsoft's PhotoDNA matched a picture ${who} put out at ${c.at} against known images of child sexual abuse.`,
+    c.viewed ? 'It had been shown to other players; it is withheld now.' : c.shown ? 'It was shown to other players before the match was known; it is withheld now.' : 'It was withheld before any other player was shown it.',
     '',
     'Done:',
     ...lines.done.map((l) => `- ${l}`),
@@ -171,16 +205,17 @@ export function caseEmail(c, lines) {
     `The picture's SHA-256 is ${c.digest}. Don't download it except to report it (docs/how-to/handle-abuse-material.md).`,
   ].join('\n');
   const subject = lines.failed ? ', and an automatic step failed' : lines.todo.length ? ' (something for you to do)' : '';
-  return { subject: `Open Hearts: a known child abuse image was blocked${subject}`, text };
+  return { subject: `Open Hearts: ${c.viewed ? 'a picture you reported was taken down' : 'a known child abuse image was blocked'}${subject}`, text };
 }
 
 /// The object, where PhotoDNA is asked and every match acted on. Its
 /// storage: `pic:<digest>`, what PhotoDNA said of a picture ({said:
 /// 'clear' or 'match', at}); `retry:<digest>`, a picture PhotoDNA has
-/// not answered for yet ({jpeg, accounts, keys, tries, next}); and
+/// not answered for yet ({jpeg, accounts, keys, tries, next});
 /// `case:<digest>:<account>`, a match being acted on ({digest, account,
 /// key, name, jpeg, at, shown, done, failed, tries, told}), the picture
-/// dropped from it once it is held and reported.
+/// dropped from it once it is held and reported; and `report:<id>`,
+/// what a report the operator made was answered ({at, body}).
 export class KnownPictures {
   constructor(state, env = {}, { fetchImpl = fetch, now = Date.now, log = (line) => console.log(line) } = {}) {
     this.state = state;
@@ -218,6 +253,12 @@ export class KnownPictures {
         await this.problem('error', e);
         return Response.json({ said: 'failed' });
       }
+    }
+    // The operator's tool, through the relay worker (knownReport): a
+    // picture they found, reported (`oh picture report`).
+    if (request.method === 'POST' && path === '/report') {
+      const { status, body } = await this.reported(await request.json().catch(() => null));
+      return Response.json(body, { status });
     }
     // The relay's daily schedule: anything left to do, such as a report
     // waiting on NCMEC's credentials, tried again.
@@ -273,6 +314,57 @@ export class KnownPictures {
     return match ? 'match' : 'clear';
   }
 
+  /// The report the operator's tool wrote ([asked], its row and [id],
+  /// reportRow), acted on as a match is: for each account that put the
+  /// picture out, as the relay's copies note and as the operator named, a
+  /// case that says the operator looked at it; and the picture known from
+  /// then on, so that whoever puts it out again is acted on too. Asked
+  /// again, as the tool does when an answer is lost, it is answered as
+  /// before, and nothing done twice. {status, body}.
+  async reported(asked) {
+    const id = asked?.id;
+    if (!isReportId(id)) return { status: 400, body: { error: 'a report, 32 hex' } };
+    const answered = await this.storage.get(`report:${id}`);
+    if (answered) return { status: 200, body: answered.body };
+    const digest = asked.digest;
+    const named = (Array.isArray(asked.accounts) ? asked.accounts : []).filter(isAccount);
+    if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) return { status: 400, body: { error: 'a picture, its SHA-256' } };
+    const jpeg = await this.copyOf(digest, named);
+    if (!jpeg) return { status: 404, body: { error: 'no copy of that picture is kept: report it by hand' } };
+    const accounts = [...named];
+    if (this.env.OH_PICTURES) {
+      for (const a of await accountsThatPutOut(r2Objects(this.env.OH_PICTURES), digest)) if (!accounts.includes(a)) accounts.push(a);
+    }
+    const how = typeof asked.how === 'string' && asked.how.trim() ? asked.how.trim().slice(0, HOW_MOST) : null;
+    await this.decided(digest, true);
+    await this.storage.delete(`retry:${digest}`);
+    for (const account of accounts.length ? accounts : [null]) await this.open({ digest, jpeg, account, key: null, shown: true, viewed: true, how });
+    const body = { reported: digest, accounts };
+    const now = this.now();
+    for (const [old, { at }] of await this.storage.list({ prefix: 'report:' })) if (now - at >= REPORT_KEPT_S * 1000) await this.storage.delete(old);
+    await this.storage.put(`report:${id}`, { at: now, body });
+    return { status: 200, body };
+  }
+
+  /// The picture [digest], base64, from wherever a copy is kept: the
+  /// relay's copy, a hold's copy for one of [accounts], or a picture taken
+  /// off one of their profiles (suspension.mjs, HELD). Null for none.
+  async copyOf(digest, accounts) {
+    const env = this.env;
+    const b64 = (bytes) => btoa(String.fromCharCode(...bytes));
+    const read = async (bucket, key) => (bucket ? await r2Objects(bucket).read(key) : null);
+    const copy = await read(env.OH_PICTURES, copyKey(digest));
+    if (copy) return b64(copy);
+    const store = storeOf(env);
+    for (const account of accounts) {
+      const held = await read(env.OH_RECORDS, heldPictureKey(account, digest));
+      if (held) return b64(held);
+      const taken = (await store?.get(`ACCOUNT#${account}`, 'HELD'))?.picture;
+      if (taken && (await pictureDigest(taken)) === digest) return taken;
+    }
+    return null;
+  }
+
   async decided(digest, match) {
     await this.storage.put(`pic:${digest}`, { said: match ? 'match' : 'clear', at: new Date(this.now()).toISOString() });
   }
@@ -307,15 +399,16 @@ export class KnownPictures {
     await this.storage.delete(`retry:${digest}`);
   }
 
-  /// A case opened for [account]'s use of a matched picture, once.
-  async open({ digest, jpeg, account, key, shown }) {
+  /// A case opened for [account]'s use of a matched picture, once:
+  /// [viewed] when the operator found it and looked at it, saying [how].
+  async open({ digest, jpeg, account, key, shown, viewed = false, how = null }) {
     const id = `case:${digest}:${account ?? 'none'}`;
     if (await this.storage.get(id)) return;
     const store = storeOf(this.env);
     // The name it played under, for the report, before anything here
     // changes the account.
     const name = account && store ? (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.name ?? null : null;
-    await this.storage.put(id, { digest, account, key, name, jpeg, at: new Date(this.now()).toISOString(), shown, done: {}, failed: {}, tries: 0, told: '' });
+    await this.storage.put(id, { digest, account, key, name, jpeg, at: new Date(this.now()).toISOString(), shown, ...(viewed ? { viewed, how } : {}), done: {}, failed: {}, tries: 0, told: '' });
     await this.wakeBy(this.now());
   }
 
@@ -411,6 +504,7 @@ export class KnownPictures {
           account: c.account,
           name: c.name,
           device: c.key,
+          found: c.viewed ? `Found by the operator, who looked at it${c.how ? `: ${c.how}` : ''}.` : undefined,
           done: c.account ? 'The picture was withheld, and the account closed.' : 'The picture was withheld.',
         });
         const ref = await fileReport({
@@ -420,7 +514,7 @@ export class KnownPictures {
           report,
           jpeg: bytesOf(c.jpeg),
           fileName,
-          details: (reportId, fileId) => fileDetailsXml({ reportId, fileId, fileName, at: c.at, digest: c.digest, shown: c.shown }),
+          details: (reportId, fileId) => fileDetailsXml({ reportId, fileId, fileName, at: c.at, digest: c.digest, shown: c.shown, viewed: !!c.viewed }),
           fetchImpl: this.http,
         });
         c.test = ncmec.test;

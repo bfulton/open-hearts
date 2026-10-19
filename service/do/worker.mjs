@@ -38,7 +38,7 @@ import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tag
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
 import { hidePictures, pictureKeeper, reviewRun } from './review.mjs';
-import { KNOWN_OBJECT, KnownPictures as KnownObject, knownAsker, knownScreen } from './known.mjs';
+import { KNOWN_OBJECT, KnownPictures as KnownObject, knownAsker, knownReport, knownScreen } from './known.mjs';
 import { PICTURES_ROW } from '../functions/pictures.mjs';
 import { alertKnownProblem, alertsOf } from '../functions/alerts.mjs';
 import { storeOf } from '../functions/rows.mjs';
@@ -309,6 +309,9 @@ export default {
     // The root answers, for the monitor that asks whether the relay is
     // up (observability/monitoring.mjs); it opens no object.
     if (path === '/') return new Response('open hearts relay: a relay lives at /<tag>\n', { status: 200 });
+    // A picture the operator found, reported by their tool (`oh picture
+    // report`).
+    if (path === '/known' && request.method === 'POST') return knownReport(request, env);
     const tag = tagOf(path);
     if (!tag) return new Response('a relay lives at /<tag>\n', { status: 404 });
     // An object is handed websockets and nothing else: what it answers

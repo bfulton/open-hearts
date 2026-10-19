@@ -1,12 +1,17 @@
 // `oh picture …`: a picture put back after the automatic check hid it
-// (service/do/review.mjs, docs/how-to/look-at-new-pictures.md), or
-// withheld at the relay wherever it was put out
-// (docs/how-to/handle-abuse-material.md). Says what it would do and
-// stops; with --apply it is done. A picture is named by its SHA-256, as
-// the daily email gives it, or by the address of its copy.
+// (service/do/review.mjs, docs/how-to/look-at-new-pictures.md); withheld
+// at the relay wherever it was put out; or reported as child sexual
+// abuse material, which the relay then handles as it does a PhotoDNA
+// match (service/do/known.mjs, docs/how-to/handle-abuse-material.md).
+// Says what it would do and stops; with --apply it is done. A picture
+// is named by its SHA-256, as the daily email gives it, or by the
+// address of its copy.
 
-import { Usage } from './env.mjs';
-import { PICTURES_ROW, allowedOf, allowing, pictureNamed, withheldOf, withholding } from '../service/functions/pictures.mjs';
+import { Failed, Usage } from './env.mjs';
+import { HOW_MOST, REPORT_KEPT_S, reportRow } from '../service/do/known.mjs';
+import { PICTURES_ROW, allowedOf, allowing, copyKey, pictureNamed, withheldOf, withholding } from '../service/functions/pictures.mjs';
+import { hex, isAccount } from '../service/functions/rows.mjs';
+import { accountsThatPutOut } from '../service/tool/find.mjs';
 
 /// The picture [args] names, the row of what is withheld and allowed,
 /// and how the picture stands in it, said.
@@ -36,4 +41,48 @@ export async function hide(ctx, { args, flags }) {
   if (!flags.apply) return ctx.log('nothing changed; --apply does it');
   await store.put(...PICTURES_ROW, withholding(row, digest, now));
   ctx.log('done: the relay withholds it within a couple of minutes');
+}
+
+/// A picture the operator found and looked at, reported: the relay
+/// withholds it, holds and terminates each account that put it out (and
+/// [--account], one the picture was taken off), reports it to NCMEC and
+/// emails what it did, as for a PhotoDNA match. The picture's bytes never
+/// come here: only whether the relay still has a copy.
+export async function report(ctx, { args, flags }) {
+  const digest = pictureNamed(args.picture);
+  if (!digest) throw new Usage('name the picture by its SHA-256 (64 hex) or the address of its copy, as the emails give it');
+  const named = flags.account ?? null;
+  if (named !== null && !isAccount(named)) throw new Usage('--account is an account, 32 hex');
+  const how = flags.how ?? null;
+  if (how !== null && (typeof how !== 'string' || !how.trim() || how.length > HOW_MOST)) throw new Usage(`--how is a few words, ${HOW_MOST} characters at the most`);
+  const store = await ctx.store();
+  const pictures = await ctx.pictures();
+  const accounts = [...new Set([...(await accountsThatPutOut(pictures, digest)), ...(named ? [named] : [])])];
+  const copy = (await pictures.list(copyKey(digest))).includes(copyKey(digest));
+  ctx.log(`${digest}: ${copy ? 'the relay has its copy' : 'the relay has no copy of it'}; put out by ${accounts.length} account(s)`);
+  for (const a of accounts) ctx.log(`  ${a}`);
+  ctx.log(
+    `would have the relay withhold it wherever it was put out, hold and terminate ${accounts.length ? 'each account' : 'nobody (no account is known)'}, their web subscriptions ended with nothing refunded, report it to NCMEC as a picture you looked at${how ? ` (${how.trim()})` : ''}, and email you what it did`,
+  );
+  if (!copy && !named) ctx.warn('without its copy, name an account it was taken off (--account), or report it by hand');
+  if (!flags.apply) return ctx.log('nothing changed; --apply does it');
+  const id = hex(crypto.getRandomValues(new Uint8Array(16)));
+  await store.put(...reportRow(id), { digest, accounts, how: how?.trim() ?? null }, { ttl: REPORT_KEPT_S });
+  const origin = await ctx.relay();
+  const { tries = 24, wait = 5000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = ctx.carryOptions ?? {};
+  let last = null;
+  for (let i = 0; i < tries; i++) {
+    if (i) await sleep(wait);
+    try {
+      const res = await ctx.fetch(`${origin}/known`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ report: id }) });
+      last = { status: res.status, body: await res.json().catch(() => null) };
+    } catch (e) {
+      last = { status: 0, body: { error: `${e?.message ?? e}` } };
+    }
+    // KV takes a while to show the row everywhere: asked again.
+    const unseen = last.status === 404 && last.body?.error === 'no such report';
+    if (!unseen && last.status !== 0 && last.status < 500) break;
+  }
+  if (last?.status !== 200) throw new Failed(`the relay said ${last?.status ?? 'nothing'}: ${last?.body?.error ?? ''}`);
+  ctx.log(`done: the relay is acting on it for ${last.body.accounts.length} account(s), and emails you what it did`);
 }

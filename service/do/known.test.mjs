@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { KNOWN_OBJECT, KnownPictures, knownAsker, knownScreen, retryAfter } from './known.mjs';
+import { KNOWN_OBJECT, KnownPictures, REPORT_KEPT_S, knownAsker, knownReport, knownScreen, retryAfter } from './known.mjs';
 import { lobbyKind } from './relay.mjs';
 import { PICTURES_ROW, WITHHELD_WHY, allowedOf, allowing, pictureDigest, withheldOf } from '../functions/pictures.mjs';
 
@@ -474,7 +474,134 @@ test('every failure of the automatic handling emails the operator, once in a whi
   assert.deepEqual(told, ['a relay could not ask whether a picture is a known image: said 503']);
 });
 
-test('off without the key, and the object answers only its two calls', async () => {
+/// The relay worker's `POST /known` (knownReport) over [t]'s object,
+/// with [body] (a string as it is, anything else as JSON); t.reached
+/// counts what got as far as the object.
+async function askRelay(t, body, env = t.env) {
+  t.reached ??= 0;
+  const KNOWN = {
+    jurisdiction: (where) => ({
+      idFromName: (name) => `${where}/${name}`,
+      get: (id) => {
+        assert.equal(id, `us/${KNOWN_OBJECT}`, 'the one object, in the United States');
+        return { fetch: async (url, init) => (t.reached++, t.obj.fetch(new Request(url, init))) };
+      },
+    }),
+  };
+  const request = new Request('https://relay.example/known', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) });
+  const res = await knownReport(request, { KNOWN, ...env });
+  return { status: res.status, body: await res.json() };
+}
+
+/// A report as `oh picture report` writes it, [row] under [id], and
+/// named to the relay.
+async function reportIt(t, row, id = 'a'.repeat(32)) {
+  t.store.m.set(`KNOWN#${id}|META`, JSON.stringify(row));
+  return askRelay(t, { report: id });
+}
+
+test('a picture the operator reports is handled as a match: each account that put it out, the report saying they looked, and the picture known from then on', async () => {
+  const jpeg = bytes(5);
+  const digest = await pictureDigest(b64(jpeg));
+  const t = await setUp();
+  t.pictures.m.set(`review/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
+  t.pictures.m.set(`seen/${A}/${digest}`, { bytes: new Uint8Array(), type: '' });
+  const said = await reportIt(t, { digest, accounts: [C], how: '  a player reported it  ' });
+  assert.deepEqual(said, { status: 200, body: { reported: digest, accounts: [C, A] } });
+  assert.equal(t.w.photoDnaAsked, 0, 'PhotoDNA not asked');
+  await t.ring();
+
+  const cases = [...(await t.state.storage.list({ prefix: 'case:' })).values()];
+  assert.deepEqual(cases.map((c) => [c.account, c.viewed, c.how, c.shown]).sort(), [[A, true, 'a player reported it', true], [C, true, 'a player reported it', true]].sort());
+  assert.ok(cases.every((c) => c.closed));
+  assert.ok(withheldOf(t.store.row(...PICTURES_ROW), t.now()).has(digest));
+  assert.equal(t.pictures.m.has(`review/${digest}.jpg`), false, 'its public copy deleted');
+  assert.deepEqual(t.records.m.get(`held/${A}/${digest}.jpg`)?.bytes, jpeg);
+  const submits = t.w.ncmec.filter((c) => c.path === '/submit');
+  assert.equal(submits.length, 2);
+  assert.ok(submits.every((c) => /Found by the operator, who looked at it: a player reported it\./.test(c.body)));
+  assert.ok(t.w.ncmec.filter((c) => c.path === '/fileinfo').every((c) => /<fileViewedByEsp>true<\/fileViewedByEsp>/.test(c.body)));
+  assert.equal(t.sent[0].subject, 'Open Hearts: a picture you reported was taken down');
+  assert.match(t.sent[0].text, /^You reported a picture account .* put out as child sexual abuse material \(a player reported it\)/);
+
+  // Known from then on: whoever puts it out again is acted on too.
+  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'match');
+  assert.equal(t.w.photoDnaAsked, 0);
+});
+
+test("a reported picture's copy is found wherever one is kept, and without one nothing is done", async () => {
+  const jpeg = bytes(6);
+  const digest = await pictureDigest(b64(jpeg));
+  const t = await setUp();
+  assert.deepEqual(await reportIt(t, { digest, accounts: [A] }), { status: 404, body: { error: 'no copy of that picture is kept: report it by hand' } });
+  assert.equal((await t.state.storage.list({ prefix: 'case:' })).size, 0);
+
+  // A's profile picture taken off, but another one: not this picture.
+  t.store.m.set(`ACCOUNT#${A}|HELD`, JSON.stringify({ picture: b64(bytes(8)) }));
+  assert.equal((await reportIt(t, { digest, accounts: [A] })).status, 404, 'never another picture in its place');
+
+  // Taken off A's profile, and held there.
+  t.store.m.set(`ACCOUNT#${A}|HELD`, JSON.stringify({ picture: b64(jpeg) }));
+  assert.equal((await reportIt(t, { digest, accounts: [A] })).status, 200);
+  let [c] = [...(await t.state.storage.list({ prefix: 'case:' })).values()];
+  assert.equal(c.jpeg, b64(jpeg));
+
+  // Kept by a hold.
+  const u = await setUp();
+  u.records.m.set(`held/${B}/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
+  assert.equal((await reportIt(u, { digest, accounts: [B] })).status, 200);
+  [c] = [...(await u.state.storage.list({ prefix: 'case:' })).values()];
+  assert.deepEqual([c.account, c.jpeg], [B, b64(jpeg)]);
+});
+
+test('a report reaches the object only when the tool wrote it, and is answered the same when asked again', async () => {
+  const t = await setUp();
+  const jpeg = bytes(7);
+  const digest = await pictureDigest(b64(jpeg));
+  t.pictures.m.set(`review/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
+
+  // Nothing the tool wrote: answered by the relay worker, the object
+  // every picture is checked through never asked.
+  const refused = [
+    ['not json', 400, 'a report, 32 hex'],
+    [{ report: 'not one' }, 400, 'a report, 32 hex'],
+    [{ report: 'b'.repeat(32), more: 'x'.repeat(256) }, 400, 'a report, 32 hex'],
+    [{ report: 'b'.repeat(32) }, 404, 'no such report'],
+  ];
+  for (const [body, status, error] of refused) assert.deepEqual(await askRelay(t, body), { status, body: { error } }, JSON.stringify(body).slice(0, 40));
+  assert.deepEqual(await askRelay(t, { report: 'b'.repeat(32) }, { ...t.env, OH_STORE: undefined }), { status: 503, body: { error: 'not configured: KNOWN or the store' } });
+  assert.equal(t.reached, 0);
+  const bare = await t.obj.fetch(new Request('https://known/report', { method: 'POST', body: JSON.stringify({ digest, accounts: [] }) }));
+  assert.deepEqual([bare.status, await bare.json()], [400, { error: 'a report, 32 hex' }], 'the object asks for the report too');
+  assert.deepEqual(await reportIt(t, { digest: 'not a digest', accounts: [] }), { status: 400, body: { error: 'a picture, its SHA-256' } });
+  assert.equal((await t.state.storage.list({ prefix: 'case:' })).size, 0);
+
+  // Reported, and acted on: its relay copy is deleted, and it is
+  // nobody's to hold. The tool asking again, its answer lost, is told
+  // the same, and nothing is done twice.
+  const id = 'c'.repeat(32);
+  const said = await reportIt(t, { digest, accounts: [] }, id);
+  assert.deepEqual(said, { status: 200, body: { reported: digest, accounts: [] } });
+  await t.ring();
+  assert.equal(t.pictures.m.has(`review/${digest}.jpg`), false);
+  const filed = t.w.ncmec.length;
+  assert.deepEqual(await askRelay(t, { report: id }), said);
+  await t.ring();
+  assert.equal(t.w.ncmec.length, filed, 'NCMEC not asked again');
+  assert.equal((await t.state.storage.list({ prefix: 'case:' })).size, 1);
+
+  // Another report since, and the first still answered; once the first
+  // has run out, the next report forgets it.
+  const other = await pictureDigest(b64(bytes(8)));
+  t.pictures.m.set(`review/${other}.jpg`, { bytes: bytes(8), type: 'image/jpeg' });
+  assert.equal((await reportIt(t, { digest: other, accounts: [] }, 'd'.repeat(32))).status, 200);
+  assert.deepEqual(await askRelay(t, { report: id }), said);
+  t.clock.tick(REPORT_KEPT_S * 1000);
+  assert.equal((await reportIt(t, { digest: other, accounts: [] }, 'e'.repeat(32))).status, 200);
+  assert.deepEqual([...(await t.state.storage.list({ prefix: 'report:' })).keys()], [`report:${'e'.repeat(32)}`]);
+});
+
+test('off without the key, and the object answers only its own calls', async () => {
   const t = await setUp({ key: '' });
   assert.equal(await t.obj.check({ jpeg: b64(bytes(1)), account: A, key: KEY }), 'off');
   assert.equal(t.w.photoDnaAsked, 0);

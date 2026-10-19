@@ -116,6 +116,8 @@ The copies are served at `pictures.openhearts.game`, so the email can show them.
 
 Before a tag's object carries a new picture, it asks Microsoft's PhotoDNA whether the picture matches a known image of child sexual abuse (`service/do/known.mjs`). Every object asks through one, `KnownPictures`, made in Cloudflare's `us` jurisdiction, so every request PhotoDNA gets comes from the United States. That object remembers what PhotoDNA said of each picture, and each tag's object remembers the pictures cleared, so a picture is asked about once. A match is answered as a picture the operator took down is, `withheld: this picture was taken down`, so the device is not told why, and it is neither stored, passed on, nor copied for the operator. What a tag already holds was asked about as it came, so it is not asked again.
 
+A picture the operator finds and looks at is handled the same way: `oh picture report` writes it in the store and names it to the relay (`POST /known`), and the object treats it as a match, from then on, with a report that says the operator looked at it and how they came to. The relay worker reads the report from the store before the object hears of it, so a request that names none, which anybody can send, never reaches the one object every new picture waits on. The object keeps what it answered for as long as the report is kept, so the tool asking again, its answer lost, is told the same and nothing is done twice.
+
 Everything after a match is done by the `KnownPictures` object, with nobody waiting on the operator:
 
 1. The picture is withheld wherever it turns up ([withheld pictures](#withheld-pictures)), even one the operator had put back.

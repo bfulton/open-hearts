@@ -2,7 +2,7 @@
 
 Use this guide when the relay emails you about a known image it blocked, or when a report, or anything else, makes you aware that a picture or name published through Open Hearts may show the sexual abuse or exploitation of a child.
 
-A picture that matches a known image of child sexual abuse is handled without you: Microsoft's PhotoDNA checks each new picture before the relay carries it, and the relay withholds a match, holds and terminates the accounts that put it out, reports it to NCMEC and emails you what it did ([how it works](../explanation/relay.md#known-images-of-child-sexual-abuse)). The rest of this guide is for what that doesn't catch, and for finishing anything it emails you it couldn't do.
+A picture that matches a known image of child sexual abuse is handled without you: Microsoft's PhotoDNA checks each new picture before the relay carries it, and the relay withholds a match, holds and terminates the accounts that put it out, reports it to NCMEC and emails you what it did ([how it works](../explanation/relay.md#known-images-of-child-sexual-abuse)). For a picture you find yourself, one command has the relay do the same ([Report a picture you found](#report-a-picture-you-found)). The rest of this guide is for a name, for finishing anything the relay emails you it couldn't do, and for when it can't act at all.
 
 US federal law requires a provider that gets actual knowledge of apparent child sexual abuse material to report it to the CyberTipline of the National Center for Missing & Exploited Children (NCMEC) as soon as reasonably possible, and to keep the report's contents for one year after it is made ([18 U.S.C. §2258A](https://www.law.cornell.edu/uscode/text/18/2258A); the year comes from the [REPORT Act of 2024](https://www.govinfo.gov/content/pkg/PLAW-118publ59/html/PLAW-118publ59.htm)). Act on the same day.
 
@@ -55,7 +55,21 @@ Every other failure of the automatic handling, such as PhotoDNA not answering, a
 
   It prints each account that put it out in the last 30 days, and whether it is the account's profile picture now. Set each in your shell in turn, and follow the rest of this guide for each one.
 
-## Take it down and hold the account
+## Report a picture you found
+
+For a picture that may show the sexual abuse or exploitation of a child, from a player's report, the daily email of new pictures or anywhere else, once you have looked at it:
+
+```bash
+./oh picture report <sha256> --how 'a player reported it' --apply
+```
+
+The relay then does what it does for a PhotoDNA match: it withholds the picture wherever it was put out, holds and terminates each account that put it out in the last 30 days, their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and `--how` you came to, and emails you what it did. Whoever puts the picture out after that is acted on too. Run it without `--apply` first to see which accounts put it out.
+
+It needs a copy of the picture: the relay's, which it keeps 30 days after the picture was last put out, or one kept from an account. For a picture already taken off an account's profile, or kept by its hold, name the account with `--account <account>`. When there is no copy, the command says so: follow the steps below by hand.
+
+## Take it down and hold the account by hand
+
+For a name, or a picture the relay can't act on:
 
 1. Take the picture down, or the name:
 

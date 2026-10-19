@@ -18,6 +18,7 @@ The tag in the path names a Durable Object, so everyone on one tag reaches the s
 | Request | Answer |
 |---|---|
 | `GET /` | 200, `open hearts relay: a relay lives at /<tag>`. The monitors ask this. |
+| `POST /known` | `{"report": <32 hex>}`: a picture the operator reports, as `oh picture report` wrote it in the store under that id, kept there ten minutes. The relay worker reads the row, the operator's word, and hands it to the `KnownPictures` object (`service/do/known.mjs`), which answers 200 `{"reported": <sha256>, "accounts": [<account>, …]}`, the same each time it is asked, or 404 when no copy of the picture is kept. A request that names no row is 404 (`no such report`), and one that is not JSON or is longer than 256 bytes 400; neither reaches the object. |
 | A path that is not a tag | 404 |
 | A tag, without a WebSocket upgrade | 426 |
 | A tag, with a WebSocket upgrade | The tag's object |

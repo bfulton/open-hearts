@@ -161,7 +161,7 @@ oh account hold <account> [--apply] [--ref <ref>]
 Holds an account's data as it is after a report the law requires, such as one of child sexual abuse material to NCMEC: a year at the least, during which nothing deletes it or puts back what was taken off it. --ref is the report's number. A deletion its owner asks for meanwhile is noted, and done once the hold is released. It also keeps a copy of each picture the account put out in the last 30 days, in the bucket of kept games, which only you reach; run it again to keep any it has put out since.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
-- **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#take-it-down-and-hold-the-account)
+- **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#take-it-down-and-hold-the-account-by-hand)
 - **Example:** `oh account hold 0123456789abcdef0123456789abcdef --ref 123456789 --apply`
 
 ### oh account release
@@ -178,7 +178,7 @@ Releases a legal hold once its year is out, deleting the pictures it kept, and s
 
 ## Pictures
 
-Pictures at the relay, wherever they were put out: one the automatic check hid, put back, or one withheld.
+Pictures at the relay, wherever they were put out: one the automatic check hid, put back; one withheld; or one reported as child sexual abuse material.
 
 ### oh picture allow
 
@@ -201,8 +201,20 @@ oh picture hide <picture> [--apply]
 Withholds a picture at the relay for 30 days, wherever it was put out, as one taken off an account is. For a picture that is no longer an account's profile picture, which `oh account remove` does not reach. It overrides `oh picture allow`.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#take-it-down-and-hold-the-account)
+- **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#take-it-down-and-hold-the-account-by-hand)
 - **Example:** `oh picture hide 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --apply`
+
+### oh picture report
+
+```bash
+oh picture report <picture> [--apply] [--account <account>] [--how <how>]
+```
+
+Reports a picture you found and looked at as child sexual abuse material: the relay handles it as it does a PhotoDNA match. The relay withholds it wherever it was put out, holds and terminates each account that put it out in the last 30 days (and --account, one it was taken off), their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and --how you came to, and emails you what it did. It needs a copy: the relay's, a hold's, or the picture taken off --account.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
+- **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#report-a-picture-you-found)
+- **Example:** `oh picture report 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --how 'a player reported it' --apply`
 
 ## Terms and price
 
