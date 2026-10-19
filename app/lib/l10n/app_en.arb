@@ -1003,6 +1003,30 @@
   "@liveAgree": {
     "description": "Button: agree to the terms and go on into live play."
   },
+  "deleteAccount": "Delete account",
+  "@deleteAccount": {
+    "description": "Button on the subscription page, and on the screen that asks: delete this device's account for good."
+  },
+  "deleteAccountTitle": "Delete your account?",
+  "@deleteAccountTitle": {
+    "description": "Title of the screen that asks before an account is deleted."
+  },
+  "deleteAccountBody": "This can't be undone. It deletes your account on all its devices — its profile, devices, backup codes and sign-in — and takes your name off the games you played. It also clears everything Open Hearts keeps on this device.\n\nLive play stops now, and the time left on your subscription is lost. A web subscription is cancelled. One from the App Store or Google Play goes on renewing until you cancel it there.\n\nTo stop paying but keep playing until your year is up, cancel instead.",
+  "@deleteAccountBody": {
+    "description": "What deleting an account does, said before it is done: what goes, that the time paid for is lost, and that cancelling is the other way to stop paying."
+  },
+  "keepAccount": "Keep account",
+  "@keepAccount": {
+    "description": "Button: do not delete the account after all."
+  },
+  "accountDeleted": "Your account is deleted",
+  "@accountDeleted": {
+    "description": "Title of the last screen in a phone build after the account was deleted."
+  },
+  "accountDeletedClose": "Close Open Hearts and open it again to start afresh.",
+  "@accountDeletedClose": {
+    "description": "On the last screen after the account was deleted: a phone app cannot start itself again."
+  },
   "waitingToReconnect": "Waiting for the others to reconnect",
   "@waitingToReconnect": {
     "description": "Under the table while the game is paused."

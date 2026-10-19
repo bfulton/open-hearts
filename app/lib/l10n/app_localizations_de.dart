@@ -856,6 +856,26 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveAgree => 'Ich stimme zu';
 
   @override
+  String get deleteAccount => 'Konto löschen';
+
+  @override
+  String get deleteAccountTitle => 'Dein Konto löschen?';
+
+  @override
+  String get deleteAccountBody =>
+      'Das lässt sich nicht rückgängig machen. Dein Konto wird auf allen seinen Geräten gelöscht – sein Profil, seine Geräte, seine Backup-Codes und seine Anmeldung –, und dein Name verschwindet aus den Spielen, die du gespielt hast. Außerdem wird alles gelöscht, was Open Hearts auf diesem Gerät speichert.\n\nDas Live-Spiel endet sofort, und die restliche Zeit deines Abos verfällt. Ein Web-Abo wird gekündigt. Eines aus dem App Store oder von Google Play verlängert sich weiter, bis du es dort kündigst.\n\nWenn du nicht mehr zahlen, aber bis zum Ende deines Jahres weiterspielen willst, kündige stattdessen.';
+
+  @override
+  String get keepAccount => 'Konto behalten';
+
+  @override
+  String get accountDeleted => 'Dein Konto ist gelöscht';
+
+  @override
+  String get accountDeletedClose =>
+      'Schließe Open Hearts und öffne es wieder, um neu anzufangen.';
+
+  @override
   String get waitingToReconnect =>
       'Warte, bis die anderen wieder verbunden sind';
 

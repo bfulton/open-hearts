@@ -119,6 +119,23 @@ void main() {
     expect(InUse.current.standing, Use.elsewhere);
   });
 
+  test('deleted from another of its devices, as a relay says: the licence off this one, and nothing to show a relay', () async {
+    final stand = standUp();
+    final me = await Identity.signer();
+    Entitlement.current.addListener(InUse.current.licenceChanged);
+    await licenceThisDevice();
+    stand.says('activate', {'activation': activationFor(me.publicKey)});
+    expect(await InUse.current.open(me), Use.here);
+
+    InUse.current.turnedAway('deleted: this account was deleted');
+    await pumpEventQueue();
+    expect(InUse.current.standing, Use.unasked, reason: 'a device of no account, not one in use elsewhere');
+    expect(InUse.current.credentials(me.publicKey), isNull);
+    expect(Entitlement.current.live, isFalse);
+    expect(Entitlement.current.inAnAccount, isFalse, reason: 'nothing left here to delete');
+    expect(Entitlement.current.suspended, isFalse);
+  });
+
   test('suspended, as a relay says: live play shut here, the duty with it, and the licence; let back, open again', () async {
     final stand = standUp();
     final me = await Identity.signer();

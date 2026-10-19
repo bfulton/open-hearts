@@ -291,13 +291,16 @@ export async function record(event, store, { now = Date.now() } = {}) {
   if (event?.type?.startsWith('customer.subscription.')) {
     const subscription = object.id;
     if (!subscription) return null;
-    await keepCustomer(store, subscription, object.customer);
     const period = object.current_period_end ?? object.items?.data?.[0]?.current_period_end;
     // Ended: Stripe deleted it, or dunning gave up, or it was refunded
     // out. A subscription that is merely *cancelling* is not this — it
     // runs to the end of what was paid for, which is what renews_at
     // already says.
     const final = event.type.endsWith('.deleted') || FINAL.has(object.status);
+    // An ending of one with no account here — deleted with its account
+    // (deletion.mjs), or not yet bound — keeps no customer: only the
+    // note that it ended, which turns a late event about it away.
+    if (!final || (await store.get(`SUB#${subscription}`, 'ACCOUNT'))) await keepCustomer(store, subscription, object.customer);
     return dateSubscription(store, subscription, {
       source: 'stripe',
       txn_ref: object.latest_invoice ?? null,
@@ -345,12 +348,28 @@ export async function endRefunded(charge, store, env, fetchImpl = fetch) {
     const named = (await ask(`/invoices/${encodeURIComponent(invoice)}`)).parent?.subscription_details?.subscription;
     const subscription = typeof named === 'string' ? named : named?.id;
     if (typeof subscription !== 'string' || !(await store.get(`SUB#${subscription}`, 'META'))) return { status: 200, body: { ended: null } };
-    if (FINAL.has((await ask(`/subscriptions/${encodeURIComponent(subscription)}`)).status)) return { status: 200, body: { ended: false, subscription } };
-    await ask(`/subscriptions/${encodeURIComponent(subscription)}?${new URLSearchParams({ 'cancellation_details[comment]': 'refunded' })}`, 'DELETE');
-    return { status: 200, body: { ended: true, subscription } };
+    return { status: 200, body: { ended: await endAtStripe(subscription, secret, 'refunded', fetchImpl), subscription } };
   } catch {
     return { status: 502, body: { error: 'the shop is not answering' } };
   }
+}
+
+/// [subscription] ended in Stripe now, with [comment] as the reason
+/// Stripe keeps, unless it has ended already or Stripe has none by that
+/// name, which renews nothing: true when it ended here. Throws
+/// [StripeRefused] when Stripe says no, or the fetch's error.
+export async function endAtStripe(subscription, secret, comment, fetchImpl = fetch) {
+  const ask = async (path, method = 'GET') => {
+    const res = await fetchImpl(`${STRIPE}${path}`, { method, headers: stripeAuth(secret) });
+    if (res.status === 404 && method === 'GET') return null;
+    if (!res.ok) throw new StripeRefused(res.status);
+    return res.json();
+  };
+  const at = `/subscriptions/${encodeURIComponent(subscription)}`;
+  const now = await ask(at);
+  if (!now || FINAL.has(now.status)) return false;
+  await ask(`${at}?${new URLSearchParams({ 'cancellation_details[comment]': comment })}`, 'DELETE');
+  return true;
 }
 
 /// The Stripe customer behind [subscription], kept so a device on it can

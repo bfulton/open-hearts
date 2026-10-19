@@ -456,25 +456,60 @@ answers by one file of cases (`service/functions/names.vectors.json`):
 
 ### Deleting an account's data
 
-On request (the privacy policy's choices), the account is forgotten.
+A player deletes their account in the app, from any of its devices:
+**Delete account** on the subscription page, there for a device that
+holds a licence, holds one that has run out, or is suspended. The
+service also deletes one on request (the privacy policy's choices),
+when the operator runs `./oh account delete`. Either way the account is
+forgotten.
+
 Its name comes off every kept game it played, found by the licence at
 its seat (`anonymizeGames`), which stays the other players' game: the
 names are kept beside a record unsigned, so the record verifies as
-before. The account is marked
-forgotten first, so a game kept later, such as one its last licence
-let it finish, is kept without its name. Every row kept for the
-account is deleted (`forgetAccount`): those under `ACCOUNT#` (its
-devices, code, backup codes, sign-in, device in use, profile, and any
-suspension or name and picture held), each
+before. A kept game notes the accounts at its seats beside it in R2
+(`accounts`, in its custom metadata), so the worker reads only the games
+that name the account; a game kept before games noted them is read
+whatever it names. The account is marked forgotten first, so a game kept
+later, such as one its last licence let it finish, is kept without its
+name. Every row kept for the account is deleted (`forgetAccount`): those
+under `ACCOUNT#` (its devices, code, backup codes, sign-in, device in
+use, profile, and any suspension or name and picture held), each
 device's `ENTITLEMENT`, the rows its codes and sign-in are found by, and
-the `SUB#` rows of every subscription it has had. A subscription still paid up is
-cancelled first. Where the `Household` object runs, its note of the
-device in use (its key, the epoch, times, the table it said it sat at,
-the relay objects it was seen at, and whether the account was suspended)
-is in the object's own storage and
-is not reached from outside. It is written over the next time the
-account is taken up, which after deletion is never, and it holds no name
-or picture. Its results stay on the relay, under its account number,
+the `SUB#` rows of every subscription it has had, which its `META` row
+names, the one before a lapsed subscriber paid again among them
+(`before`).
+
+From the app (`deleteRoute` in `service/functions/worker.mjs`), the
+service first ends in Stripe each web subscription of the account still
+running, and the time left on it goes with it, as the terms say. A
+subscription bought in a store is the store's to end: the app says to
+cancel it there. Then the games, and then the rows, in the account's
+own turn (`deleteAccount` in `service/functions/deletion.mjs`), where
+its device in use is cut off at the relay with the reason `deleted:`
+and the `Household` object keeps only the epoch it counts devices in use
+by. A run that stops part way finds the account still there when the
+device asks again, and goes on. A kept game that would not be written
+back as it was sent keeps the name, and the operator is emailed which
+(`alertUnwritten`). The device then forgets everything it keeps and
+starts afresh (`app/lib/start_afresh.dart`): the page loads again on the
+web, and a phone build asks to be closed and opened again.
+
+Stripe tells the service of the subscription's end after the account is
+gone. Its `SUB#` row comes back as the note that it ended, with no
+customer and no account (`record` in `service/functions/stripe.mjs`), so
+that a late event about it is turned away. Under a legal hold
+(`holds.mjs`), nothing is deleted or ended: the asking is noted, and the
+app is answered as for a deletion.
+
+From the operator's command, a subscription still paid up is cancelled
+first. Where the `Household` object runs, its note of the device in use
+(its key, the epoch, times, the table it said it sat at, the relay
+objects it was seen at, and whether the account was suspended) is in the
+object's own storage and is not reached from outside. It is written over
+the next time the account is taken up, which after deletion is never,
+and it holds no name or picture.
+
+Either way, its results stay on the relay, under its account number,
 which nothing left in the service ties to the person; a result cannot be
 changed in any case, since every copy is signed by the device that
 published it

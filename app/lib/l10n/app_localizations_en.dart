@@ -843,6 +843,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveAgree => 'I agree';
 
   @override
+  String get deleteAccount => 'Delete account';
+
+  @override
+  String get deleteAccountTitle => 'Delete your account?';
+
+  @override
+  String get deleteAccountBody =>
+      'This can\'t be undone. It deletes your account on all its devices — its profile, devices, backup codes and sign-in — and takes your name off the games you played. It also clears everything Open Hearts keeps on this device.\n\nLive play stops now, and the time left on your subscription is lost. A web subscription is cancelled. One from the App Store or Google Play goes on renewing until you cancel it there.\n\nTo stop paying but keep playing until your year is up, cancel instead.';
+
+  @override
+  String get keepAccount => 'Keep account';
+
+  @override
+  String get accountDeleted => 'Your account is deleted';
+
+  @override
+  String get accountDeletedClose =>
+      'Close Open Hearts and open it again to start afresh.';
+
+  @override
   String get waitingToReconnect => 'Waiting for the others to reconnect';
 
   @override

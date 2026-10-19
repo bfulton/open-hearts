@@ -84,6 +84,28 @@ void main() {
     return (e, service);
   }
 
+  test('a licence run out still says the device is in an account, until the device forgets it; another device\'s says nothing', () async {
+    final day = DateTime.now().toUtc().subtract(const Duration(days: 3));
+    final until = DateTime.utc(day.year, day.month, day.day);
+    Licence lapsedFor(PublicKey key) {
+      final unsigned = Licence(key: key, account: '0a' * 16, until: until, plan: 'year', signature: '');
+      return Licence(key: key, account: '0a' * 16, until: until, plan: 'year', signature: SchnorrSigner.fromSecret(_serviceSecret).sign(unsigned.digest));
+    }
+
+    SharedPreferences.setMockInitialValues({'licence': lapsedFor(device.publicKey).encoded});
+    final lapsed = Entitlement(service: _service);
+    await lapsed.load(device.publicKey);
+    expect(lapsed.live, isFalse);
+    expect(lapsed.inAnAccount, isTrue, reason: 'a lapsed subscriber\'s account is still there');
+    await lapsed.forget();
+    expect(lapsed.inAnAccount, isFalse, reason: 'forgotten, as when its account is deleted');
+
+    SharedPreferences.setMockInitialValues({'licence': lapsedFor(SchnorrSigner.generate().publicKey).encoded});
+    final other = Entitlement(service: _service);
+    await other.load(device.publicKey);
+    expect(other.inAnAccount, isFalse);
+  });
+
   test('a start the service does not answer asks again, further apart each time, until it does', () {
     fakeAsync((clock) {
       final licence = (after: Duration.zero, said: (answered: true, licence: _licenceFor(device.publicKey), suspended: false) as LicenceAnswer);

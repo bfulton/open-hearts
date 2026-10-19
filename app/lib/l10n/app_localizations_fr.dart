@@ -847,6 +847,26 @@ class AppLocalizationsFr extends AppLocalizations {
   String get liveAgree => 'J\'accepte';
 
   @override
+  String get deleteAccount => 'Supprimer le compte';
+
+  @override
+  String get deleteAccountTitle => 'Supprimer votre compte ?';
+
+  @override
+  String get deleteAccountBody =>
+      'C\'est définitif. Votre compte est supprimé sur tous ses appareils — son profil, ses appareils, ses codes de secours et sa connexion — et votre nom est retiré des parties que vous avez jouées. Tout ce qu\'Open Hearts garde sur cet appareil est aussi effacé.\n\nLe jeu en direct s\'arrête maintenant, et le temps qui reste sur votre abonnement est perdu. Un abonnement pris sur le web est résilié. Un abonnement de l\'App Store ou de Google Play continue de se renouveler jusqu\'à ce que vous le résiliiez là-bas.\n\nPour ne plus payer mais continuer à jouer jusqu\'à la fin de votre année, résiliez plutôt l\'abonnement.';
+
+  @override
+  String get keepAccount => 'Garder le compte';
+
+  @override
+  String get accountDeleted => 'Votre compte est supprimé';
+
+  @override
+  String get accountDeletedClose =>
+      'Fermez Open Hearts et rouvrez-le pour repartir de zéro.';
+
+  @override
   String get waitingToReconnect => 'En attente de la reconnexion des autres';
 
   @override

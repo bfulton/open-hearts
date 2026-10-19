@@ -105,6 +105,21 @@ export async function alertWaiting(env, store, { key, account, pool, target, now
   ].join('\n'));
 }
 
+/// An account deleted from the app whose name stayed on [keys], kept
+/// games that would not be written back as they were sent (records.mjs,
+/// NotAsSent): the operator's to look at, whatever the switches say,
+/// since the deletion said it was done.
+export async function alertUnwritten(env, { account, keys, now = Date.now() }) {
+  const alerts = alertsOf(env);
+  if (!alerts || !keys.length) return false;
+  return tell(env, alerts, "Open Hearts: a deleted account's name is still on a kept game", [
+    `Account ${account} was deleted from the app at ${new Date(now).toISOString()}. Its name could not be taken off ${keys.length} kept game(s), which would not be written back as they were sent:`,
+    ...keys.map((k) => `  ${k}`),
+    '',
+    'What to do is in docs/how-to/delete-an-accounts-data.md, under "A game that cannot be rewritten".',
+  ].join('\n'));
+}
+
 /// The object's side: the mail sent, where the relay binds EMAIL and
 /// says who it is from (OH_MAIL_FROM). {status, body}.
 export async function sendAlert(op, env) {

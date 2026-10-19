@@ -357,6 +357,18 @@ Future<Said<Licence>> claimCode(Signer signer, String code, {Uri? endpoint, Stri
   return (answer: licence, refusal: null);
 }
 
+/// This device's account deleted, at its asking
+/// (service/functions/worker.mjs, deleteRoute): true once it is, and
+/// once there is none — a deletion whose answer was lost, asked again,
+/// which the service carries on from where it stopped — or why not.
+Future<Said<bool>> deleteAccount(Signer signer, {Uri? endpoint}) async {
+  final answer = await askHandler('delete', signer, const {}, endpoint);
+  if (answer?.status == 200) return (answer: true, refusal: null);
+  final refused = refusalOf(answer);
+  if (answer?.status == 404 && refused.said == 'no account') return (answer: true, refusal: null);
+  return (answer: null, refusal: refused);
+}
+
 /// The devices on this subscription; with [drop], one fewer.
 Future<Said<Household>> devicesOn(Signer signer, {PublicKey? drop, Uri? endpoint}) async {
   final answer = await askHandler('devices', signer, {'drop': ?drop}, endpoint, what: drop ?? '');

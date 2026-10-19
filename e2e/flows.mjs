@@ -356,6 +356,47 @@ stillFlow('the backup codes, shown on request and copied', async ({ open }) => {
   if (copied.split('\n').join(',') !== shown.join(',')) throw new Error(`copied ${JSON.stringify(copied)}, shown ${shown.join(',')}`);
 });
 
+stillFlow('a device deletes its account, asked first, and the page starts again as a new player', async ({ open, app }) => {
+  // app/lib/subscribe_page.dart, _delete; service/functions/worker.mjs,
+  // deleteRoute; app/lib/start_afresh.dart. The rig's open house makes
+  // the device an account, as a purchase would.
+  const page = await open();
+  await waitFor(page, /^Play live/, { what: 'live play open', timeout: 40000 });
+  const item = (key) => page.evaluate((k) => localStorage.getItem(k), key);
+  const secret = await item('flutter.identity_secret');
+  const { key, account } = JSON.parse(JSON.parse(await item('flutter.licence')));
+  if (!app.store.rows.has(`ACCOUNT#${account}|META`)) throw new Error(`no account ${account} at the service`);
+  await click(page, /^Menu$/);
+  await waitFor(page, /^Subscription$/, { what: 'the menu' });
+  await click(page, /^Subscription$/);
+  await waitFor(page, /^This device$/, { what: 'the subscription page' });
+  await click(page, /^Delete account$/);
+  await waitFor(page, /^Delete your account\?$/, { what: 'the screen that asks first' });
+  // Set on this load of the page, and gone with it.
+  await page.evaluate(() => { window.ohBeforeDeleting = true; });
+  await click(page, /^Delete account$/);
+  // The page loads again, as a device that never was, and the rig's
+  // open house licenses it as a new one.
+  const again = async () => {
+    try {
+      const licence = await item('flutter.licence');
+      return licence !== null && JSON.parse(JSON.parse(licence)).key !== key;
+    } catch {
+      return false;
+    }
+  };
+  for (let i = 0; i < 240 && !(await again()); i++) await sleep(250);
+  await waitFor(page, /^Play live|^Play solo$|^This device$/, { what: 'the app again, after the reload', timeout: 60000 });
+  if (await page.evaluate(() => window.ohBeforeDeleting === true)) throw new Error('the page was not loaded again');
+  if ((await item('flutter.device_started_afresh')) === null) throw new Error('not started afresh');
+  if (!(await again())) throw new Error('not licensed as a new device');
+  const now = await item('flutter.identity_secret');
+  if (now === secret) throw new Error('the same key after the deletion');
+  const rows = [...app.store.rows.keys()].filter((k) => k.includes(account) || k.includes(key));
+  if (rows.length) throw new Error(`the service still holds ${rows.join(', ')}`);
+  if (!app.records.kept.has(`forgotten/${account}`)) throw new Error('the account is not marked forgotten');
+});
+
 stillFlow('a page keeps its address: away to another site and back lands on it', async ({ open }) => {
   // Stripe's checkout and portal are whole pages of their own. The back
   // button from there loads the app again, and it has to come back to

@@ -16,10 +16,11 @@
 // on is in the modules they import.
 
 import { accountOfKey, backupCodeOf, backupRow, entitlementOf } from './accounts.mjs';
-import { alertReport, alertSubscribed, alertWaiting, reportOf } from './alerts.mjs';
+import { alertReport, alertSubscribed, alertUnwritten, alertWaiting, reportOf } from './alerts.mjs';
 import { appHostFor, serveStatic } from './app_host.mjs';
 import { CONFIG_ROW, configOf } from './config.mjs';
 import { healthOf } from './health.mjs';
+import { holdOf } from './holds.mjs';
 import { inHousehold, inSubscription } from './household.mjs';
 import { MOST_BODY, MOST_EVENT, cors, json, preflight, signedFor, textOf } from './http.mjs';
 import { ACTIVATION_S, activationFor, licence, serviceKeys } from './licence.mjs';
@@ -27,12 +28,12 @@ import { loginRow } from './logins.mjs';
 import { measure } from './metrics.mjs';
 import { carryOutNotice, noticesOf } from './notices.mjs';
 import { MOST_PROFILE_BODY } from './profile.mjs';
-import { keepRecord, recordMost, recordResponse, tableIdShape } from './records.mjs';
+import { anonymizeGames, keepRecord, keptGames, markForgotten, recordMost, recordResponse, tableIdShape } from './records.mjs';
 import { isAccount, storeOf } from './rows.mjs';
 import { S, notConfigured, openHouse, settle } from './settings.mjs';
 import { APPLE_ID_GONE, PROVIDERS, appleIdNotice, supersede, unlinkFromAccount, whoSignedIn } from './signin.mjs';
 import { playPurchase, playSubscriptionOf, pushedByPlay, storeAccountOf } from './stores.mjs';
-import { checkout, endRefunded, manage, payerLookup, record, sameSite, webhookSigned } from './stripe.mjs';
+import { checkout, endAtStripe, endRefunded, manage, payerLookup, record, sameSite, webhookSigned } from './stripe.mjs';
 import { dateSubscription } from './subscriptions.mjs';
 import { SUSPENDED_WHY, isOrder, orderRow } from './suspension.mjs';
 import { LOCAL_TURN, mint } from './turn.mjs';
@@ -458,6 +459,48 @@ async function reportRoute(request, env) {
   return json(request, 200, { ok: true });
 }
 
+/// The account of the device asking, deleted: by any device of it, as
+/// any may drop another (docs/explanation/service.md, "Deleting an
+/// account's data"). Signed for `delete`. What is outside the store
+/// goes first, so that a run that stops part way finds the account
+/// still there when the device asks again: each web subscription of it
+/// still running is ended in Stripe, the time left on it with it (the
+/// terms, "Ending these terms"); the account is marked forgotten, and
+/// its name taken off the games it played (records.mjs). Then its rows,
+/// in its turn (deletion.mjs, deleteAccount). A game that would not be
+/// written back as it was sent keeps the name, and the operator is told
+/// (alerts.mjs). 404 for a device in no account: one whose deletion is
+/// done. Under a legal hold, only the asking is noted.
+async function deleteRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'delete');
+  if (asked instanceof Response) return asked;
+  const store = storeOf(env);
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
+  const account = await accountOfKey(store, asked.key);
+  if (!account || !(await store.get(`ACCOUNT#${account}`, `DEVICE#${asked.key}`))) return json(request, 404, { error: 'no account' });
+  if (!(await holdOf(store, account))) {
+    const meta = await store.get(`ACCOUNT#${account}`, 'META');
+    const web = [meta?.subscription, ...(Array.isArray(meta?.before) ? meta.before : [])].filter((s) => typeof s === 'string' && s.startsWith('sub_'));
+    if (web.length && !env.OH_STRIPE_SECRET) return json(request, 503, notConfigured('OH_STRIPE_SECRET'));
+    try {
+      for (const sub of web) await endAtStripe(sub, env.OH_STRIPE_SECRET, 'account deleted');
+    } catch {
+      return json(request, 502, { error: 'the shop is not answering' });
+    }
+    if (env.OH_RECORDS) {
+      await markForgotten(env.OH_RECORDS, account);
+      const unwritten = [];
+      await anonymizeGames(keptGames(env.OH_RECORDS), account, { refused: (key) => unwritten.push(key) });
+      await alertUnwritten(env, { account, keys: unwritten });
+    }
+  }
+  const { status, body } = await inHousehold(env, account, { op: 'delete', key: asked.key });
+  return json(request, status, body);
+}
+
 async function turn(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -652,6 +695,7 @@ const ROUTES = {
   profile: (request, env) => profileRoute(request, env),
   waiting: (request, env, ctx) => waitingRoute(request, env, ctx),
   report: (request, env) => reportRoute(request, env),
+  delete: (request, env) => deleteRoute(request, env),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),
   'apple-id': (request, env) => appleIdRoute(request, env),

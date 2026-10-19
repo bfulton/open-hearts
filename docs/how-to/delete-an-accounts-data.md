@@ -2,6 +2,8 @@
 
 Use this guide when a person asks for their account's data to be deleted, as the privacy policy offers.
 
+Most people don't need to ask: **Delete account**, at the foot of the app's subscription page, deletes the account from any of its devices at once, and the operator does nothing ([how it works](../explanation/service.md#deleting-an-accounts-data)). Point a person who asks to it. Use the command below when they can't, for example when they no longer have any of their devices.
+
 `./oh account delete` forgets the account ([the oh command](../reference/oh.md)). It takes the account's name off every kept game it played (`anonymizeGames` in `service/functions/records.mjs`), and deletes every row the service keeps for it in `OH_STORE` (`forgetAccount` in `service/functions/deletion.mjs`): its devices and their entitlements, its codes and backup codes, its sign-in, its device in use, its profile, any suspension or name and picture held, and the rows of every subscription it has had. Its results stay on the relay, under its account number, which nothing left in the service ties to the person.
 
 ## Before you begin
@@ -52,6 +54,21 @@ Use this guide when a person asks for their account's data to be deleted, as the
 - **Its `Household` object's note of the device in use**: the device's key, how many times the account was taken up, times, the table it last sat at, the relay tags it opened since, and whether the account was suspended (the `active` entry of `Household` in `service/functions/household.mjs`). Nothing outside the object can reach it. It is written over only when the account is taken up again, which after deletion never happens. It holds no name or picture.
 - **Stripe's own record of a web subscription**, which holds the email address and, in the subscription's metadata, the paying device's key.
 - Copies of results, records and table events that other people's devices keep, which the service cannot reach.
+
+A deletion from the app leaves less in the `Household` object (only how many times the account was taken up) and, once Stripe tells the service the subscription ended, a `SUB#` row saying so, with no customer and no account.
+
+## A game that cannot be rewritten
+
+An email with the subject **Open Hearts: a deleted account's name is still on a kept game** says that an account was deleted from the app, and names each kept game its name could not be taken off. The rest of the deletion went ahead. `JSON.stringify` would not write those records back as they were sent, so nothing rewrites them, `./oh account delete` included. The app never makes such a record.
+
+Look at each one, and delete it from the bucket if it holds the name:
+
+```bash
+npx wrangler r2 object get "open-hearts-records/tables/<table>.json" --remote --pipe | gunzip
+npx wrangler r2 object delete "open-hearts-records/tables/<table>.json" --remote
+```
+
+Its players can no longer look at the game afterwards; their own devices keep their copies.
 
 ## Check it worked
 

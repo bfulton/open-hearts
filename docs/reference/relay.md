@@ -71,6 +71,7 @@ The reason in a refusal starts with one of these words:
 | `restricted:` | Not a backup juror. The relay closes the socket. |
 | `superseded:` | Another device of this account is in use. The relay closes the socket. |
 | `suspended:` | This account is suspended from live play. The relay closes the socket. |
+| `deleted:` | This account was deleted, from one of its devices. The relay closes the socket. |
 | `too big:` | A `NOTICE`: a message or `REQ` over its limit. |
 
 ## Limits

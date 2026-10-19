@@ -90,6 +90,7 @@
       "p10": "On a device in your account, open the menu, choose <i>Subscription</i> and tap <i>Add a device</i>, then scan the code with the other device, or tap <i>Send the link instead</i>. A code works once, for ten minutes.",
       "p11": "What if I lose my phone, or clear my browser?",
       "p12": "If another of your devices is in your account, add the new one from there and drop the lost one. If not, use a backup code: on the new device, open the menu, choose <i>Activate subscription</i> and enter it, and the device joins the same account, with your name, picture, rating and games. Signed in with Apple or Google? Sign in the same way on the new device instead. Any device in the account can <i>Show backup codes</i>, and a web subscription's were emailed when you subscribed: keep them somewhere safe. Bought in the App Store or Google Play? On the new phone, tap <i>Subscribe</i>, then <i>Restore purchases</i>.",
+      "p25": "How do I delete my account?",
       "p21": "Why does it say Open Hearts is open on another device?",
       "p22": "Your account plays live on one device at a time, and the one opened most recently is the one in use. The other steps back: it leaves any table it was at and stops playing live, and you can still play alone on it. Tap <i>Use it here</i> to take the account back. If your account is in a game on the other device, you are asked first, because that game will be lost: a bot finishes your seat, and a rated game counts as one you left.",
       "p23": "What if nobody else is online?",
@@ -122,6 +123,10 @@
       "googlePlay": "<b>Google Play:</b> in the Play Store app, tap your profile picture, then Payments &amp; subscriptions, then Subscriptions.",
       "web": "<b>Web</b>, with none of the subscription's devices left: email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> from the address you paid with, and we will cancel it and confirm.",
       "refunds": "What cancelling leaves you with, and refunds, are in the <a href=\"{{base}}/terms#cancelling\">terms</a>."
+    },
+    "delete": {
+      "p1": "On a device in your account, open the menu, choose <i>Subscription</i>, and tap <i>Delete account</i> at the foot of the page. It deletes the account at once, on all its devices: its profile, devices, backup codes and sign-in, and your name on the games you played. A web subscription is cancelled with it, and the time left on it is lost. One from the App Store or Google Play has to be cancelled in the store, as above, or it goes on renewing.",
+      "p2": "Without any of your devices, email <a href=\"mailto:help@openhearts.game\">help@openhearts.game</a> with the name you play under and, if you subscribed on the web, from the address you paid with, and we will delete it. What stays after a deletion, and why, is in the <a href=\"{{base}}/privacy\">privacy policy</a>."
     },
     "addAlt": "The game's menu with the pointer on Subscription, then the subscription page with the pointer on Add a device",
     "fair": {
@@ -224,7 +229,7 @@
       "p1": "<b>On your device:</b> until you remove them.",
       "p2": "<b>On our relay:</b> moves, presence and waiting for a game: not kept. Rooms, seatings and pictures: a day. Game results: for as long as the ratings are worked out from them. A copy of each new picture, and which accounts put it out, is also kept apart for us to look at, until 30 days after it was last put out at a table, and Cloudflare, which serves that copy to us, checks it against known images of child sexual abuse. A program run by Cloudflare also looks at each new picture as it is copied, and hides one that seems to show nudity or sexual content, violence or a hate symbol; what it made of the picture is kept with the copy.",
       "p3": "<b>Finished live games:</b> for good, in Cloudflare's storage. If you ask us to delete your account's data, your name comes off the games you played; the moves stay, for the other players.",
-      "p4": "<b>Our service's account and subscription records, your account's profile among them:</b> while the subscription runs, and afterwards until you ask us to delete them. A changed profile replaces the one before. The note of which device is in use is replaced each time another of your devices opens the game. If we suspend your account from live play, or take its name or picture off, as the <a href=\"{{base}}/terms#table\">terms</a> allow, our service also keeps a note that it is suspended and since when, and the name or picture it took off, so that either can be undone. Each is kept until it is undone, or until you ask us to delete your account's records.",
+      "p4": "<b>Our service's account and subscription records, your account's profile among them:</b> while the subscription runs, and afterwards until you delete your account or ask us to delete them. A changed profile replaces the one before. The note of which device is in use is replaced each time another of your devices opens the game. If we suspend your account from live play, or take its name or picture off, as the <a href=\"{{base}}/terms#table\">terms</a> allow, our service also keeps a note that it is suspended and since when, and the name or picture it took off, so that either can be undone. Each is kept until it is undone, or until your account's records are deleted.",
       "p5": "<b>Stripe and Link:</b> as long as Stripe's policy and the law on payment and tax records require.",
       "p6": "<b>Cloudflare and Google:</b> under their own policies.",
       "p7": "<b>New Relic:</b> the errors and timings, eight days.",
@@ -235,7 +240,7 @@
       "p1": "Play alone, and nothing about you leaves your device.",
       "p2": "Play live with a name that is not your real one, and with no picture.",
       "p3": "Change your name or picture at any time; if you subscribe, the change reaches all your account's devices. What was already published stays where it is.",
-      "p4": "Ask us for a copy of what our service keeps about your account, its profile and its devices, or ask us to delete it. Then your name comes off the finished games you played, and the results your devices published stay on our relay, for the ratings, without your name: each still names your account's number and your device's public key. If you subscribed on the web, Stripe's payment records still hold your email address with your device's public key, which those results name, for as long as Stripe keeps them.",
+      "p4": "Delete your account in the app (<a href=\"{{base}}/support#delete\">how</a>), or ask us to delete it, or to send you a copy of what our service keeps about your account, its profile and its devices. Once it is deleted, your name comes off the finished games you played, and the results your devices published stay on our relay, for the ratings, without your name: each still names your account's number and your device's public key. If you subscribed on the web, Stripe's payment records still hold your email address with your device's public key, which those results name, for as long as Stripe keeps them.",
       "p5": "Where data protection law gives you rights — to see, correct or delete what is held about you, to object, or to complain to your data protection authority — you have them here too."
     },
     "children": {
@@ -383,7 +388,7 @@
     },
     "ending": {
       "title": "Ending these terms",
-      "p1": "You can stop using Open Hearts at any time, and cancel a subscription as described above. If we ever stop offering live play for good, we will stop renewals, say so here and in the app beforehand, and refund the unused part of any web subscription. Subscriptions bought in the App Store or Google Play are refunded under the store's rules. Interruptions, outages and maintenance are not stopping live play, and do not earn a refund.",
+      "p1": "You can stop using Open Hearts at any time, and cancel a subscription as described above. You can also delete your account in the app: its live play ends at once, a web subscription is cancelled with it without a refund of the time left, and one bought in the App Store or Google Play has to be cancelled in the store. If we ever stop offering live play for good, we will stop renewals, say so here and in the app beforehand, and refund the unused part of any web subscription. Subscriptions bought in the App Store or Google Play are refunded under the store's rules. Interruptions, outages and maintenance are not stopping live play, and do not earn a refund.",
       "p2": "We may end your account, stopping its live play for good and ending its subscription, if you seriously or repeatedly break these terms, or if the law requires us to. We then refund the unused part of a web subscription, unless we ended the account for a serious breach, such as cheating, harassment, illegal content or fraud. A subscription bought in Google Play is cancelled and refunded under Google's rules. One bought in the App Store can be cancelled only by you, in the App Store, and is refunded by Apple, under its rules."
     },
     "law": {

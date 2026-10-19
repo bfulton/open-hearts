@@ -846,6 +846,26 @@ class AppLocalizationsPt extends AppLocalizations {
   String get liveAgree => 'Concordo';
 
   @override
+  String get deleteAccount => 'Excluir conta';
+
+  @override
+  String get deleteAccountTitle => 'Excluir a sua conta?';
+
+  @override
+  String get deleteAccountBody =>
+      'Isso não pode ser desfeito. A sua conta é excluída em todos os dispositivos dela — o perfil, os dispositivos, os códigos de backup e o login — e o seu nome sai das partidas que você jogou. Também apaga tudo o que o Open Hearts guarda neste dispositivo.\n\nO jogo ao vivo para agora, e você perde o tempo que resta da assinatura. Uma assinatura feita na web é cancelada. Uma da App Store ou do Google Play continua sendo renovada até você cancelá-la lá.\n\nPara parar de pagar mas continuar jogando até o fim do seu ano, cancele a assinatura em vez disso.';
+
+  @override
+  String get keepAccount => 'Manter a conta';
+
+  @override
+  String get accountDeleted => 'A sua conta foi excluída';
+
+  @override
+  String get accountDeletedClose =>
+      'Feche o Open Hearts e abra de novo para começar do zero.';
+
+  @override
   String get waitingToReconnect => 'Esperando os outros reconectarem';
 
   @override

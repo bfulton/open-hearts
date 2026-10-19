@@ -1130,6 +1130,42 @@ abstract class AppLocalizations {
   /// **'I agree'**
   String get liveAgree;
 
+  /// Button on the subscription page, and on the screen that asks: delete this device's account for good.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get deleteAccount;
+
+  /// Title of the screen that asks before an account is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete your account?'**
+  String get deleteAccountTitle;
+
+  /// What deleting an account does, said before it is done: what goes, that the time paid for is lost, and that cancelling is the other way to stop paying.
+  ///
+  /// In en, this message translates to:
+  /// **'This can\'t be undone. It deletes your account on all its devices — its profile, devices, backup codes and sign-in — and takes your name off the games you played. It also clears everything Open Hearts keeps on this device.\n\nLive play stops now, and the time left on your subscription is lost. A web subscription is cancelled. One from the App Store or Google Play goes on renewing until you cancel it there.\n\nTo stop paying but keep playing until your year is up, cancel instead.'**
+  String get deleteAccountBody;
+
+  /// Button: do not delete the account after all.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep account'**
+  String get keepAccount;
+
+  /// Title of the last screen in a phone build after the account was deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is deleted'**
+  String get accountDeleted;
+
+  /// On the last screen after the account was deleted: a phone app cannot start itself again.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Open Hearts and open it again to start afresh.'**
+  String get accountDeletedClose;
+
   /// Under the table while the game is paused.
   ///
   /// In en, this message translates to:

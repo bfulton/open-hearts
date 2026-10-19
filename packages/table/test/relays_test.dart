@@ -10,9 +10,10 @@ void main() {
       expect(Relays.format(Relays.parse('wss://a, wss://b')), 'wss://a, wss://b');
     });
 
-    test('a relay\'s refusal for good: superseded, suspended or not admitted, and nothing else', () {
+    test('a relay\'s refusal for good: superseded, suspended, deleted or not admitted, and nothing else', () {
       expect(turnedAway('superseded: another device of this account is in use'), isTrue);
       expect(turnedAway('suspended: this account is suspended from live play'), isTrue);
+      expect(turnedAway('deleted: this account was deleted'), isTrue);
       expect(turnedAway('restricted: not a backup juror'), isTrue);
       expect(turnedAway('auth-required: an old answer'), isFalse, reason: 'asked again with a fresh answer');
       expect(turnedAway('rate-limited: slow down'), isFalse);

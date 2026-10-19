@@ -376,10 +376,11 @@ const supersededWhy = 'superseded: another device of this account is in use';
 
 /// Whether [why] is a refusal the relay will not change its mind about
 /// for this device: superseded, its account suspended
-/// (service/functions/suspension.mjs), or not admitted at all. The app
+/// (service/functions/suspension.mjs) or deleted
+/// (service/functions/deletion.mjs), or not admitted at all. The app
 /// goes by the same first word (packages/table, relays.dart,
 /// turnedAway).
-const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|restricted): /.test(why);
+const finalWhy = (why) => typeof why === 'string' && why.length <= 120 && /^(superseded|suspended|deleted|restricted): /.test(why);
 
 /// The relay itself. [verify] checks a signature, [refuse] is a policy
 /// that may turn an event away with a reason — an object that carries

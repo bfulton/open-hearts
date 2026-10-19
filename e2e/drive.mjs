@@ -331,19 +331,29 @@ async function handlersFor(serve, turn, records, store, config) {
 }
 
 /// The kept games' bucket (service/functions/records.mjs), in memory:
-/// what the site would keep in R2. A flow can look at it, or put a game
-/// in it to open (`app.records`). One to each rig.
+/// what the site would keep in R2, custom metadata and listing too. A
+/// flow can look at it, or put a game in it to open (`app.records`).
+/// One to each rig.
 const recordsBucket = () => ({
   kept: new Map(),
+  noted: new Map(),
   async head(key) {
     return this.kept.has(key) ? { key } : null;
   },
   async get(key) {
     const body = this.kept.get(key);
-    return body ? { body: new Blob([body]).stream() } : null;
+    return body ? { body: new Blob([body]).stream(), customMetadata: this.noted.get(key) } : null;
   },
-  async put(key, body) {
+  async put(key, body, options = {}) {
     this.kept.set(key, Buffer.from(body));
+    this.noted.set(key, options.customMetadata);
+  },
+  async list({ prefix, include = [] }) {
+    const objects = [...this.kept.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({
+      key,
+      ...(include.includes('customMetadata') ? { customMetadata: this.noted.get(key) } : {}),
+    }));
+    return { objects, truncated: false };
   },
 });
 

@@ -21,13 +21,14 @@
 //
 // window.ohCarried is the promise flutter_bootstrap.js waits on, and
 // window.ohCarry what came of it: 'carried', 'nothing' (asked, and the
-// old origin had nothing), 'kept' (a key is here already, or the carry
-// was done before), 'timed out', 'not here' (no older origin to ask:
-// a preview, a local run) or 'failed'.
+// old origin had nothing), 'kept' (a key is here already, the carry was
+// done before, or the device was started afresh), 'timed out', 'not
+// here' (no older origin to ask: a preview, a local run) or 'failed'.
 (() => {
   'use strict';
   const KEY = 'flutter.identity_secret';
   const DONE = 'oh.carried';
+  const AFRESH = 'flutter.device_started_afresh';
   // How long the old origin's page may take to arrive, and then how long
   // it may take to answer. Giving up early costs a subscriber their
   // device — the app makes a key of its own, and with a key here the
@@ -65,7 +66,9 @@
     const site = siteOf(window.location);
     if (!site) return Promise.resolve('not here');
     const storage = window.localStorage;
-    if (storage.getItem(KEY) !== null || storage.getItem(DONE) !== null) return Promise.resolve('kept');
+    // A device started afresh after its account was deleted
+    // (app/lib/start_afresh.dart) is not brought back from the old one.
+    if (storage.getItem(KEY) !== null || storage.getItem(DONE) !== null || storage.getItem(AFRESH) !== null) return Promise.resolve('kept');
     return new Promise((resolve) => {
       const frame = document.createElement('iframe');
       let timer = null;

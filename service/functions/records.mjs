@@ -20,6 +20,7 @@
 // name beside the record to an account, for forgetting one.
 
 import { nameRefused } from './names.mjs';
+import { dayOf } from './rows.mjs';
 
 /// A table's id (packages/table, spec.dart, newTableId).
 export const tableIdShape = /^[0-9a-f]{32}$/;
@@ -42,6 +43,14 @@ const keyIn = (table) => `tables/${table}.json`;
 /// kept without the account's name. R2 reads what was last written, so
 /// a record checked after the mark is in sees it.
 export const forgottenKey = (account) => `forgotten/${account}`;
+
+/// [account] marked forgotten in [binding], OH_RECORDS as the worker
+/// reaches it, for an account deleted from the app (worker.mjs,
+/// deleteRoute), as `oh account delete` marks one.
+export async function markForgotten(binding, account, { now = Date.now() } = {}) {
+  if (await binding.head(forgottenKey(account))) return;
+  await binding.put(forgottenKey(account), JSON.stringify({ forgotten: dayOf(now) }), { httpMetadata: { contentType: 'application/json' } });
+}
 
 /// An account's number (rows.mjs, isAccount).
 const accountShape = /^[0-9a-f]{32}$/;
@@ -136,12 +145,73 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
   if (await bucket.head(keyIn(table))) return { status: 200, body: { kept: true, already: true } };
   const kept = await asKept(bucket, record, text);
   if (kept === null) return { status: 422, body: { error: 'a record that cannot be kept without the names taken out of it' } };
-  const packed = await new Response(new Blob([kept]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
-  await bucket.put(keyIn(table), packed, {
-    httpMetadata: { contentType: 'application/json', contentEncoding: 'gzip' },
-    customMetadata: { from: key },
+  await bucket.put(keyIn(table), await packed(kept), {
+    httpMetadata: KEPT_AS,
+    customMetadata: { from: key, accounts: seatedAccounts(record).join(',') },
   });
   return { status: 200, body: { kept: true } };
+}
+
+/// How a record is kept: gzipped, and said so.
+const KEPT_AS = Object.freeze({ contentType: 'application/json', contentEncoding: 'gzip' });
+const packed = (text) => new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+
+/// The accounts whose licences sit at [record]'s seats, each once: what
+/// a kept game notes beside it (`accounts`, comma-separated), so that
+/// one account's games are found without reading every game
+/// (anonymizeGames).
+function seatedAccounts(record) {
+  return [...new Set(record.spec.seats.map((s) => s?.licence?.account).filter((a) => typeof a === 'string' && accountShape.test(a)))];
+}
+
+/// Thrown for a kept record that JSON.stringify would not write back as
+/// it was sent: an event's id is a digest of its body as its reader
+/// parses it, and a number written another way can parse to another
+/// value (Dart reads 2.0 and 2 apart). Such a record is never rewritten.
+export class NotAsSent extends Error {
+  constructor(key) {
+    super(`${key} would not be written back as it was sent`);
+    this.key = key;
+  }
+}
+
+/// OH_RECORDS, an R2 binding, behind the calls anonymizeGames makes, as
+/// the worker reaches it: the kept games listed with the accounts noted
+/// beside each (null for a game kept before they were), and a record
+/// read and written as its JSON, kept as keepRecord keeps it, with what
+/// was noted beside it.
+export function keptGames(binding) {
+  const noted = new Map();
+  return {
+    async list(prefix) {
+      const found = [];
+      let cursor;
+      do {
+        const page = await binding.list({ prefix, cursor, include: ['customMetadata'] });
+        for (const o of page.objects) {
+          const accounts = o.customMetadata?.accounts;
+          found.push({ key: o.key, accounts: typeof accounts === 'string' ? accounts.split(',').filter(Boolean) : null });
+        }
+        cursor = page.truncated ? page.cursor : undefined;
+      } while (cursor);
+      return found;
+    },
+    async get(key) {
+      const kept = await binding.get(key);
+      if (!kept) return null;
+      const text = await new Response(kept.body.pipeThrough(new DecompressionStream('gzip'))).text();
+      const record = JSON.parse(text);
+      if (JSON.stringify(record) !== text) throw new NotAsSent(key);
+      noted.set(key, kept.customMetadata ?? {});
+      return record;
+    },
+    async put(key, record) {
+      await binding.put(key, await packed(JSON.stringify(record)), {
+        httpMetadata: KEPT_AS,
+        customMetadata: { ...noted.get(key), accounts: seatedAccounts(record).join(',') },
+      });
+    },
+  };
 }
 
 /// [text], the record sent, as it is to be kept: without the names of
@@ -154,7 +224,7 @@ export async function keepRecord(bucket, key, table, text, { verify, service = n
 /// is a digest of its body as its reader parses it; null when it would
 /// not.
 async function asKept(bucket, record, text) {
-  const accounts = new Set(record.spec.seats.map((s) => s?.licence?.account).filter((a) => typeof a === 'string' && accountShape.test(a)));
+  const accounts = seatedAccounts(record);
   let without = record;
   let named = 0;
   for (const account of accounts) {
@@ -196,13 +266,27 @@ export function withoutNames(record, account) {
 /// Every kept game [account] sat in, by its licence, with its name
 /// taken off it: for a deletion asked for. [bucket] lists, reads and
 /// writes records as the operator's tool reaches R2
-/// (service/tool/r2.mjs), a record as its JSON. With [dry], writes
-/// nothing. Returns {key, named} for each game changed, or that would
+/// (service/tool/r2.mjs), or the worker ([keptGames]), a record as its
+/// JSON; a game listed with the accounts noted beside it is read only
+/// if it names this one. With [dry], writes nothing. A record that
+/// would not be written back as it was sent ([NotAsSent]) stops the
+/// run, unless [refused] is given, which is told its key and the run
+/// goes on. Returns {key, named} for each game changed, or that would
 /// be.
-export async function anonymizeGames(bucket, account, { dry = false } = {}) {
+export async function anonymizeGames(bucket, account, { dry = false, refused = null } = {}) {
   const changed = [];
-  for (const key of await bucket.list('tables/')) {
-    const without = withoutNames(await bucket.get(key), account);
+  for (const listed of await bucket.list('tables/')) {
+    const { key, accounts = null } = typeof listed === 'string' ? { key: listed } : listed;
+    if (accounts && !accounts.includes(account)) continue;
+    let record;
+    try {
+      record = await bucket.get(key);
+    } catch (e) {
+      if (!(e instanceof NotAsSent) || !refused) throw e;
+      refused(key);
+      continue;
+    }
+    const without = withoutNames(record, account);
     if (!without?.named.length) continue;
     changed.push({ key, named: without.named });
     if (!dry) await bucket.put(key, without.record);

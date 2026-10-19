@@ -236,10 +236,23 @@ class InUse extends ChangeNotifier {
   /// A relay turned this device away for good, with its reason: another
   /// device of the account took it up, or the account is suspended —
   /// which shuts live play here as it does on every device of the
-  /// account, the licence with it.
+  /// account, the licence with it — or deleted, from another of its
+  /// devices: the licence goes, and this device is one with no account.
   void turnedAway(String reason) {
     if (reason.startsWith('superseded:')) stepBack();
     if (reason.startsWith('suspended:')) _suspend();
+    if (reason.startsWith('deleted:')) _deleted();
+  }
+
+  /// The account was deleted: live play shut here, and the licence off
+  /// the device, as for one handed on.
+  void _deleted() {
+    _renewing?.cancel();
+    _renewing = null;
+    _activation = null;
+    _seated = null;
+    _set(Use.unasked);
+    unawaited(Entitlement.current.forget());
   }
 
   /// The account is suspended, as a relay or the service said: live

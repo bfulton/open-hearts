@@ -16,6 +16,7 @@ import {
   ticketFor,
 } from './accounts.mjs';
 import { sendAlert } from './alerts.mjs';
+import { deleteAccount } from './deletion.mjs';
 import { attest, unlinkSignIn } from './logins.mjs';
 import { sendNotice } from './notices.mjs';
 import { profileRead, profileWritten } from './profile.mjs';
@@ -262,6 +263,8 @@ export async function householdOp(op, store, { now = Date.now(), mail = null, ac
       return op.profile ? profileWritten(op, store, active, { now }) : profileRead(op, store, { now });
     case 'order':
       return carryOut(op, store, active, { now, revoke });
+    case 'delete':
+      return deleteAccount(op, store, active, { now, revoke });
     default:
       return { status: 400, body: { error: 'not a household operation' } };
   }
