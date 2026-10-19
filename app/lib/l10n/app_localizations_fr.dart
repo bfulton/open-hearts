@@ -837,6 +837,16 @@ class AppLocalizationsFr extends AppLocalizations {
       'Sur cet appareil seulement : vous ne verrez plus son nom, son image ni ses réactions. Cette personne n\'en est pas avertie.';
 
   @override
+  String get liveAgreeTitle => 'Avant de jouer en direct';
+
+  @override
+  String get liveAgreeBody =>
+      'Les autres joueurs verront votre nom et votre image : choisissez-en que vous montreriez à n\'importe qui, et jouez loyalement. Les Conditions d\'utilisation disent ce qui n\'est pas permis et ce qui se passe si vous les enfreignez. En jouant en direct, vous les acceptez.';
+
+  @override
+  String get liveAgree => 'J\'accepte';
+
+  @override
   String get waitingToReconnect => 'En attente de la reconnexion des autres';
 
   @override

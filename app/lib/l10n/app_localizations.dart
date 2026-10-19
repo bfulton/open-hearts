@@ -1112,6 +1112,24 @@ abstract class AppLocalizations {
   /// **'On this device only: you won\'t see their name, picture or reactions. They aren\'t told.'**
   String get blockNote;
 
+  /// Title of the screen asking a player, once on each device, to agree to the terms before they first play live.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you play live'**
+  String get liveAgreeTitle;
+
+  /// What the player agrees to before they first play live: the terms, linked by a button below.
+  ///
+  /// In en, this message translates to:
+  /// **'The other players will see your name and picture, so choose ones you\'d show anyone, and play fair. The Terms of use say what isn\'t allowed, and what happens if you break them. By playing live, you agree to them.'**
+  String get liveAgreeBody;
+
+  /// Button: agree to the terms and go on into live play.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree'**
+  String get liveAgree;
+
   /// Under the table while the game is paused.
   ///
   /// In en, this message translates to:

@@ -145,7 +145,7 @@ void main() {
   });
 
   testWidgets('the spinner belongs to the button that was pressed', (tester) async {
-    SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada', 'identity_agreed_terms': '2026-01-01'});
     await pumpHome(tester);
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
@@ -232,6 +232,57 @@ void main() {
     await pumpHome(tester, openRoom: 'KP4T9MXR');
     expect(find.widgetWithText(TextField, 'Your name'), findsOneWidget, reason: 'asked for a name, as with none');
     expect(find.text("This name isn't allowed. Choose another."), findsOneWidget, reason: 'and told why');
+  });
+
+  testWidgets('live play asks once for the terms: not now goes nowhere, and agreeing goes on and is kept', (tester) async {
+    // A name, and a licence, but never an agreement: a device brought
+    // into the account with a code, which never saw the subscribe page.
+    SharedPreferences.setMockInitialValues({'identity_name': 'Ada'});
+    await pumpHome(tester);
+
+    await tester.tap(find.text('Play friends'));
+    await tester.pumpAndSettle();
+    expect(find.text('Before you play live'), findsOneWidget, reason: 'asked before the name goes out');
+    expect(find.widgetWithText(TextButton, 'Terms of use'), findsOneWidget, reason: 'with the terms a tap away');
+    await tester.tap(find.text('Not now'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing, reason: 'not now opens nothing');
+    await tester.pumpAndSettle();
+    expect(find.text('Before you play live'), findsNothing);
+    expect(find.text('Share the link'), findsNothing, reason: 'and no room');
+    expect(await Identity.agreedToTerms(), isNull, reason: 'nor is it taken as agreeing');
+
+    // Tapped away, as not now.
+    await tester.tap(find.text('Play friends'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(8, 836));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing, reason: 'tapping away opens nothing either');
+    await tester.pumpAndSettle();
+    expect(find.text('Before you play live'), findsNothing);
+    expect(await Identity.agreedToTerms(), isNull);
+
+    await tester.tap(find.text('Play friends'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('I agree'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.descendant(of: find.widgetWithText(FilledButton, 'Play friends'), matching: find.byType(CircularProgressIndicator)),
+        findsOneWidget, reason: 'agreeing goes on to the room');
+    expect(await Identity.agreedToTerms(), DateTime.now().toUtc().toIso8601String().substring(0, 10), reason: 'and the day is kept');
+    await tester.pump(stopWaiting + const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Play live'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Before you play live'), findsNothing, reason: 'asked once, not every time');
+    expect(find.descendant(of: find.widgetWithText(FilledButton, 'Play live'), matching: find.byType(CircularProgressIndicator)),
+        findsOneWidget);
+    await tester.pump(stopWaiting + const Duration(seconds: 2));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('the options line says what the next game is; the sheet changes it and the device keeps it', (tester) async {

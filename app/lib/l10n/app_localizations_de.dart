@@ -846,6 +846,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nur auf diesem Gerät: Du siehst Namen, Bild und Reaktionen dieser Person nicht mehr. Sie erfährt davon nichts.';
 
   @override
+  String get liveAgreeTitle => 'Bevor du live spielst';
+
+  @override
+  String get liveAgreeBody =>
+      'Die anderen sehen deinen Namen und dein Bild, also wähle welche, die du jedem zeigen würdest, und spiel fair. Die Nutzungsbedingungen sagen, was nicht erlaubt ist und was passiert, wenn du dagegen verstößt. Wenn du live spielst, stimmst du ihnen zu.';
+
+  @override
+  String get liveAgree => 'Ich stimme zu';
+
+  @override
   String get waitingToReconnect =>
       'Warte, bis die anderen wieder verbunden sind';
 

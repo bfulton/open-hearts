@@ -78,4 +78,14 @@ class Identity {
 
   static Future<void> setName(String name) async =>
       (await SharedPreferences.getInstance()).setString(_nameKey, nameOf(name));
+
+  static const _agreedKey = 'identity_agreed_terms';
+
+  /// The day this device's player agreed to the terms of use, before
+  /// their name and picture first went out at a live table
+  /// (home_page.dart, `_agreed`); null until they have.
+  static Future<String?> agreedToTerms() async => (await SharedPreferences.getInstance()).getString(_agreedKey);
+
+  static Future<void> agreeToTerms(DateTime at) async =>
+      (await SharedPreferences.getInstance()).setString(_agreedKey, at.toUtc().toIso8601String().substring(0, 10));
 }

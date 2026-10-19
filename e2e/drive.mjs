@@ -463,6 +463,13 @@ export async function waitFor(page, re, { timeout = 30000, what = String(re) } =
   throw new Error(`timed out waiting for ${what}\nsaw: ${(await texts(page)).join(' | ')}`);
 }
 
+/// [context]'s player agreed to the terms of use already, as a device
+/// that has played live before has (app/lib/home_page.dart, `_agreed`):
+/// every context a suite opens is, so that its flows go straight in.
+/// The screen that asks is held by app/test/home_page_test.dart.
+export const agreedToTerms = (context) =>
+  context.addInitScript(() => localStorage.setItem('flutter.identity_agreed_terms', JSON.stringify('2026-01-01')));
+
 /// Waits for the front door to say this device may play live. The rig
 /// licenses every device that asks (localService), and the app asks as
 /// it starts and again, a little further apart each time, until the

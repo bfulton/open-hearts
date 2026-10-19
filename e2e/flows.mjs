@@ -21,7 +21,7 @@ import { promisify } from 'node:util';
 import { gunzipSync, gzipSync } from 'node:zlib';
 
 import { chromium } from './browser.mjs';
-import { act, appDir, click, dismiss, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor, waitGone, roomIn } from './drive.mjs';
+import { act, agreedToTerms, appDir, click, dismiss, freePort, has, labelOf, licensed, log, root, serveApp, sleep, texts, type, waitFor, waitGone, roomIn } from './drive.mjs';
 import { flowRelay, runFlows } from './pool.mjs';
 import { carry } from '../service/tool/suspend.mjs';
 
@@ -936,6 +936,7 @@ async function main() {
           permissions: ['clipboard-read', 'clipboard-write'],
         });
         contexts.push(ctx);
+        await agreedToTerms(ctx);
         // The browser's languages as it says them, before anything of the
         // page's runs, for a flow about a language a context's locale
         // cannot be set to.

@@ -18,6 +18,7 @@
 import { chromium } from './browser.mjs';
 import {
   act,
+  agreedToTerms,
   click,
   dismiss,
   has,
@@ -105,6 +106,7 @@ async function main() {
       // motion is not what is looked at — flows.mjs plays with it — and
       // four pages drawing it are a core each on a machine with four.
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US', reducedMotion: 'reduce' });
+      await agreedToTerms(ctx);
       const tasks = [];
       held.push(tasks);
       await ctx.exposeBinding('ohLongTask', (_, ms) => playing && tasks.push(ms));

@@ -833,6 +833,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'On this device only: you won\'t see their name, picture or reactions. They aren\'t told.';
 
   @override
+  String get liveAgreeTitle => 'Before you play live';
+
+  @override
+  String get liveAgreeBody =>
+      'The other players will see your name and picture, so choose ones you\'d show anyone, and play fair. The Terms of use say what isn\'t allowed, and what happens if you break them. By playing live, you agree to them.';
+
+  @override
+  String get liveAgree => 'I agree';
+
+  @override
   String get waitingToReconnect => 'Waiting for the others to reconnect';
 
   @override

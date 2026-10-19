@@ -29,6 +29,15 @@ picture travels once, as a stored event. The live area says which game
 is asked for (the target score, and rated or unrated), and *Play live*
 shows how many devices are online.
 
+Nothing goes to a relay without a name, and, the first time on each
+device, without the player agreeing to the terms of use: a screen says
+that the others will see their name and picture, links the terms, and
+asks (`_agreed` in `app/lib/home_page.dart`). The day they agreed is kept
+on the device (`Identity.agreedToTerms`). The app stores ask for this
+before anyone can publish anything; subscribing is agreeing too, but a
+device brought into an account with a code or a sign-in never saw the
+subscribe screen.
+
 ### Matchmaking
 
 There is no matchmaker (`packages/table/lib/src/matching.dart`).

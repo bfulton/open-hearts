@@ -836,6 +836,16 @@ class AppLocalizationsPt extends AppLocalizations {
       'Só neste aparelho: você não verá o nome, a imagem nem as reações dessa pessoa. Ela não é avisada.';
 
   @override
+  String get liveAgreeTitle => 'Antes de jogar ao vivo';
+
+  @override
+  String get liveAgreeBody =>
+      'Os outros jogadores vão ver o seu nome e a sua imagem, então escolha um nome e uma imagem que você mostraria a qualquer pessoa, e jogue limpo. Os Termos de uso dizem o que não é permitido e o que acontece se você os desrespeitar. Ao jogar ao vivo, você os aceita.';
+
+  @override
+  String get liveAgree => 'Concordo';
+
+  @override
   String get waitingToReconnect => 'Esperando os outros reconectarem';
 
   @override

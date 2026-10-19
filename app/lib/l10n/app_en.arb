@@ -991,6 +991,18 @@
   "@blockNote": {
     "description": "Under the block button: what blocking does."
   },
+  "liveAgreeTitle": "Before you play live",
+  "@liveAgreeTitle": {
+    "description": "Title of the screen asking a player, once on each device, to agree to the terms before they first play live."
+  },
+  "liveAgreeBody": "The other players will see your name and picture, so choose ones you'd show anyone, and play fair. The Terms of use say what isn't allowed, and what happens if you break them. By playing live, you agree to them.",
+  "@liveAgreeBody": {
+    "description": "What the player agrees to before they first play live: the terms, linked by a button below."
+  },
+  "liveAgree": "I agree",
+  "@liveAgree": {
+    "description": "Button: agree to the terms and go on into live play."
+  },
   "waitingToReconnect": "Waiting for the others to reconnect",
   "@waitingToReconnect": {
     "description": "Under the table while the game is paused."

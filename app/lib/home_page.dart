@@ -129,7 +129,7 @@ class _HomePageState extends State<HomePage> {
     _lobby = Lobby(
       who: () => (name: _name, avatar: _avatar),
       options: () => _options.copyWith(target: _playsTo),
-      named: () async => await _named() != null,
+      named: () async => await _named() != null && await _agreed(),
       words: () => context.l10n,
       seat: (controller) => context.push<bool>(located(livePath), extra: controller),
       addressChanged: _showAddress,
@@ -385,6 +385,35 @@ class _HomePageState extends State<HomePage> {
     if (_name.isNotEmpty) return _name;
     await _editProfile();
     return _name.isEmpty ? null : _name;
+  }
+
+  /// The terms agreed to, asked for once on this device before its
+  /// name and picture first go out at a live table: the app stores ask
+  /// for this before anyone publishes anything. Subscribing is agreeing
+  /// too (subscribe_page.dart), but a device brought into an account
+  /// with a code or a sign-in never saw that. False when the player
+  /// says not now.
+  Future<bool> _agreed() async {
+    if (await Identity.agreedToTerms() != null) return true;
+    if (!mounted) return false;
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) {
+        final l10n = dialog.l10n;
+        return AlertDialog(
+          title: Text(l10n.liveAgreeTitle),
+          content: Text(l10n.liveAgreeBody),
+          actions: [
+            TextButton(onPressed: () => openLink(legalPage('terms')), child: Text(l10n.termsOfUse)),
+            TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: Text(l10n.notNow)),
+            FilledButton(onPressed: () => Navigator.of(dialog).pop(true), child: Text(l10n.liveAgree)),
+          ],
+        );
+      },
+    );
+    if (agreed != true) return false;
+    await Identity.agreeToTerms(DateTime.now());
+    return true;
   }
 
   Future<void> _changeOptions() async {
