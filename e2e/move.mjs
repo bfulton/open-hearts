@@ -89,6 +89,10 @@ const flows = [
         // The open house licenses every device that asks (drive.mjs).
         const licence = await until('a licence at the old address', () => stored(page, 'flutter.licence'));
         await page.evaluate(() => localStorage.setItem('flutter.identity_name', JSON.stringify('Ada')));
+        // And agreed to the terms, as a device that played live there had
+        // (app/lib/home_page.dart, `_agreed`): carried with the rest, so
+        // the room at the new address goes straight in.
+        await page.evaluate(() => localStorage.setItem('flutter.identity_agreed_terms', JSON.stringify('2026-01-01')));
         // The offline worker the old address installed, in charge of it.
         await until('the old offline worker', () => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null));
         app.legacy(false);
