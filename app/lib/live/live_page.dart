@@ -20,6 +20,7 @@ import '../net/in_use.dart';
 import '../net/share.dart';
 import '../pages.dart';
 import '../reaction_mute.dart';
+import '../report.dart';
 import '../table_model.dart' show TableModelHand;
 import '../table_page.dart' show ActionBar;
 import '../theme.dart';
@@ -34,9 +35,12 @@ import '../ui/table_view.dart';
 import 'live_controller.dart';
 
 class LivePage extends StatefulWidget {
-  const LivePage({super.key, required this.controller});
+  const LivePage({super.key, required this.controller, this.report = sendReport});
 
   final LiveController controller;
+
+  /// Where a report of another player goes (report.dart).
+  final ReportSender report;
 
   @override
   State<LivePage> createState() => _LivePageState();
@@ -124,14 +128,16 @@ class _LivePageState extends State<LivePage> {
   }
 
   /// Holding another player's badge: what this device does with their
-  /// picture. Nothing to offer for a bot, for your own seat, or for
-  /// someone who chose no picture (pictures.dart).
-  Future<void> _aboutPicture(int seat) async {
-    final about = _c.pictureAt(seat);
+  /// picture, if they chose one (pictures.dart), and reporting them to
+  /// the people who run the game (report.dart). Nothing to offer for a
+  /// bot or for your own seat.
+  Future<void> _aboutPlayer(int seat) async {
+    final about = _c.playerAt(seat);
     if (about == null) return;
-    final pictures = _c.pictures!;
+    final pictures = _c.pictures;
+    final picture = about.picture;
     final showIt = about.hidden || about.flagged;
-    final chosen = await showModalBottomSheet<bool>(
+    final chosen = await showModalBottomSheet<_AboutPlayer>(
       context: context,
       backgroundColor: Felt.mid,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -142,34 +148,51 @@ class _LivePageState extends State<LivePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (about.flagged)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+              if (picture != null && pictures != null) ...[
+                if (about.flagged)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      sheet.l10n.pictureFlagged,
+                      style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
+                    ),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(sheet).pop(showIt ? _AboutPlayer.showPicture : _AboutPlayer.hidePicture),
+                  style: TextButton.styleFrom(foregroundColor: showIt ? Palette.gold : Palette.danger),
                   child: Text(
-                    sheet.l10n.pictureFlagged,
-                    style: const TextStyle(fontSize: 13, color: Palette.chromeDim),
+                    showIt ? sheet.l10n.showPicture(about.name) : sheet.l10n.hidePicture(about.name),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ),
-              TextButton(
-                onPressed: () => Navigator.of(sheet).pop(showIt),
-                style: TextButton.styleFrom(foregroundColor: showIt ? Palette.gold : Palette.danger),
-                child: Text(
-                  showIt ? sheet.l10n.showPicture(about.name) : sheet.l10n.hidePicture(about.name),
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                Text(
+                  sheet.l10n.pictureChoiceNote,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
                 ),
-              ),
-              Text(
-                sheet.l10n.pictureChoiceNote,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: Palette.chromeDim),
+                const SizedBox(height: 12),
+              ],
+              TextButton(
+                onPressed: () => Navigator.of(sheet).pop(_AboutPlayer.report),
+                style: TextButton.styleFrom(foregroundColor: Palette.danger),
+                child: Text(sheet.l10n.reportPlayer(about.name), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
         ),
       ),
     );
-    if (chosen == null) return;
-    await (chosen ? pictures.show(about.key) : pictures.hide(about.key));
+    if (!mounted) return;
+    switch (chosen) {
+      case null:
+        return;
+      case _AboutPlayer.showPicture:
+        await pictures?.show(about.key);
+      case _AboutPlayer.hidePicture:
+        await pictures?.hide(about.key);
+      case _AboutPlayer.report:
+        await showReport(context, about: about.key, name: about.name, picture: picture, table: _c.client.spec.id, send: widget.report);
+    }
   }
 
   void _leave() {
@@ -359,7 +382,7 @@ class _LivePageState extends State<LivePage> {
                 // clear of the seat across the table.
                 felt: TableView(
                   controller: _c,
-                  onHold: _aboutPicture,
+                  onHold: _aboutPlayer,
                   corner: _presence(context),
                   // Beside the player's own badge, while they sit here.
                   react: _c.canReact && !InUse.current.shut ? ReactionButton(onPressed: _pickReaction) : null,
@@ -506,3 +529,6 @@ class _Replaced extends StatelessWidget {
     );
   }
 }
+
+/// What the sheet holding a player's badge opens can be asked to do.
+enum _AboutPlayer { showPicture, hidePicture, report }

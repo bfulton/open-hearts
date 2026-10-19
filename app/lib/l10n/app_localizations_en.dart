@@ -781,6 +781,43 @@ class AppLocalizationsEn extends AppLocalizations {
       'On this device only, and only their picture: their name and their score stay.';
 
   @override
+  String reportPlayer(String name) {
+    return 'Report $name';
+  }
+
+  @override
+  String get reportWhat => 'What\'s wrong?';
+
+  @override
+  String get reportTheirPicture => 'Their picture';
+
+  @override
+  String get reportTheirName => 'Their name';
+
+  @override
+  String get reportSomethingElse => 'Something else';
+
+  @override
+  String get reportNoteHint => 'Anything we should know (optional)';
+
+  @override
+  String get reportGoesTo =>
+      'This goes only to the people who run Open Hearts, with your account number and theirs.';
+
+  @override
+  String get reportSend => 'Send';
+
+  @override
+  String get reportSent => 'Report sent. Thank you.';
+
+  @override
+  String get reportTooMany => 'That\'s as many reports as you can send today.';
+
+  @override
+  String get reportFailed =>
+      'The report didn\'t go. Try again, or write to help@openhearts.game.';
+
+  @override
   String get waitingToReconnect => 'Waiting for the others to reconnect';
 
   @override

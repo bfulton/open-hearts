@@ -921,6 +921,55 @@
   "@pictureChoiceNote": {
     "description": "Under the show or hide picture button."
   },
+  "reportPlayer": "Report {name}",
+  "@reportPlayer": {
+    "description": "Button and title: report another player to the people who run the game.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportWhat": "What's wrong?",
+  "@reportWhat": {
+    "description": "In the report sheet, above the choices of what is reported."
+  },
+  "reportTheirPicture": "Their picture",
+  "@reportTheirPicture": {
+    "description": "Report choice: the other player's picture."
+  },
+  "reportTheirName": "Their name",
+  "@reportTheirName": {
+    "description": "Report choice: the other player's name."
+  },
+  "reportSomethingElse": "Something else",
+  "@reportSomethingElse": {
+    "description": "Report choice: anything other than the picture or the name."
+  },
+  "reportNoteHint": "Anything we should know (optional)",
+  "@reportNoteHint": {
+    "description": "Hint in the report's note field."
+  },
+  "reportGoesTo": "This goes only to the people who run Open Hearts, with your account number and theirs.",
+  "@reportGoesTo": {
+    "description": "Under the report's note: who sees a report."
+  },
+  "reportSend": "Send",
+  "@reportSend": {
+    "description": "Button: send the report."
+  },
+  "reportSent": "Report sent. Thank you.",
+  "@reportSent": {
+    "description": "After a report has gone."
+  },
+  "reportTooMany": "That's as many reports as you can send today.",
+  "@reportTooMany": {
+    "description": "When the service refuses a report as one too many today."
+  },
+  "reportFailed": "The report didn't go. Try again, or write to help@openhearts.game.",
+  "@reportFailed": {
+    "description": "When a report could not be sent."
+  },
   "waitingToReconnect": "Waiting for the others to reconnect",
   "@waitingToReconnect": {
     "description": "Under the table while the game is paused."

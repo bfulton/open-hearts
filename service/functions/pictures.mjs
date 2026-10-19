@@ -18,6 +18,15 @@
 /// `allowed` only when something is.
 export const PICTURES_ROW = ['config', 'pictures'];
 
+/// Where the relay keeps a copy of each new picture for the operator to
+/// look at (service/do/review.mjs), named by its digest, and serves it:
+/// the bucket's custom domain (infra/cloudflare.mjs; a test holds the
+/// two equal).
+export const PICTURES_ORIGIN = 'https://pictures.openhearts.game';
+export const REVIEW_PREFIX = 'review/';
+export const copyKey = (digest) => `${REVIEW_PREFIX}${digest}.jpg`;
+export const copyUrl = (digest) => `${PICTURES_ORIGIN}/${copyKey(digest)}`;
+
 /// How long a picture taken off is withheld, unless it is put back
 /// first: longer than the relay keeps any lobby event (a day, and an
 /// hour for its sweep; service/do/tag_store.mjs), and long enough that

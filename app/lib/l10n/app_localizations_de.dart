@@ -794,6 +794,43 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nur auf diesem Gerät, und nur das Bild: Name und Punktestand bleiben.';
 
   @override
+  String reportPlayer(String name) {
+    return '$name melden';
+  }
+
+  @override
+  String get reportWhat => 'Was ist los?';
+
+  @override
+  String get reportTheirPicture => 'Das Bild';
+
+  @override
+  String get reportTheirName => 'Der Name';
+
+  @override
+  String get reportSomethingElse => 'Etwas anderes';
+
+  @override
+  String get reportNoteHint => 'Was wir wissen sollten (optional)';
+
+  @override
+  String get reportGoesTo =>
+      'Das geht nur an die Leute, die Open Hearts betreiben, mit der Nummer deines Kontos und der des gemeldeten Kontos.';
+
+  @override
+  String get reportSend => 'Senden';
+
+  @override
+  String get reportSent => 'Meldung gesendet. Danke.';
+
+  @override
+  String get reportTooMany => 'Mehr Meldungen kannst du heute nicht senden.';
+
+  @override
+  String get reportFailed =>
+      'Die Meldung ist nicht angekommen. Versuch es noch einmal oder schreib an help@openhearts.game.';
+
+  @override
   String get waitingToReconnect =>
       'Warte, bis die anderen wieder verbunden sind';
 

@@ -6,13 +6,21 @@
 // subscribers put out, `pictures`, which the relay worker sends itself:
 // service/do/review.mjs.) Each is written down for a while
 // under its subscription, so a webhook delivered twice, or a wait
-// chosen twice in a few minutes, is told once.
+// chosen twice in a few minutes, is told once. And, whatever the
+// switches say, a player's report of another, at once: a report is the
+// operator's to answer (docs/how-to/handle-a-report.md), never an alert
+// to turn off.
 //
 // The mail goes from the relay worker, which holds the EMAIL binding (a
 // Pages project cannot bind one), through an object of the Household
 // class with a name of its own, so no household's queue waits on it.
 // What it says is which store or pool, a few characters of the
-// subscription and the device, and dates: nobody's email or name.
+// subscription and the device, and dates: nobody's email or name — but
+// for a report, which says the name the reporter saw.
+
+import { copyUrl, pictureDigest } from './pictures.mjs';
+import { PROFILE_NAME_MOST } from './profile.mjs';
+import { tableIdShape } from './records.mjs';
 
 /// The Household object the mail goes through.
 export const ALERTS_OBJECT = 'operator-alerts';
@@ -107,4 +115,70 @@ export async function sendAlert(op, env) {
   if (!env.EMAIL || typeof from !== 'string' || !from.includes('@')) return { status: 503, body: { error: 'no mail here' } };
   await env.EMAIL.send({ to: op.to, from: { email: from, name: 'Open Hearts' }, subject: op.subject.slice(0, 200), text: op.text.slice(0, 4000) });
   return { status: 200, body: { sent: true } };
+}
+
+/// What a player may report another for.
+export const REPORT_WHAT = Object.freeze(['picture', 'name', 'other']);
+
+/// The most a report's note may be, in characters.
+export const REPORT_NOTE_MOST = 500;
+
+/// How many reports one account may send in a day: enough for a bad
+/// evening, too few to bury the operator.
+export const REPORTS_A_DAY = 10;
+
+/// The report [body] asks to send, as {about, what, table, name,
+/// picture, note}, or null for one that is not: [about] the reported
+/// player's account (32 hex, or a device's key, 64 hex, where no
+/// account names one); [what] one of [REPORT_WHAT]; the table it was
+/// at (32 hex), the name and the digest of the picture as the reporter
+/// saw them, and a note, each optional.
+export function reportOf(body) {
+  const { about, what, table = null, name = null, picture = null, note = '' } = body ?? {};
+  if (typeof about !== 'string' || !/^[0-9a-f]{32}(?:[0-9a-f]{32})?$/.test(about)) return null;
+  if (!REPORT_WHAT.includes(what)) return null;
+  if (table !== null && (typeof table !== 'string' || !tableIdShape.test(table))) return null;
+  if (name !== null && (typeof name !== 'string' || [...name].length > PROFILE_NAME_MOST || /\p{Cc}/u.test(name))) return null;
+  if (picture !== null && (typeof picture !== 'string' || !/^[0-9a-f]{64}$/.test(picture))) return null;
+  if (typeof note !== 'string' || [...note].length > REPORT_NOTE_MOST) return null;
+  return { about, what, table, name, picture, note: note.trim() };
+}
+
+/// [account]'s report, from its device [key], of [about] (reportOf),
+/// told to the operator at once: the same report from the same account
+/// once a day, and no more than [REPORTS_A_DAY] of them. Resolves
+/// `sent`; `already`, for the same one again; `limit`, for one too
+/// many; or `unsent`, when there is nobody to tell or the mail did not
+/// go — and then it is not counted, so it can be sent again.
+export async function alertReport(env, store, { key, account, about, what, table, name, picture, note, now = Date.now() }) {
+  const alerts = alertsOf(env);
+  if (!alerts || !store) return 'unsent';
+  const same = `${account}|${about}|${what}`;
+  if ((await store.get('ALERT#report', same)) !== null) return 'already';
+  const today = `${account}|${new Date(now).toISOString().slice(0, 10)}`;
+  const sent = (await store.get('ALERT#reports', today))?.n ?? 0;
+  if (sent >= REPORTS_A_DAY) return 'limit';
+  const profile = /^[0-9a-f]{32}$/.test(about) ? await store.get(`ACCOUNT#${about}`, 'PROFILE') : null;
+  const itsPicture = profile?.picture ? await pictureDigest(profile.picture) : null;
+  const itsName = typeof profile?.name === 'string' ? profile.name : null;
+  const subject = what === 'other' ? 'Open Hearts: a player reported' : `Open Hearts: a player's ${what} reported`;
+  const text = [
+    `Account ${account} (device ${short(key)}…) reported account ${about} for its ${what === 'other' ? 'conduct' : what}, at ${new Date(now).toISOString()}${table ? `, at table ${table}` : ''}.`,
+    '',
+    note ? `What they wrote: ${note}` : 'They wrote nothing more.',
+    '',
+    ...(picture ? [`The picture they saw: ${copyUrl(picture)} — ${picture === itsPicture ? 'its profile picture now' : 'not its profile picture now'}`] : []),
+    ...(name !== null ? [`The name they saw: ${name} — ${name === itsName ? 'its name now' : `its name now is ${itsName ? itsName : 'none'}`}`] : []),
+    '',
+    'To act on it, under docs/how-to/handle-a-report.md:',
+    `  ./oh account show ${about}`,
+    `  ./oh account remove ${about} picture --apply`,
+    `  ./oh account remove ${about} name --apply`,
+    `  ./oh account suspend ${about} --apply`,
+    'If its picture may show the sexual abuse of a child, follow docs/how-to/handle-abuse-material.md instead.',
+  ].join('\n');
+  if (!(await tell(env, alerts, subject, text))) return 'unsent';
+  await store.put('ALERT#report', same, { at: now }, { ttl: 86400 });
+  await store.put('ALERT#reports', today, { n: sent + 1 }, { ttl: 2 * 86400 });
+  return 'sent';
 }

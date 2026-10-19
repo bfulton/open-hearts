@@ -16,7 +16,7 @@
 // on is in the modules they import.
 
 import { accountOfKey, backupCodeOf, backupRow, entitlementOf } from './accounts.mjs';
-import { alertSubscribed, alertWaiting } from './alerts.mjs';
+import { alertReport, alertSubscribed, alertWaiting, reportOf } from './alerts.mjs';
 import { appHostFor, serveStatic } from './app_host.mjs';
 import { CONFIG_ROW, configOf } from './config.mjs';
 import { healthOf } from './health.mjs';
@@ -434,6 +434,30 @@ async function waitingRoute(request, env, ctx) {
   return json(request, 200, { ok: true });
 }
 
+/// A subscriber's report of another player (alerts.mjs, alertReport):
+/// emailed to the operator at once. 429 for one too many in a day; 503
+/// when it could not be sent, so the app can say so.
+async function reportRoute(request, env) {
+  const pre = preflight(request, 'POST');
+  if (pre) return pre;
+  if (request.method !== 'POST') return json(request, 405, { error: 'POST' }, { allow: 'POST, OPTIONS' });
+  const asked = await signedFor(request, env, 'report', (body) => `${body.about ?? ''} ${body.what ?? ''}`);
+  if (asked instanceof Response) return asked;
+  const report = reportOf(asked.body);
+  if (!report) return json(request, 400, { error: 'a report: who, for what, and a short note at most' });
+  const store = storeOf(env);
+  if (!store) return json(request, 503, notConfigured('OH_STORE'));
+  const account = await accountOfKey(store, asked.key);
+  if (!account || !(await entitlementOf(store, asked.key))) return json(request, 402, { error: 'no subscription' });
+  if (report.about === account) return json(request, 400, { error: 'a report is of somebody else' });
+  // Local mode tells nobody, as for a wait.
+  if (openHouse(env, request)) return json(request, 200, { ok: true });
+  const said = await alertReport(env, store, { key: asked.key, account, ...report });
+  if (said === 'limit') return json(request, 429, { error: 'too many reports today' });
+  if (said === 'unsent') return json(request, 503, { error: 'the report could not be sent' });
+  return json(request, 200, { ok: true });
+}
+
 async function turn(request, env) {
   const pre = preflight(request, 'POST');
   if (pre) return pre;
@@ -627,6 +651,7 @@ const ROUTES = {
   devices: (request, env) => devicesRoute(request, env),
   profile: (request, env) => profileRoute(request, env),
   waiting: (request, env, ctx) => waitingRoute(request, env, ctx),
+  report: (request, env) => reportRoute(request, env),
   attest: (request, env) => signInRoute(request, env, false),
   supersede: (request, env) => signInRoute(request, env, true),
   'apple-id': (request, env) => appleIdRoute(request, env),

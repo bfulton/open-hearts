@@ -690,6 +690,22 @@ help@ goes (`infra/`). It is sent from the relay worker, which holds the
 which mails only `@openhearts.game`. A failed alert never fails the
 request. Set either flag to `false` and deploy to stop it.
 
+### Reports
+
+A player reports another from the app: holding their badge at the
+table, they say what is wrong — the picture, the name or something
+else — and can add a note (`app/lib/report.dart`). The `report` handler
+emails it to the operator the same way as an alert, but at once and
+whatever the flags say, since the app stores require that reports are
+answered ([Handle a report from a player](../how-to/handle-a-report.md)).
+The mail says both accounts, the table, the name and picture the
+reporter saw beside the account's profile now, and the note: what the
+operator needs to judge it. Only a subscriber's device can send one,
+the same report goes once a day, and an account sends at most
+`REPORTS_A_DAY` a day, so that reports cannot bury the operator. A
+report that could not be sent is answered 503 and not counted, and the
+app says it did not go.
+
 ## The relay and the backup jurors
 
 The relay's core ([the relay](relay.md)), `service/do/relay.mjs`, is

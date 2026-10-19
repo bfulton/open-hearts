@@ -1022,6 +1022,72 @@ abstract class AppLocalizations {
   /// **'On this device only, and only their picture: their name and their score stay.'**
   String get pictureChoiceNote;
 
+  /// Button and title: report another player to the people who run the game.
+  ///
+  /// In en, this message translates to:
+  /// **'Report {name}'**
+  String reportPlayer(String name);
+
+  /// In the report sheet, above the choices of what is reported.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s wrong?'**
+  String get reportWhat;
+
+  /// Report choice: the other player's picture.
+  ///
+  /// In en, this message translates to:
+  /// **'Their picture'**
+  String get reportTheirPicture;
+
+  /// Report choice: the other player's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Their name'**
+  String get reportTheirName;
+
+  /// Report choice: anything other than the picture or the name.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get reportSomethingElse;
+
+  /// Hint in the report's note field.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything we should know (optional)'**
+  String get reportNoteHint;
+
+  /// Under the report's note: who sees a report.
+  ///
+  /// In en, this message translates to:
+  /// **'This goes only to the people who run Open Hearts, with your account number and theirs.'**
+  String get reportGoesTo;
+
+  /// Button: send the report.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get reportSend;
+
+  /// After a report has gone.
+  ///
+  /// In en, this message translates to:
+  /// **'Report sent. Thank you.'**
+  String get reportSent;
+
+  /// When the service refuses a report as one too many today.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s as many reports as you can send today.'**
+  String get reportTooMany;
+
+  /// When a report could not be sent.
+  ///
+  /// In en, this message translates to:
+  /// **'The report didn\'t go. Try again, or write to help@openhearts.game.'**
+  String get reportFailed;
+
   /// Under the table while the game is paused.
   ///
   /// In en, this message translates to:

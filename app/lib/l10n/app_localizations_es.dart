@@ -786,6 +786,44 @@ class AppLocalizationsEs extends AppLocalizations {
       'Solo en este dispositivo, y solo su imagen: su nombre y su puntuación se quedan.';
 
   @override
+  String reportPlayer(String name) {
+    return 'Denunciar a $name';
+  }
+
+  @override
+  String get reportWhat => '¿Qué pasa?';
+
+  @override
+  String get reportTheirPicture => 'Su imagen';
+
+  @override
+  String get reportTheirName => 'Su nombre';
+
+  @override
+  String get reportSomethingElse => 'Otra cosa';
+
+  @override
+  String get reportNoteHint => 'Algo que debamos saber (opcional)';
+
+  @override
+  String get reportGoesTo =>
+      'Esto solo les llega a quienes gestionan Open Hearts, con el número de tu cuenta y el de la cuenta denunciada.';
+
+  @override
+  String get reportSend => 'Enviar';
+
+  @override
+  String get reportSent => 'Denuncia enviada. Gracias.';
+
+  @override
+  String get reportTooMany =>
+      'Ya has enviado todas las denuncias que puedes hoy.';
+
+  @override
+  String get reportFailed =>
+      'La denuncia no se ha enviado. Inténtalo de nuevo o escribe a help@openhearts.game.';
+
+  @override
   String get waitingToReconnect => 'Esperando a que los demás se reconecten';
 
   @override

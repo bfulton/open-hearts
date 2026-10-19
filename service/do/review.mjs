@@ -20,15 +20,12 @@
 // what nobody has put out for 30 days. Apart from worker.mjs so it can
 // be tested without the runtime.
 
-import { PICTURES_ROW, allowedOf, pictureDigest, pictureIn, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
+import { PICTURES_ORIGIN, PICTURES_ROW, REVIEW_PREFIX, allowedOf, copyKey, copyUrl, pictureDigest, pictureIn, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
 import { lobbyKind } from './relay.mjs';
 
-/// Where the copies are served: the bucket's custom domain
-/// (infra/cloudflare.mjs, a test holding the two equal).
-export const PICTURES_ORIGIN = 'https://pictures.openhearts.game';
-
-/// Where in the bucket the copies are, by digest.
-export const REVIEW_PREFIX = 'review/';
+/// Where the copies are served, and where in the bucket they are
+/// (service/functions/pictures.mjs).
+export { PICTURES_ORIGIN, REVIEW_PREFIX };
 
 /// Where in the bucket each account's use of a picture is noted:
 /// `seen/<account>/<digest>`, empty, saying when the account first put
@@ -72,7 +69,6 @@ export const HIDE_AT = 0.5;
 const CHECK_SAYS = { sexual: 'nudity or sexual content', gore: 'violence or gore', hate: 'a hate symbol' };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const copyKey = (digest) => `${REVIEW_PREFIX}${digest}.jpg`;
 const seenKey = (account, digest) => `${SEEN_PREFIX}${account}/${digest}`;
 
 /// [key] in [bucket] written as [body] with what [meta] resolves, unless
@@ -264,7 +260,7 @@ export function reviewEmail(accounts, more = 0) {
       'down, keeps what the law has you keep, and reports it.',
   ];
   const tail = more ? `${more} more will come in the next email.` : '';
-  const url = (p) => `${PICTURES_ORIGIN}/${copyKey(p.digest)}`;
+  const url = (p) => copyUrl(p.digest);
   const notes = (p) => {
     const why = hiddenOf(p);
     return [
