@@ -78,6 +78,12 @@ Pictures are matched by their bytes, so the same picture put out by
 anyone is withheld. Copies that devices already received stay on those
 devices.
 
+The automatic check ([pictures to look at](#pictures-to-look-at)) hides
+a picture by adding it to the same list. A picture the operator puts
+back after the check hid it (`./oh picture allow`) is listed apart, as
+allowed, so that the check does not hide it again; the operator taking
+it down later overrides that.
+
 ### Refused names
 
 A name others would see goes through one filter in three places: the
@@ -98,7 +104,11 @@ The operator looks at every new picture after it is shown, rather than holding p
 
 A picture travels only as an event of its own (`{"kind":"picture"}`), where the take-downs and the copies see it. The app never puts one inside an avatar, and the relay refuses an event that does, its own avatar or a seat's (`pictureInAvatar`), with the reason `blocked: a picture travels as its own event`; the app ignores one there too.
 
-Once a day the relay worker's schedule emails the operator every picture each account put out since the last email, account by account, in the order it put them out. A picture an account has since replaced is in it too, so putting a picture out and changing back before the email hides nothing. Each account's pictures come with the commands that take them down, and an email holds whole accounts, up to 100 pictures ([Look at the day's new pictures](../how-to/look-at-new-pictures.md)). The same run deletes the copies and notes nobody has put out for 30 days: what is still put out is written again every week or so, keeping what it first said, so it stays.
+As a picture is first copied, a model looks at it: Cloudflare's `@cf/cloudflare/clef-flash`, through Workers AI (the `AI` binding, `checkPicture`). It is told what the picture is, a small profile picture in a card game, and asked three questions, each answered as how likely a yes is, from 0 to 1: does it show nudity or sexual content; graphic violence, injury or gore; a hate symbol. A picture with any answer of 0.5 or more is hidden: withheld as one the operator took down ([withheld pictures](#withheld-pictures)), from then on, for 30 days. The copy keeps the answers, and unless the operator allowed the picture, it is hidden again whenever it is put out while it is not withheld, so a picture whose 30 days have run out is hidden again. A check that fails leaves the picture shown, and the email says so.
+
+The line of 0.5 comes from trying the check on pictures the size the app sends, 64 pixels square. Everyday pictures (faces, people in swimwear, a cat, an emoji, text) answered under 0.06 to every question; a swastika flag answered 0.94 to the hate symbol, and Botticelli's *Birth of Venus*, a nude painting, 0.52 to nudity. The check does not ask whether a child is shown: at that size it couldn't tell a child from an adult (a child in a costume 0.48, an adult swimmer 0.46). Instead, every picture hidden as nudity or sexual content puts its account first in the email, marked urgent, for the operator to look at that day.
+
+Once a day the relay worker's schedule emails the operator every picture each account put out since the last email, account by account, in the order it put them out. A picture an account has since replaced is in it too, so putting a picture out and changing back before the email hides nothing. Each account's pictures come with what the check made of each and the commands that take them down or put back one hidden by mistake, and an email holds whole accounts, up to 100 pictures ([Look at the day's new pictures](../how-to/look-at-new-pictures.md)). The same run deletes the copies and notes nobody has put out for 30 days: what is still put out is written again every week or so, keeping what it first said, so it stays. It hides any picture in the email the check found should be hidden, in case hiding it as it was copied did not take, and keeps what the operator allowed allowed for as long as its copy is kept.
 
 The copies are served at `pictures.openhearts.game`, through Cloudflare's cache, so the email can show them, and so that Cloudflare's CSAM Scanning Tool checks each against the lists of known child sexual abuse images when it first enters the cache. The tool blocks a match at that address and emails the operator. The copy at the relay is a different thing: it stops when the operator takes the picture down ([Handle a report of child sexual abuse material](../how-to/handle-abuse-material.md)).
 

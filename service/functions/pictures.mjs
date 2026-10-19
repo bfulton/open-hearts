@@ -8,9 +8,14 @@
 // turns up: on its way in, and in what a tag's object already holds.
 // A device that still has the picture, and puts it out again before it
 // takes the change, is withheld the same way.
+//
+// The automatic check hides a picture on the same list (service/do/
+// review.mjs); one the operator puts back after it is listed as allowed,
+// so that the check does not hide it again.
 
 /// Where the list is kept: `config|pictures`, {pictures: [{sha256,
-/// until}]}, `until` in milliseconds.
+/// until}], allowed: [{sha256, until}]}, `until` in milliseconds;
+/// `allowed` only when something is.
 export const PICTURES_ROW = ['config', 'pictures'];
 
 /// How long a picture taken off is withheld, unless it is put back
@@ -63,15 +68,47 @@ export function withheldOf(row, now = Date.now()) {
   return found;
 }
 
+/// The entries of [row]'s [part] that have not run out at [now] and
+/// are not for [digest].
+const still = (row, part, now, digest) => (Array.isArray(row?.[part]) ? row[part] : []).filter((p) => Number(p?.until) > now && p.sha256 !== digest);
+
+/// A row of [pictures] and [allowed], without `allowed` when there are
+/// none.
+const rowOf = (pictures, allowed) => ({ pictures, ...(allowed.length ? { allowed } : {}) });
+
+/// The digests [row] lists as allowed at [now]: put back by the
+/// operator after the automatic check hid them.
+export function allowedOf(row, now = Date.now()) {
+  return new Set(still(row, 'allowed', now, null).map((p) => p.sha256));
+}
+
 /// [row] withholding [digest] from [now] for [WITHHELD_FOR_MS], and
-/// with what has run out gone.
+/// with what has run out gone. The operator taking a picture down
+/// overrides having allowed it.
 export function withholding(row, digest, now = Date.now()) {
-  const kept = (Array.isArray(row?.pictures) ? row.pictures : []).filter((p) => Number(p?.until) > now && p.sha256 !== digest);
-  return { pictures: [...kept, { sha256: digest, until: now + WITHHELD_FOR_MS }] };
+  return rowOf([...still(row, 'pictures', now, digest), { sha256: digest, until: now + WITHHELD_FOR_MS }], still(row, 'allowed', now, digest));
 }
 
 /// [row] no longer withholding [digest], and with what has run out
 /// gone.
 export function releasing(row, digest, now = Date.now()) {
-  return { pictures: (Array.isArray(row?.pictures) ? row.pictures : []).filter((p) => Number(p?.until) > now && p.sha256 !== digest) };
+  return rowOf(still(row, 'pictures', now, digest), still(row, 'allowed', now, null));
+}
+
+/// [row] no longer withholding [digest], and listing it as allowed for
+/// [WITHHELD_FOR_MS], so that the automatic check does not hide it
+/// again.
+export function allowing(row, digest, now = Date.now()) {
+  return rowOf(still(row, 'pictures', now, digest), [...still(row, 'allowed', now, digest), { sha256: digest, until: now + WITHHELD_FOR_MS }]);
+}
+
+/// [row] with each of [digests] it allows allowed for [WITHHELD_FOR_MS]
+/// from [now], and with what has run out gone: what the operator
+/// allowed stays allowed while its copy is kept (service/do/review.mjs).
+export function stillAllowing(row, digests, now = Date.now()) {
+  const kept = new Set(digests);
+  return rowOf(
+    still(row, 'pictures', now, null),
+    still(row, 'allowed', now, null).map((p) => (kept.has(p.sha256) ? { sha256: p.sha256, until: now + WITHHELD_FOR_MS } : p)),
+  );
 }

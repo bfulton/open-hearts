@@ -361,6 +361,7 @@ export function wranglerBindings(toml) {
   for (const a of toml.analytics_engine_datasets ?? []) out.push({ name: a.binding, type: 'analytics_engine', dataset: a.dataset });
   for (const s of toml.services ?? []) out.push({ name: s.binding, type: 'service', service: s.service });
   if (toml.version_metadata) out.push({ name: toml.version_metadata.binding, type: 'version_metadata' });
+  if (toml.ai) out.push({ name: toml.ai.binding, type: 'ai' });
   for (const [name, text] of Object.entries(toml.vars ?? {})) out.push({ name, type: 'plain_text', text });
   return out;
 }

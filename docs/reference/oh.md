@@ -25,6 +25,7 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 | `<name>` | a secret's name, as `infra/cloudflare.mjs` lists it |
 | `<platform>` | `ios` or `android` |
 | `<document>` | `terms` (the terms of use) or `privacy` (the privacy policy) |
+| `<picture>` | a picture's SHA-256 (64 hex characters), as the daily email of new pictures gives it |
 
 ## Credentials
 
@@ -174,6 +175,22 @@ Releases a legal hold once its year is out, and says whether the account's owner
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#release-the-hold)
 - **Example:** `oh account release 0123456789abcdef0123456789abcdef --apply`
+
+## Pictures
+
+Pictures the automatic check hid.
+
+### oh picture allow
+
+```bash
+oh picture allow <picture> [--apply]
+```
+
+Puts back a picture the automatic check hid by mistake, and keeps the check from hiding it again for 30 days. The relay shows it again within a couple of minutes.
+
+- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- **How-to:** [look-at-new-pictures.md](../how-to/look-at-new-pictures.md#put-back-a-picture-hidden-by-mistake)
+- **Example:** `oh picture allow 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --apply`
 
 ## Terms and price
 

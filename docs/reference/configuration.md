@@ -89,12 +89,13 @@ From `service/do/wrangler.toml`.
 | `TABLE` | Durable Object, class `TagRelay` | One object per tag. See [Relay tags, kinds and limits](relay.md). |
 | `HOUSEHOLD` | Durable Object, class `Household` | Each account's object. The Pages project binds the same class. |
 | `BENCH` | Durable Object and Cloudflare Container, class `Bench` | The backup jurors (`service/do/bench.mjs`). |
-| `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it, and each relay object reads [relay settings](#relay-settings) from it. |
+| `OH_STORE` | Workers KV | The same namespace as production's `OH_STORE`. The `Household` object reads and writes it. Each relay object reads [relay settings](#relay-settings) and the pictures withheld from it, and adds a picture the automatic check hides. |
 | `OH_PICTURES` | R2 bucket `open-hearts-pictures` | A copy of each new picture a subscriber puts out, for the operator to look at, served at `pictures.openhearts.game` (`service/do/review.mjs`). |
+| `AI` | Workers AI | The automatic check of each new picture, by `@cf/cloudflare/clef-flash` (`checkPicture` in `service/do/review.mjs`). Without it, pictures are copied and not checked. |
 | `EMAIL` | Email Sending (`send_email`) | Backup-code emails, the operator's alerts, and the day's new pictures. |
 | `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
 
-Its schedule (`triggers.crons`) runs once a day at 13:00 UTC: it deletes the copies in `OH_PICTURES` that nobody has put out for 30 days, and emails the operator the new ones when `alerts.pictures` is on.
+Its schedule (`triggers.crons`) runs once a day at 13:00 UTC, when `alerts.pictures` is on: it deletes the copies in `OH_PICTURES` that nobody has put out for 30 days, hides any new picture the check found should be hidden that isn't yet, and emails the operator the new ones.
 
 ## Environment variables
 

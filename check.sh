@@ -249,6 +249,8 @@ quick() {
       service/functions/names.vectors.json) add functions ops relay_js app_analyze app; app_files+=(app/lib/names.dart) ;;
       service/functions/names.mjs|service/functions/name_fold.mjs|service/functions/blocked_names.mjs) add functions ops relay_js ;;
       third_party/ldnoobw/*) add functions ops ;;
+      # The pictures withheld: the relay reads the list too.
+      service/functions/pictures.mjs) add functions ops relay_js ;;
       service/functions/*) add functions ops ;;
       service/tool/*.mjs) add functions ops ;;
       service/*) add service ;;

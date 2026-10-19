@@ -37,7 +37,7 @@ import wasm from '../../app/web/schnorr.wasm';
 import { limitsFrom, objectRelay, presenceTag, schnorrVerifier, serviceGate, tagOf, tally } from './relay.mjs';
 import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
-import { pictureKeeper, reviewRun } from './review.mjs';
+import { hidePictures, pictureKeeper, reviewRun } from './review.mjs';
 import { PICTURES_ROW } from '../functions/pictures.mjs';
 import { alertsOf } from '../functions/alerts.mjs';
 import { storeOf } from '../functions/rows.mjs';
@@ -80,12 +80,20 @@ export class TagRelay {
     // store at most once a minute while pictures come this way.
     this.pictures = pictureScreen({ read: () => this.env.OH_STORE?.get(PICTURES_ROW.join('|'), 'json') ?? null });
     // Each new picture a subscriber puts out, copied for the operator
-    // to look at (review.mjs), where the bucket is bound (OH_PICTURES).
-    this.keepPicture = pictureKeeper({ bucket: this.env.OH_PICTURES ?? null });
+    // to look at (review.mjs), where the bucket is bound (OH_PICTURES);
+    // looked at by Workers AI (AI) as it is copied, and hidden on the
+    // store's list if it should be.
+    const store = storeOf(this.env);
+    this.keepPicture = pictureKeeper({
+      bucket: this.env.OH_PICTURES ?? null,
+      ai: this.env.AI ?? null,
+      hide: store ? (digest) => hidePictures(store, [digest]) : null,
+      log: (line) => console.log(line),
+    });
   }
 
   /// An event the relay took, from [who]: a picture copied for the
-  /// operator to look at, and a call for a juror passed to the backup
+  /// operator to look at, and checked, and a call for a juror passed to the backup
   /// jurors where they are bound (wrangler.toml, BENCH). Neither is
   /// awaited by the relay: the caller has its OK already.
   heard(event, who) {

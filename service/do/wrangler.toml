@@ -106,6 +106,12 @@ bucket_name = "open-hearts-pictures"
 [triggers]
 crons = ["0 13 * * *"]
 
+# The model that looks at each new picture as it is copied, and hides
+# one that shows nudity or sexual content, violence or gore, or a hate
+# symbol (review.mjs).
+[ai]
+binding = "AI"
+
 # Backup codes are emailed from the Household (docs/explanation/service.md) by
 # Cloudflare's Email Sending, which needs the Workers Paid plan and the
 # sending domain onboarded to Email Service. Without them the codes are

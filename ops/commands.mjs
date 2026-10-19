@@ -18,11 +18,13 @@ export const ARGUMENTS = {
   name: 'a secret\'s name, as `infra/cloudflare.mjs` lists it',
   platform: '`ios` or `android`',
   document: '`terms` (the terms of use) or `privacy` (the privacy policy)',
+  picture: 'a picture\'s SHA-256 (64 hex characters), as the daily email of new pictures gives it',
 };
 
 /// The groups the commands are listed in, in order.
 export const GROUPS = [
   ['account', 'Accounts', 'Acting on an account, as the terms and the privacy policy allow.'],
+  ['picture', 'Pictures', 'Pictures the automatic check hid.'],
   ['terms', 'Terms and price', 'Changing the terms of use, the privacy policy or the price, as site/ledger.json records them, and telling subscribers.'],
   ['release', 'Releasing', 'Putting the relay worker and the site into production, and checking production afterwards.'],
   ['setup', 'Setting up', 'What the deployment is made of: its accounts\' definitions, its run-time rows, its secrets, and the phone builds.'],
@@ -133,6 +135,18 @@ export const COMMANDS = [
     howto: 'docs/how-to/delete-an-accounts-data.md',
     example: 'oh account delete 0123456789abcdef0123456789abcdef --apply',
     run: lazy('./account.mjs', 'del'),
+  },
+  {
+    words: ['picture', 'allow'],
+    group: 'picture',
+    args: ['picture'],
+    flags: ['apply'],
+    summary: 'Puts back a picture the automatic check hid by mistake, and keeps the check from hiding it again for 30 days.',
+    more: 'The relay shows it again within a couple of minutes.',
+    needs: CF,
+    howto: 'docs/how-to/look-at-new-pictures.md#put-back-a-picture-hidden-by-mistake',
+    example: 'oh picture allow 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --apply',
+    run: lazy('./picture.mjs', 'allow'),
   },
   {
     words: ['terms', 'status'],

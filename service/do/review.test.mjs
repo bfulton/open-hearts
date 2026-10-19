@@ -1,18 +1,20 @@
 // The pictures subscribers put out, kept for the operator to look at
 // (review.mjs): each copied once, and each account's use of it noted,
-// both kept while it is put out; and the day's email, account by
+// both kept while it is put out; each looked at by a model as it is
+// copied, and hidden if it should be; and the day's email, account by
 // account, of every picture each put out since the last — the ones it
-// has since replaced too — with the commands that take them down.
+// has since replaced too — with what the check made of each, and the
+// commands that take them down or put them back.
 //
 //   node --test service/do
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { PICTURES_ORIGIN, REVIEW_KEPT_DAYS, REVIEW_MOST, pictureKeeper, reviewEmail, reviewRun } from './review.mjs';
+import { CHECK_MODEL, PICTURES_ORIGIN, REVIEW_KEPT_DAYS, REVIEW_MOST, checkPicture, hidePictures, pictureKeeper, reviewEmail, reviewRun } from './review.mjs';
 import { lobbyKind } from './relay.mjs';
 import { r2 } from '../../infra/cloudflare.mjs';
-import { pictureDigest } from '../functions/pictures.mjs';
+import { PICTURES_ROW, WITHHELD_FOR_MS, allowing, pictureDigest, withheldOf } from '../functions/pictures.mjs';
 import { memoryStore } from '../functions/rows.mjs';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -214,4 +216,186 @@ test('review: the email escapes what it shows', () => {
   const { html } = reviewEmail([{ account: '<b>', pictures: [{ digest: 'ab'.repeat(32), at: '"x"', current: false }] }]);
   assert.ok(html.includes('<code>&lt;b&gt;</code>') && !html.includes('<code><b></code>'));
   assert.ok(html.includes('&quot;x&quot;') && !html.includes('"x"'));
+});
+
+/// Workers AI's binding, answering each picture (its base64) as
+/// [answer] says: {sexual, gore, hate}, or an Error to throw.
+function fakeAi(answer) {
+  const calls = [];
+  return {
+    calls,
+    async run(model, input) {
+      calls.push({ model, input });
+      const said = answer(input.images[0].slice('data:image/jpeg;base64,'.length));
+      if (said instanceof Error) throw said;
+      return { model: 'clef-flash', answers: Object.fromEntries(Object.entries(said).map(([id, p]) => [id, { type: 'noul', noul: p }])) };
+    },
+  };
+}
+
+const harmless = { sexual: 0.01, gore: 0.01, hate: 0.01 };
+const digestOf = (n) => pictureDigest(jpeg(n));
+const withheldIn = async (store, t) => withheldOf(await store.get(...PICTURES_ROW), t);
+
+test('review: the check asks the model its questions of the picture, and takes nothing short of an answer to each', async () => {
+  const ai = fakeAi(() => harmless);
+  assert.deepEqual(await checkPicture(ai, jpeg(1)), harmless);
+  const [{ model, input }] = ai.calls;
+  assert.equal(model, CHECK_MODEL);
+  assert.equal(input.model, 'clef-flash');
+  assert.deepEqual(input.images, [`data:image/jpeg;base64,${jpeg(1)}`]);
+  assert.deepEqual(Object.keys(input.questions), ['sexual', 'gore', 'hate']);
+  for (const q of Object.values(input.questions)) assert.ok(q.type === 'noul' && q.instructions.endsWith('?'));
+  await assert.rejects(checkPicture(fakeAi(() => ({ sexual: 0.1, gore: 0.1 })), jpeg(1)), /no answer to hate/);
+  await assert.rejects(checkPicture(fakeAi(() => ({ ...harmless, gore: 1.5 })), jpeg(1)), /no answer to gore/);
+  await assert.rejects(checkPicture(fakeAi(() => ({ ...harmless, sexual: '0.1' })), jpeg(1)), /no answer to sexual/);
+});
+
+test('review: a picture the check takes for nudity, gore or a hate symbol is hidden as it is copied, and checked once', async () => {
+  const t = Date.UTC(2026, 9, 19);
+  const b = bucket(() => t);
+  const store = memoryStore();
+  const scores = { [jpeg(1)]: harmless, [jpeg(2)]: { ...harmless, hate: 0.94 }, [jpeg(3)]: { ...harmless, sexual: 0.5 }, [jpeg(4)]: { ...harmless, gore: 0.49 } };
+  const ai = fakeAi((p) => scores[p]);
+  const keep = pictureKeeper({ bucket: b, ai, hide: (d) => hidePictures(store, [d], t), now: () => t });
+  for (const n of [1, 2, 3, 4]) assert.equal(await keep(picture(n), { account: ADA }), true);
+  assert.deepEqual(b.objects.get(await copyOf(1)).customMetadata, { at: new Date(t).toISOString(), check: 'sexual=0.010 gore=0.010 hate=0.010' });
+  assert.equal(b.objects.get(await copyOf(2)).customMetadata.check, 'sexual=0.010 gore=0.010 hate=0.940');
+  assert.deepEqual([...(await withheldIn(store, t))].sort(), [await digestOf(2), await digestOf(3)].sort(), '0.5 hides; 0.49 does not');
+  // The same pictures from Bao: copied already, so not checked again.
+  for (const n of [1, 2]) await keep(picture(n), { account: BAO });
+  assert.equal(ai.calls.length, 4);
+  // No model bound: copied, and nothing said of it.
+  await pictureKeeper({ bucket: b, now: () => t })(picture(5), { account: ADA });
+  assert.deepEqual(b.objects.get(await copyOf(5)).customMetadata, { at: new Date(t).toISOString() });
+});
+
+test('review: a hidden picture is hidden again whenever it comes back, its 30 days run out; one the operator allowed is not', async () => {
+  let t = Date.UTC(2026, 9, 19);
+  const b = bucket(() => t);
+  const store = memoryStore();
+  const ai = fakeAi(() => ({ ...harmless, sexual: 0.93 }));
+  const keep = pictureKeeper({ bucket: b, ai, hide: (d) => hidePictures(store, [d], t), now: () => t });
+  await keep(picture(1), { account: ADA });
+  await keep(picture(2), { account: ADA });
+  const [one, two] = [await digestOf(1), await digestOf(2)];
+  assert.deepEqual([...(await withheldIn(store, t))], [one, two]);
+  // Not done with until the relay withholds it: put out again before
+  // the relay has the list, it is looked at again.
+  const heads = b.heads;
+  await keep(picture(1), { account: ADA });
+  assert.ok(b.heads > heads, 'looked at again');
+  // The operator allows 2, and a daily run on day 29 keeps it allowed,
+  // its copy being kept. Then the 30 days run out, and 1 comes back,
+  // from this object, which a withheld picture never reached.
+  await store.put(...PICTURES_ROW, allowing(await store.get(...PICTURES_ROW), two, t));
+  const start = t;
+  t += 29 * DAY;
+  await reviewRun({ bucket: b, store, send: async () => {}, now: () => t });
+  t = start + WITHHELD_FOR_MS + 1000;
+  assert.deepEqual([...(await withheldIn(store, t))], []);
+  await keep(picture(1), { account: ADA });
+  await keep(picture(2), { account: ADA });
+  assert.deepEqual([...(await withheldIn(store, t))], [one], 'hidden again, from what the copy says; 2 still allowed');
+  assert.equal(ai.calls.length, 2, 'not checked again');
+  // Allowed, it is done with: put out again, nothing is asked.
+  const after = b.heads;
+  await keep(picture(2), { account: ADA });
+  assert.equal(b.heads, after);
+});
+
+test('review: a check or a hiding that fails is logged and the picture kept; the daily run hides it all the same', async () => {
+  const t = Date.UTC(2026, 9, 19);
+  const b = bucket(() => t);
+  const store = memoryStore();
+  const logs = [];
+  const ai = fakeAi((p) => (p === jpeg(1) ? new Error('model down') : p === jpeg(2) ? { ...harmless, gore: 0.9 } : harmless));
+  const keep = pictureKeeper({ bucket: b, ai, hide: async () => { throw new Error('store down'); }, log: (l) => logs.push(l), now: () => t });
+  assert.equal(await keep(picture(1), { account: ADA }), true);
+  assert.equal(b.objects.get(await copyOf(1)).customMetadata.check, 'failed');
+  assert.equal(await keep(picture(2), { account: ADA }), true);
+  assert.deepEqual(logs, ['picture not checked: Error: model down', 'picture not hidden: Error: store down']);
+  assert.equal(await store.get(...PICTURES_ROW), null);
+  // A copy that cannot be written is not remembered: tried again.
+  const put = b.put;
+  b.put = async () => { throw new Error('bucket down'); };
+  await assert.rejects(keep(picture(3), { account: ADA }), /bucket down/);
+  b.put = put;
+  assert.equal(await keep(picture(3), { account: ADA }), true);
+
+  const sent = [];
+  await reviewRun({ bucket: b, store, send: async (m) => sent.push(m), now: () => t });
+  const [one, two] = [await digestOf(1), await digestOf(2)];
+  assert.deepEqual([...(await withheldIn(store, t))], [two]);
+  const [mail] = sent;
+  assert.equal(mail.subject, 'Open Hearts: 3 new pictures to look at, from 1 account, 1 hidden by the check');
+  assert.match(mail.text, new RegExp(`${one}\\.jpg .*not checked: the check failed`));
+  assert.match(mail.text, new RegExp(`${two}\\.jpg .*hidden by the check for violence or gore \\(0\\.90\\)`));
+  assert.ok(mail.text.includes(`./oh picture allow ${two} --apply`));
+  assert.ok(!mail.text.includes(`./oh picture allow ${one}`));
+});
+
+test('review: accounts with a picture hidden as nudity or sexual content come first, in the first email; one put back is marked so', async () => {
+  let t = Date.UTC(2026, 9, 19);
+  const b = bucket(() => t);
+  const store = memoryStore();
+  const CY = '0c'.repeat(16);
+  // Ada 60 harmless; Bao 50, the last hidden as sexual; Cy 1, hidden as
+  // sexual and allowed by the operator before the email.
+  const ai = fakeAi((p) => (p === jpeg(149) || p === jpeg(200) ? { ...harmless, sexual: 0.93 } : harmless));
+  const keep = pictureKeeper({ bucket: b, ai, hide: (d) => hidePictures(store, [d], t), now: () => t });
+  for (const [account, n0, count] of [[ADA, 0, 60], [BAO, 100, 50], [CY, 200, 1]]) {
+    for (let n = n0; n < n0 + count; n++) {
+      await keep(picture(n), { account });
+      t += 1000;
+    }
+  }
+  const allowed = await digestOf(200);
+  await store.put(...PICTURES_ROW, allowing(await store.get(...PICTURES_ROW), allowed, t));
+  const sent = [];
+  // Bao alone, though Ada put hers out before, and Cy's is not urgent:
+  // whole accounts in order, and Ada would pass a hundred.
+  assert.deepEqual(await reviewRun({ bucket: b, store, send: async (m) => sent.push(m), now: () => t }), { deleted: 0, sent: 50, more: 61 });
+  const [mail] = sent;
+  assert.equal(mail.subject, 'Urgent: Open Hearts: 50 new pictures to look at, from 1 account, 1 hidden by the check');
+  assert.match(mail.text, /^The automatic check hid 1 picture as nudity or sexual content; the accounts that put them out are first\. Look at them now\./);
+  assert.match(mail.text, new RegExp(`${await digestOf(149)}\\.jpg .*hidden by the check for nudity or sexual content \\(0\\.93\\)`));
+  assert.ok(mail.text.includes(`./oh picture allow ${await digestOf(149)} --apply`));
+  assert.match(mail.html, /<b style="color:#b00020">The automatic check hid 1 picture/);
+  assert.deepEqual([...(await withheldIn(store, t))], [await digestOf(149)], 'what the operator allowed stays shown');
+  // The next day: Ada's and Cy's, nothing urgent, Cy's marked as put back.
+  t += DAY;
+  await reviewRun({ bucket: b, store, send: async (m) => sent.push(m), now: () => t });
+  const next = sent[1];
+  assert.equal(next.subject, 'Open Hearts: 61 new pictures to look at, from 2 accounts');
+  assert.ok(!next.text.includes('automatic check hid') && !next.html.includes('#b00020'));
+  assert.match(next.text, new RegExp(`${allowed}\\.jpg .*put back by you after the check hid it for nudity or sexual content \\(0\\.93\\)`));
+  assert.ok(!next.text.includes(`./oh picture allow ${allowed}`));
+});
+
+test('review: what the operator allowed stays allowed while its copy is kept, and no longer once it is deleted', async () => {
+  let t = Date.UTC(2026, 9, 19);
+  const b = bucket(() => t);
+  const store = memoryStore();
+  const ai = fakeAi(() => ({ ...harmless, hate: 0.9 }));
+  const keep = pictureKeeper({ bucket: b, ai, hide: (d) => hidePictures(store, [d], t), now: () => t });
+  await keep(picture(1), { account: ADA });
+  const [one, two] = [await digestOf(1), await digestOf(2)];
+  // 1, allowed on day 5, is not put out again; 2 is put out on day 29,
+  // and allowed too.
+  const start = t;
+  t += 5 * DAY;
+  await store.put(...PICTURES_ROW, allowing(await store.get(...PICTURES_ROW), one, t));
+  t = start + 29 * DAY;
+  await keep(picture(2), { account: ADA });
+  await store.put(...PICTURES_ROW, allowing(await store.get(...PICTURES_ROW), two, t));
+  t = start + 31 * DAY;
+  await reviewRun({ bucket: b, store, send: async () => {}, now: () => t });
+  assert.ok(!b.objects.has(await copyOf(1)), "1's copy deleted");
+  const row = await store.get(...PICTURES_ROW);
+  assert.deepEqual(
+    row.allowed.map((a) => [a.sha256, a.until]),
+    [[one, start + 5 * DAY + WITHHELD_FOR_MS], [two, t + WITHHELD_FOR_MS]],
+    "2's kept allowed from today; 1's left to run out",
+  );
 });

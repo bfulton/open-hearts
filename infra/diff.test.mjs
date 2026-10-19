@@ -400,7 +400,7 @@ test("toml: the relay's own wrangler.toml reads", () => {
   assert.deepEqual(wrangler.routes, [{ pattern: 'relay.openhearts.game', custom_domain: true }]);
   assert.deepEqual(
     wranglerBindings(wrangler).map((b) => `${b.type}:${b.name}`).sort(),
-    ['analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'r2_bucket:OH_PICTURES', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
+    ['ai:AI', 'analytics_engine:OH_METRICS', 'durable_object_namespace:BENCH', 'durable_object_namespace:HOUSEHOLD', 'durable_object_namespace:TABLE', 'kv_namespace:OH_STORE', 'plain_text:OH_MAIL_FROM', 'r2_bucket:OH_PICTURES', 'send_email:EMAIL', 'version_metadata:CF_VERSION_METADATA'],
   );
 });
 
@@ -410,6 +410,7 @@ const liveRelay = () => ({
     compatibility_flags: [],
     observability: { enabled: true },
     bindings: [
+      { name: 'AI', type: 'ai' },
       { class_name: 'Bench', name: 'BENCH', namespace_id: 'fba6', type: 'durable_object_namespace' },
       { name: 'CF_VERSION_METADATA', type: 'version_metadata' },
       { name: 'EMAIL', type: 'send_email' },
