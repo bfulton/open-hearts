@@ -70,14 +70,50 @@ jobs:
       - name: The libraries (crypto/build_ios.sh)
         run: crypto/build_ios.sh
       - name: On a simulator (the libraries loaded as the app loads them, and checked)
+        id: simulator
+        # A run that passes takes about 9 minutes. One that hangs, as two
+        # have once the app was built, is stopped well inside the job's
+        # hour, so that the step after it can say where it was.
+        timeout-minutes: 25
         run: |
           udid=$(xcrun simctl list devices available -j | python3 -c '
           import json, sys
           d = json.load(sys.stdin)["devices"]
           print(next(x["udid"] for r, v in sorted(d.items(), reverse=True) if ".iOS-" in r for x in v if x["name"].startswith("iPhone")))')
+          echo "udid=$udid" >> "$GITHUB_ENV"
           xcrun simctl boot "$udid"
           cd app && flutter pub get
-          flutter test integration_test/native_libs_test.dart -d "$udid"
+          # simctl boot returns as the simulator starts; the app goes on
+          # one that has finished.
+          echo "waiting for the simulator to finish booting"
+          xcrun simctl bootstatus "$udid"
+          # Every line the tool writes is kept for the step after this
+          # one; here, only how the build and the tests went.
+          status=0
+          flutter test -v integration_test/native_libs_test.dart -d "$udid" > "$RUNNER_TEMP/native_libs.log" 2>&1 || status=$?
+          grep -E 'Xcode build done|✅|❌|tests? passed|Some tests failed' "$RUNNER_TEMP/native_libs.log" || true
+          exit "$status"
+      - name: Where the simulator step stopped, if it failed or hung
+        if: always() && (steps.simulator.outcome == 'failure' || steps.simulator.outcome == 'cancelled')
+        run: |
+          echo "--- the end of the Flutter tool's log"
+          tail -n 150 "$RUNNER_TEMP/native_libs.log" || echo "no log: the tests never started"
+          echo "--- the simulator"
+          xcrun simctl list devices booted || true
+          # A test that never ends while the app's event loop runs fails
+          # at its timeout (30 s), so one that hangs is stuck in the tool
+          # or in a native call; the app's threads say which.
+          echo "--- the app's threads"
+          pid=$(pgrep -x Runner | head -n 1)
+          if [ -n "$pid" ]; then
+            sample "$pid" 3 -file "$RUNNER_TEMP/runner.sample.txt" > /dev/null && head -n 200 "$RUNNER_TEMP/runner.sample.txt" || echo "not sampled"
+          else
+            echo "the app is not running"
+          fi
+          echo "--- the app's log on the simulator"
+          if [ -n "${udid:-}" ]; then
+            xcrun simctl spawn "$udid" log show --last 30m --style compact --predicate 'process == "Runner"' | tail -n 150 || true
+          fi
       - name: A release without the service key is refused (app/ios/release_check.sh)
         run: |
           cd app

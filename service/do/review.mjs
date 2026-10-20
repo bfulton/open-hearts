@@ -64,7 +64,6 @@ export const HIDE_AT = 0.5;
 /// What the email calls each question's yes.
 const CHECK_SAYS = { sexual: 'nudity or sexual content', gore: 'violence or gore', hate: 'a hate symbol' };
 
-
 /// What the model makes of [jpeg] (base64): {sexual, gore, hate}, each
 /// how likely a yes. Throws when it does not answer them all.
 export async function checkPicture(ai, jpeg) {

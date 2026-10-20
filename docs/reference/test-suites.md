@@ -163,7 +163,7 @@ One job, `ios`, on macOS. It runs when started by hand, and on pull requests and
 | Step | What it checks |
 |---|---|
 | `crypto/build_ios.sh` | The deal and Schnorr libraries build as XCFrameworks. |
-| `flutter test integration_test/native_libs_test.dart` on a simulator | The libraries load as the app loads them (`app/integration_test/native_libs_test.dart`). |
+| `flutter test integration_test/native_libs_test.dart` on a simulator, once it has booted, for at most 25 minutes | The libraries load as the app loads them (`app/integration_test/native_libs_test.dart`). When it fails or hangs, the next step prints the end of the Flutter tool's log, the simulator's state, a sample of the app's threads, and the app's log on the simulator. |
 | `flutter build ios --release --no-codesign`, without the service key | The release build is refused (`app/ios/release_check.sh`). |
 | `node app/tool/defines.mjs`, then the unsigned release build | The release builds with what `config/openhearts.json` names, as `build_phone.sh` makes it. |
 | `otool` and `lipo` on the built frameworks | What the release carries. |
