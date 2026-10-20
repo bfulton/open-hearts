@@ -141,7 +141,7 @@ test("in a Durable Object, the account's turn keeps the account's pictures with 
   const picture = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2]).toString('base64');
   const said = await inHousehold(env, account, { op: 'profile', key: KEY, profile: JSON.stringify({ name: 'Ada', picture }) });
   assert.equal(said.status, 200);
-  assert.deepEqual(calls, [{ account, key: KEY, picture, prev: null }]);
+  assert.deepEqual(calls, [{ account, key: KEY, picture }]);
   assert.equal(said.body.profile.picture, undefined, 'the profile keeps what it was given back');
 });
 

@@ -9,7 +9,7 @@
 
 import { Failed, Usage } from './env.mjs';
 import { HOW_MOST, REPORT_KEPT_S, reportRow } from '../service/do/known.mjs';
-import { PICTURES_ROW, allowedOf, allowing, copyKey, pictureNamed, withheldOf, withholding } from '../service/functions/pictures.mjs';
+import { PICTURES_ROW, allowedOf, allowing, pictureNamed, withheldOf, withholding } from '../service/functions/pictures.mjs';
 import { hex, isAccount } from '../service/functions/rows.mjs';
 import { accountsWith } from '../service/tool/find.mjs';
 
@@ -57,9 +57,10 @@ export async function report(ctx, { args, flags }) {
   if (how !== null && (typeof how !== 'string' || !how.trim() || how.length > HOW_MOST)) throw new Usage(`--how is a few words, ${HOW_MOST} characters at the most`);
   const store = await ctx.store();
   const pictures = await ctx.pictures();
-  const accounts = [...new Set([...(await accountsWith(pictures, digest)), ...(named ? [named] : [])])];
-  const copy = (await pictures.list(copyKey(digest))).includes(copyKey(digest));
-  ctx.log(`${digest}: ${copy ? 'its copy is kept' : 'no copy of it is kept'}; set by ${accounts.length} account(s)`);
+  const kept = await accountsWith(pictures, digest);
+  const accounts = [...new Set([...kept, ...(named ? [named] : [])])];
+  const copy = kept.length > 0;
+  ctx.log(`${digest}: ${copy ? 'a copy of it is kept' : 'no copy of it is kept'}; set by ${accounts.length} account(s)`);
   for (const a of accounts) ctx.log(`  ${a}`);
   ctx.log(
     `would have the relay withhold it wherever it was put out, hold and terminate ${accounts.length ? 'each account' : 'nobody (no account is known)'}, their web subscriptions ended with nothing refunded, report it to NCMEC as a picture you looked at${how ? ` (${how.trim()})` : ''}, and email you what it did`,

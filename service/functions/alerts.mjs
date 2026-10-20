@@ -18,7 +18,7 @@
 // subscription and the device, and dates: nobody's email or name — but
 // for a report, which says the name the reporter saw.
 
-import { copyUrl, pictureDigest } from './pictures.mjs';
+import { pictureDigest, pictureUrl } from './pictures.mjs';
 import { PROFILE_NAME_MOST } from './profile.mjs';
 import { tableIdShape } from './records.mjs';
 
@@ -231,7 +231,7 @@ export async function alertReport(env, store, { key, account, about, what, table
     '',
     note ? `What they wrote: ${note}` : 'They wrote nothing more.',
     '',
-    ...(picture ? [`The picture they saw: ${copyUrl(picture)} — ${picture === itsPicture ? 'its profile picture now' : 'not its profile picture now'}`] : []),
+    ...(picture ? [`The picture they saw: ${pictureUrl(about, picture)} — ${picture === itsPicture ? 'its profile picture now' : 'not its profile picture now'}`] : []),
     ...(name !== null ? [`The name they saw: ${name} — ${name === itsName ? 'its name now' : `its name now is ${itsName ? itsName : 'none'}`}`] : []),
     '',
     'To act on it, under docs/how-to/handle-a-report.md:',

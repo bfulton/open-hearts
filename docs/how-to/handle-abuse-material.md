@@ -42,15 +42,15 @@ Every other failure of the automatic handling, such as PhotoDNA not answering, a
 
 - Don't download, screenshot, copy, forward or show the material to anyone, except to make the report. Look at it no more than you need to decide.
 - Don't tell the account's owner about the report.
-- Don't delete anything of the account's, except the one copy this guide says to once the hold has kept it: the law has it kept. `./oh account hold` makes sure nothing else does.
+- Don't delete anything of the account's, except its copy of the picture, which this guide says to delete once the hold has kept it: the law has it kept. `./oh account hold` makes sure nothing else does.
 
 ## Find the account
 
 - **From a report:** find the account by the name it plays under, or the report's account number, and set it in your shell, as [Suspend an account](suspend-an-account.md#find-the-account) shows.
-- **From a picture:** find the accounts that set it, by its SHA-256 or the address of its copy:
+- **From a picture:** find the accounts that set it, by its SHA-256 or the address of an account's copy of it:
 
   ```bash
-  ./oh account find /review/<sha256>.jpg
+  ./oh account find <sha256>
   ```
 
   It prints each account that set it in the last year, and whether it is the account's profile picture now. Set each in your shell in turn, and follow the rest of this guide for each one.
@@ -65,7 +65,7 @@ For a picture that may show the sexual abuse or exploitation of a child, from a 
 
 The relay then does what it does for a PhotoDNA match: it withholds the picture wherever it was put out, holds and terminates each account that set it in the last year, their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and `--how` you came to, and emails you what it did. Whoever sets the picture after that is acted on too. Run it without `--apply` first to see which accounts set it.
 
-It needs a copy of the picture: the one kept of each picture an account sets, for a year after it stops being the account's ([how it works](../explanation/relay.md#an-accounts-pictures)), or one kept from an account. For a picture already taken off an account's profile, or kept by its hold, name the account with `--account <account>`. When there is no copy, which is a picture no account has had for a year, the command says so: follow the steps below by hand.
+It needs a copy of the picture: an account's own copy, kept for a year after it stops being the account's ([how it works](../explanation/relay.md#an-accounts-pictures)), or one kept from an account. For a picture already taken off an account's profile, or kept by its hold, name the account with `--account <account>`. When there is no copy, which is a picture no account has had for a year, the command says so: follow the steps below by hand.
 
 ## Take it down and hold the account by hand
 
@@ -95,7 +95,7 @@ For a name, or a picture the relay can't act on:
 
    For a year from today, nothing deletes the account's data, nothing taken off it is put back, and a later removal keeps what was held first beside it. A deletion its owner asks for meanwhile is noted, and done once the hold is released.
 
-   It also keeps a copy of each picture the account set in the last year, at `held/<account>/<sha256>.jpg` in the bucket of kept games, `open-hearts-records`, which has no address of its own, and prints each one it keeps. The copy kept of each picture an account sets is deleted a year after it stops being the account's, which the hold may outlast, so these are the copies the law has you keep.
+   It also keeps a copy of each picture the account set in the last year, at `held/<account>/<sha256>.jpg` in the bucket of kept games, `open-hearts-records`, which has no address of its own, and prints each one it keeps. The account's own copy of each picture is deleted a year after it stops being the account's, which the hold may outlast, so these are the copies the law has you keep.
 
 1. End the account, as a serious breach, with no refund:
 
@@ -103,10 +103,10 @@ For a name, or a picture the relay can't act on:
    ./oh account terminate "$account" --serious --apply
    ```
 
-1. Delete the copy at `pictures.openhearts.game`, now that the hold has kept one:
+1. Delete the account's copy at `pictures.openhearts.game`, now that the hold has kept one:
 
    ```bash
-   npx wrangler r2 object delete "open-hearts-pictures/review/<sha256>.jpg" --remote
+   npx wrangler r2 object delete "open-hearts-pictures/account/$account/<sha256>.jpg" --remote
    ```
 
 ## Report it

@@ -2,7 +2,7 @@
 // subscription was paid with, by a picture it set, or by one of its devices' keys.
 
 import { accountsNamed, accountsPaidBy } from '../functions/deletion.mjs';
-import { ACCOUNT_PICTURES_PREFIX, pictureDigest, pictureNamed } from '../functions/pictures.mjs';
+import { ACCOUNT_PICTURES_PREFIX, pictureDigest, pictureNamed, pictureParts } from '../functions/pictures.mjs';
 import { isAccount } from '../functions/rows.mjs';
 
 /// The accounts [asked] names: as a name always, since one can have an
@@ -42,13 +42,13 @@ export async function findAccounts(store, asked, { stripeKey = null, fetchImpl =
   return { found, notes, pictures: theirs };
 }
 
-/// The accounts that set the picture [digest], as each is noted in
-/// [pictures] (service/do/profile_pictures.mjs): its picture now, or one
-/// it had in the year before (service/do/review.mjs, PICTURE_KEPT_DAYS).
+/// The accounts that set the picture [digest], each with its own copy
+/// of it in [pictures] (service/do/profile_pictures.mjs): its picture
+/// now, or one it had in the year before (service/do/review.mjs,
+/// PICTURE_KEPT_DAYS).
 export async function accountsWith(pictures, digest) {
-  const ending = `/${digest}`;
-  const of = (key) => key.slice(ACCOUNT_PICTURES_PREFIX.length).split('/')[0];
-  return [...new Set((await pictures.list(ACCOUNT_PICTURES_PREFIX)).filter((k) => k.endsWith(ending)).map(of))].filter(isAccount);
+  const theirs = (await pictures.list(ACCOUNT_PICTURES_PREFIX)).map(pictureParts).filter((p) => p?.digest === digest);
+  return [...new Set(theirs.map((p) => p.account))];
 }
 
 /// The account [target] is: itself, when it is one (32 hex), or the

@@ -194,7 +194,7 @@ async function remove(account, store, { name, picture, now, pictures = null }) {
     const digest = await pictureDigest(profile.picture);
     if (digest) await store.put(...PICTURES_ROW, withholding(await store.get(...PICTURES_ROW), digest, now));
     // No longer the account's picture, and kept as long as one replaced.
-    await pictures?.set({ account, picture: null, prev: profile.picture });
+    await pictures?.set({ account, picture: null });
   }
   if (!removed.length) return { removed };
   await store.put(pk, 'HELD', { ...held, at: new Date(now).toISOString() });
@@ -218,7 +218,7 @@ async function restore(account, store, { now, pictures = null }) {
   // The account's picture again, checked again as it is set: one since
   // found to match a known image of child sexual abuse is not, and stays
   // withheld.
-  const picture = typeof held.picture === 'string' && (pictures ? await pictures.set({ account, picture: held.picture, prev: profile.picture }) : held.picture);
+  const picture = typeof held.picture === 'string' && (pictures ? await pictures.set({ account, picture: held.picture }) : held.picture);
   if (picture) {
     next.picture = picture;
     restored.push('picture');

@@ -207,17 +207,16 @@ test('a legal hold: placed with its report, shown, and not released before its y
   await store.put(`ACCOUNT#${account}`, 'META', { subscription: 'sub_9' });
   const ctx = context(store, fakeStripe());
   // The pictures kept as accounts set them: two the account set, one
-  // of whose copies is gone, and one only another account set.
+  // of whose copies is deleted between the listing and the reading, and
+  // one only another account set.
   const [a, b, c] = await Promise.all([1, 2, 3].map((n) => pictureDigest(base64(jpeg(n)))));
   const pictures = objects({
-    [`account/${account}/${a}`]: '',
-    [`account/${account}/${b}`]: '',
-    [`account/${other}/${c}`]: '',
-    [`review/${a}.jpg`]: jpeg(1),
-    [`review/${c}.jpg`]: jpeg(3),
+    [`account/${account}/${a}.jpg`]: jpeg(1),
+    [`account/${account}/${b}.jpg`]: jpeg(2),
+    [`account/${other}/${c}.jpg`]: jpeg(3),
   });
   const records = objects({ 'tables/t1.json': '{}' });
-  ctx.pictures = async () => pictures;
+  ctx.pictures = async () => ({ ...pictures, read: async (key) => (key.endsWith(`/${b}.jpg`) ? null : pictures.read(key)) });
   ctx.bucket = () => records;
   assert.equal(await main(['account', 'hold', account], ctx), 0);
   assert.equal(await store.get(`ACCOUNT#${account}`, 'HOLD'), null, 'a dry run holds nothing');
@@ -233,7 +232,7 @@ test('a legal hold: placed with its report, shown, and not released before its y
   assert.deepEqual(Object.keys(records.kept).sort(), [`held/${account}/${a}.jpg`, 'tables/t1.json']);
   assert.match(ctx.said.join('\n'), new RegExp(`oh: no copy left of picture ${b}`));
   assert.deepEqual(ctx.said.slice(-2), [`kept held/${account}/${a}.jpg`, `kept 1 picture(s) at held/${account}/`]);
-  assert.ok(pictures.kept[`review/${a}.jpg`], 'the copy at the relay is left as it was');
+  assert.ok(pictures.kept[`account/${account}/${a}.jpg`], "the account's copy is left as it was");
 
   const shown = context(store, fakeStripe());
   await main(['account', 'show', account], shown);
@@ -268,7 +267,7 @@ test('a legal hold: placed with its report, shown, and not released before its y
 test('a hold is placed before its pictures are copied, so one that fails to copy still holds, and running it again copies them', async () => {
   const store = await webSubscriber();
   const digest = await pictureDigest(base64(jpeg(1)));
-  const pictures = objects({ [`account/${account}/${digest}`]: '', [`review/${digest}.jpg`]: jpeg(1) });
+  const pictures = objects({ [`account/${account}/${digest}.jpg`]: jpeg(1) });
   const records = objects();
   const ctx = context(store, fakeStripe());
   ctx.pictures = async () => ({ ...pictures, read: async () => { throw new Error('reading said 500'); } });
@@ -302,21 +301,21 @@ test('found by a picture: by its SHA-256 or its copy\'s address, each account th
   const [a, b] = await Promise.all([1, 2].map((n) => pictureDigest(base64(jpeg(n)))));
   await store.put(`ACCOUNT#${account}`, 'PROFILE', { picture: base64(jpeg(1)) });
   await store.put(`ACCOUNT#${other}`, 'PROFILE', { picture: base64(jpeg(2)) });
-  // And a note under something that is no account, which the daily
-  // email passes over too.
-  const pictures = objects({ [`account/${account}/${a}`]: '', [`account/${other}/${a}`]: '', [`account/${other}/${b}`]: '', [`account/bench/${a}`]: '', [`review/${a}.jpg`]: jpeg(1) });
+  // And a copy under something that is no account, which the daily
+  // run passes over too.
+  const pictures = objects({ [`account/${account}/${a}.jpg`]: jpeg(1), [`account/${other}/${a}.jpg`]: jpeg(1), [`account/${other}/${b}.jpg`]: jpeg(2), [`account/bench/${a}.jpg`]: jpeg(1) });
   const found = async (query) => {
     const ctx = context(store, fakeStripe());
     ctx.pictures = async () => pictures;
     assert.equal(await main(['account', 'find', query], ctx), 0);
     return ctx.said;
   };
-  const both = [`${account}: put the picture out; its profile picture now`, `${other}: put the picture out; not its profile picture now`, '2 account(s)'];
+  const both = [`${account}: set the picture; its profile picture now`, `${other}: set the picture; not its profile picture now`, '2 account(s)'];
   assert.deepEqual(await found(a), both);
   assert.deepEqual(await found(a.toUpperCase()), both);
-  assert.deepEqual(await found(`https://pictures.openhearts.game/review/${a}.jpg`), both, "by its copy's address");
-  assert.deepEqual(await found(`/review/${a}.jpg`), both);
-  assert.deepEqual(await found(b), [`${other}: put the picture out; its profile picture now`, '1 account(s)']);
+  assert.deepEqual(await found(`https://pictures.openhearts.game/account/${account}/${a}.jpg`), both, "by a copy's address");
+  assert.deepEqual(await found(`/account/${other}/${a}.jpg`), both);
+  assert.deepEqual(await found(b), [`${other}: set the picture; its profile picture now`, '1 account(s)']);
   assert.deepEqual(await found('cd'.repeat(32)), ['0 account(s)'], 'a picture nobody set');
   // A name is not looked for in the pictures.
   const named = context(store, fakeStripe());

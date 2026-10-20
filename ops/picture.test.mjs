@@ -44,12 +44,12 @@ test('picture allow: says what it would do, and with --apply puts the picture ba
 
 test('a picture is named by its SHA-256, or by the address of its copy', async () => {
   for (const command of ['allow', 'hide']) {
-    for (const wrong of ['ab'.repeat(31), `https://pictures.openhearts.game/review/${'ab'.repeat(31)}.jpg`, `${digest}.png`, `${digest}x`, '']) {
+    for (const wrong of ['ab'.repeat(31), `https://pictures.openhearts.game/account/${A}/${'ab'.repeat(31)}.jpg`, `${digest}.png`, `${digest}x`, '']) {
       const ctx = context(memoryStore());
       assert.equal(await main(['picture', command, wrong], ctx), 2, `${command} ${wrong}`);
       assert.match(ctx.said.join('\n'), /name the picture by its SHA-256/);
     }
-    for (const right of [`https://pictures.openhearts.game/review/${digest}.jpg`, `/review/${digest}.jpg`, ` ${digest} `]) {
+    for (const right of [`https://pictures.openhearts.game/account/${A}/${digest}.jpg`, `/account/${A}/${digest}.jpg`, ` ${digest} `]) {
       const ctx = context(memoryStore());
       assert.equal(await main(['picture', command, right], ctx), 0, `${command} ${right}`);
       assert.match(ctx.said[0], new RegExp(`^${digest}: `));
@@ -70,7 +70,7 @@ test('picture hide: says what it would do, and with --apply withholds the pictur
   assert.ok(!withheldOf(await store.get(...PICTURES_ROW), now).has(digest), 'a dry run changes nothing');
 
   const done = context(store);
-  assert.equal(await main(['picture', 'hide', `https://pictures.openhearts.game/review/${digest}.jpg`, '--apply'], done), 0);
+  assert.equal(await main(['picture', 'hide', `https://pictures.openhearts.game/account/${A}/${digest}.jpg`, '--apply'], done), 0);
   const row = await store.get(...PICTURES_ROW);
   assert.ok(withheldOf(row, now).has(digest));
   assert.ok(withheldOf(row, now + WITHHELD_FOR_MS - 1).has(digest), 'for 30 days');
@@ -105,10 +105,10 @@ const C = 'abcdefabcdefabcdefabcdefabcdefab';
 
 test('picture report: says who set it and what the relay would do; with --apply hands it to the relay, asked again while the store has not shown it', async () => {
   const store = memoryStore();
-  const keys = [`review/${digest}.jpg`, `account/${A}/${digest}`, `account/${A}/${other}`];
+  const keys = [`account/${A}/${digest}.jpg`, `account/${A}/${other}.jpg`];
   const dry = reporting(store, keys, []);
   assert.equal(await main(['picture', 'report', digest, '--account', C, '--how', 'a player reported it'], dry), 0);
-  assert.equal(dry.said[0], `${digest}: its copy is kept; set by 2 account(s)`);
+  assert.equal(dry.said[0], `${digest}: a copy of it is kept; set by 2 account(s)`);
   assert.deepEqual(dry.said.slice(1, 3), [`  ${A}`, `  ${C}`]);
   assert.match(dry.said[3], /hold and terminate each account.*report it to NCMEC as a picture you looked at \(a player reported it\)/);
   assert.equal(dry.said.at(-1), 'nothing changed; --apply does it');

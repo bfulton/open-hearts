@@ -234,7 +234,14 @@ test("in the account's turn, every change of its picture goes through what keeps
   const now = Date.now();
   const calls = [];
   const matched = new Set([jpeg(30)]);
-  const pictures = { set: async (c) => (calls.push({ ...c }), matched.has(c.picture) ? null : c.picture) };
+  const profiled = [];
+  const pictures = {
+    set: async (c) => {
+      calls.push({ ...c });
+      profiled.push((await store.get(`ACCOUNT#${account}`, 'PROFILE')) !== null);
+      return matched.has(c.picture) ? null : c.picture;
+    },
+  };
   const op = (o) => householdOp(o, store, { now, active, pictures });
   const order = async (id, act, more = {}) => {
     await store.put(...orderRow(id), orderOf(account, act, { ...more, now }));
@@ -266,16 +273,17 @@ test("in the account's turn, every change of its picture goes through what keeps
   assert.equal((await op({ op: 'delete', key: ADA.public })).status, 200);
 
   assert.deepEqual(calls, [
-    { account, key: ADA.public, picture: one, prev: null },
-    { account, key: ADA.public, picture: jpeg(30), prev: one },
-    { account, key: ADA.public, picture: two, prev: null },
-    { account, picture: null, prev: two },
-    { account, picture: two, prev: null },
-    { account, picture: null, prev: two },
-    { account, picture: two, prev: null },
-    { account, key: ADA.public, picture: one, prev: null },
-    { account, picture: null, prev: one },
+    { account, key: ADA.public, picture: one },
+    { account, key: ADA.public, picture: jpeg(30) },
+    { account, key: ADA.public, picture: two },
+    { account, picture: null },
+    { account, picture: two },
+    { account, picture: null },
+    { account, picture: two },
+    { account, key: ADA.public, picture: one },
+    { account, picture: null },
   ]);
+  assert.equal(profiled.at(-1), true, 'deleted: its pictures no longer its own before its rows go');
 });
 
 test('an account\'s data deleted on request takes its profile with it, and nobody else\'s', async () => {

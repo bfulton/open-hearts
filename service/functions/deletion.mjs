@@ -32,9 +32,10 @@ export async function deleteAccount(op, store, active, { now = Date.now(), revok
     if (!held.deleteAsked) await store.put(...holdRow(account), { ...held, deleteAsked: dayOf(now) });
     return { status: 200, body: { deleted: true } };
   }
-  const picture = (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.picture ?? null;
+  // Its pictures no longer its own before its rows go, so that a
+  // deletion that stops part way leaves none that is, and is done again.
+  await pictures?.set({ account, picture: null });
   await forgetAccount(store, account);
-  if (picture) await pictures?.set({ account, picture: null, prev: picture });
   const was = await active.get(account);
   if (was) {
     const epoch = (was.epoch ?? 0) + 1;

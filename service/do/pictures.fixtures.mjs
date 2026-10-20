@@ -17,16 +17,23 @@ export const jpeg = (n) => Buffer.from([0xff, 0xd8, 0xff, 0xe0, n & 0xff, n >> 8
 export const picture = (n, kind = lobbyKind) => ({ kind, content: JSON.stringify({ kind: 'picture', jpeg: jpeg(n) }) });
 
 /// An R2 bucket binding in memory, with [clock] for when each object
-/// was written; it lists two at a time, so that paging is used.
+/// was written; it lists two at a time, so that paging is used. Each
+/// write gives the object a new etag, and a put `onlyIf` an etag is
+/// refused, as R2 refuses it, when the object has another or is gone.
+/// [meanwhile], when a test sets it, runs once before the next put
+/// that names an etag, as another writer would between the read and
+/// the write.
 export function bucket(clock) {
   const objects = new Map();
+  let etags = 0;
   const view = (key) => {
     const o = objects.get(key);
-    return { key, uploaded: new Date(o.uploaded), customMetadata: { ...o.customMetadata }, httpMetadata: o.httpMetadata };
+    return { key, etag: o.etag, uploaded: new Date(o.uploaded), customMetadata: { ...o.customMetadata }, httpMetadata: o.httpMetadata };
   };
   return {
     objects,
     heads: 0,
+    meanwhile: null,
     async head(key) {
       this.heads++;
       return objects.has(key) ? view(key) : null;
@@ -36,9 +43,16 @@ export function bucket(clock) {
       const bytes = objects.get(key).bytes;
       return { ...view(key), arrayBuffer: async () => new Uint8Array(bytes).buffer };
     },
-    async put(key, bytes, { customMetadata = {}, httpMetadata } = {}) {
+    async put(key, bytes, { customMetadata = {}, httpMetadata, onlyIf } = {}) {
+      if (onlyIf && this.meanwhile) {
+        const run = this.meanwhile;
+        this.meanwhile = null;
+        await run();
+      }
+      if (onlyIf?.etagMatches !== undefined && objects.get(key)?.etag !== onlyIf.etagMatches) return null;
       const kept = typeof bytes === 'string' ? new TextEncoder().encode(bytes) : new Uint8Array(bytes);
-      objects.set(key, { bytes: kept, customMetadata: { ...customMetadata }, httpMetadata, uploaded: clock() });
+      objects.set(key, { bytes: kept, customMetadata: { ...customMetadata }, httpMetadata, uploaded: clock(), etag: `e${++etags}` });
+      return view(key);
     },
     async list({ prefix, cursor }) {
       const all = [...objects.keys()].filter((k) => k.startsWith(prefix)).sort();

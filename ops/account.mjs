@@ -11,7 +11,7 @@ import { accountOf, findAccounts } from '../service/tool/find.mjs';
 import { forget } from '../service/tool/forget.mjs';
 import { carry, standing, wouldDo } from '../service/tool/suspend.mjs';
 import { HOLD_DAYS, Held, heldPictureKey, heldPicturesPrefix, hold, holdRow, isReportRef, keepHeldPictures } from '../service/functions/holds.mjs';
-import { accountPictureKey, pictureNamed } from '../service/functions/pictures.mjs';
+import { accountPicturesPrefix, pictureNamed } from '../service/functions/pictures.mjs';
 import { anonymizeGames } from '../service/functions/records.mjs';
 import { dayAfter, dayOf } from '../service/functions/rows.mjs';
 
@@ -65,7 +65,7 @@ export async function find(ctx, { args }) {
   for (const note of said.notes) ctx.warn(note);
   for (const a of said.found) {
     const now = said.pictures.get(a);
-    ctx.log(now === undefined ? a : `${a}: put the picture out; ${now ? 'its profile picture now' : 'not its profile picture now'}`);
+    ctx.log(now === undefined ? a : `${a}: set the picture; ${now ? 'its profile picture now' : 'not its profile picture now'}`);
   }
   ctx.log(`${said.found.size} account(s)`);
 }
@@ -192,7 +192,7 @@ export async function holdAccount(ctx, { args, flags }) {
   if (stands.hold) ctx.log(`  already held${ref && !stands.hold.ref ? `; would add report ${ref}` : ''}`);
   else ctx.log(`  would hold its data until at least ${dayAfter(ctx.now(), HOLD_DAYS)}: nothing deletes it, or puts back what was taken off it, until it is released`);
   const pictures = await ctx.pictures();
-  const theirs = (await pictures.list(accountPictureKey(account, ''))).length;
+  const theirs = (await pictures.list(accountPicturesPrefix(account))).length;
   ctx.log(`  and would keep a copy of each picture it set in the last year, ${theirs} now, at ${heldPicturesPrefix(account)} in the bucket of kept games, until the hold is released`);
   if (!flags.apply) return ctx.log('nothing changed; --apply does it');
   const row = await hold(store, account, { ref, now: ctx.now() });

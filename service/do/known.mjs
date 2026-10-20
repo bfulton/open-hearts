@@ -11,7 +11,8 @@
 //   1. the picture withheld wherever it turns up (pictures.mjs);
 //   2. each account that set it held (holds.mjs), a copy of the picture
 //      and of every other it set kept where only the operator reaches
-//      them, and any copy of it served for the daily email deleted;
+//      them, and the account's own copy of it, which an address serves
+//      for the daily email, deleted;
 //   3. each such account terminated, its web subscriptions ended in
 //      Stripe with nothing refunded (an order the service carries out,
 //      suspension.mjs);
@@ -33,7 +34,7 @@ import { heldPictureKey, hold, keepHeldPictures } from '../functions/holds.mjs';
 import { bodyOf } from '../functions/http.mjs';
 import { NcmecRefused, fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
 import { photoDnaMatch } from '../functions/photodna.mjs';
-import { PICTURES_ROW, copyKey, pictureDigest, withheldOf, withholding } from '../functions/pictures.mjs';
+import { PICTURES_ROW, pictureDigest, pictureKey, withheldOf, withholding } from '../functions/pictures.mjs';
 import { isAccount, storeOf } from '../functions/rows.mjs';
 import { orderOf } from '../functions/suspension.mjs';
 import { accountsWith } from '../tool/find.mjs';
@@ -283,7 +284,7 @@ export class KnownPictures {
 
   /// The report the operator's tool wrote ([asked], its row and [id],
   /// reportRow), acted on as a match is: for each account that set the
-  /// picture, as their pictures are noted and as the operator named, a
+  /// picture, as each has a copy of it and as the operator named, a
   /// case that says the operator looked at it; and the picture known from
   /// then on, so that whoever sets it again is acted on too. Asked
   /// again, as the tool does when an answer is lost, it is answered as
@@ -313,15 +314,19 @@ export class KnownPictures {
     return { status: 200, body };
   }
 
-  /// The picture [digest], base64, from wherever a copy is kept: the
-  /// relay's copy, a hold's copy for one of [accounts], or a picture taken
-  /// off one of their profiles (suspension.mjs, HELD). Null for none.
+  /// The picture [digest], base64, from wherever a copy is kept: an
+  /// account's copy, one of [accounts]' first, then a hold's copy for one
+  /// of them, or a picture taken off one of their profiles
+  /// (suspension.mjs, HELD). Null for none.
   async copyOf(digest, accounts) {
     const env = this.env;
     const b64 = (bytes) => btoa(String.fromCharCode(...bytes));
     const read = async (bucket, key) => (bucket ? await r2Objects(bucket).read(key) : null);
-    const copy = await read(env.OH_PICTURES, copyKey(digest));
-    if (copy) return b64(copy);
+    const others = env.OH_PICTURES ? await accountsWith(r2Objects(env.OH_PICTURES), digest) : [];
+    for (const account of new Set([...accounts, ...others])) {
+      const copy = await read(env.OH_PICTURES, pictureKey(account, digest));
+      if (copy) return b64(copy);
+    }
     const store = storeOf(env);
     for (const account of accounts) {
       const held = await read(env.OH_RECORDS, heldPictureKey(account, digest));
@@ -351,9 +356,8 @@ export class KnownPictures {
   }
 
   /// A picture PhotoDNA matched after it was let through: every account
-  /// that set it, as noted here and as their pictures are noted
-  /// (profile_pictures.mjs), acted on, and the copy served for the email
-  /// taken down. [asking] is the account whose setting it found the
+  /// that set it, as noted here and as each has a copy of it
+  /// (profile_pictures.mjs), acted on, and each copy taken down. [asking] is the account whose setting it found the
   /// match, which is acted on as it asks; when nobody is known at all,
   /// the match is acted on without an account.
   async matchedLate(digest, waiting, asking = null) {
@@ -446,9 +450,9 @@ export class KnownPictures {
       if (!store) throw new Error('no store');
       const row = await store.get(...PICTURES_ROW);
       if (!withheldOf(row, now).has(c.digest)) await store.put(...PICTURES_ROW, withholding(row, c.digest, now));
-      // The copy made while it was let through, which an address
-      // serves: the case keeps the picture until the hold has it.
-      if (c.shown && env.OH_PICTURES) await env.OH_PICTURES.delete(copyKey(c.digest));
+      // The account's copy, kept if it was ever let through, which an
+      // address serves: the case keeps the picture until the hold has it.
+      if (c.account && env.OH_PICTURES) await env.OH_PICTURES.delete(pictureKey(c.account, c.digest));
     });
     if (c.account) {
       await attempt('held', async () => {

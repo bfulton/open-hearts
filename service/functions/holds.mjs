@@ -7,7 +7,7 @@
 // (suspension.mjs); a deletion asked for meanwhile is noted, and done
 // once the hold is released (`oh account release`).
 
-import { accountPictureKey, copyKey } from './pictures.mjs';
+import { accountPicturesPrefix, pictureParts } from './pictures.mjs';
 import { dayAfter, dayOf } from './rows.mjs';
 
 /// How long a hold lasts at the least, in days: the year the law has a
@@ -22,33 +22,33 @@ export const holdOf = (store, account) => store.get(...holdRow(account));
 
 /// Where a hold keeps a copy of each picture the account set, in the
 /// private bucket of kept games (OH_RECORDS), which has no address of
-/// its own: the copies kept of each picture an account sets
-/// (pictures.mjs) are served at one, for the daily email, and deleted a
-/// year after a picture stops being the account's, which a hold may
-/// outlast. Placed and released by `oh account hold` and `oh account
+/// its own: the account's copy of each picture it sets (pictures.mjs)
+/// is served at one, for the daily email, and deleted a year after the
+/// picture stops being the account's, which a hold may outlast. Placed and released by `oh account hold` and `oh account
 /// release`.
 export const heldPicturesPrefix = (account) => `held/${account}/`;
 export const heldPictureKey = (account, digest) => `${heldPicturesPrefix(account)}${digest}.jpg`;
 
-/// Each picture [account] set that [pictures] (OH_PICTURES) still has a
-/// copy of, copied into [records] where a hold keeps it. Both are
+/// Each picture [account] set that [pictures] (OH_PICTURES) still has
+/// its copy of, copied into [records] where a hold keeps it. Both are
 /// buckets as {list(prefix) -> keys, read(key) -> bytes or null,
 /// write(key, bytes, type)}: the operator's tool reaches them through
 /// Cloudflare's API, the relay through its bindings. Resolves {kept,
-/// gone}: the digests copied, and those whose copy was already deleted.
+/// gone}: the digests copied, and those whose copy was deleted between
+/// the listing and the reading.
 export async function keepHeldPictures(pictures, records, account) {
-  const theirs = accountPictureKey(account, '');
   const kept = [];
   const gone = [];
-  for (const key of await pictures.list(theirs)) {
-    const digest = key.slice(theirs.length);
-    const jpeg = await pictures.read(copyKey(digest));
+  for (const key of await pictures.list(accountPicturesPrefix(account))) {
+    const parts = pictureParts(key);
+    if (!parts) continue;
+    const jpeg = await pictures.read(key);
     if (!jpeg) {
-      gone.push(digest);
+      gone.push(parts.digest);
       continue;
     }
-    await records.write(heldPictureKey(account, digest), jpeg, 'image/jpeg');
-    kept.push(digest);
+    await records.write(heldPictureKey(account, parts.digest), jpeg, 'image/jpeg');
+    kept.push(parts.digest);
   }
   return { kept, gone };
 }

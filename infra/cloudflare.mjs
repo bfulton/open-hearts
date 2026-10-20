@@ -82,13 +82,14 @@ export const pages = {
 export const kv = ['open-hearts-store', 'open-hearts-store-preview'];
 
 /// R2 buckets. The game records are private: no r2.dev address, no
-/// custom domain, no CORS, so the worker is the only way in. The
-/// pictures subscribers put out at live tables, kept for the operator
-/// to look at (service/do/review.mjs), are served at their own domain,
-/// for the operator's daily email to show them; each is named by its
-/// SHA-256, so nobody finds one without the picture or the email. The
-/// records bucket also keeps what a legal hold keeps of an account's
-/// pictures (service/functions/holds.mjs), where no address serves it.
+/// custom domain, no CORS, so the worker is the only way in. Each
+/// account's copy of each picture it sets, kept for the operator to look
+/// at (service/do/profile_pictures.mjs), is served at the pictures
+/// bucket's own domain, for the operator's daily email to show it; each
+/// is named by its account and its SHA-256, so nobody finds one without
+/// both the account and the picture, or the email. The records bucket
+/// also keeps what a legal hold keeps of an account's pictures
+/// (service/functions/holds.mjs), where no address serves it.
 export const r2 = [
   {
     name: 'open-hearts-pictures',

@@ -99,8 +99,8 @@ export class TagRelay {
     // store at most once a minute while pictures come this way.
     this.pictures = pictureScreen({ read: () => this.env.OH_STORE?.get(PICTURES_ROW.join('|'), 'json') ?? null });
     // A picture is carried only as its account's picture now, checked
-    // as the account set it (profile_pictures.mjs): its note in the
-    // pictures bucket says so.
+    // as the account set it (profile_pictures.mjs): the account's copy
+    // of it in the pictures bucket says so.
     this.owned = ownedScreen({ bucket: this.env.OH_PICTURES ?? null, log: (line) => console.log(line) });
   }
 
@@ -290,7 +290,7 @@ export default {
     const from = { email: e.OH_MAIL_FROM, name: 'Open Hearts' };
     const send = alerts?.pictures && e.EMAIL ? (mail) => e.EMAIL.send({ to: alerts.to, from, ...mail }) : null;
     ctx.waitUntil(
-      reviewRun({ bucket: e.OH_PICTURES, store, send, ask: knownAsker(e) }).then(
+      reviewRun({ bucket: e.OH_PICTURES, store, records: e.OH_RECORDS ?? null, send, ask: knownAsker(e), log: (line) => console.log(`pictures: ${line}`) }).then(
         (r) => console.log(`pictures: ${r.deleted} deleted, ${r.asked} asked about again, ${r.sent} emailed, ${r.more} for later`),
         (err) => {
           console.log(`pictures: the daily run failed: ${err}`);

@@ -166,7 +166,7 @@ export const COMMANDS = [
     args: ['picture'],
     flags: ['apply', 'account=', 'how='],
     summary: 'Reports a picture you found and looked at as child sexual abuse material: the relay handles it as it does a PhotoDNA match.',
-    more: 'The relay withholds it wherever it was put out, holds and terminates each account that set it in the last year (and --account, one it was taken off), their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and --how you came to, and emails you what it did. It needs a copy: the one kept of each picture an account sets, a hold\'s, or the picture taken off --account.',
+    more: 'The relay withholds it wherever it was put out, holds and terminates each account that set it in the last year (and --account, one it was taken off), their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and --how you came to, and emails you what it did. It needs a copy: an account\'s own copy of it, a hold\'s, or the picture taken off --account.',
     needs: [...CF, '(Workers R2 Storage Edit)'],
     howto: 'docs/how-to/handle-abuse-material.md#report-a-picture-you-found',
     example: "oh picture report 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --how 'a player reported it' --apply",

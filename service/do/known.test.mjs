@@ -137,14 +137,14 @@ function world({ known = new Set() } = {}) {
 }
 
 /// The object over a fresh deployment: account A has a web
-/// subscription, a name and an earlier picture the relay copied.
+/// subscription, a name and its copy of an earlier picture.
 async function setUp({ ncmec = true, endpoint = NCMEC, known = new Set(), key = 'k' } = {}) {
   const store = kv();
   store.m.set(`ACCOUNT#${A}|META`, JSON.stringify({ subscription: 'sub_1' }));
   store.m.set(`ACCOUNT#${A}|PROFILE`, JSON.stringify({ name: 'Ada' }));
   const earlier = bytes(9);
   const earlierDigest = await pictureDigest(b64(earlier));
-  const pictures = r2({ [`account/${A}/${earlierDigest}`]: new Uint8Array(), [`review/${earlierDigest}.jpg`]: earlier });
+  const pictures = r2({ [`account/${A}/${earlierDigest}.jpg`]: earlier });
   const records = r2();
   const sent = [];
   const w = world({ known });
@@ -286,16 +286,16 @@ test('a match at upload: withheld, held with its pictures, terminated with its w
   assert.equal(t.w.ncmec.filter((c) => c.path === '/finish').length, 2, 'and one report an account');
 });
 
-test("PhotoDNA not answering lets a picture through, asks again, and a match then is acted on for each account that put it out, its public copy deleted", async () => {
+test("PhotoDNA not answering lets a picture through, asks again, and a match then is acted on for each account that set it, each account's copy deleted", async () => {
   const jpeg = bytes(1);
   const digest = await pictureDigest(b64(jpeg));
   const t = await setUp({ known: new Set([digest]) });
   t.w.photoDnaDown = true;
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'failed');
   assert.equal(t.state.alarm, t.now() + retryAfter(1));
-  // Carried meanwhile: the relay copied it, and C put it out too.
-  t.pictures.m.set(`review/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
-  t.pictures.m.set(`account/${C}/${digest}`, { bytes: new Uint8Array(), type: '' });
+  // Set meanwhile: A's copy kept, and C set it too.
+  t.pictures.m.set(`account/${A}/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
+  t.pictures.m.set(`account/${C}/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
 
   t.clock.tick(retryAfter(1));
   await t.ring();
@@ -307,7 +307,7 @@ test("PhotoDNA not answering lets a picture through, asks again, and a match the
   const cases = [...(await t.state.storage.list({ prefix: 'case:' })).values()];
   assert.deepEqual(cases.map((c) => c.account).sort(), [A, C].sort());
   assert.ok(cases.every((c) => c.shown));
-  assert.equal(t.pictures.m.has(`review/${digest}.jpg`), false, 'its public copy deleted');
+  for (const a of [A, C]) assert.equal(t.pictures.m.has(`account/${a}/${digest}.jpg`), false, "each account's copy deleted");
   assert.deepEqual(t.records.m.get(`held/${C}/${digest}.jpg`)?.bytes, jpeg, 'and the hold has it');
   assert.equal((await t.state.storage.list({ prefix: 'retry:' })).size, 0);
   assert.ok(t.w.ncmec.filter((c) => c.path === '/fileinfo').every((c) => /<publiclyAvailable>true<\/publiclyAvailable>/.test(c.body)));
@@ -500,12 +500,11 @@ async function reportIt(t, row, id = 'a'.repeat(32)) {
   return askRelay(t, { report: id });
 }
 
-test('a picture the operator reports is handled as a match: each account that put it out, the report saying they looked, and the picture known from then on', async () => {
+test('a picture the operator reports is handled as a match: each account that set it, the report saying they looked, and the picture known from then on', async () => {
   const jpeg = bytes(5);
   const digest = await pictureDigest(b64(jpeg));
   const t = await setUp();
-  t.pictures.m.set(`review/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
-  t.pictures.m.set(`account/${A}/${digest}`, { bytes: new Uint8Array(), type: '' });
+  t.pictures.m.set(`account/${A}/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
   const said = await reportIt(t, { digest, accounts: [C], how: '  a player reported it  ' });
   assert.deepEqual(said, { status: 200, body: { reported: digest, accounts: [C, A] } });
   assert.equal(t.w.photoDnaAsked, 0, 'PhotoDNA not asked');
@@ -515,7 +514,7 @@ test('a picture the operator reports is handled as a match: each account that pu
   assert.deepEqual(cases.map((c) => [c.account, c.viewed, c.how, c.shown]).sort(), [[A, true, 'a player reported it', true], [C, true, 'a player reported it', true]].sort());
   assert.ok(cases.every((c) => c.closed));
   assert.ok(withheldOf(t.store.row(...PICTURES_ROW), t.now()).has(digest));
-  assert.equal(t.pictures.m.has(`review/${digest}.jpg`), false, 'its public copy deleted');
+  assert.equal(t.pictures.m.has(`account/${A}/${digest}.jpg`), false, "A's copy deleted");
   assert.deepEqual(t.records.m.get(`held/${A}/${digest}.jpg`)?.bytes, jpeg);
   const submits = t.w.ncmec.filter((c) => c.path === '/submit');
   assert.equal(submits.length, 2);
@@ -558,7 +557,7 @@ test('a report reaches the object only when the tool wrote it, and is answered t
   const t = await setUp();
   const jpeg = bytes(7);
   const digest = await pictureDigest(b64(jpeg));
-  t.pictures.m.set(`review/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
+  t.pictures.m.set(`account/${B}/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
 
   // Nothing the tool wrote: answered by the relay worker, the object
   // every picture is checked through never asked.
@@ -576,14 +575,14 @@ test('a report reaches the object only when the tool wrote it, and is answered t
   assert.deepEqual(await reportIt(t, { digest: 'not a digest', accounts: [] }), { status: 400, body: { error: 'a picture, its SHA-256' } });
   assert.equal((await t.state.storage.list({ prefix: 'case:' })).size, 0);
 
-  // Reported, and acted on: its relay copy is deleted, and it is
-  // nobody's to hold. The tool asking again, its answer lost, is told
-  // the same, and nothing is done twice.
+  // Reported, and acted on, though nobody was named: B, whose copy it
+  // is, held, and the copy deleted. The tool asking again, its answer
+  // lost, is told the same, and nothing is done twice.
   const id = 'c'.repeat(32);
   const said = await reportIt(t, { digest, accounts: [] }, id);
-  assert.deepEqual(said, { status: 200, body: { reported: digest, accounts: [] } });
+  assert.deepEqual(said, { status: 200, body: { reported: digest, accounts: [B] } });
   await t.ring();
-  assert.equal(t.pictures.m.has(`review/${digest}.jpg`), false);
+  assert.equal(t.pictures.m.has(`account/${B}/${digest}.jpg`), false);
   const filed = t.w.ncmec.length;
   assert.deepEqual(await askRelay(t, { report: id }), said);
   await t.ring();
@@ -593,7 +592,7 @@ test('a report reaches the object only when the tool wrote it, and is answered t
   // Another report since, and the first still answered; once the first
   // has run out, the next report forgets it.
   const other = await pictureDigest(b64(bytes(8)));
-  t.pictures.m.set(`review/${other}.jpg`, { bytes: bytes(8), type: 'image/jpeg' });
+  t.pictures.m.set(`account/${B}/${other}.jpg`, { bytes: bytes(8), type: 'image/jpeg' });
   assert.equal((await reportIt(t, { digest: other, accounts: [] }, 'd'.repeat(32))).status, 200);
   assert.deepEqual(await askRelay(t, { report: id }), said);
   t.clock.tick(REPORT_KEPT_S * 1000);

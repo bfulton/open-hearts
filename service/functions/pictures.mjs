@@ -18,23 +18,49 @@
 /// `allowed` only when something is.
 export const PICTURES_ROW = ['config', 'pictures'];
 
-/// Where a copy of each picture an account sets is kept, for the
-/// operator to look at and act on (service/do/profile_pictures.mjs),
-/// named by its digest, and served for the daily email: the bucket's
-/// custom domain (infra/cloudflare.mjs; a test holds the two equal).
+/// Where each picture an account sets is kept, for the operator to look
+/// at and act on (service/do/profile_pictures.mjs): one object for each
+/// account and picture, `account/<account>/<digest>.jpg`, the picture's
+/// bytes, and in its metadata all that is known of it: when the account
+/// set it (`at`), what the model made of it (`check`), what PhotoDNA
+/// said (`known`), when the operator was emailed it (`told`), and, once
+/// it is no longer the account's picture, since when (`replaced`). The
+/// one without `replaced` is the account's picture now, the only one the
+/// relay carries for it. Two accounts that set the same picture have a
+/// copy each. Served for the daily email at the bucket's custom domain
+/// (infra/cloudflare.mjs; a test holds the two equal).
 export const PICTURES_ORIGIN = 'https://pictures.openhearts.game';
-export const REVIEW_PREFIX = 'review/';
-export const copyKey = (digest) => `${REVIEW_PREFIX}${digest}.jpg`;
-export const copyUrl = (digest) => `${PICTURES_ORIGIN}/${copyKey(digest)}`;
-
-/// Where in the same bucket each picture an account set is noted:
-/// `account/<account>/<digest>`, empty, saying when the account set it
-/// (`at`), whether the operator has been told (`told`), and, once it is
-/// no longer the account's picture, since when (`replaced`). The one
-/// without `replaced` is the account's picture now, the only one the
-/// relay carries for it.
 export const ACCOUNT_PICTURES_PREFIX = 'account/';
-export const accountPictureKey = (account, digest) => `${ACCOUNT_PICTURES_PREFIX}${account}/${digest}`;
+export const accountPicturesPrefix = (account) => `${ACCOUNT_PICTURES_PREFIX}${account}/`;
+export const pictureKey = (account, digest) => `${accountPicturesPrefix(account)}${digest}.jpg`;
+export const pictureUrl = (account, digest) => `${PICTURES_ORIGIN}/${pictureKey(account, digest)}`;
+
+/// The account and digest [key] keeps the picture of ({account,
+/// digest}), or null for a key that is not a picture's.
+export function pictureParts(key) {
+  const m = /^account\/([0-9a-f]{32})\/([0-9a-f]{64})\.jpg$/.exec(String(key));
+  return m ? { account: m[1], digest: m[2] } : null;
+}
+
+/// The picture at [key] in [bucket] (an R2 binding), its metadata made
+/// what [change] makes of it (a copy of it, to return changed, or null
+/// to leave it as it is). Written only if nobody wrote the picture since
+/// it was read, by its etag, and read again if somebody did, so that
+/// two writers never lose each other's change; and never written back
+/// once deleted. Resolves the metadata the picture has now, or null
+/// when there is no such picture. Throws when every one of [tries]
+/// writes lost to another.
+export async function changePicture(bucket, key, change, { tries = 3 } = {}) {
+  for (let i = 0; i < tries; i++) {
+    const o = await bucket.get(key);
+    if (!o) return null;
+    const meta = change({ ...(o.customMetadata ?? {}) });
+    if (!meta) return { ...(o.customMetadata ?? {}) };
+    const bytes = await o.arrayBuffer();
+    if (await bucket.put(key, bytes, { httpMetadata: o.httpMetadata, customMetadata: meta, onlyIf: { etagMatches: o.etag } })) return meta;
+  }
+  throw new Error(`${key} written by another ${tries} times over`);
+}
 
 /// The SHA-256 [said] names a picture by, as the operator is given one:
 /// the digest itself, as the daily email gives it, or the address or

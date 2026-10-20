@@ -33,13 +33,15 @@ squashed from a pull request, the pull request's number.
   it; a subscriber can send ten a day, the same report once a day.
   (2026-10-19, #32)
 - A picture is the account's: the account's turn checks it as the
-  account sets it, before anyone is shown it, and keeps a copy of each
-  picture the account sets, apart, for the operator, until a year after
-  it stops being the account's (replaced, taken off, or the account
-  deleted), as long as a hold keeps one reported. The relay carries only
-  an account's picture now. A room or a pool waits for a profile save on
-  its way, so a picture just changed goes once the service has it.
-  (2026-10-19, #32)
+  account sets it, before anyone is shown it, and keeps the account's
+  own copy of it, apart, for the operator, until a year after it stops
+  being the account's (replaced, taken off, or the account deleted), as
+  long as a hold keeps one reported. Everything known of a picture
+  travels with that one copy, and two accounts that set the same picture
+  have one each, each checked and acted on for itself. The relay carries
+  only an account's picture now. A room or a pool waits for a profile
+  save on its way, so a picture just changed goes once the service has
+  it. (2026-10-19, #32)
 - Pictures are checked as an account sets them, by Cloudflare's Workers
   AI, for nudity, gore and hate symbols. One the check flags is withheld
   from everyone within a couple of minutes, and the daily email shows it
@@ -55,10 +57,11 @@ squashed from a pull request, the pull request's number.
   PhotoDNA's key is set; reports are filed once NCMEC's credentials are,
   and until then the email says to file one by hand. (2026-10-19, #32)
 - Every new picture is emailed to the operator once a day, account by
-  account, with the commands to take it down. The daily run keeps what
-  is kept for as long as the privacy policy says whether or not the
-  email is on, asks PhotoDNA again about any picture it has not cleared,
-  and emails the operator if it fails. (2026-10-19, #32)
+  account, with the commands to take it down. The daily run does only
+  what each copy says is still to do: it keeps what is kept for as long
+  as the privacy policy says whether or not the email is on, asks
+  PhotoDNA again about any picture it has not cleared, and emails the
+  operator if it fails. (2026-10-19, #32)
 - Names that are obscene or slurs, in five languages, are refused by the
   app, the service and the relay, matched as whole words so real names
   stay. (2026-10-19, #32)

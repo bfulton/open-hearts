@@ -140,7 +140,7 @@ export async function profileWritten(op, store, active, { now = Date.now(), pict
     return { status: 409, body: { error: 'superseded: another device of this account is in use' } };
   }
   const was = await store.get(`ACCOUNT#${account}`, 'PROFILE');
-  const picture = pictures ? await pictures.set({ account, key: op.key, picture: checked.profile.picture, prev: was?.picture ?? null }) : checked.profile.picture;
+  const picture = pictures ? await pictures.set({ account, key: op.key, picture: checked.profile.picture }) : checked.profile.picture;
   const row = { ...checked.profile, picture, version: (was?.version ?? 0) + 1, updated_at: new Date(now).toISOString() };
   await store.put(`ACCOUNT#${account}`, 'PROFILE', row);
   return { status: 200, body: profileShown(row) };

@@ -25,8 +25,8 @@ function asked(...answers) {
 
 test('the pictures bucket: listed by prefix a page at a time, and each object read, written and deleted at its own path', async () => {
   const { calls, fetchImpl } = asked(
-    new Response(JSON.stringify({ success: true, result: [{ key: 'seen/a/1' }], result_info: { is_truncated: true, cursor: 'c 2' } })),
-    new Response(JSON.stringify({ success: true, result: [{ key: 'seen/b/2' }], result_info: { is_truncated: false } })),
+    new Response(JSON.stringify({ success: true, result: [{ key: 'account/a/1.jpg' }], result_info: { is_truncated: true, cursor: 'c 2' } })),
+    new Response(JSON.stringify({ success: true, result: [{ key: 'account/b/2.jpg' }], result_info: { is_truncated: false } })),
     new Response(Uint8Array.from([0xff, 0xd8, 1])),
     new Response('', { status: 404 }),
     new Response('', { status: 500 }),
@@ -35,21 +35,21 @@ test('the pictures bucket: listed by prefix a page at a time, and each object re
     new Response('', { status: 500 }),
   );
   const pictures = await picturesBucket(env, fetchImpl);
-  assert.deepEqual(await pictures.list('seen/'), ['seen/a/1', 'seen/b/2']);
+  assert.deepEqual(await pictures.list('account/'), ['account/a/1.jpg', 'account/b/2.jpg']);
   const at = objects('open-hearts-pictures');
-  assert.deepEqual(calls.map((c) => c.url), [`${at}?prefix=seen%2F`, `${at}?prefix=seen%2F&cursor=c%202`]);
+  assert.deepEqual(calls.map((c) => c.url), [`${at}?prefix=account%2F`, `${at}?prefix=account%2F&cursor=c%202`]);
   assert.equal(calls[0].headers.authorization, 'Bearer token');
 
-  assert.deepEqual(await pictures.read('review/ab.jpg'), Uint8Array.from([0xff, 0xd8, 1]));
-  assert.equal(calls[2].url, `${at}/review/ab.jpg`, "a key's slashes stay in the path");
-  assert.equal(await pictures.read('review/gone.jpg'), null);
-  await assert.rejects(pictures.read('review/ab.jpg'), /reading said 500/);
+  assert.deepEqual(await pictures.read('account/a/ab.jpg'), Uint8Array.from([0xff, 0xd8, 1]));
+  assert.equal(calls[2].url, `${at}/account/a/ab.jpg`, "a key's slashes stay in the path");
+  assert.equal(await pictures.read('account/a/gone.jpg'), null);
+  await assert.rejects(pictures.read('account/a/ab.jpg'), /reading said 500/);
 
   await pictures.write('held/a/ab.jpg', Uint8Array.from([1]), 'image/jpeg');
   assert.deepEqual([calls[5].method, calls[5].url, calls[5].headers['content-type']], ['PUT', `${at}/held/a/ab.jpg`, 'image/jpeg']);
-  await pictures.remove('review/gone.jpg');
+  await pictures.remove('account/a/gone.jpg');
   assert.equal(calls[6].method, 'DELETE');
-  await assert.rejects(pictures.remove('review/ab.jpg'), /deleting said 500/);
+  await assert.rejects(pictures.remove('account/a/ab.jpg'), /deleting said 500/);
 });
 
 test('the records bucket: a record at its path, and its bytes as any object', async () => {

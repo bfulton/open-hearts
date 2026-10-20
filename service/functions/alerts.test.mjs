@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 
 import { REPORTS_A_DAY, REPORT_NOTE_MOST, alertsOf, alertSubscribed, alertWaiting, reportOf, sendAlert } from './alerts.mjs';
-import { copyUrl, pictureDigest } from './pictures.mjs';
+import { pictureDigest } from './pictures.mjs';
 import { configEnv } from './deployment.mjs';
 import worker from './worker.mjs';
 import { Household } from './household.mjs';
@@ -218,7 +218,7 @@ test('a report reaches the operator at once, switches off or on; once a day each
   const text = sent[0].text;
   assert.match(text, new RegExp(`^Account ${mine} \\(device ${ada.public.slice(0, 8)}…\\) reported account ${bao} for its picture, at .*, at table ${table}\\.`));
   assert.match(text, /What they wrote: not a face/);
-  assert.ok(text.includes(`The picture they saw: ${copyUrl(digest)} — its profile picture now`));
+  assert.ok(text.includes(`The picture they saw: https://pictures.openhearts.game/account/${bao}/${digest}.jpg — its profile picture now`), 'its own copy');
   assert.ok(text.includes('The name they saw: Bao — its name now'));
   assert.ok(text.includes(`./oh account remove ${bao} picture --apply`) && text.includes(`./oh account suspend ${bao} --apply`));
   assert.match(text, /handle-abuse-material\.md/);
