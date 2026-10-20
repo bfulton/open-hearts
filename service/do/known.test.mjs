@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { KNOWN_OBJECT, KnownPictures, REPORT_KEPT_S, knownAsker, knownReport, retryAfter } from './known.mjs';
-import { PICTURES_ROW, allowedOf, allowing, pictureDigest, withheldOf } from '../functions/pictures.mjs';
+import { PICTURES_ROW, allowedOf, allowing, copiesOf, currentOf, pictureDigest, withheldOf } from '../functions/pictures.mjs';
 
 const A = '0123456789abcdef0123456789abcdef';
 const B = 'fedcba9876543210fedcba9876543210';
@@ -48,20 +48,30 @@ function kv() {
 /// An R2 bucket binding.
 function r2(seed = {}) {
   const m = new Map(Object.entries(seed).map(([k, v]) => [k, { bytes: v, type: 'image/jpeg' }]));
+  // Each object's metadata and etag, by key, as R2 keeps them.
+  const meta = new Map();
+  const etag = new Map();
+  let etags = 0;
+  const view = (key) => ({ key, etag: etag.get(key), customMetadata: { ...(meta.get(key) ?? {}) }, httpMetadata: { contentType: m.get(key).type }, uploaded: new Date(0) });
   return {
     m,
+    meta,
     async get(k) {
       const v = m.get(k);
-      return v ? { arrayBuffer: async () => v.bytes.slice().buffer } : null;
+      return v ? { ...view(k), arrayBuffer: async () => v.bytes.slice().buffer } : null;
     },
     async put(k, body, opts) {
+      if (opts?.onlyIf && (!m.has(k) || etag.get(k) !== opts.onlyIf.etagMatches)) return null;
       m.set(k, { bytes: new Uint8Array(body), type: opts?.httpMetadata?.contentType });
+      meta.set(k, { ...(opts?.customMetadata ?? {}) });
+      etag.set(k, `e${++etags}`);
+      return view(k);
     },
     async delete(k) {
       m.delete(k);
     },
     async list({ prefix }) {
-      return { objects: [...m.keys()].filter((k) => k.startsWith(prefix)).sort().map((key) => ({ key })), truncated: false };
+      return { objects: [...m.keys()].filter((k) => k.startsWith(prefix)).sort().map(view), truncated: false };
     },
   };
 }
@@ -504,7 +514,11 @@ test('a picture the operator reports is handled as a match: each account that se
   const jpeg = bytes(5);
   const digest = await pictureDigest(b64(jpeg));
   const t = await setUp();
-  t.pictures.m.set(`account/${A}/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
+  // A's picture now, and one before it that a save stopped short of
+  // saying is no longer hers.
+  const before = `account/${A}/${await pictureDigest(b64(bytes(6)))}.jpg`;
+  await t.pictures.put(before, bytes(6), { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { at: '2026-10-01T00:00:00.000Z', last: '2026-10-01T00:00:00.000Z' } });
+  await t.pictures.put(`account/${A}/${digest}.jpg`, jpeg, { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { at: '2026-10-02T00:00:00.000Z', last: '2026-10-02T00:00:00.000Z' } });
   const said = await reportIt(t, { digest, accounts: [C], how: '  a player reported it  ' });
   assert.deepEqual(said, { status: 200, body: { reported: digest, accounts: [C, A] } });
   assert.equal(t.w.photoDnaAsked, 0, 'PhotoDNA not asked');
@@ -515,6 +529,8 @@ test('a picture the operator reports is handled as a match: each account that se
   assert.ok(cases.every((c) => c.closed));
   assert.ok(withheldOf(t.store.row(...PICTURES_ROW), t.now()).has(digest));
   assert.equal(t.pictures.m.has(`account/${A}/${digest}.jpg`), false, "A's copy deleted");
+  assert.equal(t.pictures.meta.get(before).ended, '2026-10-02T00:00:00.000Z', 'the one before is not hers again as it goes');
+  assert.equal(currentOf(await copiesOf(t.pictures, A)), null);
   assert.deepEqual(t.records.m.get(`held/${A}/${digest}.jpg`)?.bytes, jpeg);
   const submits = t.w.ncmec.filter((c) => c.path === '/submit');
   assert.equal(submits.length, 2);

@@ -38,8 +38,9 @@ squashed from a pull request, the pull request's number.
   being the account's (replaced, taken off, or the account deleted), as
   long as a hold keeps one reported. Everything known of a picture
   travels with that one copy, and two accounts that set the same picture
-  have one each, each checked and acted on for itself. The relay carries
-  only an account's picture now. A room or a pool waits for a profile
+  have one each, each checked and acted on for itself. The account's
+  picture now is the one it set last, and the relay carries only that
+  one. A room or a pool waits for a profile
   save on its way, so a picture just changed goes once the service has
   it. (2026-10-19, #32)
 - Pictures are checked as an account sets them, by Cloudflare's Workers

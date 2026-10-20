@@ -10,8 +10,9 @@
 // symbol is hidden at once: withheld at the relay as a picture the
 // operator took down is (service/functions/pictures.mjs). Once a day the
 // worker's schedule goes over every copy kept, and does only what each
-// copy's own flags say is still to do: deletes what is kept no longer
-// than promised; asks PhotoDNA again about what it has not cleared;
+// copy's own flags say is still to do: holds each account's copies to
+// the order it set them in; deletes what is kept no longer than
+// promised; asks PhotoDNA again about what it has not cleared;
 // hides again what the check found should be; and emails the operator,
 // account by account, every picture each set since the last email — the
 // ones it has since replaced too, so that swapping a picture back before
@@ -21,7 +22,7 @@
 
 import { HOLD_DAYS } from '../functions/holds.mjs';
 import { forgottenKey } from '../functions/records.mjs';
-import { ACCOUNT_PICTURES_PREFIX, PICTURES_ORIGIN, PICTURES_ROW, allowedOf, changePicture, pictureDigest, pictureParts, pictureUrl, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
+import { ACCOUNT_PICTURES_PREFIX, PICTURES_ORIGIN, PICTURES_ROW, allowedOf, changePicture, copyOf, currentOf, newestFirst, pictureUrl, settleCopies, stillAllowing, withheldOf, withholding } from '../functions/pictures.mjs';
 
 /// Where the copies are served (service/functions/pictures.mjs).
 export { PICTURES_ORIGIN };
@@ -33,22 +34,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /// hold keeps one reported (holds.mjs), so that a picture is kept as
 /// long whether or not it was reported.
 export const PICTURE_KEPT_DAYS = HOLD_DAYS;
-
-/// How long a copy is left alone after it was written before the run
-/// holds it to its account's profile: the store shows a changed profile
-/// everywhere within a minute or so, and a save writes the copy a moment
-/// before the profile, so the run never takes one being made for one a
-/// save left behind.
-const SETTLED_MS = DAY_MS;
-
-/// How often the run holds each account's copies to its profile, in
-/// days, on a day its number gives it; and every day for a week after
-/// they were last written. A save, or the run, writes them, so an account
-/// written to lately is the one most likely out of step; the weekly turn
-/// catches what changed a profile outside the account's turn (`oh
-/// account delete`, service/tool/forget.mjs), and the week of days covers
-/// runs that failed meanwhile.
-const SQUARE_EVERY_DAYS = 7;
 
 /// The most pictures one email shows, in whole accounts; the rest go in
 /// the next.
@@ -130,20 +115,31 @@ export async function hidePictures(store, digests, now = Date.now(), kept = null
   return new Set(digests.filter((d) => allowed.has(d)));
 }
 
-/// What a copy's metadata [m] says, as profile_pictures.mjs writes it.
-const flagsOf = (m = {}) => ({ at: m.at ?? '', told: m.told ?? null, replaced: m.replaced ?? null, check: m.check ?? null, known: m.known ?? null });
-
-/// Every account's copy of every picture in [bucket]: {key, account,
-/// digest, at, told, replaced, check, known, uploaded}.
+/// Every account's copy of every picture in [bucket], as copyOf says
+/// it.
 async function listed(bucket) {
   const found = [];
   let cursor;
   do {
     const page = await bucket.list({ prefix: ACCOUNT_PICTURES_PREFIX, cursor, include: ['customMetadata'] });
     for (const o of page.objects) {
-      const parts = pictureParts(o.key);
-      if (parts) found.push({ key: o.key, ...parts, ...flagsOf(o.customMetadata), uploaded: new Date(o.uploaded).getTime() });
+      const c = copyOf(o);
+      if (c) found.push(c);
     }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return found;
+}
+
+/// When each account [records] (OH_RECORDS) marks forgotten was marked,
+/// in milliseconds, by account.
+async function forgottenIn(records) {
+  const prefix = forgottenKey('');
+  const found = new Map();
+  let cursor;
+  do {
+    const page = await records.list({ prefix, cursor });
+    for (const o of page.objects) found.set(o.key.slice(prefix.length), new Date(o.uploaded).getTime());
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
   return found;
@@ -244,20 +240,18 @@ export function reviewEmail(accounts, more = 0) {
 }
 
 /// The day's run, over every account's copy of every picture
-/// ([bucket]) and [store] (the accounts' profiles, and the pictures
-/// withheld), each copy's own flags saying what is still to do for it:
+/// ([bucket]) and [store] (the pictures withheld), each copy's own flags
+/// saying what is still to do for it:
 ///
-/// 1. an account whose copies were written in the last week, one that
-///    has more than one that says it is its picture now, and every other
-///    on its day of the week (SQUARE_EVERY_DAYS) is held to its profile:
-///    each such copy but its profile's picture says from today that it
-///    no longer is — a save that stopped part way, or the account
-///    deleted, and then from when it was, as the mark its deletion left
-///    in [records] (OH_RECORDS) says. Only the account's turn makes a
-///    picture its own, as it checks it (profile_pictures.mjs), so the run
-///    only ever says one is not;
+/// 1. each account's copies are held to the order it set them in: each
+///    but the one it set last says since when it is no longer the
+///    account's picture, from when the one after it was set, in case the
+///    save that set that one stopped part way; and the one it set last
+///    too, for an account deleted outside its turn (`oh account
+///    delete`, service/tool/forget.mjs), from when the mark its deletion
+///    left in [records] (OH_RECORDS) was made;
 /// 2. a copy that has not been its account's for [PICTURE_KEPT_DAYS]
-///    is deleted;
+///    is deleted, each account's oldest first;
 /// 3. with [ask] (known.mjs, knownAsker), each copy PhotoDNA has not
 ///    cleared is asked about again, for its account, whether or not the
 ///    account still has it — each was shown while it did — so that a
@@ -272,64 +266,71 @@ export function reviewEmail(accounts, more = 0) {
 ///    oldest account first, whole accounts up to [REVIEW_MOST] pictures,
 ///    each marked told once the email has gone.
 ///
-/// A copy written less than a day ago is left as it is (SETTLED_MS).
 /// Each change to a copy is written only if nothing else wrote it
 /// meanwhile (changePicture); one that loses is left for the next day,
-/// and [log] says so. Returns {deleted, asked, sent, more}.
+/// and [log] says so. The run never makes a picture an account's: only
+/// the account's turn sets one, as it checks it. Returns {deleted,
+/// asked, sent, more}.
 export async function reviewRun({ bucket, store, records = null, send = null, ask = null, now = Date.now, log = () => {} }) {
   const t = now();
   const today = new Date(t).toISOString();
   const copies = await listed(bucket);
-  const settled = (c) => t - c.uploaded >= SETTLED_MS;
   // [c] made what [change] makes of its metadata, and [c] what it says
   // now: false when it is gone, or another writer won every time.
   const changed = async (c, change) => {
     try {
       const m = await changePicture(bucket, c.key, change);
       if (!m) return false;
-      Object.assign(c, flagsOf(m));
+      Object.assign(c, copyOf({ key: c.key, customMetadata: m, uploaded: c.uploaded }));
       return true;
     } catch (e) {
       log(`picture ${c.key} left for the next run: ${e?.message ?? e}`);
       return false;
     }
   };
-  const replaced = (c) => changed(c, (m) => (m.replaced ? null : { ...m, replaced: today }));
-
-  // 1. Held to the profiles, where something changed.
+  // Each account's copies, the one it set last first.
   const byAccount = new Map();
   for (const c of copies) byAccount.set(c.account, [...(byAccount.get(c.account) ?? []), c]);
-  const day = Math.floor(t / DAY_MS) % SQUARE_EVERY_DAYS;
-  for (const [account, theirs] of byAccount) {
-    const current = theirs.filter((c) => !c.replaced && settled(c));
-    const lately = theirs.some((c) => t - c.uploaded < SQUARE_EVERY_DAYS * DAY_MS);
-    const itsDay = parseInt(account.slice(0, 8), 16) % SQUARE_EVERY_DAYS === day;
-    if (!current.length || (!lately && !itsDay && current.length < 2)) continue;
-    const profile = await store.get(`ACCOUNT#${account}`, 'PROFILE');
-    const itsNow = profile?.picture ? await pictureDigest(profile.picture) : null;
-    const theirsNoMore = current.filter((c) => c.digest !== itsNow);
-    if (!theirsNoMore.length) continue;
-    // An account deleted outside its turn (`oh account delete`) found on
-    // its day of the week: its pictures stopped being its own when it
-    // was deleted, so that each is kept a year from then and no longer.
-    const deleted = !profile && records ? (await records.head(forgottenKey(account)))?.uploaded : null;
-    for (const c of theirsNoMore) {
-      const since = deleted && new Date(deleted).getTime() >= Date.parse(c.at) ? new Date(deleted).toISOString() : today;
-      await changed(c, (m) => (m.replaced ? null : { ...m, replaced: since }));
+  for (const [account, theirs] of byAccount) byAccount.set(account, newestFirst(theirs));
+  // [account]'s copies held to their order, the one set last ended from
+  // [end] when given.
+  const settle = async (account, end = null) => {
+    try {
+      await settleCopies(bucket, byAccount.get(account), { end });
+    } catch (e) {
+      log(`pictures of ${account} left for the next run: ${e?.message ?? e}`);
     }
+  };
+
+  // 1. Held to the order each account set them in.
+  const forgotten = records ? await forgottenIn(records) : new Map();
+  for (const [account, theirs] of byAccount) {
+    // Deleted outside its turn: its picture stopped being its own when
+    // it was, so that it is kept a year from then and no longer; or,
+    // set after the mark was made, from the run that finds it.
+    const deleted = currentOf(theirs) ? forgotten.get(account) : undefined;
+    const end = deleted === undefined ? null : deleted >= Date.parse(theirs[0].last) ? new Date(deleted).toISOString() : today;
+    await settle(account, end);
   }
 
-  // 2. Kept as long as promised, and no longer: each read again just
-  // before, so that one its account has set again since stays.
-  const expired = (c) => !!c.replaced && t - Date.parse(c.replaced) >= PICTURE_KEPT_DAYS * DAY_MS;
-  const stale = [];
-  for (const c of copies.filter(expired)) {
-    const still = await bucket.head(c.key);
-    if (!still || !expired(flagsOf(still.customMetadata))) continue;
-    await bucket.delete(c.key);
-    stale.push(c);
+  // 2. Kept as long as promised, and no longer: each account's oldest
+  // first, stopping at the first that is not, so that none is left to
+  // become the account's picture now as the one after it goes; and each
+  // read again just before, so that one its account has set again since
+  // stays.
+  const expired = (c) => !!c.ended && t - Date.parse(c.ended) >= PICTURE_KEPT_DAYS * DAY_MS;
+  const stale = new Set();
+  for (const theirs of byAccount.values()) {
+    for (const c of [...theirs].reverse()) {
+      if (!expired(c)) break;
+      const still = await bucket.head(c.key);
+      if (!still) continue;
+      if (!expired(copyOf(still))) break;
+      await bucket.delete(c.key);
+      stale.add(c);
+    }
   }
-  const kept = copies.filter((c) => !stale.includes(c));
+  const kept = copies.filter((c) => !stale.has(c));
 
   // 3. PhotoDNA asked again.
   let asked = 0;
@@ -351,10 +352,11 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
       await changed(c, (m) => (m.known === 'clear' ? null : { ...m, known: 'clear' }));
     } else if (said === 'match') {
       // The object acts on it for this account and deletes the copy
-      // (known.mjs); one no longer theirs keeps since when, so that its
-      // year is not begun again.
+      // (known.mjs); the account's picture now is no longer its own
+      // from today, and one before keeps since when, so that its year
+      // is not begun again.
       matched.add(c.key);
-      if (!c.replaced) await replaced(c);
+      if (currentOf(byAccount.get(c.account)) === c) await settle(c.account, today);
     } else {
       // PhotoDNA without its key, or not answering: tomorrow.
       break;
@@ -362,16 +364,17 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
   }
 
   // 4. Hidden, unless the operator allowed it.
+  const current = new Set([...byAccount.values()].map(currentOf).filter(Boolean));
   const untold = kept.filter((c) => !c.told && !matched.has(c.key));
-  const shownNow = kept.filter((c) => !c.replaced && !matched.has(c.key));
+  const shownNow = kept.filter((c) => current.has(c) && !matched.has(c.key));
   const toHide = [...new Set([...shownNow, ...untold].filter((c) => hiddenFor(checkOf(c.check)).length).map((c) => c.digest))];
   const allowed = await hidePictures(store, toHide, t, new Set(kept.map((c) => c.digest)));
-  if (!send) return { deleted: stale.length, asked, sent: 0, more: 0 };
+  if (!send) return { deleted: stale.size, asked, sent: 0, more: 0 };
 
   // 5. The email.
   const toTell = new Map();
   for (const c of untold) {
-    const use = { copy: c, digest: c.digest, at: c.at, current: !c.replaced, check: checkOf(c.check), allowed: allowed.has(c.digest) };
+    const use = { copy: c, digest: c.digest, at: c.at, current: current.has(c), check: checkOf(c.check), allowed: allowed.has(c.digest) };
     toTell.set(c.account, [...(toTell.get(c.account) ?? []), use]);
   }
   const first = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -382,7 +385,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
     // first, so that they are never left for a later email.
     .sort((a, b) => (a.urgent !== b.urgent ? (a.urgent ? -1 : 1) : first(a.uses[0].at, b.uses[0].at)));
   const total = waiting.reduce((count, a) => count + a.uses.length, 0);
-  if (!total) return { deleted: stale.length, asked, sent: 0, more: 0 };
+  if (!total) return { deleted: stale.size, asked, sent: 0, more: 0 };
   // Whole accounts: one is never split across two emails.
   const shown = [];
   let count = 0;
@@ -398,5 +401,5 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
     ),
   );
   for (const a of shown) for (const u of a.uses) await changed(u.copy, (m) => (m.told ? null : { ...m, told: today }));
-  return { deleted: stale.length, asked, sent: count, more: total - count };
+  return { deleted: stale.size, asked, sent: count, more: total - count };
 }

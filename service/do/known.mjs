@@ -34,7 +34,7 @@ import { heldPictureKey, hold, keepHeldPictures } from '../functions/holds.mjs';
 import { bodyOf } from '../functions/http.mjs';
 import { NcmecRefused, fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
 import { photoDnaMatch } from '../functions/photodna.mjs';
-import { PICTURES_ROW, pictureDigest, pictureKey, withheldOf, withholding } from '../functions/pictures.mjs';
+import { PICTURES_ROW, deleteCopy, pictureDigest, pictureKey, withheldOf, withholding } from '../functions/pictures.mjs';
 import { isAccount, storeOf } from '../functions/rows.mjs';
 import { orderOf } from '../functions/suspension.mjs';
 import { accountsWith } from '../tool/find.mjs';
@@ -452,7 +452,8 @@ export class KnownPictures {
       if (!withheldOf(row, now).has(c.digest)) await store.put(...PICTURES_ROW, withholding(row, c.digest, now));
       // The account's copy, kept if it was ever let through, which an
       // address serves: the case keeps the picture until the hold has it.
-      if (c.account && env.OH_PICTURES) await env.OH_PICTURES.delete(pictureKey(c.account, c.digest));
+      // No picture it set before becomes its picture now as it goes.
+      if (c.account && env.OH_PICTURES) await deleteCopy(env.OH_PICTURES, c.account, c.digest);
     });
     if (c.account) {
       await attempt('held', async () => {

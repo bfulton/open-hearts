@@ -99,8 +99,8 @@ export class TagRelay {
     // store at most once a minute while pictures come this way.
     this.pictures = pictureScreen({ read: () => this.env.OH_STORE?.get(PICTURES_ROW.join('|'), 'json') ?? null });
     // A picture is carried only as its account's picture now, checked
-    // as the account set it (profile_pictures.mjs): the account's copy
-    // of it in the pictures bucket says so.
+    // as the account set it (profile_pictures.mjs): the one it set last,
+    // as its copies in the pictures bucket say.
     this.owned = ownedScreen({ bucket: this.env.OH_PICTURES ?? null, log: (line) => console.log(line) });
   }
 

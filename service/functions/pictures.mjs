@@ -22,12 +22,14 @@ export const PICTURES_ROW = ['config', 'pictures'];
 /// at and act on (service/do/profile_pictures.mjs): one object for each
 /// account and picture, `account/<account>/<digest>.jpg`, the picture's
 /// bytes, and in its metadata all that is known of it: when the account
-/// set it (`at`), what the model made of it (`check`), what PhotoDNA
-/// said (`known`), when the operator was emailed it (`told`), and, once
-/// it is no longer the account's picture, since when (`replaced`). The
-/// one without `replaced` is the account's picture now, the only one the
-/// relay carries for it. Two accounts that set the same picture have a
-/// copy each. Served for the daily email at the bucket's custom domain
+/// first set it (`at`), when it last did (`last`), what the model made
+/// of it (`check`), what PhotoDNA said (`known`), when the operator was
+/// emailed it (`told`), and, once it is no longer the account's picture,
+/// since when (`ended`). The account's picture now is the one it set
+/// last, unless that one says it has ended: the account took it off, or
+/// was deleted, and set none since. It is the only one the relay carries
+/// for the account. Two accounts that set the same picture have a copy
+/// each. Served for the daily email at the bucket's custom domain
 /// (infra/cloudflare.mjs; a test holds the two equal).
 export const PICTURES_ORIGIN = 'https://pictures.openhearts.game';
 export const ACCOUNT_PICTURES_PREFIX = 'account/';
@@ -60,6 +62,69 @@ export async function changePicture(bucket, key, change, { tries = 3 } = {}) {
     if (await bucket.put(key, bytes, { httpMetadata: o.httpMetadata, customMetadata: meta, onlyIf: { etagMatches: o.etag } })) return meta;
   }
   throw new Error(`${key} written by another ${tries} times over`);
+}
+
+/// What the copy [o] (an object R2 listed or read, with its metadata)
+/// says: {key, account, digest, at, last, ended, told, check, known,
+/// uploaded}, or null for an object that is not a copy.
+export function copyOf(o) {
+  const parts = pictureParts(o?.key);
+  if (!parts) return null;
+  const m = o.customMetadata ?? {};
+  return { key: o.key, ...parts, ...flagsOf(m), uploaded: new Date(o.uploaded).getTime() };
+}
+
+/// A copy's metadata [m], as profile_pictures.mjs writes it.
+const flagsOf = (m) => ({ at: m.at ?? '', last: m.last ?? '', ended: m.ended ?? null, told: m.told ?? null, check: m.check ?? null, known: m.known ?? null });
+
+/// [copies], of one account, the one it set last first.
+export const newestFirst = (copies) => [...copies].sort((a, b) => (a.last !== b.last ? (a.last < b.last ? 1 : -1) : a.key < b.key ? -1 : 1));
+
+/// Every copy [account] has in [bucket] (an R2 binding), as [copyOf]
+/// says it, the one it set last first.
+export async function copiesOf(bucket, account) {
+  const found = [];
+  let cursor;
+  do {
+    const page = await bucket.list({ prefix: accountPicturesPrefix(account), cursor, include: ['customMetadata'] });
+    for (const o of page.objects) {
+      const c = copyOf(o);
+      if (c) found.push(c);
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return newestFirst(found);
+}
+
+/// Of [copies], one account's with the one it set last first, its
+/// picture now: that one, unless it says it has ended; else null.
+export const currentOf = (copies) => (copies[0] && !copies[0].ended ? copies[0] : null);
+
+/// [copies], one account's in [bucket] with the one it set last first,
+/// made to say what that order says: each but the first that does not
+/// yet say since when it is no longer the account's picture says so,
+/// from when the one after it was set; and with [end] (ISO), the first
+/// too, from then. Each is written only if it was not set again since
+/// it was listed (changePicture), and [copies] are changed as written.
+/// Throws, once those before it are written, for a copy another writer
+/// kept it from writing.
+export async function settleCopies(bucket, copies, { end = null } = {}) {
+  const set = copies.map((c) => c.last);
+  for (let i = 0; i < copies.length; i++) {
+    const c = copies[i];
+    const since = i ? set[i - 1] : end;
+    if (c.ended || !since) continue;
+    const m = await changePicture(bucket, c.key, (m) => (m.ended || (m.last ?? '') !== c.last ? null : { ...m, ended: since }));
+    if (m) Object.assign(c, flagsOf(m));
+  }
+}
+
+/// [account]'s copy of [digest] deleted from [bucket], so that none it
+/// set before becomes its picture now: each before it says first that
+/// it has ended, if it does not yet.
+export async function deleteCopy(bucket, account, digest) {
+  await settleCopies(bucket, await copiesOf(bucket, account));
+  await bucket.delete(pictureKey(account, digest));
 }
 
 /// The SHA-256 [said] names a picture by, as the operator is given one:

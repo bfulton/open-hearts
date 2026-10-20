@@ -1,8 +1,9 @@
 // The pictures accounts set, kept for the operator to look at
 // (review.mjs, profile_pictures.mjs): the day's run goes over every
 // account's copy of every picture and does only what each copy's flags
-// say is still to do — keeps each for a year after it stops being its
-// account's and no longer, holds the copies to the profiles, asks
+// say is still to do — holds each account's copies to the order it set
+// them in, keeps each for a year after it stops being its account's and
+// no longer, asks
 // PhotoDNA again about what it has not cleared, keeps hidden what the
 // check found should be, and emails the operator, account by account,
 // every picture each set since the last — the ones it has since replaced
@@ -19,7 +20,7 @@ import { accountPictures } from './profile_pictures.mjs';
 import { ADA, BAO, CY, DAY, bucket, fakeAi, harmless, jpeg } from './pictures.fixtures.mjs';
 import { r2 } from '../../infra/cloudflare.mjs';
 import { HOLD_DAYS } from '../functions/holds.mjs';
-import { PICTURES_ROW, WITHHELD_FOR_MS, allowing, pictureDigest, withheldOf } from '../functions/pictures.mjs';
+import { PICTURES_ROW, WITHHELD_FOR_MS, allowing, copiesOf, currentOf, pictureDigest, withheldOf } from '../functions/pictures.mjs';
 import { memoryStore } from '../functions/rows.mjs';
 
 const keyOf = async (account, n) => `account/${account}/${await pictureDigest(jpeg(n))}.jpg`;
@@ -92,7 +93,7 @@ test('review: a picture swapped back before the email is in it — every picture
   assert.match(mail.text, /Every picture each account set since the last email/);
   // Told once, and the copy says so without forgetting the rest.
   const two = await s.meta(ADA, 2);
-  assert.deepEqual(Object.keys(two).sort(), ['at', 'known', 'replaced', 'told']);
+  assert.deepEqual(Object.keys(two).sort(), ['at', 'ended', 'known', 'last', 'told']);
   assert.equal(two.told, iso(s.t.now));
   s.t.now += DAY;
   const again = [];
@@ -166,90 +167,124 @@ test("review: a copy is kept a year after it stops being its account's, and no l
     return head(key);
   };
   assert.equal((await s.run()).deleted, 0);
-  assert.ok(!(await s.meta(ADA, 2)).replaced, 'set again: hers, and kept');
+  assert.ok(!(await s.meta(ADA, 2)).ended, 'set again: hers, and kept');
+  assert.ok(s.b.objects.has(await keyOf(ADA, 3)), 'and the one before it, which went first, then stops');
 });
 
-test("review: an account is held to its profile each day for a week after its copies were written, and once a week after that; only ever made to say a picture is no longer the account's", async () => {
+test('review: a copy set again while the run holds the copies to their order is the account\'s picture now; and the one before it ends when that was first set', async () => {
   const s = setUp();
   await s.set(ADA, 1);
-  await s.set(BAO, 2);
-  // Ada's profile gone, Bao's picture taken off it, by whatever did it.
-  await s.store.del(`ACCOUNT#${ADA}`, 'PROFILE');
-  await s.store.put(`ACCOUNT#${BAO}`, 'PROFILE', { name: 'Bao', picture: null });
+  // A save of 2 that stopped once its copy was written; and as the run
+  // is about to say 1 has ended, Ada sets 1 again.
+  const two = iso(s.t.now);
+  await s.b.put(await keyOf(ADA, 2), Buffer.from(jpeg(2), 'base64'), { customMetadata: { at: two, last: two, known: 'clear' } });
+  s.t.now += 1000;
+  s.b.meanwhile = () => s.set(ADA, 1);
   await s.run();
-  assert.ok(!(await s.meta(ADA, 1)).replaced, 'written within the day: left alone');
-  s.t.now += DAY;
-  await s.run();
-  assert.equal((await s.meta(ADA, 1)).replaced, iso(s.t.now));
-  assert.equal((await s.meta(BAO, 2)).replaced, iso(s.t.now));
-  // Bao's profile with 2 again, though nothing set it: still not his,
-  // since only his turn makes a picture his, as it checks it.
-  await s.store.put(`ACCOUNT#${BAO}`, 'PROFILE', { name: 'Bao', picture: jpeg(2) });
-  s.t.now += DAY;
-  await s.run();
-  assert.ok((await s.meta(BAO, 2)).replaced);
+  assert.ok(!(await s.meta(ADA, 1)).ended, 'hers now');
+  assert.equal(currentOf(await copiesOf(s.b, ADA))?.key, await keyOf(ADA, 1));
 
-  // Cy untouched for a month, his profile then deleted outside his turn
-  // (`oh account delete`, which marks him forgotten): no longer his
-  // within a week, on his day, from when he was deleted, and his profile
-  // read on that day only.
+  // Two saves that stopped, of 3 then 4, and 3's set again as the run
+  // is about to say it has ended, by a save that stops too: 2 ends when
+  // 3 was first set.
+  const t = setUp();
+  await t.set(BAO, 2);
+  const stopped = async (n) => {
+    t.t.now += 1000;
+    await t.b.put(await keyOf(BAO, n), Buffer.from(jpeg(n), 'base64'), { customMetadata: { at: iso(t.t.now), last: iso(t.t.now), known: 'clear' } });
+    return iso(t.t.now);
+  };
+  const three = await stopped(3);
+  await stopped(4);
+  t.t.now += 1000;
+  t.b.meanwhile = async () => {
+    const key = await keyOf(BAO, 3);
+    const o = t.b.objects.get(key);
+    await t.b.put(key, o.bytes, { customMetadata: { ...o.customMetadata, last: iso(t.t.now) } });
+  };
+  await t.run();
+  assert.equal((await t.meta(BAO, 2)).ended, three);
+});
+
+test('review: no copy is deleted while one its account set before it does not yet say it has ended, which would become its picture now', async () => {
+  const s = setUp();
+  await s.set(ADA, 1);
+  // A save of 2 that stopped once its copy was written, and her
+  // picture then taken off.
+  const two = iso(s.t.now);
+  await s.b.put(await keyOf(ADA, 2), Buffer.from(jpeg(2), 'base64'), { customMetadata: { at: two, last: two, known: 'clear' } });
+  s.t.now += 1000;
+  await s.b.put(await keyOf(ADA, 2), Buffer.from(jpeg(2), 'base64'), { customMetadata: { at: two, last: two, known: 'clear', ended: iso(s.t.now) } });
+  // 1 cannot be written to say it has ended, by the run or anyone.
+  const one = await keyOf(ADA, 1);
+  const put = s.b.put.bind(s.b);
+  s.b.put = async (key, bytes, o = {}) => (key === one && o.onlyIf ? null : put(key, bytes, o));
+  s.t.now += PICTURE_KEPT_DAYS * DAY;
+  const logs = [];
+  assert.equal((await s.run([], { log: (l) => logs.push(l) })).deleted, 0);
+  assert.ok(s.b.objects.has(await keyOf(ADA, 2)), '2 kept, past its year, so that 1 is not hers again');
+  assert.deepEqual(logs.filter((l) => l.startsWith('pictures of')), [`pictures of ${ADA} left for the next run: ${one} written by another 3 times over`]);
+  assert.equal(currentOf(await copiesOf(s.b, ADA)), null);
+  // Once 1 says so: both go, a year after each ended.
+  s.b.put = put;
+  s.t.now += DAY;
+  assert.equal((await s.run()).deleted, 2);
+  assert.equal(s.b.objects.size, 0);
+});
+
+test("review: each account's copies are held to the order it set them in, whatever a save that stopped part way left, and an account deleted outside its turn from when it was; no profile is read", async () => {
+  const s = setUp();
+  const reads = [];
+  const get = s.store.get.bind(s.store);
+  s.store.get = async (pk, sk) => (sk === 'PROFILE' && reads.push(pk), get(pk, sk));
+  await s.set(ADA, 1);
+  // A save of 2 that stopped once its copy was written.
+  const two = iso(s.t.now);
+  await s.b.put(await keyOf(ADA, 2), Buffer.from(jpeg(2), 'base64'), { customMetadata: { at: two, last: two, known: 'clear' } });
+  // Bao's picture taken off, in his turn.
+  await s.set(BAO, 3);
+  await s.set(BAO, null);
+  const baoEnded = (await s.meta(BAO, 3)).ended;
+  s.t.now += 1000;
+  await s.run();
+  assert.equal((await s.meta(ADA, 1)).ended, two, "1 no longer hers since 2 was set: hers now, the one she set last");
+  assert.ok(!(await s.meta(ADA, 2)).ended);
+  assert.equal((await s.meta(BAO, 3)).ended, baoEnded, 'his as his turn left it');
+  assert.deepEqual(reads, [], 'no profile read');
+
+  // Cy deleted outside his turn (`oh account delete`, which marks him
+  // forgotten first): his picture no longer his from when he was.
   const t = setUp();
   const records = bucket(() => t.t.now);
   await t.set(CY, 3);
-  await t.run();
   t.t.now += 30 * DAY;
-  // Emailed a month ago, and nothing written since: his profile read
-  // on his day of the week only.
-  const get = t.store.get.bind(t.store);
-  let reads = 0;
-  t.store.get = async (pk, sk) => (sk === 'PROFILE' && reads++, get(pk, sk));
-  for (let d = 0; d < 7; d++, t.t.now += DAY) await t.run([], { records });
-  assert.equal(reads, 1, 'read once in a week, on his day');
-  assert.ok(!(await t.meta(CY, 3)).replaced);
-  await t.store.del(`ACCOUNT#${CY}`, 'PROFILE');
+  // Others forgotten before him, so that his mark is on a later page.
+  await records.put(`forgotten/${ADA}`, '{}');
+  await records.put(`forgotten/${BAO}`, '{}');
   await records.put(`forgotten/${CY}`, JSON.stringify({ forgotten: 'that day' }));
   const deleted = t.t.now;
   t.t.now += DAY / 2;
-  for (let d = 0; d < 7 && !(await t.meta(CY, 3)).replaced; d++, t.t.now += DAY) await t.run([], { records });
-  assert.equal((await t.meta(CY, 3)).replaced, iso(deleted), 'within a week, on his day, from when he was deleted');
-  // With no such mark, from the day it is found.
-  const v = setUp();
-  await v.set(CY, 3);
-  v.t.now += 30 * DAY;
-  await v.store.del(`ACCOUNT#${CY}`, 'PROFILE');
-  let found = null;
-  for (let d = 0; d < 7 && !found; d++) {
-    await v.run([], { records: bucket(() => v.t.now) });
-    if ((await v.meta(CY, 3)).replaced) found = v.t.now;
-    else v.t.now += DAY;
-  }
-  assert.equal((await v.meta(CY, 3)).replaced, iso(found), 'from the run that found it');
-  // A mark from before the copy was made says nothing of when the copy
+  await t.run([], { records });
+  assert.equal((await t.meta(CY, 3)).ended, iso(deleted));
+  // A mark from before his picture was set says nothing of when it
   // stopped being his: from the run that finds it.
   const w = setUp();
   const marks = bucket(() => w.t.now);
   await marks.put(`forgotten/${CY}`, '{}');
   w.t.now += DAY;
   await w.set(CY, 3);
-  w.t.now += 30 * DAY;
-  await w.store.del(`ACCOUNT#${CY}`, 'PROFILE');
-  let seen = null;
-  for (let d = 0; d < 7 && !seen; d++) {
-    await w.run([], { records: marks });
-    if ((await w.meta(CY, 3)).replaced) seen = w.t.now;
-    else w.t.now += DAY;
-  }
-  assert.equal((await w.meta(CY, 3)).replaced, iso(seen));
-
-  // And one left with two pictures now by a save long ago is held to
-  // its profile the next day, whatever its day.
-  const u = setUp();
-  await u.set(CY, 4);
-  await u.b.put(await keyOf(CY, 5), Buffer.from(jpeg(5), 'base64'), { customMetadata: { at: iso(u.t.now), known: 'clear' } });
-  u.t.now += 30 * DAY;
-  await u.run();
-  assert.equal((await u.meta(CY, 5)).replaced, iso(u.t.now));
-  assert.ok(!(await u.meta(CY, 4)).replaced, 'his profile\'s');
+  w.t.now += DAY;
+  await w.run([], { records: marks });
+  assert.equal((await w.meta(CY, 3)).ended, iso(w.t.now));
+  // Another account's mark says nothing of his, nor does none.
+  const v = setUp();
+  const others = bucket(() => v.t.now);
+  await others.put(`forgotten/${ADA}`, '{}');
+  await v.set(CY, 3);
+  v.t.now += DAY;
+  await v.run([], { records: others });
+  await v.run();
+  assert.ok(!(await v.meta(CY, 3)).ended);
 });
 
 test("review: PhotoDNA is asked again about each copy it has not cleared, for its account, whether or not the account still has it; a match is no longer theirs, from when it stopped being so, and never emailed", async () => {
@@ -270,7 +305,7 @@ test("review: PhotoDNA is asked again about each copy it has not cleared, for it
     return said;
   };
   const when = [(await s.meta(ADA, 1)).at, (await s.meta(BAO, 1)).at, (await s.meta(CY, 2)).at, (await s.meta(CY, 3)).at, (await s.meta(CY, 4)).at];
-  const cyHad = [(await s.meta(CY, 2)).replaced, (await s.meta(CY, 3)).replaced];
+  const cyHad = [(await s.meta(CY, 2)).ended, (await s.meta(CY, 3)).ended];
   assert.ok(cyHad.every(Boolean), "2 and 3 are no longer Cy's");
   const sent = [];
   assert.deepEqual(await s.run(sent, { ask }), { deleted: 0, asked: 5, sent: 2, more: 0 });
@@ -292,8 +327,8 @@ test("review: PhotoDNA is asked again about each copy it has not cleared, for it
     assert.equal(copy.httpMetadata.contentType, 'image/jpeg');
     assert.deepEqual([...copy.bytes], [...Buffer.from(jpeg(n), 'base64')]);
   }
-  assert.equal((await s.meta(CY, 3)).replaced, cyHad[1], 'a cleared one is as it was');
-  assert.ok(!(await s.meta(CY, 4)).replaced);
+  assert.equal((await s.meta(CY, 3)).ended, cyHad[1], 'a cleared one is as it was');
+  assert.ok(!(await s.meta(CY, 4)).ended);
   for (const n of [1, 2]) assert.ok(!sent[0].text.includes(await digestOf(n)), `the match ${n} never emailed`);
   assert.ok(sent[0].text.includes(await digestOf(3)) && sent[0].text.includes(await digestOf(4)));
   // Asked once: 3 and 4 are cleared, and 1 and 2 no longer copied.
@@ -306,11 +341,11 @@ test("review: PhotoDNA is asked again about each copy it has not cleared, for it
   const m = setUp({ ask: async () => 'off' });
   await m.set(ADA, 5);
   await m.set(ADA, 6);
-  const had = (await m.meta(ADA, 5)).replaced;
+  const had = (await m.meta(ADA, 5)).ended;
   m.t.now += DAY;
   await m.run([], { ask: async () => 'match' });
-  assert.equal((await m.meta(ADA, 5)).replaced, had);
-  assert.equal((await m.meta(ADA, 6)).replaced, iso(m.t.now));
+  assert.equal((await m.meta(ADA, 5)).ended, had);
+  assert.equal((await m.meta(ADA, 6)).ended, iso(m.t.now));
 
   // Without its key, not answering, or out of reach: tried tomorrow.
   for (const said of ['off', 'failed', new Error('said 503')]) {
@@ -322,7 +357,7 @@ test("review: PhotoDNA is asked again about each copy it has not cleared, for it
     assert.deepEqual(tried, [ADA], String(said));
     assert.equal(r.asked, said instanceof Error ? 0 : 1);
     assert.equal((await t.meta(ADA, 1)).known, 'off');
-    assert.ok(!(await t.meta(ADA, 1)).replaced);
+    assert.ok(!(await t.meta(ADA, 1)).ended);
   }
 });
 
