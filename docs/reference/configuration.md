@@ -102,7 +102,7 @@ From `service/do/wrangler.toml`.
 | `EMAIL` | Email Sending (`send_email`) | Backup-code emails, the operator's alerts, and the day's new pictures. |
 | `OH_METRICS` | Workers Analytics Engine, dataset `open_hearts_relay` | A line of counts from each object: a minute after its last, and at once when its last socket closes, each with the seconds it covers (`tally` and `tallied` in `service/do/relay.mjs`). |
 
-Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With PhotoDNA's key set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. It deletes from `OH_PICTURES` each picture a year after it stopped being an account's, asks PhotoDNA again about each picture an account has now that it hasn't cleared, and hides any the check found should be hidden that isn't; when `alerts.pictures` is on, it also emails the operator the new ones.
+Its schedule (`triggers.crons`) runs once a day at 13:00 UTC. With PhotoDNA's key set, it wakes the `KnownPictures` object to try again anything left to do after a match, such as a report waiting on NCMEC's credentials. It deletes from `OH_PICTURES` each picture a year after it stopped being an account's, asks PhotoDNA again about each picture kept that it hasn't cleared, for each account that set it, and hides any the check found should be hidden that isn't; when `alerts.pictures` is on, it also emails the operator the new ones.
 
 ## Environment variables
 

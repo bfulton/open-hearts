@@ -250,10 +250,11 @@ export function reviewEmail(accounts, more = 0) {
 ///    (profile_pictures.mjs), so the run only ever says one is not;
 /// 2. what has not been its account's for [PICTURE_KEPT_DAYS] is
 ///    deleted, and each copy no note names;
-/// 3. with [ask] (known.mjs, knownAsker), each picture an account has
-///    now that PhotoDNA has not cleared is asked about again, for each
-///    account that has it, so that a match is acted on for each, and is
-///    no longer theirs;
+/// 3. with [ask] (known.mjs, knownAsker), each picture kept that
+///    PhotoDNA has not cleared is asked about again, for each account
+///    that set it, whether or not it still has it — each was shown while
+///    it was — so that a match is acted on for each, and is no longer
+///    theirs;
 /// 4. every picture an account has now, or new for the email, that the
 ///    check found should be hidden is hidden, unless the operator
 ///    allowed it, in case hiding it as it was set did not take; and what
@@ -303,7 +304,7 @@ export async function reviewRun({ bucket, store, send = null, ask = null, now = 
   const matched = new Set();
   for (const c of ask ? kept : []) {
     const digest = digestIn(c);
-    const theirs = live.filter((n) => n.digest === digest && !n.replaced);
+    const theirs = live.filter((n) => n.digest === digest);
     if (c.known === 'clear' || !theirs.length) continue;
     const copy = await bucket.get(c.key);
     if (!copy) continue;
@@ -324,9 +325,10 @@ export async function reviewRun({ bucket, store, send = null, ask = null, now = 
       }
       // PhotoDNA without its key, or not answering: tomorrow.
       if (said !== 'match') break;
-      // The object acts on it, for this account (known.mjs).
+      // The object acts on it, for this account (known.mjs); one no
+      // longer theirs keeps since when, so its year is not begun again.
       matched.add(digest);
-      await replaced(n);
+      if (!n.replaced) await replaced(n);
     }
   }
 

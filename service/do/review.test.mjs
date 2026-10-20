@@ -179,37 +179,54 @@ test("review: a note is squared with its account's profile once it has settled, 
   assert.ok(s.b.objects.get(await noteOf(BAO, 2)).customMetadata.replaced);
 });
 
-test('review: PhotoDNA is asked again about each picture an account has now that it has not cleared, for each account; a match is no longer theirs, and never emailed', async () => {
+test("review: PhotoDNA is asked again about each picture it has not cleared, for each account that set it, whether or not it still has it; a match is no longer theirs, from when it stopped being so, and never emailed", async () => {
   const s = setUp({ ask: async () => 'off' });
   await s.set(ADA, 1);
   await s.set(BAO, 1);
   await s.set(CY, 2);
   await s.set(CY, 3);
+  await s.set(CY, 4);
   const asked = [];
-  const answers = { [jpeg(1)]: 'match', [jpeg(3)]: 'clear' };
-  const ask = async (a) => (asked.push(a), answers[a.jpeg]);
-  const at = async (account, n) => s.b.objects.get(await noteOf(account, n)).customMetadata.at;
-  const when = [await at(ADA, 1), await at(BAO, 1), await at(CY, 3)];
+  const answers = { [jpeg(1)]: 'match', [jpeg(2)]: 'match', [jpeg(3)]: 'clear', [jpeg(4)]: 'clear' };
+  // As the object does on a match: the copy deleted as the picture is
+  // withheld (known.mjs, the case's first step).
+  const ask = async (a) => {
+    asked.push(a);
+    const said = answers[a.jpeg];
+    if (said === 'match') s.b.objects.delete(`review/${await pictureDigest(a.jpeg)}.jpg`);
+    return said;
+  };
+  const meta = async (account, n) => s.b.objects.get(await noteOf(account, n)).customMetadata;
+  const when = [(await meta(ADA, 1)).at, (await meta(BAO, 1)).at, (await meta(CY, 2)).at, (await meta(CY, 3)).at, (await meta(CY, 4)).at];
+  const cyHad = [(await meta(CY, 2)).replaced, (await meta(CY, 3)).replaced];
+  assert.ok(cyHad.every(Boolean), "2 and 3 are no longer Cy's");
   const sent = [];
-  assert.deepEqual(await s.run(sent, { ask }), { deleted: 0, asked: 3, sent: 2, more: 0 });
+  assert.deepEqual(await s.run(sent, { ask }), { deleted: 0, asked: 5, sent: 2, more: 0 });
   const order = (rows) => rows.map((r) => JSON.stringify(r)).sort();
   assert.deepEqual(
     order(asked.map((a) => [a.jpeg, a.account, a.key, a.shown, a.at])),
     order([
       [jpeg(1), ADA, null, true, when[0]],
       [jpeg(1), BAO, null, true, when[1]],
-      [jpeg(3), CY, null, true, when[2]],
+      [jpeg(2), CY, null, true, when[2]],
+      [jpeg(3), CY, null, true, when[3]],
+      [jpeg(4), CY, null, true, when[4]],
     ]),
-    "each account with the match, each with when it set it; 2, no longer anybody's, not asked",
+    'each account that set a picture not cleared, each with when it set it, whether or not it has it now',
   );
-  for (const account of [ADA, BAO]) assert.equal(s.b.objects.get(await noteOf(account, 1)).customMetadata.replaced, iso(s.t.now));
-  const three = s.b.objects.get(await copyOf(3));
-  assert.equal(three.customMetadata.known, 'clear');
-  assert.equal(three.httpMetadata.contentType, 'image/jpeg');
-  assert.deepEqual([...three.bytes], [...Buffer.from(jpeg(3), 'base64')]);
-  assert.ok(!sent[0].text.includes(await digestOf(1)), 'the match never emailed');
-  assert.ok(sent[0].text.includes(await digestOf(2)) && sent[0].text.includes(await digestOf(3)));
-  // Asked once: 3 is cleared, and 1 nobody's.
+  for (const account of [ADA, BAO]) assert.equal((await meta(account, 1)).replaced, iso(s.t.now));
+  assert.equal((await meta(CY, 2)).replaced, cyHad[0], 'one no longer theirs keeps since when, so its year is not begun again');
+  for (const n of [3, 4]) {
+    const copy = s.b.objects.get(await copyOf(n));
+    assert.equal(copy.customMetadata.known, 'clear');
+    assert.equal(copy.httpMetadata.contentType, 'image/jpeg');
+    assert.deepEqual([...copy.bytes], [...Buffer.from(jpeg(n), 'base64')]);
+  }
+  assert.equal((await meta(CY, 3)).replaced, cyHad[1], 'a cleared one is as it was');
+  assert.ok(!(await meta(CY, 4)).replaced);
+  for (const n of [1, 2]) assert.ok(!sent[0].text.includes(await digestOf(n)), `the match ${n} never emailed`);
+  assert.ok(sent[0].text.includes(await digestOf(3)) && sent[0].text.includes(await digestOf(4)));
+  // Asked once: 3 and 4 are cleared, and 1 and 2 no longer copied.
   s.t.now += DAY;
   assert.equal((await s.run([], { ask })).asked, 0);
 
