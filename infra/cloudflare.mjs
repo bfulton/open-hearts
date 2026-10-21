@@ -89,7 +89,12 @@ export const kv = ['open-hearts-store', 'open-hearts-store-preview'];
 /// is named by its account and its SHA-256, so nobody finds one without
 /// both the account and the picture, or the email. The records bucket
 /// also keeps what a legal hold keeps of an account's pictures
-/// (service/functions/holds.mjs), where no address serves it.
+/// (service/functions/holds.mjs), where no address serves it. The
+/// private bucket keeps what this repository must not: the PhotoDNA
+/// module Microsoft licenses to Open Hearts as confidential, which only
+/// the operator's tool reaches, to deploy the relay with it
+/// (ops/photodna.mjs).
+export const PRIVATE_BUCKET = 'open-hearts-private';
 export const r2 = [
   {
     name: 'open-hearts-pictures',
@@ -107,6 +112,13 @@ export const r2 = [
   },
   {
     name: 'open-hearts-records-preview',
+    location: 'ENAM',
+    storageClass: 'Standard',
+    publicDevUrl: false,
+    customDomains: [],
+  },
+  {
+    name: PRIVATE_BUCKET,
     location: 'ENAM',
     storageClass: 'Standard',
     publicDevUrl: false,

@@ -217,6 +217,17 @@ test("a match is never kept: neither it nor the one before is the account's, and
   assert.equal((await s.meta(BAO, 8)).ended, iso(s.t.now));
 });
 
+test('a picture that cannot be read is never kept either, nor the one before it', async () => {
+  const s = setUp({ said: (p) => (p === jpeg(9) ? 'unreadable' : 'clear') });
+  await s.pictures.set({ account: ADA, key: KEY, picture: jpeg(1) });
+  s.t.now += 1000;
+  assert.equal(await s.pictures.set({ account: ADA, key: KEY, picture: jpeg(9) }), null);
+  assert.ok(!s.b.objects.has(await keyOf(ADA, 9)));
+  assert.equal((await s.meta(ADA, 1)).ended, iso(s.t.now));
+  assert.equal(s.ai.calls.length, 1, 'the model never shown it');
+  assert.deepEqual(s.alerts, []);
+});
+
 test('PhotoDNA without its key, not answering, or out of reach: the picture is kept, its copy says so, and the operator is told of the object out of reach', async () => {
   for (const [said, known] of [[null, 'off'], ['off', 'off'], ['failed', 'failed']]) {
     const s = setUp({ said });

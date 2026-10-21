@@ -37,9 +37,9 @@ const COPY_HTTP = { contentType: 'image/jpeg', cacheControl: 'public, max-age=86
 /// relay worker runs it with [env]: the pictures bucket (OH_PICTURES),
 /// Workers AI (AI), [store] (the pictures withheld), and [ask], which
 /// asks the object about a picture ({jpeg, account, key, shown, at} ->
-/// 'clear', 'match', 'failed' or 'off'; knownAsker), or null while
-/// PhotoDNA has no key. Without the bucket, nothing is kept or checked,
-/// and the relay carries no picture.
+/// 'clear', 'match', 'failed', 'unreadable' or 'off'; knownAsker), or
+/// null while PhotoDNA has no key. Without the bucket, nothing is kept
+/// or checked, and the relay carries no picture.
 export function accountPictures(env, { now = Date.now, log = (line) => console.log(line), ask = knownAsker(env), store = storeOf(env) } = {}) {
   const bucket = env.OH_PICTURES ?? null;
 
@@ -58,7 +58,7 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
     /// [picture] (base64, or null for none) set as [account]'s by its
     /// device [key] (null for the operator's order): resolves the
     /// picture the profile keeps, which is [picture], or null for one
-    /// PhotoDNA matched.
+    /// PhotoDNA matched or could not be asked about, being unreadable.
     async set({ account, key = null, picture }) {
       if (!bucket || !isAccount(account)) return picture;
       const theirs = await copiesOf(bucket, account);
@@ -87,10 +87,11 @@ export function accountPictures(env, { now = Date.now, log = (line) => console.l
           await alertKnownProblem(env, store, { what: 'unreachable', error, now: now() });
         }
       }
-      if (said === 'match') {
+      if (said === 'match' || said === 'unreadable') {
         // Never the account's, and nothing before it is, since the
-        // profile has none: a copy of it kept before, the object
-        // deletes as it acts on the match (known.mjs).
+        // profile has none: a copy of a match kept before, the object
+        // deletes as it acts on it (known.mjs). One that cannot be
+        // decoded cannot be asked about, which the app's own never are.
         await settle(theirs, at);
         return null;
       }

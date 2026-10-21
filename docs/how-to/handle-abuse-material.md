@@ -12,11 +12,13 @@ Do this once, before any report arrives:
 
 - Register Open Hearts with NCMEC as an electronic service provider, by email to [espteam@ncmec.org](mailto:espteam@ncmec.org) ([NCMEC](https://www.missingkids.org/csam)). The law requires a provider's registration to be kept current. Keep its details in your own records, not in this repository.
 - Until the registration is in place, report through the public CyberTipline at [report.cybertip.org](https://report.cybertip.org/) or on 1-800-843-5678.
-- Set PhotoDNA's key, once Microsoft has approved the service and issued one, and its address in `config/openhearts.json` (`photodna.endpoint`), from the API reference that comes with the key ([Configuration](../reference/configuration.md#configopenheartsjson)):
+- Set PhotoDNA's key, once Microsoft has approved the service and issued one:
 
   ```bash
   ./oh secret set OH_PHOTODNA_KEY --apply
   ```
+
+  Then keep the PhotoDNA module in the private bucket and deploy the relay with it ([Update the PhotoDNA module](update-the-photodna-module.md)).
 
 - Ask NCMEC, once Open Hearts is registered, for credentials for its CyberTipline reporting API, and set them:
 

@@ -287,6 +287,26 @@ test("review: each account's copies are held to the order it set them in, whatev
   assert.ok(!(await v.meta(CY, 3)).ended);
 });
 
+test('review: a copy PhotoDNA cannot be asked about, not decoding, is said to be, hidden, emailed as that, and not asked about again', async () => {
+  const s = setUp({ ask: async () => 'off' });
+  await s.set(ADA, 1);
+  await s.set(BAO, 2);
+  const ask = async (a) => (a.jpeg === jpeg(1) ? 'unreadable' : 'clear');
+  const sent = [];
+  assert.deepEqual(await s.run(sent, { ask }), { deleted: 0, asked: 2, sent: 2, more: 0 });
+  assert.equal((await s.meta(ADA, 1)).known, 'unreadable');
+  assert.equal((await s.meta(BAO, 2)).known, 'clear');
+  assert.ok(!(await s.meta(ADA, 1)).ended, 'still the account\'s, hidden');
+  const withheld = await withheldIn(s.store, s.t.now);
+  assert.ok(withheld.has(await digestOf(1)));
+  assert.ok(!withheld.has(await digestOf(2)));
+  assert.match(sent[0].text, /hidden: it could not be decoded, so PhotoDNA could not be asked about it/);
+  assert.equal(sent[0].text.match(/could not be decoded/g).length, 1, 'only for that one');
+  s.t.now += DAY;
+  assert.equal((await s.run([], { ask })).asked, 0);
+  assert.ok((await withheldIn(s.store, s.t.now)).has(await digestOf(1)), 'hidden still');
+});
+
 test("review: PhotoDNA is asked again about each copy it has not cleared, for its account, whether or not the account still has it; a match is no longer theirs, from when it stopped being so, and never emailed", async () => {
   const s = setUp({ ask: async () => 'off' });
   await s.set(ADA, 1);

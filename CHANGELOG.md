@@ -57,6 +57,15 @@ squashed from a pull request, the pull request's number.
   again until it is done, and any failure emails the operator. Off until
   PhotoDNA's key is set; reports are filed once NCMEC's credentials are,
   and until then the email says to file one by hand. (2026-10-19, #32)
+- PhotoDNA is never sent a picture: the relay decodes it and makes its
+  PhotoDNA Edge Hashes itself, with the module Microsoft licenses to Open
+  Hearts, and sends PhotoDNA's MatchHash only those. The module is kept
+  out of this repository, in a private bucket, pinned by SHA-256 in
+  `config/openhearts.json`; `./oh photodna put` and `get` keep and fetch
+  it, `./oh deploy relay` builds the relay with it, and `check.sh` fails
+  on any committed file that is part of it. A match with Microsoft's test
+  pictures only is logged and acted on for nobody, and a picture that
+  can't be decoded is refused as a match is. (2026-10-21, #34)
 - Every new picture is emailed to the operator once a day, account by
   account, with the commands to take it down. The daily run does only
   what each copy says is still to do: it keeps what is kept for as long

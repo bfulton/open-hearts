@@ -17,7 +17,14 @@
     "playPushEmail": null
   },
   "alerts": { "to": "alerts@openhearts.game", "subscribed": true, "waiting": true, "pictures": true },
-  "photodna": { "endpoint": null },
+  "photodna": {
+    "endpoint": "https://api.microsoftmoderator.com/photodna/v1.0/MatchHash",
+    "module": {
+      "edge.mjs": "7671b740d5ae4d7dad92de97c7bf430761f1ed7eba5a54e8325e73329f0d76dc",
+      "edge_core.mjs": "60e068545d331bde04bc554ed5b5911c9b2da09048e3176a7b09a563309b90dd",
+      "photoDnaEdgeHash.wasm": "15db0d0214908a339eed382f4b0356a3c17896f566b3915bbaa6ea8d0c727b26"
+    }
+  },
   "ncmec": {
     "endpoint": "https://exttest.cybertip.org/ispws",
     "reporter": { "firstName": "Bright", "lastName": "Fulton", "email": "help@openhearts.game" }

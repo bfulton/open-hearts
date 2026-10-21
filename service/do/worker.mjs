@@ -39,6 +39,8 @@ import { tagStore } from './tag_store.mjs';
 import { pictureScreen } from './withheld.mjs';
 import { reviewRun } from './review.mjs';
 import { KNOWN_OBJECT, KnownPictures as KnownObject, knownAsker, knownReport } from './known.mjs';
+import { jpegHasher } from './photodna.mjs';
+import { edgeHashes } from 'open-hearts-photodna';
 import { accountPictures, ownedScreen } from './profile_pictures.mjs';
 import { PICTURES_ROW } from '../functions/pictures.mjs';
 import { alertKnownProblem, alertPicturesProblem, alertsOf } from '../functions/alerts.mjs';
@@ -74,10 +76,11 @@ export class Bench extends BenchObject {
 }
 
 /// Where PhotoDNA is asked about each new picture, and a match acted on
-/// (known.mjs): one object, kept in the United States.
+/// (known.mjs): one object, kept in the United States, hashing pictures
+/// with the module the deploy adds (photodna_off.mjs), if it does.
 export class KnownPictures extends KnownObject {
   constructor(state, env = {}) {
-    super(state, withConfig(env, config));
+    super(state, withConfig(env, config), { hasher: edgeHashes ? jpegHasher(edgeHashes) : null });
   }
 }
 

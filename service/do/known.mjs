@@ -1,9 +1,11 @@
 // Known images of child sexual abuse, kept from being shown at all.
 // Each picture an account sets is asked about as it is set, before
 // anyone is shown it (profile_pictures.mjs), of Microsoft's PhotoDNA
-// (service/functions/photodna.mjs), from one object in Cloudflare's
-// "us" jurisdiction, so that every request PhotoDNA gets comes from the
-// United States; PhotoDNA is asked about each picture once. A picture
+// (photodna.mjs), from one object in Cloudflare's "us" jurisdiction, so
+// that every request PhotoDNA gets comes from the United States;
+// PhotoDNA is asked about each picture once, and is sent its hashes,
+// never the picture. A picture that cannot be decoded, so that nothing
+// can be asked about it, is never the account's either. A picture
 // that matches is never the account's, and everything that follows is
 // done here, with nothing waiting on the operator
 // (docs/how-to/handle-abuse-material.md):
@@ -26,14 +28,16 @@
 // set, so the game goes on, and asks again; a match found then is acted
 // on as any other, and the picture taken down with it.
 //
-// Off until the deployment has PhotoDNA's key (OH_PHOTODNA_KEY); a
-// report is filed once it has NCMEC's credentials too, and until then
-// the email says to file it by hand.
+// Off until the deployment has PhotoDNA's key (OH_PHOTODNA_KEY) and
+// the module that makes the hashes, which the relay's deploy adds
+// (photodna_off.mjs); a report is filed once it has NCMEC's credentials
+// too, and until then the email says to file it by hand.
 
 import { heldPictureKey, hold, keepHeldPictures } from '../functions/holds.mjs';
 import { bodyOf } from '../functions/http.mjs';
 import { NcmecRefused, fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
-import { photoDnaMatch } from '../functions/photodna.mjs';
+import { Unreadable } from './jpeg.mjs';
+import { photoDnaMatch } from './photodna.mjs';
 import { PICTURES_ROW, deleteCopy, pictureDigest, pictureKey, withheldOf, withholding } from '../functions/pictures.mjs';
 import { isAccount, storeOf } from '../functions/rows.mjs';
 import { orderOf } from '../functions/suspension.mjs';
@@ -85,9 +89,10 @@ export const r2Objects = (bucket) => ({
 });
 
 /// How a relay object asks the one object about a picture: {jpeg,
-/// account, key} -> 'clear', 'match', 'failed' (PhotoDNA did not answer)
-/// or 'off'. Null where there is nothing to ask: no PhotoDNA key, or a
-/// runtime that cannot keep the object in the United States.
+/// account, key} -> 'clear', 'match', 'failed' (PhotoDNA did not answer),
+/// 'unreadable' (no hash can be made of it) or 'off'. Null where there is
+/// nothing to ask: no PhotoDNA key, or a runtime that cannot keep the
+/// object in the United States.
 export function knownAsker(env) {
   if (!env.KNOWN || !env.OH_PHOTODNA_KEY || typeof env.KNOWN.jurisdiction !== 'function') return null;
   const us = env.KNOWN.jurisdiction('us');
@@ -183,10 +188,13 @@ export function caseEmail(c, lines) {
 /// dropped from it once it is held and reported; and `report:<id>`,
 /// what a report the operator made was answered ({at, body}).
 export class KnownPictures {
-  constructor(state, env = {}, { fetchImpl = fetch, now = Date.now, log = (line) => console.log(line) } = {}) {
+  constructor(state, env = {}, { hasher = null, fetchImpl = fetch, now = Date.now, log = (line) => console.log(line) } = {}) {
     this.state = state;
     this.storage = state.storage;
     this.env = env;
+    // What makes a picture's PhotoDNA hashes (photodna.mjs, jpegHasher):
+    // the licensed module the relay's deploy adds, or none.
+    this.hasher = hasher;
     // What this object reaches the world with: PhotoDNA, the service,
     // NCMEC. Not `fetch`, which is how the runtime reaches the object.
     this.http = fetchImpl;
@@ -196,7 +204,15 @@ export class KnownPictures {
 
   get photoDna() {
     const { OH_PHOTODNA_KEY: key, OH_PHOTODNA_ENDPOINT: endpoint } = this.env;
-    return key && endpoint ? { key, endpoint, fetchImpl: this.http } : null;
+    return key && endpoint && this.hasher ? { key, endpoint, hasher: this.hasher, fetchImpl: this.http } : null;
+  }
+
+  /// Why PhotoDNA is not asked although its key is set, or null.
+  get photoDnaMissing() {
+    if (!this.env.OH_PHOTODNA_KEY) return null;
+    if (!this.env.OH_PHOTODNA_ENDPOINT) return 'OH_PHOTODNA_KEY is set but photodna.endpoint in config/openhearts.json is not, so no picture is checked';
+    if (!this.hasher) return 'OH_PHOTODNA_KEY is set but the relay was deployed without the PhotoDNA module, so no picture is checked (docs/how-to/update-the-photodna-module.md)';
+    return null;
   }
 
   /// [what] failed, with [error]: the operator emailed, once in a while
@@ -246,32 +262,39 @@ export class KnownPictures {
 
   /// What PhotoDNA says of the picture [jpeg] (base64) an [account] set,
   /// from its device [key] (null for the daily run's asking again):
-  /// 'clear', 'match', 'failed' or 'off'. Asked of PhotoDNA once; a match
+  /// 'clear', 'match', 'failed', 'unreadable' (it cannot be decoded or
+  /// hashed, so it cannot be asked about) or 'off'. Asked of PhotoDNA
+  /// once, and a picture found unreadable never again; a match
   /// is acted on for each account that sets it, [shown] when others may
   /// have seen it, as when it was set before PhotoDNA had said, [at]
   /// (ISO) then.
   async check({ jpeg, account = null, key = null, shown = false, at = null }) {
     if (!this.photoDna) {
-      if (this.env.OH_PHOTODNA_KEY) await this.problem('config', 'OH_PHOTODNA_KEY is set but photodna.endpoint in config/openhearts.json is not, so no picture is checked');
+      const missing = this.photoDnaMissing;
+      if (missing) await this.problem('config', missing);
       return 'off';
     }
     const digest = await pictureDigest(jpeg);
     if (!digest) return 'off';
     const known = await this.storage.get(`pic:${digest}`);
-    if (known?.said === 'clear') return 'clear';
+    if (known?.said === 'clear' || known?.said === 'unreadable') return known.said;
     if (known?.said === 'match') {
       await this.open({ digest, jpeg, account, key, shown, at });
       return 'match';
     }
     let match;
     try {
-      match = await photoDnaMatch(bytesOf(jpeg), this.photoDna);
+      match = await this.asked(digest, jpeg);
     } catch (e) {
+      if (e instanceof Unreadable) {
+        await this.decided(digest, 'unreadable');
+        return 'unreadable';
+      }
       await this.problem('photodna', `a picture was let through unchecked, to be asked about again: ${e.message}`);
       await this.notAnswered(digest, jpeg, account, key, at);
       return 'failed';
     }
-    await this.decided(digest, match);
+    await this.decided(digest, match ? 'match' : 'clear');
     if (match) {
       // A picture let through before, while PhotoDNA did not answer, was
       // shown: its accounts are acted on as the retry finds them.
@@ -304,7 +327,7 @@ export class KnownPictures {
       for (const a of await accountsWith(r2Objects(this.env.OH_PICTURES), digest)) if (!accounts.includes(a)) accounts.push(a);
     }
     const how = typeof asked.how === 'string' && asked.how.trim() ? asked.how.trim().slice(0, HOW_MOST) : null;
-    await this.decided(digest, true);
+    await this.decided(digest, 'match');
     await this.storage.delete(`retry:${digest}`);
     for (const account of accounts.length ? accounts : [null]) await this.open({ digest, jpeg, account, key: null, shown: true, viewed: true, how });
     const body = { reported: digest, accounts };
@@ -337,8 +360,17 @@ export class KnownPictures {
     return null;
   }
 
-  async decided(digest, match) {
-    await this.storage.put(`pic:${digest}`, { said: match ? 'match' : 'clear', at: new Date(this.now()).toISOString() });
+  /// Whether PhotoDNA matches the picture [jpeg] (base64), [digest]: a
+  /// match with Microsoft's test pictures only is none, and logged.
+  async asked(digest, jpeg) {
+    const { match, test } = await photoDnaMatch(bytesOf(jpeg), this.photoDna);
+    if (test && !match) this.log(`known pictures: ${digest} matched only Microsoft's test pictures, and nobody is acted on for it`);
+    return match;
+  }
+
+  /// What PhotoDNA said of [digest]: 'match', 'clear' or 'unreadable'.
+  async decided(digest, said) {
+    await this.storage.put(`pic:${digest}`, { said, at: new Date(this.now()).toISOString() });
   }
 
   /// [digest] let through unchecked: asked about again, with each
@@ -408,15 +440,20 @@ export class KnownPictures {
         const digest = id.slice('retry:'.length);
         let match;
         try {
-          match = await photoDnaMatch(bytesOf(waiting.jpeg), this.photoDna);
+          match = await this.asked(digest, waiting.jpeg);
         } catch (e) {
+          if (e instanceof Unreadable) {
+            await this.decided(digest, 'unreadable');
+            await this.storage.delete(id);
+            continue;
+          }
           await this.problem('photodna', `a picture let through earlier is still unchecked: ${e.message}`);
           const tries = waiting.tries + 1;
           await this.storage.put(id, { ...waiting, tries, next: this.now() + retryAfter(tries) });
           later(this.now() + retryAfter(tries));
           continue;
         }
-        await this.decided(digest, match);
+        await this.decided(digest, match ? 'match' : 'clear');
         if (match) await this.matchedLate(digest, waiting);
         else await this.storage.delete(id);
       }

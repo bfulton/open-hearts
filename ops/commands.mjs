@@ -19,6 +19,7 @@ export const ARGUMENTS = {
   platform: '`ios` or `android`',
   document: '`terms` (the terms of use) or `privacy` (the privacy policy)',
   picture: 'a picture\'s SHA-256 (64 hex characters), as the daily email of new pictures gives it, or the address of its copy',
+  dir: 'a folder outside this repository holding the PhotoDNA module\'s files, edge.mjs among them',
 };
 
 /// The groups the commands are listed in, in order.
@@ -345,6 +346,29 @@ export const COMMANDS = [
     howto: 'docs/how-to/change-remote-config.md',
     example: 'oh config clear app --apply',
     run: lazy('./setup.mjs', 'configClear'),
+  },
+  {
+    words: ['photodna', 'put'],
+    group: 'setup',
+    args: ['dir'],
+    flags: ['apply'],
+    summary: 'Keeps the PhotoDNA module in the private bucket, every file in <dir> named by its SHA-256, and pins them in config/openhearts.json.',
+    more: 'The module is Microsoft\'s, licensed to Open Hearts as confidential, and the relay\'s code that calls it; never put it in this repository. Commit config/openhearts.json, and the relay deployed from main is built with exactly the files it pins.',
+    needs: [...CF, '(Workers R2 Storage Edit)'],
+    howto: 'docs/how-to/update-the-photodna-module.md',
+    example: 'oh photodna put ~/photodna-module --apply',
+    run: lazy('./photodna.mjs', 'put'),
+  },
+  {
+    words: ['photodna', 'get'],
+    group: 'setup',
+    args: ['dir'],
+    summary: 'Fetches the PhotoDNA module config/openhearts.json pins, from the private bucket into <dir>, to change it.',
+    more: 'Each file is checked against its pin. Keep <dir> outside this repository.',
+    needs: [...CF, '(Workers R2 Storage Edit)'],
+    howto: 'docs/how-to/update-the-photodna-module.md',
+    example: 'oh photodna get ~/photodna-module',
+    run: lazy('./photodna.mjs', 'get'),
   },
   {
     words: ['secret', 'set'],

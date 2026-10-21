@@ -14,6 +14,12 @@ compatibility_date = "2025-01-01"
 # Where the apps find it (app/lib/net/relays.dart, ourRelay).
 routes = [{ pattern = "relay.openhearts.game", custom_domain = true }]
 
+# The PhotoDNA module, which is not in the repository: this stand-in
+# here, and Microsoft's licensed module only as the relay is deployed
+# (photodna_off.mjs; `oh deploy relay` passes --alias in its place).
+[alias]
+"open-hearts-photodna" = "./photodna_off.mjs"
+
 # The backup jurors' image is built from the repo on every
 # deploy (service/bench/build.sh): the juror compiled from the table
 # code as it is now, never a stage left over from an earlier deploy, so
