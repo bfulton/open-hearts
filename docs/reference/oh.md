@@ -26,7 +26,6 @@ Development tools, such as `./check.sh`, the chaos walk and the bot benchmarks, 
 | `<platform>` | `ios` or `android` |
 | `<document>` | `terms` (the terms of use) or `privacy` (the privacy policy) |
 | `<picture>` | a picture's SHA-256 (64 hex characters), as the daily email of new pictures gives it, or the address of its copy |
-| `<dir>` | a folder outside this repository holding the PhotoDNA module's files, edge.mjs among them |
 
 ## Credentials
 
@@ -34,7 +33,7 @@ Each command reads what it needs from the environment, and says which are missin
 
 | Variable | What it is |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, hold or release an account, and keep or fetch the PhotoDNA module. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. |
+| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token. Accounts: Workers KV Storage Edit, and Workers R2 Storage Edit to find an account by a picture, take a name off kept games, and hold or release an account. Deploys and infrastructure: what docs/how-to/apply-infrastructure.md lists. |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account the project is in. |
 | `STRIPE_API_KEY` | A live-mode Stripe secret or restricted key. Finding an account by email: Customers and Subscriptions read. Refunds and terminations: Subscriptions write, Refunds write, and Invoices read. oh verify: Prices read and Checkout Sessions write, to make a checkout through Link and expire it. Infrastructure: what docs/how-to/apply-infrastructure.md lists. |
 | `NEW_RELIC_API_KEY` | A New Relic User key, for the monitors (oh infra). |
@@ -211,7 +210,7 @@ Withholds a picture at the relay for 30 days, wherever it was put out, as one ta
 oh picture report <picture> [--apply] [--account <account>] [--how <how>]
 ```
 
-Reports a picture you found and looked at as child sexual abuse material: the relay handles it as it does a PhotoDNA match. The relay withholds it wherever it was put out, holds and terminates each account that set it in the last year (and --account, one it was taken off), their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and --how you came to, and emails you what it did. It needs a copy: an account's own copy of it, a hold's, or the picture taken off --account.
+Reports a picture you found and looked at as child sexual abuse material: the relay handles it as it does a match with a known image. The relay withholds it wherever it was put out, holds and terminates each account that set it in the last year (and --account, one it was taken off), their web subscriptions ended with nothing refunded, reports it to NCMEC saying you looked at it and --how you came to, and emails you what it did. It needs a copy: an account's own copy of it, a hold's, or the picture taken off --account.
 
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
 - **How-to:** [handle-abuse-material.md](../how-to/handle-abuse-material.md#report-a-picture-you-found)
@@ -396,30 +395,6 @@ Deletes a run-time row, so every field goes back to its default.
 - **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - **How-to:** [change-remote-config.md](../how-to/change-remote-config.md)
 - **Example:** `oh config clear app --apply`
-
-### oh photodna put
-
-```bash
-oh photodna put <dir> [--apply]
-```
-
-Keeps the PhotoDNA module in the private bucket, every file in <dir> named by its SHA-256, and pins them in config/openhearts.json. The module is Microsoft's, licensed to Open Hearts as confidential, and the relay's code that calls it; never put it in this repository. Commit config/openhearts.json, and the relay deployed from main is built with exactly the files it pins.
-
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
-- **How-to:** [update-the-photodna-module.md](../how-to/update-the-photodna-module.md)
-- **Example:** `oh photodna put ~/photodna-module --apply`
-
-### oh photodna get
-
-```bash
-oh photodna get <dir>
-```
-
-Fetches the PhotoDNA module config/openhearts.json pins, from the private bucket into <dir>, to change it. Each file is checked against its pin. Keep <dir> outside this repository.
-
-- **Needs:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, (Workers R2 Storage Edit)
-- **How-to:** [update-the-photodna-module.md](../how-to/update-the-photodna-module.md)
-- **Example:** `oh photodna get ~/photodna-module`
 
 ### oh secret set
 

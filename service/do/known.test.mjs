@@ -19,18 +19,19 @@ const B = 'fedcba9876543210fedcba9876543210';
 const C = 'abcdefabcdefabcdefabcdefabcdefab';
 const KEY = 'cd'.repeat(32);
 const ORIGIN = 'https://play.example';
-const PHOTODNA = 'https://photodna.example/photodna/v1.0/MatchHash';
+const SHIELD = 'https://shield.example/v1/pdq';
 const NCMEC = 'https://report.cybertip.org/ispws';
 
 const bytes = (n) => Uint8Array.from([0xff, 0xd8, 0xff, n]);
 const b64 = (u8) => Buffer.from(u8).toString('base64');
 
-/// The licensed module's stand-in (photodna.mjs, jpegHasher): a
-/// picture's one hash is its digest, for the world below to match by,
-/// and a picture of one byte cannot be read.
+/// The PDQ hash's stand-in (arachnid.mjs, pictureHash): a picture's
+/// hash is its digest, for the world below to match by; a picture of
+/// one byte cannot be read, and one ending in 0xfe is too featureless to
+/// ask about.
 const hasher = (jpeg) => {
   if (jpeg.length === 1) throw new Unreadable('not a picture that can be read');
-  return [`h:${createHash('sha256').update(jpeg).digest('hex')}`];
+  return { hash: `h:${createHash('sha256').update(jpeg).digest('hex')}`, quality: jpeg.at(-1) === 0xfe ? 49 : 100 };
 };
 
 /// Cloudflare KV, as storeOf reads it (rows.mjs).
@@ -117,36 +118,35 @@ function doState() {
   return st;
 }
 
-/// Everything the object reaches: PhotoDNA's MatchHash, which matches
-/// the pictures in [known], and those in [tests] to Microsoft's test
-/// pictures (and, while [photoDnaDown], answers nothing); the service's
-/// order route; and NCMEC, each answering as told.
-function world({ known = new Set(), tests = new Set() } = {}) {
+/// Everything the object reaches: Arachnid Shield's PDQ call, which
+/// matches the pictures in [known] as CSAM, those in [harmful] as
+/// harmful-abusive material and those in [tests] to its test pictures
+/// (and, while [shieldDown], answers nothing); the service's order
+/// route; and NCMEC, each answering as told.
+function world({ known = new Set(), harmful = new Set(), tests = new Set() } = {}) {
   const w = {
     known,
+    harmful,
     tests,
-    photoDnaDown: false,
-    photoDnaAsked: 0,
+    shieldDown: false,
+    shieldAsked: 0,
     order: () => ({ status: 200, body: { act: 'terminate' } }),
     ncmecFails: null,
     orders: [],
     ncmec: [],
     store: null,
     async fetchImpl(url, init) {
-      if (url === PHOTODNA) {
-        w.photoDnaAsked++;
-        if (w.photoDnaDown) return new Response('{"statusCode":500}', { status: 500 });
-        const asked = JSON.parse(init.body);
-        const MatchResults = asked.map(({ DataRepresentation, Value }) => {
-          const digest = Value.slice('h:'.length);
-          const source = w.known.has(digest) ? 'Known' : w.tests.has(digest) ? 'Test' : null;
-          return {
-            Status: { Code: DataRepresentation === 'PreHashV2' && init.headers['ocp-apim-subscription-key'] === 'k' ? 3000 : 3002 },
-            IsMatch: !!source,
-            MatchDetails: { AdvancedInfo: [], MatchFlags: source ? [{ Source: source, Violations: ['A1'], MatchDistance: 10 }] : [] },
-          };
-        });
-        return Response.json({ TrackingId: 't', MatchResults });
+      if (url === SHIELD) {
+        w.shieldAsked++;
+        if (w.shieldDown) return Response.json({ detail: 'down' }, { status: 503 });
+        if (init.headers.authorization !== `Basic ${Buffer.from('user:pass').toString('base64')}`) return Response.json({ detail: 'please supply your API username and password' }, { status: 401 });
+        const scanned_hashes = {};
+        for (const hash of JSON.parse(init.body).hashes) {
+          const digest = hash.slice('h:'.length);
+          const classification = w.known.has(digest) ? 'csam' : w.harmful.has(digest) ? 'harmful-abusive-material' : w.tests.has(digest) ? 'test' : null;
+          scanned_hashes[hash] = classification ? { classification, match_type: 'near', near_match_details: [] } : null;
+        }
+        return Response.json({ scanned_hashes });
       }
       if (url === `${ORIGIN}/api/order`) {
         const { order } = JSON.parse(init.body);
@@ -169,7 +169,7 @@ function world({ known = new Set(), tests = new Set() } = {}) {
 
 /// The object over a fresh deployment: account A has a web
 /// subscription, a name and its copy of an earlier picture.
-async function setUp({ ncmec = true, endpoint = NCMEC, known = new Set(), tests = new Set(), key = 'k', withHasher = hasher } = {}) {
+async function setUp({ ncmec = true, endpoint = NCMEC, known = new Set(), harmful = new Set(), tests = new Set(), withHasher = hasher, shield = true } = {}) {
   const store = kv();
   store.m.set(`ACCOUNT#${A}|META`, JSON.stringify({ subscription: 'sub_1' }));
   store.m.set(`ACCOUNT#${A}|PROFILE`, JSON.stringify({ name: 'Ada' }));
@@ -178,7 +178,7 @@ async function setUp({ ncmec = true, endpoint = NCMEC, known = new Set(), tests 
   const pictures = r2({ [`account/${A}/${earlierDigest}.jpg`]: earlier });
   const records = r2();
   const sent = [];
-  const w = world({ known, tests });
+  const w = world({ known, harmful, tests });
   w.store = store;
   const env = {
     OH_STORE: store,
@@ -187,8 +187,8 @@ async function setUp({ ncmec = true, endpoint = NCMEC, known = new Set(), tests 
     EMAIL: { send: async (m) => sent.push(m) },
     OH_MAIL_FROM: 'noreply@openhearts.game',
     OH_ALERTS_TO: 'alerts@openhearts.game',
-    OH_PHOTODNA_KEY: key,
-    OH_PHOTODNA_ENDPOINT: PHOTODNA,
+    ...(shield ? { OH_ARACHNID_USERNAME: 'user', OH_ARACHNID_PASSWORD: 'pass' } : {}),
+    OH_ARACHNID_ENDPOINT: SHIELD,
     OH_APP_ORIGIN: ORIGIN,
     OH_NCMEC_ENDPOINT: endpoint,
     OH_NCMEC_EMAIL: 'help@openhearts.game',
@@ -225,11 +225,11 @@ test('asked as each picture is set: a match opens a case for the account that se
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'match');
   assert.deepEqual([(await caseOf(A)).shown, (await caseOf(A)).at, (await caseOf(A)).key], [false, new Date(t.now()).toISOString(), KEY]);
   // The daily run asking again of a picture another account had kept
-  // meanwhile: shown, from when it was set; PhotoDNA not asked again.
+  // meanwhile: shown, from when it was set; Shield not asked again.
   const earlier = new Date(t.now() - 3 * 60 * 60 * 1000).toISOString();
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: null, shown: true, at: earlier }), 'match');
   assert.deepEqual([(await caseOf(B)).shown, (await caseOf(B)).at], [true, earlier]);
-  assert.equal(t.w.photoDnaAsked, 1);
+  assert.equal(t.w.shieldAsked, 1);
   // A time yet to come, or none that reads as one, is now.
   for (const at of [new Date(t.now() + 60 * 1000).toISOString(), 'soon']) {
     const account = at === 'soon' ? 'dd'.repeat(16) : C;
@@ -237,34 +237,44 @@ test('asked as each picture is set: a match opens a case for the account that se
     assert.equal((await caseOf(account)).at, new Date(t.now()).toISOString(), at);
   }
 
-  // Let through while PhotoDNA did not answer: the case, when it
+  // Let through while Shield did not answer: the case, when it
   // matches, is from when it was first let through.
   const other = bytes(6);
   const late = await pictureDigest(b64(other));
   const u = await setUp({ known: new Set([late]) });
-  u.w.photoDnaDown = true;
+  u.w.shieldDown = true;
   const first = new Date(u.now()).toISOString();
   assert.equal(await u.obj.check({ jpeg: b64(other), account: A, key: KEY }), 'failed');
   u.clock.tick(60 * 1000);
   assert.equal(await u.obj.check({ jpeg: b64(other), account: B, key: KEY }), 'failed');
   assert.equal((await u.state.storage.get(`retry:${late}`)).at, first, 'the first time kept');
-  u.w.photoDnaDown = false;
+  u.w.shieldDown = false;
   u.clock.tick(retryAfter(2));
   await u.ring();
   for (const account of [A, B]) assert.equal((await u.state.storage.get(`case:${late}:${account}`)).at, first, account);
 });
 
-test("a match with Microsoft's test pictures only is no match: nobody acted on, and it is logged", async () => {
+test("a match with Shield's test pictures is no match: nobody acted on, and it is logged", async () => {
   const jpeg = bytes(7);
   const digest = await pictureDigest(b64(jpeg));
   const t = await setUp({ tests: new Set([digest]) });
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'clear');
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'clear');
-  assert.equal(t.w.photoDnaAsked, 1, 'asked once');
+  assert.equal(t.w.shieldAsked, 1, 'asked once');
   assert.deepEqual([...(await t.state.storage.list({ prefix: 'case:' }))], []);
   assert.deepEqual(t.sent, []);
   assert.deepEqual(t.alerts, []);
-  assert.deepEqual(t.logs, [`known pictures: ${digest} matched only Microsoft's test pictures, and nobody is acted on for it`]);
+  assert.deepEqual(t.logs, [`known pictures: ${digest} matched Arachnid Shield's test pictures, and nobody is acted on for it`]);
+});
+
+test('a picture too featureless for its hash to say what it is, is clear, and Shield is never asked', async () => {
+  const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xfe]);
+  const digest = await pictureDigest(b64(jpeg));
+  const t = await setUp({ known: new Set([digest]) });
+  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'clear');
+  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'clear');
+  assert.equal(t.w.shieldAsked, 0);
+  assert.deepEqual(t.logs, [`known pictures: ${digest} is too featureless to match (quality 49), and is not asked about`]);
 });
 
 test('a picture that cannot be decoded or hashed is unreadable, never asked about, and known as that from then on', async () => {
@@ -274,20 +284,20 @@ test('a picture that cannot be decoded or hashed is unreadable, never asked abou
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'unreadable');
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'unreadable');
   assert.equal(hashed, 1, 'decided once');
-  assert.equal(t.w.photoDnaAsked, 0);
+  assert.equal(t.w.shieldAsked, 0);
   assert.equal((await t.state.storage.get(`pic:${await pictureDigest(b64(jpeg))}`)).said, 'unreadable');
   assert.deepEqual([...(await t.state.storage.list({ prefix: 'case:' }))], []);
   assert.deepEqual(t.alerts, []);
 
-  // Let through while PhotoDNA did not answer, and unreadable when asked
-  // again (a module that hashes it no longer): unreadable, not retried.
+  // Let through while Shield did not answer, and unreadable when asked
+  // again (a decoder that reads it no longer): unreadable, not retried.
   const other = bytes(8);
   const late = await pictureDigest(b64(other));
   let readable = true;
   const u = await setUp({ withHasher: (b) => (readable ? hasher(b) : hasher(Uint8Array.from([0]))) });
-  u.w.photoDnaDown = true;
+  u.w.shieldDown = true;
   assert.equal(await u.obj.check({ jpeg: b64(other), account: A, key: KEY }), 'failed');
-  u.w.photoDnaDown = false;
+  u.w.shieldDown = false;
   readable = false;
   u.clock.tick(retryAfter(1));
   await u.ring();
@@ -296,17 +306,86 @@ test('a picture that cannot be decoded or hashed is unreadable, never asked abou
   assert.equal(u.state.alarm, null, 'nothing left to do');
 });
 
-test('asked of one object, in the "us" jurisdiction, and only with the key', async () => {
+test('asked of one object, in the "us" jurisdiction, and only with credentials', async () => {
   const calls = [];
   const KNOWN = {
     jurisdiction: (j) => (calls.push(['jurisdiction', j]), { idFromName: (n) => (calls.push(['name', n]), `id:${n}`), get: (id) => ({ fetch: async (url, init) => (calls.push(['fetch', id, url, JSON.parse(init.body)]), Response.json({ said: 'clear' })) }) }),
   };
-  assert.equal(knownAsker({ KNOWN }), null, 'no key, nothing asked');
-  assert.equal(knownAsker({ OH_PHOTODNA_KEY: 'k' }), null);
-  assert.equal(knownAsker({ OH_PHOTODNA_KEY: 'k', KNOWN: { get() {}, idFromName() {} } }), null, 'nowhere it can be kept in the United States');
-  const ask = knownAsker({ KNOWN, OH_PHOTODNA_KEY: 'k' });
+  assert.equal(knownAsker({ KNOWN }), null, 'no credentials, nothing asked');
+  assert.equal(knownAsker({ OH_ARACHNID_USERNAME: 'user' }), null);
+  assert.equal(knownAsker({ OH_ARACHNID_USERNAME: 'user', KNOWN: { get() {}, idFromName() {} } }), null, 'nowhere it can be kept in the United States');
+  const ask = knownAsker({ KNOWN, OH_ARACHNID_USERNAME: 'user' });
   assert.equal(await ask({ jpeg: 'x', account: A, key: KEY }), 'clear');
   assert.deepEqual(calls, [['jurisdiction', 'us'], ['name', KNOWN_OBJECT], ['fetch', `id:${KNOWN_OBJECT}`, 'https://known/check', { jpeg: 'x', account: A, key: KEY }]]);
+});
+
+test('a harmful or abusive image of a child at upload: refused, withheld, the account\'s copy deleted, and the operator told; never held, terminated or reported', async () => {
+  const jpeg = bytes(3);
+  const digest = await pictureDigest(b64(jpeg));
+  const t = await setUp({ harmful: new Set([digest]) });
+  t.pictures.m.set(`account/${A}/${digest}.jpg`, { bytes: jpeg, type: 'image/jpeg' });
+  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'harmful');
+  assert.equal(t.state.alarm, t.now(), 'acted on at once');
+  const [[, opened]] = [...(await t.state.storage.list({ prefix: 'case:' }))];
+  assert.equal(opened.jpeg, undefined, 'the picture never kept, not even while the case is open');
+  await t.ring();
+
+  assert.ok(withheldOf(t.store.row(...PICTURES_ROW), t.now()).has(digest), 'withheld at the relay');
+  assert.ok(!t.pictures.m.has(`account/${A}/${digest}.jpg`), "the account's copy deleted");
+  assert.equal(t.store.row(`ACCOUNT#${A}`, 'HOLD'), null, 'not held');
+  assert.deepEqual(t.w.orders, [], 'not terminated');
+  assert.deepEqual(t.w.ncmec, [], 'not reported');
+  assert.equal(t.sent.length, 1);
+  const [mail] = t.sent;
+  assert.equal(mail.subject, 'Open Hearts: a picture was refused as harmful or abusive material of a child');
+  assert.match(mail.text, new RegExp(`Arachnid Shield knows a picture account ${A} set at .* as harmful or abusive material of a child`));
+  assert.match(mail.text, /refused as it was set, before any other player was shown it/);
+  assert.match(mail.text, /- withheld wherever it turns up/);
+  assert.doesNotMatch(mail.text, /Not done yet|hold|terminate it|report it/, 'nothing else to do by itself');
+  assert.match(mail.text, new RegExp(`\\./oh account suspend ${A} --apply`));
+  assert.match(mail.text, new RegExp(`SHA-256 is ${digest}\\. No copy of it is kept\\.`));
+  assert.ok(!mail.text.includes(b64(jpeg)), 'never the picture');
+  const [[, c]] = [...(await t.state.storage.list({ prefix: 'case:' }))];
+  assert.equal(c.closed, true);
+  assert.equal(c.jpeg, undefined, 'never kept');
+  assert.equal(t.state.alarm, null, 'nothing left to do');
+
+  // Another account setting it: known, not asked again, and told.
+  const asked = t.w.shieldAsked;
+  assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'harmful');
+  assert.equal(t.w.shieldAsked, asked);
+  await t.ring();
+  assert.equal(t.sent.length, 2);
+  assert.match(t.sent[1].text, new RegExp(`account ${B}`));
+  assert.deepEqual(t.w.ncmec, []);
+
+  // Let through while Shield did not answer, and harmful once it does:
+  // each account that set it acted on as shown.
+  const other = bytes(4);
+  const late = await pictureDigest(b64(other));
+  const u = await setUp({ harmful: new Set([late]) });
+  u.w.shieldDown = true;
+  assert.equal(await u.obj.check({ jpeg: b64(other), account: A, key: KEY }), 'failed');
+  u.w.shieldDown = false;
+  u.clock.tick(retryAfter(1));
+  await u.ring();
+  assert.equal(await u.state.storage.get(`retry:${late}`), undefined);
+  assert.equal((await u.state.storage.get(`pic:${late}`)).said, 'harmful');
+  assert.match(u.sent.at(-1).text, /shown to other players before Shield had said; it is withheld now/);
+  assert.deepEqual([u.w.orders, u.w.ncmec], [[], []]);
+
+  // Let through for one account, and found harmful as another sets it:
+  // the first is told of as harmful too, not acted on as a match.
+  const third = bytes(5);
+  const v = await setUp({ harmful: new Set([await pictureDigest(b64(third))]) });
+  v.w.shieldDown = true;
+  assert.equal(await v.obj.check({ jpeg: b64(third), account: A, key: KEY }), 'failed');
+  v.w.shieldDown = false;
+  assert.equal(await v.obj.check({ jpeg: b64(third), account: B, key: KEY }), 'harmful');
+  await v.ring();
+  const cases = [...(await v.state.storage.list({ prefix: 'case:' })).values()];
+  assert.deepEqual(cases.map((c) => [c.account, c.harmful, c.closed]).sort(), [[A, true, true], [B, true, true]]);
+  assert.deepEqual([v.w.orders, v.w.ncmec, v.store.row(`ACCOUNT#${A}`, 'HOLD')], [[], [], null]);
 });
 
 test('a match at upload: withheld, held with its pictures, terminated with its web subscription, reported, and the operator told; nothing left', async () => {
@@ -316,7 +395,7 @@ test('a match at upload: withheld, held with its pictures, terminated with its w
   const clear = b64(bytes(2));
   assert.equal(await t.obj.check({ jpeg: clear, account: A, key: KEY }), 'clear');
   assert.equal(await t.obj.check({ jpeg: clear, account: B, key: KEY }), 'clear');
-  assert.equal(t.w.photoDnaAsked, 1, 'a picture is asked about once');
+  assert.equal(t.w.shieldAsked, 1, 'a picture is asked about once');
 
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'match');
   assert.equal(t.state.alarm, t.now(), 'acted on at once');
@@ -350,21 +429,21 @@ test('a match at upload: withheld, held with its pictures, terminated with its w
   assert.equal(t.state.alarm, null, 'nothing left to do');
 
   // Another account putting it out: withheld, and acted on, without
-  // asking PhotoDNA again.
-  const asked = t.w.photoDnaAsked;
+  // asking Shield again.
+  const asked = t.w.shieldAsked;
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'match');
-  assert.equal(t.w.photoDnaAsked, asked);
+  assert.equal(t.w.shieldAsked, asked);
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'match');
   await t.ring();
   assert.equal((await t.state.storage.list({ prefix: 'case:' })).size, 2, 'one case an account');
   assert.equal(t.w.ncmec.filter((c) => c.path === '/finish').length, 2, 'and one report an account');
 });
 
-test("PhotoDNA not answering lets a picture through, asks again, and a match then is acted on for each account that set it, each account's copy deleted", async () => {
+test("Shield not answering lets a picture through, asks again, and a match then is acted on for each account that set it, each account's copy deleted", async () => {
   const jpeg = bytes(1);
   const digest = await pictureDigest(b64(jpeg));
   const t = await setUp({ known: new Set([digest]) });
-  t.w.photoDnaDown = true;
+  t.w.shieldDown = true;
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'failed');
   assert.equal(t.state.alarm, t.now() + retryAfter(1));
   // Set meanwhile: A's copy kept, and C set it too.
@@ -374,7 +453,7 @@ test("PhotoDNA not answering lets a picture through, asks again, and a match the
   t.clock.tick(retryAfter(1));
   await t.ring();
   assert.equal(t.state.alarm, t.now() + retryAfter(2), 'still down: asked again later');
-  t.w.photoDnaDown = false;
+  t.w.shieldDown = false;
   t.clock.tick(retryAfter(2));
   await t.ring();
 
@@ -392,9 +471,9 @@ test("PhotoDNA not answering lets a picture through, asks again, and a match the
 test('a match found as another account puts out a picture let through earlier: a case for each account, and none for nobody', async () => {
   const jpeg = bytes(1);
   const t = await setUp({ known: new Set([await pictureDigest(b64(jpeg))]) });
-  t.w.photoDnaDown = true;
+  t.w.shieldDown = true;
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: null, key: null }), 'failed', 'set by no account the object knows');
-  t.w.photoDnaDown = false;
+  t.w.shieldDown = false;
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'match');
   await t.ring();
   const cases = [...(await t.state.storage.list({ prefix: 'case:' })).values()];
@@ -512,28 +591,30 @@ test("an account no longer there has nothing to end; a picture allowed after the
 test('every failure of the automatic handling emails the operator, once in a while for each kind', async () => {
   const jpeg = bytes(1);
   const t = await setUp({ known: new Set([await pictureDigest(b64(jpeg))]) });
-  t.w.photoDnaDown = true;
+  t.w.shieldDown = true;
   await t.obj.check({ jpeg: b64(jpeg), account: A, key: KEY });
   await t.obj.check({ jpeg: b64(bytes(2)), account: A, key: KEY });
   assert.equal(t.alerts.length, 1, 'one email for one outage');
   assert.equal(t.alerts[0].op, 'alert');
   assert.equal(t.alerts[0].to, 'alerts@openhearts.game');
-  assert.equal(t.alerts[0].subject, 'Open Hearts: the automatic handling of abuse images failed (photodna)');
-  assert.match(t.alerts[0].text, /a picture was let through unchecked, to be asked about again: PhotoDNA said 500, no results/);
+  assert.equal(t.alerts[0].subject, 'Open Hearts: the automatic handling of abuse images failed (shield)');
+  assert.match(t.alerts[0].text, /a picture was let through unchecked, to be asked about again: Arachnid Shield said 503: down/);
 
-  // A key and no address: nothing is checked, and the operator is told.
-  const config = await setUp();
-  config.env.OH_PHOTODNA_ENDPOINT = undefined;
-  assert.equal(await config.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'off');
-  assert.match(config.alerts[0].subject, /\(config\)/);
-  assert.match(config.alerts[0].text, /OH_PHOTODNA_KEY is set but photodna.endpoint/);
-
-  // A key and a relay deployed without the licensed module: the same.
-  const unbuilt = await setUp({ withHasher: null });
-  assert.equal(await unbuilt.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'off');
-  assert.equal(unbuilt.w.photoDnaAsked, 0);
-  assert.match(unbuilt.alerts[0].subject, /\(config\)/);
-  assert.match(unbuilt.alerts[0].text, /OH_PHOTODNA_KEY is set but the relay was deployed without the PhotoDNA module/);
+  // A username and no password, or no address: nothing is checked, and
+  // the operator is told.
+  for (const [unset, said] of [['OH_ARACHNID_PASSWORD', /OH_ARACHNID_USERNAME is set but OH_ARACHNID_PASSWORD is not/], ['OH_ARACHNID_ENDPOINT', /OH_ARACHNID_USERNAME is set but arachnid.endpoint/]]) {
+    const config = await setUp();
+    config.env[unset] = undefined;
+    assert.equal(await config.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'off');
+    assert.equal(config.w.shieldAsked, 0);
+    assert.match(config.alerts[0].subject, /\(config\)/);
+    assert.match(config.alerts[0].text, said);
+  }
+  // Credentials Shield refuses: a failure like any other.
+  const refused = await setUp();
+  refused.env.OH_ARACHNID_PASSWORD = 'wrong';
+  assert.equal(await refused.obj.check({ jpeg: b64(jpeg), account: A, key: KEY }), 'failed');
+  assert.match(refused.alerts[0].text, /Arachnid Shield said 401: please supply your API username and password/);
 
   // Anything else that throws: told, the picture let through, and the
   // alarm set to try again.
@@ -592,7 +673,7 @@ test('a picture the operator reports is handled as a match: each account that se
   await t.pictures.put(`account/${A}/${digest}.jpg`, jpeg, { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { at: '2026-10-02T00:00:00.000Z', last: '2026-10-02T00:00:00.000Z' } });
   const said = await reportIt(t, { digest, accounts: [C], how: '  a player reported it  ' });
   assert.deepEqual(said, { status: 200, body: { reported: digest, accounts: [C, A] } });
-  assert.equal(t.w.photoDnaAsked, 0, 'PhotoDNA not asked');
+  assert.equal(t.w.shieldAsked, 0, 'Shield not asked');
   await t.ring();
 
   const cases = [...(await t.state.storage.list({ prefix: 'case:' })).values()];
@@ -612,7 +693,7 @@ test('a picture the operator reports is handled as a match: each account that se
 
   // Known from then on: whoever puts it out again is acted on too.
   assert.equal(await t.obj.check({ jpeg: b64(jpeg), account: B, key: KEY }), 'match');
-  assert.equal(t.w.photoDnaAsked, 0);
+  assert.equal(t.w.shieldAsked, 0);
 });
 
 test("a reported picture's copy is found wherever one is kept, and without one nothing is done", async () => {
@@ -687,10 +768,10 @@ test('a report reaches the object only when the tool wrote it, and is answered t
   assert.deepEqual([...(await t.state.storage.list({ prefix: 'report:' })).keys()], [`report:${'e'.repeat(32)}`]);
 });
 
-test('off without the key, and the object answers only its own calls', async () => {
-  const t = await setUp({ key: '' });
+test('off without credentials, and the object answers only its own calls', async () => {
+  const t = await setUp({ shield: false });
   assert.equal(await t.obj.check({ jpeg: b64(bytes(1)), account: A, key: KEY }), 'off');
-  assert.equal(t.w.photoDnaAsked, 0);
+  assert.equal(t.w.shieldAsked, 0);
   const said = await t.obj.fetch(new Request('https://known/check', { method: 'POST', body: JSON.stringify({ jpeg: b64(bytes(1)) }) }));
   assert.deepEqual(await said.json(), { said: 'off' });
   assert.equal((await t.obj.fetch(new Request('https://known/check', { method: 'POST', body: 'not json' }))).status, 200);

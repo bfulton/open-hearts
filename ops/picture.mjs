@@ -1,8 +1,8 @@
 // `oh picture …`: a picture put back after the automatic check hid it
 // (service/do/review.mjs, docs/how-to/look-at-new-pictures.md); withheld
 // at the relay wherever it was put out; or reported as child sexual
-// abuse material, which the relay then handles as it does a PhotoDNA
-// match (service/do/known.mjs, docs/how-to/handle-abuse-material.md).
+// abuse material, which the relay then handles as it does a match with a
+// known image (service/do/known.mjs, docs/how-to/handle-abuse-material.md).
 // Says what it would do and stops; with --apply it is done. A picture
 // is named by its SHA-256, as the daily email gives it, or by the
 // address of its copy.
@@ -46,8 +46,8 @@ export async function hide(ctx, { args, flags }) {
 /// A picture the operator found and looked at, reported: the relay
 /// withholds it, holds and terminates each account that set it (and
 /// [--account], one the picture was taken off), reports it to NCMEC and
-/// emails what it did, as for a PhotoDNA match. The picture's bytes never
-/// come here: only whether a copy of it is kept.
+/// emails what it did, as for a match with a known image. The picture's
+/// bytes never come here: only whether a copy of it is kept.
 export async function report(ctx, { args, flags }) {
   const digest = pictureNamed(args.picture);
   if (!digest) throw new Usage('name the picture by its SHA-256 (64 hex) or the address of its copy, as the emails give it');

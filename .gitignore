@@ -12,11 +12,6 @@ packages/*/pubspec.lock
 node_modules/
 .wrangler/
 
-# Microsoft's PhotoDNA module, licensed to Open Hearts as confidential:
-# fetched here only as the relay is deployed, never committed
-# (service/do/photodna_off.mjs).
-service/do/private/
-
 # The service's signing secret, as bin/service_key.dart wrote it before
 # it printed it instead: a copy left on a disk is never a commit.
 service.secret

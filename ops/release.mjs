@@ -5,12 +5,11 @@
 // production is in gate.mjs, which deploy.sh and the relay's build step
 // run themselves, so that deploying without oh is held to it too.
 
-import { readFile, rm } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Failed, Usage, root, wranglerVersion } from './env.mjs';
 import { releaseProblems } from './gate.mjs';
-import { MODULE_ALIAS, MODULE_DIR, fetchModule, pinsOf } from './photodna.mjs';
 import { termsProblems, untold } from './terms.mjs';
 import { told } from '../site/ledger.mjs';
 import { stripe as stripeDefinition } from '../infra/stripe.mjs';
@@ -48,25 +47,12 @@ export async function relay(ctx, { flags }) {
   const gone = await missing(ctx, RELAY_NEEDS);
   for (const g of gone) ctx.log(`  not ready: needs ${g}`);
   const ready = (await cleared(ctx, 'relay', flags.apply)) && !gone.length;
-  const pinned = pinsOf(await ctx.config());
-  ctx.log(pinned ? `  with the PhotoDNA module config/openhearts.json pins, from the private bucket (${Object.keys(pinned).length} files)` : '  without a PhotoDNA module: config/openhearts.json pins none, so the relay asks PhotoDNA nothing');
   if (!flags.apply) {
     ctx.log(ready ? 'nothing deployed; --apply deploys it' : 'nothing deployed');
     return;
   }
   if (gone.length) throw new Failed(`relay: needs ${gone.join(', ')}`);
-  // Fetched now, into the folder git ignores, built in the stand-in's
-  // place (service/do/photodna_off.mjs), and on this computer only
-  // while it is built.
-  const dir = ctx.moduleDir ?? MODULE_DIR;
-  await rm(dir, { recursive: true, force: true });
-  let code;
-  try {
-    const withModule = (await fetchModule(ctx, dir)) !== null;
-    code = await ctx.run('npx', ['--yes', `wrangler@${version}`, 'deploy', ...(withModule ? ['--alias', MODULE_ALIAS] : [])], { cwd: join(root, 'service/do') });
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  const code = await ctx.run('npx', ['--yes', `wrangler@${version}`, 'deploy'], { cwd: join(root, 'service/do') });
   if (code !== 0) throw new Failed(`relay: wrangler deploy exited ${code}`);
 }
 

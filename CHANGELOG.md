@@ -57,15 +57,18 @@ squashed from a pull request, the pull request's number.
   again until it is done, and any failure emails the operator. Off until
   PhotoDNA's key is set; reports are filed once NCMEC's credentials are,
   and until then the email says to file one by hand. (2026-10-19, #32)
-- PhotoDNA is never sent a picture: the relay decodes it and makes its
-  PhotoDNA Edge Hashes itself, with the module Microsoft licenses to Open
-  Hearts, and sends PhotoDNA's MatchHash only those. The module is kept
-  out of this repository, in a private bucket, pinned by SHA-256 in
-  `config/openhearts.json`; `./oh photodna put` and `get` keep and fetch
-  it, `./oh deploy relay` builds the relay with it, and `check.sh` fails
-  on any committed file that is part of it. A match with Microsoft's test
-  pictures only is logged and acted on for nobody, and a picture that
-  can't be decoded is refused as a match is. (2026-10-21, #34)
+- Known images of child sexual abuse are found by the Canadian Centre
+  for Child Protection's Arachnid Shield instead of Microsoft's
+  PhotoDNA, and Shield is never sent a picture: the relay decodes it,
+  makes its PDQ hash with a port of Meta's reference that makes the same
+  hash bit for bit, and asks Shield about the hash. A picture Shield
+  knows as harmful or abusive material of a child, not child sexual
+  abuse material, is refused and withheld, and the operator emailed with
+  the command to suspend the account; nothing else is done by itself.
+  A match with Shield's test pictures is logged and acted on for nobody,
+  a picture too featureless to match is not asked about, and one that
+  can't be decoded is refused as a match is. The privacy policy names
+  the Canadian Centre for Child Protection. (2026-10-22, #34)
 - Every new picture is emailed to the operator once a day, account by
   account, with the commands to take it down. The daily run does only
   what each copy says is still to do: it keeps what is kept for as long

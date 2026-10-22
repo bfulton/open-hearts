@@ -12,7 +12,7 @@
 // worker's schedule goes over every copy kept, and does only what each
 // copy's own flags say is still to do: holds each account's copies to
 // the order it set them in; deletes what is kept no longer than
-// promised; asks PhotoDNA again about what it has not cleared;
+// promised; asks Arachnid Shield again about what it has not cleared;
 // hides again what the check found should be; and emails the operator,
 // account by account, every picture each set since the last email — the
 // ones it has since replaced too, so that swapping a picture back before
@@ -197,7 +197,7 @@ export function reviewEmail(accounts, more = 0) {
         : p.check && !Object.keys(p.check).length
           ? ['not checked: the check failed']
           : []),
-      ...(p.unreadable ? ['hidden: it could not be decoded, so PhotoDNA could not be asked about it'] : []),
+      ...(p.unreadable ? ['hidden: it could not be decoded, so Arachnid Shield could not be asked about it'] : []),
     ];
   };
   const commands = (a) => [
@@ -254,18 +254,19 @@ export function reviewEmail(accounts, more = 0) {
 ///    left in [records] (OH_RECORDS) was made;
 /// 2. a copy that has not been its account's for [PICTURE_KEPT_DAYS]
 ///    is deleted, each account's oldest first;
-/// 3. with [ask] (known.mjs, knownAsker), each copy PhotoDNA has not
-///    cleared is asked about again, for its account, whether or not the
-///    account still has it — each was shown while it did — so that a
-///    match is acted on for each account that set it, and is no longer
-///    theirs; and one that cannot be decoded is said to be;
+/// 3. with [ask] (known.mjs, knownAsker), each copy Arachnid Shield
+///    has not cleared is asked about again, for its account, whether or
+///    not the account still has it — each was shown while it did — so
+///    that a match, or a picture Shield knows as harmful, is acted on for
+///    each account that set it, and is no longer theirs; and one that
+///    cannot be decoded is said to be;
 /// 4. every picture an account has now, or new for the email, that the
 ///    check found should be hidden, or that cannot be decoded, is hidden,
 ///    unless the operator allowed it, in case hiding it as it was set did
 ///    not take; and what the operator allowed stays allowed while a copy
 ///    of it is kept;
 /// 5. with [send] ({subject, text, html}), the operator is emailed every
-///    copy not yet told of but one PhotoDNA matched, account by account,
+///    copy not yet told of but one Shield matched, account by account,
 ///    oldest account first, whole accounts up to [REVIEW_MOST] pictures,
 ///    each marked told once the email has gone.
 ///
@@ -335,7 +336,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
   }
   const kept = copies.filter((c) => !stale.has(c));
 
-  // 3. PhotoDNA asked again.
+  // 3. Shield asked again.
   let asked = 0;
   const matched = new Set();
   for (const c of ask ? kept : []) {
@@ -355,7 +356,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
       // Unreadable: no hash can be made of it, so nothing can be asked;
       // hidden below, as the app's own pictures never are.
       await changed(c, (m) => (m.known === said ? null : { ...m, known: said }));
-    } else if (said === 'match') {
+    } else if (said === 'match' || said === 'harmful') {
       // The object acts on it for this account and deletes the copy
       // (known.mjs); the account's picture now is no longer its own
       // from today, and one before keeps since when, so that its year
@@ -363,7 +364,7 @@ export async function reviewRun({ bucket, store, records = null, send = null, as
       matched.add(c.key);
       if (currentOf(byAccount.get(c.account)) === c) await settle(c.account, today);
     } else {
-      // PhotoDNA without its key, or not answering: tomorrow.
+      // Shield without its credentials, or not answering: tomorrow.
       break;
     }
   }

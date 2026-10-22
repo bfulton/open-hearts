@@ -63,8 +63,11 @@ its own licence beside it:
 - **ZXing** (`app/web/zxing/`): the QR scanner's decoder on the web,
   `@zxing/library` 0.23.0. Apache-2.0.
 - **jpeg-js** (`service/do/vendor/jpeg-js/`): the JPEG decoder the relay
-  decodes a picture with before hashing it for PhotoDNA, from jpeg-js
-  0.4.4. BSD-3-Clause, the decoder itself Apache-2.0.
+  decodes a picture with before hashing it, from jpeg-js 0.4.4.
+  BSD-3-Clause, the decoder itself Apache-2.0.
+- **PDQ** (`service/do/pdq.mjs`): the relay's picture hash, a port of
+  Meta's C++ reference in ThreatExchange (`pdq/cpp`). BSD
+  (`service/do/pdq.LICENSE.txt`).
 - **New Relic's browser agent** (`app/web/observability.js`): its loader,
   as New Relic serves it, on play.openhearts.game only. Apache-2.0
   (`app/web/nr-loader-full-1.323.0.min.js.LICENSE.txt`).

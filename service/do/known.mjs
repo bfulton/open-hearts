@@ -1,14 +1,17 @@
 // Known images of child sexual abuse, kept from being shown at all.
 // Each picture an account sets is asked about as it is set, before
-// anyone is shown it (profile_pictures.mjs), of Microsoft's PhotoDNA
-// (photodna.mjs), from one object in Cloudflare's "us" jurisdiction, so
-// that every request PhotoDNA gets comes from the United States;
-// PhotoDNA is asked about each picture once, and is sent its hashes,
-// never the picture. A picture that cannot be decoded, so that nothing
-// can be asked about it, is never the account's either. A picture
-// that matches is never the account's, and everything that follows is
-// done here, with nothing waiting on the operator
-// (docs/how-to/handle-abuse-material.md):
+// anyone is shown it (profile_pictures.mjs), of the Canadian Centre for
+// Child Protection's Arachnid Shield (arachnid.mjs), through one object
+// kept in Cloudflare's "us" jurisdiction, under the US law that has a
+// match reported and what is kept of it kept. Shield is asked about
+// each picture once, and is sent its PDQ hash, never the picture. A
+// picture that cannot be decoded, so that nothing can be asked about
+// it, is never the account's either; nor is one Shield knows as a
+// harmful or abusive image of a child that is not one of sexual abuse,
+// and the operator is emailed each account that sets one. A picture
+// that matches a known image of sexual abuse is never the account's,
+// and everything that follows is done here, with nothing waiting on the
+// operator (docs/how-to/handle-abuse-material.md):
 //
 //   1. the picture withheld wherever it turns up (pictures.mjs);
 //   2. each account that set it held (holds.mjs), a copy of the picture
@@ -24,20 +27,20 @@
 //
 // Each step is written down as it is done, and the object's alarm tries
 // the rest again until all are: Stripe or NCMEC not answering delays a
-// step, and loses none. PhotoDNA not answering lets the picture be
-// set, so the game goes on, and asks again; a match found then is acted
-// on as any other, and the picture taken down with it.
+// step, and loses none. Shield not answering lets the picture be set,
+// so the game goes on, and asks again; a match found then is acted on
+// as any other, and the picture taken down with it.
 //
-// Off until the deployment has PhotoDNA's key (OH_PHOTODNA_KEY) and
-// the module that makes the hashes, which the relay's deploy adds
-// (photodna_off.mjs); a report is filed once it has NCMEC's credentials
-// too, and until then the email says to file it by hand.
+// Off until the deployment has Shield's credentials
+// (OH_ARACHNID_USERNAME, OH_ARACHNID_PASSWORD); a report is filed once
+// it has NCMEC's credentials too, and until then the email says to file
+// it by hand.
 
 import { heldPictureKey, hold, keepHeldPictures } from '../functions/holds.mjs';
 import { bodyOf } from '../functions/http.mjs';
 import { NcmecRefused, fileDetailsXml, fileReport, reportXml } from '../functions/ncmec.mjs';
+import { CSAM, HARMFUL, MIN_QUALITY, TEST, pictureHash, shieldSays } from './arachnid.mjs';
 import { Unreadable } from './jpeg.mjs';
-import { photoDnaMatch } from './photodna.mjs';
 import { PICTURES_ROW, deleteCopy, pictureDigest, pictureKey, withheldOf, withholding } from '../functions/pictures.mjs';
 import { isAccount, storeOf } from '../functions/rows.mjs';
 import { orderOf } from '../functions/suspension.mjs';
@@ -46,7 +49,7 @@ import { placeOrder } from '../tool/suspend.mjs';
 import { alertKnownProblem, alertsOf } from '../functions/alerts.mjs';
 
 /// The one object every check goes through.
-export const KNOWN_OBJECT = 'photodna';
+export const KNOWN_OBJECT = 'known';
 
 /// A picture the operator found and reports (`oh picture report`),
 /// written where only the operator's tool writes, and named to the relay
@@ -89,12 +92,13 @@ export const r2Objects = (bucket) => ({
 });
 
 /// How a relay object asks the one object about a picture: {jpeg,
-/// account, key} -> 'clear', 'match', 'failed' (PhotoDNA did not answer),
-/// 'unreadable' (no hash can be made of it) or 'off'. Null where there is
-/// nothing to ask: no PhotoDNA key, or a runtime that cannot keep the
-/// object in the United States.
+/// account, key} -> 'clear', 'match', 'harmful' (Shield knows it as a
+/// harmful or abusive image of a child), 'failed' (Shield did not
+/// answer), 'unreadable' (it cannot be decoded) or 'off'. Null where
+/// there is nothing to ask: no Shield credentials, or a runtime that
+/// cannot keep the object in the United States.
 export function knownAsker(env) {
-  if (!env.KNOWN || !env.OH_PHOTODNA_KEY || typeof env.KNOWN.jurisdiction !== 'function') return null;
+  if (!env.KNOWN || !env.OH_ARACHNID_USERNAME || typeof env.KNOWN.jurisdiction !== 'function') return null;
   const us = env.KNOWN.jurisdiction('us');
   const stub = us.get(us.idFromName(KNOWN_OBJECT));
   return async (asked) => {
@@ -138,13 +142,16 @@ export function ncmecOf(env) {
 }
 
 /// What a match's case has done, in the operator's words, and what it
-/// has not: {done: [line], todo: [line]}.
+/// has not: {done: [line], todo: [line]}. A harmful one's is only
+/// withheld.
 export function caseLines(c, { ncmec }) {
   const done = [];
   const todo = [];
   const step = (ok, did, failing) => (ok ? done.push(did) : todo.push(failing));
   const why = (s) => (c.failed?.[s] ? ` (${c.failed[s]}; tried again by itself)` : ' (tried again by itself)');
+  const failed = () => Object.keys(c.failed ?? {}).length > 0;
   step(c.done.hidden, 'withheld wherever it turns up', `withhold it${why('hidden')}`);
+  if (c.harmful) return { done, todo, failed: failed() };
   if (c.account) {
     step(c.done.held, `held for a year at the least, with a copy of each picture it set at ${heldPictureKey(c.account, '')}... in open-hearts-records`, `hold it${why('held')}: ./oh account hold ${c.account} --apply`);
     step(c.done.ended, 'terminated, its web subscription ended in Stripe, nothing refunded', `terminate it${why('ended')}: ./oh account terminate ${c.account} --serious --apply`);
@@ -156,16 +163,31 @@ export function caseLines(c, { ncmec }) {
     const by = c.account ? `, then ./oh account hold ${c.account} --ref <number> --apply` : '';
     todo.push(ncmec && !c.test ? `report it to NCMEC${why('reported')}` : `report it to NCMEC yourself, at https://report.cybertip.org/ (docs/how-to/handle-abuse-material.md)${by}`);
   }
-  return { done, todo, failed: Object.keys(c.failed ?? {}).length > 0 };
+  return { done, todo, failed: failed() };
 }
 
 /// The email of a case: {subject, text}. It never holds the picture.
 export function caseEmail(c, lines) {
   const who = c.account ? `account ${c.account}` : 'a device the relay did not know';
+  const failing = lines.failed ? ', and an automatic step failed' : '';
+  if (c.harmful) {
+    const text = [
+      `Arachnid Shield knows a picture ${who} set at ${c.at} as harmful or abusive material of a child. It is not known child sexual abuse material, so nothing else is done by itself: the account is not held, terminated or reported.`,
+      c.shown ? 'It was shown to other players before Shield had said; it is withheld now.' : 'It was refused as it was set, before any other player was shown it.',
+      '',
+      'Done:',
+      ...lines.done.map((l) => `- ${l}`),
+      ...(lines.todo.length ? ['', 'Not done yet:', ...lines.todo.map((l) => `- ${l}`)] : []),
+      ...(c.account ? ['', `If the account should not go on: ./oh account suspend ${c.account} --apply (docs/how-to/suspend-an-account.md).`] : []),
+      '',
+      `The picture's SHA-256 is ${c.digest}. No copy of it is kept.`,
+    ].join('\n');
+    return { subject: `Open Hearts: a picture was refused as harmful or abusive material of a child${failing}`, text };
+  }
   const text = [
     c.viewed
       ? `You reported a picture ${who} set as child sexual abuse material${c.how ? ` (${c.how})` : ''}, at ${c.at}.`
-      : `Microsoft's PhotoDNA matched a picture ${who} set at ${c.at} against known images of child sexual abuse.`,
+      : `Arachnid Shield matched a picture ${who} set at ${c.at} against known images of child sexual abuse.`,
     c.viewed ? 'It had been shown to other players; it is withheld now.' : c.shown ? 'It was shown to other players before the match was known; it is withheld now.' : 'It was withheld before any other player was shown it.',
     '',
     'Done:',
@@ -174,44 +196,47 @@ export function caseEmail(c, lines) {
     '',
     `The picture's SHA-256 is ${c.digest}. Don't download it except to report it (docs/how-to/handle-abuse-material.md).`,
   ].join('\n');
-  const subject = lines.failed ? ', and an automatic step failed' : lines.todo.length ? ' (something for you to do)' : '';
+  const subject = failing || (lines.todo.length ? ' (something for you to do)' : '');
   return { subject: `Open Hearts: ${c.viewed ? 'a picture you reported was taken down' : 'a known child abuse image was blocked'}${subject}`, text };
 }
 
-/// The object, where PhotoDNA is asked and every match acted on. Its
-/// storage: `pic:<digest>`, what PhotoDNA said of a picture ({said:
-/// 'clear' or 'match', at}); `retry:<digest>`, a picture PhotoDNA has
-/// not answered for yet ({jpeg, seen: [{account, key}], tries, next,
-/// at}, `at` when it was first let through);
+/// The object, where Shield is asked and every match acted on. Its
+/// storage: `pic:<digest>`, what Shield said of a picture ({said:
+/// 'clear', 'match', 'harmful' or 'unreadable', at}); `retry:<digest>`,
+/// a picture Shield has not answered for yet ({jpeg, seen: [{account,
+/// key}], tries, next, at}, `at` when it was first let through);
 /// `case:<digest>:<account>`, a match being acted on ({digest, account,
 /// key, name, jpeg, at, shown, done, failed, tries, told}), the picture
-/// dropped from it once it is held and reported; and `report:<id>`,
-/// what a report the operator made was answered ({at, body}).
+/// dropped from it once it is held and reported, or [harmful], a
+/// picture Shield knows as harmful, only withheld and told of; and
+/// `report:<id>`, what a report the operator made was answered ({at,
+/// body}).
 export class KnownPictures {
-  constructor(state, env = {}, { hasher = null, fetchImpl = fetch, now = Date.now, log = (line) => console.log(line) } = {}) {
+  constructor(state, env = {}, { hasher = pictureHash, fetchImpl = fetch, now = Date.now, log = (line) => console.log(line) } = {}) {
     this.state = state;
     this.storage = state.storage;
     this.env = env;
-    // What makes a picture's PhotoDNA hashes (photodna.mjs, jpegHasher):
-    // the licensed module the relay's deploy adds, or none.
+    // What makes a picture's PDQ hash for Shield (arachnid.mjs).
     this.hasher = hasher;
-    // What this object reaches the world with: PhotoDNA, the service,
+    // What this object reaches the world with: Shield, the service,
     // NCMEC. Not `fetch`, which is how the runtime reaches the object.
     this.http = fetchImpl;
     this.now = now;
     this.log = log;
   }
 
-  get photoDna() {
-    const { OH_PHOTODNA_KEY: key, OH_PHOTODNA_ENDPOINT: endpoint } = this.env;
-    return key && endpoint && this.hasher ? { key, endpoint, hasher: this.hasher, fetchImpl: this.http } : null;
+  /// How Shield is asked: {endpoint, username, password, fetchImpl}, or
+  /// null without its credentials and address.
+  get shield() {
+    const { OH_ARACHNID_ENDPOINT: endpoint, OH_ARACHNID_USERNAME: username, OH_ARACHNID_PASSWORD: password } = this.env;
+    return endpoint && username && password ? { endpoint, username, password, fetchImpl: this.http } : null;
   }
 
-  /// Why PhotoDNA is not asked although its key is set, or null.
-  get photoDnaMissing() {
-    if (!this.env.OH_PHOTODNA_KEY) return null;
-    if (!this.env.OH_PHOTODNA_ENDPOINT) return 'OH_PHOTODNA_KEY is set but photodna.endpoint in config/openhearts.json is not, so no picture is checked';
-    if (!this.hasher) return 'OH_PHOTODNA_KEY is set but the relay was deployed without the PhotoDNA module, so no picture is checked (docs/how-to/update-the-photodna-module.md)';
+  /// Why Shield is not asked although its username is set, or null.
+  get shieldMissing() {
+    if (!this.env.OH_ARACHNID_USERNAME) return null;
+    if (!this.env.OH_ARACHNID_PASSWORD) return 'OH_ARACHNID_USERNAME is set but OH_ARACHNID_PASSWORD is not, so no picture is checked';
+    if (!this.env.OH_ARACHNID_ENDPOINT) return 'OH_ARACHNID_USERNAME is set but arachnid.endpoint in config/openhearts.json is not, so no picture is checked';
     return null;
   }
 
@@ -231,7 +256,7 @@ export class KnownPictures {
       try {
         return Response.json({ said: await this.check(asked) });
       } catch (e) {
-        // Let through, as when PhotoDNA does not answer.
+        // Let through, as when Shield does not answer.
         await this.problem('error', e);
         return Response.json({ said: 'failed' });
       }
@@ -260,17 +285,17 @@ export class KnownPictures {
     }
   }
 
-  /// What PhotoDNA says of the picture [jpeg] (base64) an [account] set,
+  /// What Shield says of the picture [jpeg] (base64) an [account] set,
   /// from its device [key] (null for the daily run's asking again):
-  /// 'clear', 'match', 'failed', 'unreadable' (it cannot be decoded or
-  /// hashed, so it cannot be asked about) or 'off'. Asked of PhotoDNA
-  /// once, and a picture found unreadable never again; a match
-  /// is acted on for each account that sets it, [shown] when others may
-  /// have seen it, as when it was set before PhotoDNA had said, [at]
-  /// (ISO) then.
+  /// 'clear', 'match', 'harmful', 'failed', 'unreadable' (it cannot be
+  /// decoded, so it cannot be asked about) or 'off'. Asked of Shield
+  /// once, and a picture found unreadable never again; a match, or a
+  /// harmful one, is acted on for each account that sets it, [shown]
+  /// when others may have seen it, as when it was set before Shield had
+  /// said, [at] (ISO) then.
   async check({ jpeg, account = null, key = null, shown = false, at = null }) {
-    if (!this.photoDna) {
-      const missing = this.photoDnaMissing;
+    if (!this.shield) {
+      const missing = this.shieldMissing;
       if (missing) await this.problem('config', missing);
       return 'off';
     }
@@ -278,31 +303,31 @@ export class KnownPictures {
     if (!digest) return 'off';
     const known = await this.storage.get(`pic:${digest}`);
     if (known?.said === 'clear' || known?.said === 'unreadable') return known.said;
-    if (known?.said === 'match') {
-      await this.open({ digest, jpeg, account, key, shown, at });
-      return 'match';
+    if (known?.said === 'match' || known?.said === 'harmful') {
+      await this.open({ digest, jpeg, account, key, shown, at, harmful: known.said === 'harmful' });
+      return known.said;
     }
-    let match;
+    let said;
     try {
-      match = await this.asked(digest, jpeg);
+      said = await this.asked(digest, jpeg);
     } catch (e) {
       if (e instanceof Unreadable) {
         await this.decided(digest, 'unreadable');
         return 'unreadable';
       }
-      await this.problem('photodna', `a picture was let through unchecked, to be asked about again: ${e.message}`);
+      await this.problem('shield', `a picture was let through unchecked, to be asked about again: ${e.message}`);
       await this.notAnswered(digest, jpeg, account, key, at);
       return 'failed';
     }
-    await this.decided(digest, match ? 'match' : 'clear');
-    if (match) {
-      // A picture let through before, while PhotoDNA did not answer, was
+    await this.decided(digest, said);
+    if (said !== 'clear') {
+      // A picture let through before, while Shield did not answer, was
       // shown: its accounts are acted on as the retry finds them.
       const waiting = await this.storage.get(`retry:${digest}`);
-      if (waiting) await this.matchedLate(digest, waiting, account);
-      await this.open({ digest, jpeg, account, key, shown, at });
+      if (waiting) await this.matchedLate(digest, waiting, account, said === 'harmful');
+      await this.open({ digest, jpeg, account, key, shown, at, harmful: said === 'harmful' });
     }
-    return match ? 'match' : 'clear';
+    return said;
   }
 
   /// The report the operator's tool wrote ([asked], its row and [id],
@@ -360,15 +385,26 @@ export class KnownPictures {
     return null;
   }
 
-  /// Whether PhotoDNA matches the picture [jpeg] (base64), [digest]: a
-  /// match with Microsoft's test pictures only is none, and logged.
+  /// What Shield says of the picture [jpeg] (base64), [digest]: 'match'
+  /// (known child sexual abuse material), 'harmful' (a harmful or
+  /// abusive image of a child) or 'clear'. A picture too featureless to
+  /// match (arachnid.mjs, MIN_QUALITY) is not asked about, and clear; a
+  /// match with Shield's test pictures is none, and logged. Unreadable
+  /// for a picture that cannot be decoded; ShieldFailed when Shield does
+  /// not answer.
   async asked(digest, jpeg) {
-    const { match, test } = await photoDnaMatch(bytesOf(jpeg), this.photoDna);
-    if (test && !match) this.log(`known pictures: ${digest} matched only Microsoft's test pictures, and nobody is acted on for it`);
-    return match;
+    const { hash, quality } = this.hasher(bytesOf(jpeg));
+    if (quality < MIN_QUALITY) {
+      this.log(`known pictures: ${digest} is too featureless to match (quality ${quality}), and is not asked about`);
+      return 'clear';
+    }
+    const said = await shieldSays(hash, this.shield);
+    if (said === TEST) this.log(`known pictures: ${digest} matched Arachnid Shield's test pictures, and nobody is acted on for it`);
+    return said === CSAM ? 'match' : said === HARMFUL ? 'harmful' : 'clear';
   }
 
-  /// What PhotoDNA said of [digest]: 'match', 'clear' or 'unreadable'.
+  /// What Shield said of [digest]: 'match', 'harmful', 'clear' or
+  /// 'unreadable'.
   async decided(digest, said) {
     await this.storage.put(`pic:${digest}`, { said, at: new Date(this.now()).toISOString() });
   }
@@ -387,12 +423,13 @@ export class KnownPictures {
     await this.wakeBy(next);
   }
 
-  /// A picture PhotoDNA matched after it was let through: every account
-  /// that set it, as noted here and as each has a copy of it
-  /// (profile_pictures.mjs), acted on, and each copy taken down. [asking] is the account whose setting it found the
-  /// match, which is acted on as it asks; when nobody is known at all,
-  /// the match is acted on without an account.
-  async matchedLate(digest, waiting, asking = null) {
+  /// A picture Shield matched after it was let through, or knows as
+  /// [harmful]: every account that set it, as noted here and as each has
+  /// a copy of it (profile_pictures.mjs), acted on, and each copy taken
+  /// down. [asking] is the account whose setting it found the match,
+  /// which is acted on as it asks; when nobody is known at all, the
+  /// match is acted on without an account.
+  async matchedLate(digest, waiting, asking = null, harmful = false) {
     const seen = [...waiting.seen];
     if (this.env.OH_PICTURES) {
       for (const account of await accountsWith(r2Objects(this.env.OH_PICTURES), digest)) {
@@ -400,14 +437,16 @@ export class KnownPictures {
       }
     }
     if (!seen.length && !asking) seen.push({ account: null, key: null });
-    for (const { account, key } of seen) await this.open({ digest, jpeg: waiting.jpeg, account, key, shown: true, at: waiting.at ?? null });
+    for (const { account, key } of seen) await this.open({ digest, jpeg: waiting.jpeg, account, key, shown: true, at: waiting.at ?? null, harmful });
     await this.storage.delete(`retry:${digest}`);
   }
 
   /// A case opened for [account]'s use of a matched picture, once, set
   /// at [at] (ISO; now, unless it is known to be earlier): [viewed] when
-  /// the operator found it and looked at it, saying [how].
-  async open({ digest, jpeg, account, key, shown, at = null, viewed = false, how = null }) {
+  /// the operator found it and looked at it, saying [how]; [harmful] for
+  /// one Shield knows as harmful, which is withheld and told of, and
+  /// whose picture is not kept here.
+  async open({ digest, jpeg, account, key, shown, at = null, viewed = false, how = null, harmful = false }) {
     const id = `case:${digest}:${account ?? 'none'}`;
     if (await this.storage.get(id)) return;
     const store = storeOf(this.env);
@@ -415,7 +454,7 @@ export class KnownPictures {
     // changes the account.
     const name = account && store ? (await store.get(`ACCOUNT#${account}`, 'PROFILE'))?.name ?? null : null;
     const when = typeof at === 'string' && Date.parse(at) <= this.now() ? at : new Date(this.now()).toISOString();
-    await this.storage.put(id, { digest, account, key, name, jpeg, at: when, shown, ...(viewed ? { viewed, how } : {}), done: {}, failed: {}, tries: 0, told: '' });
+    await this.storage.put(id, { digest, account, key, name, ...(harmful ? { harmful } : { jpeg }), at: when, shown, ...(viewed ? { viewed, how } : {}), done: {}, failed: {}, tries: 0, told: '' });
     await this.wakeBy(this.now());
   }
 
@@ -425,37 +464,37 @@ export class KnownPictures {
     if (set === null || set > at) await this.storage.setAlarm(at);
   }
 
-  /// Everything still to do: pictures PhotoDNA has not answered for
-  /// asked about again, and each open case's steps tried; the alarm set
-  /// for whatever is left.
+  /// Everything still to do: pictures Shield has not answered for asked
+  /// about again, and each open case's steps tried; the alarm set for
+  /// whatever is left.
   async work() {
     let next = null;
     const later = (at) => (next = next === null ? at : Math.min(next, at));
-    if (this.photoDna) {
+    if (this.shield) {
       for (const [id, waiting] of await this.storage.list({ prefix: 'retry:' })) {
         if (waiting.next > this.now()) {
           later(waiting.next);
           continue;
         }
         const digest = id.slice('retry:'.length);
-        let match;
+        let said;
         try {
-          match = await this.asked(digest, waiting.jpeg);
+          said = await this.asked(digest, waiting.jpeg);
         } catch (e) {
           if (e instanceof Unreadable) {
             await this.decided(digest, 'unreadable');
             await this.storage.delete(id);
             continue;
           }
-          await this.problem('photodna', `a picture let through earlier is still unchecked: ${e.message}`);
+          await this.problem('shield', `a picture let through earlier is still unchecked: ${e.message}`);
           const tries = waiting.tries + 1;
           await this.storage.put(id, { ...waiting, tries, next: this.now() + retryAfter(tries) });
           later(this.now() + retryAfter(tries));
           continue;
         }
-        await this.decided(digest, match ? 'match' : 'clear');
-        if (match) await this.matchedLate(digest, waiting);
-        else await this.storage.delete(id);
+        await this.decided(digest, said);
+        if (said === 'clear') await this.storage.delete(id);
+        else await this.matchedLate(digest, waiting, null, said === 'harmful');
       }
     }
     for (const [id, c] of await this.storage.list({ prefix: 'case:' })) {
@@ -492,7 +531,7 @@ export class KnownPictures {
       // No picture it set before becomes its picture now as it goes.
       if (c.account && env.OH_PICTURES) await deleteCopy(env.OH_PICTURES, c.account, c.digest);
     });
-    if (c.account) {
+    if (c.account && !c.harmful) {
       await attempt('held', async () => {
         if (!store || !env.OH_RECORDS) throw new Error('no store or OH_RECORDS');
         await hold(store, c.account, { now });
@@ -508,7 +547,7 @@ export class KnownPictures {
         if (r?.status !== 200) throw new Error(`the service said ${r?.status ?? 'nothing'}${r?.body?.error ? `: ${r.body.error}` : ''}`);
       });
     }
-    if (ncmec) {
+    if (ncmec && !c.harmful) {
       await attempt('reported', async () => {
         const fileName = `${c.digest}.jpg`;
         const report = reportXml({
@@ -552,9 +591,10 @@ export class KnownPictures {
       }
     }
     // Done when every step is: the report too, unless only the operator
-    // can file it (no credentials, or only the test service).
-    const reported = !!c.done.reported && !c.test;
-    c.closed = !!c.done.hidden && (!c.account || (!!c.done.held && !!c.done.ended)) && reported && (c.told === told || !canTell);
+    // can file it (no credentials, or only the test service). A harmful
+    // picture's only step is withholding it.
+    const reported = c.harmful || (!!c.done.reported && !c.test);
+    c.closed = !!c.done.hidden && (c.harmful || !c.account || (!!c.done.held && !!c.done.ended)) && reported && (c.told === told || !canTell);
     // The picture is kept here only while a step still needs it.
     if (c.closed || (c.done.held && c.done.reported)) delete c.jpeg;
     const after = { ...c, retry };

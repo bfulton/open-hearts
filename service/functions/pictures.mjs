@@ -23,7 +23,7 @@ export const PICTURES_ROW = ['config', 'pictures'];
 /// account and picture, `account/<account>/<digest>.jpg`, the picture's
 /// bytes, and in its metadata all that is known of it: when the account
 /// first set it (`at`), when it last did (`last`), what the model made
-/// of it (`check`), what PhotoDNA said (`known`), when the operator was
+/// of it (`check`), what Arachnid Shield said (`known`), when the operator was
 /// emailed it (`told`), and, once it is no longer the account's picture,
 /// since when (`ended`). The account's picture now is the one it set
 /// last, unless that one says it has ended: the account took it off, or

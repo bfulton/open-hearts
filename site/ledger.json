@@ -61,6 +61,19 @@
         "de": "Jedes Bild, das dein Konto wählt, wird geprüft, und wir bewahren eine Kopie bis ein Jahr, nachdem es nicht mehr deins ist; eines, das gegen die Regeln zu verstoßen scheint, wird verborgen. Meldungen kommen per E-Mail. Du kannst Spieler blockieren und dein Konto löschen.",
         "fr": "Chaque image que choisit votre compte est vérifiée, et nous en gardons une copie jusqu'à un an après qu'elle n'est plus la vôtre ; celle qui semble enfreindre les règles est masquée. Les signalements arrivent par e-mail. Vous pouvez bloquer des joueurs et supprimer votre compte."
       }
+    },
+    {
+      "date": "2026-10-22",
+      "fingerprint": "9d724cc9e7fe90a01bf0f41112a4d5a9de2c0544af82370acb3727baf3cc094b",
+      "change": "material",
+      "storesNotified": null,
+      "summary": {
+        "en": "Each new picture is checked against known images of child abuse by Project Arachnid, run by the Canadian Centre for Child Protection, which is sent only a fingerprint of the picture, never the picture itself.",
+        "es": "Cada imagen nueva se compara con imágenes conocidas de abuso infantil mediante Project Arachnid, del Canadian Centre for Child Protection, al que solo se envía una huella de la imagen, nunca la imagen.",
+        "pt": "Cada imagem nova é comparada com imagens conhecidas de abuso infantil pelo Project Arachnid, do Canadian Centre for Child Protection, que recebe só uma impressão digital da imagem, nunca a imagem.",
+        "de": "Jedes neue Bild wird vom Project Arachnid des Canadian Centre for Child Protection mit bekannten Bildern von Kindesmissbrauch abgeglichen; es erhält nur einen Fingerabdruck des Bildes, nie das Bild selbst.",
+        "fr": "Chaque nouvelle image est comparée à des images connues d'abus sur des enfants par Project Arachnid, du Centre canadien de protection de l'enfance, qui ne reçoit qu'une empreinte de l'image, jamais l'image elle-même."
+      }
     }
   ]
 }

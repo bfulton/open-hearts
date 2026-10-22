@@ -2,8 +2,8 @@
 // (https://report.cybertip.org/ispws/documentation/): the report opened
 // with what happened and who did it, the picture uploaded and described,
 // and the report finished, after which nothing can be added to it or
-// taken back. Filed by service/do/known.mjs when PhotoDNA matches a
-// picture an account set (docs/how-to/handle-abuse-material.md).
+// taken back. Filed by service/do/known.mjs when Arachnid Shield
+// matches a picture an account set (docs/how-to/handle-abuse-material.md).
 //
 // The service's answers are XML, a few known elements deep, so they are
 // read by element name; Workers have no XML parser.
@@ -37,8 +37,8 @@ const schema = 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noName
 /// ({firstName, lastName, email}), and the account by its number, the
 /// name it played under ([name], or none), the device that put the
 /// picture out ([device]), how it was found ([found], a sentence: by
-/// PhotoDNA unless said) and what was done ([done], a sentence).
-export function reportXml({ at, reporter, account, name = null, device = null, found = 'Matched by Microsoft PhotoDNA against known images as it was set as a profile picture.', done }) {
+/// Arachnid Shield unless said) and what was done ([done], a sentence).
+export function reportXml({ at, reporter, account, name = null, device = null, found = "Matched by its PDQ hash against known images by the Canadian Centre for Child Protection's Arachnid Shield as it was set as a profile picture.", done }) {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<report ${schema}>`,

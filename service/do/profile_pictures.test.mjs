@@ -1,5 +1,5 @@
 // An account's pictures (profile_pictures.mjs): each checked as the
-// account sets it — PhotoDNA through the one object, and the model —
+// account sets it — Shield through the one object, and the model —
 // kept as the account's own copy, with all that is known of it, set
 // last, which makes it its picture now, and the one before no longer; a
 // match never kept; and the relay carrying an account's picture now and
@@ -18,7 +18,7 @@ import { memoryStore } from '../functions/rows.mjs';
 const keyOf = async (account, n) => `account/${account}/${await pictureDigest(jpeg(n))}.jpg`;
 const iso = (t) => new Date(t).toISOString();
 
-/// The account's pictures over a fresh bucket and store, PhotoDNA
+/// The account's pictures over a fresh bucket and store, Shield
 /// answering [said] (a function of the picture, or a word), the model
 /// [ai], and what was asked, logged and alerted kept.
 function setUp({ said = 'clear', ai = fakeAi(() => harmless), env = {}, start = Date.UTC(2026, 9, 20) } = {}) {
@@ -203,7 +203,7 @@ test("a match is never kept: neither it nor the one before is the account's, and
   assert.equal((await s.meta(ADA, 1)).ended, iso(s.t.now));
   assert.equal(s.ai.calls.length, 1, 'the model never shown it');
 
-  // One kept while PhotoDNA had not said, and set again once it has
+  // One kept while Shield had not said, and set again once it has
   // matched: asked about as one shown since it was first set, and no
   // longer the account's.
   const first = s.t.now;
@@ -217,18 +217,20 @@ test("a match is never kept: neither it nor the one before is the account's, and
   assert.equal((await s.meta(BAO, 8)).ended, iso(s.t.now));
 });
 
-test('a picture that cannot be read is never kept either, nor the one before it', async () => {
-  const s = setUp({ said: (p) => (p === jpeg(9) ? 'unreadable' : 'clear') });
-  await s.pictures.set({ account: ADA, key: KEY, picture: jpeg(1) });
-  s.t.now += 1000;
-  assert.equal(await s.pictures.set({ account: ADA, key: KEY, picture: jpeg(9) }), null);
-  assert.ok(!s.b.objects.has(await keyOf(ADA, 9)));
-  assert.equal((await s.meta(ADA, 1)).ended, iso(s.t.now));
-  assert.equal(s.ai.calls.length, 1, 'the model never shown it');
-  assert.deepEqual(s.alerts, []);
+test('a picture that cannot be read, or that Shield knows as harmful, is never kept either, nor the one before it', async () => {
+  for (const said of ['unreadable', 'harmful']) {
+    const s = setUp({ said: (p) => (p === jpeg(9) ? said : 'clear') });
+    await s.pictures.set({ account: ADA, key: KEY, picture: jpeg(1) });
+    s.t.now += 1000;
+    assert.equal(await s.pictures.set({ account: ADA, key: KEY, picture: jpeg(9) }), null, said);
+    assert.ok(!s.b.objects.has(await keyOf(ADA, 9)), said);
+    assert.equal((await s.meta(ADA, 1)).ended, iso(s.t.now), said);
+    assert.equal(s.ai.calls.length, 1, `${said}: the model never shown it`);
+    assert.deepEqual(s.alerts, [], said);
+  }
 });
 
-test('PhotoDNA without its key, not answering, or out of reach: the picture is kept, its copy says so, and the operator is told of the object out of reach', async () => {
+test('Shield without its key, not answering, or out of reach: the picture is kept, its copy says so, and the operator is told of the object out of reach', async () => {
   for (const [said, known] of [[null, 'off'], ['off', 'off'], ['failed', 'failed']]) {
     const s = setUp({ said });
     assert.equal(await s.pictures.set({ account: ADA, key: KEY, picture: jpeg(1) }), jpeg(1));
@@ -244,7 +246,7 @@ test('PhotoDNA without its key, not answering, or out of reach: the picture is k
   assert.ok(!(await s.meta(ADA, 1)).ended, 'hers all the same');
 });
 
-test('what PhotoDNA cleared stays cleared on the copy, once it has said so', async () => {
+test('what Shield cleared stays cleared on the copy, once it has said so', async () => {
   let said = 'off';
   const s = setUp({ said: () => said });
   await s.pictures.set({ account: ADA, picture: jpeg(1) });
@@ -258,7 +260,7 @@ test('what PhotoDNA cleared stays cleared on the copy, once it has said so', asy
   said = 'off';
   await s.pictures.set({ account: ADA, picture: jpeg(1) });
   assert.equal((await s.meta(ADA, 1)).known, 'clear', 'never taken back');
-  // Nor as she sets it again after another, while PhotoDNA has no key.
+  // Nor as she sets it again after another, while Shield has no key.
   await s.pictures.set({ account: ADA, picture: jpeg(2) });
   await s.pictures.set({ account: ADA, picture: jpeg(1) });
   assert.ok(!(await s.meta(ADA, 1)).ended);

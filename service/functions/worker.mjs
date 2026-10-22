@@ -324,8 +324,8 @@ async function checkoutRoute(request, env) {
 /// (suspension.mjs), or, for a notice of a change to the terms, here
 /// (notices.mjs): `{order}`, the id the operator's tool wrote it under.
 /// The order is read here first, so a request that names none wakes no
-/// account's object. A termination the relay orders when PhotoDNA
-/// matches a picture (service/do/known.mjs) says `endWeb`: once the
+/// account's object. A termination the relay orders when Arachnid
+/// Shield matches a picture (service/do/known.mjs) says `endWeb`: once the
 /// account is ended, so is each of its web subscriptions in Stripe,
 /// with nothing refunded, as for any serious breach. Stripe not
 /// answering is a 502, and the relay orders it again.

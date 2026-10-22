@@ -1,4 +1,4 @@
-// A picture's pixels for its PhotoDNA hash (jpeg.mjs): a JPEG as the
+// A picture's pixels for its PDQ hash (jpeg.mjs): a JPEG as the
 // app makes them decoded to plain RGB, and anything else, or anything
 // too large, Unreadable.
 //

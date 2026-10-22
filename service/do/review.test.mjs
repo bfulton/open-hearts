@@ -4,7 +4,7 @@
 // say is still to do — holds each account's copies to the order it set
 // them in, keeps each for a year after it stops being its account's and
 // no longer, asks
-// PhotoDNA again about what it has not cleared, keeps hidden what the
+// Arachnid Shield again about what it has not cleared, keeps hidden what the
 // check found should be, and emails the operator, account by account,
 // every picture each set since the last — the ones it has since replaced
 // too — with what the check made of each, and the commands that take
@@ -287,7 +287,7 @@ test("review: each account's copies are held to the order it set them in, whatev
   assert.ok(!(await v.meta(CY, 3)).ended);
 });
 
-test('review: a copy PhotoDNA cannot be asked about, not decoding, is said to be, hidden, emailed as that, and not asked about again', async () => {
+test('review: a copy Arachnid Shield cannot be asked about, not decoding, is said to be, hidden, emailed as that, and not asked about again', async () => {
   const s = setUp({ ask: async () => 'off' });
   await s.set(ADA, 1);
   await s.set(BAO, 2);
@@ -300,14 +300,14 @@ test('review: a copy PhotoDNA cannot be asked about, not decoding, is said to be
   const withheld = await withheldIn(s.store, s.t.now);
   assert.ok(withheld.has(await digestOf(1)));
   assert.ok(!withheld.has(await digestOf(2)));
-  assert.match(sent[0].text, /hidden: it could not be decoded, so PhotoDNA could not be asked about it/);
+  assert.match(sent[0].text, /hidden: it could not be decoded, so Arachnid Shield could not be asked about it/);
   assert.equal(sent[0].text.match(/could not be decoded/g).length, 1, 'only for that one');
   s.t.now += DAY;
   assert.equal((await s.run([], { ask })).asked, 0);
   assert.ok((await withheldIn(s.store, s.t.now)).has(await digestOf(1)), 'hidden still');
 });
 
-test("review: PhotoDNA is asked again about each copy it has not cleared, for its account, whether or not the account still has it; a match is no longer theirs, from when it stopped being so, and never emailed", async () => {
+test("review: Arachnid Shield is asked again about each copy it has not cleared, for its account, whether or not the account still has it; a match is no longer theirs, from when it stopped being so, and never emailed", async () => {
   const s = setUp({ ask: async () => 'off' });
   await s.set(ADA, 1);
   await s.set(BAO, 1);
@@ -358,14 +358,19 @@ test("review: PhotoDNA is asked again about each copy it has not cleared, for it
   // A match the object has not yet deleted is no longer theirs, and
   // one no longer theirs keeps since when, so that its year is not
   // begun again.
-  const m = setUp({ ask: async () => 'off' });
-  await m.set(ADA, 5);
-  await m.set(ADA, 6);
-  const had = (await m.meta(ADA, 5)).ended;
-  m.t.now += DAY;
-  await m.run([], { ask: async () => 'match' });
-  assert.equal((await m.meta(ADA, 5)).ended, had);
-  assert.equal((await m.meta(ADA, 6)).ended, iso(m.t.now));
+  // So is one Shield knows as harmful, and neither is emailed.
+  for (const said of ['match', 'harmful']) {
+    const m = setUp({ ask: async () => 'off' });
+    await m.set(ADA, 5);
+    await m.set(ADA, 6);
+    const had = (await m.meta(ADA, 5)).ended;
+    m.t.now += DAY;
+    const mails = [];
+    assert.deepEqual(await m.run(mails, { ask: async () => said }), { deleted: 0, asked: 2, sent: 0, more: 0 }, said);
+    assert.equal((await m.meta(ADA, 5)).ended, had, said);
+    assert.equal((await m.meta(ADA, 6)).ended, iso(m.t.now), said);
+    assert.deepEqual(mails, [], said);
+  }
 
   // Without its key, not answering, or out of reach: tried tomorrow.
   for (const said of ['off', 'failed', new Error('said 503')]) {

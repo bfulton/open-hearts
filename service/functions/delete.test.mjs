@@ -217,7 +217,7 @@ test('a kept game that would not be written back keeps the name, the operator is
   assert.equal(await store.get(`ACCOUNT#${account}`, 'META'), null, 'and the account is gone');
 });
 
-/// An order as the relay writes one when PhotoDNA matches a picture
+/// An order as the relay writes one when Arachnid Shield matches a picture
 /// (service/do/known.mjs), asked of the service.
 async function ordered(t, order) {
   const id = 'e'.repeat(32);
@@ -225,7 +225,7 @@ async function ordered(t, order) {
   return worker.fetch(new Request(`${origin}/api/order`, { method: 'POST', body: JSON.stringify({ order: id }) }), t.env);
 }
 
-test("a termination the relay orders on a PhotoDNA match ends the account, and its web subscription in Stripe with nothing refunded; one without the word leaves Stripe alone", async (t) => {
+test("a termination the relay orders on a Arachnid Shield match ends the account, and its web subscription in Stripe with nothing refunded; one without the word leaves Stripe alone", async (t) => {
   const s = await subscribed();
   const stripe = stripeAt(t);
   const res = await ordered(s, { account: s.account, act: 'terminate', at: new Date().toISOString(), endWeb: true });

@@ -163,7 +163,7 @@ export function alertPicturesProblem(env, store, { error, now = Date.now() }) {
     what: 'run',
     subject: 'Open Hearts: the daily run over the pictures failed',
     about:
-      "Each picture an account sets is kept apart for a year after it stops being the account's, then deleted, as the privacy policy says. The daily run deletes it, asks PhotoDNA again about any it has not cleared, hides any the check found should be hidden, and emails you the new ones. It runs again tomorrow; the relay worker's logs say more.",
+      "Each picture an account sets is kept apart for a year after it stops being the account's, then deleted, as the privacy policy says. The daily run deletes it, asks Arachnid Shield again about any it has not cleared, hides any the check found should be hidden, and emails you the new ones. It runs again tomorrow; the relay worker's logs say more.",
     error,
     now,
   });

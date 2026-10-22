@@ -7,4 +7,4 @@ The package is under the BSD 3-Clause licence in `LICENSE`; the decoder
 itself carries the Apache License 2.0 notice at its top.
 
 The relay worker decodes each new profile picture with it before the
-picture's PhotoDNA hash is made (`service/do/jpeg.mjs`).
+picture's PDQ hash is made (`service/do/jpeg.mjs`).
