@@ -70,7 +70,7 @@ its own licence beside it:
   (`service/do/pdq.LICENSE.txt`).
 - **New Relic's browser agent** (`app/web/observability.js`): its loader,
   as New Relic serves it, on play.openhearts.game only. Apache-2.0
-  (`app/web/nr-loader-full-1.323.0.min.js.LICENSE.txt`).
+  (`app/web/nr-loader-full-1.324.0.min.js.LICENSE.txt`).
 - **The name filter's word lists** (`third_party/ldnoobw/`): the
   English, Spanish, Portuguese, German and French lists from the List
   of Dirty, Naughty, Obscene, and Otherwise Bad Words, by Shutterstock
